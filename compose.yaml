@@ -1,0 +1,45 @@
+name: aiosources
+
+services:
+  postgres:
+    image: postgres:18.6@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ingest}
+      POSTGRES_USER: ${POSTGRES_USER:-ingest}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 1m
+    restart: unless-stopped
+
+  aiosources:
+    image: ${AIOSOURCES_IMAGE:-aiosources:local}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ingest}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-ingest}
+      BIND: 0.0.0.0:7000
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${PORT:-7000}:7000"
+    volumes:
+      - state:/data
+    tmpfs:
+      - /var/lib/postgresql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 45s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: ${POSTGRES_VOLUME:-aiosources_v2_postgres_data}
+  state:
+    name: ${STATE_VOLUME:-aiosources_v2_state}

@@ -1,0 +1,1458 @@
+{
+  "reference": "Earlier mapping and file-selection behavior; synthetic source data",
+  "languages": [
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "fr"
+      ],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "fra"
+      ],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "fre"
+      ],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "french"
+      ],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "en"
+      ],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "eng"
+      ],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "english"
+      ],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "es"
+      ],
+      "flags": [
+        "🇪🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "spa"
+      ],
+      "flags": [
+        "🇪🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "spanish"
+      ],
+      "flags": [
+        "🇪🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "de"
+      ],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ger"
+      ],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "deu"
+      ],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "german"
+      ],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "deutsch"
+      ],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "it"
+      ],
+      "flags": [
+        "🇮🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ita"
+      ],
+      "flags": [
+        "🇮🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "italian"
+      ],
+      "flags": [
+        "🇮🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "pt"
+      ],
+      "flags": [
+        "🇵🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "por"
+      ],
+      "flags": [
+        "🇵🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "portuguese"
+      ],
+      "flags": [
+        "🇵🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "nl"
+      ],
+      "flags": [
+        "🇳🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "dut"
+      ],
+      "flags": [
+        "🇳🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "nld"
+      ],
+      "flags": [
+        "🇳🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "dutch"
+      ],
+      "flags": [
+        "🇳🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ru"
+      ],
+      "flags": [
+        "🇷🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "rus"
+      ],
+      "flags": [
+        "🇷🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "russian"
+      ],
+      "flags": [
+        "🇷🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ja"
+      ],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "jpn"
+      ],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "japanese"
+      ],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ko"
+      ],
+      "flags": [
+        "🇰🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "kor"
+      ],
+      "flags": [
+        "🇰🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "korean"
+      ],
+      "flags": [
+        "🇰🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "zh"
+      ],
+      "flags": [
+        "🇨🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "zho"
+      ],
+      "flags": [
+        "🇨🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "chi"
+      ],
+      "flags": [
+        "🇨🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "chinese"
+      ],
+      "flags": [
+        "🇨🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hi"
+      ],
+      "flags": [
+        "🇮🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hin"
+      ],
+      "flags": [
+        "🇮🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hindi"
+      ],
+      "flags": [
+        "🇮🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ar"
+      ],
+      "flags": [
+        "🇸🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ara"
+      ],
+      "flags": [
+        "🇸🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "arabic"
+      ],
+      "flags": [
+        "🇸🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "pl"
+      ],
+      "flags": [
+        "🇵🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "pol"
+      ],
+      "flags": [
+        "🇵🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "polish"
+      ],
+      "flags": [
+        "🇵🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "tr"
+      ],
+      "flags": [
+        "🇹🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "tur"
+      ],
+      "flags": [
+        "🇹🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "turkish"
+      ],
+      "flags": [
+        "🇹🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "sv"
+      ],
+      "flags": [
+        "🇸🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "swe"
+      ],
+      "flags": [
+        "🇸🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "swedish"
+      ],
+      "flags": [
+        "🇸🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "no"
+      ],
+      "flags": [
+        "🇳🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "nor"
+      ],
+      "flags": [
+        "🇳🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "norwegian"
+      ],
+      "flags": [
+        "🇳🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "da"
+      ],
+      "flags": [
+        "🇩🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "dan"
+      ],
+      "flags": [
+        "🇩🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "danish"
+      ],
+      "flags": [
+        "🇩🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "fi"
+      ],
+      "flags": [
+        "🇫🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "fin"
+      ],
+      "flags": [
+        "🇫🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "finnish"
+      ],
+      "flags": [
+        "🇫🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "cs"
+      ],
+      "flags": [
+        "🇨🇿"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ces"
+      ],
+      "flags": [
+        "🇨🇿"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "cze"
+      ],
+      "flags": [
+        "🇨🇿"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "czech"
+      ],
+      "flags": [
+        "🇨🇿"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "sk"
+      ],
+      "flags": [
+        "🇸🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "slk"
+      ],
+      "flags": [
+        "🇸🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "slo"
+      ],
+      "flags": [
+        "🇸🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "slovak"
+      ],
+      "flags": [
+        "🇸🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hu"
+      ],
+      "flags": [
+        "🇭🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hun"
+      ],
+      "flags": [
+        "🇭🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hungarian"
+      ],
+      "flags": [
+        "🇭🇺"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ro"
+      ],
+      "flags": [
+        "🇷🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ron"
+      ],
+      "flags": [
+        "🇷🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "rum"
+      ],
+      "flags": [
+        "🇷🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "romanian"
+      ],
+      "flags": [
+        "🇷🇴"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "el"
+      ],
+      "flags": [
+        "🇬🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ell"
+      ],
+      "flags": [
+        "🇬🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "gre"
+      ],
+      "flags": [
+        "🇬🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "greek"
+      ],
+      "flags": [
+        "🇬🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "he"
+      ],
+      "flags": [
+        "🇮🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "heb"
+      ],
+      "flags": [
+        "🇮🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hebrew"
+      ],
+      "flags": [
+        "🇮🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "th"
+      ],
+      "flags": [
+        "🇹🇭"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "tha"
+      ],
+      "flags": [
+        "🇹🇭"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "thai"
+      ],
+      "flags": [
+        "🇹🇭"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "vi"
+      ],
+      "flags": [
+        "🇻🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "vie"
+      ],
+      "flags": [
+        "🇻🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "vietnamese"
+      ],
+      "flags": [
+        "🇻🇳"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "id"
+      ],
+      "flags": [
+        "🇮🇩"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ind"
+      ],
+      "flags": [
+        "🇮🇩"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "indonesian"
+      ],
+      "flags": [
+        "🇮🇩"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "uk"
+      ],
+      "flags": [
+        "🇺🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ukr"
+      ],
+      "flags": [
+        "🇺🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "ukrainian"
+      ],
+      "flags": [
+        "🇺🇦"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "bg"
+      ],
+      "flags": [
+        "🇧🇬"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "bul"
+      ],
+      "flags": [
+        "🇧🇬"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "bulgarian"
+      ],
+      "flags": [
+        "🇧🇬"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hr"
+      ],
+      "flags": [
+        "🇭🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "hrv"
+      ],
+      "flags": [
+        "🇭🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "croatian"
+      ],
+      "flags": [
+        "🇭🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "sr"
+      ],
+      "flags": [
+        "🇷🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "srp"
+      ],
+      "flags": [
+        "🇷🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "scc"
+      ],
+      "flags": [
+        "🇷🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "serbian"
+      ],
+      "flags": [
+        "🇷🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "sl"
+      ],
+      "flags": [
+        "🇸🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "slv"
+      ],
+      "flags": [
+        "🇸🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.1080p.WEB-DL",
+      "languages": [
+        "slovenian"
+      ],
+      "flags": [
+        "🇸🇮"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.FRENCH.1080p.WEB-DL",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.TRUEFRENCH.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.ENGLISH.1080p",
+      "languages": [],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.MULTI.1080p",
+      "languages": [],
+      "flags": []
+    },
+    {
+      "title": "Example.Movie.2021.MULTi.VFF.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.VOSTFR.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.DUAL-AUDIO.1080p",
+      "languages": [],
+      "flags": []
+    },
+    {
+      "title": "Example.Movie.2021.ITALIAN.1080p",
+      "languages": [],
+      "flags": [
+        "🇮🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.GERMAN.1080p",
+      "languages": [],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.JAPANESE.1080p",
+      "languages": [],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Frenchman.2021.1080p",
+      "languages": [],
+      "flags": []
+    },
+    {
+      "title": "Multiverse.2021.1080p",
+      "languages": [],
+      "flags": []
+    },
+    {
+      "title": "Example.Movie.2021.1080p",
+      "languages": [
+        " FRENCH ",
+        "fr",
+        "fre",
+        "ENGLISH",
+        "eng",
+        "unknown"
+      ],
+      "flags": [
+        "🇫🇷",
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.ENG.1080p",
+      "languages": [],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.EN.1080p",
+      "languages": [],
+      "flags": [
+        "🇬🇧"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.FRA.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.FRE.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.FR.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.ITA.1080p",
+      "languages": [],
+      "flags": [
+        "🇮🇹"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.JPN.1080p",
+      "languages": [],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.JA.1080p",
+      "languages": [],
+      "flags": [
+        "🇯🇵"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.GER.1080p",
+      "languages": [],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.DEU.1080p",
+      "languages": [],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.DE.1080p",
+      "languages": [],
+      "flags": [
+        "🇩🇪"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.SPA.1080p",
+      "languages": [],
+      "flags": [
+        "🇪🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.ES.1080p",
+      "languages": [],
+      "flags": [
+        "🇪🇸"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.VF.1080p",
+      "languages": [],
+      "flags": [
+        "🇫🇷"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.VO.1080p",
+      "languages": [],
+      "flags": []
+    },
+    {
+      "title": "Example.Movie.2021.DANISH.1080p",
+      "languages": [],
+      "flags": [
+        "🇩🇰"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.DUTCH.1080p",
+      "languages": [],
+      "flags": [
+        "🇳🇱"
+      ]
+    },
+    {
+      "title": "Example.Movie.2021.PORTUGUESE.1080p",
+      "languages": [],
+      "flags": [
+        "🇵🇹"
+      ]
+    }
+  ],
+  "episodes": [
+    {
+      "title": "Example.Series.2021.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.S01.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.S01E02.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.S02E02.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Series.S01E03.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Series.2021.1080p",
+      "season": 1,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.2021.1080p",
+      "season": 1,
+      "episode": 2,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.2021.1080p",
+      "season": 2,
+      "episode": 2,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Series.2021.1080p",
+      "season": 1,
+      "episode": 3,
+      "requested_season": 1,
+      "requested_episode": 2,
+      "media_type": "series",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Series.S01E02-E03.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 1,
+      "requested_episode": 3,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.S01-S03.COMPLETE.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 2,
+      "requested_episode": 4,
+      "media_type": "series",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Series.S01-S03.COMPLETE.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": 4,
+      "requested_episode": 4,
+      "media_type": "series",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Anime - 03.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Anime - 04.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": true,
+      "expected": false,
+      "improvement": "Known wrong absolute episode is rejected even when the v1 parser missed its number."
+    },
+    {
+      "title": "Example.Anime.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Anime.1080p",
+      "season": null,
+      "episode": 3,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": true,
+      "expected": true
+    },
+    {
+      "title": "Example.Anime.1080p",
+      "season": null,
+      "episode": 4,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": false,
+      "expected": false
+    },
+    {
+      "title": "Example.Anime.S01.COMPLETE.1080p",
+      "season": null,
+      "episode": null,
+      "requested_season": null,
+      "requested_episode": 3,
+      "media_type": "anime",
+      "eligible": true,
+      "expected": true
+    }
+  ],
+  "files": [
+    {
+      "names": [
+        "Example.S01E02.mkv",
+        "Example.S01E03.mkv"
+      ],
+      "season": 1,
+      "episode": 2,
+      "selected": "Example.S01E02.mkv",
+      "expected": "Example.S01E02.mkv"
+    },
+    {
+      "names": [
+        "Example.S01E02.mkv",
+        "Duplicate.S01E02.mp4"
+      ],
+      "season": 1,
+      "episode": 2,
+      "selected": null,
+      "expected": ""
+    },
+    {
+      "names": [
+        "Example.S01E03.mkv",
+        "sample.S01E02.mkv"
+      ],
+      "season": 1,
+      "episode": 2,
+      "selected": null,
+      "expected": ""
+    },
+    {
+      "names": [
+        "Season 1/Example - 02.mkv",
+        "Season 1/Example - 03.mkv"
+      ],
+      "season": 1,
+      "episode": 2,
+      "selected": null,
+      "expected": "Season 1/Example - 02.mkv",
+      "improvement": "The parent folder supplies the season and exactly one file supplies the requested episode."
+    },
+    {
+      "names": [
+        "Example/Season.01/Example.E02.mkv",
+        "Example/Season.01/Example.E03.mkv"
+      ],
+      "season": 1,
+      "episode": 2,
+      "selected": null,
+      "expected": "Example/Season.01/Example.E02.mkv",
+      "improvement": "The parent folder supplies the season and exactly one file supplies the requested episode."
+    },
+    {
+      "names": [
+        "Example - 03.mkv",
+        "Example - 04.mkv"
+      ],
+      "season": null,
+      "episode": 3,
+      "selected": "Example - 03.mkv",
+      "expected": "Example - 03.mkv"
+    },
+    {
+      "names": [
+        "Example - 03.mkv",
+        "Duplicate - 03.mp4"
+      ],
+      "season": null,
+      "episode": 3,
+      "selected": null,
+      "expected": ""
+    }
+  ]
+}

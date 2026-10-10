@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "id": "private",
+  "name": "Private indexer",
+  "url": "https://indexer.example/",
+  "auth": {
+    "api_key_env": "TORZNAB_API_KEY"
+  },
+  "request_interval": "4s",
+  "page_size": 100,
+  "search": {
+    "categories": []
+  },
+  "output": {
+    "fields": [
+      "guid",
+      "title",
+      "size",
+      "info_hash",
+      "categories",
+      "seeders",
+      "attributes.imdbid"
+    ]
+  }
+}

@@ -1,0 +1,126 @@
+# AIOSources
+
+Your sources, one searchable catalog, ready for Stremio.
+
+AIOSources is a self-hosted application that organizes torrent metadata from your own sources, identifies films and series, and connects your catalog to Stremio or AIOStreams. Configure everything from a web interface and keep control of your accounts and data.
+
+## What you can do
+
+- **Manage your sources:** configure connections visually or import your own JSON definitions, preview results and schedule automatic imports.
+- **Search your catalog:** find partial titles, source identifiers or info hashes, and combine filters across sources.
+- **Identify films and series:** use TMDB information to verify IMDb, TMDB and TVDB identifiers, then review or correct uncertain results.
+- **Check availability:** connect AllDebrid or TorBox to see cached availability and prepare playback when you select a stream.
+- **Connect Stremio and AIOStreams:** install your private addon link and browse the results from your catalog.
+- **Share selected metadata:** create revocable, read-only catalog shares and import catalogs shared with you.
+- **Follow activity:** see source statistics, processing history, returned Stremio results, logs and storage usage.
+
+AIOSources ships with no configured sources or account credentials. Use sources you are authorized to access and content you are entitled to use and share. Example configurations use fictitious addresses.
+
+## Install with Docker Compose
+
+This HTTP example is for a trusted local network. Save the following as `compose.yaml`. Replace `XXX.XXX.XXX.XXX` with your server's IP address or domain, and `XXX` with a strong administrator password. Change the example database password in both `POSTGRES_PASSWORD` and `DATABASE_URL` before deployment.
+
+```yaml
+services:
+  aiosources_postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aiosources
+      POSTGRES_USER: aiosources
+      POSTGRES_PASSWORD: aiosources
+    volumes:
+      - aiosources_postgres_data:/var/lib/postgresql
+    networks:
+      - aiosources_postgres
+  aiosources:
+    depends_on:
+      - aiosources_postgres
+    image: codeberg.org/aiosources/aiosources:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://aiosources:aiosources@aiosources_postgres:5432/aiosources
+      PUBLIC_URL: http://XXX.XXX.XXX.XXX:7000 # Replace with your IP address or domain.
+      ADMIN_PASSWORD: XXX # Password for the administration interface.
+    volumes:
+      - aiosources_data:/data:rw
+    ports:
+      - 7000:7000
+    networks:
+      - aiosources # Also connect AIOStreams to this network.
+      - aiosources_postgres
+    dns:
+      - 1.1.1.1
+
+volumes:
+  aiosources_postgres_data:
+  aiosources_data:
+
+networks:
+  aiosources:
+  aiosources_postgres:
+```
+
+Start the application:
+
+```sh
+docker compose up -d
+```
+
+Open `http://YOUR_SERVER_IP:7000` and sign in with `ADMIN_PASSWORD`. For access over the internet, use an HTTPS reverse proxy, restrict access to the administration interface and set `PUBLIC_URL` to that external HTTPS address.
+
+Both Linux `amd64` and `arm64` images are available. If AIOStreams uses another Compose project, attach it to the same Docker network or use the externally reachable address.
+
+## Environment variables
+
+These are all application environment variables. The image supplies the defaults below; native installations use `.ingest`, `providers` and `127.0.0.1:8080` for the three path/listen settings. Add overrides to the application service's `environment` section or `env_file`.
+
+| Variable | Image default | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Required | PostgreSQL connection URL. |
+| `BIND` | `0.0.0.0:7000` | Address and port on which the application listens. |
+| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`. Setting this does not enable HTTPS; HTTPS is required for catalog sharing. |
+| `ADMIN_PASSWORD` | Generated when omitted | Administration password, 12–72 bytes. An omitted password is saved as `/data/admin-password`; it can be read locally with `/aiosource password`. |
+| `DATA_DIR` | `/data` | Private application state, including the encryption key. Preserve this storage when updating. |
+| `PROVIDERS_DIR` | `/data/providers` | Private JSON source definitions. |
+| `MASTER_KEY` | Generated `vault.key` in `DATA_DIR` | Optional existing 32-byte encryption key, encoded in base64 or hexadecimal. Never change the key of an existing installation. |
+
+TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets**. They have no dedicated deployment variables. Import concurrency defaults to **5**, and can be changed in Sources settings; existing saved limits are preserved.
+
+**Upgrading from prefixed variables:** remove `INGEST_` from the six old deployment variable names in your environment and Compose overrides before starting this image. Keep every value, path and volume unchanged. The application refuses obsolete names rather than silently generating a different password or encryption key. `DATABASE_URL` keeps its name. Compose-only options and development/test variables are listed in [Deployment and settings](docs/SETTINGS.md).
+
+## Set up your catalog
+
+1. Open **Sources → Settings → Add source**. Configure your authorized source or import its JSON definition. Add any required credential through the encrypted secret picker, save, then start a preview or import. Automatic timing belongs to that source's **Schedules** section.
+2. In **Metadata → Settings**, add your own [TMDB API read access token](https://www.themoviedb.org/settings/api). Information updates and torrent identification run automatically when enabled. Use **Identification** to review uncertain matches.
+3. Optionally add your AllDebrid or TorBox key in **Debrid → Settings**. AllDebrid availability checks can create temporary entries in your account; AIOSources only cleans up entries it has confirmed it created.
+4. In **Stremio → Settings**, copy your manifest URL into Stremio or AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
+
+Treat the manifest URL like a password: it grants access to your catalog and configured playback services. Replace its token in Stremio settings to revoke an old link. Use your service accounts according to their terms; a catalog or playback link does not grant rights to its content.
+
+Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
+
+## Update
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+Keep both data volumes. Interrupted collections resume from saved progress where their recovery policy allows it; deliberate manual stops remain under your control.
+
+## Help and contributions
+
+- [Source setup](docs/CONFIGURATION.md) and [complete configuration reference](docs/JSON_REFERENCE.md)
+- [Environment settings](docs/SETTINGS.md), [operations](docs/OPERATIONS.md) and [catalog sharing](docs/SHARING.md)
+- [Security and private vulnerability reporting](SECURITY.md)
+- [Contributing](CONTRIBUTING.md), [development](docs/DEVELOPMENT.md) and [verification](docs/VERIFICATION.md)
+- [Content rights, service terms and attribution](LEGAL.md)
+
+## License and acknowledgements
+
+AIOSources is available under the [MIT License](LICENSE). It builds on [Ingest](https://github.com/moodiness/ingest), including its Torznab SDK, with the original copyright and license notices preserved. Included libraries, icons and fonts retain their own licenses; see the [third-party notices](web/public/THIRD-PARTY-NOTICES.txt).
+
+Film and series information is supplied by [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Its API and data have separate [usage and attribution requirements](https://developer.themoviedb.org/docs/faq), including licensing for commercial use. TMDB attribution and licenses are also accessible from **About AIOSources** in the application.
+
+AIOSources is an independent project. Stremio, AIOStreams, AllDebrid, TorBox and TMDB names identify compatible services and do not imply affiliation or endorsement.

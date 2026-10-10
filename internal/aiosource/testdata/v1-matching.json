@@ -1,0 +1,5872 @@
+{
+  "matching": [
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            1
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            2
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            3
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            1,
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [],
+          "isSeasonPack": true
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ],
+        {
+          "tmdb": "999"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 1,
+          "episode": 1
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ],
+        {},
+        true
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2020,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2018,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Serial",
+          "normalized": "example serial",
+          "year": 2019,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Serial"
+            ],
+            "years": [
+              2018
+            ],
+            "seasonYears": {
+              "1": 2019
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            },
+            "episodeYears": {
+              "1:1": 2019,
+              "1:2": 2020,
+              "2:2": 2021
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "東京物語",
+          "normalized": "東京物語",
+          "year": 1953,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "東京物語"
+            ],
+            "years": [
+              1953
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {}
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "102"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1932,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Different Title"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "tvdb": "501"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {}
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "102"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1970,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Different Title"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Z",
+          "normalized": "z",
+          "year": 1969,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Z"
+            ],
+            "years": [
+              1969
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "tvdb": "501"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {}
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "102"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2010,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Different Title"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "9",
+          "normalized": "9",
+          "year": 2009,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "9"
+            ],
+            "years": [
+              2009
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "tvdb": "501"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {}
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "102"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1953,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Different Title"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "母",
+          "normalized": "母",
+          "year": 1952,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "母"
+            ],
+            "years": [
+              1952
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "tvdb": "501"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "3",
+            "workId": "3",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "M",
+          "normalized": "m",
+          "year": 1931,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "M"
+            ],
+            "years": [
+              1931
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        },
+        true
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "C++",
+          "normalized": "c",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "C#"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "C#",
+          "normalized": "c",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "C++"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "C",
+          "normalized": "c",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "C#"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "É",
+          "normalized": "e",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "É"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Amelie",
+          "normalized": "amelie",
+          "year": 2001,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Amélie",
+              "Le Fabuleux Destin d’Amélie Poulain"
+            ],
+            "years": [
+              2001
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "imdb": "tt9999999"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Amelie",
+          "normalized": "amelie",
+          "year": 2002,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Amélie",
+              "Le Fabuleux Destin d’Amélie Poulain"
+            ],
+            "years": [
+              2001
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          }
+        ],
+        {
+          "tmdb": "102"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          }
+        ],
+        {
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          }
+        ],
+        {
+          "tvdb": "502"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          }
+        ],
+        {
+          "imdb": "1234567"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Title",
+          "normalized": "shared title",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567",
+              "tvdb": "501"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Shared Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example",
+          "normalized": "example",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "movie",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "tv",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "tv"
+    },
+    {
+      "args": [
+        {
+          "title": "Example",
+          "normalized": "example",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "movie",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "tv",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Unrelated",
+          "normalized": "unrelated",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "movie",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "tv",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {}
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "tmdb": "101",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "imdb": "7654321"
+        }
+      ],
+      "status": "matched",
+      "entry": "2"
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt7654321"
+            }
+          }
+        ],
+        {
+          "tmdb": "102",
+          "imdb": "tt7654321"
+        }
+      ],
+      "status": "matched",
+      "entry": "2"
+    },
+    {
+      "args": [
+        {
+          "title": "The Runner",
+          "normalized": "the runner",
+          "year": 2026,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1715967",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Runner"
+            ],
+            "years": [
+              2026
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1386315",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Runner"
+            ],
+            "years": [
+              2026
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt34564059"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Runner",
+          "normalized": "the runner",
+          "year": 2026,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1715967",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Runner"
+            ],
+            "years": [
+              2026
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1386315",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Runner"
+            ],
+            "years": [
+              2026
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt34564059"
+            }
+          }
+        ],
+        {
+          "tmdb": "1386315"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Locked",
+          "normalized": "locked",
+          "year": 2025,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1506133",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1083968",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked",
+              "Piégé"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26671996"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Locked",
+          "normalized": "locked",
+          "year": 2025,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1506133",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1083968",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked",
+              "Piégé"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26671996"
+            }
+          }
+        ],
+        {
+          "tmdb": "1083968"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Piege",
+          "normalized": "piege",
+          "year": 2025,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1032823",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Trap",
+              "Piège"
+            ],
+            "years": [
+              2024,
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26753003"
+            }
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1083968",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked",
+              "Piégé"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26671996"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Piege",
+          "normalized": "piege",
+          "year": 2025,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "1032823",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Trap",
+              "Piège"
+            ],
+            "years": [
+              2024,
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26753003"
+            }
+          },
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "1083968",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Locked",
+              "Piégé"
+            ],
+            "years": [
+              2025
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt26671996"
+            }
+          }
+        ],
+        {
+          "tmdb": "1083968"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Title",
+          "normalized": "example title",
+          "year": 2022,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example Title"
+            ],
+            "years": [
+              2022
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Title",
+          "normalized": "example title",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            1
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example Title"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example Title"
+            ],
+            "years": [
+              2022
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Spider-Man 2",
+          "normalized": "spider man 2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Spider-Man"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective",
+          "normalized": "the extraordinary adventures of a very unusual detective",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectives"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Thing",
+          "normalized": "the thing",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Thing"
+            ],
+            "years": [
+              1982
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Thing"
+            ],
+            "years": [
+              2011
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "It",
+          "normalized": "it",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "It"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Shared Show",
+          "normalized": "shared show",
+          "year": null,
+          "mediaType": "tv",
+          "seasons": [
+            2
+          ],
+          "episodes": [
+            4
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Shared Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {
+              "1": 2024,
+              "2": 2025
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Shared Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {
+              "1": 2024
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Walking Dead",
+          "normalized": "the walking dead",
+          "year": 2010,
+          "mediaType": "tv",
+          "seasons": [
+            5
+          ],
+          "episodes": [
+            1
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "The Walking Dead"
+            ],
+            "years": [
+              2010
+            ],
+            "seasonYears": {
+              "5": 2014
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "The Walking Dead",
+          "normalized": "the walking dead",
+          "year": 2014,
+          "mediaType": "tv",
+          "seasons": [
+            5
+          ],
+          "episodes": [
+            1
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "The Walking Dead"
+            ],
+            "years": [
+              2010
+            ],
+            "seasonYears": {
+              "5": 2014
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "The Walking Dead",
+          "normalized": "the walking dead",
+          "year": 2012,
+          "mediaType": "tv",
+          "seasons": [
+            5
+          ],
+          "episodes": [
+            1
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "The Walking Dead"
+            ],
+            "years": [
+              2010
+            ],
+            "seasonYears": {
+              "5": 2014
+            },
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detectiv",
+          "normalized": "the extraordinary adventures of a very unusual detectiv",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detectiv",
+          "normalized": "the extraordinary adventures of a very unusual detectiv",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "imdb": "tt1234567"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Spider-Man 2",
+          "normalized": "spider man 2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Spider-Man"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detectiv",
+          "normalized": "the extraordinary adventures of a very unusual detectiv",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "2",
+            "source": "tmdb",
+            "sourceId": "102",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectives"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {}
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        true
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        },
+        true
+      ],
+      "status": "ambiguous",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": null,
+          "normalized": "",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        []
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective",
+          "normalized": "the extraordinary adventures of a very unusual detective",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective 2",
+              "Unrelated Translation"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective",
+          "normalized": "the extraordinary adventures of a very unusual detective",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectiv"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective 2",
+          "normalized": "the extraordinary adventures of a very unusual detective 2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective 3",
+              "2"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective 2",
+          "normalized": "the extraordinary adventures of a very unusual detective 2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectiv 2"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective B2",
+          "normalized": "the extraordinary adventures of a very unusual detective b2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective B3",
+              "B2"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective B2",
+          "normalized": "the extraordinary adventures of a very unusual detective b2",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectiv B2"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective ٢",
+          "normalized": "the extraordinary adventures of a very unusual detective ٢",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detective ٣",
+              "٢"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "The Extraordinary Adventures of a Very Unusual Detective ٢",
+          "normalized": "the extraordinary adventures of a very unusual detective ٢",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "The Extraordinary Adventures of a Very Unusual Detectiv ٢"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {
+          "tmdb": "101"
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 2
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "episode": 3
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": -1
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "episode": 1.5
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1
+          ],
+          "episodes": [
+            2
+          ],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 1,
+          "episode": 2
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 0
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": null,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 1
+        }
+      ],
+      "status": "unmatched",
+      "entry": null
+    },
+    {
+      "args": [
+        {
+          "title": "Example Show",
+          "normalized": "example show",
+          "year": 2021,
+          "mediaType": "tv",
+          "seasons": [
+            1,
+            2,
+            3
+          ],
+          "episodes": [],
+          "isSeasonPack": true
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "tv",
+            "revision": 1,
+            "titles": [
+              "Example Show"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ],
+        {},
+        false,
+        {
+          "season": 2
+        }
+      ],
+      "status": "matched",
+      "entry": "1"
+    },
+    {
+      "args": [
+        {
+          "title": "Dune",
+          "normalized": "dune",
+          "year": 2021,
+          "mediaType": null,
+          "seasons": [],
+          "episodes": [],
+          "isSeasonPack": false
+        },
+        [
+          {
+            "entryId": "1",
+            "workId": "1",
+            "source": "tmdb",
+            "sourceId": "101",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          },
+          {
+            "entryId": "2",
+            "workId": "1",
+            "source": "future",
+            "sourceId": "other",
+            "mediaType": "movie",
+            "revision": 1,
+            "titles": [
+              "Dune"
+            ],
+            "years": [
+              2021
+            ],
+            "seasonYears": {},
+            "externalIds": {
+              "imdb": "tt1234567"
+            }
+          }
+        ]
+      ],
+      "status": "matched",
+      "entry": "1"
+    }
+  ],
+  "parsing": [
+    {
+      "title": "Example.Serial.S01E02.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01E01.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          1
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S02E02.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          2
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01E03.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          3
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01E01-E02.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          1,
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01.COMPLETE.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [],
+        "isSeasonPack": true
+      }
+    },
+    {
+      "title": "Example.Serial.2020.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2020,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01E02.2018.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2018,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Serial.S01E02.2019.1080p",
+      "result": {
+        "title": "Example Serial",
+        "normalized": "example serial",
+        "year": 2019,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Spider-Man.2.2004.1080p.WEB-DL-GROUP",
+      "result": {
+        "title": "Spider-Man 2",
+        "normalized": "spider man 2",
+        "year": 2004,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "1917.2019.1080p",
+      "result": {
+        "title": "1917",
+        "normalized": "1917",
+        "year": 2019,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "東京物語.1953.1080p",
+      "result": {
+        "title": "東京物語",
+        "normalized": "東京物語",
+        "year": 1953,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "M.1931.1080p",
+      "result": {
+        "title": "M",
+        "normalized": "m",
+        "year": 1931,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "M.1080p",
+      "result": {
+        "title": "M",
+        "normalized": "m",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "M.1932.1080p",
+      "result": {
+        "title": "M",
+        "normalized": "m",
+        "year": 1932,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Z.1969.1080p",
+      "result": {
+        "title": "Z",
+        "normalized": "z",
+        "year": 1969,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Z.1080p",
+      "result": {
+        "title": "Z",
+        "normalized": "z",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Z.1970.1080p",
+      "result": {
+        "title": "Z",
+        "normalized": "z",
+        "year": 1970,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "9.2009.1080p",
+      "result": {
+        "title": "9",
+        "normalized": "9",
+        "year": 2009,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "9.1080p",
+      "result": {
+        "title": "9",
+        "normalized": "9",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "9.2010.1080p",
+      "result": {
+        "title": "9",
+        "normalized": "9",
+        "year": 2010,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "母.1952.1080p",
+      "result": {
+        "title": "母",
+        "normalized": "母",
+        "year": 1952,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "母.1080p",
+      "result": {
+        "title": "母",
+        "normalized": "母",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "母.1953.1080p",
+      "result": {
+        "title": "母",
+        "normalized": "母",
+        "year": 1953,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "M.1931.1080p",
+      "result": {
+        "title": "M",
+        "normalized": "m",
+        "year": 1931,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "C++.2021.1080p",
+      "result": {
+        "title": "C++",
+        "normalized": "c",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "C#.2021.1080p",
+      "result": {
+        "title": "C#",
+        "normalized": "c",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "C.2021.1080p",
+      "result": {
+        "title": "C",
+        "normalized": "c",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "É.2021.1080p",
+      "result": {
+        "title": "É",
+        "normalized": "e",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Amelie.2001.1080p",
+      "result": {
+        "title": "Amelie",
+        "normalized": "amelie",
+        "year": 2001,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Amelie.2002.1080p",
+      "result": {
+        "title": "Amelie",
+        "normalized": "amelie",
+        "year": 2002,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Shared.Title.2021.1080p",
+      "result": {
+        "title": "Shared Title",
+        "normalized": "shared title",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.S01E02.2021.1080p",
+      "result": {
+        "title": "Example",
+        "normalized": "example",
+        "year": 2021,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.2021.1080p",
+      "result": {
+        "title": "Example",
+        "normalized": "example",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Unrelated.2021.1080p",
+      "result": {
+        "title": "Unrelated",
+        "normalized": "unrelated",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The.Runner.2026.MULTI.VF2.2160p.WEBRip.DV.HDR10Plus.EAC3.5.1.x265-Amen",
+      "result": {
+        "title": "The Runner",
+        "normalized": "the runner",
+        "year": 2026,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Locked.2025.MULTi.AD.1080p.WEB.SDR.EAC3.5.1.AV1-BYOR",
+      "result": {
+        "title": "Locked",
+        "normalized": "locked",
+        "year": 2025,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Piege.2025.MULTi.1080p.WEBRip.EAC3.5.1.x265-Maxadonf",
+      "result": {
+        "title": "Piege",
+        "normalized": "piege",
+        "year": 2025,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Title.2022.1080p",
+      "result": {
+        "title": "Example Title",
+        "normalized": "example title",
+        "year": 2022,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Title.S01E01.2021.1080p",
+      "result": {
+        "title": "Example Title",
+        "normalized": "example title",
+        "year": 2021,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          1
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Spider-Man.2.2021.1080p",
+      "result": {
+        "title": "Spider-Man 2",
+        "normalized": "spider man 2",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detective.2021.1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detective",
+        "normalized": "the extraordinary adventures of a very unusual detective",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The.Thing.1080p",
+      "result": {
+        "title": "The Thing",
+        "normalized": "the thing",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "It.1080p",
+      "result": {
+        "title": "It",
+        "normalized": "it",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Shared.Show.S02E04.1080p",
+      "result": {
+        "title": "Shared Show",
+        "normalized": "shared show",
+        "year": null,
+        "mediaType": "tv",
+        "seasons": [
+          2
+        ],
+        "episodes": [
+          4
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The.Walking.Dead.S05E01.2010.1080p",
+      "result": {
+        "title": "The Walking Dead",
+        "normalized": "the walking dead",
+        "year": 2010,
+        "mediaType": "tv",
+        "seasons": [
+          5
+        ],
+        "episodes": [
+          1
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The.Walking.Dead.S05E01.2014.1080p",
+      "result": {
+        "title": "The Walking Dead",
+        "normalized": "the walking dead",
+        "year": 2014,
+        "mediaType": "tv",
+        "seasons": [
+          5
+        ],
+        "episodes": [
+          1
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The.Walking.Dead.S05E01.2012.1080p",
+      "result": {
+        "title": "The Walking Dead",
+        "normalized": "the walking dead",
+        "year": 2012,
+        "mediaType": "tv",
+        "seasons": [
+          5
+        ],
+        "episodes": [
+          1
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detectiv 2021 1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detectiv",
+        "normalized": "the extraordinary adventures of a very unusual detectiv",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Spider-Man.2.2021.1080p",
+      "result": {
+        "title": "Spider-Man 2",
+        "normalized": "spider man 2",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "",
+      "result": {
+        "title": null,
+        "normalized": "",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detective.2021.1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detective",
+        "normalized": "the extraordinary adventures of a very unusual detective",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detective 2.2021.1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detective 2",
+        "normalized": "the extraordinary adventures of a very unusual detective 2",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detective B2.2021.1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detective B2",
+        "normalized": "the extraordinary adventures of a very unusual detective b2",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "The Extraordinary Adventures of a Very Unusual Detective ٢.2021.1080p",
+      "result": {
+        "title": "The Extraordinary Adventures of a Very Unusual Detective ٢",
+        "normalized": "the extraordinary adventures of a very unusual detective ٢",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Show.S01E02.2021.1080p",
+      "result": {
+        "title": "Example Show",
+        "normalized": "example show",
+        "year": 2021,
+        "mediaType": "tv",
+        "seasons": [
+          1
+        ],
+        "episodes": [
+          2
+        ],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Show.2021.1080p",
+      "result": {
+        "title": "Example Show",
+        "normalized": "example show",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Show.1080p",
+      "result": {
+        "title": "Example Show",
+        "normalized": "example show",
+        "year": null,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    },
+    {
+      "title": "Example.Show.S01-S03.2021.1080p",
+      "result": {
+        "title": "Example Show",
+        "normalized": "example show",
+        "year": 2021,
+        "mediaType": "tv",
+        "seasons": [
+          1,
+          2,
+          3
+        ],
+        "episodes": [],
+        "isSeasonPack": true
+      }
+    },
+    {
+      "title": "Dune.2021.1080p",
+      "result": {
+        "title": "Dune",
+        "normalized": "dune",
+        "year": 2021,
+        "mediaType": null,
+        "seasons": [],
+        "episodes": [],
+        "isSeasonPack": false
+      }
+    }
+  ]
+}

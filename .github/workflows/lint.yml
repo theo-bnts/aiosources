@@ -1,0 +1,39 @@
+name: Lint CI
+
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            torznab/go.sum
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install frontend dependencies
+        run: npm --prefix web ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm --prefix web run typecheck
+      - name: Go analysis
+        run: |
+          go vet ./...
+          go -C torznab vet ./...
+      - name: Check Go formatting
+        run: |
+          test -z "$(gofmt -l cmd internal torznab web/*.go)"
+      - name: Check frontend formatting
+        run: npm --prefix web run format:check
+      - name: Frontend dependency audit
+        run: npm --prefix web audit --audit-level=high

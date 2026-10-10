@@ -1,0 +1,38 @@
+# Merge this service into your existing Compose deployment. PostgreSQL stays external.
+services:
+  aiosources:
+    container_name: streaming_aiosources
+    image: ${AIOSOURCES_IMAGE:-aiosources:local}
+    build: ./aiosources
+    env_file: ./aiosources/.env
+    environment:
+      BIND: 0.0.0.0:7000
+      DATA_DIR: /data
+      PROVIDERS_DIR: /data/providers
+    volumes:
+      - aiosources_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+      - /var/lib/postgresql:rw,noexec,nosuid,size=64m
+    restart: unless-stopped
+    stop_grace_period: 45s
+    networks:
+      - aiostreams
+    healthcheck:
+      test: [CMD, /aiosource, healthcheck]
+      interval: 30s
+      timeout: 15s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+volumes:
+  aiosources_data:
+    name: streaming_aiosources_v2_data
+networks:
+  aiostreams:
+    external: true

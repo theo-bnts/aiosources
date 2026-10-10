@@ -1,0 +1,9 @@
+# Private provider profiles and credentials are not distributed.
+*.yml
+*.yaml
+*.json
+.env
+.env.*
+
+# The generic example contains no real endpoint or credentials.
+!providers/provider.example.json

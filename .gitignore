@@ -1,0 +1,32 @@
+# Private configuration and backups
+.env
+.env.*
+!.env.example
+*.env
+/compose.override.yaml
+/backups/
+/.scraper/
+/.ingest/
+/providers/*
+!/providers/*.example.json
+
+# Generated Go/frontend output
+/bin/
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+
+# Browser regressions: never commit reports, downloads or authenticated state
+/web/test-results/
+/web/playwright-report/
+/web/blob-report/
+/web/playwright/.cache/
+/web/playwright/.auth/
+/web/.playwright/
+/web/e2e/.runtime/
+/web/e2e/.auth/
+/web/e2e/downloads/
+
+# Workflow adaptations delivered locally, never committed
+/livraison-workflows/

@@ -1,0 +1,24 @@
+{
+  "@uiw/codemirror-extensions-basic-setup 4.25.11": {
+    "file": "uiw-codemirror.txt",
+    "source": "https://github.com/uiwjs/react-codemirror/blob/990500ad9ae72400272c873df3ae061860ff00c2/LICENSE",
+    "sha256": "fd1f049b3bb5cbaf5143516b72dbc6805cd30cca0cda94edb37160e37662fd17"
+  },
+  "@uiw/react-codemirror 4.25.11": {
+    "file": "uiw-codemirror.txt",
+    "source": "https://github.com/uiwjs/react-codemirror/blob/990500ad9ae72400272c873df3ae061860ff00c2/LICENSE",
+    "sha256": "fd1f049b3bb5cbaf5143516b72dbc6805cd30cca0cda94edb37160e37662fd17"
+  },
+  "react-remove-scroll-bar 2.3.8": {
+    "file": "react-remove-scroll-bar.txt",
+    "source": "https://github.com/theKashey/react-remove-scroll-bar/blob/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+    "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84"
+  },
+  "Alpine ca-certificates-bundle 20260909-r0": {
+    "file": "ca-certificates.txt",
+    "source": "https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20260909/ca-certificates-20260909.tar.bz2",
+    "sha256": "a9dcc67ae9c92071171494bd971486517e30a51c3084f4c80bbd42300feb5b74",
+    "builder": "golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade",
+    "license_source": "https://www.mozilla.org/media/MPL/2.0/index.815ca599c9df.txt"
+  }
+}
