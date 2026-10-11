@@ -1,0 +1,74 @@
+name: Promote stable image
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: stable-images
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.event.release.prerelease == false && github.event.release.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested release
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Validate release image record
+        id: image
+        env:
+          CODEBERG_ORGANIZATION: ${{ vars.CODEBERG_ORGANIZATION }}
+          CODEBERG_IMAGE: ${{ vars.CODEBERG_IMAGE }}
+        run: |
+          codeberg=''
+          if [[ -n "$CODEBERG_ORGANIZATION" || -n "$CODEBERG_IMAGE" ]]; then
+            codeberg="codeberg.org/$CODEBERG_ORGANIZATION/$CODEBERG_IMAGE"
+          fi
+          python3 tools/release_channels.py promotion --revision "$GITHUB_SHA" --event "$GITHUB_EVENT_PATH" --codeberg "$codeberg" --output "$GITHUB_OUTPUT"
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Codeberg
+        if: steps.image.outputs.codeberg != ''
+        uses: docker/login-action@v4
+        with:
+          registry: codeberg.org
+          username: ${{ secrets.CODEBERG_USERNAME }}
+          password: ${{ secrets.CODEBERG_TOKEN }}
+      - name: Verify both architectures and promote the exact tested image
+        env:
+          GHCR_IMAGE: ${{ steps.image.outputs.ghcr }}
+          CODEBERG_IMAGE: ${{ steps.image.outputs.codeberg }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          RELEASE_TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          for image in "$GHCR_IMAGE" "$CODEBERG_IMAGE"; do
+            if [[ -z "$image" ]]; then continue; fi
+            docker buildx imagetools inspect "$image@$IMAGE_DIGEST" --raw > "$RUNNER_TEMP/manifest.json"
+            python3 - "$RUNNER_TEMP/manifest.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1]) as source:
+              manifest = json.load(source)
+          platforms = {(p.get('os'), p.get('architecture')) for item in manifest.get('manifests', []) for p in [item.get('platform', {})] if p.get('os') == 'linux'}
+          if platforms != {('linux', 'amd64'), ('linux', 'arm64')}:
+              raise SystemExit('The tested image must contain Linux amd64 and arm64.')
+          PY
+          done
+          for image in "$GHCR_IMAGE" "$CODEBERG_IMAGE"; do
+            if [[ -z "$image" ]]; then continue; fi
+            docker buildx imagetools create --tag "$image:latest" --tag "$image:stable" --tag "$image:$RELEASE_TAG" "$image@$IMAGE_DIGEST"
+            actual=$(docker buildx imagetools inspect "$image:latest" --format '{{.Manifest.Digest}}')
+            test "$actual" = "$IMAGE_DIGEST"
+          done
