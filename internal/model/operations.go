@@ -22,12 +22,15 @@ type OperationRun struct {
 }
 
 type OperationEvent struct {
-	ID        int64     `json:"id"`
-	RunID     string    `json:"run_id"`
-	Phase     string    `json:"phase"`
-	Processed int64     `json:"processed"`
-	Errors    int64     `json:"errors"`
-	CreatedAt time.Time `json:"created_at"`
+	DurationMS int64     `json:"duration_ms,omitempty"`
+	HTTPStatus int       `json:"http_status,omitempty"`
+	ErrorCode  string    `json:"error_code,omitempty"`
+	ID         int64     `json:"id"`
+	RunID      string    `json:"run_id"`
+	Phase      string    `json:"phase"`
+	Processed  int64     `json:"processed"`
+	Errors     int64     `json:"errors"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type OperationFilter struct {

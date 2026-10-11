@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
 import {
@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/dialog'
 import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/components/common'
 import { Login } from '@/components/login'
+import { PublicEntry } from '@/components/public-entry'
 import { AboutDialog } from '@/components/about-dialog'
 
 export class RootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -274,6 +275,7 @@ function AppNavigation({
 }
 
 export function SessionGate({ children }: { children: ReactNode }) {
+  const location = useLocation()
   const session = useQuery({
     queryKey: ['session'],
     queryFn: async ({ signal }) => {
@@ -308,7 +310,11 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       </div>
     )
-  if (!session.data.authenticated) return <Login />
+  if (location.pathname === '/public')
+    return <PublicEntry authenticated={session.data.authenticated} />
+  if (!session.data.authenticated)
+    return location.pathname === '/login' ? <Login /> : <PublicEntry />
+  if (location.pathname === '/login') return <Navigate to="/" replace />
   return (
     <>
       <div className="fixed right-4 bottom-4 z-40 w-[calc(100%-2rem)] max-w-md">

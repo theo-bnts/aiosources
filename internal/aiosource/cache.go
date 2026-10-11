@@ -139,6 +139,7 @@ func (s *Service) checkResourceTriggered(ctx context.Context, service, key, reso
 		return err
 	}
 	defer func() { history.finish(ctx, checkResult) }()
+	ctx = withProviderHistory(ctx, history)
 	history.checkpoint(ctx, "availability")
 	if full {
 		v = model.AIOResource{Key: resource, Service: service, Account: account, Hashes: hashes, CheckedAt: now}
@@ -277,7 +278,7 @@ func (s *Service) adCheckOwned(ctx context.Context, key, hash string) (model.AIO
 				}
 			}
 			if owned {
-				defer s.enqueueCleanup(key, hash)
+				defer s.enqueueCleanup(ctx, key, hash)
 			}
 			if e != nil {
 				return e
@@ -288,13 +289,14 @@ func (s *Service) adCheckOwned(ctx context.Context, key, hash string) (model.AIO
 		if result.Cached {
 			if files, e := s.Providers.ADFiles(ctx, key, id); e == nil {
 				result.Files = files
+				result.Shareable = owned && len(files) > 0
 			}
 		}
 		return nil
 	})
 	return result, err
 }
-func (s *Service) enqueueCleanup(key, hash string) {
+func (s *Service) enqueueCleanup(parent context.Context, key, hash string) {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -315,6 +317,11 @@ func (s *Service) enqueueCleanup(key, hash string) {
 		defer func() { <-s.cleanupSlots }()
 		ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
 		defer cancel()
+		// Keep the safe operation reference, without inheriting the caller's
+		// cancellation into cleanup whose ownership is already durable.
+		if h, ok := parent.Value(providerHistoryKey{}).(providerCallHistory); ok {
+			ctx = context.WithValue(ctx, providerHistoryKey{}, h)
+		}
 		_ = s.withHash(ctx, fingerprint(key), hash, func() error { return s.cleanupHash(ctx, key, hash, false) })
 	}()
 }
@@ -372,6 +379,7 @@ func (s *Service) RecoverCleanup(ctx context.Context, key string, retry bool) (c
 		return err
 	}
 	defer func() { history.finish(ctx, cleanupResult) }()
+	ctx = withProviderHistory(ctx, history)
 	history.checkpoint(ctx, "cleanup")
 	inventory, err := s.Providers.ADInventory(ctx, key)
 	if err != nil {
@@ -425,12 +433,29 @@ func (s *Service) Availability(ctx context.Context, c model.AIOConfig, resource 
 		// Decide from the resource that existed before starting this check.
 		// A first check writes its retry state before any observation arrives;
 		// reading after launch could incorrectly treat a cold check as warm.
+		shared, err := s.DB.SharedAvailability(ctx, service, hashes, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
+		if err != nil {
+			return nil, err
+		}
+		out[service] = map[string]model.AIOAvailability{}
+		for _, a := range shared {
+			out[service][a.Hash] = a
+		}
+		missing := []string{}
+		for _, h := range hashes {
+			if _, ok := out[service][h]; !ok {
+				missing = append(missing, h)
+			}
+		}
+		if len(missing) == 0 {
+			continue
+		}
 		resourceState, found, err := s.DB.AIOResource(ctx, service, fingerprint(key), resource)
 		if err != nil {
 			return nil, err
 		}
-		warm := found && freshResource(resourceState, hashes, time.Now(), time.Duration(c.CacheMinutes)*time.Minute)
-		f, err := s.cacheFlightTriggered(service, key, resource, hashes, c, "playback", warm)
+		warm := found && freshResource(resourceState, missing, time.Now(), time.Duration(c.CacheMinutes)*time.Minute)
+		f, err := s.cacheFlightTriggered(service, key, resource, missing, c, "playback", warm)
 		if err == nil && (!warm || !f.warm) {
 			flights = append(flights, f)
 		} else if err != nil && !errors.Is(err, model.ErrBusy) {
@@ -450,9 +475,10 @@ func (s *Service) Availability(ctx context.Context, c model.AIOConfig, resource 
 		if err != nil {
 			return nil, err
 		}
-		out[service] = map[string]model.AIOAvailability{}
 		for _, a := range items {
-			out[service][a.Hash] = a
+			if current, ok := out[service][a.Hash]; !ok || a.CheckedAt.After(current.CheckedAt) {
+				out[service][a.Hash] = a
+			}
 		}
 	}
 	return out, nil

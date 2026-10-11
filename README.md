@@ -11,6 +11,7 @@ AIOSources is a self-hosted application that organizes torrent metadata from you
 - **Identify films and series:** use TMDB information to verify IMDb, TMDB and TVDB identifiers, then review or correct uncertain results.
 - **Check availability:** connect AllDebrid or TorBox to see cached availability and prepare playback when you select a stream.
 - **Connect Stremio and AIOStreams:** install your private addon link and browse the results from your catalog.
+- **Offer optional public access:** let visitors install the addon with their own debrid keys and reuse shared cache observations, while keeping administration private.
 - **Share selected metadata:** create revocable, read-only catalog shares and import catalogs shared with you.
 - **Follow activity:** see source statistics, processing history, returned Stremio results, logs and storage usage.
 
@@ -87,7 +88,7 @@ These are all application environment variables. The image supplies the defaults
 | --- | --- | --- |
 | `DATABASE_URL` | Required | PostgreSQL connection URL. |
 | `BIND` | `0.0.0.0:7000` | Address and port on which the application listens. |
-| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`. Setting this does not enable HTTPS; HTTPS is required for catalog sharing. |
+| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`. Setting this does not enable HTTPS; HTTPS is required for catalog sharing and public access. |
 | `ADMIN_PASSWORD` | Generated when omitted | Administration password, 12–72 bytes. An omitted password is saved as `/data/admin-password`; it can be read locally with `/aiosource password`. |
 | `DATA_DIR` | `/data` | Private application state, including the encryption key. Preserve this storage when updating. |
 | `PROVIDERS_DIR` | `/data/providers` | Private JSON source definitions. |
@@ -109,6 +110,14 @@ Treat the manifest URL like a password: it grants access to your catalog and con
 Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links.
 
 Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
+
+### Optional public access
+
+Enable **Stremio → Settings → Public access** to offer a visitor homepage. Visitors supply at least one AllDebrid or TorBox key and receive an encrypted installation URL. Keys are processed without saving them; playback uses each visitor's own account. Administration remains protected. Disabling public access revokes existing public links, while private installations keep working.
+
+Fresh availability can be reused between visitors and the administrator, independently for each debrid service. Private or unknown sources are offered only when a matching video is confirmed cached; administrator announce URLs are excluded. Missing AllDebrid observations use the administrator's recoverable probes, so a configured administrator AllDebrid account is needed to fill its cold cache. TorBox can check directly with the visitor's key without creating torrents.
+
+Use an external HTTPS `PUBLIC_URL`. Visitors must trust the host that processes their keys and keep their encrypted link private. The existing histories retain media and safe provider diagnostics for up to seven days, without visitor identities or keys. See [Public instances](docs/PUBLIC_INSTANCES.md) for cache behavior and the AllDebrid cached-playback race limitation.
 
 ## Update
 

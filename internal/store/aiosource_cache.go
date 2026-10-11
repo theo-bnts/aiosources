@@ -51,7 +51,13 @@ func (s *Store) SaveAIOAvailability(ctx context.Context, service, account string
 		return err
 	}
 	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.aio_availability(service,account,hash,cached,checked_at,files) SELECT $1,$2,$3,$4,$5,$6 FROM ingest.aio_state WHERE cache_generation=$7 ON CONFLICT(service,account,hash) DO UPDATE SET cached=EXCLUDED.cached,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files WHERE ingest.aio_availability.checked_at<=EXCLUDED.checked_at`, service, account, v.Hash, v.Cached, v.CheckedAt, b, v.Generation)
-	return databaseError("save availability", err)
+	if err != nil {
+		return databaseError("save availability", err)
+	}
+	if v.Shareable {
+		return s.SaveSharedAvailability(ctx, service, v)
+	}
+	return nil
 }
 func (s *Store) AddAIOCleanup(ctx context.Context, v model.AIOCleanup) error {
 	_, err := s.pool.Exec(ctx, `INSERT INTO ingest.aio_cleanup(account,hash,magnet_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, v.Account, v.Hash, v.ID)
@@ -83,7 +89,7 @@ func (s *Store) FinishAIOCleanup(ctx context.Context, v model.AIOCleanup, succes
 	return databaseError("finish temporary magnet cleanup", err)
 }
 func (s *Store) ResetAIOCache(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `TRUNCATE ingest.aio_availability,ingest.aio_resources;UPDATE ingest.aio_state SET cache_generation=cache_generation+1`)
+	_, err := s.pool.Exec(ctx, `TRUNCATE ingest.aio_availability,ingest.aio_shared_availability,ingest.aio_resources;UPDATE ingest.aio_state SET cache_generation=cache_generation+1`)
 	return databaseError("reset availability cache", err)
 }
 

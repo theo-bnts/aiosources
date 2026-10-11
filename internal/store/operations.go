@@ -147,17 +147,39 @@ func (s *Store) OperationEvents(ctx context.Context, id string, opts model.ListO
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_events WHERE run_id=$1`, id).Scan(&result.Total); err != nil {
 		return result, databaseError("count operation events", err)
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id,run_id,phase,processed,errors,created_at FROM ingest.operation_events WHERE run_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3`, id, opts.Limit, opts.Offset)
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,phase,processed,errors,created_at,duration_ms,http_status,error_code FROM ingest.operation_events WHERE run_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3`, id, opts.Limit, opts.Offset)
 	if err != nil {
 		return result, databaseError("list operation events", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var event model.OperationEvent
-		if err := rows.Scan(&event.ID, &event.RunID, &event.Phase, &event.Processed, &event.Errors, &event.CreatedAt); err != nil {
+		if err := rows.Scan(&event.ID, &event.RunID, &event.Phase, &event.Processed, &event.Errors, &event.CreatedAt, &event.DurationMS, &event.HTTPStatus, &event.ErrorCode); err != nil {
 			return result, err
 		}
 		result.Items = append(result.Items, event)
 	}
 	return result, databaseError("read operation events", rows.Err())
+}
+
+func (s *Store) RecordProviderCall(ctx context.Context, runID, phase string, status int, duration int64, code string) error {
+	if !(model.ProviderCall{Phase: phase, DurationMS: duration, HTTPStatus: status, ErrorCode: code}).Valid() {
+		return model.ErrInvalid
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin provider diagnostics", err)
+	}
+	defer rollback(tx)
+	// Serialize the cap across concurrent checks without counting unbounded
+	// history. The row lock is released before the next external request.
+	var id string
+	if err = tx.QueryRow(ctx, `SELECT id FROM ingest.operation_runs WHERE id=$1 FOR UPDATE`, runID).Scan(&id); err != nil {
+		return databaseError("lock provider diagnostics", err)
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO ingest.operation_events(run_id,phase,processed,errors,duration_ms,http_status,error_code) SELECT $1,$2,0,CASE WHEN $5='' THEN 0 ELSE 1 END,$3,$4,$5 WHERE NOT EXISTS(SELECT 1 FROM ingest.operation_events WHERE run_id=$1 OFFSET 999 LIMIT 1)`, runID, phase, duration, status, code)
+	if err != nil {
+		return databaseError("record provider call", err)
+	}
+	return databaseError("commit provider diagnostics", tx.Commit(ctx))
 }

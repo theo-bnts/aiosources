@@ -10,12 +10,21 @@ export type StremioResult = {
   size: number
 }
 export type StremioRequest = {
+  origin: 'private' | 'public'
+  kind: 'stream' | 'manifest' | 'playback'
+  service: '' | 'alldebrid' | 'torbox'
+  calls?: {
+    phase: string
+    duration_ms: number
+    http_status: number
+    error_code: '' | 'provider_error' | 'authentication' | 'cancelled' | 'timeout'
+  }[]
   id: number
   created_at: string
   media_type: string
   resource: string
   duration_ms: number
-  outcome: 'results' | 'empty' | 'invalid' | 'failed' | 'cancelled' | 'busy'
+  outcome: 'results' | 'empty' | 'invalid' | 'failed' | 'cancelled' | 'busy' | 'pending'
   matched: number
   eligible: number
   invalid_hash: number

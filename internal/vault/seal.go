@@ -39,5 +39,5 @@ func (v *Vault) Open(purpose string, envelope []byte) ([]byte, error) {
 }
 
 func internalPurpose(purpose string) bool {
-	return purpose == "admin-mfa-pending-v1" || purpose == "admin-mfa-active-v1"
+	return purpose == "admin-mfa-pending-v1" || purpose == "admin-mfa-active-v1" || purpose == "public-installation-v1" || purpose == "public-playback-v1"
 }

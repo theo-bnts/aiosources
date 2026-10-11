@@ -30,8 +30,8 @@ func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*mode
 	rows, err := tx.Query(ctx, `SELECT CASE
 WHEN n.nspname='ingest' AND (c.relname IN ('torrents','staged_torrents','raw_records','pages','events','runs','collection_state','legacy_imports','schedule_clocks','torrent_history','torrent_history_baselines','torrent_history_metadata') OR c.relname LIKE 'run_%') THEN 'sources'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
-WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_resources','aio_cleanup','aio_incidents') THEN 'debrid'
-WHEN n.nspname='ingest' AND c.relname='stremio_requests' THEN 'stremio'
+WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_cleanup','aio_incidents') THEN 'debrid'
+WHEN n.nspname='ingest' AND c.relname IN ('stremio_requests','aio_public_access') THEN 'stremio'
 WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','remote_checkpoints','shares') OR c.relname LIKE 'share_%') THEN 'sharing'
 WHEN n.nspname='ingest' AND c.relname IN ('activity_logs','operation_runs','operation_events') THEN 'logs'
 WHEN n.nspname='ingest' AND (c.relname IN ('secrets','security_settings','security_attempts','security_recovery_codes') OR c.relname LIKE 'admin_%') THEN 'access'

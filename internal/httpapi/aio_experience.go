@@ -49,7 +49,12 @@ func (s *server) stremioRequests(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := s.options.Store.ListStremioRequests(r.Context(), opts)
+	origin, kind := r.URL.Query().Get("origin"), r.URL.Query().Get("kind")
+	if (origin != "" && origin != "private" && origin != "public") || (kind != "" && kind != "stream" && kind != "manifest" && kind != "playback") {
+		writeError(w, http.StatusBadRequest, "Invalid request filters")
+		return
+	}
+	items, err := s.options.Store.ListStremioRequestsFiltered(r.Context(), opts, origin, kind)
 	if err != nil {
 		respondError(w, err)
 		return

@@ -8,6 +8,7 @@ import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import type { Page } from '@/lib/types'
 import type { OperationRun, OperationEvent, OperationStatus } from '@/lib/operation-types'
+import { providerSteps, providerErrors } from '@/lib/provider-call'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -51,6 +52,8 @@ const services = {
 }
 const triggers = { manual: 'Manual', automatic: 'Automatic', playback: 'Playback request' }
 const phases: Record<string, string> = {
+  ...providerSteps,
+
   configuration: 'Starting',
   changes: 'Downloading information changes',
   inventory: 'Importing film & series inventory',
@@ -370,7 +373,18 @@ export function OperationDetailPage({ section }: { section: Section }) {
                                 <TableCell className="text-xs text-muted-foreground">
                                   {date(event.created_at)}
                                 </TableCell>
-                                <TableCell>{phases[event.phase] || event.phase}</TableCell>
+                                <TableCell>
+                                  {phases[event.phase] || event.phase}
+                                  {event.phase.startsWith('provider_') && (
+                                    <p className="help mt-1">
+                                      {number(event.duration_ms || 0)} ms
+                                      {event.http_status ? ` · HTTP ${event.http_status}` : ''}
+                                      {event.error_code
+                                        ? ` · ${providerErrors[event.error_code] ?? 'Provider error'}`
+                                        : ''}
+                                    </p>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-right font-mono text-xs">
                                   {number(event.processed)}
                                 </TableCell>

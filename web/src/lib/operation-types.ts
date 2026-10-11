@@ -17,6 +17,9 @@ export type OperationRun = {
   error?: string
 }
 export type OperationEvent = {
+  duration_ms?: number
+  http_status?: number
+  error_code?: string
   id: number
   run_id: string
   phase: string

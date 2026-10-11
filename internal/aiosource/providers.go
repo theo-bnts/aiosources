@@ -58,7 +58,10 @@ func maxTime(a, b time.Time) time.Time {
 	}
 	return b
 }
-func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path string, body io.Reader, contentType string) (json.RawMessage, error) {
+func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path string, body io.Reader, contentType string) (payload json.RawMessage, requestErr error) {
+	started := time.Now()
+	status := 0
+	defer func() { recordProviderCall(ctx, strings.Split(path, "?")[0], status, started, requestErr) }()
 	if strings.TrimSpace(key) == "" {
 		return nil, ErrAuth
 	}
@@ -85,6 +88,7 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		return nil, errors.New("provider transport failed")
 	}
 	defer res.Body.Close()
+	status = res.StatusCode
 	if res.StatusCode == 401 || res.StatusCode == 403 {
 		return nil, ErrAuth
 	}
@@ -343,6 +347,7 @@ func (p *ProviderHTTP) TBCheck(ctx context.Context, key string, hashes []string)
 			continue
 		}
 		v := model.AIOAvailability{Hash: strings.ToLower(h), Cached: true, CheckedAt: time.Now()}
+		v.Shareable = true
 		if files, ok := tbFiles(item.Files); ok {
 			v.Files = files
 		}
@@ -353,12 +358,15 @@ func (p *ProviderHTTP) TBCheck(ctx context.Context, key string, hashes []string)
 		if v, ok := byHash[h]; ok {
 			out = append(out, v)
 		} else if complete {
-			out = append(out, model.AIOAvailability{Hash: h, Cached: false, CheckedAt: time.Now()})
+			out = append(out, model.AIOAvailability{Hash: h, Cached: false, CheckedAt: time.Now(), Shareable: true})
 		}
 	}
 	return out, nil
 }
 func (p *ProviderHTTP) TBPlay(ctx context.Context, key, hash, magnet string, r Resource) (link string, playErr error) {
+	return p.tbPlay(ctx, key, hash, magnet, r, false)
+}
+func (p *ProviderHTTP) tbPlay(ctx context.Context, key, hash, magnet string, r Resource, cachedOnly bool) (link string, playErr error) {
 	stage := "add"
 	defer func() {
 		if playErr != nil {
@@ -367,6 +375,11 @@ func (p *ProviderHTTP) TBPlay(ctx context.Context, key, hash, magnet string, r R
 	}()
 	var body bytes.Buffer
 	form := multipart.NewWriter(&body)
+	if cachedOnly {
+		if err := form.WriteField("add_only_if_cached", "true"); err != nil {
+			return "", err
+		}
+	}
 	if err := form.WriteField("magnet", magnet); err != nil {
 		return "", err
 	}

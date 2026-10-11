@@ -39,6 +39,9 @@ type Service struct {
 	probes                    map[string]*adProbe
 	slots                     chan struct{}
 	cleanupSlots              chan struct{}
+	publicProbe               chan struct{}
+	publicADMu                sync.Mutex
+	publicADFlight            *flight
 	automationWake            chan struct{}
 }
 type flight struct {
@@ -65,6 +68,8 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	}
 	defer release()
 	s.automationWake = make(chan struct{}, 1)
+	// Public cache checks must leave connection capacity for administration.
+	s.publicProbe = make(chan struct{}, 1)
 	if _, err = v.Resolve(ctx, installationSecret); errors.Is(err, model.ErrNotFound) {
 		if _, err = s.RotateToken(ctx); err != nil {
 			cancel()

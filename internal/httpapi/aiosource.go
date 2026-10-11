@@ -16,6 +16,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	if s.options.AIOSource == nil {
 		return
 	}
+	s.registerPublicInstance(mux)
 	mux.HandleFunc("GET /api/aiosource", s.auth.protect(s.aioStatus))
 	mux.HandleFunc("GET /api/operations", s.auth.protect(s.operationHistory))
 	mux.HandleFunc("GET /api/operations/{id}", s.auth.protect(s.operationDetail))
@@ -37,7 +38,10 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 		writeJSON(w, 200, map[string]string{"manifest_path": "/stremio/" + token + "/manifest.json"})
 	}))
 	mux.HandleFunc("POST /api/aiosource/{action}", s.auth.protect(s.aioAction))
-	mux.HandleFunc("GET /stremio/{token}/manifest.json", s.aioProtect(func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, aiosource.Manifest()) }))
+	mux.HandleFunc("GET /stremio/{token}/manifest.json", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
+		s.options.AIOSource.RecordAddonRequest("private", "manifest", "", "", time.Now(), nil)
+		writeJSON(w, 200, aiosource.Manifest())
+	}))
 	mux.HandleFunc("GET /stremio/{token}/configure", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/addon/settings", http.StatusSeeOther)
 	}))
@@ -200,7 +204,9 @@ func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"streams": streams})
 }
 func (s *server) aioPlayback(w http.ResponseWriter, r *http.Request) {
-	link, err := s.options.AIOSource.Playback(r.Context(), r.PathValue("service"), r.PathValue("provider"), r.PathValue("source"), r.PathValue("type"), r.PathValue("id"))
+	link, err := s.options.AIOSource.TracePlayback(r.Context(), "private", r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
+		return s.options.AIOSource.Playback(ctx, r.PathValue("service"), r.PathValue("provider"), r.PathValue("source"), r.PathValue("type"), r.PathValue("id"))
+	})
 	if errors.Is(err, aiosource.ErrPending) {
 		w.Header().Set("Retry-After", "10")
 		writeError(w, 425, "Torrent is not ready yet. Try again shortly.")

@@ -88,6 +88,7 @@ type AIOFile struct {
 	Link string `json:"-"`
 }
 type AIOAvailability struct {
+	Shareable  bool      `json:"-"`
 	Generation int64     `json:"-"`
 	Hash       string    `json:"hash"`
 	Cached     bool      `json:"cached"`

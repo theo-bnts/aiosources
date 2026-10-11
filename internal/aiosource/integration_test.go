@@ -289,7 +289,7 @@ func TestTemporaryCleanupHasBoundedWorkersAndDurableOverflow(t *testing.T) {
 		if err := s.DB.AddAIOCleanup(ctx, model.AIOCleanup{Account: fingerprint("synthetic-key"), Hash: hash, ID: int64(n)}); err != nil {
 			t.Fatal(err)
 		}
-		s.enqueueCleanup("synthetic-key", hash)
+		s.enqueueCleanup(ctx, "synthetic-key", hash)
 	}
 	for n := 0; n < 4; n++ {
 		select {
@@ -407,6 +407,20 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
+	if err != nil || len(out) != 1 || !strings.HasPrefix(out[0].Name, "[TB+]") {
+		t.Fatal("account change lost fresh shared availability", err)
+	}
+	mu.Lock()
+	if checks != 1 {
+		t.Error("new account repeated a fresh read-only cache check")
+	}
+	mu.Unlock()
+	// Availability is now shared; simulate expiry before expecting the changed
+	// provider response to be discovered. Playback IDs remain account-specific.
+	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
+		t.Fatal(err)
+	}
+	out, err = s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
 	if err != nil || len(out) != 0 {
 		t.Fatalf("uncached private source served: %+v %v", out, err)
 	}
@@ -438,7 +452,7 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 	mu.Lock()
 	cached = true
 	mu.Unlock()
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_resources SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_availability SET checked_at=now()-interval '4 days'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_resources SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_availability SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
 		t.Fatal(err)
 	}
 	out, err = s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")

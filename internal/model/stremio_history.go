@@ -17,6 +17,10 @@ type StremioResult struct {
 }
 
 type StremioRequest struct {
+	Origin             string          `json:"origin"`
+	Kind               string          `json:"kind"`
+	Service            string          `json:"service"`
+	Calls              []ProviderCall  `json:"calls,omitempty"`
 	ID                 int64           `json:"id"`
 	CreatedAt          time.Time       `json:"created_at"`
 	MediaType          string          `json:"media_type"`

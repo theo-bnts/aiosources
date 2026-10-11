@@ -78,7 +78,13 @@ func baseStream(rec model.AIORecord, r Resource, sourceName string) Stream {
 	return Stream{Name: "［AIO " + sourceName + "］ " + q, InfoHash: rec.Hash, Title: rec.Title + "\n" + details, Hints: hints}
 }
 func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string) (streams []Stream, streamErr error) {
+	return s.streams(ctx, base, token, mediaType, id, nil)
+}
+func (s *Service) streams(ctx context.Context, base, token, mediaType, id string, visitor *PublicInstallation) (streams []Stream, streamErr error) {
 	history := newStremioHistory(mediaType, id)
+	if visitor != nil {
+		history.Origin = "public"
+	}
 	names := map[string]string{}
 	defer func() {
 		history.DurationMS = time.Since(history.CreatedAt).Milliseconds()
@@ -135,7 +141,12 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 	if len(eligible) == 0 {
 		return []Stream{}, nil
 	}
-	availability, err := s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
+	var availability map[string]map[string]model.AIOAvailability
+	if visitor == nil {
+		availability, err = s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
+	} else {
+		availability, err = s.publicAvailability(ctx, c, streamResourceKey(r, rows), hashes, visitor)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -176,11 +187,19 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 			if !configured {
 				tracker.Private = true
 			}
+			if visitor != nil && tracker.Private && (!known || !observed.Cached) {
+				history.PrivateUnavailable++
+				continue
+			}
 			if known && !observed.Cached && tracker.Private && tracker.AnnounceSecret == "" {
 				history.PrivateUnavailable++
 				continue
 			}
 			selected, hasFile := SelectFile(observed.Files, r)
+			if visitor != nil && tracker.Private && !hasFile {
+				history.FileUnavailable++
+				continue
+			}
 			if known && observed.Cached && len(observed.Files) > 0 && !hasFile {
 				history.FileUnavailable++
 				continue
@@ -191,6 +210,16 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 				known = false
 			}
 			segments := []string{"stremio", token, "play", service, rec.Provider, rec.SourceID, mediaType, id}
+			if visitor != nil {
+				locator, e := s.sealPublicSource(rec.Provider, rec.SourceID)
+				if e != nil {
+					return nil, e
+				}
+				segments = []string{"public", "stremio", token, "play", service, locator, mediaType, id}
+				if tracker.Private {
+					stream.InfoHash = ""
+				}
+			}
 			for i := range segments {
 				segments[i] = url.PathEscape(segments[i])
 			}
@@ -218,6 +247,15 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 	return out, nil
 }
 func (s *Service) Playback(ctx context.Context, service, provider, sourceID, mediaType, id string) (string, error) {
+	return s.playback(ctx, service, provider, sourceID, mediaType, id, nil)
+}
+func (s *Service) PublicPlayback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
+	if visitor == nil || !validPublicKeys(visitor.Services) || visitor.Services[service] == "" {
+		return "", ErrAuth
+	}
+	return s.playback(ctx, service, provider, sourceID, mediaType, id, visitor)
+}
+func (s *Service) playback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	if service != "alldebrid" && service != "torbox" {
 		return "", model.ErrInvalid
 	}
@@ -255,31 +293,63 @@ func (s *Service) Playback(ctx context.Context, service, provider, sourceID, med
 	if err != nil {
 		return "", err
 	}
-	name := c.TorBoxSecret
-	if service == "alldebrid" {
-		name = c.AllDebridSecret
-	}
-	if name == "" {
-		return "", model.ErrInvalid
-	}
-	key, err := s.key(life, name)
-	if err != nil {
-		return "", err
-	}
-	magnet, _, err := s.magnet(life, rec, c)
-	if err != nil {
-		return "", err
+	private := false
+	var key, magnet string
+	var observed model.AIOAvailability
+	if visitor == nil {
+		name := c.TorBoxSecret
+		if service == "alldebrid" {
+			name = c.AllDebridSecret
+		}
+		if name == "" {
+			return "", model.ErrInvalid
+		}
+		key, err = s.key(life, name)
+		if err != nil {
+			return "", err
+		}
+		magnet, _, err = s.magnet(life, rec, c)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		key = visitor.Services[service]
+		if key == "" {
+			return "", ErrAuth
+		}
+		tracker, configured := c.Trackers[rec.Provider]
+		private = !configured || tracker.Private
+		if private {
+			items, e := s.DB.SharedAvailability(life, service, []string{rec.Hash}, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
+			if e != nil {
+				return "", e
+			}
+			if len(items) != 1 || !items[0].Cached {
+				return "", ErrPending
+			}
+			observed = items[0]
+			if _, ok := SelectFile(observed.Files, r); !ok {
+				return "", ErrPending
+			}
+		}
+		magnet = publicMagnet(rec)
 	}
 	var link string
+	generation, err := s.DB.AIOCacheGeneration(life)
+	if err != nil {
+		return "", err
+	}
 	if service == "torbox" {
-		link, err = s.Providers.TBPlay(life, key, rec.Hash, magnet, r)
+		link, err = s.Providers.tbPlay(life, key, rec.Hash, magnet, r, private)
 	} else {
 		stage := "cleanup"
 		err = s.withHash(life, fingerprint(key), rec.Hash, func() error {
-			if err := s.cleanupHash(life, key, rec.Hash, false); err != nil {
-				return err
+			if visitor == nil {
+				if err := s.cleanupHash(life, key, rec.Hash, false); err != nil {
+					return err
+				}
+				stage = "inventory"
 			}
-			stage = "inventory"
 			inventory, err := s.Providers.ADInventory(life, key)
 			if err != nil {
 				return err
@@ -297,10 +367,17 @@ func (s *Service) Playback(ctx context.Context, service, provider, sourceID, med
 				stage = "add"
 				item, err = s.Providers.ADAdd(life, key, rec.Hash, magnet)
 				if err != nil {
+					if visitor != nil && private {
+						s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
+					}
 					return err
 				}
 			}
 			if item.Ready == nil || !*item.Ready {
+				if visitor != nil && private && existing == nil && item.ID > 0 {
+					s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
+					_ = s.DB.ForgetSharedAvailability(life, service, rec.Hash, observed.CheckedAt)
+				}
 				return ErrPending
 			}
 			stage = "file_list"
@@ -315,14 +392,25 @@ func (s *Service) Playback(ctx context.Context, service, provider, sourceID, med
 			}
 			stage = "unlock"
 			link, err = s.Providers.ADUnlock(life, key, file.Link)
+			if err == nil && existing == nil {
+				_ = s.DB.SaveSharedAvailability(life, service, model.AIOAvailability{Hash: rec.Hash, Cached: true, CheckedAt: time.Now(), Files: files, Generation: generation})
+			}
 			return err
 		})
 		if err != nil {
 			err = &playbackError{stage: stage, cause: err}
 		}
 	}
+	if visitor != nil && service == "torbox" && err == nil {
+		if items, e := s.Providers.TBCheck(life, key, []string{rec.Hash}); e == nil {
+			for _, a := range items {
+				a.Generation = generation
+				_ = s.DB.SaveSharedAvailability(life, service, a)
+			}
+		}
+	}
 	s.recordPlaybackFailure(service, err)
-	if !errors.Is(err, ErrPending) && !errors.Is(err, context.Canceled) {
+	if visitor == nil && !errors.Is(err, ErrPending) && !errors.Is(err, context.Canceled) {
 		s.observe(service, err)
 	}
 	return link, err

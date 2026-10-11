@@ -9,6 +9,7 @@ import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { resetListView } from '@/lib/list-view'
 import type { Page } from '@/lib/types'
 import type { StremioRequest, StremioStatistics } from '@/lib/stremio-types'
+import { providerSteps, providerErrors } from '@/lib/provider-call'
 import { Button } from '@/components/ui/button'
 import { Statistic } from '@/components/statistic'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +33,8 @@ import {
   Pager,
 } from '@/components/common'
 
+const origins = { private: 'Private installation', public: 'Public installation' } as const
+const kinds = { stream: 'Streams', manifest: 'Manifest', playback: 'Playback' } as const
 const outcomes = {
   results: 'Results returned',
   empty: 'No results',
@@ -39,6 +42,7 @@ const outcomes = {
   failed: 'Request failed',
   cancelled: 'Interrupted',
   busy: 'Too many active requests',
+  pending: 'Playback pending',
 } as const
 const services = { direct: 'Direct', alldebrid: 'AllDebrid', torbox: 'TorBox' } as const
 const cacheLabels = {
@@ -56,12 +60,15 @@ function Outcome({ item }: { item: StremioRequest }) {
           ? 'success'
           : item.outcome === 'failed'
             ? 'destructive'
-            : item.outcome === 'empty' || item.outcome === 'invalid' || item.outcome === 'busy'
+            : item.outcome === 'empty' ||
+                item.outcome === 'invalid' ||
+                item.outcome === 'busy' ||
+                item.outcome === 'pending'
               ? 'warning'
               : 'secondary'
       }
     >
-      {outcomes[item.outcome]}
+      {item.outcome === 'results' && item.kind !== 'stream' ? 'Completed' : outcomes[item.outcome]}
     </Badge>
   )
 }
@@ -122,15 +129,20 @@ export function StremioHistoryPage() {
     listState = useListViewState()
   const [search, setSearch] = useViewSearchParams()
   const q = search.get('q') ?? '',
-    status = search.get('status') ?? ''
+    status = search.get('status') ?? '',
+    origin = search.get('origin') ?? '',
+    kind = search.get('kind') ?? ''
   const pagination = useURLPagination(),
     { limit, offset } = pagination
   const query = useQuery({
-    queryKey: ['stremio-requests', { q, status, limit, offset }],
+    queryKey: ['stremio-requests', { q, status, origin, kind, limit, offset }],
     queryFn: ({ signal }) =>
-      api<Page<StremioRequest>>(`/stremio/requests?${params({ q, status, limit, offset })}`, {
-        signal,
-      }),
+      api<Page<StremioRequest>>(
+        `/stremio/requests?${params({ q, status, origin, kind, limit, offset })}`,
+        {
+          signal,
+        },
+      ),
     refetchInterval: 5000,
   })
   function filter(patch: Record<string, string>) {
@@ -175,13 +187,34 @@ export function StremioHistoryPage() {
             ))}
           </select>
         </div>
+        {[
+          { name: 'origin', label: 'Installation', value: origin, choices: origins },
+          { name: 'kind', label: 'Request type', value: kind, choices: kinds },
+        ].map((item) => (
+          <div className="field" key={item.name}>
+            <Label htmlFor={`stremio-${item.name}`}>{item.label}</Label>
+            <select
+              id={`stremio-${item.name}`}
+              className="native-select"
+              value={item.value}
+              onChange={(e) => filter({ [item.name]: e.target.value })}
+            >
+              <option value="">All</option>
+              {Object.entries(item.choices).map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
         <Button variant="outline" type="submit" className="self-end">
           Search
         </Button>
         <div className="self-end">
           <ClearFiltersButton
-            active={Boolean(q || status)}
-            onClear={() => setSearch(resetListView(search, ['q', 'status']))}
+            active={Boolean(q || status || origin || kind)}
+            onClear={() => setSearch(resetListView(search, ['q', 'status', 'origin', 'kind']))}
           />
         </div>
       </form>
@@ -218,13 +251,16 @@ export function StremioHistoryPage() {
                             {item.resource}
                           </Link>
                           <p className="help mt-1">
-                            {item.media_type} · #{item.id}
+                            {kinds[item.kind]} · {origins[item.origin]} · #{item.id}
+                            {item.service && ` · ${services[item.service]}`}
                           </p>
                         </TableCell>
                         <TableCell>
                           <Outcome item={item} />
                         </TableCell>
-                        <TableCell className="mono text-right">{number(item.returned)}</TableCell>
+                        <TableCell className="mono text-right">
+                          {item.kind === 'stream' ? number(item.returned) : '—'}
+                        </TableCell>
                         <TableCell className="mono text-right">
                           {number(item.duration_ms)} ms
                         </TableCell>
@@ -251,7 +287,7 @@ export function StremioHistoryPage() {
               <ListEmpty
                 title="No requests in this view"
                 description="Requests are recorded when the addon is used."
-                filtered={Boolean(q || status)}
+                filtered={Boolean(q || status || origin || kind)}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}
               />
@@ -287,7 +323,9 @@ export function StremioRequestPage() {
       <PageHeader
         title={item ? `Request #${item.id}` : 'Request details'}
         description={
-          item ? `${item.media_type} · ${item.resource} · ${date(item.created_at)}` : undefined
+          item
+            ? `${kinds[item.kind]} · ${origins[item.origin]} · ${item.resource} · ${date(item.created_at)}`
+            : undefined
         }
         back={{ to: '/addon/history', label: 'Stremio history' }}
         actions={item && <Outcome item={item} />}
@@ -298,116 +336,179 @@ export function StremioRequestPage() {
       ) : (
         item && (
           <>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Statistic label="Identified source records" value={item.matched} />
-              <Statistic label="Eligible torrents" value={item.eligible} />
-              <Statistic label="Results returned" value={item.returned} />
-              <Statistic label="Response time (ms)" value={item.duration_ms} />
-            </dl>
-            <section className="section-card">
-              <h2 className="section-title">Selection details</h2>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="help">Invalid or missing info hash</dt>
-                  <dd className="mt-1 tabular-nums">{number(item.invalid_hash)}</dd>
-                </div>
-                <div>
-                  <dt className="help">Different episode</dt>
-                  <dd className="mt-1 tabular-nums">{number(item.wrong_episode)}</dd>
-                </div>
-                <div>
-                  <dt className="help">Uncached private source without an announce URL</dt>
-                  <dd className="mt-1 tabular-nums">{number(item.private_unavailable)}</dd>
-                </div>
-                <div>
-                  <dt className="help">No matching video in provider files</dt>
-                  <dd className="mt-1 tabular-nums">{number(item.file_unavailable)}</dd>
-                </div>
-              </dl>
-              <p className="help">
-                A torrent can produce one result per configured debrid service. Provider exclusions
-                are counted separately.
-              </p>
-              {item.outcome === 'empty' && (
-                <p className="notice notice-warning">
-                  {item.matched === 0
-                    ? 'No current identification was published for this resource.'
-                    : item.eligible === 0
-                      ? 'All source records were excluded by their info hash or episode.'
-                      : 'The configured playback services returned no eligible results.'}
+            {item.kind !== 'stream' ? (
+              <section className="section-card">
+                <h2 className="section-title">Request details</h2>
+                <p className="help">
+                  {number(item.duration_ms)} ms · {origins[item.origin]}
+                  {item.service && ` · ${services[item.service]}`}
                 </p>
-              )}
-              {item.outcome === 'failed' && (
-                <p className="notice notice-error">
-                  The request could not complete. Check the related service entries in Logs.
+                <p>
+                  {item.outcome === 'results'
+                    ? item.kind === 'playback'
+                      ? 'Playback link resolved. The link is not stored in history.'
+                      : 'Manifest returned.'
+                    : item.outcome === 'pending'
+                      ? 'The selected torrent is not ready for playback. Try again shortly.'
+                      : 'The request could not complete. Check the related service entries in Logs.'}
                 </p>
-              )}
-            </section>
-            <section className="space-y-4">
-              <h2 className="section-title">Returned results</h2>
-              {item.results?.length ? (
+              </section>
+            ) : (
+              <>
+                <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  <Statistic label="Identified source records" value={item.matched} />
+                  <Statistic label="Eligible torrents" value={item.eligible} />
+                  <Statistic label="Results returned" value={item.returned} />
+                  <Statistic label="Response time (ms)" value={item.duration_ms} />
+                </dl>
+                <section className="section-card">
+                  <h2 className="section-title">Selection details</h2>
+                  <dl className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="help">Invalid or missing info hash</dt>
+                      <dd className="mt-1 tabular-nums">{number(item.invalid_hash)}</dd>
+                    </div>
+                    <div>
+                      <dt className="help">Different episode</dt>
+                      <dd className="mt-1 tabular-nums">{number(item.wrong_episode)}</dd>
+                    </div>
+                    <div>
+                      <dt className="help">Private source unavailable for playback</dt>
+                      <dd className="mt-1 tabular-nums">{number(item.private_unavailable)}</dd>
+                    </div>
+                    <div>
+                      <dt className="help">No matching video in provider files</dt>
+                      <dd className="mt-1 tabular-nums">{number(item.file_unavailable)}</dd>
+                    </div>
+                  </dl>
+                  <p className="help">
+                    A torrent can produce one result per configured debrid service. Provider
+                    exclusions are counted separately.
+                  </p>
+                  {item.outcome === 'empty' && (
+                    <p className="notice notice-warning">
+                      {item.matched === 0
+                        ? 'No current identification was published for this resource.'
+                        : item.eligible === 0
+                          ? 'All source records were excluded by their info hash or episode.'
+                          : 'The configured playback services returned no eligible results.'}
+                    </p>
+                  )}
+                  {item.outcome === 'failed' && (
+                    <p className="notice notice-error">
+                      The request could not complete. Check the related service entries in Logs.
+                    </p>
+                  )}
+                </section>
+                <section className="space-y-4">
+                  <h2 className="section-title">Returned results</h2>
+                  {item.results?.length ? (
+                    <div className="table-frame">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Result / source</TableHead>
+                            <TableHead>Service / cache</TableHead>
+                            <TableHead>File</TableHead>
+                            <TableHead className="text-right">Size</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {item.results.map((result, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="max-w-lg whitespace-normal">
+                                <p className="font-medium">{result.name}</p>
+                                <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+                                  {result.title}
+                                </p>
+                                {result.source_id ? (
+                                  <Link
+                                    className="data-link mt-2 inline-block text-xs"
+                                    to={`/torrents?${params({ provider: result.provider, q: result.source_id })}`}
+                                  >
+                                    {sourceName(result.provider, result.provider_name)} ·{' '}
+                                    {result.source_id}
+                                  </Link>
+                                ) : (
+                                  <p className="help mt-2">
+                                    {sourceName(result.provider, result.provider_name)}
+                                  </p>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <p className="mb-1 text-sm">{services[result.service]}</p>
+                                <Badge
+                                  variant={
+                                    result.cache === 'cached'
+                                      ? 'success'
+                                      : result.cache === 'unknown' || result.cache === 'download'
+                                        ? 'warning'
+                                        : 'secondary'
+                                  }
+                                >
+                                  {cacheLabels[result.cache]}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-md whitespace-normal break-words text-xs">
+                                {result.filename}
+                              </TableCell>
+                              <TableCell className="text-right text-xs">
+                                {bytes(result.size)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <Empty
+                      title="No results returned"
+                      description="This request did not return any playable result."
+                    />
+                  )}
+                  {item.truncated && (
+                    <p className="notice notice-warning">
+                      This request returned more than 1,000 results. The first 1,000 display
+                      summaries were retained; the total count above is complete.
+                    </p>
+                  )}
+                </section>
+              </>
+            )}
+            {Boolean(item.calls?.length) && (
+              <section className="space-y-4" aria-label="Provider calls">
+                <h2 className="section-title">Provider calls</h2>
                 <div className="table-frame">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Result / source</TableHead>
-                        <TableHead>Service / cache</TableHead>
-                        <TableHead>File</TableHead>
-                        <TableHead className="text-right">Size</TableHead>
+                        <TableHead>Step</TableHead>
+                        <TableHead>Result</TableHead>
+                        <TableHead className="text-right">Response time</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {item.results.map((result, index) => (
+                      {item.calls!.map((call, index) => (
                         <TableRow key={index}>
-                          <TableCell className="max-w-lg whitespace-normal">
-                            <p className="font-medium">{result.name}</p>
-                            <p className="mt-1 whitespace-pre-wrap break-words text-sm">
-                              {result.title}
-                            </p>
-                            <Link
-                              className="data-link mt-2 inline-block text-xs"
-                              to={`/torrents?${params({ provider: result.provider, q: result.source_id })}`}
-                            >
-                              {sourceName(result.provider, result.provider_name)} ·{' '}
-                              {result.source_id}
-                            </Link>
-                          </TableCell>
+                          <TableCell>{providerSteps[call.phase] ?? 'Provider request'}</TableCell>
                           <TableCell>
-                            <p className="mb-1 text-sm">{services[result.service]}</p>
-                            <Badge
-                              variant={
-                                result.cache === 'cached'
-                                  ? 'success'
-                                  : result.cache === 'unknown' || result.cache === 'download'
-                                    ? 'warning'
-                                    : 'secondary'
-                              }
-                            >
-                              {cacheLabels[result.cache]}
+                            <Badge variant={call.error_code ? 'warning' : 'success'}>
+                              {call.error_code ? providerErrors[call.error_code] : 'Completed'}
                             </Badge>
+                            {call.http_status > 0 && (
+                              <p className="help mt-1">HTTP {call.http_status}</p>
+                            )}
                           </TableCell>
-                          <TableCell className="max-w-md whitespace-normal break-words text-xs">
-                            {result.filename}
+                          <TableCell className="mono text-right">
+                            {number(call.duration_ms)} ms
                           </TableCell>
-                          <TableCell className="text-right text-xs">{bytes(result.size)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-              ) : (
-                <Empty
-                  title="No results returned"
-                  description="This request did not return any playable result."
-                />
-              )}
-              {item.truncated && (
-                <p className="notice notice-warning">
-                  This request returned more than 1,000 results. The first 1,000 display summaries
-                  were retained; the total count above is complete.
-                </p>
-              )}
-            </section>
+              </section>
+            )}
           </>
         )
       )}

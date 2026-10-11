@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { SecretPicker } from '@/components/secret-picker'
 import { CopyButton } from '@/components/copy-button'
 import { FormStatus } from '@/components/form-status'
+import { PublicAccessSettings } from '@/components/public-access-settings'
 import type { Config, Status, Tracker } from '@/lib/aiosource-types'
 
 type FormScope = 'metadata' | 'debrid' | 'trackers'
@@ -399,6 +400,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           </div>
         </Panel>
       )}
+      {section === 'stremio' && <PublicAccessSettings />}
       {section === 'debrid' && settingsForm}
       {section === 'debrid' && (
         <form
