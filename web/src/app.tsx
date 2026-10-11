@@ -44,7 +44,6 @@ import {
 import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/components/common'
 import { Login } from '@/components/login'
 import { PublicEntry } from '@/components/public-entry'
-import { AboutDialog } from '@/components/about-dialog'
 
 export class RootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
@@ -461,7 +460,6 @@ export function AppShell() {
   const footer = (
     <div className="shrink-0 space-y-3 border-t border-border p-3">
       <ErrorNotice error={logout.error} />
-      <AboutDialog />
       <Button
         variant="destructive"
         className="min-h-11 w-full justify-center lg:min-h-9"
@@ -495,7 +493,7 @@ export function AppShell() {
           {footer}
         </aside>
         <div className="lg:pl-60">
-          <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9">
+          <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border bg-background/95 py-3 pr-20 pl-5 backdrop-blur-sm sm:pr-32 md:pr-36 md:pl-9">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <DialogTrigger asChild>
                 <Button

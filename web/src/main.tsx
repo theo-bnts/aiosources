@@ -27,6 +27,7 @@ import { AppShell, RootBoundary, SessionGate } from '@/app'
 import { Empty } from '@/components/common'
 import { WorkspaceLayout } from '@/components/workspace-layout'
 import { Button } from '@/components/ui/button'
+import { AboutDialog } from '@/components/about-dialog'
 import './index.css'
 
 const SourceStatisticsPage = lazy(() =>
@@ -135,11 +136,16 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <Route
       element={
-        <SessionGate>
-          <UnsavedChangesProvider>
-            <Outlet />
-          </UnsavedChangesProvider>
-        </SessionGate>
+        <>
+          <div className="fixed top-2.5 right-5 z-30 md:right-9 lg:top-3.5">
+            <AboutDialog />
+          </div>
+          <SessionGate>
+            <UnsavedChangesProvider>
+              <Outlet />
+            </UnsavedChangesProvider>
+          </SessionGate>
+        </>
       }
       errorElement={
         <div className="page">
