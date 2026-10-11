@@ -434,7 +434,7 @@ func TestPublicCacheFailureStaysUnknownAndDoesNotSaveCredentials(t *testing.T) {
 		t.Fatal("authentication failure became global negative")
 	}
 	runs, err := s.DB.ListOperations(ctx, model.OperationFilter{Kind: "cache"})
-	if err != nil || len(runs.Items) != 1 || runs.Items[0].Status != "failed" {
+	if err != nil || len(runs.Items) != 1 || runs.Items[0].Status != "failed" || runs.Items[0].Phase != "availability" {
 		t.Fatal("provider failure absent from history", err)
 	}
 	events, err := s.DB.OperationEvents(ctx, runs.Items[0].ID, model.ListOptions{})

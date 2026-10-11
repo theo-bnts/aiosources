@@ -305,6 +305,7 @@ func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, h
 	}
 	defer func() { h.finish(ctx, checkErr) }()
 	ctx = withProviderHistory(ctx, h)
+	h.checkpoint(ctx, "availability")
 	generation, err := s.DB.AIOCacheGeneration(ctx)
 	if err != nil {
 		return err
@@ -327,6 +328,7 @@ func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, h
 				h.run.Results["uncached"]++
 			}
 		}
+		h.checkpoint(ctx, "availability")
 	}
 	return nil
 }
