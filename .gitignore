@@ -15,6 +15,8 @@
 node_modules/
 dist/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 .DS_Store
 
 # Browser regressions: never commit reports, downloads or authenticated state

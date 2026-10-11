@@ -42,6 +42,7 @@ import { CollectDialog } from '@/components/collect-dialog'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { FormStatus } from '@/components/form-status'
 import { AdvancedImportSettings } from '@/components/advanced-import-settings'
+import { Disclosure } from '@/components/ui/disclosure'
 import { useListViewState } from '@/lib/detail-navigation'
 import {
   ConfirmAction,
@@ -99,7 +100,6 @@ export function ProvidersPage() {
         title="Sources"
         actions={
           <>
-            <CollectDialog />
             <Button asChild>
               <Link to="/providers/new" state={listState}>
                 <PlusIcon />
@@ -211,7 +211,7 @@ export function ProvidersPage() {
                           <Button
                             size="icon-sm"
                             variant="ghost"
-                            aria-label={`Run ${source.name || source.id}`}
+                            aria-label={`Run manual import for ${source.name || source.id}`}
                             disabled={!source.valid || !source.enabled}
                           >
                             <PlayIcon />
@@ -268,6 +268,9 @@ export function ProvidersPage() {
           />
         )
       )}
+      <Disclosure title="Manual actions">
+        <CollectDialog />
+      </Disclosure>
       <AdvancedImportSettings />
     </div>
   )
@@ -870,7 +873,7 @@ function ProviderForm({
                   }
                 >
                   <PlayIcon />
-                  Run
+                  Run manual import
                 </Button>
               }
             />

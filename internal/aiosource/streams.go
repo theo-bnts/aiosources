@@ -11,19 +11,24 @@ import (
 
 type Stream struct {
 	Name     string   `json:"name"`
-	Title    string   `json:"title"`
+	Title    string   `json:"description"`
 	InfoHash string   `json:"infoHash,omitempty"`
 	URL      string   `json:"url,omitempty"`
 	Sources  []string `json:"sources,omitempty"`
 	Hints    Behavior `json:"behaviorHints"`
 }
 type Behavior struct {
-	BingeGroup  string `json:"bingeGroup"`
-	Size        int64  `json:"videoSize,omitempty"`
-	Filename    string `json:"filename"`
-	NotWebReady bool   `json:"notWebReady,omitempty"`
-	FolderName  string `json:"folderName,omitempty"`
-	FolderSize  int64  `json:"folderSize,omitempty"`
+	BingeGroup  string  `json:"bingeGroup"`
+	Size        int64   `json:"videoSize,omitempty"`
+	Filename    string  `json:"filename"`
+	NotWebReady bool    `json:"notWebReady,omitempty"`
+	FolderName  string  `json:"folderName,omitempty"`
+	FolderSize  int64   `json:"folderSize,omitempty"`
+	Indexer     string  `json:"indexer,omitempty"`
+	Service     string  `json:"service,omitempty"`
+	Cached      *bool   `json:"cached,omitempty"`
+	PublishDate string  `json:"publishDate,omitempty"`
+	Duration    float64 `json:"duration,omitempty"`
 }
 
 func Manifest() map[string]any {
@@ -66,7 +71,11 @@ func baseStream(rec model.AIORecord, r Resource, sourceName string) Stream {
 	if label := streamLanguageLabel(languages); label != "" {
 		details += "  🏷️ " + label
 	}
-	return Stream{Name: "［AIO " + sourceName + "］ " + q, InfoHash: rec.Hash, Title: rec.Title + "\n" + details, Hints: Behavior{BingeGroup: streamBingeGroup(rec, r, q, languages), Size: rec.Size, Filename: rec.Title, NotWebReady: true}}
+	hints := Behavior{BingeGroup: streamBingeGroup(rec, r, q, languages), Size: max(0, rec.Size), Filename: rec.Title, NotWebReady: true, Indexer: sourceName, Duration: rec.DurationSeconds}
+	if rec.PublishedAt != nil {
+		hints.PublishDate = rec.PublishedAt.UTC().Format(time.RFC3339Nano)
+	}
+	return Stream{Name: "［AIO " + sourceName + "］ " + q, InfoHash: rec.Hash, Title: rec.Title + "\n" + details, Hints: hints}
 }
 func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string) (streams []Stream, streamErr error) {
 	history := newStremioHistory(mediaType, id)
@@ -181,38 +190,20 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 				// failed. Retain playback but present the cache as unverified.
 				known = false
 			}
-			item := stream
-			item.InfoHash = ""
-			item.Hints.NotWebReady = false
-			item.Hints.BingeGroup += "|" + service
-			marker := "TB"
-			label := "TorBox"
-			if service == "alldebrid" {
-				marker = "AD"
-				label = "AllDebrid"
-			}
-			if known {
-				if observed.Cached {
-					item.Name = "[" + marker + "+] " + stream.Name
-				} else {
-					item.Name = "[" + marker + " download] " + stream.Name
-				}
-			}
-			item.Title += "\n" + label
-			if !known {
-				item.Title += " · Cache unknown"
-			}
-			if hasFile {
-				item.Hints.Filename = selected.Path
-				item.Hints.Size = selected.Size
-				item.Hints.FolderName = rec.Title
-				item.Hints.FolderSize = rec.Size
-			}
 			segments := []string{"stremio", token, "play", service, rec.Provider, rec.SourceID, mediaType, id}
 			for i := range segments {
 				segments[i] = url.PathEscape(segments[i])
 			}
-			item.URL = strings.TrimRight(base, "/") + "/" + strings.Join(segments, "/")
+			var cached *bool
+			if known {
+				value := observed.Cached
+				cached = &value
+			}
+			var file *model.AIOFile
+			if hasFile {
+				file = &selected
+			}
+			item := playbackStream(stream, rec, service, cached, file, strings.TrimRight(base, "/")+"/"+strings.Join(segments, "/"))
 			out = append(out, item)
 			cache := "unknown"
 			if known {

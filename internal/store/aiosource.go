@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -199,6 +200,13 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 	r.Title = text("title", "name")
 	r.Hash = strings.ToLower(text("info_hash", "hash", "infohash"))
 	r.Size, _ = strconv.ParseInt(text("size"), 10, 64)
+	if published, err := time.Parse(time.RFC3339Nano, text("published_at")); err == nil {
+		published = published.UTC()
+		r.PublishedAt = &published
+	}
+	if seconds, err := strconv.ParseFloat(text("duration"), 64); err == nil && seconds > 0 && !math.IsInf(seconds, 0) && seconds <= float64(1<<53-1)/1000 {
+		r.DurationSeconds = seconds
+	}
 	for kind, dst := range map[string]*string{"imdb": &r.IMDb, "tmdb": &r.TMDB, "tvdb": &r.TVDB, "mal": &r.MAL} {
 		values := []any{f[kind+"_id"], f[kind]}
 		if kind == "imdb" {
@@ -253,11 +261,30 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 	}
 	r.Season = index("season")
 	r.Episode = index("episode")
-	if langs, ok := f["audiolangs"].([]any); ok {
-		for _, v := range langs {
-			if s, ok := v.(string); ok {
-				r.Languages = append(r.Languages, s)
+	// Source adapters use both ordinary fields and Torznab attributes. Only
+	// explicit audio language fields belong here; raw/private fields stay private.
+	var addLanguages func(any)
+	addLanguages = func(value any) {
+		switch value := value.(type) {
+		case string:
+			for _, language := range strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == '/' || r == ';' }) {
+				language = strings.TrimSpace(language)
+				if language != "" && !slices.Contains(r.Languages, language) {
+					r.Languages = append(r.Languages, language)
+				}
 			}
+		case []any:
+			for _, language := range value {
+				addLanguages(language)
+			}
+		}
+	}
+	for _, key := range []string{"audiolangs", "languages", "language"} {
+		addLanguages(f[key])
+	}
+	if attributes, ok := f["attributes"].(map[string]any); ok {
+		for _, key := range []string{"audiolangs", "languages", "language"} {
+			addLanguages(attributes[key])
 		}
 	}
 	return r, nil

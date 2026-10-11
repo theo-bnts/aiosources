@@ -50,11 +50,17 @@ test('source creation and import actions appear only in Settings', async ({ page
   for (const path of ['/providers', '/runs']) {
     await page.goto(path)
     await expect(page.getByRole('link', { name: 'Add source', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Start import', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Run manual import', exact: true })).toHaveCount(
+      0,
+    )
   }
   await page.goto('/providers/settings')
   await expect(page.getByRole('link', { name: 'Add source', exact: true })).toHaveCount(1)
-  await expect(page.getByRole('button', { name: 'Start import', exact: true })).toHaveCount(1)
+  await expect(
+    page.locator('.page-heading').getByRole('button', { name: 'Run manual import', exact: true }),
+  ).toHaveCount(0)
+  await page.getByText('Manual actions', { exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Run manual import', exact: true })).toBeVisible()
 })
 
 test('secret forms and open deletion confirmations cannot adopt a competing rotation silently', async ({

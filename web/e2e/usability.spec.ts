@@ -558,7 +558,8 @@ test.describe('real local imports', () => {
     })
     for (const [index, action] of ['preview', 'incremental', 'incremental', 'full'].entries()) {
       await page.goto('/providers/settings')
-      await page.getByRole('button', { name: 'Start import', exact: true }).click()
+      await page.getByText('Manual actions', { exact: true }).click()
+      await page.getByRole('button', { name: 'Run manual import', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await dialog.getByLabel('Source', { exact: true }).selectOption('action-source')
       await dialog.getByLabel('Action', { exact: true }).selectOption(action)
@@ -578,7 +579,7 @@ test.describe('real local imports', () => {
         (value) =>
           new URL(value.url()).pathname === '/api/runs' && value.request().method() === 'POST',
       )
-      await dialog.getByRole('button', { name: 'Start import', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
       const created = await response
       expect(created.status()).toBe(202)
       const request = created.request().postDataJSON()

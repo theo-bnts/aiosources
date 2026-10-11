@@ -367,7 +367,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             </div>
             <div className="flex flex-wrap gap-3">
               <Button
-                variant="outline"
                 disabled={busy || status.status.works === 0}
                 onClick={() => action.mutate('match')}
               >
@@ -461,6 +460,16 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           </fieldset>
         </form>
       )}
+      {section === 'debrid' && (
+        <Disclosure title="Manual actions">
+          <Button
+            disabled={action.isPending || !status.config.alldebrid_secret}
+            onClick={() => action.mutate('retry-cleanup')}
+          >
+            Retry temporary cleanup
+          </Button>
+        </Disclosure>
+      )}
       <Disclosure
         id="maintenance"
         title="Maintenance"
@@ -518,13 +527,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                   </Button>
                 }
               />
-              <Button
-                variant="outline"
-                disabled={action.isPending || !status.config.alldebrid_secret}
-                onClick={() => action.mutate('retry-cleanup')}
-              >
-                Retry temporary cleanup
-              </Button>
             </div>
           </>
         )}

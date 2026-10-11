@@ -393,7 +393,7 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 	token, _ := s.Token(ctx)
 	for i := 0; i < 2; i++ {
 		out, err := s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
-		if err != nil || len(out) != 1 || !strings.HasPrefix(out[0].Name, "[TB+]") || out[0].InfoHash != "" || out[0].Hints.Size != 123 {
+		if err != nil || len(out) != 1 || !strings.HasPrefix(out[0].Name, "[TB+]") || out[0].InfoHash != hash || out[0].Hints.Size != 123 || out[0].Hints.Service != "torbox" || out[0].Hints.Cached == nil || !*out[0].Hints.Cached {
 			t.Fatalf("invalid cache stream %+v %v", out, err)
 		}
 	}

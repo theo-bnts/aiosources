@@ -6,7 +6,7 @@ Verified on 11 October 2026 using the embedded production application, PostgreSQ
 
 | Check | Result |
 | --- | --- |
-| Complete application Go suite with race detection | 1,535 passing test/subtest events; no failing or individually skipped tests |
+| Complete application Go suite with race detection | 1,578 passing test/subtest events; no failing or individually skipped tests |
 | Standalone Torznab SDK with race detection | 191 passing test/subtest events; no failing or individually skipped tests |
 | Go static analysis and formatting, both modules | Passed |
 | Frontend unit tests | 21 passed |
@@ -18,6 +18,9 @@ Verified on 11 October 2026 using the embedded production application, PostgreSQ
 | Source-aware Go vulnerability scans | No affected imported package or reachable call; see the module-only advisory in [Security](../SECURITY.md) |
 | Frontend dependency audit | No reported vulnerabilities |
 | Existing GitHub workflows and original MIT license | Preserved unchanged |
+| Image channel metadata and promotion guards | Six Python test cases passed; preview/draft releases, altered digests, mismatched commits/registries and unsafe tags are rejected |
+| Proposed GHCR/pre-release workflows | Actionlint validation passed; files delivered separately for owner installation |
+| Actual upstream AIOStreams parser | Ten synthetic direct/debrid/season-pack responses accepted with their supported metadata preserved |
 
 Test counts include parent and subtest events. Go packages with no tests are not individual skipped tests.
 
@@ -31,6 +34,8 @@ Test counts include parent and subtest events. Go packages with no tests are not
 - Authenticated API access, CSRF, sign-in throttling, cookie restrictions, two-step verification, session revocation and private filesystem/vault handling. A direct-HTTP regression verifies that spoofed forwarded headers cannot change the trusted origin or evade connection-based throttling.
 - Environment-name migration fails before generating private state. The default concurrency is five, while saved settings survive restart. The retained workflow's old test-only database name still runs actual integration tests.
 - Source drafts, concurrent edits, exact JSON numbers, navigation, forms, histories, paging and mobile layouts. Closing navigation or credits leaves source drafts intact; normal route changes and sign-out retain their unsaved-change guards.
+- Standard stream descriptions, structured indexer/service/cache/date/duration hints, debrid hashes, selected-file versus folder sizes, and web readiness. Unknown cache values and invalid optional metadata are omitted; a pack's aggregate duration is not attached to its selected episode. The real [AIOStreams parser](https://github.com/Viren070/AIOStreams/blob/b3170f148fff5703bf06f36e0db6dc799e6a76cf/packages/core/src/parser/streams.ts) was exercised with its file parser and dependencies; only logging and unrelated runtime configuration were isolated.
+- An anonymous-access matrix covers private administration routes and verifies that installation/share credentials cannot substitute for administrator authentication. Public login/static assets and minimal health/session responses remain intentional.
 
 ## Public files and attribution
 

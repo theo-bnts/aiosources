@@ -39,23 +39,25 @@ type AIOWork struct {
 	Revision     int64          `json:"revision"`
 }
 type AIORecord struct {
-	ReviewedEpisode     bool     `json:"reviewed_episode,omitempty"`
-	Normalized          string   `json:"-"`
-	QueueVersion        int64    `json:"-"`
-	CandidateGeneration int64    `json:"-"`
-	Provider            string   `json:"provider"`
-	SourceID            string   `json:"source_id"`
-	Title               string   `json:"title"`
-	Hash                string   `json:"hash"`
-	Size                int64    `json:"size"`
-	IMDb                string   `json:"imdb"`
-	TMDB                string   `json:"tmdb"`
-	TVDB                string   `json:"tvdb"`
-	MAL                 string   `json:"mal"`
-	Season              *int     `json:"season"`
-	Episode             *int     `json:"episode"`
-	Languages           []string `json:"languages"`
-	Fingerprint         string   `json:"fingerprint"`
+	ReviewedEpisode     bool       `json:"reviewed_episode,omitempty"`
+	Normalized          string     `json:"-"`
+	QueueVersion        int64      `json:"-"`
+	CandidateGeneration int64      `json:"-"`
+	Provider            string     `json:"provider"`
+	SourceID            string     `json:"source_id"`
+	Title               string     `json:"title"`
+	Hash                string     `json:"hash"`
+	Size                int64      `json:"size"`
+	IMDb                string     `json:"imdb"`
+	TMDB                string     `json:"tmdb"`
+	TVDB                string     `json:"tvdb"`
+	MAL                 string     `json:"mal"`
+	Season              *int       `json:"season"`
+	Episode             *int       `json:"episode"`
+	Languages           []string   `json:"languages"`
+	PublishedAt         *time.Time `json:"published_at,omitempty"`
+	DurationSeconds     float64    `json:"duration_seconds,omitempty"`
+	Fingerprint         string     `json:"fingerprint"`
 }
 
 // Eligibility belongs in candidate discovery, before the bounded safety cap.

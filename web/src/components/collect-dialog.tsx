@@ -101,13 +101,13 @@ export function CollectDialog({
         {trigger ?? (
           <Button>
             <PlayIcon />
-            Start import
+            Run manual import
           </Button>
         )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Start import</DialogTitle>
+          <DialogTitle>Run manual import</DialogTitle>
           <DialogDescription>
             Choose what to do with this source. Follow progress and resume interrupted imports in
             History.
@@ -331,7 +331,7 @@ export function CollectDialog({
                 invalidKnownPages
               }
             >
-              {mutation.isPending ? 'Creating…' : 'Start import'}
+              {mutation.isPending ? 'Creating…' : 'Run manual import'}
             </Button>
           </DialogFooter>
         </form>

@@ -71,6 +71,14 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with `ADMIN_PASSWORD`. For access 
 
 Both Linux `amd64` and `arm64` images are available. If AIOStreams uses another Compose project, attach it to the same Docker network or use the externally reachable address.
 
+### Stable versions and previews
+
+The Compose example uses `latest`, the stable image channel. With the release workflows installed, new builds are published as **GitHub pre-releases** and use the `preview` tag; they do not replace `latest` automatically. Images are mirrored to `ghcr.io/theo-bnts/aiosources` as well as Codeberg. A newly created GHCR package must be made public before anonymous pulls work.
+
+To try a preview, replace `:latest` with `:preview`, then pull and recreate the application container. Each pre-release also gives the exact image digest, which pins the tested build even when `preview` advances. Keep both data volumes. To follow stable releases again, restore `:latest`. An older image is not guaranteed to understand database changes made by a newer preview; do not use a production database as a disposable test installation.
+
+For maintainers: after testing a pre-release, open **GitHub → Releases → Edit**, clear **Set as a pre-release** and save. The stable-promotion workflow verifies the recorded image and both architectures, then publishes that same image under `latest`, `stable` and the release tag, without rebuilding it. GHCR stable tags become available after the first promotion.
+
 ## Environment variables
 
 These are all application environment variables. The image supplies the defaults below; native installations use `.ingest`, `providers` and `127.0.0.1:8080` for the three path/listen settings. Add overrides to the application service's `environment` section or `env_file`.
@@ -97,6 +105,8 @@ TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets*
 4. In **Stremio → Settings**, copy your manifest URL into Stremio or AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
 
 Treat the manifest URL like a password: it grants access to your catalog and configured playback services. Replace its token in Stremio settings to revoke an old link. Use your service accounts according to their terms; a catalog or playback link does not grant rights to its content.
+
+Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links.
 
 Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
 
