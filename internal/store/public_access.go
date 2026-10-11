@@ -3,10 +3,13 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"github.com/theo-bnts/aiosources/internal/model"
+	"errors"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 var sharedHashRE = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
@@ -32,14 +35,36 @@ func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision)
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin public access change", err)
+	}
+	defer rollback(tx)
+	var previous bool
+	err = tx.QueryRow(ctx, `SELECT enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ErrConflict
+	}
+	if err != nil {
+		return databaseError("lock public access", err)
+	}
+	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
 	if tag.RowsAffected() != 1 {
 		return model.ErrConflict
 	}
-	return nil
+	if previous != value.Enabled {
+		kind := "security.public_access_disabled"
+		if value.Enabled {
+			kind = "security.public_access_enabled"
+		}
+		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
+			return err
+		}
+	}
+	return databaseError("commit public access change", tx.Commit(ctx))
 }
 func (s *Store) SharedAvailability(ctx context.Context, service string, hashes []string, after time.Time) ([]model.AIOAvailability, error) {
 	rows, err := s.pool.Query(ctx, `SELECT hash,cached,checked_at,files FROM ingest.aio_shared_availability WHERE service=$1 AND hash=ANY($2) AND checked_at>$3 AND checked_at<=now() AND (cached OR checked_at>now()-interval '15 minutes')`, service, hashes, after)

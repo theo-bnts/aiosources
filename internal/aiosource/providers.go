@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/theo-bnts/aiosources/internal/model"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 var ErrPending = errors.New("torrent is not ready")
@@ -30,6 +31,18 @@ type ProviderHTTP struct {
 func NewProviderHTTP() *ProviderHTTP {
 	return &ProviderHTTP{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ADBase: "https://api.alldebrid.com", TBBase: "https://api.torbox.app/v1/api", next: map[string]time.Time{}}
 }
+
+// Documented demonstration keys authenticate static fixtures, not an account.
+// Check them locally too so previously issued public links fail closed.
+func allDebridDemoKey(key string) bool {
+	switch key {
+	case "staticDemoApikeyPrem", "staticDemoApikeyTria", "staticDemoApikeyFree":
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *ProviderHTTP) pace(ctx context.Context, service string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -62,7 +75,7 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	started := time.Now()
 	status := 0
 	defer func() { recordProviderCall(ctx, strings.Split(path, "?")[0], status, started, requestErr) }()
-	if strings.TrimSpace(key) == "" {
+	if strings.TrimSpace(key) == "" || (service == "alldebrid" && allDebridDemoKey(key)) {
 		return nil, ErrAuth
 	}
 	if err := p.pace(ctx, service); err != nil {
@@ -102,12 +115,22 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	var envelope struct {
 		Status  string          `json:"status"`
 		Success *bool           `json:"success"`
+		Demo    json.RawMessage `json:"demo"`
 		Data    json.RawMessage `json:"data"`
 		Error   json.RawMessage `json:"error"`
 		Detail  string          `json:"detail"`
 	}
 	if json.Unmarshal(b, &envelope) != nil {
 		return nil, ErrInvalidResponse
+	}
+	if service == "alldebrid" && len(envelope.Demo) > 0 {
+		switch string(envelope.Demo) {
+		case `true`, `"true"`:
+			return nil, ErrAuth
+		case `false`, `"false"`, `null`:
+		default:
+			return nil, ErrInvalidResponse
+		}
 	}
 	success := envelope.Success != nil && *envelope.Success
 	if service == "alldebrid" {

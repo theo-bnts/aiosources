@@ -216,3 +216,42 @@ func TestPublicAdmissionIsBoundedAndUntrustedHeadersCannotBypassIt(t *testing.T)
 		}
 	}
 }
+
+func TestEnabledPublicInstallationCannotReadOrChangeAdministration(t *testing.T) {
+	f, addon, _ := addonAPI(t)
+	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"success":true,"data":{"id":1}}`)
+	}))
+	defer upstream.Close()
+	addon.Providers.TBBase = upstream.URL
+	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "synthetic-visitor-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []struct{ method, path string }{
+		{"GET", "/api/providers"}, {"GET", "/api/secrets"}, {"GET", "/api/raw/1/download"},
+		{"GET", "/api/operations"}, {"GET", "/api/stremio/requests"}, {"GET", "/api/logs"},
+		{"GET", "/api/security/sessions"}, {"GET", "/api/aiosource"}, {"GET", "/api/remotes"},
+		{"PUT", "/api/stremio/public-access"}, {"PUT", "/api/aiosource/config"},
+		{"POST", "/api/aiosource/token"}, {"POST", "/api/runs"}, {"PUT", "/api/providers/example"},
+		{"DELETE", "/api/secrets/example"}, {"POST", "/api/security/mfa/enroll"},
+		{"GET", "/stremio/" + configuration + "/manifest.json"},
+	} {
+		t.Run(route.method+" "+route.path, func(t *testing.T) {
+			response := f.request(route.method, route.path, `{}`, false, configuration)
+			if response.Code != http.StatusUnauthorized || response.Header().Get("Cache-Control") != "no-store" {
+				t.Fatalf("public credential granted administrator access: %d", response.Code)
+			}
+			if strings.Contains(response.Body.String(), configuration) || response.Header().Get("Access-Control-Allow-Credentials") != "" {
+				t.Fatal("public credential was reflected or administrator cookies were exposed to other origins")
+			}
+		})
+	}
+	access, err := f.db.PublicAccess(f.ctx)
+	if err != nil || !access.Enabled || access.Revision != 2 {
+		t.Fatal("unauthorized public requests changed administration state", err)
+	}
+}

@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/theo-bnts/aiosources/internal/model"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 const publicInstallationPurpose = "public-installation-v1"
@@ -37,7 +38,7 @@ func validPublicKeys(keys map[string]string) bool {
 		for _, p := range PublicProviders {
 			supported = supported || service == p.ID
 		}
-		if !supported || len(key) < 8 || len(key) > 512 {
+		if !supported || len(key) < 8 || len(key) > 512 || (service == "alldebrid" && allDebridDemoKey(key)) {
 			return false
 		}
 		for _, c := range key {

@@ -10,6 +10,8 @@ When disabled, the homepage keeps its ordinary login. Disabling public access re
 
 Visitor keys are validated with the provider and processed only in memory during the request. The application does not save them in its database, encrypted secret store, request history, logs or browser storage. Keys never enter a background job that would need them after a restart.
 
+Provider demonstration keys and static demo responses cannot validate an account or supply cache observations. Previously issued links containing a documented demonstration key are rejected without revoking legitimate visitor installations.
+
 The manifest URL contains an authenticated encrypted configuration, bound to this instance and its current public-access generation. It uses a separate encryption purpose from administration, two-step verification and source references. Keep that URL private: its ciphertext is a bearer credential. The existing `/data` volume contains the encryption key; preserve it across updates.
 
 A public installation cannot authenticate an administrator endpoint or a private installation. Keys, account inventory, provider file IDs and download links are not shared between accounts. Public playback always uses the visitor's selected service account. There is no fallback to an administrator key or announce URL.
@@ -46,7 +48,7 @@ Public activity uses the existing pages, visible only to administrators:
 
 - **Stremio → History:** stream, manifest and playback requests, including requests served entirely from cache. Filters distinguish public and private installations and request type. Details include normalized media identifiers, duration, outcome, selection counts and returned display fields. Playback details include bounded provider steps, duration, HTTP status and fixed error categories; the playback link is never saved.
 - **Debrid → History:** actual availability and cleanup work. Operation details include safe provider-call diagnostics. Reusing availability does not fabricate an external call.
-- **Logs:** meaningful provider failures through the existing sanitized logging. Provider error bodies, request URLs and submitted keys are excluded.
+- **Logs:** public-access activation and deactivation, and meaningful provider failures through the existing sanitized logging. Access changes and their logs commit together; a failed or conflicting save does not change access or create a misleading log. Provider error bodies, request URLs and submitted keys are excluded.
 
 There is no visitor database or stable visitor identifier. History does not save IP addresses, account email, username or visitor account fingerprints. Media identifiers and filenames remain activity data: the homepage explains this retention before visitors submit keys.
 
