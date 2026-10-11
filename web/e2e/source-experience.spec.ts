@@ -148,11 +148,14 @@ test('source setup keeps essentials visible and advanced configuration lossless'
     search: { categories: [5000] },
     output: { fields: ['title', 'info_hash'] },
   }
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'example-source.json',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(source)),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('tab', { name: /^Connection/ }).click()
   await expect(page.getByLabel('Search mode', { exact: true })).toHaveValue('tvsearch')
   await expect(page.getByLabel('Category requests', { exact: true })).toHaveValue('each')
@@ -164,6 +167,7 @@ test('source setup keeps essentials visible and advanced configuration lossless'
   await page.getByText('Native identity', { exact: true }).click()
   await expect(page.getByLabel('Native ID pattern', { exact: true })).toHaveValue('/items/([0-9]+)')
   await page.getByLabel('Native ID pattern', { exact: true }).fill('/entries/([0-9]+)')
+  await page.getByRole('button', { name: 'JSON', exact: true }).click()
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click()
   const download = await downloading

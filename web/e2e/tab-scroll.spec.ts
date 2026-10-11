@@ -138,6 +138,7 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
   await expect(
     page.getByRole('heading', { name: 'Add source', exact: true, level: 2 }),
   ).toBeVisible()
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'synthetic-tab-navigation.json',
     mimeType: 'application/json',
@@ -152,6 +153,8 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
       }),
     ),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await retainDocumentHeight(page)
   const identity = page.getByRole('tab', { name: 'Identity', exact: true })
   await identity.focus()

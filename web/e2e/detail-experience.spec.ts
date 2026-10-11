@@ -90,11 +90,13 @@ test.describe('returning from details', () => {
     await page.getByRole('link', { name: 'All sources', exact: true }).click()
     await expect(page).toHaveURL(sourcesView)
     await page.getByRole('link', { name: 'Add source', exact: true }).click()
+    await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
     await page.locator('input[type="file"]').setInputFiles({
       name: 'source.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ ...definition, id: 'added', name: 'Example added' })),
     })
+    await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/providers\/added$/)
     await page.getByRole('link', { name: 'All sources', exact: true }).click()

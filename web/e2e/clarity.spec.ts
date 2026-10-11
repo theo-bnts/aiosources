@@ -51,6 +51,7 @@ test('source configuration navigation preserves unsaved edits and saving release
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 8 })
   await page.goto('/providers/new')
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'synthetic-navigation-source.json',
     mimeType: 'application/json',
@@ -65,6 +66,8 @@ test('source configuration navigation preserves unsaved edits and saving release
       }),
     ),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(/\/providers\/guard-source$/)
   await expect(page.getByRole('alertdialog')).toHaveCount(0)

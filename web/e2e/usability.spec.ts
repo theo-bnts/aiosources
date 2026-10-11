@@ -21,6 +21,7 @@ async function createSource(
   save = true,
 ) {
   await page.goto('/providers/new')
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'synthetic-usability-source.json',
     mimeType: 'application/json',
@@ -36,6 +37,8 @@ async function createSource(
       }),
     ),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   if (save) {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/providers/${id}$`))
@@ -241,6 +244,7 @@ test('adaptive authentication, pagination and adapter controls retain hidden val
   await page.getByLabel('Authentication type', { exact: true }).selectOption('basic')
   await page.getByRole('tab', { name: /^Pagination/ }).click()
   await page.getByLabel('Pagination type', { exact: true }).selectOption('page')
+  await page.getByRole('button', { name: 'JSON', exact: true }).click()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click()
   const exported = await download
@@ -250,11 +254,13 @@ test('adaptive authentication, pagination and adapter controls retain hidden val
   for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
   await exported.delete()
   expect(Buffer.concat(chunks).toString('utf8')).toBe(original.json)
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('tab', { name: /^Imports/ }).click()
   for (const label of ['Timing', 'Daily time', 'Schedule enabled', 'Scheduled collection mode']) {
     await expect(page.getByLabel(label, { exact: true })).toHaveCount(0)
   }
   await page.getByLabel('Request interval', { exact: true }).selectOption('2s')
+  await page.getByRole('button', { name: 'JSON', exact: true }).click()
   const settingsDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click()
   const settings = await settingsDownload

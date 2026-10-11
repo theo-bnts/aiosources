@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   FingerprintIcon,
   GlobeIcon,
@@ -1130,6 +1130,9 @@ export function SourceEditor({
   sourceID,
   onBlockedChange,
   initialStage,
+  mode: requestedMode,
+  onModeChange,
+  jsonActions,
 }: {
   value: string
   onChange: (value: string) => void
@@ -1137,12 +1140,13 @@ export function SourceEditor({
   sourceID?: string
   onBlockedChange: (blocked: boolean) => void
   initialStage?: string
+  mode: 'visual' | 'json'
+  onModeChange: (mode: 'visual' | 'json') => void
+  jsonActions?: ReactNode
 }) {
   const document = useMemo(() => parseProviderJSON(value), [value])
   const sourceStages = document.getIn(['http', 'catalog']) === true ? remoteStages : stages
-  const [mode, setMode] = useState<'visual' | 'json'>(() =>
-    document.errors.length ? 'json' : 'visual',
-  )
+  const mode = document.errors.length ? 'json' : requestedMode
   const [selectedIndex, setSelected] = useState(() =>
     Math.max(
       0,
@@ -1219,7 +1223,7 @@ export function SourceEditor({
               variant={mode === 'visual' ? 'secondary' : 'ghost'}
               aria-pressed={mode === 'visual'}
               disabled={document.errors.length > 0 || drafts.size > 0}
-              onClick={() => setMode('visual')}
+              onClick={() => onModeChange('visual')}
             >
               <FlowArrowIcon />
               Visual stages
@@ -1229,12 +1233,15 @@ export function SourceEditor({
               variant={mode === 'json' ? 'secondary' : 'ghost'}
               aria-pressed={mode === 'json'}
               disabled={drafts.size > 0}
-              onClick={() => setMode('json')}
+              onClick={() => onModeChange('json')}
             >
               <BracketsCurlyIcon />
               JSON
             </Button>
           </div>
+          {mode === 'json' && jsonActions && (
+            <div className="flex flex-wrap gap-2">{jsonActions}</div>
+          )}
         </div>
         {drafts.size > 0 && (
           <p className="notice notice-warning" role="status">
@@ -1247,7 +1254,7 @@ export function SourceEditor({
             {editError}
           </p>
         )}
-        {document.errors.length > 0 && (
+        {document.errors.length > 0 && (sourceID || value.trim() !== '') && (
           <div className="notice notice-error" role="alert">
             <p className="font-medium">Repair the JSON to enable visual editing and saving.</p>
             <ul className="mt-2 list-inside list-disc">

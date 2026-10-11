@@ -13,6 +13,7 @@ import {
   PlayIcon,
   DownloadSimpleIcon,
   UploadSimpleIcon,
+  BracketsCurlyIcon,
 } from '@phosphor-icons/react'
 import { api, ApiError, queryClient, refreshData } from '@/lib/api'
 import type {
@@ -350,9 +351,7 @@ async function readSourceImport(file: File) {
 export function ProviderEditor() {
   const { id } = useParams()
   const [template, setTemplate] = useState<AdapterInfo | null>(null)
-  const [imported, setImported] = useState<string | null>(null)
-  const [importError, setImportError] = useState<Error | null>(null)
-  const fileInput = useRef<HTMLInputElement>(null)
+  const [jsonDefinition, setJSONDefinition] = useState(false)
   const document = useQuery({
     queryKey: ['provider', id],
     queryFn: ({ signal }) =>
@@ -385,10 +384,10 @@ export function ProviderEditor() {
         )}
       </div>
     )
-  if (imported !== null)
+  if (jsonDefinition)
     return (
       <div className="page">
-        <ProviderForm key="imported" initialJSON={imported} />
+        <ProviderForm key="json" initialJSON="" />
       </div>
     )
   if (template)
@@ -401,36 +400,15 @@ export function ProviderEditor() {
     <div className="page">
       <PageHeader
         title="Add source"
-        description="Start from a server template or import a strict JSON definition. Configure and validate before saving."
+        description="Choose a source template or configure a JSON definition."
         back={{ to: '/providers/settings', label: 'All sources' }}
         actions={
-          <Button variant="outline" onClick={() => fileInput.current?.click()}>
-            <UploadSimpleIcon />
-            Import JSON
+          <Button variant="outline" onClick={() => setJSONDefinition(true)}>
+            <BracketsCurlyIcon />
+            Use JSON
           </Button>
         }
       />
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        className="sr-only"
-        aria-label="Import a source JSON definition"
-        onChange={async (event) => {
-          const file = event.target.files?.[0]
-          event.target.value = ''
-          if (!file) return
-          try {
-            setImported(await readSourceImport(file))
-            setImportError(null)
-          } catch (error) {
-            setImportError(
-              error instanceof Error ? error : new Error('Could not read the source definition.'),
-            )
-          }
-        }}
-      />
-      <ErrorNotice error={importError} />
       <ErrorNotice error={adapters.error} retry={() => void adapters.refetch()} />
       {adapters.isPending ? (
         <Loading />
@@ -503,6 +481,9 @@ function ProviderForm({
   const [editorKey, setEditorKey] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
   const parsed = useMemo(() => parseProviderJSON(json), [json])
+  const [editorMode, setEditorMode] = useState<'visual' | 'json'>(() =>
+    parsed.errors.length ? 'json' : 'visual',
+  )
   const byteLength = useMemo(() => new TextEncoder().encode(json).length, [json])
   const locallyInvalid = parsed.errors.length > 0 || byteLength > 128 * 1024
   const dirty = json !== savedJSON || fieldDraft
@@ -730,60 +711,29 @@ function ProviderForm({
           </p>
         </section>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          {(dirty || save.isPending) && <FormStatus dirty={dirty} saving={save.isPending} />}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy || fieldDraft}
-            onClick={() => fileInput.current?.click()}
-          >
-            <UploadSimpleIcon />
-            Import JSON
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={locallyInvalid || fieldDraft}
-            onClick={() => {
-              const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
-              const url = URL.createObjectURL(blob)
-              const link = window.document.createElement('a')
-              const id = parsed.get('id')
-              link.href = url
-              link.download = `${typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id) ? id : 'source-definition'}.json`
-              link.click()
-              window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-            }}
-          >
-            <DownloadSimpleIcon />
-            Export JSON
-          </Button>
-        </div>
-      </div>
-      <input
-        ref={fileInput}
-        type="file"
-        accept=".json,application/json"
-        className="sr-only"
-        aria-label="Import source JSON"
-        onChange={async (event) => {
-          const file = event.target.files?.[0]
-          event.target.value = ''
-          if (!file) return
-          try {
-            setPendingImport({ name: file.name, json: await readSourceImport(file) })
-            setImportError(null)
-          } catch (error) {
-            setImportError(
-              error instanceof Error ? error : new Error('Could not read the source definition.'),
-            )
-          }
-        }}
-      />
+      {(dirty || save.isPending) && <FormStatus dirty={dirty} saving={save.isPending} />}
+      {(editorMode === 'json' || parsed.errors.length > 0) && (
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          className="sr-only"
+          aria-label="Import a source JSON definition"
+          onChange={async (event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (!file) return
+            try {
+              setPendingImport({ name: file.name, json: await readSourceImport(file) })
+              setImportError(null)
+            } catch (error) {
+              setImportError(
+                error instanceof Error ? error : new Error('Could not read the source definition.'),
+              )
+            }
+          }}
+        />
+      )}
       {pendingImport && (
         <section className="notice space-y-3">
           <h2 className="font-medium">Import {pendingImport.name}?</h2>
@@ -832,6 +782,39 @@ function ProviderForm({
         sourceID={sourceID}
         initialStage={hash === '#schedules' ? 'schedules' : undefined}
         onBlockedChange={setFieldDraft}
+        mode={editorMode}
+        onModeChange={setEditorMode}
+        jsonActions={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy || fieldDraft}
+              onClick={() => fileInput.current?.click()}
+            >
+              <UploadSimpleIcon />
+              Import JSON
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={locallyInvalid || fieldDraft}
+              onClick={() => {
+                const blob = new Blob([json], { type: 'application/json;charset=utf-8' })
+                const url = URL.createObjectURL(blob)
+                const link = window.document.createElement('a')
+                const id = parsed.get('id')
+                link.href = url
+                link.download = `${typeof id === 'string' && /^[a-zA-Z0-9_-]+$/.test(id) ? id : 'source-definition'}.json`
+                link.click()
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+              }}
+            >
+              <DownloadSimpleIcon />
+              Export JSON
+            </Button>
+          </>
+        }
       />
       {validation && validatedJSON === json && (
         <section className="notice" aria-live="polite">

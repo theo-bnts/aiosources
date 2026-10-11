@@ -33,11 +33,28 @@ function sourceJSON(id: string, url: string) {
 
 async function importSource(page: Page, json: string) {
   await page.goto('/providers/new')
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'JSON', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toBeVisible()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'synthetic-source.json',
     mimeType: 'application/json',
     buffer: Buffer.from(json),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'JSON', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Display name', { exact: true })).toHaveValue(
     'Synthetic editor source',
   )
@@ -45,6 +62,11 @@ async function importSource(page: Page, json: string) {
 }
 
 async function exportSource(page: Page): Promise<string> {
+  const visual =
+    (await page
+      .getByRole('button', { name: 'Visual stages', exact: true })
+      .getAttribute('aria-pressed')) === 'true'
+  await page.getByRole('button', { name: 'JSON', exact: true }).click()
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click()
   const download = await downloaded
@@ -56,6 +78,7 @@ async function exportSource(page: Page): Promise<string> {
     return Buffer.concat(chunks).toString('utf8')
   } finally {
     await download.delete()
+    if (visual) await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   }
 }
 
@@ -236,16 +259,11 @@ test('invalid raw and structured drafts block saving and stage changes without d
   await pasteJSON(page, 'Request body · JSON', fieldDraft)
   const body = page.getByRole('textbox', { name: 'Request body · JSON', exact: true })
   await expect(body).toHaveText(fieldDraft)
-  for (const name of [
-    'Save',
-    'Check configuration',
-    'Export JSON',
-    'Import JSON',
-    'JSON',
-    'Visual stages',
-  ]) {
+  for (const name of ['Save', 'Check configuration', 'JSON', 'Visual stages']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeDisabled()
   }
+  await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toHaveCount(0)
   for (const name of [/^Identity/, /^Pagination/, /^Source fields/, /^Imports/]) {
     await expect(page.getByRole('tab', { name })).toBeDisabled()
   }

@@ -172,6 +172,7 @@ test('private playback saves independently and fields have space below their lab
   server,
 }) => {
   await page.goto('/providers/new')
+  await page.getByRole('button', { name: 'Use JSON', exact: true }).click()
   await page.getByLabel('Import a source JSON definition', { exact: true }).setInputFiles({
     name: 'synthetic-private-source.json',
     mimeType: 'application/json',
@@ -186,6 +187,8 @@ test('private playback saves independently and fields have space below their lab
       }),
     ),
   })
+  await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
+  await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page).toHaveURL(/\/providers\/private-playback$/)
   await page.goto('/secrets')
