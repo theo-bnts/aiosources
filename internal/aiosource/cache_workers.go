@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -58,7 +57,7 @@ func (s *Service) checkADResource(ctx context.Context, key string, hashes []stri
 				}
 				history.run.Errors++
 				failure = result.err
-				if errors.Is(failure, ErrAuth) {
+				if stopProviderChecks(failure) {
 					return failure
 				}
 				continue

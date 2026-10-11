@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -61,18 +60,6 @@ func recordProviderCall(ctx context.Context, path string, status int, started ti
 	case "torrents/requestdl":
 		phase = "provider_playback"
 	}
-	code := ""
-	if err != nil {
-		code = "provider_error"
-		if errors.Is(err, ErrAuth) {
-			code = "authentication"
-		}
-		if errors.Is(err, context.Canceled) {
-			code = "cancelled"
-		}
-		if errors.Is(err, context.DeadlineExceeded) {
-			code = "timeout"
-		}
-	}
+	code := providerFailureCode(err)
 	h.recordCall(ctx, model.ProviderCall{Phase: phase, HTTPStatus: status, DurationMS: time.Since(started).Milliseconds(), ErrorCode: code})
 }

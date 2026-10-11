@@ -13,4 +13,11 @@ export const providerErrors: Record<string, string> = {
   authentication: 'Key or subscription rejected',
   cancelled: 'Interrupted',
   timeout: 'Timed out',
+  rate_limit: 'Request rate limit reached',
+  account_limit: 'Torrent or download limit reached',
+  subscription: 'Subscription or higher plan required',
+  provider_unavailable: 'Provider temporarily unavailable',
+  invalid_torrent: 'Torrent rejected',
+  file_too_large: 'File exceeds provider or plan limit',
+  not_found: 'Torrent or file unavailable',
 }

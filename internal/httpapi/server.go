@@ -136,6 +136,14 @@ func writeError(w http.ResponseWriter, status int, message string) {
 }
 
 func respondError(w http.ResponseWriter, err error) {
+	var provider *aiosource.ProviderError
+	if errors.As(err, &provider) {
+		if provider.RetryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(provider.RetryAfter))
+		}
+		writeError(w, provider.HTTPStatus(), provider.Error())
+		return
+	}
 	switch {
 	case errors.Is(err, model.ErrNotFound):
 		writeError(w, http.StatusNotFound, "Item not found")

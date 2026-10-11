@@ -165,6 +165,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	for _, rec := range eligible {
 		stream := baseStream(rec, r, names[rec.Provider])
 		if len(availability) == 0 {
+			if tracker := c.Trackers[rec.Provider]; tracker.Private && tracker.AnnounceSecret == "" {
+				history.PrivateUnavailable++
+				continue
+			}
 			magnet, sources, err := s.magnet(ctx, rec, c)
 			if err != nil {
 				return nil, err
@@ -187,11 +191,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			if !configured {
 				tracker.Private = true
 			}
-			if visitor != nil && tracker.Private && (!known || !observed.Cached) {
-				history.PrivateUnavailable++
-				continue
-			}
-			if known && !observed.Cached && tracker.Private && tracker.AnnounceSecret == "" {
+			if tracker.Private && (visitor != nil || tracker.AnnounceSecret == "") && (!known || !observed.Cached) {
 				history.PrivateUnavailable++
 				continue
 			}
@@ -205,6 +205,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 				continue
 			}
 			if observed.Cached && r.Episode != nil && !hasFile {
+				if tracker.Private && (visitor != nil || tracker.AnnounceSecret == "") {
+					history.FileUnavailable++
+					continue
+				}
 				// Global readiness cannot certify an episode when listing files
 				// failed. Retain playback but present the cache as unverified.
 				known = false

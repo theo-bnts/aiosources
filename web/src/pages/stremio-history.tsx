@@ -493,7 +493,9 @@ export function StremioRequestPage() {
                           <TableCell>{providerSteps[call.phase] ?? 'Provider request'}</TableCell>
                           <TableCell>
                             <Badge variant={call.error_code ? 'warning' : 'success'}>
-                              {call.error_code ? providerErrors[call.error_code] : 'Completed'}
+                              {call.error_code
+                                ? (providerErrors[call.error_code] ?? 'Provider error')
+                                : 'Completed'}
                             </Badge>
                             {call.http_status > 0 && (
                               <p className="help mt-1">HTTP {call.http_status}</p>

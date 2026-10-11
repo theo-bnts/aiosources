@@ -189,6 +189,10 @@ The previous notification inbox, bell, read/unread state and external delivery f
 
 Activity changes still use the authenticated live event stream. A browser does not need to remain open for jobs or their logs to persist. The original event and checkpoint are committed atomically with the log. Historical source events and published data are not rewritten.
 
+Debrid errors distinguish request rate limits, account capacity, subscription restrictions, rejected or oversized torrents, missing files and temporary service failures. Logs and the Stremio and Debrid histories use the same categories, including API errors returned with HTTP 200. Provider response messages and bodies are never retained: they can contain credentials or private URLs. Temporary playback failures return a bounded `Retry-After` header; account capacity failures require freeing capacity or waiting for the account limit to reset.
+
+A failed availability check preserves earlier observations and never records the failed request as an uncached torrent. AllDebrid checks stop the current batch on account-wide or temporary service failures; TorBox stops on the failed batch. Further checks follow the existing saved retry delay. Torrent creation is never automatically replayed after a provider error, and personal account torrents are never deleted to make room.
+
 ## Database
 
 **Storage** contains only PostgreSQL availability and size, local available space, and storage usage by category. Tables and indexes are included; database overhead is separate. Local space describes the application state-directory filesystem, which may differ from PostgreSQL storage.

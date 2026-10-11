@@ -109,6 +109,8 @@ Treat the manifest URL like a password: it grants access to your catalog and con
 
 Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links.
 
+A source marked **Private source** without an announce URL is offered only when cached availability is verified. Unknown or uncached results are hidden, including episodes that cannot be confirmed in a season pack. Without a configured debrid service, these private sources are excluded from direct torrent results.
+
 Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
 
 ### Optional public access

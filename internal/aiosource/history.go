@@ -54,6 +54,10 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 		case "cleanup":
 			h.run.Error = "Temporary magnet cleanup failed. Pending cleanup is preserved for a later attempt."
 		}
+		var remote *ProviderError
+		if (h.run.Kind == "cache" || h.run.Kind == "cleanup") && errors.As(err, &remote) {
+			h.run.Error += " " + remote.Error()
+		}
 	}
 	final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()

@@ -17,7 +17,7 @@ export type StremioRequest = {
     phase: string
     duration_ms: number
     http_status: number
-    error_code: '' | 'provider_error' | 'authentication' | 'cancelled' | 'timeout'
+    error_code: string
   }[]
   id: number
   created_at: string

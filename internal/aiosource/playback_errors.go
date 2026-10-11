@@ -23,7 +23,10 @@ func (s *Service) recordPlaybackFailure(service string, err error) {
 	if errors.As(err, &failure) {
 		stage = failure.stage
 	}
+	var remote *ProviderError
 	switch {
+	case errors.As(err, &remote):
+		code = remote.Code
 	case errors.Is(err, context.DeadlineExceeded):
 		code = "timeout"
 	case errors.Is(err, ErrAuth):

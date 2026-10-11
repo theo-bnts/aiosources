@@ -24,6 +24,9 @@ func (s *Store) RecordPlaybackFailure(ctx context.Context, service, stage, code 
 		"parse":            "The provider response could not be used.",
 		"no_matching_file": "No unique matching video was found.",
 	}[code]
+	if reason == "" && code != "" && (model.ProviderCall{Phase: "provider_request", ErrorCode: code}).Valid() {
+		reason = model.ProviderFailureMessage(code)
+	}
 	if operation == "" || reason == "" {
 		return model.ErrInvalid
 	}

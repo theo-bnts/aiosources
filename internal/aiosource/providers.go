@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -98,18 +98,22 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, errors.New("provider transport failed")
+		var timed net.Error
+		if errors.As(err, &timed) && timed.Timeout() {
+			return nil, newProviderError("timeout", "")
+		}
+		return nil, newProviderError("provider_unavailable", "")
 	}
 	defer res.Body.Close()
 	status = res.StatusCode
-	if res.StatusCode == 401 || res.StatusCode == 403 {
-		return nil, ErrAuth
-	}
-	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("provider HTTP %d", res.StatusCode)
-	}
 	b, err := io.ReadAll(io.LimitReader(res.Body, 8<<20+1))
 	if err != nil || len(b) > 8<<20 {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if res.StatusCode != http.StatusOK {
+			return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), nil)
+		}
 		return nil, ErrInvalidResponse
 	}
 	var envelope struct {
@@ -118,10 +122,19 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		Demo    json.RawMessage `json:"demo"`
 		Data    json.RawMessage `json:"data"`
 		Error   json.RawMessage `json:"error"`
-		Detail  string          `json:"detail"`
 	}
 	if json.Unmarshal(b, &envelope) != nil {
+		if res.StatusCode != http.StatusOK {
+			return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), nil)
+		}
 		return nil, ErrInvalidResponse
+	}
+	var rejected *ProviderError
+	if len(envelope.Error) > 0 && string(envelope.Error) != "null" {
+		rejected = providerResponseError(envelope.Error)
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), rejected)
 	}
 	if service == "alldebrid" && len(envelope.Demo) > 0 {
 		switch string(envelope.Demo) {
@@ -136,22 +149,28 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	if service == "alldebrid" {
 		success = envelope.Status == "success"
 	}
-	if !success || (len(envelope.Error) > 0 && string(envelope.Error) != "null") {
-		detail := strings.ToLower(string(envelope.Error) + envelope.Detail)
-		if strings.Contains(detail, "auth_") || strings.Contains(detail, "bad_token") || strings.Contains(detail, "invalid_token") || strings.Contains(detail, "unauthorized") {
-			return nil, ErrAuth
-		}
-		return nil, ErrInvalidResponse
+	if rejected != nil {
+		return nil, newProviderError(rejected.Code, res.Header.Get("Retry-After"))
+	}
+	if !success {
+		return nil, newProviderError("provider_error", "")
 	}
 	if service == "alldebrid" {
 		var data struct {
-			Error json.RawMessage `json:"error"`
+			Error   json.RawMessage `json:"error"`
+			Magnets []struct {
+				Error json.RawMessage `json:"error"`
+			} `json:"magnets"`
 		}
-		if json.Unmarshal(envelope.Data, &data) == nil && len(data.Error) > 0 && string(data.Error) != "null" {
-			if strings.Contains(strings.ToLower(string(data.Error)), "auth_") {
-				return nil, ErrAuth
+		if json.Unmarshal(envelope.Data, &data) == nil {
+			if len(data.Error) > 0 && string(data.Error) != "null" {
+				return nil, newProviderError(providerResponseError(data.Error).Code, res.Header.Get("Retry-After"))
 			}
-			return nil, ErrInvalidResponse
+			for _, magnet := range data.Magnets {
+				if len(magnet.Error) > 0 && string(magnet.Error) != "null" {
+					return nil, newProviderError(providerResponseError(magnet.Error).Code, res.Header.Get("Retry-After"))
+				}
+			}
 		}
 	}
 	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
