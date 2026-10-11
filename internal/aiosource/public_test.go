@@ -227,6 +227,29 @@ func TestPublicProvidersCheckIndependentlyWithoutBackgroundVisitorKeys(t *testin
 	}
 }
 
+func TestAllDebridAccountPendingDoesNotOverrideFreshSharedAvailability(t *testing.T) {
+	ctx, s, _ := testService(t)
+	c, _ := s.DB.AIOConfig(ctx)
+	c.AllDebridSecret = "adminAD"
+	if err := s.Vault.Put(ctx, "adminAD", "administrator-own-key"); err != nil {
+		t.Fatal(err)
+	}
+	generation, _ := s.DB.AIOCacheGeneration(ctx)
+	hash := strings.Repeat("7", 40)
+	if err := s.DB.SaveSharedAvailability(ctx, "alldebrid", model.AIOAvailability{Generation: generation, Hash: hash, Cached: true, CheckedAt: time.Now().Add(-time.Second), Files: []model.AIOFile{{Path: "Example.Movie.mp4", Size: 100}}}); err != nil {
+		t.Fatal(err)
+	}
+	// An existing account download is not a provider-wide negative, even when
+	// its inventory observation arrived after another account verified the cache.
+	if err := s.DB.SaveAIOAvailability(ctx, "alldebrid", fingerprint("administrator-own-key"), model.AIOAvailability{Generation: generation, Hash: hash, Cached: false, CheckedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	states, err := s.Availability(ctx, c, "movie:imdb:1234567", []string{hash})
+	if err != nil || !states["alldebrid"][hash].Cached || len(states["alldebrid"][hash].Files) != 1 {
+		t.Fatal("account-specific pending state erased verified shared cache", err)
+	}
+}
+
 func TestPublicInstallationIsStatelessScopedAndRevocable(t *testing.T) {
 	ctx, s, conn := testService(t)
 	key := "visitor-key-never-store"

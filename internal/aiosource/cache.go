@@ -476,6 +476,11 @@ func (s *Service) Availability(ctx context.Context, c model.AIOConfig, resource 
 			return nil, err
 		}
 		for _, a := range items {
+			if current, ok := out[service][a.Hash]; ok && service == "alldebrid" && current.Cached && !a.Cached {
+				// An inventory entry still downloading is account-specific. It
+				// cannot invalidate verified, fresh provider-wide availability.
+				continue
+			}
 			if current, ok := out[service][a.Hash]; !ok || a.CheckedAt.After(current.CheckedAt) {
 				out[service][a.Hash] = a
 			}

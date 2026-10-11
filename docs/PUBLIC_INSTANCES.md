@@ -28,6 +28,8 @@ A visitor's fresh TorBox check can be reused by the administrator or another vis
 
 The services are checked independently, with a bounded response budget. A slow provider does not prevent the other provider's check. Unknown availability is not presented as cached.
 
+An existing AllDebrid download still waiting in one account does not erase a verified positive shared observation. Playback readiness within that account is still checked separately.
+
 ## Private sources and playback
 
 A source with unknown privacy is treated as private. Public responses include a private-source result only when its shared cache observation is fresh and a usable video matches the request. Season packs must contain the exact requested episode. A missing file list cannot certify that episode.
