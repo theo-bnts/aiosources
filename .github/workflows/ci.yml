@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
@@ -19,5 +23,8 @@ jobs:
 
   docker:
     needs: tests
+    permissions:
+      contents: write
+      packages: write
     uses: ./.github/workflows/docker-image.yml
     secrets: inherit
