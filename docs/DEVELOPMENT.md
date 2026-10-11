@@ -53,13 +53,13 @@ The authenticated source API uses `GET /api/providers/{id}` → `{provider, json
 
 ## Local Docker build
 
-The distributed `compose.yaml` selects `AIOSOURCES_IMAGE`, defaulting to `aiosources:local`, without an implicit build. Set this variable to your published Codeberg image when using the existing publication workflow. Building from a checkout is an explicit development choice:
+The distributed `compose.yaml` selects `AIOSOURCES_IMAGE`, defaulting to `ghcr.io/theo-bnts/aiosources:stable`, without an implicit build. Set this variable to `ghcr.io/theo-bnts/aiosources:preview` to test a pre-release. Building from a checkout is an explicit development choice:
 
 ```sh
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-This builds `aiosources:local` with version `2.0.0`; it does not replace the published Codeberg tag. Explicit `-f` arguments do not automatically include a private `compose.override.yaml`; add it explicitly if required. Preserve existing database credentials, mounts and volume names when working on an existing installation. Never point verification at production volumes.
+This builds `aiosources:local` with version `2.0.0`; it does not replace any published image tag. Explicit `-f` arguments do not automatically include a private `compose.override.yaml`; add it explicitly if required. Preserve existing database credentials, mounts and volume names when working on an existing installation. Never point verification at production volumes.
 
 
 ## Verification
@@ -142,7 +142,7 @@ Also exercise a fresh isolated deployment: log in, add a synthetic source, run P
 
 If the public repository starts empty while the working repository has private history, publish a reviewed clean tree as its first public commit or explicitly review every historical object first. Ignoring a file does not remove it from old commits. Do not push unreviewed branches or legacy tags with `--all` or `--tags`.
 
-The existing [CI workflow](../.github/workflows/ci.yml) chains Go/frontend lint, race and browser tests, then the [Codeberg image job](../.github/workflows/docker-image.yml). Workflow changes are managed separately from application commits. On a successful `main` push, the retained publication job builds both Linux architectures and publishes `latest` plus the commit SHA to the configured Codeberg image. It does not create version tags or GitHub releases.
+The [CI workflow](../.github/workflows/ci.yml) chains Go/frontend lint, race and browser tests, then the [image job](../.github/workflows/docker-image.yml). On a successful `main` push, it builds both Linux architectures, publishes `preview` and the full commit tag to GHCR and the configured Codeberg mirror, and creates a GitHub pre-release. After the maintainer tests and marks that pre-release stable, the [promotion workflow](../.github/workflows/release.yml) publishes the exact recorded image under `stable`, `latest` and the release tag without rebuilding it.
 
 Local checks do not publish an image. Verify the resulting CI run and use the published commit tag or digest for a reproducible deployment. See [the verification report](VERIFICATION.md) for completed local checks and account-validation limits.
 

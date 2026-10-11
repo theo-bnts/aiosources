@@ -897,7 +897,7 @@ This example intentionally shows all SDK fields. Set all four referenced environ
 | `services.postgres.stop_grace_period` | duration; `1m` | Graceful database shutdown window. |
 | `services.postgres.restart` | string; `unless-stopped` | Container restart policy, not run Resume policy. |
 | `services.aiosources` | mapping | Application service. |
-| `services.aiosources.image` | string; `${AIOSOURCES_IMAGE:-aiosources:local}` | Published application image; no default local build. |
+| `services.aiosources.image` | string; `${AIOSOURCES_IMAGE:-ghcr.io/theo-bnts/aiosources:stable}` | Stable GHCR application image; no default local build. |
 | `services.aiosources.environment` | mapping | Values actually passed into the app container. |
 | `services.aiosources.environment.DATABASE_URL` | string assembled from PostgreSQL substitutions | Connects to internal service host `postgres:5432`, not the host-side published port. |
 | `services.aiosources.environment.ADMIN_PASSWORD` | string; `${ADMIN_PASSWORD:-}` | Optional initial administrator password, 12–72 bytes when supplied; unset/empty lets the application generate it. |

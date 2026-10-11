@@ -1,5 +1,5 @@
 # Opt in explicitly: docker compose -f compose.yaml -f compose.build.yaml up --build
-# Never tags or pulls the published Codeberg image. Base-image pulls are still required.
+# Never tags or pulls the published application image. Base-image pulls are still required.
 services:
   aiosources:
     image: aiosources:local

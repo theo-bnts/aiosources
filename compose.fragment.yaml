@@ -2,8 +2,7 @@
 services:
   aiosources:
     container_name: streaming_aiosources
-    image: ${AIOSOURCES_IMAGE:-aiosources:local}
-    build: ./aiosources
+    image: ${AIOSOURCES_IMAGE:-ghcr.io/theo-bnts/aiosources:stable}
     env_file: ./aiosources/.env
     environment:
       BIND: 0.0.0.0:7000

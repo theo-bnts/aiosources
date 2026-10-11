@@ -36,7 +36,7 @@ services:
   aiosources:
     depends_on:
       - aiosources_postgres
-    image: codeberg.org/aiosources/aiosources:latest
+    image: ghcr.io/theo-bnts/aiosources:stable
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://aiosources:aiosources@aiosources_postgres:5432/aiosources
@@ -73,9 +73,9 @@ Both Linux `amd64` and `arm64` images are available. If AIOStreams uses another 
 
 ### Stable versions and previews
 
-The Compose example uses `latest`, the stable image channel. With the release workflows installed, new builds are published as **GitHub pre-releases** and use the `preview` tag; they do not replace `latest` automatically. Images are mirrored to `ghcr.io/theo-bnts/aiosources` as well as Codeberg. A newly created GHCR package must be made public before anonymous pulls work.
+The Compose example uses `ghcr.io/theo-bnts/aiosources:stable`. GHCR is the primary image registry; Codeberg remains a mirror. New builds are published as **GitHub pre-releases** and use the `preview` tag; they do not replace `stable` or `latest` automatically. A newly created GHCR package must be made public before anonymous pulls work.
 
-To try a preview, replace `:latest` with `:preview`, then pull and recreate the application container. Each pre-release also gives the exact image digest, which pins the tested build even when `preview` advances. Keep both data volumes. To follow stable releases again, restore `:latest`. An older image is not guaranteed to understand database changes made by a newer preview; do not use a production database as a disposable test installation.
+To try a preview, replace `:stable` with `:preview`, then pull and recreate the application container. Each pre-release also gives the exact image digest, which pins the tested build even when `preview` advances. Keep both data volumes. To follow stable releases again, restore `:stable`. An older image is not guaranteed to understand database changes made by a newer preview; do not use a production database as a disposable test installation.
 
 For maintainers: after testing a pre-release, open **GitHub → Releases → Edit**, clear **Set as a pre-release** and save. The stable-promotion workflow verifies the recorded image and both architectures, then publishes that same image under `latest`, `stable` and the release tag, without rebuilding it. GHCR stable tags become available after the first promotion.
 

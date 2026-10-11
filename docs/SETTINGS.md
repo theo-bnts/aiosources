@@ -16,14 +16,14 @@ Start from [`.env.example`](../.env.example). Compose uses these values:
 | `BIND_IP`         | `127.0.0.1` | Host interface for the panel; loopback-only by default.                      |
 | `ADMIN_PASSWORD`  | Generated  | Optional administrator password, 12–72 bytes.                                |
 | `PUBLIC_URL`      | Unset      | Exact external origin; HTTPS is required to activate sharing.                |
-| `AIOSOURCES_IMAGE`       | `aiosources:local` | Application image; set your Codeberg image or build locally.             |
+| `AIOSOURCES_IMAGE`       | `ghcr.io/theo-bnts/aiosources:stable` | Application image; stable GHCR releases by default. |
 | `POSTGRES_VOLUME`        | `aiosources_v2_postgres_data` | PostgreSQL volume name. Preserve the actual existing volume on upgrade. |
 | `STATE_VOLUME`    | `aiosources_v2_state` | Private state volume name. Preserve the actual existing volume on upgrade. |
 | `COMPOSE_PROJECT_NAME`   | `aiosources`   | Compose project identity; preserve it when upgrading an existing deployment. |
 
 The container runs as UID/GID `65532:65532`. State lives in `/data`, and private source JSON in `/data/providers`. Compose constructs `DATABASE_URL` from its PostgreSQL settings. Source migration does not change `compose.yaml` or CI YAML. For an existing installation, stop all application replicas and source writers and follow [Migrating existing sources](CONFIGURATION.md#migrating-existing-sources) before restarting with JSON-only loading.
 
-The distributed Compose file selects `AIOSOURCES_IMAGE` (default `aiosources:local`); it has no implicit local build. See [Local Docker build](DEVELOPMENT.md#local-docker-build) for the explicit development override.
+The distributed Compose file selects `AIOSOURCES_IMAGE` (default `ghcr.io/theo-bnts/aiosources:stable`); it has no implicit local build. Use `:preview` to test pre-releases. See [Local Docker build](DEVELOPMENT.md#local-docker-build) for the explicit development override.
 
 ### First AIOSources deployment
 

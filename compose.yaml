@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   aiosources:
-    image: ${AIOSOURCES_IMAGE:-aiosources:local}
+    image: ${AIOSOURCES_IMAGE:-ghcr.io/theo-bnts/aiosources:stable}
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ingest}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-ingest}
       BIND: 0.0.0.0:7000
