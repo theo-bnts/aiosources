@@ -107,7 +107,7 @@ test('source directories share filters and a stale activation is reloaded withou
   })
   await page.route('**/api/providers/alpha', async (route) => {
     if (route.request().method() === 'GET') await gate
-    await route.continue()
+    await route.fallback()
   })
   try {
     const reading = page.waitForRequest(
@@ -126,7 +126,7 @@ test('source directories share filters and a stale activation is reloaded withou
     expect(writes).toBe(0)
   } finally {
     release()
-    await page.unrouteAll({ behavior: 'wait' })
+    // Keep the forwarding handler until context teardown; the gate is released.
   }
   await page.getByRole('button', { name: 'Reload sources', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveCount(0)

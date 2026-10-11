@@ -113,7 +113,7 @@ test('moved import settings preserve validation, persisted policies and concurre
   })
   await page.route('**/api/settings/collections', async (route) => {
     if (route.request().method() === 'PUT') await heldSave
-    await route.continue()
+    await route.fallback()
   })
   try {
     const submitted = page.waitForRequest(
@@ -138,9 +138,8 @@ test('moved import settings preserve validation, persisted policies and concurre
     expect((await rejected).status()).toBe(409)
   } finally {
     releaseSave()
-    // A response can arrive before its routing callback finishes. Drain the
-    // delayed save and concurrent refresh before changing interception rules.
-    await page.unrouteAll({ behavior: 'wait' })
+    // Keep forwarding through the context's egress guard until teardown. Removing
+    // page interception while a live refresh is in flight can handle it twice.
   }
   await expect(form.getByRole('alert')).toContainText('Your unsaved draft is preserved.')
   await expect(progress).toHaveValue('11')

@@ -13,7 +13,7 @@ test('navigation waits for an explicit save to finish without offering to discar
   })
   await page.route('**/api/settings/collections', async (route) => {
     if (route.request().method() === 'PUT') await gate
-    await route.continue()
+    await route.fallback()
   })
   try {
     await page
@@ -37,7 +37,7 @@ test('navigation waits for an explicit save to finish without offering to discar
     ).toBe(2)
   } finally {
     release()
-    await page.unrouteAll({ behavior: 'wait' })
+    // Keep the forwarding handler until context teardown; the gate is released.
   }
 })
 
