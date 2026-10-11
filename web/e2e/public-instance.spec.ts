@@ -1,6 +1,82 @@
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
+test('public access preserves the access proxy cookie without an administrator session', async ({
+  page,
+  server,
+  browser,
+}) => {
+  await page.goto('/addon/settings')
+  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  await access.getByRole('switch').check()
+  await access.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+
+  const context = await browser.newContext({ baseURL: server.origin })
+  await context.addCookies([
+    {
+      name: 'CF_Authorization',
+      value: 'synthetic-access-session',
+      url: server.origin,
+      httpOnly: true,
+    },
+  ])
+  const visitor = await context.newPage()
+  const publicRequests: string[] = []
+  let rejected = 0
+  await context.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.origin !== server.origin) return route.abort('blockedbyclient')
+    if (url.pathname.startsWith('/api/')) {
+      const headers = await request.allHeaders()
+      if (!headers.cookie?.includes('CF_Authorization=synthetic-access-session')) {
+        rejected++
+        // Like Access, redirect anonymous API requests to the external sign-in
+        // page, which the application CSP correctly prevents fetch from loading.
+        return route.fulfill({
+          status: 302,
+          headers: { Location: 'https://access.invalid/cdn-cgi/access/login' },
+        })
+      }
+    }
+    if (url.pathname.startsWith('/api/public/')) publicRequests.push(url.pathname)
+    if (url.pathname === '/api/public/install') {
+      expect(request.postDataJSON()).toEqual({ services: { torbox: 'synthetic-visitor-key' } })
+      return route.fulfill({
+        json: {
+          manifest_url: `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,
+        },
+      })
+    }
+    return route.continue()
+  })
+  try {
+    await visitor.goto('/')
+    await expect(
+      visitor.getByRole('heading', { name: 'Connect your debrid services' }),
+    ).toBeVisible()
+    await expect(visitor.getByRole('navigation')).toHaveCount(0)
+    await expect(visitor.getByRole('link', { name: 'Admin login', exact: true })).toBeVisible()
+    await visitor.getByLabel('TorBox API key').fill('synthetic-visitor-key')
+    await visitor.getByRole('button', { name: 'Create installation link' }).click()
+    await expect(visitor.getByLabel('Manifest URL', { exact: true })).toHaveValue(
+      `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,
+    )
+    await expect(visitor.getByLabel('TorBox API key')).toHaveValue('')
+    expect(publicRequests).toContain('/api/public/config')
+    expect(publicRequests).toContain('/api/public/install')
+    expect(rejected).toBe(0)
+    expect((await context.cookies()).map((cookie) => cookie.name)).toEqual(['CF_Authorization'])
+    expect((await context.request.get('/api/providers')).status()).toBe(401)
+    const stored = await visitor.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
+    expect(stored.includes('synthetic-visitor-key')).toBe(false)
+    expect(stored.includes('synthetic-encrypted-link')).toBe(false)
+  } finally {
+    await context.close()
+  }
+})
+
 test('public access is opt-in and visitors get a private link without administrator menus or saved keys', async ({
   page,
   server,

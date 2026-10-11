@@ -14,10 +14,11 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
   const info = useQuery({
     queryKey: ['public-config'],
     queryFn: async ({ signal }) => {
+      // Access proxies need their same-origin session cookie even on public routes.
       const response = await fetch('/api/public/config', {
         signal,
         cache: 'no-store',
-        credentials: 'omit',
+        credentials: 'same-origin',
       })
       if (!response.ok) throw new Error('Public configuration is unavailable.')
       return response.json() as Promise<PublicInfo>
@@ -58,7 +59,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
       // Credential values never enter React Query, navigation state or browser storage.
       const response = await fetch('/api/public/install', {
         method: 'POST',
-        credentials: 'omit',
+        credentials: 'same-origin',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ services }),
