@@ -102,15 +102,20 @@ type securityProof struct {
 
 func (s *server) securityProof(w http.ResponseWriter, r *http.Request) (securityProof, bool) {
 	var input securityProof
+	if !s.auth.admitPasswordRequest(w) {
+		return input, false
+	}
+	defer func() { <-s.auth.passwordRequests }()
 	if !s.auth.allowAttempt(r) {
 		w.Header().Set("Retry-After", "60")
 		writeError(w, http.StatusTooManyRequests, "Security verification is temporarily unavailable or rate limited. Try again in one minute.")
 		return input, false
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPasswordProofBytes)
 	if !decodeJSON(w, r, &input) {
 		return input, false
 	}
-	if !s.auth.checkPassword(r, input.Password) || len(input.Code) > 64 {
+	if len(input.Code) > 64 || !s.auth.checkPassword(r, input.Password) {
 		securityError(w, store.ErrAuthentication)
 		return input, false
 	}

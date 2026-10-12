@@ -53,17 +53,30 @@ func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password stri
 	if err != nil || len(decoded) != 32 || len(password) != 43 || len(shareID) > 128 {
 		return nil, ErrCatalogAuthentication
 	}
+	var hash []byte
+	var enabled, unexpired bool
+	candidate := sharingPasswordHash(shareID, password)
+	// Unauthenticated requests must never queue for a recipient's row lock.
+	// A normal MVCC read can reject them while an active download holds it.
+	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp() FROM ingest.shares WHERE id=$1`, shareID).Scan(&hash, &enabled, &unexpired)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrCatalogAuthentication
+	}
+	if err != nil {
+		return nil, databaseError("verify catalogue credentials", err)
+	}
+	if subtle.ConstantTimeCompare(hash, candidate[:]) != 1 || !enabled || !unexpired {
+		return nil, ErrCatalogAuthentication
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, databaseError("begin catalogue admission", err)
 	}
 	defer rollback(tx)
-	var hash []byte
-	var enabled, unexpired bool
 	var revision int64
 	var requests, concurrent int
-	// This row lock serializes admissions, policy changes and revocation across
-	// instances. Authenticate before either charging quota or clearing leases.
+	// Recheck under the lock: rotation, revocation and expiry may have changed
+	// since the first read. Admissions and quota changes remain atomic.
 	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads FROM ingest.shares WHERE id=$1 FOR UPDATE`, shareID).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
@@ -71,7 +84,6 @@ func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password stri
 	if err != nil {
 		return nil, databaseError("authorize catalogue admission", err)
 	}
-	candidate := sharingPasswordHash(shareID, password)
 	if subtle.ConstantTimeCompare(hash, candidate[:]) != 1 || !enabled || !unexpired {
 		return nil, ErrCatalogAuthentication
 	}

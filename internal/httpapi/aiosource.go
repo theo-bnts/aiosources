@@ -77,8 +77,7 @@ func (s *server) aioProtect(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		if !s.options.AIOSource.Authorized(r.Context(), r.PathValue("token")) {
-			writeError(w, 401, "Invalid installation token")
+		if !s.authorizeAddon(w, r) {
 			return
 		}
 		select {
@@ -95,6 +94,31 @@ func (s *server) aioProtect(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func (s *server) authorizeAddon(w http.ResponseWriter, r *http.Request) bool {
+	// Authentication precedes the playback limit, so it needs its own bound.
+	// Invalid tokens cannot create an unbounded database-waiting queue.
+	select {
+	case s.streamAuth <- struct{}{}:
+		defer func() { <-s.streamAuth }()
+	default:
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusTooManyRequests, "Too many active requests")
+		return false
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := s.options.AIOSource.ValidateToken(ctx, r.PathValue("token")); err != nil {
+		if errors.Is(err, aiosource.ErrAuth) {
+			writeError(w, http.StatusUnauthorized, "Invalid installation token")
+		} else {
+			w.Header().Set("Retry-After", "1")
+			writeError(w, http.StatusServiceUnavailable, "Authentication storage is unavailable")
+		}
+		return false
+	}
+	return true
 }
 func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	c, err := s.options.Store.AIOConfig(r.Context())

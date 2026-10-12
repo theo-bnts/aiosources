@@ -1,13 +1,108 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
+
+func TestInvalidCatalogCredentialsDoNotWaitForAnActiveDownloadLock(t *testing.T) {
+	ctx, endpoint := testutil.NewDatabase(t)
+	db, err := Open(ctx, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(db.Close)
+	if err := db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	grant := sharingGrant(t, ctx, db)
+	control, err := pgx.Connect(ctx, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = control.Close(context.Background()) })
+	tx, err := control.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
+	if _, err := tx.Exec(ctx, `SELECT id FROM ingest.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
+		t.Fatal(err)
+	}
+	bounded, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	if _, err := db.BeginCatalogDownload(bounded, grant.Share.ID, strings.Repeat("A", 43)); !errors.Is(err, ErrCatalogAuthentication) {
+		t.Fatalf("invalid credentials occupied a connection waiting for the share lock: %v", err)
+	}
+	var charged int
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.share_requests WHERE share_id=$1`, grant.Share.ID).Scan(&charged); err != nil || charged != 0 {
+		t.Fatalf("unauthenticated requests consumed the recipient quota: %d %v", charged, err)
+	}
+}
+
+func TestCatalogAdmissionRechecksRevocationAfterWaitingForItsLock(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	grant := sharingGrant(t, ctx, db)
+	control, err := pgx.ConnectConfig(ctx, db.pool.Config().ConnConfig.Copy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = control.Close(context.Background()) })
+	tx, err := control.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
+	if _, err := tx.Exec(ctx, `SELECT id FROM ingest.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan error, 1)
+	go func() {
+		download, err := db.BeginCatalogDownload(ctx, grant.Share.ID, grant.Password)
+		if download != nil {
+			_ = download.Close()
+		}
+		result <- err
+	}()
+	deadline, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	for {
+		var waiting bool
+		if err := control.QueryRow(deadline, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%FROM ingest.shares WHERE id=$1 FOR UPDATE%')`).Scan(&waiting); err != nil {
+			t.Fatal("admission did not reach its locked recheck:", err)
+		}
+		if waiting {
+			break
+		}
+		select {
+		case <-time.After(10 * time.Millisecond):
+		case <-deadline.Done():
+			t.Fatal("admission never waited for the recipient lock")
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE ingest.shares SET enabled=false,revision=revision+1 WHERE id=$1`, grant.Share.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-result:
+		if !errors.Is(err, ErrCatalogAuthentication) {
+			t.Fatalf("a credential verified before revocation was admitted afterwards: %v", err)
+		}
+	case <-deadline.Done():
+		t.Fatal("revoked admission did not finish")
+	}
+}
 
 func TestCatalogAdmissionIsSharedAndOnlyChargesAuthenticatedRequests(t *testing.T) {
 	ctx, endpoint := testutil.NewDatabase(t)

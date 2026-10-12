@@ -105,11 +105,21 @@ func (s *Service) Token(ctx context.Context) (string, error) {
 	return s.Vault.Resolve(ctx, installationSecret)
 }
 func (s *Service) Authorized(ctx context.Context, token string) bool {
+	return s.ValidateToken(ctx, token) == nil
+}
+
+func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	if len(token) != 43 {
-		return false
+		return ErrAuth
 	}
 	expected, err := s.Token(ctx)
-	return err == nil && subtle.ConstantTimeCompare([]byte(expected), []byte(token)) == 1
+	if err != nil {
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(expected), []byte(token)) != 1 {
+		return ErrAuth
+	}
+	return nil
 }
 func (s *Service) Close(ctx context.Context) error {
 	s.mu.Lock()

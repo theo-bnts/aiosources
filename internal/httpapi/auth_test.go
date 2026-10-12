@@ -1,13 +1,91 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
+
+type heldAuthenticationBody struct {
+	reader  *strings.Reader
+	started chan<- struct{}
+	release <-chan struct{}
+	once    sync.Once
+}
+
+func (b *heldAuthenticationBody) Read(p []byte) (int, error) {
+	b.once.Do(func() { b.started <- struct{}{} })
+	<-b.release
+	return b.reader.Read(p)
+}
+
+func (*heldAuthenticationBody) Close() error { return nil }
+
+func TestLoginRejectsExcessRequestsBeforeReadingTheirBodies(t *testing.T) {
+	f := newSecurityFixture(t)
+	started := make(chan struct{}, 8)
+	release := make(chan struct{})
+	responses := make(chan int, 8)
+	var releasing sync.Once
+	defer func() {
+		releasing.Do(func() { close(release) })
+		for range 8 {
+			if status := <-responses; status != http.StatusOK {
+				t.Errorf("admitted login failed after its body was released: %d", status)
+			}
+		}
+	}()
+	for index := range 8 {
+		r := httptest.NewRequest(http.MethodPost, "https://admin.example.test/api/login", nil).WithContext(f.ctx)
+		r.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", index+10)
+		r.Header.Set("Origin", "https://admin.example.test")
+		r.Header.Set("Content-Type", "application/json")
+		r.Body = &heldAuthenticationBody{reader: strings.NewReader(`{"password":"synthetic-test-password"}`), started: started, release: release}
+		go func() {
+			w := httptest.NewRecorder()
+			f.handler.ServeHTTP(w, r)
+			responses <- w.Code
+		}()
+	}
+	deadline, cancel := context.WithTimeout(f.ctx, 10*time.Second)
+	defer cancel()
+	for range 8 {
+		select {
+		case <-started:
+		case <-deadline.Done():
+			t.Fatal("login requests did not reach their body-read boundary")
+		}
+	}
+	excess := f.request(http.MethodPost, "/api/login", map[string]string{"password": "synthetic-test-password"}, nil)
+	if excess.Code != http.StatusTooManyRequests || excess.Header().Get("Retry-After") == "" {
+		t.Fatalf("additional unauthenticated work was accepted while eight bodies were held: %d", excess.Code)
+	}
+	releasing.Do(func() { close(release) })
+}
+
+func TestPasswordProofBodiesHaveASeparateSmallLimit(t *testing.T) {
+	f := newSecurityFixture(t)
+	cookie := f.login(t, "")
+	for _, path := range []string{"/api/login", "/api/security/mfa/enroll"} {
+		r := httptest.NewRequest(http.MethodPost, "https://admin.example.test"+path, strings.NewReader(strings.Repeat(" ", 8192)+`{"password":"synthetic-test-password"}`)).WithContext(f.ctx)
+		r.RemoteAddr = "192.0.2.2:1234"
+		r.Header.Set("Origin", "https://admin.example.test")
+		r.Header.Set("Content-Type", "application/json")
+		r.AddCookie(cookie)
+		r.Header.Set("X-CSRF-Token", csrfForToken(cookie.Value))
+		w := httptest.NewRecorder()
+		f.handler.ServeHTTP(w, r)
+		if w.Code != http.StatusBadRequest || strings.Contains(w.Body.String(), "synthetic-test-password") {
+			t.Fatalf("oversized password proof was accepted or reflected at %s: %d", path, w.Code)
+		}
+	}
+}
 
 func TestDirectHTTPDeploymentIgnoresForwardedIdentityAndKeepsMutationProtection(t *testing.T) {
 	fixture := newSecurityFixture(t)

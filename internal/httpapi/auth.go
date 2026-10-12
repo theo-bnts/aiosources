@@ -23,6 +23,7 @@ import (
 
 const sessionCookie = "ingest_session"
 const sessionLifetime = 12 * time.Hour
+const maxPasswordProofBytes = 4096
 
 type session struct {
 	id      string
@@ -38,14 +39,15 @@ type loginWindow struct {
 }
 
 type authentication struct {
-	mu             sync.Mutex
-	passwordHash   []byte
-	origin         string
-	secure         bool
-	db             *store.Store
-	vault          *vault.Vault
-	attempts       map[string]loginWindow
-	passwordChecks chan struct{}
+	mu               sync.Mutex
+	passwordHash     []byte
+	origin           string
+	secure           bool
+	db               *store.Store
+	vault            *vault.Vault
+	attempts         map[string]loginWindow
+	passwordChecks   chan struct{}
+	passwordRequests chan struct{}
 }
 
 func newAuthentication(password, publicURL string, db *store.Store, secretVault *vault.Vault) (*authentication, error) {
@@ -75,7 +77,7 @@ func newAuthentication(password, publicURL string, db *store.Store, secretVault 
 	if err != nil {
 		return nil, errors.New("could not initialize persistent administrator authentication")
 	}
-	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, vault: secretVault, attempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2)}, nil
+	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, vault: secretVault, attempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2), passwordRequests: make(chan struct{}, 8)}, nil
 }
 
 func randomToken() (string, error) {
@@ -189,11 +191,26 @@ func (a *authentication) checkPassword(r *http.Request, password string) bool {
 	return bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)) == nil
 }
 
+func (a *authentication) admitPasswordRequest(w http.ResponseWriter) bool {
+	select {
+	case a.passwordRequests <- struct{}{}:
+		return true
+	default:
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusTooManyRequests, "Authentication is temporarily busy. Try again shortly.")
+		return false
+	}
+}
+
 func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if !a.allowedOrigin(r) {
 		writeError(w, http.StatusForbidden, "Request origin is not allowed")
 		return
 	}
+	if !a.admitPasswordRequest(w) {
+		return
+	}
+	defer func() { <-a.passwordRequests }()
 	if !a.allowAttempt(r) {
 		w.Header().Set("Retry-After", "60")
 		writeError(w, http.StatusTooManyRequests, "Authentication is temporarily unavailable or rate limited. Try again in one minute.")
@@ -203,10 +220,11 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 		Code     string `json:"code"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPasswordProofBytes)
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if !a.checkPassword(r, input.Password) || len(input.Code) > 64 {
+	if len(input.Code) > 64 || !a.checkPassword(r, input.Password) {
 		writeError(w, http.StatusUnauthorized, "Incorrect password or verification code")
 		return
 	}

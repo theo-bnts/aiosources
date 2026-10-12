@@ -75,6 +75,122 @@ func addonAPI(t *testing.T) (sharingAPIFixture, *aiosource.Service, *pgx.Conn) {
 	t.Cleanup(func() { _ = conn.Close(context.Background()) })
 	return sharingAPIFixture{ctx: ctx, db: db, handler: handler, cookie: w.Result().Cookies()[0], csrf: session.CSRF}, addon, conn
 }
+
+func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
+	f, addon, control := addonAPI(t)
+	token, err := addon.Token(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := control.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.secrets IN ACCESS EXCLUSIVE MODE`); err != nil {
+		_ = tx.Rollback(context.Background())
+		t.Fatal(err)
+	}
+	s := &server{options: Options{AIOSource: addon}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
+	var protected atomic.Int32
+	handler := s.aioProtect(func(w http.ResponseWriter, _ *http.Request) {
+		protected.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := func(token string) *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/stremio/"+token+"/manifest.json", nil).WithContext(f.ctx)
+		r.SetPathValue("token", token)
+		return r
+	}
+	results := make(chan int, 64)
+	defer func() {
+		_ = tx.Rollback(context.Background())
+		for range 64 {
+			if status := <-results; status != http.StatusUnauthorized {
+				t.Errorf("invalid installation was not rejected: %d", status)
+			}
+		}
+	}()
+	for range 64 {
+		go func() {
+			w := httptest.NewRecorder()
+			handler(w, request(strings.Repeat("A", 43)))
+			results <- w.Code
+		}()
+	}
+	deadline, cancel := context.WithTimeout(f.ctx, 3*time.Second)
+	defer cancel()
+	for len(s.streamAuth) != 64 {
+		select {
+		case <-time.After(time.Millisecond):
+		case <-deadline.Done():
+			t.Fatal("installation checks did not reach the blocked database boundary")
+		}
+	}
+	excess := httptest.NewRecorder()
+	handler(excess, request(strings.Repeat("A", 43)))
+	if excess.Code != http.StatusTooManyRequests || excess.Header().Get("Retry-After") == "" || excess.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("excess installation checks entered the database queue: %d", excess.Code)
+	}
+	if protected.Load() != 0 {
+		t.Fatal("an unauthorized installation reached protected addon work")
+	}
+	if err := tx.Rollback(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	for len(s.streamAuth) != 0 {
+		select {
+		case <-time.After(time.Millisecond):
+		case <-deadline.Done():
+			t.Fatal("installation admission was not released after the database recovered")
+		}
+	}
+	valid := httptest.NewRecorder()
+	handler(valid, request(token))
+	if valid.Code != http.StatusNoContent || protected.Load() != 1 {
+		t.Fatal("admission protection changed valid installation behavior")
+	}
+}
+
+func TestInstallationStorageTimeoutIsRetryableWithoutAuthorizingPlayback(t *testing.T) {
+	f, addon, control := addonAPI(t)
+	token, err := addon.Token(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := control.Begin(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.secrets IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatal(err)
+	}
+	s := &server{options: Options{AIOSource: addon}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
+	protected := false
+	handler := s.aioProtect(func(w http.ResponseWriter, _ *http.Request) {
+		protected = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+	request := func() *http.Request {
+		r := httptest.NewRequest(http.MethodGet, "/stremio/"+token+"/manifest.json", nil).WithContext(f.ctx)
+		r.SetPathValue("token", token)
+		return r
+	}
+	started := time.Now()
+	w := httptest.NewRecorder()
+	handler(w, request())
+	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" || protected || len(s.streamAuth) != 0 || time.Since(started) > 7*time.Second {
+		t.Fatalf("unavailable storage invalidated a valid token, leaked admission, or allowed playback: %d", w.Code)
+	}
+	if err := tx.Rollback(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	w = httptest.NewRecorder()
+	handler(w, request())
+	if w.Code != http.StatusNoContent || !protected {
+		t.Fatal("valid installation did not recover with the database")
+	}
+}
 func TestStremioAuthenticationCORSAndInstallation(t *testing.T) {
 	f, addon, _ := addonAPI(t)
 	if response := f.request("GET", "/api/aiosource", "", false, ""); response.Code != 401 {
