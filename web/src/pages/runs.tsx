@@ -707,7 +707,10 @@ export function RunDetailPage() {
           )}
         </TabsContent>
         <TabsContent value="raw" className="mt-5">
-          <RawTableView runId={run.id} />
+          <RawTableView
+            runId={run.id}
+            compact={run.storage_mode === 'compact' && run.mode !== 'preview'}
+          />
         </TabsContent>
       </Tabs>
     </div>

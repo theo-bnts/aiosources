@@ -51,6 +51,8 @@ func TestManualPauseFinalPagePreventsPublicationUntilResume(t *testing.T) {
 	for _, terminal := range []model.RunStatus{model.StatusSucceeded, model.StatusFailed, model.StatusCancelled} {
 		t.Run(string(terminal), func(t *testing.T) {
 			ctx, _, db := scheduleDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			setStorageMode(t, ctx, db, model.StorageFull)
 			provider := model.Provider{ID: "final-pause", Name: "Final pause"}
 			publishSharingRow(t, ctx, db, provider.ID, "old", `{"title":"Old"}`, nil)
 			run := mirrorClaim(t, ctx, db, provider, model.ModeFull)

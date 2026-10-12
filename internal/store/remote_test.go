@@ -152,6 +152,8 @@ func TestRemoteMirrorAtomicBaselineDeltaScopeResetAndIsolation(t *testing.T) {
 
 func TestRemoteMirrorFailureCancellationAndCheckpointRollback(t *testing.T) {
 	ctx, _, db := scheduleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	p := mirrorSource("remote-copy")
 	original := mirrorItem("a", map[string]any{"title": "Original"}, false)
 	baseline := mirrorClaim(t, ctx, db, p, model.ModeIncremental)
@@ -255,6 +257,8 @@ func TestRemoteMirrorRefusesStaleResumedPublication(t *testing.T) {
 
 func TestRemoteMirrorUnrepresentablePageRetainsRawAndRetriesAtomically(t *testing.T) {
 	ctx, _, db := scheduleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	p := mirrorSource("remote-copy")
 	run := mirrorClaim(t, ctx, db, p, model.ModeIncremental)
 	initial := append([]byte(nil), run.Cursor...)

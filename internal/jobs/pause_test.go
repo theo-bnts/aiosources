@@ -35,6 +35,8 @@ func TestManualPauseCommitsInFlightResponseAndResumesWithoutRefetch(t *testing.T
 	for _, final := range []bool{false, true} {
 		t.Run(fmt.Sprintf("final=%t", final), func(t *testing.T) {
 			ctx, _, db := schedulerDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			useFullStorage(t, ctx, db)
 			entered, release, interrupted := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			var releaseOnce sync.Once
 			requests := make(chan string, 8)

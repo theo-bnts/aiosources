@@ -159,6 +159,14 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		// stopped. Publish that checkpoint rather than fetching it again.
 		return model.StatusSucceeded, "", ""
 	}
+	if run.Mode == model.ModeMetadata && len(run.MetadataFields()) == 0 {
+		// The empty detail selection is still a completed durable traversal.
+		// Commit it before FinishRun, without requesting discarded information.
+		if _, err := m.db.SavePage(ctx, run, model.Page{Done: true, Next: run.Cursor}, ""); err != nil {
+			return stopReason(ctx, errPersistence)
+		}
+		return model.StatusSucceeded, "", ""
+	}
 	resolved, err := m.secrets(ctx, run.Config)
 	if err != nil {
 		if eventErr := m.event(ctx, run.ID, "source_error", "Source credentials are unavailable", map[string]any{"failure_code": "configuration"}); eventErr != nil {
@@ -352,7 +360,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 	if err := m.waitRateLimit(ctx, run.ID, retryAt, deadline); err != nil {
 		return stopReason(ctx, err)
 	}
-	source, err := connectors.New(ctx, run.Config, run.Mode, environment)
+	source, err := connectors.New(ctx, run.ConnectorConfig(), run.Mode, environment)
 	if err != nil {
 		if source != nil {
 			_ = source.Close()

@@ -153,6 +153,8 @@ func TestMetadataDatabaseRejectionStopsAndResumesWithoutSkipping(t *testing.T) {
 	for _, invalidID := range []bool{false, true} {
 		t.Run(fmt.Sprintf("invalid_id=%t", invalidID), func(t *testing.T) {
 			ctx, _, db := schedulerDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			useFullStorage(t, ctx, db)
 			var corrected atomic.Bool
 			var requests [4]atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

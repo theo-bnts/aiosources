@@ -209,6 +209,8 @@ func TestFullRunPublishesOnlyAfterResumedCompletion(t *testing.T) {
 
 func TestCancellationPreventsFullPublication(t *testing.T) {
 	ctx, _, db := lifecycleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	useFullStorage(t, ctx, db)
 	entered, requestCancelled := make(chan struct{}), make(chan struct{})
 	releaseHandler := make(chan struct{})
 	var enterOnce, cancelOnce sync.Once
@@ -276,6 +278,8 @@ func TestCancellationPreventsFullPublication(t *testing.T) {
 
 func TestRejectedPagesRetainRawWithoutChangingCheckpointOrStaging(t *testing.T) {
 	ctx, _, db := lifecycleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	useFullStorage(t, ctx, db)
 	p := lifecycleProvider("rejected-source", "http://source.example.invalid")
 	doc := model.ProviderDocument{Provider: p, Revision: "synthetic-revision"}
 	seedLive(t, ctx, db, p, lifecycleRecord("old", "Old"))
@@ -361,6 +365,8 @@ func TestRejectedPagesRetainRawWithoutChangingCheckpointOrStaging(t *testing.T) 
 
 func TestManagerArchivesRepeatedIdentityPageOnlyOnce(t *testing.T) {
 	ctx, _, db := lifecycleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	useFullStorage(t, ctx, db)
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count := requests.Add(1)
@@ -410,6 +416,7 @@ func TestManagerArchivesRepeatedIdentityPageOnlyOnce(t *testing.T) {
 
 func TestLiveLocksAndFinalCheckpointSurviveRecovery(t *testing.T) {
 	ctx, databaseURL, owner := lifecycleDatabase(t)
+	useFullStorage(t, ctx, owner)
 	peer := openLifecycleStore(t, ctx, databaseURL)
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -477,6 +484,8 @@ func TestLiveLocksAndFinalCheckpointSurviveRecovery(t *testing.T) {
 
 func TestLegacyImportIsAdditiveWithoutResurrectingFullDeletions(t *testing.T) {
 	ctx, databaseURL, db := lifecycleDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	useFullStorage(t, ctx, db)
 	// SQL is used only to model the pre-existing public legacy table, never to
 	// inspect or mutate implementation-owned ingest state.
 	fixture, err := pgx.Connect(ctx, withoutPoolOptions(t, databaseURL))

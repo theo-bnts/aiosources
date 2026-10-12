@@ -25,7 +25,7 @@ AND ($6='' OR EXISTS (
     JOIN ingest.runs AS parent ON parent.id=accepted.run_id
     WHERE accepted.run_id=$6 AND accepted.source_id=record.source_id
     AND parent.provider_id=record.provider_id AND record.first_seen_at>=parent.created_at))
-ORDER BY source_id LIMIT $5`, run.ProviderID, run.CreatedAt, after, run.Config.MetadataFields(), limit, run.MetadataParentRunID)
+ORDER BY source_id LIMIT $5`, run.ProviderID, run.CreatedAt, after, run.MetadataFields(), limit, run.MetadataParentRunID)
 	if err != nil {
 		return nil, databaseError("read metadata candidates", err)
 	}
@@ -50,9 +50,9 @@ func queueMetadataAfterDiscovery(ctx context.Context, tx pgx.Tx, parent model.Ru
 		return err
 	}
 	err = tx.QueryRow(ctx, `INSERT INTO ingest.runs
-(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,trigger,metadata_parent_run_id)
+(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,trigger,metadata_parent_run_id,storage_mode)
 SELECT $1,parent.provider_id,parent.provider_name,'metadata','queued',parent.max_pages,
-parent.revision,parent.config,parent.policy,parent.trigger,parent.id
+parent.revision,parent.config,parent.policy,parent.trigger,parent.id,parent.storage_mode
 FROM ingest.runs AS parent WHERE parent.id=$2 AND EXISTS (
     SELECT 1 FROM ingest.run_record_identities AS accepted
     JOIN ingest.torrents AS record ON record.provider_id=parent.provider_id AND record.source_id=accepted.source_id
@@ -60,7 +60,7 @@ FROM ingest.runs AS parent WHERE parent.id=$2 AND EXISTS (
     AND record.first_seen_at>=parent.created_at AND record.first_seen_at<=NOW()
     AND EXISTS (SELECT 1 FROM unnest($3::text[]) AS required(name)
         WHERE COALESCE(record.fields->required.name,'null'::jsonb)='null'::jsonb))
-ON CONFLICT (metadata_parent_run_id) DO NOTHING RETURNING id`, id, parent.ID, parent.Config.MetadataFields()).Scan(&id)
+ON CONFLICT (metadata_parent_run_id) DO NOTHING RETURNING id`, id, parent.ID, parent.MetadataFields()).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -76,7 +76,7 @@ ON CONFLICT (metadata_parent_run_id) DO NOTHING RETURNING id`, id, parent.ID, pa
 type metadataUpdate struct {
 	sourceID string
 	fields   []byte
-	rawID    int64
+	rawID    *int64
 }
 
 // A detail response can only supplement the same published native identity and

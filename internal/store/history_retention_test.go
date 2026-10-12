@@ -172,6 +172,8 @@ func TestHistoryRetentionPreservesOldFullRecoveryAndCoverage(t *testing.T) {
 
 func TestHistoryRetentionIsBoundedAndCancellationRollsBack(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	run := mirrorClaim(t, ctx, db, model.Provider{ID: "bounded", Adapter: "http_json"}, model.ModeFull)
 	run, err := db.SavePage(ctx, run, model.Page{Items: []model.Record{coverageRecord("staged")}, Next: json.RawMessage(`{"page":2}`)}, "first")
 	if err != nil {
@@ -290,6 +292,7 @@ func TestHistoryRetentionCompactsCatalogWithoutChangingRecentSnapshots(t *testin
 
 func TestHistoryRetentionCatalogRemainsCompleteAcrossCleanupBatches(t *testing.T) {
 	ctx, db := sharingDatabase(t)
+	grant := sharingGrant(t, ctx, db)
 	publishSharingRow(t, ctx, db, "shared", "a", `{"title":"A original"}`, nil)
 	publishSharingRow(t, ctx, db, "shared", "b", `{"title":"B original"}`, nil)
 	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.catalog_journal(provider_id,source_id,origin,fields,deleted)
@@ -312,7 +315,6 @@ UPDATE ingest.catalog_journal SET recorded_at=now()-interval '8 days'`); err != 
 		t.Fatal(err)
 	}
 	publishSharingRow(t, ctx, db, "shared", "a", `{"title":"A current"}`, nil)
-	grant := sharingGrant(t, ctx, db)
 	page := sharingPage(t, ctx, db, grant, CatalogPageRequest{Limit: 1})
 	if _, err = db.PruneHistory(ctx); err != nil {
 		t.Fatal(err)
@@ -391,8 +393,10 @@ func TestHistoryRetentionMigrationKeepsLegacyAcceptanceEvidence(t *testing.T) {
 		id     string
 		reject bool
 	}{{"trusted", false}, {"partial", true}} {
-		run, err := db.CreateRun(ctx, model.Run{ProviderID: tc.id, Config: model.Provider{ID: tc.id, Adapter: "http_json"}, Mode: model.ModeIncremental})
-		if err != nil {
+		// Seed using the historical schema, rather than a current writer that
+		// necessarily requires columns added by later migrations.
+		run := model.Run{ID: tc.id + "-legacy", ProviderID: tc.id}
+		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,revision,mode,status,config) VALUES($1,$2,$2,'','incremental','queued',jsonb_build_object('id',$2::text,'adapter','http_json'))`, run.ID, tc.id); err != nil {
 			t.Fatal(err)
 		}
 		var page int64
@@ -436,6 +440,8 @@ func TestHistoryRetentionMigrationKeepsLegacyAcceptanceEvidence(t *testing.T) {
 
 func TestHistoryRetentionDetachesRecentReferencesToExpiredArchives(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{ID: "archive-reference", Adapter: "http_json"}
 	old := mirrorClaim(t, ctx, db, provider, model.ModeFull)
 	old, err := db.SavePage(ctx, old, model.Page{Items: []model.Record{coverageRecord("same")}, Done: true}, "old-page")
@@ -483,6 +489,8 @@ func TestHistoryRetentionDetachesRecentReferencesToExpiredArchives(t *testing.T)
 
 func TestHistoryRetentionRollsBackWhenPublicationIsBusy(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	run := mirrorClaim(t, ctx, db, model.Provider{ID: "busy-publication", Adapter: "http_json"}, model.ModeFull)
 	run, err := db.SavePage(ctx, run, model.Page{Items: []model.Record{coverageRecord("held")}, Next: json.RawMessage(`{"page":2}`)}, "held-page")
 	if err != nil {

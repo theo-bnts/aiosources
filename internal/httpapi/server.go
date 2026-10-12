@@ -113,6 +113,7 @@ func New(options Options) (http.Handler, error) {
 	s.registerSearchRoutes(mux)
 	s.registerHistoryRoutes(mux)
 	s.registerSystemHealthRoutes(mux)
+	s.registerStorageRoutes(mux)
 	s.registerCollectionSettingsRoutes(mux)
 	mux.HandleFunc("/api/", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "API route not found")

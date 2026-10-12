@@ -211,6 +211,7 @@ var migrations = []struct {
 	{48, statisticsFingerprintSchema},
 	{49, publicAccessSchema},
 	{50, publicAccessActivitySchema},
+	{51, storageSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

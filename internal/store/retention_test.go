@@ -14,6 +14,8 @@ func TestSavePageKeepsObservationsWithoutPayloadDuplication(t *testing.T) {
 	for _, mode := range []model.RunMode{model.ModePreview, model.ModeIncremental, model.ModeFull, model.ModeMetadata} {
 		t.Run(string(mode), func(t *testing.T) {
 			ctx, _, db := activityDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			setStorageMode(t, ctx, db, model.StorageFull)
 			provider := metadataSource("compact-observations")
 			if mode == model.ModeMetadata {
 				publishSharingRow(t, ctx, db, provider.ID, "10", `{"info_hash":"0123456789012345678901234567890123456789"}`, nil)
@@ -100,6 +102,8 @@ COALESCE((SELECT sum(octet_length(body)) FROM ingest.pages WHERE run_id=$1),0)
 
 func TestCompactObservationsPreservePostgresInterpretationErrors(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{ID: "invalid-fields", Adapter: "http_json"}
 	run := mirrorClaim(t, ctx, db, provider, model.ModeIncremental)
 	invalid, overflow, badID, valid := coverageRecord("nul"), coverageRecord("overflow"), coverageRecord("bad\u0000id"), coverageRecord("valid")
@@ -133,6 +137,8 @@ func TestCompactObservationsPreservePostgresInterpretationErrors(t *testing.T) {
 
 func TestMetadataRetentionMigrationLeavesLegacyArchivesAndCheckpointsUntouched(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := metadataSource("legacy-archives")
 	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
 	run, err := db.SavePage(ctx, run, model.Page{Items: []model.Record{coverageRecord("old")}, Next: json.RawMessage(`{"old_cursor":{"unmodified":true}}`)}, "")
@@ -188,6 +194,8 @@ func TestRejectedAtomicPagesPreserveStagingAndCoverage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			ctx, _, db := activityDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			setStorageMode(t, ctx, db, model.StorageFull)
 			provider := model.Provider{ID: name, Adapter: "http_json"}
 			item := func(id, title string) model.Record {
 				record := coverageRecord(id, "root")

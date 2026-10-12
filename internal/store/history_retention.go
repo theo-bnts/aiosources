@@ -149,6 +149,9 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
 		return 0, databaseError("lock catalog retention", err)
 	}
+	if _, err = tx.Exec(ctx, `SELECT ingest.sync_catalog_tracking()`); err != nil {
+		return 0, databaseError("reconcile catalog storage", err)
+	}
 	if err = exec(`WITH expired AS MATERIALIZED (
  SELECT sequence,provider_id,source_id,origin,fields,deleted,recorded_at FROM ingest.catalog_journal
  WHERE recorded_at<$1 ORDER BY recorded_at,sequence LIMIT $2
@@ -161,7 +164,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
  ORDER BY provider_id,source_id,origin,sequence DESC
 ), retained AS (
  INSERT INTO ingest.catalog_baselines AS previous(provider_id,source_id,origin,fields,deleted,sequence,recorded_at)
- SELECT provider_id,source_id,origin,fields,deleted,sequence,recorded_at FROM latest
+ SELECT provider_id,source_id,origin,ingest.catalog_fields(fields),deleted,sequence,recorded_at FROM latest
  ON CONFLICT(provider_id,source_id,origin) DO UPDATE SET fields=EXCLUDED.fields,deleted=EXCLUDED.deleted,
  sequence=EXCLUDED.sequence,recorded_at=EXCLUDED.recorded_at WHERE previous.sequence<EXCLUDED.sequence
  RETURNING 1

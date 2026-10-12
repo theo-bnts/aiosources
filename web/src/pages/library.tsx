@@ -263,7 +263,7 @@ export function TorrentsPage() {
   )
 }
 
-export function RawTableView({ runId }: { runId: string }) {
+export function RawTableView({ runId, compact = false }: { runId: string; compact?: boolean }) {
   const listState = useListViewState()
   const date = useDate()
   const [search, setSearch] = useViewSearchParams()
@@ -299,6 +299,12 @@ export function RawTableView({ runId }: { runId: string }) {
         }}
       />
       <div className="space-y-3">
+        {compact && (
+          <p className="help">
+            Storage saving retains record errors here. Successful records are omitted; response
+            errors remain in Events, and imported torrents remain in Search.
+          </p>
+        )}
         <div className="field max-w-sm">
           <Label htmlFor={runId ? 'run-raw-processing' : 'raw-processing'}>Processing result</Label>
           <select
@@ -319,7 +325,7 @@ export function RawTableView({ runId }: { runId: string }) {
             <option value="accepted">Accepted</option>
           </select>
         </div>
-        {records.data?.counts && (
+        {records.data?.counts && !compact && (
           <p className="help" role="status">
             {number(records.data.counts.error)} errors · {number(records.data.counts.ignored)}{' '}
             ignored · {number(records.data.counts.enrichment)} enrichment ·{' '}

@@ -76,6 +76,7 @@ func TestTorrentSearchOversizedFieldsAndNumericPrefixCollisions(t *testing.T) {
 
 func TestSemanticPublicationHistoryIgnoresStagingAndObservations(t *testing.T) {
 	ctx, db := sharingDatabase(t)
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{Version: 1, ID: "source", Name: "Source", Adapter: "http_json", URL: "https://source.invalid/items"}
 	run := mirrorClaim(t, ctx, db, provider, model.ModeIncremental)
 	page := model.Page{Body: []byte("first"), Items: []model.Record{
@@ -237,6 +238,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy-one','s
 
 func TestRemoteMalformedTimestampPublicationPreservesFieldsAndSemanticHistory(t *testing.T) {
 	ctx, db := sharingDatabase(t)
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := mirrorSource("remote-dates")
 	hash := strings.Repeat("c", 40)
 	original := mirrorItem("invalid-zone", map[string]any{"title": "Original", "published_at": "2026-09-01T00:00:00+99:00", "size": json.Number("9007199254740993"), "info_hash": hash, "arbitrary": nil}, false)

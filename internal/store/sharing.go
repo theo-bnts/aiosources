@@ -166,6 +166,11 @@ func lockShareRevision(ctx context.Context, tx pgx.Tx, id string, expected int64
 	if expected < 1 {
 		return model.ErrInvalid
 	}
+	// Policy triggers and source resets use publication before recipient rows.
+	// Acquiring it before the revision lock avoids a cycle with snapshot cleanup.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
+		return databaseError("lock share publication policy", err)
+	}
 	var revision int64
 	if err := tx.QueryRow(ctx, "SELECT revision FROM ingest.shares WHERE id=$1 FOR UPDATE", id).Scan(&revision); err != nil {
 		return databaseError("lock share", err)

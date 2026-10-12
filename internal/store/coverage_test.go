@@ -34,6 +34,7 @@ func assertCoverage(t *testing.T, ctx context.Context, db *Store, runID string, 
 
 func TestScopeCoverageSurvivesResumeWithoutPublishingPreview(t *testing.T) {
 	ctx, endpoint, db := activityDatabase(t)
+	sharingGrant(t, ctx, db)
 	provider := model.Provider{Version: 1, ID: "coverage-preview", Name: "Coverage", Adapter: "http_json"}
 	// A preexisting live identity is not evidence for a new collection.
 	publishSharingRow(t, ctx, db, provider.ID, "prior", `{"title":"Prior"}`, nil)
@@ -167,6 +168,9 @@ func TestScopeCoverageRejectedPagesLeaveProgressUnchanged(t *testing.T) {
 
 func TestScopeCoverageResetsOnlyDerivedGeneration(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
+	sharingGrant(t, ctx, db)
 	provider := model.Provider{Version: 1, ID: "coverage-reset", Name: "Coverage", Adapter: "http_json"}
 	publishSharingRow(t, ctx, db, provider.ID, "live", `{"title":"Published"}`, nil)
 	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
@@ -198,6 +202,8 @@ func TestScopeCoverageResetsOnlyDerivedGeneration(t *testing.T) {
 
 func TestScopeCoverageRollsBackWithCheckpointFailure(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{Version: 1, ID: "coverage-rollback", Name: "Coverage", Adapter: "http_json"}
 	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
 	run, err := db.SavePage(ctx, run, model.Page{Items: []model.Record{coverageRecord("old", "root")}, Next: json.RawMessage(`{"page":2}`)}, "old")
@@ -238,6 +244,8 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_coverage_checkpoint()`); err != nil 
 
 func TestScopeRefreshResumesAtomicallyWithoutPublishingOrLosingOtherScopes(t *testing.T) {
 	ctx, endpoint, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{Version: 1, ID: "scope-refresh", Name: "Coverage", Adapter: "http_json"}
 	publishSharingRow(t, ctx, db, provider.ID, "published", `{"title":"Published"}`, nil)
 	publishSharingRow(t, ctx, db, "other-provider", "1", `{"title":"Independent","info_hash":"0123456789012345678901234567890123456789"}`, nil)
@@ -374,6 +382,8 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_scope_refresh()`); err != nil {
 
 func TestLatestCoverageMigrationBackfillsOnlyAcceptedCurrentObservations(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{
 		Version: 1, ID: "coverage-backfill", Name: "Coverage", Adapter: "http_json",
 		Traversal: &model.JSONTraversal{Scopes: []model.JSONScope{
@@ -491,6 +501,8 @@ func TestScopeMembershipMovesOutAndBackWithoutChangingOtherOccurrences(t *testin
 	for _, mode := range []model.RunMode{model.ModeFull, model.ModeIncremental} {
 		t.Run(string(mode), func(t *testing.T) {
 			ctx, _, db := activityDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			setStorageMode(t, ctx, db, model.StorageFull)
 			provider := model.Provider{Version: 1, ID: "scope-move-out", Name: "Coverage", Adapter: "http_json"}
 			run := mirrorClaim(t, ctx, db, provider, mode)
 			run, err := db.SavePage(ctx, run, model.Page{

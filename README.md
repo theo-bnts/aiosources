@@ -113,6 +113,16 @@ A source marked **Private source** without an announce URL is offered only when 
 
 Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
 
+### Keep storage under control
+
+**Storage → Data retention** uses **Storage saving** by default. New imports keep torrent identifiers, release, language and playback information relevant to AIOSources and AIOStreams, while discarding descriptions and unused source details. **All mapped fields** keeps additional fields selected in your source definitions. In Storage saving, successful per-record processing details are omitted; record errors, previews, run history, committed changes and resume/coverage evidence remain available. Both modes preserve the TMDB titles, aliases, identifiers and season information used for identification; full TMDB responses are never stored.
+
+Saving this setting affects imports started afterwards, including automatic imports. An import already queued or in progress keeps its original mode. Previously stored fields are not removed automatically. Source APIs may still return complete responses; the saving applies to retained data and unnecessary detail-only enrichment.
+
+To start again with the new mode, optionally use **Reset all source data** after pausing running imports. This removes imported torrents, remote catalog copies, source history, resume points and manual identifications. Your source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch. This reset cannot be undone.
+
+Catalog sharing keeps only fields its export protocol can use, and does not keep publication snapshots while every share is disabled or expired. Enabling sharing builds a fresh snapshot of the current catalog. Storage measurements include PostgreSQL tables and indexes; ordinary deletion makes space reusable inside PostgreSQL, while a source reset also releases the large source table files.
+
 ### Optional public access
 
 Enable **Stremio → Settings → Public access** to offer a visitor homepage. Visitors supply at least one AllDebrid or TorBox key and receive an encrypted installation URL. Keys are processed without saving them; playback uses each visitor's own account. Administration remains protected. Disabling public access revokes existing public links, while private installations keep working.

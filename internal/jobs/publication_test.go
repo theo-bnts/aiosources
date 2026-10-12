@@ -26,6 +26,8 @@ func TestFullPublicationCompletesOrResumesWithoutRefetch(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			ctx, endpoint, db := schedulerDatabase(t)
+			// This scenario verifies the optional complete processing history.
+			useFullStorage(t, ctx, db)
 			control, err := pgx.Connect(ctx, endpoint)
 			if err != nil {
 				t.Fatal(err)

@@ -51,7 +51,11 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
 	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET enabled=TRUE,fields=CASE WHEN id=$1 THEN ARRAY['title','seeders'] ELSE ARRAY['seeders'] END WHERE id IN ($1,$2)`, mixed.Share.ID, only.Share.ID); err != nil {
 		t.Fatal(err)
 	}
-	run := mirrorClaim(t, ctx, db, model.Provider{ID: "history-fixture"}, model.ModeFull)
+	// Historical fixtures cannot be created with a writer for a newer schema.
+	run := model.Run{ID: "history-fixture-run", ProviderID: "history-fixture"}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,revision,mode,status,config) VALUES($1,$2,$2,'','full','running',jsonb_build_object('id',$2::text))`, run.ID, run.ProviderID); err != nil {
+		t.Fatal(err)
+	}
 	var pageID int64
 	if err = db.pool.QueryRow(ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,$2,1,'','application/json') RETURNING id`, run.ID, run.ProviderID).Scan(&pageID); err != nil {
 		t.Fatal(err)

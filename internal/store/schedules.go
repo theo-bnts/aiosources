@@ -18,6 +18,9 @@ const queueLockNamespace int32 = 1768843111
 // Queue mutations use a short transaction lock, separate from the worker's
 // session-long provider lease. Hash collisions only serialize unrelated queues.
 func lockProviderQueue(ctx context.Context, tx pgx.Tx, providerID string) error {
+	if err := lockSourceData(ctx, tx); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", queueLockNamespace, int32(providerLockKey(providerID)))
 	return err
 }
@@ -247,8 +250,8 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				if err != nil {
 					return clock, nil, err
 				}
-				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full)
-VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull))
+				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full,storage_mode)
+VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM ingest.storage_settings WHERE singleton)) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull))
 				if err == nil {
 					err = lifecycleEvent(ctx, tx, run.ID, "queued", "Scheduled collection queued")
 				}

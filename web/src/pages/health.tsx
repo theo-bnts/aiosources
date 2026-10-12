@@ -5,6 +5,7 @@ import type { SystemHealth } from '@/lib/health-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { storageStatus } from '@/lib/storage-status'
+import { StorageSettingsPanel } from '@/components/storage-settings'
 import {
   Table,
   TableBody,
@@ -42,6 +43,7 @@ export function HealthPage() {
   const disk = report && storageStatus(report.disk.available, report.disk.measured_at, stale)
   return (
     <div className="page">
+      <StorageSettingsPanel />
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       {query.isPending ? (
         <Loading label="Loading storage measurements" />

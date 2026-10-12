@@ -184,6 +184,7 @@ func TestMetadataInvalidFieldsKeepWholePageAndCheckpointUnapplied(t *testing.T) 
 
 func TestFullPreservesOnlySameIdentityDetailMetadataAtAtomicPublication(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := metadataSource("full-metadata")
 	seed := mirrorClaim(t, ctx, db, provider, model.ModeIncremental)
 	enriched := func(id string) model.Record {

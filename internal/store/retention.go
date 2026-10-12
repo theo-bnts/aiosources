@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -48,7 +49,9 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 	}
 	primaryCount := 0
 	rejectedPrimary := false
-	for _, record := range page.Items {
+	page.Items = slices.Clone(page.Items)
+	for index := range page.Items {
+		record := &page.Items[index]
 		record.Fields = model.WithoutSwarmCounts(record.Fields)
 		if !record.Auxiliary {
 			primaryCount++
@@ -137,7 +140,7 @@ VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID
 		sourceID string
 		fields   []byte
 		origin   []byte
-		rawID    int64
+		rawID    *int64
 		deleted  bool
 	}
 	var stagedUpdates []stagedUpdate
@@ -158,7 +161,7 @@ VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID
 		if contentType == "" {
 			contentType = page.ContentType
 		}
-		var rawID int64
+		var rawID *int64
 		const insertRaw = `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained)
 VALUES($1,$2,$3,$4,$5,''::bytea,$6,
 CASE WHEN $11 OR jsonb_typeof($7::jsonb)<>'object' THEN $7::jsonb ELSE '{}'::jsonb END,
@@ -170,7 +173,17 @@ $8,$9,$10,FALSE) RETURNING id`
 		if err != nil {
 			return model.Run{}, databaseError("begin record retention", err)
 		}
-		err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID)
+		retainObservation := run.StorageMode != model.StorageCompact || run.Mode == model.ModePreview || record.Error != "" || page.Error != ""
+		if retainObservation {
+			err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID)
+		} else {
+			// Validate the same interpretation without writing millions of empty
+			// success observations. Durable identity/scope/filter ledgers below,
+			// not diagnostic rows, establish coverage and recovery boundaries.
+			var kind string
+			var sourceLength, typeLength int
+			err = itemTx.QueryRow(ctx, `SELECT jsonb_typeof($1::jsonb),length($2::text),length($3::text)`, fields, record.SourceID, contentType).Scan(&kind, &sourceLength, &typeLength)
+		}
 		if err != nil {
 			rollback(itemTx)
 			var dataError *pgconn.PgError
@@ -214,7 +227,12 @@ $8,$9,$10,FALSE) RETURNING id`
 		if run.Mode == model.ModePreview {
 			continue
 		}
+		record.Fields = model.StoredTorrentFields(record.Fields, run.StorageMode)
 		if remote {
+			fields, err = jsonObject(record.Fields)
+			if err != nil {
+				return model.Run{}, err
+			}
 			origin, err := json.Marshal(record.Origin)
 			if err != nil || record.Origin == nil || record.SourceID != model.CatalogItemID(*record.Origin) {
 				return model.Run{}, errors.New("invalid retained catalogue identity")

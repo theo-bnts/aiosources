@@ -11,6 +11,8 @@ import (
 
 func TestDistinctRecordsMigrationPreservesHistoryAndResume(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
+	// This scenario verifies the optional complete processing history.
+	setStorageMode(t, ctx, db, model.StorageFull)
 	provider := model.Provider{Version: 1, ID: "distinct-migration", Adapter: "http_json"}
 	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
 	save := func(page model.Page, fingerprint string) {
@@ -170,6 +172,7 @@ func TestNativeDetailAttributesSurviveLaterListUpdates(t *testing.T) {
 	for _, mode := range []model.RunMode{model.ModeIncremental, model.ModeFull} {
 		t.Run(string(mode), func(t *testing.T) {
 			ctx, _, db := activityDatabase(t)
+			setStorageMode(t, ctx, db, model.StorageFull)
 			provider := model.Provider{ID: "native-details", Adapter: "http_json"}
 			enriched := coverageRecord("249627")
 			enriched.Fields["attributes"] = map[string]any{"imdbid": []string{"tt123"}, "quality": []string{"10"}}
