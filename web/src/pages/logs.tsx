@@ -5,7 +5,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
 import { activityLevels, activityServices, type LogEntry } from '@/lib/activity-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
-import { useDate } from '@/lib/format'
+import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { ActivityLinks, LevelBadge } from '@/components/activity-common'
@@ -28,12 +28,6 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table'
-
-function localTime(value: string) {
-  const parsed = new Date(value)
-  if (!value || Number.isNaN(parsed.getTime())) return ''
-  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
-}
 
 export function LogsPage() {
   const date = useDate()
@@ -92,9 +86,13 @@ export function LogsPage() {
           }
           for (const key of ['from', 'to']) {
             const value = String(form.get(key) ?? '')
-            if (value) next.set(key, new Date(value).toISOString())
+            if (value) next.set(key, dateTimeToISO(value, search.get(key))!)
           }
-          if (next.has('from') && next.has('to') && next.get('from')! > next.get('to')!) {
+          if (
+            next.has('from') &&
+            next.has('to') &&
+            Date.parse(next.get('from')!) > Date.parse(next.get('to')!)
+          ) {
             setFilterError(new Error('The start time must be before the end time.'))
             return
           }
@@ -156,11 +154,16 @@ export function LogsPage() {
           </div>
           <div className="field">
             <Label htmlFor="log-from">From (browser local time)</Label>
-            <Input id="log-from" name="from" type="datetime-local" defaultValue={localTime(from)} />
+            <Input
+              id="log-from"
+              name="from"
+              type="datetime-local"
+              defaultValue={localDateTime(from)}
+            />
           </div>
           <div className="field">
             <Label htmlFor="log-to">To (browser local time)</Label>
-            <Input id="log-to" name="to" type="datetime-local" defaultValue={localTime(to)} />
+            <Input id="log-to" name="to" type="datetime-local" defaultValue={localDateTime(to)} />
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Button type="submit">

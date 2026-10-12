@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { bytes, useDate } from '@/lib/format'
 import type { SystemHealth } from '@/lib/health-types'
 import { ErrorNotice, Loading } from '@/components/common'
@@ -31,7 +31,7 @@ export function HealthPage() {
   const query = useQuery({
     queryKey: ['system-health'],
     queryFn: ({ signal }) => api<SystemHealth>('/system-health', { signal }),
-    refetchInterval: 30_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL,
   })
   const report = query.data
   const stale =

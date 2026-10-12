@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
-import { api, params } from '@/lib/api'
+import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { number, statusLabels, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
@@ -9,6 +9,7 @@ import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import type { Page } from '@/lib/types'
 import type { OperationRun, OperationEvent, OperationStatus } from '@/lib/operation-types'
 import { providerSteps, providerErrors } from '@/lib/provider-call'
+import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -100,7 +101,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
         `/operations?${params({ group: section, kind, service, status, offset, limit })}`,
         { signal },
       ),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
@@ -271,7 +272,7 @@ export function OperationDetailPage({ section }: { section: Section }) {
     queryKey: ['operation', id],
     queryFn: ({ signal }) =>
       api<OperationRun>(`/operations/${encodeURIComponent(id!)}`, { signal }),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const events = useQuery({
     queryKey: ['operation-events', id, offset, limit],
@@ -280,7 +281,7 @@ export function OperationDetailPage({ section }: { section: Section }) {
         `/operations/${encodeURIComponent(id!)}/events?${params({ offset, limit })}`,
         { signal },
       ),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const result = run.data
   return (
@@ -327,14 +328,12 @@ export function OperationDetailPage({ section }: { section: Section }) {
                 ),
                 ...(result.resource ? { Resource: result.resource } : {}),
               }).map(([label, value]) => (
-                <div key={label} className="statistic-card">
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd
-                    className={`mt-2 break-words ${typeof value === 'number' ? 'text-xl font-semibold tabular-nums' : 'text-sm'}`}
-                  >
-                    {typeof value === 'number' ? number(value) : value}
-                  </dd>
-                </div>
+                <Statistic
+                  key={label}
+                  label={label}
+                  value={value}
+                  size={typeof value === 'number' ? 'default' : 'sm'}
+                />
               ))}
             </dl>
             <p className="help">

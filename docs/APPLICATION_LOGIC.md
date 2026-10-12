@@ -10,6 +10,7 @@ The application uses shared rules at its boundaries while keeping the guarantees
 - Versioned writes reject stale updates. Users explicitly load or compare the current version before saving again. Forms that offer a merge retain changed fields and adopt only untouched server fields. Source JSON editors preserve exact numeric lexemes and use their existing comparison workflow.
 - A confirmation keeps the action and revision selected when it opened, even if the list refreshes underneath it. This includes deletion and credential replacement.
 - The metadata, debrid and private-playback forms save independently. Another pending form can adopt the revision produced by that same writer's successful save. If a further writer changes settings before the follow-up read, an explicit review is required instead.
+- Public-access settings use the same explicit revision review, retaining the local enabled choice. Identification reloads report request failures and refresh candidate revisions. A successful explicit reload clears the old selection, including when only metadata changed.
 - Leaving an unsaved form or closing an edited dialog uses the common draft guard. Newly generated sharing passwords and recovery codes are also guarded until explicitly acknowledged. These values remain in memory, not browser storage.
 
 Secret metadata has database revisions protecting rotations, deletion and recreation. Secret revisions come from a monotonically increasing database sequence: deleting and recreating a name cannot make an old editor valid again. Sequence gaps are normal; clients treat revisions as opaque values.
@@ -22,7 +23,9 @@ Query parsing rejects malformed encoding and ambiguous repeated parameters. Mult
 
 Browser query reads retry a transient network error, HTTP 408/429, or a server error once. Validation, authentication, permission, conflict and not-found errors do not retry automatically; cancelled reads never retry. Writes do not replay automatically after an uncertain acknowledgement. JSON responses, raw-page reads and downloads share interrupted-response handling. Proxy HTML or malformed error payloads produce a readable error rather than breaking error rendering.
 
-Data refresh covers source documents, schedules, remote documents, raw record/page details, identification diagnostics, secrets, and the other live query families. Storage measurements are read-only and do not scan observation history. The simplified console has no diagnostic settings API.
+Data refresh covers source documents, schedules, remote documents, processed-record details, identification diagnostics, secrets, and the other live query families. Live events are grouped at most once every five seconds and reuse an in-flight read rather than cancelling it repeatedly. A successful write still refreshes immediately and supersedes reads started before the write. Immutable raw archives are excluded. Storage measurements are read-only and do not scan observation history. The simplified console has no diagnostic settings API.
+
+Public setup uses the shared response/error handling and same-origin cookies, with no query or mutation cache for submitted service credentials. Statistics and histories share numeric cards, identification labels and semantic colors. Date fields use browser local time. Untouched dates retain their exact stored precision and offset, including during the repeated daylight-saving hour. Failed or incomplete candidate searches are distinguished from a successful search with no results.
 
 ## Service lifecycle
 

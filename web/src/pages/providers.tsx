@@ -15,7 +15,7 @@ import {
   UploadSimpleIcon,
   BracketsCurlyIcon,
 } from '@phosphor-icons/react'
-import { api, ApiError, queryClient, refreshData } from '@/lib/api'
+import { api, ApiError, queryClient, refreshData, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import type {
   AdapterInfo,
   Items,
@@ -65,7 +65,7 @@ export function ProvidersPage() {
   const schedules = useQuery({
     queryKey: ['schedules'],
     queryFn: ({ signal }) => api<Items<ScheduleSummary>>('/schedules', { signal }),
-    refetchInterval: 15_000,
+    refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const bySource = new Map((schedules.data?.items ?? []).map((item) => [item.provider_id, item]))
   const visible = items.filter(

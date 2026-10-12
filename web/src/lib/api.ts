@@ -28,6 +28,8 @@ export function retryRead(count: number, error: unknown) {
 }
 
 export const AUTO_REFRESH_INTERVAL = 30_000
+export const LIVE_REFRESH_INTERVAL = 5_000
+export const COLLECTION_REFRESH_INTERVAL = 15_000
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -141,7 +143,7 @@ export function params(values: Record<string, string | number | undefined>) {
   return query.toString()
 }
 
-export async function refreshData() {
+async function invalidateData(cancelRefetch: boolean) {
   await Promise.all(
     [
       'providers',
@@ -167,14 +169,22 @@ export async function refreshData() {
       'torrent-related',
       'run-changes',
       'system-health',
-      'health',
       'aiosource',
       'matching-diagnostics',
       'stremio-statistics',
       'stremio-requests',
       'security',
-      'sessions',
       'collection-settings',
-    ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
+    ].map((key) => queryClient.invalidateQueries({ queryKey: [key] }, { cancelRefetch })),
   )
+}
+
+// A completed write must supersede reads that started before that write.
+export function refreshData() {
+  return invalidateData(true)
+}
+
+// Repeated live events must let an in-flight read finish, including slow statistics.
+export function refreshLiveData() {
+  return invalidateData(false)
 }

@@ -8,7 +8,7 @@ import {
   CloudArrowDownIcon,
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react'
-import { api, ApiError, queryClient, refreshData } from '@/lib/api'
+import { api, ApiError, queryClient, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type { RemoteCatalog } from '@/lib/catalog-types'
 import type { Items, ProviderDocument, Run, SecretInfo, Validation } from '@/lib/types'
 import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/lib/remote-config'
@@ -63,7 +63,7 @@ export default function RemotesPage() {
   const remotes = useQuery({
     queryKey: ['remotes'],
     queryFn: ({ signal }) => api<Items<RemoteCatalog>>('/remotes', { signal }),
-    refetchInterval: 30_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL,
   })
   const items = remotes.data?.items ?? []
   const counts = useSourceTorrentStats(items.length > 0)

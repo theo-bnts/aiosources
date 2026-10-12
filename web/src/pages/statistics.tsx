@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { api, params } from '@/lib/api'
+import { api, params, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
 import type { Status } from '@/lib/aiosource-types'
+import { identificationResults, identificationStatuses } from '@/lib/identification'
 import { Empty, ErrorNotice, Loading, PageHeader } from '@/components/common'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
@@ -22,7 +23,7 @@ export function SourceStatisticsPage() {
   const overview = useQuery({
     queryKey: ['collection-settings'],
     queryFn: ({ signal }) => api<CollectionOverview>('/settings/collections', { signal }),
-    refetchInterval: 15_000,
+    refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const items = (providers.data?.items ?? []).filter((source) => !source.remote_catalog)
   const counts = useSourceTorrentStats(items.length > 0)
@@ -121,7 +122,7 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
   const query = useQuery({
     queryKey: ['aiosource'],
     queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const status = query.data
   if (legacyMatches)
@@ -140,16 +141,15 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
               <>
                 <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Statistic label="Film & series entries" value={status.status.works} />
-                  {[
-                    ['Identified torrents', 'matched', status.status.matched],
-                    ['Needs review', 'ambiguous', status.status.ambiguous],
-                    ['Not identified', 'unmatched', status.status.unmatched],
-                    ['Awaiting identification', 'pending', status.status.matching_pending],
-                  ].map(([label, decision, value]) => (
+                  {identificationStatuses.map((decision) => (
                     <Statistic
-                      key={label}
-                      label={String(label)}
-                      value={Number(value)}
+                      key={decision}
+                      label={
+                        decision === 'matched'
+                          ? 'Identified torrents'
+                          : identificationResults[decision].label
+                      }
+                      value={status.status[decision === 'pending' ? 'matching_pending' : decision]}
                       to={`/metadata/identification?${params({ match_status: decision })}`}
                     />
                   ))}

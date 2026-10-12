@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
+import { QueryObserver } from '@tanstack/react-query'
 import {
   api,
   ApiError,
@@ -7,6 +8,7 @@ import {
   rawPage,
   queryClient,
   refreshData,
+  refreshLiveData,
   retryRead,
   setCSRF,
 } from '../src/lib/api.ts'
@@ -16,6 +18,66 @@ afterEach(() => {
   globalThis.fetch = originalFetch
   queryClient.clear()
   setCSRF()
+})
+
+test('live updates let a slow active read finish without cancelling or replaying it', async () => {
+  let calls = 0
+  let cancelled = 0
+  const finish: Array<(value: string) => void> = []
+  queryClient.setQueryData(['torrents'], 'saved')
+  const observer = new QueryObserver(queryClient, {
+    queryKey: ['torrents'],
+    staleTime: Infinity,
+    queryFn: ({ signal }) => {
+      calls++
+      signal.addEventListener('abort', () => cancelled++, { once: true })
+      return new Promise<string>((resolve) => finish.push(resolve))
+    },
+  })
+  const unsubscribe = observer.subscribe(() => {})
+  try {
+    const read = observer.refetch()
+    const events = Promise.all(Array.from({ length: 5 }, () => refreshLiveData()))
+    await new Promise((resolve) => setImmediate(resolve))
+    for (const resolve of finish) resolve('received')
+    await Promise.all([read, events])
+    assert.equal(cancelled, 0)
+    assert.equal(calls, 1)
+    assert.equal(observer.getCurrentResult().data, 'received')
+  } finally {
+    for (const resolve of finish) resolve('cleanup')
+    unsubscribe()
+  }
+})
+
+test('a completed write supersedes an older read instead of displaying its stale snapshot', async () => {
+  let snapshot = 'before write'
+  let cancelled = 0
+  const finish: Array<() => void> = []
+  queryClient.setQueryData(['providers'], 'saved')
+  const observer = new QueryObserver(queryClient, {
+    queryKey: ['providers'],
+    staleTime: Infinity,
+    queryFn: ({ signal }) => {
+      const value = snapshot
+      signal.addEventListener('abort', () => cancelled++, { once: true })
+      return new Promise<string>((resolve) => finish.push(() => resolve(value)))
+    },
+  })
+  const unsubscribe = observer.subscribe(() => {})
+  try {
+    const read = observer.refetch()
+    snapshot = 'after write'
+    const updated = refreshData()
+    await new Promise((resolve) => setImmediate(resolve))
+    for (const resolve of finish) resolve()
+    await Promise.all([read, updated])
+    assert.equal(cancelled, 1)
+    assert.equal(observer.getCurrentResult().data, 'after write')
+  } finally {
+    for (const resolve of finish) resolve()
+    unsubscribe()
+  }
 })
 
 test('every read uses the same bounded retry policy without replaying client errors or cancellations', () => {

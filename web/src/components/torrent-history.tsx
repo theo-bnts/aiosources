@@ -7,10 +7,11 @@ import type { CatalogOrigin, Page, Torrent } from '@/lib/types'
 import type { OccurrenceHistory, RunChanges, TorrentChange } from '@/lib/history-types'
 import { occurrenceHref } from '@/lib/search-types'
 import { decodeSearchJSON, exactField, exactJSON, fieldChanges } from '@/lib/search-json'
-import { bytes, useDate, number } from '@/lib/format'
+import { bytes, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { Badge } from '@/components/ui/badge'
+import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
 import {
@@ -555,17 +556,13 @@ export function RunPublicationCounts({ data }: { data: RunChanges }) {
           recorded changes, not a reconstructed total for the run.
         </p>
       )}
-      <dl className="grid grid-cols-3 divide-x divide-border rounded-md border border-border py-4 text-center">
+      <dl className="grid gap-3 sm:grid-cols-3">
         {(['added', 'updated', 'deleted'] as const).map((kind) => (
-          <div key={kind} className="min-w-0 px-2 sm:px-4">
-            <dt className="text-xs text-muted-foreground">
-              {kind === 'added' ? 'Added' : kind === 'updated' ? 'Updated' : 'Deleted'}
-              {!data.history_complete ? ' (recorded)' : ''}
-            </dt>
-            <dd className="mt-2 font-mono text-xl tabular-nums sm:text-2xl">
-              {number(data.counts[kind])}
-            </dd>
-          </div>
+          <Statistic
+            key={kind}
+            label={`${kind === 'added' ? 'Added' : kind === 'updated' ? 'Updated' : 'Deleted'}${!data.history_complete ? ' (recorded)' : ''}`}
+            value={data.counts[kind]}
+          />
         ))}
       </dl>
     </section>

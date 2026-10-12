@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { DatabaseIcon } from '@phosphor-icons/react'
+import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,17 +14,8 @@ type PublicInfo = { enabled: boolean; providers: { id: string; name: string }[] 
 export function PublicEntry({ authenticated = false }: { authenticated?: boolean }) {
   const info = useQuery({
     queryKey: ['public-config'],
-    queryFn: async ({ signal }) => {
-      // Access proxies need their same-origin session cookie even on public routes.
-      const response = await fetch('/api/public/config', {
-        signal,
-        cache: 'no-store',
-        credentials: 'same-origin',
-      })
-      if (!response.ok) throw new Error('Public configuration is unavailable.')
-      return response.json() as Promise<PublicInfo>
-    },
-    refetchInterval: 5000,
+    queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
     retry: false,
   })
   const [manifest, setManifest] = useState('')
@@ -39,7 +31,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
     }
   }, [info.data?.enabled])
   async function install(form: HTMLFormElement) {
-    if (pending) return
+    if (request.current) return
     const values = new FormData(form),
       services: Record<string, string> = {}
     for (const provider of info.data?.providers ?? []) {
@@ -57,22 +49,19 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
     request.current = controller
     try {
       // Credential values never enter React Query, navigation state or browser storage.
-      const response = await fetch('/api/public/install', {
+      const body = await api<{ manifest_url: string }>('/public/install', {
         method: 'POST',
-        credentials: 'same-origin',
         cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ services }),
         signal: controller.signal,
       })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error || 'Could not create the installation link.')
       if (!controller.signal.aborted) setManifest(body.manifest_url)
     } catch (caught) {
       if (!controller.signal.aborted) setError(caught)
     } finally {
       for (const name of Object.keys(services)) delete services[name]
       form.reset()
+      if (request.current === controller) request.current = null
       if (!controller.signal.aborted) setPending(false)
     }
   }

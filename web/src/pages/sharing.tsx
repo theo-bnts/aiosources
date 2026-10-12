@@ -2,9 +2,9 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { PlusIcon, ShareNetworkIcon } from '@phosphor-icons/react'
-import { api, ApiError, refreshData } from '@/lib/api'
+import { api, ApiError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type { CatalogShare, CatalogShares, SharePassword } from '@/lib/catalog-types'
-import { useDate } from '@/lib/format'
+import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,14 +39,6 @@ function shareExpired(share: CatalogShare) {
   return Boolean(share.expires_at && Date.parse(share.expires_at) <= Date.now())
 }
 
-function localExpiration(value?: string | null) {
-  if (!value) return ''
-  const valueDate = new Date(value)
-  return new Date(valueDate.getTime() - valueDate.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 19)
-}
-
 export default function SharingPage() {
   const date = useDate()
   const returnFocus = useRef<HTMLElement | null>(null)
@@ -57,7 +49,7 @@ export default function SharingPage() {
   const shares = useQuery({
     queryKey: ['shares'],
     queryFn: ({ signal }) => api<CatalogShares>('/shares', { signal }),
-    refetchInterval: 30_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL,
     structuralSharing: false,
   })
   const httpsReady = Boolean(shares.data?.public_url.startsWith('https://'))
@@ -341,7 +333,7 @@ function ShareForm({
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? 'selected')
   const [sourceIDs, setSourceIDs] = useState(share?.source_ids ?? [])
   const [fields, setFields] = useState(share?.fields ?? data.fields)
-  const [expiresAt, setExpiresAt] = useState(localExpiration(share?.expires_at))
+  const [expiresAt, setExpiresAt] = useState(localDateTime(share?.expires_at, 'seconds'))
   const [requestsPerMinute, setRequestsPerMinute] = useState(
     String(share?.requests_per_minute ?? 120),
   )
@@ -370,7 +362,7 @@ function ShareForm({
         scope,
         source_ids: scope === 'all' ? [] : sourceIDs,
         fields,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+        expires_at: dateTimeToISO(expiresAt, original?.expires_at, 'seconds'),
         requests_per_minute: requests,
         max_concurrent_downloads: concurrent,
         ...(original ? { revision: original.revision } : {}),
@@ -416,7 +408,7 @@ function ShareForm({
     scope !== (original?.scope ?? 'selected') ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
     JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
-    expiresAt !== localExpiration(original?.expires_at) ||
+    expiresAt !== localDateTime(original?.expires_at, 'seconds') ||
     requestsPerMinute !== String(original?.requests_per_minute ?? 120) ||
     maxConcurrentDownloads !== String(original?.max_concurrent_downloads ?? 2) ||
     (!original && acknowledged)

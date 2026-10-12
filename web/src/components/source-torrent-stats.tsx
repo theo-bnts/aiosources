@@ -1,23 +1,17 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api, params } from '@/lib/api'
+import { api, params, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { number } from '@/lib/format'
+import { identificationResults, identificationStatuses } from '@/lib/identification'
 import type { Items, SourceTorrentStats as TorrentStats } from '@/lib/types'
-
-const decisions = [
-  { status: 'matched', label: 'Identified' },
-  { status: 'unmatched', label: 'Not identified' },
-  { status: 'ambiguous', label: 'Needs review' },
-  { status: 'pending', label: 'Awaiting identification' },
-] as const
 
 export function useSourceTorrentStats(enabled: boolean) {
   const query = useQuery({
     queryKey: ['source-torrent-stats'],
     queryFn: ({ signal }) => api<Items<TorrentStats>>('/source-torrent-stats', { signal }),
     enabled,
-    refetchInterval: enabled ? 15_000 : false,
+    refetchInterval: enabled ? COLLECTION_REFRESH_INTERVAL : false,
   })
   const bySource = useMemo(
     () => new Map(query.data?.items?.map((item) => [item.provider_id, item])),
@@ -35,7 +29,7 @@ export function SourceTorrentStats({
   counts?: TorrentStats
   unavailable: boolean
 }) {
-  if (unavailable || !counts)
+  if (!counts)
     return (
       <p className={`text-sm ${unavailable ? 'text-destructive' : 'text-muted-foreground'}`}>
         {unavailable ? 'Counts unavailable' : 'Loading counts…'}
@@ -56,14 +50,14 @@ export function SourceTorrentStats({
             </Link>
           </dd>
         </div>
-        {decisions.map(({ status, label }) => (
+        {identificationStatuses.map((status) => (
           <div key={status}>
-            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dt className="text-xs text-muted-foreground">{identificationResults[status].label}</dt>
             <dd className="mt-1">
               <Link
                 className="data-link tabular-nums"
                 to={`/metadata/identification?${params({ match_status: status, match_provider: counts.provider_id })}`}
-                aria-label={`View ${number(counts[status])} ${label.toLowerCase()} torrents from ${source}`}
+                aria-label={`View ${number(counts[status])} ${identificationResults[status].label.toLowerCase()} torrents from ${source}`}
               >
                 {number(counts[status])}
               </Link>
@@ -71,6 +65,11 @@ export function SourceTorrentStats({
           </div>
         ))}
       </dl>
+      {unavailable && (
+        <p role="status" className="help text-amber-300">
+          Last available counts.
+        </p>
+      )}
       {counts.pending_import && (
         <p className="help border-t pt-2">
           <Link

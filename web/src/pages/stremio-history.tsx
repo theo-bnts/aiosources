@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
-import { api, params } from '@/lib/api'
+import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import { number, bytes, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
@@ -78,7 +78,7 @@ export function StremioStatisticsPage() {
   const query = useQuery({
     queryKey: ['stremio-statistics'],
     queryFn: ({ signal }) => api<StremioStatistics>('/stremio/statistics', { signal }),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   return (
     <div className="page">
@@ -143,7 +143,7 @@ export function StremioHistoryPage() {
           signal,
         },
       ),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   function filter(patch: Record<string, string>) {
     const next = new URLSearchParams(search)

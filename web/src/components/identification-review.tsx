@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { api, ApiError, params, refreshData } from '@/lib/api'
+import { api, ApiError, params, queryClient, refreshData } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { MatchDiagnostic, ReviewDetail, ReviewWork } from '@/lib/aiosource-types'
 import type { Items } from '@/lib/types'
@@ -46,6 +46,7 @@ export function IdentificationReview({
   item: MatchDiagnostic
   onClose: () => void
 }) {
+  const [reviewVersion, setReviewVersion] = useState(0)
   const detail = useQuery({
     queryKey: ['identification-review', item.occurrence_id],
     queryFn: ({ signal }) =>
@@ -74,11 +75,19 @@ export function IdentificationReview({
         ) : (
           detail.data && (
             <ReviewForm
-              key={`${item.occurrence_id}:${detail.data.record.fingerprint}:${detail.data.review?.revision ?? 0}`}
+              key={`${item.occurrence_id}:${detail.data.record.fingerprint}:${detail.data.review?.revision ?? 0}:${reviewVersion}`}
               detail={detail.data}
               occurrence={item.occurrence_id}
               onClose={onClose}
-              reload={() => void detail.refetch()}
+              reload={async () => {
+                // Load candidates before a changed record can replace the edited form.
+                await queryClient.invalidateQueries(
+                  { queryKey: ['review-candidates'] },
+                  { throwOnError: true },
+                )
+                await detail.refetch({ throwOnError: true })
+                setReviewVersion((version) => version + 1)
+              }}
             />
           )
         )}
@@ -96,7 +105,7 @@ function ReviewForm({
   detail: ReviewDetail
   occurrence: string
   onClose: () => void
-  reload: () => void
+  reload: () => Promise<void>
 }) {
   const sourceName = useSourceNames()
   const [selected, setSelected] = useState<ReviewWork | null>(null)
@@ -109,11 +118,12 @@ function ReviewForm({
   const [episode, setEpisode] = useState(
     String(detail.review?.episode ?? detail.record.episode ?? ''),
   )
+  const canSearch = q.trim().length >= 3 || /^\d+$/.test(q)
   const candidates = useQuery({
     queryKey: ['review-candidates', q, kind],
     queryFn: ({ signal }) =>
       api<Items<ReviewWork>>(`/aiosource/candidates?${params({ q, type: kind })}`, { signal }),
-    enabled: q.trim().length >= 3 || /^\d+$/.test(q),
+    enabled: canSearch,
     refetchInterval: false,
     staleTime: 30_000,
   })
@@ -250,12 +260,20 @@ function ReviewForm({
           </label>
         ))}
       </div>
-      {!candidates.isFetching && !candidates.data?.items?.length && (
-        <Empty
-          title="No candidates in this view"
-          description="Try another title or identifier. Only downloaded film and series information is available here."
-        />
+      {!canSearch && (
+        <p className="help" role="status">
+          Enter at least 3 characters or an identifier to search.
+        </p>
       )}
+      {canSearch &&
+        candidates.isSuccess &&
+        !candidates.isFetching &&
+        !candidates.data.items?.length && (
+          <Empty
+            title="No candidates in this view"
+            description="Try another title or identifier. Only downloaded film and series information is available here."
+          />
+        )}
       {selected && !candidates.data?.items?.some((work) => work.id === selected.id) && (
         <section className="space-y-3 rounded-md border border-primary/40 p-4">
           <h3 className="font-medium">Selected identification</h3>
@@ -290,6 +308,7 @@ function ReviewForm({
                   <Input
                     id="review-season"
                     inputMode="numeric"
+                    disabled={save.isPending}
                     value={season}
                     onChange={(event) => setSeason(event.target.value)}
                     placeholder="0–999"
@@ -300,6 +319,7 @@ function ReviewForm({
                   <Input
                     id="review-episode"
                     inputMode="numeric"
+                    disabled={save.isPending}
                     value={episode}
                     onChange={(event) => setEpisode(event.target.value)}
                     placeholder="Empty for a season pack"
@@ -326,7 +346,7 @@ function ReviewForm({
           description="The source, metadata or review changed. Your previous selection will be cleared so you can check the latest information."
           label="Load current information"
           trigger={<Button variant="outline">Review latest data</Button>}
-          action={async () => reload()}
+          action={reload}
         />
       )}
       <DialogFooter>

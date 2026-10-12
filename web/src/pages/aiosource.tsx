@@ -2,7 +2,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
-import { api, ApiError, queryClient } from '@/lib/api'
+import { api, ApiError, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import type { Items, SecretInfo, ProviderSummary } from '@/lib/types'
 import { Loading, ErrorNotice, ConfirmAction } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -47,15 +47,15 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   const query = useQuery({
     queryKey: ['aiosource'],
     queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const secrets = useQuery({
     queryKey: ['secrets'],
-    queryFn: () => api<Items<SecretInfo>>('/secrets'),
+    queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
   })
   const providers = useQuery({
     queryKey: ['providers'],
-    queryFn: () => api<Items<ProviderSummary>>('/providers'),
+    queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
   const [drafts, setDrafts] = useState<Partial<Record<FormScope, Draft>>>({})
   const [feedback, setFeedback] = useState<

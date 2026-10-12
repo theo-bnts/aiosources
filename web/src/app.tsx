@@ -30,7 +30,14 @@ import {
   DownloadSimpleIcon,
   ChartLineIcon,
 } from '@phosphor-icons/react'
-import { api, queryClient, refreshData, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import {
+  api,
+  queryClient,
+  refreshLiveData,
+  setCSRF,
+  AUTO_REFRESH_INTERVAL,
+  LIVE_REFRESH_INTERVAL,
+} from '@/lib/api'
 import type { Session } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -329,12 +336,17 @@ function useLiveUpdates() {
   useEffect(() => {
     const source = new EventSource('/api/events', { withCredentials: true })
     let timer: number | undefined
+    let nextRefresh = 0
     const queueRefresh = () => {
-      if (!timer)
-        timer = window.setTimeout(() => {
-          timer = undefined
-          void refreshData()
-        }, 500)
+      if (timer === undefined)
+        timer = window.setTimeout(
+          () => {
+            timer = undefined
+            nextRefresh = performance.now() + LIVE_REFRESH_INTERVAL
+            void refreshLiveData()
+          },
+          Math.max(500, nextRefresh - performance.now()),
+        )
     }
     source.onopen = () => {
       setState('live')
@@ -343,7 +355,7 @@ function useLiveUpdates() {
     source.addEventListener('update', queueRefresh)
     source.onerror = () => {
       setState('reconnecting')
-      void queryClient.invalidateQueries({ queryKey: ['session'] })
+      void queryClient.invalidateQueries({ queryKey: ['session'] }, { cancelRefetch: false })
     }
     return () => {
       source.close()

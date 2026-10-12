@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useQuery } from '@tanstack/react-query'
 import { ShieldCheckIcon, SignOutIcon } from '@phosphor-icons/react'
-import { api, queryClient, setCSRF } from '@/lib/api'
+import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
 import type { Items } from '@/lib/types'
 import type {
@@ -47,12 +47,12 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
   const status = useQuery({
     queryKey: ['security', 'status'],
     queryFn: ({ signal }) => api<SecurityStatus>('/security', { signal }),
-    refetchInterval: 30_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL,
   })
   const sessions = useQuery({
     queryKey: ['security', 'sessions'],
     queryFn: ({ signal }) => api<Items<AdminSession>>('/security/sessions', { signal }),
-    refetchInterval: 30_000,
+    refetchInterval: AUTO_REFRESH_INTERVAL,
   })
   const sessionItems = sessions.data?.items ?? []
   const [operation, setOperation] = useState<Operation | null>(null)

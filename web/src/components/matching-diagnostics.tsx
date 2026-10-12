@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api, params } from '@/lib/api'
+import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { MatchDiagnostic } from '@/lib/aiosource-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
 import { useURLPagination } from '@/lib/pagination'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { number, useDate } from '@/lib/format'
+import { identificationResults } from '@/lib/identification'
 import { ClearFiltersButton, ListEmpty, ErrorNotice, Loading, Pager } from '@/components/common'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,12 +24,6 @@ import {
   TableCell,
 } from '@/components/ui/table'
 
-const labels = {
-  matched: 'Identified',
-  ambiguous: 'Needs review',
-  unmatched: 'Not identified',
-  pending: 'Awaiting identification',
-}
 const reasons: Record<string, string> = {
   'manually reviewed': 'Film or series chosen in a manual review.',
   'reviewed source changed':
@@ -78,7 +73,7 @@ export function MatchingDiagnostics() {
         `/aiosource/matches?${params({ status: status === 'all' ? '' : status, provider, q, limit, offset })}`,
         { signal },
       ),
-    refetchInterval: 5000,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   function filter(patch: Record<string, string>) {
     const next = new URLSearchParams(search)
@@ -99,7 +94,7 @@ export function MatchingDiagnostics() {
             onChange={(event) => filter({ match_status: event.target.value })}
           >
             <option value="all">All results</option>
-            {Object.entries(labels).map(([key, label]) => (
+            {Object.entries(identificationResults).map(([key, { label }]) => (
               <option key={key} value={key}>
                 {label}
               </option>
@@ -187,18 +182,8 @@ export function MatchingDiagnostics() {
                         </p>
                       </div>
                       <p className="text-sm font-medium">
-                        <Badge
-                          variant={
-                            item.status === 'matched'
-                              ? 'success'
-                              : item.status === 'ambiguous'
-                                ? 'warning'
-                                : item.status === 'pending'
-                                  ? 'info'
-                                  : 'secondary'
-                          }
-                        >
-                          {labels[item.status]}
+                        <Badge variant={identificationResults[item.status].variant}>
+                          {identificationResults[item.status].label}
                         </Badge>
                         {item.imdb && <span className="mono ml-2">{item.imdb}</span>}
                       </p>
@@ -247,18 +232,8 @@ export function MatchingDiagnostics() {
                             </p>
                           </TableCell>
                           <TableCell className="whitespace-normal">
-                            <Badge
-                              variant={
-                                item.status === 'matched'
-                                  ? 'success'
-                                  : item.status === 'ambiguous'
-                                    ? 'warning'
-                                    : item.status === 'pending'
-                                      ? 'info'
-                                      : 'secondary'
-                              }
-                            >
-                              {labels[item.status]}
+                            <Badge variant={identificationResults[item.status].variant}>
+                              {identificationResults[item.status].label}
                             </Badge>
                             {item.imdb && <p className="mono mt-1">{item.imdb}</p>}
                           </TableCell>

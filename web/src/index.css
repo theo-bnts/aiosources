@@ -95,10 +95,10 @@
     @apply text-base font-medium tracking-tight;
   }
   .section-card {
-    @apply space-y-5 rounded-md border border-border bg-card p-5 sm:p-6;
+    @apply min-w-0 space-y-5 rounded-md border border-border bg-card p-5 sm:p-6;
   }
   .statistic-card {
-    @apply rounded-md border border-border bg-card p-4;
+    @apply min-w-0 rounded-md border border-border bg-card p-4;
   }
   .toolbar {
     @apply flex flex-wrap items-center gap-3;
