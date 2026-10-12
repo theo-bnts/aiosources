@@ -267,7 +267,12 @@ test.describe('browser local dates', () => {
       '2026-10-25T02:30',
     )
     await page.getByLabel('Source or service', { exact: true }).selectOption('service:tmdb')
+    const applied = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.pathname === '/api/logs' && url.searchParams.get('service') === 'tmdb'
+    })
     await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
+    expect((await applied).ok()).toBe(true)
     await expect(page).toHaveURL(
       (url) =>
         url.searchParams.get('from') === from &&
@@ -275,6 +280,9 @@ test.describe('browser local dates', () => {
         url.searchParams.get('service') === 'tmdb',
     )
     await page.getByLabel('From (browser local time)', { exact: true }).fill('2026-10-25T04:00')
+    await expect(page.getByLabel('From (browser local time)', { exact: true })).toHaveValue(
+      '2026-10-25T04:00',
+    )
     await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText(
       'The start time must be before the end time.',
