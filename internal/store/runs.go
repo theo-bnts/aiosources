@@ -189,7 +189,7 @@ func (s *Store) ClaimNext(ctx context.Context) (*model.Run, error) {
 	default:
 		return nil, nil
 	}
-	conn, err := s.pool.Acquire(ctx)
+	conn, err := s.collectionPool.Acquire(ctx)
 	if err != nil {
 		<-s.claimSlots
 		return nil, databaseError("acquire collection session", err)

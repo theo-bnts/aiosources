@@ -94,7 +94,7 @@ These are all application environment variables. The image supplies the defaults
 | `PROVIDERS_DIR` | `/data/providers` | Private JSON source definitions. |
 | `MASTER_KEY` | Generated `vault.key` in `DATA_DIR` | Optional existing 32-byte encryption key, encoded in base64 or hexadecimal. Never change the key of an existing installation. |
 
-TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets**. They have no dedicated deployment variables. Import concurrency defaults to **5**, and can be changed in Sources settings; existing saved limits are preserved.
+TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets**. They have no dedicated deployment variables. Import concurrency defaults to **5**, and can be changed from **1 to 32** in Sources settings without deployment changes; existing saved limits are preserved. Each source runs at most one import at a time.
 
 **Upgrading from prefixed variables:** remove `INGEST_` from the six old deployment variable names in your environment and Compose overrides before starting this image. Keep every value, path and volume unchanged. The application refuses obsolete names rather than silently generating a different password or encryption key. `DATABASE_URL` keeps its name. Compose-only options and development/test variables are listed in [Deployment and settings](docs/SETTINGS.md).
 

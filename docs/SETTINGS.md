@@ -71,7 +71,7 @@ Open **Sources → Settings → Advanced settings** to change **Simultaneous imp
 - Increasing the limit wakes queued work.
 - Decreasing it leaves active runs and their checkpoints intact. New runs wait until the active count falls below the new limit.
 - Only one run per source is admitted at a time; each source's request interval and rate-limit handling remain unchanged.
-- The page shows running and queued totals, plus this instance's database connection capacity. That local capacity can be lower than the shared limit: two pool connections remain reserved for administration and recovery. If necessary, configure `pool_max_conns` in `DATABASE_URL` and restart to increase the pool itself. Saving a larger collection limit does not silently change the connection pool.
+- All instances support the full 1–32 range, independently of CPU count or the ordinary database connection pool size. Import sessions have a separate bounded pool and open only as work is admitted; startup does not open 32 connections. Administration, scheduling, metadata and recovery keep their ordinary connection budget. `pool_max_conns` in `DATABASE_URL` configures that ordinary pool, not the number of simultaneous imports.
 
 Concurrent edits use revisions. If another administrator changes shared settings, the page preserves the draft and asks whether to use the saved values or keep the edit before saving again.
 

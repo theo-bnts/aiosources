@@ -24,14 +24,15 @@ import (
 const notificationChannel = "ingest_run_changes"
 
 type Store struct {
-	pool       *pgxpool.Pool
-	mu         sync.Mutex
-	leases     map[string]*runLease
-	claimSlots chan struct{}
-	closed     bool
-	background context.Context
-	cancel     context.CancelFunc
-	listeners  sync.WaitGroup
+	pool           *pgxpool.Pool
+	collectionPool *pgxpool.Pool
+	mu             sync.Mutex
+	leases         map[string]*runLease
+	claimSlots     chan struct{}
+	closed         bool
+	background     context.Context
+	cancel         context.CancelFunc
+	listeners      sync.WaitGroup
 }
 
 type runLease struct {
@@ -45,8 +46,7 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	if err != nil {
 		return nil, errors.New("invalid database connection configuration")
 	}
-	// Two connections always remain available for API work and recovery, even
-	// when every collection slot owns a session advisory lock.
+	// Short queries retain their own budget, independently of collection leases.
 	if config.MaxConns < 4 {
 		config.MaxConns = 4
 	}
@@ -61,8 +61,20 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, databaseError("connect database", err)
 	}
+	// A run retains its session advisory lock until it finishes. Keeping these
+	// sessions separate supports the entire saved 1-32 range even on small
+	// machines, without occupying API, scheduling or recovery connections.
+	// Open connections only as imports need them, never all 32 at startup.
+	collectionConfig := config.Copy()
+	collectionConfig.MaxConns = model.MaxCollectionWorkers
+	collectionConfig.MinConns, collectionConfig.MinIdleConns = 0, 0
+	collectionPool, err := pgxpool.NewWithConfig(ctx, collectionConfig)
+	if err != nil {
+		pool.Close()
+		return nil, databaseError("open collection sessions", err)
+	}
 	background, cancel := context.WithCancel(context.Background())
-	return &Store{pool: pool, leases: make(map[string]*runLease), claimSlots: make(chan struct{}, int(config.MaxConns)-2), background: background, cancel: cancel}, nil
+	return &Store{pool: pool, collectionPool: collectionPool, leases: make(map[string]*runLease), claimSlots: make(chan struct{}, model.MaxCollectionWorkers), background: background, cancel: cancel}, nil
 }
 
 func (s *Store) Close() {
@@ -84,6 +96,7 @@ func (s *Store) Close() {
 		lease.mu.Unlock()
 	}
 	s.listeners.Wait()
+	s.collectionPool.Close()
 	s.pool.Close()
 }
 

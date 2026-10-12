@@ -8,6 +8,43 @@ async function savedSettings(page: Page): Promise<CollectionSettings> {
   return (await response.json()).settings
 }
 
+test('the full import concurrency range persists without local-capacity warnings', async ({
+  page,
+}) => {
+  await page.goto('/import-settings')
+  const form = page.getByRole('form', { name: 'Advanced settings', exact: true })
+  const workers = form.getByLabel('Simultaneous imports', { exact: true })
+  const save = form.getByRole('button', { name: 'Save', exact: true })
+  await expect(workers).toHaveAttribute('min', '1')
+  await expect(workers).toHaveAttribute('max', '32')
+  const initial = await (await page.request.get('/api/settings/collections')).json()
+  expect(initial.capacity).toBe(32)
+  for (const value of ['5', '32', '1']) {
+    await workers.fill(value)
+    await expect(workers).toHaveAttribute('aria-invalid', 'false')
+    await expect(page.getByText(/exceeds.*capacity|cannot fill the shared limit/)).toHaveCount(0)
+    const response = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/settings/collections') &&
+        response.request().method() === 'PUT',
+    )
+    await save.click()
+    const result = await response
+    expect(result.status()).toBe(200)
+    expect((await result.json()).settings.workers).toBe(Number(value))
+    await expect(save).toBeDisabled()
+    expect((await savedSettings(page)).workers).toBe(Number(value))
+  }
+  await page.reload()
+  await expect(workers).toHaveValue('1')
+  for (const value of ['0', '33', '1.5']) {
+    await workers.fill(value)
+    await expect(workers).toHaveAttribute('aria-invalid', 'true')
+    await expect(save).toBeDisabled()
+    expect((await savedSettings(page)).workers).toBe(1)
+  }
+})
+
 test('advanced import controls load on demand and folding preserves drafts and navigation protection', async ({
   page,
 }) => {

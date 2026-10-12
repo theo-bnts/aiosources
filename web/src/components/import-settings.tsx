@@ -185,22 +185,10 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
         data &&
         values && (
           <>
-            {data.settings.workers > data.capacity && (
-              <p className="notice notice-warning" role="status">
-                The saved limit of {data.settings.workers} exceeds this instance’s capacity of{' '}
-                {data.capacity}. This instance cannot fill the shared limit on its own.
-              </p>
-            )}
             <form onSubmit={submit} aria-label="Advanced settings" className="space-y-6" noValidate>
               <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
                 <legend className="pr-3 text-sm font-medium">Concurrency · Immediate</legend>
                 <div className="max-w-sm">{numberInput('workers')}</div>
-                {dirty && Number(values.workers) > data.capacity && (
-                  <p className="notice notice-warning">
-                    Your proposed limit exceeds the local capacity of {data.capacity}. Saving is
-                    allowed, but this instance alone cannot use every configured slot.
-                  </p>
-                )}
               </fieldset>
               <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
                 <legend className="pr-3 text-sm font-medium">Quota handling · New imports</legend>

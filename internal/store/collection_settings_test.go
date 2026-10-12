@@ -1,8 +1,11 @@
 package store
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -26,6 +29,88 @@ func TestDefaultCollectionConcurrencyPreservesAnExistingSetting(t *testing.T) {
 	saved, err := db.CollectionSettings(ctx)
 	if err != nil || saved.Workers != 3 {
 		t.Fatalf("restart overwrote saved concurrency: %+v %v", saved, err)
+	}
+}
+
+func TestFullCollectionRangeDoesNotConsumeAdministrationConnections(t *testing.T) {
+	ctx, databaseURL, initial := activityDatabase(t)
+	initial.Close()
+	parsed, err := url.Parse(databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := parsed.Query()
+	query.Set("pool_max_conns", "4")
+	parsed.RawQuery = query.Encode()
+	db, err := Open(ctx, parsed.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(db.Close)
+	if err := db.InitializeCollectionSettings(ctx, model.MaxCollectionWorkers); err != nil {
+		t.Fatal(err)
+	}
+	for index := range model.MaxCollectionWorkers + 1 {
+		id := fmt.Sprintf("concurrency-%02d", index)
+		if _, err := db.CreateRun(ctx, model.Run{ProviderID: id, Config: model.Provider{ID: id}, Mode: model.ModePreview}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var active []*model.Run
+	for range model.MaxCollectionWorkers {
+		run, err := db.ClaimNext(ctx)
+		if err != nil || run == nil {
+			t.Fatalf("saved limit 32 only admitted %d imports with a four-connection administration pool: %v", len(active), err)
+		}
+		active = append(active, run)
+	}
+	bounded, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if run, err := db.ClaimNext(bounded); err != nil || run != nil {
+		t.Fatalf("maximum capacity admitted a 33rd import or blocked: %+v %v", run, err)
+	}
+	overview, err := db.CollectionOverview(bounded)
+	if err != nil || overview.Capacity != 32 || overview.Running != 32 || overview.Queued != 1 {
+		t.Fatalf("administration could not read the fully occupied collection queue: %+v %v", overview, err)
+	}
+	if db.pool.Config().MaxConns != 4 || db.pool.Stat().AcquiredConns() != 0 {
+		t.Fatal("active imports resized or occupied the administration pool")
+	}
+	overview.Settings.Workers = 1
+	if err := db.UpdateCollectionSettings(bounded, overview.Settings); err != nil {
+		t.Fatal("administration could not lower the active import limit", err)
+	}
+	for index, run := range active {
+		current, err := db.GetRun(ctx, run.ID)
+		if err != nil || current.Status != model.StatusRunning || current.PauseRequested || current.CancelRequested {
+			t.Fatalf("decreasing capacity interrupted a live import: %+v %v", current, err)
+		}
+		if queued, err := db.ClaimNext(ctx); err != nil || queued != nil {
+			t.Fatalf("lower limit admitted queued work before %d active imports drained: %+v %v", len(active)-index, queued, err)
+		}
+		if _, err := db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run, err := db.ClaimNext(ctx)
+	if err != nil || run == nil {
+		t.Fatalf("remaining queued import did not start after draining to the new limit: %+v %v", run, err)
+	}
+	if _, err := db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	reopened, err := Open(ctx, parsed.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(reopened.Close)
+	if err := reopened.InitializeCollectionSettings(ctx, model.DefaultCollectionWorkers); err != nil {
+		t.Fatal(err)
+	}
+	overview, err = reopened.CollectionOverview(ctx)
+	if err != nil || overview.Settings.Workers != 1 || overview.Capacity != 32 || overview.Running != 0 {
+		t.Fatalf("restart changed the saved concurrency or available range: %+v %v", overview, err)
 	}
 }
 
