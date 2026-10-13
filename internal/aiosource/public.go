@@ -14,7 +14,9 @@ import (
 )
 
 const publicInstallationPurpose = "public-installation-v1"
-const maxPublicInstallationSize = 8192
+
+// MaxPublicInstallationSize bounds encrypted links and setup request bodies.
+const MaxPublicInstallationSize = 8192
 
 type PublicProvider struct {
 	ID   string `json:"id"`
@@ -49,7 +51,7 @@ func (s *Service) publicPrivateSources(c model.AIOConfig) ([]PublicPrivateSource
 		return nil, err
 	}
 	for _, source := range sources {
-		if tracker, configured := c.Trackers[source.ID]; configured && tracker.Private {
+		if tracker, configured := c.Trackers[source.ID]; source.Valid && configured && tracker.Private {
 			name := strings.TrimSpace(source.Name)
 			if name == "" {
 				name = source.ID
@@ -79,7 +81,14 @@ func (s *Service) PublicPrivateSources(ctx context.Context) ([]PublicPrivateSour
 	if err != nil {
 		return nil, err
 	}
-	return s.publicPrivateSources(c)
+	sources, err := s.publicPrivateSources(c)
+	if err != nil {
+		// The optional list cannot authorize an uncached download when source
+		// definitions are unavailable. Keep cached-only setup usable, as in
+		// visitorAnnounces; validation of supplied announces still fails closed.
+		return nil, nil
+	}
+	return sources, nil
 }
 
 func validPublicAnnounces(announces map[string]string) bool {
@@ -212,13 +221,13 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 		return "", err
 	}
 	configuration := base64.RawURLEncoding.EncodeToString(sealed)
-	if len(configuration) > maxPublicInstallationSize {
+	if len(configuration) > MaxPublicInstallationSize {
 		return "", model.ErrInvalid
 	}
 	return configuration, nil
 }
 func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
-	if len(value) < 32 || len(value) > maxPublicInstallationSize {
+	if len(value) < 32 || len(value) > MaxPublicInstallationSize {
 		return nil, ErrAuth
 	}
 	access, err := s.DB.PublicAccess(ctx)

@@ -95,6 +95,13 @@ func StoredTorrentFields(fields map[string]any, mode StorageMode) map[string]any
 	if mode != StorageCompact || fields == nil {
 		return fields
 	}
+	return compactTorrentFields(fields)
+}
+
+func compactTorrentFields(fields map[string]any) map[string]any {
+	if fields == nil {
+		return nil
+	}
 	result := make(map[string]any)
 	for key, value := range fields {
 		if !CompactTorrentField(key) {
@@ -106,7 +113,14 @@ func StoredTorrentFields(fields map[string]any, mode StorageMode) map[string]any
 		case "attributes":
 			value = compactObject(value, compactAttributeKeys)
 		case "metadata":
-			value = compactObject(value, compactTorrentKeys)
+			// Source metadata can nest the same identifier/attribute objects.
+			// Apply their projection at every level instead of retaining unused
+			// detail payloads merely because they sit inside a known container.
+			if object, ok := value.(map[string]any); ok {
+				value = compactTorrentFields(object)
+			} else {
+				value = compactObject(value, compactTorrentKeys)
+			}
 		}
 		result[key] = value
 	}

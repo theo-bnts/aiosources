@@ -3,14 +3,15 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"github.com/theo-bnts/aiosources/internal/aiosource"
-	"github.com/theo-bnts/aiosources/internal/model"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/theo-bnts/aiosources/internal/aiosource"
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 // Admission data is bounded, volatile and never appears in history or exports.
@@ -18,6 +19,17 @@ type publicAdmission struct {
 	mu      sync.Mutex
 	windows map[string]loginWindow
 	slots   chan struct{}
+}
+
+func (a *publicAdmission) acquire(w http.ResponseWriter) bool {
+	select {
+	case a.slots <- struct{}{}:
+		return true
+	default:
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusTooManyRequests, "Too many public requests. Try again shortly.")
+		return false
+	}
 }
 
 func (a *publicAdmission) admit(w http.ResponseWriter, r *http.Request, setup bool) bool {
@@ -91,6 +103,13 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		w.WriteHeader(204)
 	}))
 	mux.HandleFunc("GET /api/public/config", func(w http.ResponseWriter, r *http.Request) {
+		// Listing consented source names reads definitions too. Bound this work
+		// like other anonymous requests, without charging homepage refreshes
+		// against the visitor's setup or addon request quota.
+		if !s.public.acquire(w) {
+			return
+		}
+		defer func() { <-s.public.slots }()
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		value, err := s.options.Store.PublicAccess(ctx)
@@ -124,18 +143,15 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		if !s.public.admit(w, r, true) {
 			return
 		}
-		select {
-		case s.public.slots <- struct{}{}:
-			defer func() { <-s.public.slots }()
-		default:
-			writeError(w, 429, "Too many public requests. Try again shortly.")
+		if !s.public.acquire(w) {
 			return
 		}
+		defer func() { <-s.public.slots }()
 		var input struct {
 			Services  map[string]string `json:"services"`
 			Announces map[string]string `json:"announces"`
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 4096)
+		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
 		if !decodeJSON(w, r, &input) {
 			return
 		}
@@ -172,13 +188,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			if !s.public.admit(w, r, false) {
 				return
 			}
-			select {
-			case s.public.slots <- struct{}{}:
-				defer func() { <-s.public.slots }()
-			default:
-				writeError(w, 429, "Too many public requests. Try again shortly.")
+			if !s.public.acquire(w) {
 				return
 			}
+			defer func() { <-s.public.slots }()
 			visitor, err := s.options.AIOSource.OpenPublicInstallation(r.Context(), s.auth.origin, r.PathValue("configuration"))
 			if err != nil {
 				writeError(w, 401, "Invalid public installation")

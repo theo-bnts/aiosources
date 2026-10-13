@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -19,9 +21,10 @@ import (
 	"github.com/theo-bnts/aiosources/internal/vault"
 )
 
-func visitorSourceRegistry(t *testing.T, s *Service) {
+func visitorSourceRegistry(t *testing.T, s *Service) string {
 	t.Helper()
-	registry, err := providers.New(t.TempDir(), nil)
+	directory := t.TempDir()
+	registry, err := providers.New(directory, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +51,53 @@ func visitorSourceRegistry(t *testing.T, s *Service) {
 	}
 	if err := s.DB.SetAIOConfig(s.ctx, c); err != nil {
 		t.Fatal(err)
+	}
+	return directory
+}
+
+func TestInvalidSourceDefinitionCannotAuthorizeVisitorDownloads(t *testing.T) {
+	ctx, s, conn := testService(t)
+	directory := visitorSourceRegistry(t, s)
+	hash := strings.Repeat("f", 40)
+	seedMovie(t, ctx, s, conn, "private-one", "one", hash)
+	access, _ := s.DB.PublicAccess(ctx)
+	access.Enabled, access.AllowPrivateDownloads = true, true
+	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	access, _ = s.DB.PublicAccess(ctx)
+	visitor := &PublicInstallation{Generation: access.Generation, Services: map[string]string{"alldebrid": "visitor-invalid-definition-key"},
+		Announces: map[string]string{"private-one": "https://announce.example.invalid/visitor-invalid-definition-passkey/announce"}}
+	invalid := `{"version":1,"id":"private-one","name":"Example Library","adapter":"unsupported","url":"https://source.example.invalid/api"}`
+	if err := os.WriteFile(filepath.Join(directory, "private-one.json"), []byte(invalid), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if sources, err := s.PublicPrivateSources(ctx); err != nil || len(sources) != 1 || sources[0].ID != "private-two" {
+		t.Fatal("invalid definition still offered a visitor announce field", err)
+	}
+	var validations atomic.Int64
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		validations.Add(1)
+		fmt.Fprint(w, `{"status":"success","data":{"user":{"isPremium":true}}}`)
+	}))
+	defer upstream.Close()
+	s.Providers.ADBase = upstream.URL
+	if _, err := s.CreatePublicInstallation(ctx, "https://public.example", visitor.Services, visitor.Announces); !errors.Is(err, model.ErrInvalid) || validations.Load() != 0 {
+		t.Fatal("invalid definition authorized a new visitor announce or contacted its service", err)
+	}
+	generation, _ := s.DB.AIOCacheGeneration(ctx)
+	if err := s.DB.SaveSharedAvailability(ctx, "alldebrid", model.AIOAvailability{Generation: generation, Hash: hash, Cached: true,
+		CheckedAt: time.Now(), Files: []model.AIOFile{{Path: "Example.Movie.2021.mp4", Size: 100}}}); err != nil {
+		t.Fatal(err)
+	}
+	if streams, err := s.PublicStreams(ctx, "https://public.example", "encrypted", "movie", "tt1234567", visitor); err != nil || len(streams) != 1 {
+		t.Fatal("invalid definition unnecessarily prevented cached playback", err)
+	}
+	if err := s.DB.ForgetSharedAvailability(ctx, "alldebrid", hash, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if streams, err := s.PublicStreams(ctx, "https://public.example", "encrypted", "movie", "tt1234567", visitor); err != nil || len(streams) != 0 {
+		t.Fatal("previously supplied announce bypassed the now invalid definition", err)
 	}
 }
 
@@ -139,13 +189,13 @@ func TestVisitorAnnouncesAreOptInScopedEncryptedAndNeverStored(t *testing.T) {
 	}
 	longAnnounce := "https://announce.example.invalid/announce?key=" + strings.Repeat("p", 2450)
 	longLink, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": strings.Repeat("k", 512)}, map[string]string{"private-one": longAnnounce})
-	if err != nil || len(longLink) <= 4096 || len(longLink) > maxPublicInstallationSize {
+	if err != nil || len(longLink) <= 4096 || len(longLink) > MaxPublicInstallationSize {
 		t.Fatal("bounded multi-credential links still hit the old key-only size limit", err)
 	}
 	if decoded, err := s.OpenPublicInstallation(ctx, "https://public.example", longLink); err != nil || decoded.Announces["private-one"] != longAnnounce {
 		t.Fatal("valid larger encrypted link cannot be used", err)
 	}
-	if _, err := s.OpenPublicInstallation(ctx, "https://public.example", strings.Repeat("a", maxPublicInstallationSize+1)); !errors.Is(err, ErrAuth) {
+	if _, err := s.OpenPublicInstallation(ctx, "https://public.example", strings.Repeat("a", MaxPublicInstallationSize+1)); !errors.Is(err, ErrAuth) {
 		t.Fatal("oversized encrypted configuration was accepted")
 	}
 	assertNoVisitorData(t, ctx, conn, key, announce, "visitor-passkey", configuration)
@@ -388,6 +438,23 @@ func TestVisitorAnnounceSeasonPacksNeverInventCachedEpisodeAvailability(t *testi
 	if err := s.sources.Close(); err != nil {
 		t.Fatal(err)
 	}
+	if sources, err := s.PublicPrivateSources(ctx); err != nil || len(sources) != 0 {
+		t.Fatal("unreadable optional source list prevented the cached-only public homepage", err)
+	}
+	var validations atomic.Int64
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		validations.Add(1)
+		fmt.Fprint(w, `{"success":true,"data":{"id":42}}`)
+	}))
+	defer upstream.Close()
+	s.Providers.TBBase = upstream.URL
+	keys := map[string]string{"torbox": "visitor-cached-only-key"}
+	if _, err := s.CreatePublicInstallation(ctx, "https://public.example", keys, nil); err != nil || validations.Load() != 1 {
+		t.Fatal("unreadable optional source list prevented cached-only installation", err)
+	}
+	if _, err := s.CreatePublicInstallation(ctx, "https://public.example", keys, visitor.Announces); err == nil || validations.Load() != 1 {
+		t.Fatal("unreadable source list allowed a supplied announce or contacted the provider")
+	}
 	streams, err = s.PublicStreams(ctx, "https://public.example", "encrypted", "series", "tt1234567:2:4", visitor)
 	if err != nil || len(streams) != 1 {
 		t.Fatal("unreadable optional source list prevented cached playback", err)
@@ -399,4 +466,106 @@ func TestVisitorAnnounceSeasonPacksNeverInventCachedEpisodeAvailability(t *testi
 	if err != nil || len(streams) != 0 {
 		t.Fatal("unreadable source definition authorized uncached playback", err)
 	}
+}
+
+func TestCompactImportsAndSourceResetPreservePublicPermissionAndSharedPlayback(t *testing.T) {
+	ctx, s, conn := testService(t)
+	visitorSourceRegistry(t, s)
+	hash := strings.Repeat("c", 40)
+	const key = "visitor-reset-service-key"
+	const own = "https://announce.example.invalid/visitor-reset-passkey/announce"
+	work := model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie"}, Years: []int{2021}}
+	if err := s.DB.SaveAIOWork(ctx, work, []string{"example movie"}); err != nil {
+		t.Fatal(err)
+	}
+	importRecord := func() {
+		t.Helper()
+		provider := model.Provider{ID: "private-one", Name: "Example Library", Adapter: "http_json"}
+		run, err := s.DB.EnqueueRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeIncremental})
+		if err != nil || run.Mode != model.ModeFull || !run.InitialFull || run.StorageMode != model.StorageCompact {
+			t.Fatal("fresh compact import did not start from a new full baseline", err)
+		}
+		claimed, err := s.DB.ClaimNext(ctx)
+		if err != nil || claimed == nil || claimed.ID != run.ID {
+			t.Fatal("compact import could not be claimed", err)
+		}
+		fields := map[string]any{"title": "Example.Movie.2021.1080p.WEB-DL", "imdb_id": "tt1234567", "info_hash": hash,
+			"description": "unused source detail", "attributes": map[string]any{"language": []string{"fra", "eng"}}}
+		if _, err := s.DB.SavePage(ctx, *claimed, model.Page{Done: true, Items: []model.Record{{SourceID: "one", Fields: fields}}}, "completed"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DB.FinishRun(ctx, run.ID, model.StatusSucceeded, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Match(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	importRecord()
+	var adds atomic.Int64
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+key {
+			t.Error("public playback used another account after source reset")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch r.URL.Path {
+		case "/user/me":
+			fmt.Fprint(w, `{"success":true,"data":{"id":42}}`)
+		case "/torrents/createtorrent":
+			_ = r.ParseMultipartForm(1 << 20)
+			if r.FormValue("add_only_if_cached") != "true" || r.FormValue("magnet") != "magnet:?xt=urn:btih:"+hash {
+				t.Error("retained public installation sent an announce for cached playback")
+			}
+			adds.Add(1)
+			fmt.Fprintf(w, `{"success":true,"data":{"torrent_id":7,"hash":"%s"}}`, hash)
+		case "/torrents/mylist":
+			fmt.Fprintf(w, `{"success":true,"data":{"hash":"%s","download_finished":true,"download_present":true,"files":[{"id":3,"name":"Example.Movie.2021.mp4","size":100}]}}`, hash)
+		case "/torrents/requestdl":
+			fmt.Fprint(w, `{"success":true,"data":"https://video.example/reset-playback"}`)
+		case "/torrents/checkcached":
+			fmt.Fprintf(w, `{"success":true,"data":{"%s":{"hash":"%s","name":"Example Movie","size":100,"files":[{"id":99,"name":"Example.Movie.2021.mp4","size":100}]}}}`, hash, hash)
+		default:
+			t.Error("unexpected public provider operation")
+		}
+	}))
+	defer upstream.Close()
+	s.Providers.TBBase = upstream.URL
+	access, _ := s.DB.PublicAccess(ctx)
+	access.Enabled, access.AllowPrivateDownloads = true, true
+	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": key}, map[string]string{"private-one": own})
+	if err != nil {
+		t.Fatal(err)
+	}
+	visitor, err := s.OpenPublicInstallation(ctx, "https://public.example", configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	streams, err := s.PublicStreams(ctx, "https://public.example", configuration, "movie", "tt1234567", visitor)
+	if err != nil || len(streams) != 1 || streams[0].InfoHash != "" || streams[0].Hints.Cached == nil || !*streams[0].Hints.Cached {
+		t.Fatal("compact import lost matching or public cached playback", err)
+	}
+	settings, _ := s.DB.StorageOverview(ctx)
+	if err := s.DB.ResetSourceData(ctx, settings.Settings.Revision); err != nil {
+		t.Fatal(err)
+	}
+	visitor, err = s.OpenPublicInstallation(ctx, "https://public.example", configuration)
+	if err != nil || visitor.Announces["private-one"] != own {
+		t.Fatal("source reset unexpectedly revoked public configuration", err)
+	}
+	if _, err := s.PublicPlayback(ctx, "torbox", "private-one", "one", "movie", "tt1234567", visitor); !errors.Is(err, model.ErrNotFound) || adds.Load() != 0 {
+		t.Fatal("old public playback could start a download after source reset", err)
+	}
+	importRecord()
+	streams, err = s.PublicStreams(ctx, "https://public.example", configuration, "movie", "tt1234567", visitor)
+	if err != nil || len(streams) != 1 || streams[0].Hints.Cached == nil || !*streams[0].Hints.Cached {
+		t.Fatal("reimport did not recover matching and retained shared availability", err)
+	}
+	if link, err := s.PublicPlayback(ctx, "torbox", "private-one", "one", "movie", "tt1234567", visitor); err != nil || link != "https://video.example/reset-playback" || adds.Load() != 1 {
+		t.Fatal("reimported compact record cannot resolve public cached playback", err)
+	}
+	assertNoVisitorData(t, ctx, conn, key, own, "visitor-reset-passkey", configuration)
 }

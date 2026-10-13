@@ -57,3 +57,26 @@ func TestCompactStorageProjectsTypedTorznabAttributesAndIdentifiers(t *testing.T
 		}
 	}
 }
+
+func TestCompactStorageAlsoProjectsNestedMetadataWithoutChangingEvidence(t *testing.T) {
+	fields := map[string]any{"metadata": map[string]any{
+		"description":  "unused outer detail",
+		"attributes":   map[string]any{"language": []string{"fr", "en"}, "description": "unused attribute detail"},
+		"external_ids": map[string]any{"imdb": []string{"tt1", "tt2"}, "poster": "unused identifier detail"},
+		"metadata":     map[string]any{"season": 2, "description": "unused inner detail"},
+	}}
+	before, _ := json.Marshal(fields)
+	compact := StoredTorrentFields(fields, StorageCompact)
+	want := map[string]any{"metadata": map[string]any{
+		"attributes":   map[string]any{"language": []string{"fr", "en"}},
+		"external_ids": map[string]any{"imdb": []string{"tt1", "tt2"}},
+		"metadata":     map[string]any{"season": 2},
+	}}
+	if !reflect.DeepEqual(compact, want) {
+		t.Fatal("nested metadata retained unused payloads or changed useful evidence")
+	}
+	after, _ := json.Marshal(fields)
+	if string(before) != string(after) || !reflect.DeepEqual(StoredTorrentFields(fields, StorageFull), fields) {
+		t.Fatal("nested projection mutated the source or full storage")
+	}
+}

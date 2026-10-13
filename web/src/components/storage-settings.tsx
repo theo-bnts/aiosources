@@ -112,7 +112,7 @@ export function StorageSettingsPanel() {
                   </Button>
                 </p>
               )}
-              <div className="form-actions">
+              <div className="toolbar">
                 <Button type="submit" disabled={!dirty || conflict || save.isPending}>
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
