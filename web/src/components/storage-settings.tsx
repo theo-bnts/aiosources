@@ -42,6 +42,21 @@ export function StorageSettingsPanel() {
       (save.error instanceof ApiError && save.error.status === 409))
   useUnsavedChanges(dirty, 'storage settings', save.isPending)
 
+  let resetUnavailableReason: string | undefined
+  if (query.error) {
+    resetUnavailableReason = 'Storage settings could not be checked. Try again above.'
+  } else if (!query.data) {
+    resetUnavailableReason = 'Wait for storage settings to load.'
+  } else if (save.isPending) {
+    resetUnavailableReason = 'Wait for storage settings to finish saving.'
+  } else if (conflict) {
+    resetUnavailableReason = 'Reload the saved storage settings before resetting source data.'
+  } else if (dirty) {
+    resetUnavailableReason = 'Save the selected storage mode before resetting source data.'
+  } else if (query.data.running > 0) {
+    resetUnavailableReason = 'Pause running imports before resetting source data.'
+  }
+
   async function reset() {
     if (!query.data) return
     await api<StorageOverview>('/settings/storage/reset-sources', {
@@ -129,21 +144,24 @@ export function StorageSettingsPanel() {
                 trigger={
                   <Button
                     variant="outline"
-                    disabled={
-                      Boolean(query.error) ||
-                      dirty ||
-                      save.isPending ||
-                      !query.data ||
-                      query.data.running > 0
-                    }
+                    disabled={Boolean(resetUnavailableReason)}
+                    aria-describedby="source-data-reset-help source-data-reset-status"
                   >
                     Reset all source data
                   </Button>
                 }
               />
-              <p className="help mt-2">
-                Optional: start over to reclaim space used by previously stored source data. Pause
-                running imports first. Queued and paused imports are removed with their data.
+              <p className="help mt-2" id="source-data-reset-help">
+                Optional: start over to reclaim space used by previously stored source data. Queued
+                and paused imports are removed with their data.
+              </p>
+              <p
+                className={resetUnavailableReason ? 'help mt-2 text-amber-300' : 'sr-only'}
+                id="source-data-reset-status"
+                role="status"
+                aria-live="polite"
+              >
+                {resetUnavailableReason}
               </p>
             </div>
           </>

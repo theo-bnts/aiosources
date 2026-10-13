@@ -55,6 +55,20 @@ func TestStorageSavingPreservesMatchingAndPlaybackDataWithMuchSmallerRecords(t *
 		}
 		assertCoverage(t, ctx, db, run.ID, map[string]int64{"chosen": 1}, []string{"one"}, map[string]bool{"one": true})
 		mirrorFinish(t, ctx, db, run, model.StatusSucceeded)
+		for _, query := range []string{"synthetic-fragment-unused", "Seri", strings.Repeat("a", 12)} {
+			results, err := db.ListTorrents(ctx, model.ListOptions{
+				Query: query, ProviderID: provider.ID, Category: "5000",
+				MinSize: "9007199254740993", MaxSize: "9007199254740993",
+				PublishedAfter: "2026-09-01T00:00:00Z", PublishedBefore: "2026-09-02T00:00:00Z",
+			})
+			want := int64(1)
+			if query == "synthetic-fragment-unused" {
+				want = 0
+			}
+			if err != nil || results.Total != want || len(results.Items) != int(want) {
+				t.Fatalf("%s storage changed partial search or combined filters: %+v %v", mode, results, err)
+			}
+		}
 		record, err := scanAIORecord(db.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+` FROM ingest.torrents t WHERE provider_id=$1`, provider.ID))
 		if err != nil {
 			t.Fatal(err)

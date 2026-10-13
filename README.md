@@ -119,7 +119,7 @@ Two-step verification, encrypted secrets and session management are available in
 
 Saving this setting affects imports started afterwards, including automatic imports. An import already queued or in progress keeps its original mode. Previously stored fields are not removed automatically. Source APIs may still return complete responses; the saving applies to retained data and unnecessary detail-only enrichment.
 
-To start again with the new mode, optionally use **Reset all source data** after pausing running imports. This removes imported torrents, remote catalog copies, source history, resume points and manual identifications. Your source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch. This reset cannot be undone.
+To start again with the new mode, save your selection and pause any running imports, then optionally use **Reset all source data**. The button explains why it is unavailable when these steps are still needed. This removes imported torrents, remote catalog copies, source history, resume points and manual identifications. Your source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch. This reset cannot be undone.
 
 Catalog sharing keeps only fields its export protocol can use, and does not keep publication snapshots while every share is disabled or expired. Enabling sharing builds a fresh snapshot of the current catalog. Storage measurements include PostgreSQL tables and indexes; ordinary deletion makes space reusable inside PostgreSQL, while a source reset also releases the large source table files.
 

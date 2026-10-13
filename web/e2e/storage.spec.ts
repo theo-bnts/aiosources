@@ -1,8 +1,10 @@
+import pg from 'pg'
 import { test, expect } from './fixtures'
 
 test('Storage saving is the default, edits are explicit and data reset requires confirmation', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/health')
   const retention = page
     .locator('section')
@@ -13,13 +15,23 @@ test('Storage saving is the default, edits are explicit and data reset requires 
     retention.getByText('Applies to imports started after saving.', { exact: false }),
   ).toBeVisible()
   const save = retention.getByRole('button', { name: 'Save', exact: true })
+  const reset = retention.getByRole('button', { name: 'Reset all source data', exact: true })
+  const resetStatus = retention.locator('#source-data-reset-status')
   await expect(save).toBeDisabled()
+  await expect(reset).toBeEnabled()
   await mode.selectOption('full')
-  await expect(
-    retention.getByRole('button', { name: 'Reset all source data', exact: true }),
-  ).toBeDisabled()
+  await expect(reset).toBeDisabled()
+  await expect(resetStatus).toHaveText(
+    'Save the selected storage mode before resetting source data.',
+  )
+  await expect(reset).toHaveAttribute(
+    'aria-describedby',
+    'source-data-reset-help source-data-reset-status',
+  )
   await save.click()
   await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
+  await expect(reset).toBeEnabled()
+  await expect(resetStatus).toHaveText('')
   await page.reload()
   await expect(mode).toHaveValue('full')
   await retention.getByRole('button', { name: 'Reset all source data', exact: true }).click()
@@ -62,7 +74,85 @@ test('Storage settings report stale edits without silently overwriting another a
     page.getByText('Storage settings changed elsewhere.', { exact: false }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await expect(
+    page.getByRole('button', { name: 'Reset all source data', exact: true }),
+  ).toBeDisabled()
+  await expect(page.locator('#source-data-reset-status')).toHaveText(
+    'Reload the saved storage settings before resetting source data.',
+  )
+  await mode.selectOption('compact')
+  await expect(
+    page.getByRole('button', { name: 'Reset all source data', exact: true }),
+  ).toBeDisabled()
+  await expect(page.locator('#source-data-reset-status')).toHaveText(
+    'Reload the saved storage settings before resetting source data.',
+  )
   await page.getByRole('button', { name: 'Reload saved value', exact: true }).click()
   await expect(mode).toHaveValue('compact')
   await expect(page.getByText('Storage settings changed elsewhere.', { exact: false })).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: 'Reset all source data', exact: true }),
+  ).toBeEnabled()
+})
+
+test.describe('resetting source data with imports in progress', () => {
+  test.use({ collectionSource: true, viewport: { width: 390, height: 844 }, hasTouch: true })
+
+  test('saving the mode keeps active imports protected and pausing unlocks reset automatically', async ({
+    page,
+    server,
+  }) => {
+    test.setTimeout(75_000)
+    const db = new pg.Client({ connectionString: server.databaseURL })
+    await db.connect()
+    try {
+      await db.query(`INSERT INTO ingest.runs
+        (id,provider_id,provider_name,mode,status,trigger,revision,config,started_at)
+        VALUES('storage-active','example','Example source','full','running','manual','',
+          '{"version":1,"id":"example","adapter":"http_json","enabled":false}',now())`)
+      await page.goto('/health')
+      const reset = page.getByRole('button', { name: 'Reset all source data', exact: true })
+      const status = page.locator('#source-data-reset-status')
+      await expect(reset).toBeDisabled()
+      await expect(status).toHaveText('Pause running imports before resetting source data.')
+      await page.getByLabel('Stored torrent information', { exact: true }).selectOption('full')
+      await expect(status).toHaveText(
+        'Save the selected storage mode before resetting source data.',
+      )
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible()
+      await expect(reset).toBeDisabled()
+      await expect(status).toHaveText('Pause running imports before resetting source data.')
+
+      const session = await (await page.request.get('/api/session')).json()
+      const settings = await (await page.request.get('/api/settings/storage')).json()
+      const blocked = await page.request.post('/api/settings/storage/reset-sources', {
+        headers: { Origin: server.origin, 'X-CSRF-Token': session.csrf_token },
+        data: { revision: settings.settings.revision, confirm: true },
+      })
+      expect(blocked.status()).toBe(409)
+      expect(
+        (await db.query("SELECT status FROM ingest.runs WHERE id='storage-active'")).rows,
+      ).toEqual([{ status: 'running' }])
+
+      await db.query(
+        "UPDATE ingest.runs SET status='paused',pause_reason='manual',finished_at=now() WHERE id='storage-active'",
+      )
+      await expect(reset).toBeEnabled({ timeout: 40_000 })
+      await expect(status).toHaveText('')
+      await reset.click()
+      const dialog = page.getByRole('alertdialog')
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'Reset source data', exact: true }).click()
+      await expect(dialog).toBeHidden()
+      expect((await db.query('SELECT count(*)::int AS count FROM ingest.runs')).rows).toEqual([
+        { count: 0 },
+      ])
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true)
+    } finally {
+      await db.end()
+    }
+  })
 })
