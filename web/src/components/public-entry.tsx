@@ -9,8 +9,13 @@ import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
+import { Disclosure } from '@/components/ui/disclosure'
 
-type PublicInfo = { enabled: boolean; providers: { id: string; name: string }[] }
+type PublicInfo = {
+  enabled: boolean
+  providers: { id: string; name: string }[]
+  private_sources?: { id: string; name: string }[]
+}
 export function PublicEntry({ authenticated = false }: { authenticated?: boolean }) {
   const info = useQuery({
     queryKey: ['public-config'],
@@ -33,7 +38,8 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
   async function install(form: HTMLFormElement) {
     if (request.current) return
     const values = new FormData(form),
-      services: Record<string, string> = {}
+      services: Record<string, string> = {},
+      announces: Record<string, string> = {}
     for (const provider of info.data?.providers ?? []) {
       const key = String(values.get(provider.id) ?? '').trim()
       if (key) services[provider.id] = key
@@ -41,6 +47,10 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
     if (!Object.keys(services).length) {
       setError(new Error('Enter at least one service key.'))
       return
+    }
+    for (const source of info.data?.private_sources ?? []) {
+      const announce = String(values.get(`announce:${source.id}`) ?? '').trim()
+      if (announce) announces[source.id] = announce
     }
     setPending(true)
     setError(null)
@@ -52,7 +62,10 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
       const body = await api<{ manifest_url: string }>('/public/install', {
         method: 'POST',
         cache: 'no-store',
-        body: JSON.stringify({ services }),
+        body: JSON.stringify({
+          services,
+          ...(Object.keys(announces).length ? { announces } : {}),
+        }),
         signal: controller.signal,
       })
       if (!controller.signal.aborted) setManifest(body.manifest_url)
@@ -60,6 +73,8 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
       if (!controller.signal.aborted) setError(caught)
     } finally {
       for (const name of Object.keys(services)) delete services[name]
+      for (const name of Object.keys(announces)) delete announces[name]
+      for (const name of [...values.keys()]) values.delete(name)
       form.reset()
       if (request.current === controller) request.current = null
       if (!controller.signal.aborted) setPending(false)
@@ -119,6 +134,31 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
             Enter at least one key. The host processes your keys without saving them. Request
             history retains media, results and errors for up to 7 days without identifying you.
           </p>
+          {Boolean(info.data.private_sources?.length) && (
+            <Disclosure title="Advanced">
+              <p className="help">
+                Optional: supply your own complete announce URL to allow uncached playback from a
+                private source. These URLs stay in your encrypted installation link and are sent
+                only to your debrid account when needed.
+              </p>
+              {info.data.private_sources!.map((source) => (
+                <div className="field" key={source.id}>
+                  <Label htmlFor={`public-announce-${source.id}`}>{source.name} announce URL</Label>
+                  <Input
+                    id={`public-announce-${source.id}`}
+                    name={`announce:${source.id}`}
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    placeholder="Complete announce URL"
+                    maxLength={8192}
+                    disabled={pending}
+                  />
+                </div>
+              ))}
+            </Disclosure>
+          )}
           <ErrorNotice error={error || info.error} />
           <Button type="submit" disabled={pending}>
             {pending ? 'Checking services…' : 'Create installation link'}

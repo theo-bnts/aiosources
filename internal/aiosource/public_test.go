@@ -48,7 +48,7 @@ func TestPublicAllDebridPlaybackUsesGuestAccountAndHandlesCacheRace(t *testing.T
 			}
 		case "/v4/magnet/upload":
 			adds.Add(1)
-			if r.Form.Get("magnets[]") != publicMagnet(model.AIORecord{Hash: hash}) {
+			if r.Form.Get("magnets[]") != publicMagnet(model.AIORecord{Hash: hash}, "") {
 				t.Error("source credentials were sent to the visitor account")
 			}
 			if incomplete.Load() {
@@ -253,7 +253,7 @@ func TestAllDebridAccountPendingDoesNotOverrideFreshSharedAvailability(t *testin
 func TestPublicInstallationIsStatelessScopedAndRevocable(t *testing.T) {
 	ctx, s, conn := testService(t)
 	key := "visitor-key-never-store"
-	if _, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": key}); !errors.Is(err, model.ErrNotFound) {
+	if _, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": key}, nil); !errors.Is(err, model.ErrNotFound) {
 		t.Fatal("disabled mode accepted installation")
 	}
 	access, _ := s.DB.PublicAccess(ctx)
@@ -271,11 +271,11 @@ func TestPublicInstallationIsStatelessScopedAndRevocable(t *testing.T) {
 	defer upstream.Close()
 	s.Providers.TBBase = upstream.URL
 	for _, keys := range []map[string]string{nil, {"unsupported": key}, {"torbox": "bad\nkey"}} {
-		if _, err := s.CreatePublicInstallation(ctx, "https://public.example", keys); !errors.Is(err, model.ErrInvalid) {
+		if _, err := s.CreatePublicInstallation(ctx, "https://public.example", keys, nil); !errors.Is(err, model.ErrInvalid) {
 			t.Fatal("invalid keys accepted")
 		}
 	}
-	token, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": key})
+	token, err := s.CreatePublicInstallation(ctx, "https://public.example", map[string]string{"torbox": key}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

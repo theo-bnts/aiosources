@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 )
 
 const publicInstallationPurpose = "public-installation-v1"
+const maxPublicInstallationSize = 8192
 
 type PublicProvider struct {
 	ID   string `json:"id"`
@@ -27,6 +29,124 @@ type PublicInstallation struct {
 	Generation int64             `json:"generation"`
 	Audience   string            `json:"audience"`
 	Services   map[string]string `json:"services"`
+	Announces  map[string]string `json:"announces,omitempty"`
+}
+
+// This is a consented list of source names, never a source definition or secret
+// reference. Only sources explicitly marked private can accept visitor announces.
+type PublicPrivateSource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (s *Service) publicPrivateSources(c model.AIOConfig) ([]PublicPrivateSource, error) {
+	out := []PublicPrivateSource{}
+	if s.sources == nil {
+		return out, nil
+	}
+	sources, err := s.sources.List()
+	if err != nil {
+		return nil, err
+	}
+	for _, source := range sources {
+		if tracker, configured := c.Trackers[source.ID]; configured && tracker.Private {
+			name := strings.TrimSpace(source.Name)
+			if name == "" {
+				name = source.ID
+			}
+			out = append(out, PublicPrivateSource{ID: source.ID, Name: name})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := strings.ToLower(out[i].Name), strings.ToLower(out[j].Name)
+		if a == b {
+			return out[i].ID < out[j].ID
+		}
+		return a < b
+	})
+	return out, nil
+}
+
+func (s *Service) PublicPrivateSources(ctx context.Context) ([]PublicPrivateSource, error) {
+	access, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !access.Enabled || !access.AllowPrivateDownloads {
+		return nil, nil
+	}
+	c, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.publicPrivateSources(c)
+}
+
+func validPublicAnnounces(announces map[string]string) bool {
+	for source, value := range announces {
+		if source == "" || validateAnnounce(value) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *Service) validatePublicAnnounces(ctx context.Context, access model.PublicAccess, announces map[string]string) error {
+	if len(announces) == 0 {
+		return nil
+	}
+	if !access.AllowPrivateDownloads || !validPublicAnnounces(announces) {
+		return model.ErrInvalid
+	}
+	c, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return err
+	}
+	sources, err := s.publicPrivateSources(c)
+	if err != nil {
+		return err
+	}
+	allowed := map[string]bool{}
+	for _, source := range sources {
+		allowed[source.ID] = true
+	}
+	for source := range announces {
+		if !allowed[source] {
+			return model.ErrInvalid
+		}
+	}
+	return nil
+}
+
+// Re-read the policy for every stream/playback request. Existing encrypted links
+// keep cached playback when the administrator withdraws uncached permission.
+func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visitor *PublicInstallation) (map[string]string, error) {
+	if visitor == nil || len(visitor.Announces) == 0 {
+		return nil, nil
+	}
+	access, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !access.Enabled || access.Generation != visitor.Generation || !validPublicAnnounces(visitor.Announces) {
+		return nil, ErrAuth
+	}
+	if !access.AllowPrivateDownloads {
+		return nil, nil
+	}
+	sources, err := s.publicPrivateSources(c)
+	if err != nil {
+		// An unreadable definition cannot authorize an uncached download, but
+		// must not prevent existing cached playback through an encrypted link.
+		return nil, nil
+	}
+	allowed := map[string]string{}
+	for _, source := range sources {
+		if value := visitor.Announces[source.ID]; value != "" {
+			allowed[source.ID] = value
+		}
+	}
+	return allowed, nil
 }
 
 func validPublicKeys(keys map[string]string) bool {
@@ -49,7 +169,7 @@ func validPublicKeys(keys map[string]string) bool {
 	}
 	return true
 }
-func (s *Service) CreatePublicInstallation(ctx context.Context, audience string, keys map[string]string) (string, error) {
+func (s *Service) CreatePublicInstallation(ctx context.Context, audience string, keys, announces map[string]string) (string, error) {
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return "", err
@@ -60,6 +180,9 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	if !validPublicKeys(keys) || audience == "" {
 		return "", model.ErrInvalid
 	}
+	if err = s.validatePublicAnnounces(ctx, access, announces); err != nil {
+		return "", err
+	}
 	for _, provider := range PublicProviders {
 		if key, ok := keys[provider.ID]; ok {
 			if err = s.Providers.ValidateKey(ctx, provider.ID, key); err != nil {
@@ -67,7 +190,19 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 			}
 		}
 	}
-	data, err := json.Marshal(PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys})
+	// Provider validation may take seconds. Do not create a new link after public
+	// access or the optional source permission was withdrawn during those calls.
+	latest, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return "", err
+	}
+	if !latest.Enabled || latest.Generation != access.Generation {
+		return "", model.ErrNotFound
+	}
+	if err = s.validatePublicAnnounces(ctx, latest, announces); err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces})
 	if err != nil {
 		return "", model.ErrInvalid
 	}
@@ -76,10 +211,14 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(sealed), nil
+	configuration := base64.RawURLEncoding.EncodeToString(sealed)
+	if len(configuration) > maxPublicInstallationSize {
+		return "", model.ErrInvalid
+	}
+	return configuration, nil
 }
 func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
-	if len(value) < 32 || len(value) > 4096 {
+	if len(value) < 32 || len(value) > maxPublicInstallationSize {
 		return nil, ErrAuth
 	}
 	access, err := s.DB.PublicAccess(ctx)
@@ -99,7 +238,7 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 	}
 	defer clear(data)
 	var out PublicInstallation
-	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || !validPublicKeys(out.Services) {
+	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
 		return nil, ErrAuth
 	}
 	return &out, nil
@@ -417,9 +556,14 @@ func (s *Service) finishAddonRequest(item model.StremioRequest, started time.Tim
 	s.saveStremioHistory(item)
 }
 
-// A plain magnet here never resolves administrator source credentials.
-func publicMagnet(rec model.AIORecord) string {
-	return "magnet:?xt=urn:btih:" + strings.ToLower(rec.Hash)
+// Public magnets never resolve administrator source credentials. A visitor's
+// own announce is included only after the current uncached policy allows it.
+func publicMagnet(rec model.AIORecord, announce string) string {
+	magnet := "magnet:?xt=urn:btih:" + strings.ToLower(rec.Hash)
+	if announce != "" {
+		magnet += "&tr=" + strings.ReplaceAll(url.QueryEscape(announce), "+", "%20")
+	}
+	return magnet
 }
 
 func (s *Service) cleanupPublicMagnet(ctx context.Context, key, hash string, item adMagnet, inventory []adMagnet) {

@@ -56,7 +56,7 @@ func TestPublicInstallationRejectsDemoKeysAndPreviouslyIssuedDemoLinks(t *testin
 	for _, key := range []string{"staticDemoApikeyPrem", "staticDemoApikeyTria", "staticDemoApikeyFree"} {
 		t.Run(key, func(t *testing.T) {
 			keys := map[string]string{"alldebrid": key}
-			if token, err := s.CreatePublicInstallation(ctx, "https://public.example", keys); token != "" || (!errors.Is(err, ErrAuth) && !errors.Is(err, model.ErrInvalid)) {
+			if token, err := s.CreatePublicInstallation(ctx, "https://public.example", keys, nil); token != "" || (!errors.Is(err, ErrAuth) && !errors.Is(err, model.ErrInvalid)) {
 				t.Errorf("demonstration key created an installation: %v", err)
 			}
 			// Reproduce a link issued by the old validator. The guard must also

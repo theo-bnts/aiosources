@@ -57,7 +57,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "visitor-key-never-save"})
+	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "visitor-key-never-save"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestEnabledPublicInstallationCannotReadOrChangeAdministration(t *testing.T)
 	}))
 	defer upstream.Close()
 	addon.Providers.TBBase = upstream.URL
-	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "synthetic-visitor-key"})
+	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "synthetic-visitor-key"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

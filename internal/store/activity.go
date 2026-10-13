@@ -104,7 +104,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	switch kind {
 	case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 		"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset":
-	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_access_enabled", "security.public_access_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked":
+	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked":
 	default:
 		return model.ErrInvalid
 	}

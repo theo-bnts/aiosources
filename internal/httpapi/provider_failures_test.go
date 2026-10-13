@@ -94,7 +94,7 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 					if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 						t.Fatal(err)
 					}
-					token, e := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{tc.service: private})
+					token, e := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{tc.service: private}, nil)
 					if e != nil {
 						t.Fatal(e)
 					}

@@ -123,6 +123,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if err != nil {
 		return nil, err
 	}
+	announces, err := s.visitorAnnounces(ctx, c, visitor)
+	if err != nil {
+		return nil, err
+	}
 	eligible := []model.AIORecord{}
 	hashes := []string{}
 	for _, rec := range rows {
@@ -164,7 +168,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	out := []Stream{}
 	for _, rec := range eligible {
 		stream := baseStream(rec, r, names[rec.Provider])
-		if len(availability) == 0 {
+		if visitor == nil && len(availability) == 0 {
 			if tracker := c.Trackers[rec.Provider]; tracker.Private && tracker.AnnounceSecret == "" {
 				history.PrivateUnavailable++
 				continue
@@ -191,12 +195,17 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			if !configured {
 				tracker.Private = true
 			}
-			if tracker.Private && (visitor != nil || tracker.AnnounceSecret == "") && (!known || !observed.Cached) {
+			canDownload := tracker.AnnounceSecret != ""
+			if visitor != nil {
+				canDownload = announces[rec.Provider] != ""
+			}
+			cachedOnly := tracker.Private && !canDownload
+			if cachedOnly && (!known || !observed.Cached) {
 				history.PrivateUnavailable++
 				continue
 			}
 			selected, hasFile := SelectFile(observed.Files, r)
-			if visitor != nil && tracker.Private && !hasFile {
+			if visitor != nil && cachedOnly && !hasFile {
 				history.FileUnavailable++
 				continue
 			}
@@ -204,12 +213,12 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 				history.FileUnavailable++
 				continue
 			}
-			if observed.Cached && r.Episode != nil && !hasFile {
-				if tracker.Private && (visitor != nil || tracker.AnnounceSecret == "") {
+			if observed.Cached && !hasFile && (r.Episode != nil || (visitor != nil && tracker.Private)) {
+				if cachedOnly {
 					history.FileUnavailable++
 					continue
 				}
-				// Global readiness cannot certify an episode when listing files
+				// Global readiness cannot certify the requested video when listing files
 				// failed. Retain playback but present the cache as unverified.
 				known = false
 			}
@@ -297,7 +306,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 	if err != nil {
 		return "", err
 	}
-	private := false
+	cachedOnly := false
 	var key, magnet string
 	var observed model.AIOAvailability
 	if visitor == nil {
@@ -322,21 +331,32 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 			return "", ErrAuth
 		}
 		tracker, configured := c.Trackers[rec.Provider]
-		private = !configured || tracker.Private
+		private := !configured || tracker.Private
+		announces, e := s.visitorAnnounces(life, c, visitor)
+		if e != nil {
+			return "", e
+		}
+		announce := ""
 		if private {
 			items, e := s.DB.SharedAvailability(life, service, []string{rec.Hash}, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
 			if e != nil {
 				return "", e
 			}
-			if len(items) != 1 || !items[0].Cached {
-				return "", ErrPending
+			if len(items) == 1 && items[0].Cached {
+				observed = items[0]
+				_, cachedOnly = SelectFile(observed.Files, r)
+				if !cachedOnly && len(observed.Files) > 0 {
+					return "", ErrPending
+				}
 			}
-			observed = items[0]
-			if _, ok := SelectFile(observed.Files, r); !ok {
+			if !cachedOnly {
+				announce = announces[rec.Provider]
+			}
+			if !cachedOnly && announce == "" {
 				return "", ErrPending
 			}
 		}
-		magnet = publicMagnet(rec)
+		magnet = publicMagnet(rec, announce)
 	}
 	var link string
 	generation, err := s.DB.AIOCacheGeneration(life)
@@ -344,7 +364,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 		return "", err
 	}
 	if service == "torbox" {
-		link, err = s.Providers.tbPlay(life, key, rec.Hash, magnet, r, private)
+		link, err = s.Providers.tbPlay(life, key, rec.Hash, magnet, r, cachedOnly)
 	} else {
 		stage := "cleanup"
 		err = s.withHash(life, fingerprint(key), rec.Hash, func() error {
@@ -371,14 +391,14 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 				stage = "add"
 				item, err = s.Providers.ADAdd(life, key, rec.Hash, magnet)
 				if err != nil {
-					if visitor != nil && private {
+					if visitor != nil && cachedOnly {
 						s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
 					}
 					return err
 				}
 			}
 			if item.Ready == nil || !*item.Ready {
-				if visitor != nil && private && existing == nil && item.ID > 0 {
+				if visitor != nil && cachedOnly && existing == nil && item.ID > 0 {
 					s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
 					_ = s.DB.ForgetSharedAvailability(life, service, rec.Hash, observed.CheckedAt)
 				}

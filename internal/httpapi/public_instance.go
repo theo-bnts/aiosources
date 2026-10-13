@@ -98,7 +98,19 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"enabled": value.Enabled && s.publicOriginAllowed(), "providers": aiosource.PublicProviders})
+		enabled := value.Enabled && s.publicOriginAllowed()
+		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders}
+		if enabled && value.AllowPrivateDownloads {
+			sources, err := s.options.AIOSource.PublicPrivateSources(ctx)
+			if err != nil {
+				respondError(w, err)
+				return
+			}
+			if len(sources) > 0 {
+				info["private_sources"] = sources
+			}
+		}
+		writeJSON(w, 200, info)
 	})
 	mux.HandleFunc("POST /api/public/install", func(w http.ResponseWriter, r *http.Request) {
 		if !s.publicOriginAllowed() {
@@ -120,7 +132,8 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		var input struct {
-			Services map[string]string `json:"services"`
+			Services  map[string]string `json:"services"`
+			Announces map[string]string `json:"announces"`
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4096)
 		if !decodeJSON(w, r, &input) {
@@ -128,13 +141,15 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, input.Services)
-		for k := range input.Services {
-			delete(input.Services, k)
-		}
+		hasAnnounces := len(input.Announces) > 0
+		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, input.Services, input.Announces)
+		clear(input.Services)
+		clear(input.Announces)
 		if err != nil {
 			if errors.Is(err, model.ErrNotFound) {
 				writeError(w, 404, "Public access is disabled")
+			} else if hasAnnounces && errors.Is(err, model.ErrInvalid) {
+				writeError(w, 400, "Check the service keys and complete announce URLs. Visitor announce URLs must be enabled for the selected private sources.")
 			} else {
 				writeError(w, 400, "Could not validate the service keys. Check the keys, subscription and provider connection.")
 			}
@@ -169,11 +184,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				writeError(w, 401, "Invalid public installation")
 				return
 			}
-			defer func() {
-				for k := range visitor.Services {
-					delete(visitor.Services, k)
-				}
-			}()
+			defer func() { clear(visitor.Services); clear(visitor.Announces) }()
 			next(w, r, visitor)
 		}
 	}
@@ -204,7 +215,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		})
 		if errors.Is(err, aiosource.ErrPending) {
 			w.Header().Set("Retry-After", "10")
-			writeError(w, 425, "Cached playback is unavailable. Try again shortly.")
+			writeError(w, 425, "Playback is being prepared. Try again shortly.")
 			return
 		}
 		if err != nil {

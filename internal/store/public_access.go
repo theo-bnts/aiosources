@@ -31,7 +31,7 @@ ALTER TABLE ingest.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT 
 
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
-	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.Generation)
+	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,allow_private_downloads,generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.AllowPrivateDownloads, &out.Generation)
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
@@ -40,15 +40,15 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		return databaseError("begin public access change", err)
 	}
 	defer rollback(tx)
-	var previous bool
-	err = tx.QueryRow(ctx, `SELECT enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous)
+	var previous, previousDownloads bool
+	err = tx.QueryRow(ctx, `SELECT enabled,allow_private_downloads FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
 	if err != nil {
 		return databaseError("lock public access", err)
 	}
-	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision)
+	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,allow_private_downloads=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.AllowPrivateDownloads)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
@@ -59,6 +59,15 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		kind := "security.public_access_disabled"
 		if value.Enabled {
 			kind = "security.public_access_enabled"
+		}
+		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
+			return err
+		}
+	}
+	if previousDownloads != value.AllowPrivateDownloads {
+		kind := "security.public_source_downloads_disabled"
+		if value.AllowPrivateDownloads {
+			kind = "security.public_source_downloads_enabled"
 		}
 		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
 			return err
