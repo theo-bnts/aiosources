@@ -181,7 +181,10 @@ export function ProvidersPage() {
                   </TableCell>
                   <TableCell>
                     {source.last_run ? (
-                      <Link to={`/runs/${source.last_run.id}`}>
+                      <Link
+                        to={`/runs/${encodeURIComponent(source.last_run.id)}`}
+                        state={listState}
+                      >
                         <RunStatusBadge run={source.last_run} />
                       </Link>
                     ) : (

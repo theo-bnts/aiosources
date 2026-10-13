@@ -341,7 +341,7 @@ export function OperationDetailPage({ section }: { section: Section }) {
               uncached torrents are results, not errors. Stopping or restarting preserves saved
               data; pending work follows the existing automatic retry settings.
             </p>
-            {result.errors > 0 && result.status === 'succeeded' && (
+            {result.kind === 'metadata' && result.errors > 0 && result.status === 'succeeded' && (
               <p className="notice notice-warning" role="status">
                 The pass completed with deferred work. Failed information requests remain available
                 for a later retry.

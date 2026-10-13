@@ -9,7 +9,7 @@ import { occurrenceHref } from '@/lib/search-types'
 import { decodeSearchJSON, exactField, exactJSON, fieldChanges } from '@/lib/search-json'
 import { bytes, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
-import { useViewSearchParams } from '@/lib/detail-navigation'
+import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,7 @@ export function TorrentTable({
 }) {
   const date = useDate()
   const sourceName = useSourceNames()
+  const listState = useListViewState()
   return (
     <div className="table-frame">
       <Table>
@@ -99,6 +100,7 @@ export function TorrentTable({
                   <Button asChild variant="ghost" size="icon-sm">
                     <Link
                       to={`/raw/${torrent.raw_id}`}
+                      state={listState}
                       aria-label={`Open processed record for ${torrent.source_id}`}
                     >
                       <ArrowRightIcon />

@@ -6,6 +6,7 @@ import { api, refreshData } from '@/lib/api'
 import type { Items, ProviderDocument, ProviderSummary, Run, RunMode, StartRun } from '@/lib/types'
 import { supportsMetadata } from '@/lib/collection-types'
 import { modeLabels } from '@/lib/format'
+import { useListViewState } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
@@ -35,6 +36,7 @@ export function CollectDialog({
   const [maxDuration, setMaxDuration] = useState('')
   const [knownPages, setKnownPages] = useState('')
   const navigate = useNavigate()
+  const returnView = useListViewState()
   const sources = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
@@ -78,7 +80,7 @@ export function CollectDialog({
     onSuccess: async (run) => {
       setOpen(false)
       await refreshData()
-      navigate(`/runs/${encodeURIComponent(run.id)}`)
+      navigate(`/runs/${encodeURIComponent(run.id)}`, { state: returnView })
     },
   })
   const selected = sources.data?.items?.find((item) => item.id === provider)

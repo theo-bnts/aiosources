@@ -33,6 +33,7 @@ export function TorrentSearchForm({
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
   const [error, setError] = useState<Error | null>(null)
+  const [invalidFields, setInvalidFields] = useState<string[]>([])
   const form = useRef<HTMLFormElement>(null)
   const dateInputs = useRef<Record<string, { input: HTMLInputElement; value: string }>>({})
   const choices = new Map((filters.providers ?? []).map((id) => [id, id]))
@@ -48,6 +49,7 @@ export function TorrentSearchForm({
       onSubmit={(event) => {
         event.preventDefault()
         setError(null)
+        setInvalidFields([])
         const data = new FormData(event.currentTarget)
         const next: TorrentFilters = {}
         for (const key of torrentFilterKeys) {
@@ -78,10 +80,37 @@ export function TorrentSearchForm({
             const parsed = new Date(next[key])
             if (Number.isNaN(parsed.getTime())) {
               setError(new Error('Enter a valid publication date and time.'))
+              setInvalidFields([key])
               return
             }
             next[key] = parsed.toISOString()
           }
+        }
+        const invalidSize = (['min_size', 'max_size'] as const).find(
+          (key) => next[key] && !/^[0-9]{1,1000}$/.test(next[key]!),
+        )
+        if (invalidSize) {
+          setError(
+            new Error('Enter a nonnegative whole size without separators (up to 1,000 digits).'),
+          )
+          setInvalidFields([invalidSize])
+          return
+        }
+        // Byte counts can exceed JavaScript's safe integer range. Compare exact
+        // integers, as the server does, before replacing the applied results.
+        if (next.min_size && next.max_size && BigInt(next.min_size) > BigInt(next.max_size)) {
+          setError(new Error('Minimum size must not exceed maximum size.'))
+          setInvalidFields(['min_size', 'max_size'])
+          return
+        }
+        if (
+          next.published_after &&
+          next.published_before &&
+          new Date(next.published_after) > new Date(next.published_before)
+        ) {
+          setError(new Error('Published after must not be later than published before.'))
+          setInvalidFields(['published_after', 'published_before'])
+          return
         }
         onApply(next)
       }}
@@ -136,7 +165,7 @@ export function TorrentSearchForm({
           />
         </div>
         {rangeFields.map(([key, label, placeholder]) => (
-          <div className="field" key={key}>
+          <div className="field xl:col-span-2" key={key}>
             <Label htmlFor={`torrent-${key}`}>{label}</Label>
             <Input
               id={`torrent-${key}`}
@@ -144,6 +173,9 @@ export function TorrentSearchForm({
               defaultValue={filters[key] ?? ''}
               inputMode="numeric"
               pattern="[0-9]*"
+              maxLength={1000}
+              aria-invalid={invalidFields.includes(key) || undefined}
+              aria-describedby={invalidFields.includes(key) ? 'torrent-filter-error' : undefined}
               title="Enter a nonnegative whole number without separators."
               placeholder={placeholder}
             />
@@ -169,6 +201,8 @@ export function TorrentSearchForm({
                 name={key}
                 type="datetime-local"
                 step="0.001"
+                aria-invalid={invalidFields.includes(key) || undefined}
+                aria-describedby={invalidFields.includes(key) ? 'torrent-filter-error' : undefined}
                 defaultValue={local}
                 ref={(input) => {
                   if (input && dateInputs.current[key]?.input !== input) {
@@ -191,13 +225,18 @@ export function TorrentSearchForm({
           onClear={() => {
             form.current?.reset()
             setError(null)
+            setInvalidFields([])
             setSelectedSources([])
             onApply({})
           }}
         />
       </div>
       <ErrorNotice error={providers.error} retry={() => void providers.refetch()} />
-      <ErrorNotice error={error} />
+      {error && (
+        <div id="torrent-filter-error">
+          <ErrorNotice error={error} />
+        </div>
+      )}
     </form>
   )
 }

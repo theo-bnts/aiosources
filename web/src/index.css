@@ -107,7 +107,7 @@
     @apply overflow-hidden rounded-md border border-border bg-card/30;
   }
   .field {
-    @apply grid gap-2;
+    @apply grid min-w-0 gap-2;
   }
   .label {
     @apply text-sm font-medium;
@@ -131,7 +131,7 @@
     @apply border-destructive/40 bg-destructive/10 text-destructive;
   }
   .native-select {
-    @apply h-9 max-w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:outline-ring disabled:opacity-50;
+    @apply h-9 min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:outline-ring disabled:opacity-50;
   }
   .editor-frame {
     @apply overflow-hidden rounded-md border border-input;

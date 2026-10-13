@@ -14,6 +14,7 @@ import type { Items, ProviderDocument, Run, SecretInfo, Validation } from '@/lib
 import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/lib/remote-config'
 import type { RemoteDraft } from '@/lib/remote-config'
 import { useDate } from '@/lib/format'
+import { useListViewState } from '@/lib/detail-navigation'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { FormStatus } from '@/components/form-status'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
@@ -53,6 +54,7 @@ function safeConfigurationError(error: unknown) {
 }
 
 export default function RemotesPage() {
+  const listState = useListViewState()
   const filters = useSourceFilters()
   const date = useDate()
   const navigate = useNavigate()
@@ -87,7 +89,7 @@ export default function RemotesPage() {
       body: JSON.stringify({ provider_id: remote.id, mode }),
     })
     await refreshData()
-    navigate(`/runs/${encodeURIComponent(run.id)}`)
+    navigate(`/runs/${encodeURIComponent(run.id)}`, { state: listState })
   }
   return (
     <div className="space-y-5">
@@ -161,6 +163,7 @@ export default function RemotesPage() {
                       {remote.last_run ? (
                         <Link
                           to={`/runs/${encodeURIComponent(remote.last_run.id)}`}
+                          state={listState}
                           className="inline-flex items-center gap-2"
                         >
                           <RunStatusBadge run={remote.last_run} />

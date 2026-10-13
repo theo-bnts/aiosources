@@ -332,14 +332,16 @@ export function ConfirmAction({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const confirming = useRef(false)
-  const selectedAction = useRef(action)
+  // Keep the visible decision and the captured write on the same revision while
+  // live reads update the underlying list. Reopening reviews the latest values.
+  const [selected, setSelected] = useState({ action, title, description, label, destructive })
   async function confirm() {
     if (confirming.current) return
     confirming.current = true
     setPending(true)
     setError(null)
     try {
-      await selectedAction.current()
+      await selected.action()
       setOpen(false)
     } catch (caught) {
       setError(caught)
@@ -353,7 +355,7 @@ export function ConfirmAction({
       open={open}
       onOpenChange={(value) => {
         if (!confirming.current) {
-          if (value) selectedAction.current = action
+          if (value) setSelected({ action, title, description, label, destructive })
           setOpen(value)
           setError(null)
         }
@@ -362,9 +364,9 @@ export function ConfirmAction({
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogTitle>{selected.title}</AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="text-sm leading-6 text-muted-foreground">{description}</div>
+            <div className="text-sm leading-6 text-muted-foreground">{selected.description}</div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <ErrorNotice error={error} />
@@ -373,12 +375,12 @@ export function ConfirmAction({
             Back
           </AlertDialogCancel>
           <Button
-            variant={destructive ? 'destructive' : 'default'}
+            variant={selected.destructive ? 'destructive' : 'default'}
             className="min-h-11 sm:min-h-9"
             disabled={pending}
             onClick={() => void confirm()}
           >
-            {pending ? 'Processing…' : label}
+            {pending ? 'Processing…' : selected.label}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
