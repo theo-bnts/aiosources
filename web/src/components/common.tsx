@@ -319,14 +319,14 @@ export function ConfirmAction({
   description,
   label = 'Confirm',
   action,
-  destructive = false,
+  variant = 'default',
 }: {
   trigger: ReactNode
   title: string
   description: ReactNode
   label?: string
   action: () => Promise<unknown>
-  destructive?: boolean
+  variant?: 'default' | 'warning' | 'destructive'
 }) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
@@ -334,7 +334,7 @@ export function ConfirmAction({
   const confirming = useRef(false)
   // Keep the visible decision and the captured write on the same revision while
   // live reads update the underlying list. Reopening reviews the latest values.
-  const [selected, setSelected] = useState({ action, title, description, label, destructive })
+  const [selected, setSelected] = useState({ action, title, description, label, variant })
   async function confirm() {
     if (confirming.current) return
     confirming.current = true
@@ -355,7 +355,7 @@ export function ConfirmAction({
       open={open}
       onOpenChange={(value) => {
         if (!confirming.current) {
-          if (value) setSelected({ action, title, description, label, destructive })
+          if (value) setSelected({ action, title, description, label, variant })
           setOpen(value)
           setError(null)
         }
@@ -375,7 +375,7 @@ export function ConfirmAction({
             Back
           </AlertDialogCancel>
           <Button
-            variant={selected.destructive ? 'destructive' : 'default'}
+            variant={selected.variant}
             className="min-h-11 sm:min-h-9"
             disabled={pending}
             onClick={() => void confirm()}

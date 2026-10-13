@@ -231,10 +231,11 @@ export default function RemotesPage() {
                     title={`Fully resync “${remote.name || remote.id}”?`}
                     description="Download a fresh authoritative snapshot instead of using the checkpoint. Only this remote’s local copy is replaced, atomically after success. Local sources are not modified."
                     label="Start full resync"
+                    variant="warning"
                     trigger={
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="warning"
                         disabled={!remote.valid || !remote.enabled || active}
                       >
                         Full resync

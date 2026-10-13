@@ -267,7 +267,7 @@ function RunControls({
               : 'The saved resume point and prepared catalog data are preserved. Cancelling releases this run’s hold, allowing future scheduled runs to use the current source configuration.'
           }
           label={active ? 'Request cancellation' : 'Cancel run'}
-          destructive
+          variant="destructive"
           trigger={
             <Button
               variant="destructive"

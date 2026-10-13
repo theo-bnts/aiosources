@@ -3,6 +3,7 @@ import {
   DatabaseIcon,
   DiscordLogoIcon,
   GithubLogoIcon,
+  HeartIcon,
   InfoIcon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
@@ -65,6 +66,24 @@ export function AboutDialog() {
               <ArrowUpRightIcon className="ml-auto shrink-0" aria-hidden="true" />
             </a>
           </Button>
+          <Button
+            variant="outline"
+            className="h-auto justify-start gap-3 px-4 py-3 sm:col-span-2"
+            asChild
+          >
+            <a
+              href="https://github.com/sponsors/theo-bnts"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <HeartIcon aria-hidden="true" />
+              <span className="grid gap-1 text-left">
+                <span>Support AIOSources</span>
+                <span className="help font-normal">GitHub Sponsors</span>
+              </span>
+              <ArrowUpRightIcon className="ml-auto shrink-0" aria-hidden="true" />
+            </a>
+          </Button>
         </section>
         <p className="text-sm leading-6 text-muted-foreground">
           Use sources you are authorized to access and content you are entitled to use and share.
@@ -84,7 +103,7 @@ export function AboutDialog() {
               This product uses the TMDB API but is not endorsed or certified by TMDB.
             </p>
           </div>
-          <p className="help">
+          <p className="text-sm leading-6 text-muted-foreground">
             Built on{' '}
             <a
               href="https://github.com/moodiness/ingest"

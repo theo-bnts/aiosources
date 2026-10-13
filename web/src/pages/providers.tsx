@@ -235,11 +235,11 @@ export function ProvidersPage() {
                         title={`Delete source “${source.name || source.id}”?`}
                         description="Only the configuration will be deleted. Raw archives and run history are preserved."
                         label="Delete source"
-                        destructive
+                        variant="destructive"
                         trigger={
                           <Button
                             size="icon-sm"
-                            variant="ghost"
+                            variant="destructive"
                             aria-label={`Delete ${source.name || source.id}`}
                           >
                             <TrashIcon />
@@ -691,8 +691,9 @@ function ProviderForm({
               title="Reload the server definition?"
               description="Your local edits will be discarded and replaced by the version shown above."
               label="Reload"
+              variant="warning"
               trigger={
-                <Button variant="ghost" disabled={busy}>
+                <Button variant="warning" disabled={busy}>
                   Discard my edits
                 </Button>
               }
@@ -747,7 +748,7 @@ function ProviderForm({
           </p>
           <div className="toolbar">
             <Button
-              variant="outline"
+              variant="warning"
               disabled={busy || fieldDraft}
               onClick={() => {
                 setJSON(pendingImport.json)
@@ -850,7 +851,6 @@ function ProviderForm({
               providerId={sourceID}
               trigger={
                 <Button
-                  variant="outline"
                   disabled={
                     dirty ||
                     blocked ||
@@ -867,9 +867,9 @@ function ProviderForm({
               title="Delete this source?"
               description="The definition will be deleted. Archives and history will remain available."
               label="Delete"
-              destructive
+              variant="destructive"
               trigger={
-                <Button variant="ghost" className="text-destructive" disabled={busy}>
+                <Button variant="destructive" disabled={busy}>
                   <TrashIcon />
                   Delete source
                 </Button>

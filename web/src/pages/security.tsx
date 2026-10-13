@@ -203,10 +203,10 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       </p>
                     )}
                     <div className="toolbar">
-                      <Button variant="outline" onClick={() => open('recovery')}>
+                      <Button variant="warning" onClick={() => open('recovery')}>
                         Replace recovery codes
                       </Button>
-                      <Button variant="outline" onClick={() => open('disable')}>
+                      <Button variant="warning" onClick={() => open('disable')}>
                         Disable verification
                       </Button>
                     </div>
@@ -222,7 +222,12 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       </p>
                     )}
                     <div className="toolbar">
-                      <Button onClick={() => open(enrollment ? 'confirm' : 'enroll')}>
+                      <Button
+                        variant={
+                          !enrollment && status.data.pending_expires_at ? 'warning' : 'default'
+                        }
+                        onClick={() => open(enrollment ? 'confirm' : 'enroll')}
+                      >
                         {enrollment
                           ? 'Continue setup'
                           : status.data.pending_expires_at
@@ -230,7 +235,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                             : 'Set up verification'}
                       </Button>
                       {status.data.pending_expires_at && (
-                        <Button variant="outline" onClick={() => open('cancel')}>
+                        <Button variant="warning" onClick={() => open('cancel')}>
                           Cancel setup
                         </Button>
                       )}
@@ -261,9 +266,9 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
               title="Revoke all other sessions?"
               description="Every session except this browser will be signed out. Other browsers will need your password and, when enabled, a fresh verification code."
               label="Revoke others"
-              destructive
+              variant="warning"
               trigger={
-                <Button variant="outline" disabled={!sessions.data || sessionItems.length < 2}>
+                <Button variant="warning" disabled={!sessions.data || sessionItems.length < 2}>
                   Revoke others
                 </Button>
               }
@@ -321,9 +326,9 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                                 : `The ${item.user_agent} session created ${date(item.created_at)} will lose access.`
                             }
                             label={item.current ? 'Sign out' : 'Revoke session'}
-                            destructive
+                            variant="warning"
                             trigger={
-                              <Button variant="ghost" size="sm">
+                              <Button variant="warning" size="sm">
                                 <SignOutIcon />
                                 {item.current ? 'Sign out' : 'Revoke'}
                               </Button>
@@ -478,7 +483,14 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
               </DialogClose>
               <Button
                 type="submit"
-                variant={operation === 'disable' ? 'destructive' : 'default'}
+                variant={
+                  operation === 'disable' ||
+                  operation === 'recovery' ||
+                  operation === 'cancel' ||
+                  (operation === 'enroll' && Boolean(status.data?.pending_expires_at))
+                    ? 'warning'
+                    : 'default'
+                }
                 disabled={pending}
               >
                 {pending

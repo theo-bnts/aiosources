@@ -208,8 +208,9 @@ function AuthenticationSettings() {
             title="Clear incompatible authentication fields?"
             description="Only incompatible authentication fields are removed from this draft. Credentials remain in Secrets. Save the source to apply the change."
             label="Clear incompatible fields"
+            variant="warning"
             trigger={
-              <Button type="button" variant="outline">
+              <Button type="button" variant="warning">
                 Clear incompatible fields
               </Button>
             }
@@ -645,7 +646,7 @@ function TraversalSettings() {
       {configured ? (
         <>
           <Button
-            variant="outline"
+            variant="warning"
             size="sm"
             onClick={() => change((next) => next.delete('traversal'))}
           >
@@ -771,7 +772,7 @@ function TraversalOptions() {
       {configured ? (
         <>
           <Button
-            variant="outline"
+            variant="warning"
             size="sm"
             onClick={() => change((next) => next.deleteIn(['traversal', 'options']))}
           >
@@ -822,7 +823,7 @@ function RecoverySettings() {
     >
       {configured ? (
         <>
-          <Button variant="outline" size="sm" onClick={() => change((next) => next.deleteIn(base))}>
+          <Button variant="warning" size="sm" onClick={() => change((next) => next.deleteIn(base))}>
             Remove ID recovery
           </Button>
           <MapField path={[...base, 'discovery_query']} label="Discovery query" />
@@ -902,7 +903,7 @@ function RequestLimitsSettings() {
       </p>
       {document.kindIn(['request_limits']) !== undefined && (
         <Button
-          variant="outline"
+          variant="warning"
           size="sm"
           onClick={() => change((next) => next.delete('request_limits'))}
         >

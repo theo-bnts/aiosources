@@ -247,7 +247,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                       <>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="warning"
                           disabled={save.isPending}
                           onClick={useSavedValues}
                         >
@@ -289,7 +289,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                 {draft && !conflict && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="warning"
                     onClick={useSavedValues}
                     disabled={save.isPending}
                   >

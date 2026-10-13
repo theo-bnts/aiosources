@@ -473,7 +473,7 @@ export function AppShell() {
     <div className="shrink-0 space-y-3 border-t border-border p-3">
       <ErrorNotice error={logout.error} />
       <Button
-        variant="destructive"
+        variant="warning"
         className="min-h-11 w-full justify-center lg:min-h-9"
         disabled={logout.isPending}
         onClick={() => discard(() => logout.mutate())}

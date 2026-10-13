@@ -352,9 +352,9 @@ export function SavedTorrentViews({
                 title="Delete this saved view?"
                 description={`Delete “${selected?.name ?? ''}”? The records and currently applied filters will not be changed.`}
                 label="Delete view"
-                destructive
+                variant="destructive"
                 trigger={
-                  <Button variant="ghost" disabled={!selected || save.isPending}>
+                  <Button variant="destructive" disabled={!selected || save.isPending}>
                     Delete
                   </Button>
                 }

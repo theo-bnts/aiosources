@@ -345,7 +345,8 @@ function ReviewForm({
           title="Review the latest data?"
           description="The source, metadata or review changed. Your previous selection will be cleared so you can check the latest information."
           label="Load current information"
-          trigger={<Button variant="outline">Review latest data</Button>}
+          variant="warning"
+          trigger={<Button variant="warning">Review latest data</Button>}
           action={reload}
         />
       )}
@@ -356,8 +357,9 @@ function ReviewForm({
               title="Return to automatic identification?"
               description="Remove this manual choice and queue automatic matching for this torrent. Imported source data stays intact."
               label="Use automatic matching"
+              variant="warning"
               trigger={
-                <Button variant="outline" disabled={save.isPending}>
+                <Button variant="warning" disabled={save.isPending}>
                   Use automatic matching
                 </Button>
               }

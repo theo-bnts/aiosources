@@ -147,7 +147,7 @@ export default function SecretsPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => openSecret(secret.name)}>
+                      <Button variant="warning" size="sm" onClick={() => openSecret(secret.name)}>
                         <ArrowClockwiseIcon />
                         Replace
                       </Button>
@@ -155,10 +155,10 @@ export default function SecretsPage() {
                         title={`Delete secret “${secret.name}”?`}
                         description="The encrypted value will be permanently deleted. The server refuses deletion while a source or resumable run still references it."
                         label="Delete secret"
-                        destructive
+                        variant="destructive"
                         trigger={
                           <Button
-                            variant="ghost"
+                            variant="destructive"
                             size="icon-sm"
                             aria-label={`Delete secret ${secret.name}`}
                           >
@@ -300,7 +300,11 @@ export default function SecretsPage() {
                   Back
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={busy || !value || !name}>
+              <Button
+                type="submit"
+                variant={editing?.rotate ? 'warning' : 'default'}
+                disabled={busy || !value || !name}
+              >
                 {save.isPending
                   ? 'Saving…'
                   : editing?.rotate

@@ -222,7 +222,7 @@ export function JSONField({
         <div id={`${id}-help`} className="space-y-1 text-xs text-destructive" role="alert">
           <p>{error} This draft has not been applied; save is blocked.</p>
           <Button
-            variant="ghost"
+            variant="warning"
             size="sm"
             onClick={() => {
               setDraft(raw)
@@ -342,7 +342,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
         {key !== name && (
           <Button
             size="sm"
-            variant="ghost"
+            variant="warning"
             onClick={() => {
               setKey(name)
               setError('')
@@ -369,7 +369,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
         />
       )}
       <Button
-        variant="ghost"
+        variant="warning"
         size="icon-sm"
         className="sm:mt-7"
         aria-label={`Remove ${name}`}
@@ -497,7 +497,7 @@ export function ArrayField({
                   {label} · {index + 1}
                 </span>
                 <Button
-                  variant="ghost"
+                  variant="warning"
                   size="icon-sm"
                   aria-label={`Remove ${label} ${index + 1}`}
                   onClick={() => change((next) => next.deleteIn([...path, index]))}

@@ -136,14 +136,14 @@ export function StorageSettingsPanel() {
             </form>
             <div className="border-t border-border pt-5">
               <ConfirmAction
-                destructive
+                variant="destructive"
                 title="Reset all source data?"
                 label="Reset source data"
                 description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
                 action={reset}
                 trigger={
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     disabled={Boolean(resetUnavailableReason)}
                     aria-describedby="source-data-reset-help source-data-reset-status"
                   >

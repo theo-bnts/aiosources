@@ -10,6 +10,7 @@ async function openAbout(page: Page) {
   for (const [name, href] of [
     ['GitHub Source code and releases', 'https://github.com/theo-bnts/aiosources'],
     ['Discord Help in French only', 'https://discord.gg/h3sja5XN8b'],
+    ['Support AIOSources GitHub Sponsors', 'https://github.com/sponsors/theo-bnts'],
   ]) {
     const link = dialog.getByRole('link', { name, exact: true })
     await expect(link).toHaveAttribute('href', href)

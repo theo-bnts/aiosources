@@ -142,7 +142,7 @@ export function PublicAccessSettings() {
               {dirty && (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="warning"
                   disabled={busy}
                   onClick={() => {
                     setDraft(undefined)

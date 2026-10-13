@@ -113,7 +113,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
               Keep editing
             </Button>
             <Button
-              variant="destructive"
+              variant="warning"
               disabled={pending}
               onClick={() => {
                 const proceed = closing?.proceed

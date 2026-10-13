@@ -192,9 +192,10 @@ export default function SharingPage() {
                       : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
                   }
                   label={share.enabled ? 'Disable access' : 'Enable access'}
+                  variant={share.enabled ? 'warning' : 'default'}
                   trigger={
                     <Button
-                      variant="outline"
+                      variant={share.enabled ? 'warning' : 'default'}
                       size="sm"
                       disabled={
                         !share.enabled &&
@@ -219,8 +220,9 @@ export default function SharingPage() {
                   title={`Rotate password for “${share.name}”?`}
                   description="The previous password will stop working immediately. Give the replacement to the recipient through a secure channel. Permissions and enabled state are unchanged."
                   label="Rotate password"
+                  variant="warning"
                   trigger={
-                    <Button variant="outline" size="sm">
+                    <Button variant="warning" size="sm">
                       Rotate password
                     </Button>
                   }
@@ -238,9 +240,9 @@ export default function SharingPage() {
                   title={`Revoke “${share.name}” permanently?`}
                   description="This share and its password will stop working. The recipient’s existing downloaded data is not deleted. Create a new share if you want to grant access again."
                   label="Revoke share"
-                  destructive
+                  variant="destructive"
                   trigger={
-                    <Button variant="ghost" size="sm" className="text-destructive">
+                    <Button variant="destructive" size="sm">
                       Revoke
                     </Button>
                   }

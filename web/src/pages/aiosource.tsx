@@ -258,7 +258,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
         {drafts[form] && (
           <Button
             type="button"
-            variant="outline"
+            variant="warning"
             disabled={save.isPending}
             onClick={() => {
               setDrafts((current) => {
@@ -358,7 +358,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               </Button>
               {status.syncing && (
                 <Button
-                  variant="outline"
+                  variant="warning"
                   onClick={() => action.mutate('stop-sync')}
                   disabled={action.isPending}
                 >
@@ -375,7 +375,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               </Button>
               {status.matching && (
                 <Button
-                  variant="outline"
+                  variant="warning"
                   onClick={() => action.mutate('stop-matching')}
                   disabled={action.isPending}
                 >
@@ -489,7 +489,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 title="Reset metadata catalog?"
                 description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
                 label="Reset metadata"
-                destructive
+                variant="destructive"
                 action={() => action.mutateAsync('reset-metadata')}
                 trigger={
                   <Button variant="destructive" disabled={busy}>
@@ -501,9 +501,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 title="Reset title matches?"
                 description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
                 label="Reset matches"
+                variant="destructive"
                 action={() => action.mutateAsync('reset-mapping')}
                 trigger={
-                  <Button variant="outline" disabled={busy}>
+                  <Button variant="destructive" disabled={busy}>
                     Reset matches
                   </Button>
                 }
@@ -522,9 +523,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 title="Reset cache observations?"
                 description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
                 label="Reset cache"
+                variant="destructive"
                 action={() => action.mutateAsync('reset-cache')}
                 trigger={
-                  <Button variant="outline" disabled={action.isPending}>
+                  <Button variant="destructive" disabled={action.isPending}>
                     Reset cache
                   </Button>
                 }
@@ -538,9 +540,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               title="Replace installation token?"
               description="Existing addon URLs will stop working. Reinstall with the new manifest URL."
               label="Replace token"
+              variant="warning"
               action={() => action.mutateAsync('token')}
               trigger={
-                <Button variant="outline" disabled={action.isPending}>
+                <Button variant="warning" disabled={action.isPending}>
                   Replace token
                 </Button>
               }
