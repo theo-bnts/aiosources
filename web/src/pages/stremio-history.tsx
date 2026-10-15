@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
-import { number, bytes, useDate } from '@/lib/format'
+import { number, bytes, percentage, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { resetListView } from '@/lib/list-view'
@@ -98,11 +98,13 @@ export function StremioStatisticsPage() {
               <Statistic
                 label="Requests without results"
                 value={query.data.empty}
+                detail={`(${percentage(query.data.empty, query.data.requests)})`}
                 to="/addon/history?status=empty"
               />
               <Statistic
                 label="Failed or interrupted requests"
                 value={query.data.failed}
+                detail={`(${percentage(query.data.failed, query.data.requests)})`}
                 to="/addon/history"
               />
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />

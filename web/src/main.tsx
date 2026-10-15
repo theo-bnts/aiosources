@@ -20,7 +20,6 @@ import {
   KeyIcon,
   ShieldCheckIcon,
   DevicesIcon,
-  ListChecksIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -28,6 +27,7 @@ import { Empty } from '@/components/common'
 import { WorkspaceLayout } from '@/components/workspace-layout'
 import { Button } from '@/components/ui/button'
 import { AboutDialog } from '@/components/about-dialog'
+import { ConnectionNoticeProvider } from '@/components/connection-notice'
 import './index.css'
 
 const SourceStatisticsPage = lazy(() =>
@@ -194,14 +194,12 @@ const router = createBrowserRouter(
               tabs={[
                 { path: '/metadata', label: 'Statistics', icon: ChartBarIcon },
                 { path: '/metadata/settings', label: 'Settings', icon: GearSixIcon },
-                { path: '/metadata/identification', label: 'Identification', icon: ListChecksIcon },
                 { path: '/metadata/history', label: 'History', icon: ClockCounterClockwiseIcon },
               ]}
             />
           }
         >
           <Route path="metadata" element={<AIOStatisticsPage section="metadata" />} />
-          <Route path="metadata/identification" element={<MatchingDiagnostics />} />
           <Route
             path="metadata/settings"
             element={<AIOSourcePage key="metadata" section="metadata" />}
@@ -212,6 +210,7 @@ const router = createBrowserRouter(
           />
           <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
         </Route>
+        <Route path="metadata/identification" element={<MatchingDiagnostics />} />
         <Route
           element={
             <WorkspaceLayout
@@ -311,7 +310,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <IconContext.Provider value={{ weight: 'regular', size: 18 }}>
         <QueryClientProvider client={queryClient}>
-          <RouterProvider router={router} />
+          <ConnectionNoticeProvider>
+            <RouterProvider router={router} />
+          </ConnectionNoticeProvider>
         </QueryClientProvider>
       </IconContext.Provider>
     </React.StrictMode>

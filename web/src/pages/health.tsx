@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, AUTO_REFRESH_INTERVAL } from '@/lib/api'
-import { bytes, useDate } from '@/lib/format'
+import { bytes, percentage, useDate } from '@/lib/format'
 import type { SystemHealth } from '@/lib/health-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
@@ -111,6 +111,7 @@ export function HealthPage() {
                         <TableRow>
                           <TableHead>Stored data</TableHead>
                           <TableHead className="text-right">Space used</TableHead>
+                          <TableHead className="text-right">Share of database</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -124,6 +125,11 @@ export function HealthPage() {
                               <TableCell>{categories[category.key] || category.key}</TableCell>
                               <TableCell className="text-right font-mono text-xs">
                                 {bytes(category.bytes)}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-xs">
+                                {category.bytes >= 0
+                                  ? percentage(category.bytes, report.database.total_bytes)
+                                  : 'Not available'}
                               </TableCell>
                             </TableRow>
                           ))}

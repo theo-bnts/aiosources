@@ -29,15 +29,18 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 		t.Fatalf("current counts: %+v %v", status, err)
 	}
 	counts, err := db.SourceTorrentStats(ctx, []string{"one", "two", "empty", "one"})
-	if err != nil || len(counts) != 3 {
+	if err != nil || len(counts.Items) != 3 {
 		t.Fatalf("source counts: %+v %v", counts, err)
+	}
+	if counts.Totals.Imported != 9 || counts.Totals.AwaitingImport != 0 {
+		t.Fatalf("global totals included pending imports or dropped published records: %+v", counts.Totals)
 	}
 	want := []model.SourceTorrentStats{
 		{ProviderID: "empty"},
 		{ProviderID: "one", Imported: 8, Matched: 1, Ambiguous: 1, Unmatched: 1, Pending: 5},
 		{ProviderID: "two", Imported: 1, Pending: 1},
 	}
-	for i, item := range counts {
+	for i, item := range counts.Items {
 		if item != want[i] || item.Imported != item.Matched+item.Ambiguous+item.Unmatched+item.Pending {
 			t.Fatalf("source totals differ from current decisions: %+v, want %+v", counts, want)
 		}
@@ -83,7 +86,10 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 		t.Fatalf("queued result remains identified: %+v %v", status, err)
 	}
 	counts, err = db.SourceTorrentStats(ctx, []string{"one"})
-	if err != nil || len(counts) != 1 || counts[0].Matched != 0 || counts[0].Pending != 6 || counts[0].Imported != 8 {
+	if err != nil || len(counts.Items) != 1 || counts.Items[0].Matched != 0 || counts.Items[0].Pending != 6 || counts.Items[0].Imported != 8 {
 		t.Fatalf("queued result remains identified in source counts: %+v %v", counts, err)
+	}
+	if counts.Totals.Imported != 9 {
+		t.Fatalf("filtering source cards changed the global denominator: %+v", counts.Totals)
 	}
 }

@@ -95,6 +95,13 @@ type AIOAvailability struct {
 	CheckedAt  time.Time `json:"checked_at"`
 	Files      []AIOFile `json:"files,omitempty"`
 }
+
+type SharedCacheStats struct {
+	Service     string    `json:"service"`
+	Cached      int64     `json:"cached"`
+	Uncached    int64     `json:"uncached"`
+	LastChecked time.Time `json:"last_checked"`
+}
 type AIOResource struct {
 	Generation  int64
 	Key         string

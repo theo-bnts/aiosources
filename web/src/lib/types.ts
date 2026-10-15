@@ -144,7 +144,13 @@ export interface SourceTorrentStats {
   ambiguous: number
   unmatched: number
   pending: number
-  pending_import?: { run_id: string; torrents: number }
+  pending_import?: { run_id: string; torrents: number; new: number; updates: number }
+  storage?: { bytes: number; measured_at: string }
+}
+
+export type SourceTorrentOverview = {
+  items: SourceTorrentStats[]
+  totals: { imported: number; awaiting_import: number }
 }
 export interface AdapterInfo {
   type: string

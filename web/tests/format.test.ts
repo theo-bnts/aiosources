@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { bytes, dateTimeToISO, localDateTime } from '../src/lib/format.ts'
+import { bytes, dateTimeToISO, localDateTime, percentage } from '../src/lib/format.ts'
+
+test('statistics use their own denominators and never display NaN for empty catalogues', () => {
+  assert.equal(percentage(2333, 5555), '42%')
+  assert.equal(percentage(1, 3), '33.3%')
+  assert.equal(percentage(0, 0), '0%')
+  assert.equal(percentage(2, 2), '100%')
+  assert.equal(percentage(1, 10000), '<0.1%')
+})
 
 test('date fields follow browser local time, including daylight saving and expiration seconds', () => {
   const original = process.env.TZ

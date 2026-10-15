@@ -25,7 +25,7 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   await expect(page).toHaveURL(/\/metadata\/history$/)
   const breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb', exact: true })
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata'])
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Metadata'])
   await expect(page.getByRole('link', { name: 'Cache verification', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect(page).toHaveURL(/offset=50/)

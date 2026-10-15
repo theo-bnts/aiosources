@@ -47,23 +47,17 @@ test('statistics are the first view, settings contain configuration and statuses
   for (const [path, heading, statistic] of [
     ['/providers', 'Sources', 'Imported torrents'],
     ['/metadata', 'Metadata', 'Film & series entries'],
-    ['/debrid', 'Debrid', 'Configured services'],
+    ['/debrid', 'Debrid', 'Shared availability cache'],
   ]) {
     await page.goto(path)
     const views = page.getByRole('tablist', { name: `${heading} views`, exact: true })
-    await expect(views.getByRole('tab')).toHaveText(
-      heading === 'Metadata'
-        ? ['Statistics', 'Settings', 'Identification', 'History']
-        : ['Statistics', 'Settings', 'History'],
-    )
+    await expect(views.getByRole('tab')).toHaveText(['Statistics', 'Settings', 'History'])
     await expect(views.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',
     )
-    await expect(views.locator('svg[aria-hidden="true"]')).toHaveCount(
-      heading === 'Metadata' ? 4 : 3,
-    )
-    await expect(page.getByText(statistic, { exact: true })).toBeVisible()
+    await expect(views.locator('svg[aria-hidden="true"]')).toHaveCount(3)
+    await expect(page.getByText(statistic, { exact: true }).first()).toBeVisible()
     await views.getByRole('tab', { name: 'Settings', exact: true }).click()
     await expect(page).toHaveURL(server.origin + path + '/settings')
     await expect(page.getByText(statistic, { exact: true })).toHaveCount(0)

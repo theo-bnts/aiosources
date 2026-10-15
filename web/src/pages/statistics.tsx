@@ -11,6 +11,8 @@ import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/sou
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
+import { DebridStatistics } from '@/components/debrid-statistics'
+import { number, percentage, useDate } from '@/lib/format'
 
 export function SourceStatisticsPage() {
   const location = useLocation()
@@ -52,15 +54,35 @@ export function SourceStatisticsPage() {
       <ErrorNotice error={overview.error} retry={() => void overview.refetch()} />
       <ErrorNotice error={counts.error} retry={() => void counts.refetch()} />
       {overview.data && (
-        <dl className="grid gap-3 sm:grid-cols-3">
+        <dl className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+          <Statistic
+            label="Imported torrents"
+            value={counts.totals ? counts.totals.imported : 'Not available'}
+            to="/torrents"
+          />
+          <Statistic
+            label="Awaiting import completion"
+            value={counts.totals ? counts.totals.awaiting_import : 'Not available'}
+            to="/runs"
+          />
           <Statistic
             label="Running imports"
             value={overview.data.running}
             to="/runs?status=running"
           />
           <Statistic label="Queued imports" value={overview.data.queued} to="/runs?status=queued" />
-          <Statistic label="Import capacity on this instance" value={overview.data.capacity} />
+          <Statistic
+            label="Import capacity on this instance"
+            value={overview.data.capacity}
+            className="col-span-2 xl:col-span-1"
+          />
         </dl>
+      )}
+      {counts.data && (
+        <p className="help">
+          Published and awaiting records are counted separately. Storage estimates include source
+          history and indexes; shared metadata and caches are separate.
+        </p>
       )}
       {(items.length > 0 || filtered) && (
         <SourceFilters
@@ -93,6 +115,7 @@ export function SourceStatisticsPage() {
                 source={source.name || source.id}
                 counts={counts.bySource.get(source.id)}
                 unavailable={counts.isError}
+                totals={counts.totals}
               />
             </section>
           ))}
@@ -114,6 +137,7 @@ export function SourceStatisticsPage() {
 }
 
 export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' }) {
+  const date = useDate()
   const location = useLocation()
   const legacyMatches =
     section === 'metadata' &&
@@ -125,6 +149,12 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const status = query.data
+  const identifiedTotal = status
+    ? status.status.matched +
+      status.status.ambiguous +
+      status.status.unmatched +
+      status.status.matching_pending
+    : 0
   if (legacyMatches)
     return (
       <Navigate to={`/metadata/identification${location.search}`} replace state={location.state} />
@@ -141,6 +171,11 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
               <>
                 <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Statistic label="Film & series entries" value={status.status.works} />
+                  <Statistic
+                    label="Imported torrents"
+                    value={identifiedTotal}
+                    to="/metadata/identification"
+                  />
                   {identificationStatuses.map((decision) => (
                     <Statistic
                       key={decision}
@@ -149,11 +184,37 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
                           ? 'Identified torrents'
                           : identificationResults[decision].label
                       }
-                      value={status.status[decision === 'pending' ? 'matching_pending' : decision]}
+                      value={`${number(status.status[decision === 'pending' ? 'matching_pending' : decision])} (${percentage(status.status[decision === 'pending' ? 'matching_pending' : decision], identifiedTotal)})`}
                       to={`/metadata/identification?${params({ match_status: decision })}`}
                     />
                   ))}
                   <Statistic label="Information pending" value={status.status.pending} />
+                </dl>
+                <dl className="grid gap-3 sm:grid-cols-2">
+                  <Statistic
+                    label="Last successful information update"
+                    value={
+                      status.status.last_sync
+                        ? date(status.status.last_sync)
+                        : 'No completed update'
+                    }
+                    size="sm"
+                    to="/metadata/history?kind=metadata"
+                  />
+                  <Statistic
+                    label="Next automatic information update"
+                    value={
+                      status.automation.next_update
+                        ? date(status.automation.next_update)
+                        : status.automation.updates === 'running'
+                          ? 'Running'
+                          : status.automation.updates === 'disabled'
+                            ? 'Disabled'
+                            : 'Waiting'
+                    }
+                    size="sm"
+                    to="/metadata/settings"
+                  />
                 </dl>
                 <div className="flex flex-wrap gap-2" aria-label="Current activity">
                   <Link
@@ -193,14 +254,8 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
               </>
             ) : (
               <>
-                <dl className="grid gap-3 sm:grid-cols-3">
-                  <Statistic
-                    label="Configured services"
-                    value={
-                      Number(Boolean(status.config.alldebrid_secret)) +
-                      Number(Boolean(status.config.torbox_secret))
-                    }
-                  />
+                <DebridStatistics config={status.config} />
+                <dl className="grid gap-3 sm:grid-cols-2">
                   <Statistic
                     label="Temporary AllDebrid magnets pending cleanup"
                     value={status.status.cleanup_pending}

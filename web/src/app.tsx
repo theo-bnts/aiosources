@@ -29,6 +29,7 @@ import {
   CaretDownIcon,
   DownloadSimpleIcon,
   ChartLineIcon,
+  ListChecksIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -107,6 +108,12 @@ const navigationGroups = [
         label: 'Metadata',
         description: 'Film and series information and torrent identification.',
         icon: FilmSlateIcon,
+      },
+      {
+        to: '/metadata/identification',
+        label: 'Identification',
+        description: 'Review and correct torrent identification.',
+        icon: ListChecksIcon,
       },
     ],
   },
@@ -323,9 +330,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
   if (location.pathname === '/login') return <Navigate to="/" replace />
   return (
     <>
-      <div className="fixed right-4 bottom-4 z-40 w-[calc(100%-2rem)] max-w-md">
-        <ErrorNotice error={session.error} retry={() => void session.refetch()} />
-      </div>
+      <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       {children}
     </>
   )

@@ -5,16 +5,25 @@ test('connection errors stay opaque on desktop and mobile and recover automatica
   page,
 }) => {
   await page.clock.install()
+  await page.goto('/metadata')
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Sources', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Metadata', level: 1, exact: true })).toBeVisible()
   let unavailable = true
   await page.route('**/api/session', async (route) => {
+    if (unavailable) await route.abort('failed')
+    else await route.continue()
+  })
+  await page.route('**/api/aiosource', async (route) => {
     if (unavailable) await route.abort('failed')
     else await route.continue()
   })
   await page.clock.runFor(30_001)
   const alert = page.locator('.fixed[role="alert"], .fixed [role="alert"]')
   await expect(alert).toContainText('The server is unreachable.')
+  await expect(alert).toHaveCount(1)
+  await expect(
+    page.locator('#main-content').getByText('The server is unreachable.', { exact: false }),
+  ).toHaveCount(0)
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 844 })
     for (const dark of [true, false]) {
@@ -39,7 +48,7 @@ test('connection errors stay opaque on desktop and mobile and recover automatica
   unavailable = false
   await page.clock.runFor(30_001)
   await expect(alert).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Sources', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Metadata', level: 1, exact: true })).toBeVisible()
 })
 
 test('lists update without refresh controls and empty pages keep a single create action', async ({

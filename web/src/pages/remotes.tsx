@@ -198,6 +198,7 @@ export default function RemotesPage() {
                   source={remote.name || remote.id}
                   counts={counts.bySource.get(remote.id)}
                   unavailable={counts.isError}
+                  totals={counts.totals}
                 />
                 {remote.last_run?.error && (
                   <p role="status" className="notice notice-error break-words">

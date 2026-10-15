@@ -28,9 +28,15 @@ type HealthDisk struct {
 }
 
 type SystemHealth struct {
-	CheckedAt   time.Time      `json:"checked_at"`
-	Status      string         `json:"status"`
-	Database    HealthDatabase `json:"database"`
-	Disk        HealthDisk     `json:"disk"`
-	NextCheckAt time.Time      `json:"next_check_at"`
+	CheckedAt     time.Time               `json:"checked_at"`
+	Status        string                  `json:"status"`
+	Database      HealthDatabase          `json:"database"`
+	Disk          HealthDisk              `json:"disk"`
+	NextCheckAt   time.Time               `json:"next_check_at"`
+	SourceStorage []SourceStorageEstimate `json:"source_storage,omitempty"`
+}
+
+type SourceStorageEstimate struct {
+	ProviderID string `json:"provider_id"`
+	Bytes      int64  `json:"bytes"`
 }

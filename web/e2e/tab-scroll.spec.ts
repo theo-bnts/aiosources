@@ -111,7 +111,6 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
 test('history and catalog sharing tabs keep scroll and their selected view', async ({ page }) => {
   for (const [url, tab, target] of [
     ['/metadata', 'History', /\/metadata\/history$/],
-    ['/metadata', 'Identification', /\/metadata\/identification$/],
     ['/addon', 'History', /\/addon\/history$/],
     ['/debrid', 'History', /\/debrid\/history$/],
     ['/providers', 'History', /\/runs$/],

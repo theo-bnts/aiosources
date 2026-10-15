@@ -18,6 +18,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	}
 	s.registerPublicInstance(mux)
 	mux.HandleFunc("GET /api/aiosource", s.auth.protect(s.aioStatus))
+	mux.HandleFunc("GET /api/debrid/statistics", s.auth.protect(s.cacheStatistics))
 	mux.HandleFunc("GET /api/operations", s.auth.protect(s.operationHistory))
 	mux.HandleFunc("GET /api/operations/{id}", s.auth.protect(s.operationDetail))
 	mux.HandleFunc("GET /api/operations/{id}/events", s.auth.protect(s.operationEvents))

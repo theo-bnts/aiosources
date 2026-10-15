@@ -10,10 +10,10 @@ import (
 func sourceStats(t *testing.T, ctx context.Context, db *Store, source string) model.SourceTorrentStats {
 	t.Helper()
 	items, err := db.SourceTorrentStats(ctx, []string{source})
-	if err != nil || len(items) != 1 {
+	if err != nil || len(items.Items) != 1 {
 		t.Fatalf("source counts: %+v %v", items, err)
 	}
-	return items[0]
+	return items.Items[0]
 }
 
 func TestSourceTorrentStatsKeepFullProgressSeparateAcrossResumeAndPublication(t *testing.T) {
@@ -39,6 +39,9 @@ func TestSourceTorrentStatsKeepFullProgressSeparateAcrossResumeAndPublication(t 
 		counts := sourceStats(t, ctx, db, provider.ID)
 		if counts.Imported != 2 || counts.Pending != 2 || counts.PendingImport == nil || counts.PendingImport.RunID != run.ID || counts.PendingImport.Torrents != staged {
 			t.Fatalf("incomplete Full changed published totals or lost progress: %+v", counts)
+		}
+		if counts.PendingImport.New != 1 || counts.PendingImport.Updates != 1 {
+			t.Fatalf("pending imports confused new records with updates: %+v", counts.PendingImport)
 		}
 	}
 	assertProgress(2)
@@ -130,7 +133,7 @@ func TestSourceTorrentStatsSupersedeRetainedFailedProgressAndExcludeRemoteDeleti
 	if counts := sourceStats(t, ctx, db, p.ID); counts.Imported != 1 || counts.PendingImport != nil {
 		t.Fatalf("cancelled progress remained in current counts: %+v", counts)
 	}
-	if items, err := db.SourceTorrentStats(ctx, nil); err != nil || items == nil || len(items) != 0 {
+	if items, err := db.SourceTorrentStats(ctx, nil); err != nil || items.Items == nil || len(items.Items) != 0 {
 		t.Fatalf("empty source list was not an empty response: %+v %v", items, err)
 	}
 }

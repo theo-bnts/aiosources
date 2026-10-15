@@ -7,15 +7,19 @@ export function Statistic({
   value,
   to,
   size = 'default',
+  detail,
+  className,
 }: {
   label: string
   value: number | string
   to?: string
   size?: 'default' | 'sm'
+  detail?: string
+  className?: string
 }) {
   const text = typeof value === 'number' ? number(value) : value
   return (
-    <div className="statistic-card">
+    <div className={cn('statistic-card', className)}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd
         className={cn(
@@ -30,6 +34,7 @@ export function Statistic({
         ) : (
           text
         )}
+        {detail && <span className="ml-2 text-sm font-normal text-muted-foreground">{detail}</span>}
       </dd>
     </div>
   )

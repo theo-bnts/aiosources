@@ -11,6 +11,14 @@ export class ApiError extends Error {
   }
 }
 
+// Transport failures share one notification; HTTP and validation errors stay
+// beside the operation that failed. Invalid JSON is not a connection failure.
+export class ConnectionError extends ApiError {
+  constructor(message: string) {
+    super(0, message)
+  }
+}
+
 let csrfToken: string | undefined
 export function setCSRF(token?: string) {
   csrfToken = token
@@ -53,7 +61,7 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
     response = await fetch(`/api${path}`, { ...init, credentials: 'same-origin', headers })
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error
-    throw new ApiError(0, 'The server is unreachable. Check your connection and try again.')
+    throw new ConnectionError('The server is unreachable. Check your connection and try again.')
   }
   if (!response.ok) {
     let payload: { error?: string; details?: string[] } = {}
@@ -107,8 +115,7 @@ async function readBody<T>(read: () => Promise<T>): Promise<T> {
     return await read()
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') throw error
-    throw new ApiError(
-      0,
+    throw new ConnectionError(
       'The server response was interrupted. Check your connection and try again.',
     )
   }
@@ -148,6 +155,7 @@ async function invalidateData(cancelRefetch: boolean) {
     [
       'providers',
       'source-torrent-stats',
+      'debrid-statistics',
       'provider',
       'remote-document',
       'schedules',

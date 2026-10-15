@@ -28,7 +28,7 @@ func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*mode
 		return nil, databaseError("measure database storage", err)
 	}
 	rows, err := tx.Query(ctx, `SELECT CASE
-WHEN n.nspname='ingest' AND (c.relname IN ('torrents','staged_torrents','raw_records','pages','events','runs','collection_state','legacy_imports','schedule_clocks','torrent_history','torrent_history_baselines','torrent_history_metadata') OR c.relname LIKE 'run_%') THEN 'sources'
+WHEN n.nspname='ingest' AND `+sourceStorageRelations+` THEN 'sources'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_cleanup','aio_incidents') THEN 'debrid'
 WHEN n.nspname='ingest' AND c.relname IN ('stremio_requests','aio_public_access') THEN 'stremio'
@@ -70,6 +70,17 @@ WHERE c.relkind IN ('r','m') AND n.nspname !~ '^pg_' AND n.nspname<>'information
 	// the raw measurements; a negative remainder is explicitly visible, not faked.
 	report.Database.Available = true
 	report.Database.MeasuredAt = &report.CheckedAt
+	// Source estimates are optional. A statistics permission or planner failure
+	// must not hide the independently measured database and filesystem sizes.
+	if estimateTx, err := tx.Begin(ctx); err == nil {
+		if estimates, err := sourceStorageEstimates(ctx, estimateTx); err == nil {
+			if err := estimateTx.Commit(ctx); err == nil {
+				report.SourceStorage = estimates
+			}
+		} else {
+			rollback(estimateTx)
+		}
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, databaseError("finish storage measurement", err)

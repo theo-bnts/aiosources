@@ -20,7 +20,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Search', '/torrents'],
     ['Metadata', 'Metadata', '/metadata'],
     ['Metadata', 'Metadata', '/metadata/settings'],
-    ['Metadata', 'Metadata', '/metadata/identification'],
+    ['Metadata', 'Identification', '/metadata/identification'],
     ['Metadata', 'Metadata', '/metadata/history'],
     ['Metadata', 'Metadata', '/metadata/history/missing'],
     ['Debrid', 'Debrid', '/debrid'],
@@ -47,10 +47,12 @@ test('navigation and page tabs remain coherent on every current and legacy route
     await page.goto(url)
     await expect(
       page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
-    ).toHaveText(['Sources', 'Connections'].includes(group) ? [`${group}/`, label] : [label])
+    ).toHaveText(
+      ['Sources', 'Metadata', 'Connections'].includes(group) ? [`${group}/`, label] : [label],
+    )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
     await expect(navigation.locator('a[aria-current="page"]')).toHaveText(label)
-    if (['Sources', 'Connections'].includes(group))
+    if (['Sources', 'Metadata', 'Connections'].includes(group))
       await expect(navigation.getByRole('button', { name: group, exact: true })).toHaveAttribute(
         'aria-expanded',
         'true',
@@ -61,11 +63,12 @@ test('navigation and page tabs remain coherent on every current and legacy route
   }
   await page.goto('/providers')
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
-  await expect(navigation.getByRole('button')).toHaveText(['Sources', 'Connections'])
+  await expect(navigation.getByRole('button')).toHaveText(['Sources', 'Metadata', 'Connections'])
   await expect(navigation.getByRole('link')).toHaveText([
     'Sources',
     'Search',
     'Metadata',
+    'Identification',
     'Debrid',
     'Stremio',
     'Catalog sharing',
@@ -120,7 +123,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     'aria-selected',
     'true',
   )
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata'])
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Metadata'])
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await expect(navigation.getByRole('button', { name: 'Sources', exact: true })).toHaveAttribute(

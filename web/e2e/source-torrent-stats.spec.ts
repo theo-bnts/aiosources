@@ -1,6 +1,6 @@
 import pg from 'pg'
 import { test, expect } from './fixtures'
-import type { Items, SourceTorrentStats } from '../src/lib/types'
+import type { SourceTorrentOverview } from '../src/lib/types'
 
 test.use({ collectionSource: true })
 
@@ -90,21 +90,30 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM ingest.raw_records WHERE
   const text = await response.text()
   expect(text).not.toContain('private-path')
   expect(text).not.toContain('Alpha identified release')
-  const body: Items<SourceTorrentStats> = JSON.parse(text)
-  expect(body.items?.find((item) => item.provider_id === 'alpha')).toEqual({
+  const body: SourceTorrentOverview = JSON.parse(text)
+  expect(body.totals).toEqual({ imported: 7, awaiting_import: 2 })
+  expect(body.items?.find((item) => item.provider_id === 'alpha')).toMatchObject({
     provider_id: 'alpha',
     imported: 5,
     matched: 1,
     unmatched: 1,
     ambiguous: 1,
     pending: 2,
-    pending_import: { run_id: 'synthetic-full', torrents: 2 },
+    pending_import: { run_id: 'synthetic-full', torrents: 2, new: 1, updates: 1 },
   })
   await page.goto('/providers')
   const alpha = page.locator('section').filter({ hasText: 'Alpha source' })
   await expect(
     alpha.getByRole('link', { name: 'View 5 imported torrents from Alpha source', exact: true }),
   ).toBeVisible()
+  await expect(
+    alpha.getByRole('link', { name: 'View 5 imported torrents from Alpha source', exact: true }),
+  ).toContainText('71.4%')
+  await expect(
+    alpha.getByRole('link', { name: 'View 1 identified torrents from Alpha source', exact: true }),
+  ).toContainText('20%')
+  await expect(alpha.locator('dl > div').filter({ hasText: 'New records:' })).toContainText('50%')
+  await expect(alpha.locator('dl > div').filter({ hasText: 'Updates:' })).toContainText('50%')
   for (const [total, result] of [
     [1, 'identified'],
     [1, 'not identified'],

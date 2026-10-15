@@ -1,6 +1,9 @@
 package httpapi
 
-import "net/http"
+import (
+	"github.com/theo-bnts/aiosources/internal/model"
+	"net/http"
+)
 
 func (s *server) sourceTorrentStats(w http.ResponseWriter, r *http.Request) {
 	sources, err := s.options.Providers.List()
@@ -17,5 +20,18 @@ func (s *server) sourceTorrentStats(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	if s.options.Health != nil {
+		if report := s.options.Health.Report(); report != nil && report.Database.Available && report.Database.MeasuredAt != nil {
+			estimates := make(map[string]int64, len(report.SourceStorage))
+			for _, estimate := range report.SourceStorage {
+				estimates[estimate.ProviderID] = estimate.Bytes
+			}
+			for i := range items.Items {
+				if size, ok := estimates[items.Items[i].ProviderID]; ok {
+					items.Items[i].Storage = &model.SourceStorageUsage{Bytes: size, MeasuredAt: *report.Database.MeasuredAt}
+				}
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, items)
 }

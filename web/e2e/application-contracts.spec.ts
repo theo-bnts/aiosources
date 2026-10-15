@@ -221,7 +221,8 @@ test('named secret creation recovers a lost acknowledgement without replacing a 
     } else await route.continue()
   })
   await editor.getByRole('button', { name: 'Create secret', exact: true }).click()
-  await expect(editor.getByRole('alert')).toBeVisible()
+  await expect(page.locator('[data-connection-notice]')).toContainText('The server is unreachable.')
+  await expect(editor.getByRole('alert')).toHaveCount(0)
   const metadata = await (await page.request.get('/api/secrets')).json()
   await expect(
     page.getByRole('row', { includeHidden: true }).filter({ hasText: 'owned_creation' }),

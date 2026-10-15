@@ -1,4 +1,12 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -10,7 +18,8 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
-import { ApiError } from '@/lib/api'
+import { ApiError, ConnectionError } from '@/lib/api'
+import { ConnectionNotices } from '@/lib/connection-notices'
 import { number, statusLabels } from '@/lib/format'
 import { useDetailBackLink } from '@/lib/detail-navigation'
 import type { Run } from '@/lib/types'
@@ -88,16 +97,24 @@ export function ErrorNotice({
   error,
   retry,
   retryLabel = 'Try again',
+  presentation = 'inline',
 }: {
   error: unknown
   retry?: () => void
   retryLabel?: string
+  presentation?: 'inline' | 'notification'
 }) {
-  if (!error) return null
+  const register = useContext(ConnectionNotices)
+  const id = useId()
+  const notification = register && presentation === 'inline' && error instanceof ConnectionError
+  useEffect(() => {
+    if (notification) return register(id, { error, retry })
+  }, [notification, register, id, error, retry])
+  if (!error || notification) return null
   return (
     <div
-      role="alert"
-      className="rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm"
+      role={presentation === 'notification' ? 'presentation' : 'alert'}
+      className={`rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm ${presentation === 'notification' ? 'pr-12' : ''}`}
     >
       <div className="flex items-start gap-3">
         <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />

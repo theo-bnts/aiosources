@@ -3,6 +3,12 @@ import type { RunMode, RunStatus } from './types'
 
 const integers = new Intl.NumberFormat('en-GB')
 const decimals = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 })
+const percentages = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 1 })
+
+export function percentage(value: number, total: number) {
+  if (value > 0 && total > 0 && value / total < 0.001) return '<0.1%'
+  return percentages.format(total > 0 ? value / total : 0)
+}
 export const modeLabels: Record<RunMode, string> = {
   preview: 'Preview',
   incremental: 'Update',
