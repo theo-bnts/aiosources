@@ -90,9 +90,9 @@ test('one About entry stays in the same place on public, sign-in and administrat
     await expect(trigger).toHaveCount(1)
     await expect(trigger).toBeVisible()
     await target.evaluate(() => document.fonts.ready)
-    await trigger.evaluate(async (node) => {
-      await Promise.all(node.getAnimations().map((animation) => animation.finished))
-    })
+    // Wait for stable geometry. Hover/focus color transitions can be cancelled
+    // normally and must not reject the position check through Animation.finished.
+    await trigger.scrollIntoViewIfNeeded()
     return trigger.boundingBox()
   }
   async function checkAtSamePosition(target: Page, expected: Awaited<ReturnType<typeof position>>) {
