@@ -100,7 +100,11 @@ test('torrent search combines title and ID fragments, filters and saved views th
   await page.getByText('Saved views', { exact: true }).click()
   await page.getByLabel('View name', { exact: true }).fill('Partial title')
   await page.getByRole('button', { name: 'Save as new', exact: true }).click()
-  await expect(page.getByText('Saved the currently applied search filters.')).toBeVisible()
+  await expect(
+    page
+      .locator('[data-notification]')
+      .filter({ hasText: 'Saved the currently applied search filters.' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(search).toHaveValue('')
   await expect(results).toHaveCount(6)

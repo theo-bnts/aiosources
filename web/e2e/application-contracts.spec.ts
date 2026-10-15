@@ -193,7 +193,7 @@ test('saved view conflicts keep the edited name until an explicit review of the 
   await expect(name).toHaveValue('Local view draft')
   await page.getByRole('button', { name: 'Update selected', exact: true }).click()
   await expect(
-    page.getByRole('status').filter({ hasText: 'Saved the currently applied' }),
+    page.locator('[data-notification]').filter({ hasText: 'Saved the currently applied' }),
   ).toBeVisible()
   const saved = await (await page.request.get('/api/saved-views')).json()
   expect(saved.items.find((view: { id: string }) => view.id === original.id).name).toBe(
