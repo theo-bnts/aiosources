@@ -18,9 +18,9 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
-import { ApiError, ConnectionError } from '@/lib/api'
-import { ConnectionNotices } from '@/lib/connection-notices'
-import { number, statusLabels } from '@/lib/format'
+import { ApiError } from '@/lib/api'
+import { RequestNotices } from '@/lib/request-notices'
+import { messageText, number, statusLabels } from '@/lib/format'
 import { useDetailBackLink } from '@/lib/detail-navigation'
 import type { Run } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -98,15 +98,23 @@ export function ErrorNotice({
   retry,
   retryLabel = 'Try again',
   presentation = 'inline',
+  scope = 'form',
 }: {
   error: unknown
   retry?: () => void
   retryLabel?: string
   presentation?: 'inline' | 'notification'
+  scope?: 'form' | 'action'
 }) {
-  const register = useContext(ConnectionNotices)
+  const register = useContext(RequestNotices)
   const id = useId()
-  const notification = register && presentation === 'inline' && error instanceof ConnectionError
+  const notification =
+    register &&
+    presentation === 'inline' &&
+    Boolean(error) &&
+    (scope === 'action' ||
+      (error instanceof ApiError &&
+        (error.status === 0 || error.status === 408 || error.status >= 500)))
   useEffect(() => {
     if (notification) return register(id, { error, retry })
   }, [notification, register, id, error, retry])
@@ -120,7 +128,7 @@ export function ErrorNotice({
         <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1 space-y-2">
           <p className="break-words text-sm">
-            {error instanceof Error ? error.message : 'An unexpected error occurred.'}
+            {error instanceof Error ? messageText(error.message) : 'An unexpected error occurred.'}
           </p>
           {error instanceof ApiError && error.details.length > 0 && (
             <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">

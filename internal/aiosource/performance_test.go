@@ -113,3 +113,35 @@ func BenchmarkMetadataSeasonLookup(b *testing.B) {
 		}
 	}
 }
+
+// Unlike the repeated-title fixture, each pick has a different title and ID.
+// This measures the no-reuse path, including episodic and season-pack requests.
+func BenchmarkMatchingVariedCatalog(b *testing.B) {
+	ctx, s, conn := testService(b)
+	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+ SELECT CASE WHEN n%3=0 THEN 'movie' ELSE 'tv' END,n::text,'tt'||(10000000+n)::text,ARRAY[2021] FROM generate_series(1,90) n;
+ INSERT INTO ingest.aio_titles(work_id,title,normalized)
+ SELECT id,'Synthetic Adventure '||tmdb_id,'synthetic adventure '||tmdb_id FROM ingest.aio_works;
+ INSERT INTO ingest.torrents(provider_id,source_id,fields)
+ SELECT 'synthetic',n::text,jsonb_build_object('title','Synthetic.Adventure.'||n||CASE n%3 WHEN 0 THEN '.2021.1080p' WHEN 1 THEN '.S01E03.2021.1080p' ELSE '.S01.COMPLETE.2021.1080p' END,'tmdb_id',n::text,'info_hash',md5(n::text)||'12345678') FROM generate_series(1,90) n;
+ ANALYZE ingest.aio_works; ANALYZE ingest.aio_titles; ANALYZE ingest.torrents;`); err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for range b.N {
+		b.StopTimer()
+		if err := s.DB.ResetAIOMapping(ctx); err != nil {
+			b.Fatal(err)
+		}
+		b.StartTimer()
+		if err := s.Match(ctx); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	var matched int
+	if err := conn.QueryRow(ctx, "SELECT count(*) FROM ingest.aio_matches WHERE status='matched'").Scan(&matched); err != nil || matched != 90 {
+		b.Fatal("varied decisions changed", matched, err)
+	}
+	b.ReportMetric(float64(matched), "matched/90")
+}

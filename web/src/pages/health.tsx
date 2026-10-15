@@ -1,31 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, AUTO_REFRESH_INTERVAL } from '@/lib/api'
-import { bytes, percentage, useDate } from '@/lib/format'
+import { bytes, useDate } from '@/lib/format'
 import type { SystemHealth } from '@/lib/health-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { storageStatus } from '@/lib/storage-status'
 import { StorageSettingsPanel } from '@/components/storage-settings'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-
-const categories: Record<string, string> = {
-  sources: 'Sources',
-  metadata: 'Metadata',
-  debrid: 'Debrid',
-  stremio: 'Stremio',
-  sharing: 'Catalog sharing',
-  access: 'Security',
-  logs: 'Logs and operation history',
-  other: 'Settings and database state',
-  overhead: 'Database overhead',
-}
+import { StorageBreakdown } from '@/components/storage-breakdown'
 
 export function HealthPage() {
   const date = useDate()
@@ -101,52 +82,7 @@ export function HealthPage() {
                 </p>
               </section>
             </div>
-            <section className="section-card">
-              <h2 className="section-title">Where storage is used</h2>
-              {report.database.measured_at ? (
-                <>
-                  <div className="table-frame">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Stored data</TableHead>
-                          <TableHead className="text-right">Space used</TableHead>
-                          <TableHead className="text-right">Share of database</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {[
-                          ...report.database.categories,
-                          { key: 'overhead', bytes: report.database.other_database_bytes },
-                        ]
-                          .sort((a, b) => b.bytes - a.bytes || a.key.localeCompare(b.key))
-                          .map((category) => (
-                            <TableRow key={category.key}>
-                              <TableCell>{categories[category.key] || category.key}</TableCell>
-                              <TableCell className="text-right font-mono text-xs">
-                                {bytes(category.bytes)}
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums text-xs">
-                                {category.bytes >= 0
-                                  ? percentage(category.bytes, report.database.total_bytes)
-                                  : 'Not available'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <p className="help">
-                    Tables and indexes are included. Sizes are measured independently and may
-                    briefly differ while imports are running.
-                  </p>
-                </>
-              ) : (
-                <p className="help">
-                  Storage usage will appear after the first successful database measurement.
-                </p>
-              )}
-            </section>
+            <StorageBreakdown report={report} />
           </>
         )
       )}

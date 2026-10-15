@@ -10,7 +10,7 @@ import {
 import { api, ApiError, AUTO_REFRESH_INTERVAL, downloadBytes, params, rawPage } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, RawDetail, RawRecord, Torrent } from '@/lib/types'
-import { useDate, number } from '@/lib/format'
+import { messageText, useDate, number } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
@@ -147,7 +147,7 @@ function DownloadButton({
         <DownloadSimpleIcon />
         {download.isPending ? 'Downloading…' : label}
       </Button>
-      <ErrorNotice error={download.error} />
+      <ErrorNotice error={download.error} scope="action" />
     </div>
   )
 }
@@ -398,7 +398,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                               >
                                 Error
                               </Badge>
-                              <p className="help mt-1 break-words">{record.error}</p>
+                              <p className="help mt-1 break-words">{messageText(record.error)}</p>
                             </div>
                           ) : record.auxiliary ? (
                             <Badge variant="outline">Enrichment</Badge>

@@ -127,7 +127,9 @@ test('a failed review reload keeps its confirmation and selection until it can b
   await editor.getByRole('button', { name: 'Review latest data', exact: true }).click()
   const confirmation = page.getByRole('alertdialog')
   await confirmation.getByRole('button', { name: 'Load current information', exact: true }).click()
-  await expect(confirmation.getByRole('alert')).toContainText('temporarily unavailable')
+  await expect(page.locator('[data-request-notice]')).toContainText('temporarily unavailable')
+  await expect(confirmation.getByRole('alert')).toHaveCount(0)
+  await expect(confirmation).toBeVisible()
   await expect(
     page.getByRole('radio', { name: 'Choose Review Example', exact: true, includeHidden: true }),
   ).toBeChecked()
@@ -198,7 +200,9 @@ test('failed candidate loading does not discard a review when the source record 
   await editor.getByRole('button', { name: 'Review latest data', exact: true }).click()
   const confirmation = page.getByRole('alertdialog')
   await confirmation.getByRole('button', { name: 'Load current information', exact: true }).click()
-  await expect(confirmation.getByRole('alert')).toContainText('temporarily unavailable')
+  await expect(page.locator('[data-request-notice]')).toContainText('temporarily unavailable')
+  await expect(confirmation.getByRole('alert')).toHaveCount(0)
+  await expect(confirmation).toBeVisible()
   await expect(
     page.getByRole('radio', { name: 'Choose Review Example', exact: true, includeHidden: true }),
   ).toBeChecked()

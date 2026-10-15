@@ -476,7 +476,7 @@ export function AppShell() {
   )
   const footer = (
     <div className="shrink-0 space-y-3 border-t border-border p-3">
-      <ErrorNotice error={logout.error} />
+      <ErrorNotice error={logout.error} scope="action" />
       <Button
         variant="warning"
         className="min-h-11 w-full justify-center lg:min-h-9"

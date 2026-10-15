@@ -19,7 +19,7 @@ import (
 
 const cleanupTimeout = 15 * time.Second
 
-const coverageFailureMessage = "source-ID coverage could not be verified against refreshed source totals; review scope counts and the minimum total in run events"
+const coverageFailureMessage = "Source-ID coverage could not be verified against refreshed source totals; review scope counts and the minimum total in run events"
 
 func sourceFailureMessage(page model.Page) string {
 	if incomplete, _ := page.Metadata["coverage_incomplete"].(bool); incomplete {
@@ -38,7 +38,7 @@ func sourceFailureMessage(page model.Page) string {
 	case "noncanonical_id":
 		return "ID recovery discovery returned an invalid numeric source ID"
 	default:
-		return "source response could not be processed"
+		return "Source response could not be processed"
 	}
 }
 
@@ -100,7 +100,7 @@ func (m *Manager) runClaim(run model.Run) {
 		// Even an unexpected adapter panic must release the provider lock.
 		defer func() {
 			if recover() != nil {
-				status, message, reason = model.StatusFailed, "collection adapter failed unexpectedly", ""
+				status, message, reason = model.StatusFailed, "Collection adapter failed unexpectedly", ""
 			}
 		}()
 		return m.collect(ctx, run)
@@ -378,11 +378,11 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if eventErr := m.event(ctx, run.ID, "source_error", "Source initialization failed", map[string]any{"failure_code": code}); eventErr != nil {
 			return stopReason(ctx, eventErr)
 		}
-		return stopReason(ctx, errors.New("source initialization failed"))
+		return stopReason(ctx, errors.New("Source initialization failed"))
 	}
 	defer func() {
 		if err := source.Close(); err != nil && (status == model.StatusSucceeded || status == model.StatusPaused) {
-			status, message, reason = model.StatusFailed, "source resources could not be released", ""
+			status, message, reason = model.StatusFailed, "Source resources could not be released", ""
 		}
 	}()
 	if err := m.event(ctx, run.ID, "started", "Collection attempt started", map[string]any{
@@ -403,7 +403,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if boundaryErr != nil {
 			if pendingResponse.StatusCode != 0 {
 				responseMetadata(&page)
-				if err := m.archiveFailure(ctx, run, page, "source request stopped at a response boundary", connectors.FailureCode(fetchErr)); err != nil {
+				if err := m.archiveFailure(ctx, run, page, "Source request stopped at a response boundary", connectors.FailureCode(fetchErr)); err != nil {
 					return stopReason(ctx, err)
 				}
 			}
@@ -413,7 +413,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if fetchErr != nil || page.Error != "" || ctx.Err() != nil {
 			failure := sourceFailureMessage(page)
 			if ctx.Err() != nil {
-				failure = "source request was interrupted"
+				failure = "Source request was interrupted"
 			}
 			code := connectors.FailureCode(fetchErr)
 			if metadataCode, ok := page.Metadata["failure_code"].(string); code == "unknown" && ok && connectors.ValidFailureCode(metadataCode) {
@@ -425,16 +425,16 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 			return stopReason(ctx, errors.New(failure))
 		}
 		if len(page.Next) > 0 && !json.Valid(page.Next) {
-			if err := m.archiveFailure(ctx, run, page, "source returned an invalid continuation checkpoint", "parse"); err != nil {
+			if err := m.archiveFailure(ctx, run, page, "Source returned an invalid continuation checkpoint", "parse"); err != nil {
 				return stopReason(ctx, err)
 			}
-			return model.StatusFailed, "source returned an invalid continuation checkpoint", ""
+			return model.StatusFailed, "Source returned an invalid continuation checkpoint", ""
 		}
 		if !page.Done && !advances(run.Cursor, page.Next) {
-			if err := m.archiveFailure(ctx, run, page, "pagination did not advance", "stalled"); err != nil {
+			if err := m.archiveFailure(ctx, run, page, "Pagination did not advance", "stalled"); err != nil {
 				return stopReason(ctx, err)
 			}
-			return model.StatusFailed, "pagination did not advance", ""
+			return model.StatusFailed, "Pagination did not advance", ""
 		}
 
 		fingerprint, ids, completeIDs := pageFingerprint(page)
@@ -444,7 +444,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 			if allKnown {
 				known, err := m.db.Known(ctx, run.ProviderID, ids, run.CreatedAt)
 				if err != nil {
-					if archiveErr := m.archiveFailure(ctx, run, page, "known-record lookup failed", "unknown"); archiveErr != nil {
+					if archiveErr := m.archiveFailure(ctx, run, page, "Known-record lookup failed", "unknown"); archiveErr != nil {
 						return stopReason(ctx, archiveErr)
 					}
 					return stopReason(ctx, errPersistence)
@@ -469,7 +469,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 			page.Done = true
 		}
 		if err := m.checkControl(ctx, run.ID, false); err != nil {
-			if archiveErr := m.archiveFailure(ctx, run, page, "collection was interrupted before checkpoint commit", "unknown"); archiveErr != nil {
+			if archiveErr := m.archiveFailure(ctx, run, page, "Collection was interrupted before checkpoint commit", "unknown"); archiveErr != nil {
 				return stopReason(ctx, archiveErr)
 			}
 			return stopReason(ctx, err)
@@ -488,32 +488,32 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if errors.Is(err, model.ErrStalled) {
 			// Store has already retained this rejected response as an errored
 			// attempt without advancing its successful checkpoint.
-			return model.StatusFailed, "pagination repeated source identities", ""
+			return model.StatusFailed, "Pagination repeated source identities", ""
 		}
 		if err != nil {
 			return stopReason(ctx, errPersistence)
 		}
 		if run.Mode == model.ModeMetadata && committed.Errors > run.Errors {
-			return model.StatusFailed, "metadata records could not be represented in database fields; correct the source data before resuming", ""
+			return model.StatusFailed, "Metadata records could not be represented in database fields; correct the source data before resuming", ""
 		}
 		if run.Config.HTTP.Catalog && committed.Errors > run.Errors {
-			return model.StatusFailed, "remote catalogue records could not be retained faithfully", ""
+			return model.StatusFailed, "Remote catalogue records could not be retained faithfully", ""
 		}
 		if run.Mode == model.ModeFull && committed.Errors > run.Errors {
-			return model.StatusFailed, "full catalogue records could not be retained faithfully; correct the source data before resuming", ""
+			return model.StatusFailed, "Full catalogue records could not be retained faithfully; correct the source data before resuming", ""
 		}
 		attemptPages += committed.Pages - run.Pages
 		run = committed
 		pendingResponse = connectors.Response{}
 		m.Notify("run", run.ID)
 		if run.PauseRequested {
-			return model.StatusPaused, "collection manually paused; resume from the last committed checkpoint", model.PauseManual
+			return model.StatusPaused, "Collection manually paused; resume from the last committed checkpoint", model.PauseManual
 		}
 		if page.Done {
 			return model.StatusSucceeded, "", ""
 		}
 		if run.PauseReason == model.PauseNoProgress {
-			return model.StatusPaused, "useful-progress threshold reached; review run events before resuming", model.PauseNoProgress
+			return model.StatusPaused, "Useful-progress threshold reached; review run events before resuming", model.PauseNoProgress
 		}
 		if err := checkQuotaBoundary(ctx, responseRetryAt); err != nil {
 			return stopReason(ctx, err)
@@ -523,9 +523,9 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 				return model.StatusSucceeded, "", ""
 			}
 			if run.Trigger == model.TriggerScheduled {
-				return model.StatusPaused, "page budget reached; the next scheduled tick will continue this traversal", model.PauseBudget
+				return model.StatusPaused, "Page budget reached; the next scheduled tick will continue this traversal", model.PauseBudget
 			}
-			return model.StatusPaused, "page budget reached; resume to continue the traversal", model.PauseBudget
+			return model.StatusPaused, "Page budget reached; resume to continue the traversal", model.PauseBudget
 		}
 	}
 }
@@ -661,9 +661,9 @@ func interrupted(ctx context.Context) (model.RunStatus, string, model.PauseReaso
 	case errors.Is(cause, errCancelled):
 		return model.StatusCancelled, "", ""
 	case errors.Is(cause, errNotifications), errors.Is(cause, errPersistence):
-		return model.StatusPaused, "collection persistence was interrupted", model.PauseInterrupted
+		return model.StatusPaused, "Collection persistence was interrupted", model.PauseInterrupted
 	default:
-		return model.StatusPaused, "collection interrupted; resume from the last committed checkpoint", model.PauseInterrupted
+		return model.StatusPaused, "Collection interrupted; resume from the last committed checkpoint", model.PauseInterrupted
 	}
 }
 
@@ -675,17 +675,17 @@ func stopReason(ctx context.Context, err error) (model.RunStatus, string, model.
 	case errors.Is(err, errCancelled):
 		return model.StatusCancelled, "", ""
 	case errors.Is(err, errPaused):
-		return model.StatusPaused, "collection manually paused; resume from the last committed checkpoint", model.PauseManual
+		return model.StatusPaused, "Collection manually paused; resume from the last committed checkpoint", model.PauseManual
 	case errors.Is(err, errQuotaPaused):
-		return model.StatusPaused, "source quota wait exceeds the configured threshold; resume to honor the remaining cooldown", model.PauseQuota
+		return model.StatusPaused, "Source quota wait exceeds the configured threshold; resume to honor the remaining cooldown", model.PauseQuota
 	case errors.Is(err, errDuration):
-		return model.StatusPaused, "attempt duration budget reached; resume to continue the traversal", model.PauseBudget
+		return model.StatusPaused, "Attempt duration budget reached; resume to continue the traversal", model.PauseBudget
 	case errors.Is(err, errNoProgress):
-		return model.StatusPaused, "useful-progress threshold reached; review run events before resuming", model.PauseNoProgress
+		return model.StatusPaused, "Useful-progress threshold reached; review run events before resuming", model.PauseNoProgress
 	case errors.Is(err, errSecrets):
-		return model.StatusFailed, "a required secret is unavailable", ""
+		return model.StatusFailed, "A required secret is unavailable", ""
 	case errors.Is(err, errPersistence):
-		return model.StatusPaused, "collection persistence was interrupted", model.PauseInterrupted
+		return model.StatusPaused, "Collection persistence was interrupted", model.PauseInterrupted
 	default:
 		// The only other inputs are fixed messages constructed inside this package.
 		return model.StatusFailed, err.Error(), ""

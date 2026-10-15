@@ -105,7 +105,7 @@ func paginationOptions(w http.ResponseWriter, query url.Values, defaultLimit, ma
 	if raw := query.Get("limit"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 1 || value > maxLimit {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("limit must be between 1 and %d", maxLimit))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("Limit must be between 1 and %d", maxLimit))
 			return options, false
 		}
 		options.Limit = value
@@ -113,7 +113,7 @@ func paginationOptions(w http.ResponseWriter, query url.Values, defaultLimit, ma
 	if raw := query.Get("offset"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 0 || value > 1000000 {
-			writeError(w, http.StatusBadRequest, "offset must be between 0 and 1000000")
+			writeError(w, http.StatusBadRequest, "Offset must be between 0 and 1000000")
 			return options, false
 		}
 		options.Offset = value

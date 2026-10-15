@@ -5,7 +5,7 @@ import { ArrowRightIcon, PauseIcon, PlayIcon, StopIcon } from '@phosphor-icons/r
 import { api, params, queryClient, refreshData } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
-import { useDate, modeLabels, number, statusLabels } from '@/lib/format'
+import { messageText, useDate, modeLabels, number, statusLabels } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
@@ -357,7 +357,7 @@ function EventsView({ runId }: { runId: string }) {
                       {event.kind}
                     </Badge>
                     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                      <p className="min-w-0 break-words leading-6">{event.message}</p>
+                      <p className="min-w-0 break-words leading-6">{messageText(event.message)}</p>
                       {event.kind === 'metadata_queued' &&
                         typeof event.data?.metadata_run_id === 'string' &&
                         event.data.metadata_run_id !== '' && (
@@ -514,7 +514,10 @@ export function RunDetailPage() {
         }
       />
       <ErrorNotice error={runQuery.error} retry={() => void runQuery.refetch()} />
-      <ErrorNotice error={actionMutation.variables?.runId === id ? actionMutation.error : null} />
+      <ErrorNotice
+        error={actionMutation.variables?.runId === id ? actionMutation.error : null}
+        scope="action"
+      />
       {run.error && run.status === 'failed' && <ErrorNotice error={new Error(run.error)} />}
       {(run.status === 'paused' || (run.status === 'failed' && run.pause_requested)) && (
         <div role="status" className="notice notice-warning flex items-start gap-3">
@@ -559,7 +562,7 @@ export function RunDetailPage() {
               'Resume it to continue.'
             )}
             {run.status === 'paused' && !run.pause_requested && run.error && (
-              <span className="mt-2 block text-muted-foreground">{run.error}</span>
+              <span className="mt-2 block text-muted-foreground">{messageText(run.error)}</span>
             )}
           </p>
         </div>

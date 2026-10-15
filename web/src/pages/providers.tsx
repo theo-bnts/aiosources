@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -24,7 +25,7 @@ import type {
   ScheduleSummary,
   Validation,
 } from '@/lib/types'
-import { useDate } from '@/lib/format'
+import { messageText, useDate } from '@/lib/format'
 import { frequencyLabel } from '@/lib/schedule-input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -325,7 +326,7 @@ function SourceScheduleCell({
           </p>
           {schedule.last_error && (
             <p className="mt-1 max-w-xs whitespace-normal text-xs text-destructive">
-              {schedule.last_error}
+              {messageText(schedule.last_error)}
             </p>
           )}
         </>
@@ -477,7 +478,7 @@ function ProviderForm({
   const [validatedJSON, setValidatedJSON] = useState<string | null>(null)
   const [remote, setRemote] = useState<ProviderDocument | null>(null)
   const [mergeError, setMergeError] = useState('')
-  const [message, setMessage] = useState('')
+  const notify = useNotification()
   const [fieldDraft, setFieldDraft] = useState(false)
   const [importError, setImportError] = useState<Error | null>(null)
   const [pendingImport, setPendingImport] = useState<{ name: string; json: string } | null>(null)
@@ -500,7 +501,6 @@ function ProviderForm({
     onSuccess: (result, source) => {
       setValidation(result)
       setValidatedJSON(source)
-      setMessage('')
     },
   })
   const save = useMutation({
@@ -546,7 +546,7 @@ function ProviderForm({
       setRevision(result.revision)
       setRemote(null)
       setPendingImport(null)
-      setMessage('Configuration saved. No run was started.')
+      notify('Configuration saved. No run was started.')
       await refreshData()
       markSaved()
       if (!sourceID || result.provider.id !== sourceID)
@@ -594,11 +594,6 @@ function ProviderForm({
           </>
         }
       />
-      {message && (
-        <p role="status" className="notice text-primary">
-          {message}
-        </p>
-      )}
       <ErrorNotice error={validate.error} />
       <ErrorNotice error={save.error} />
       <ErrorNotice error={loadRemote.error} />
@@ -665,7 +660,7 @@ function ProviderForm({
                 setRemote(null)
                 save.reset()
                 setValidation(null)
-                setMessage(
+                notify(
                   'Server changes and your field edits are merged. Review the result before saving.',
                 )
               }}
@@ -680,7 +675,7 @@ function ProviderForm({
                 setSavedJSON(remote.json)
                 setRemote(null)
                 save.reset()
-                setMessage(
+                notify(
                   'Revision updated. Your reviewed definition is preserved; check the merge before saving.',
                 )
               }}
@@ -754,7 +749,7 @@ function ProviderForm({
                 setJSON(pendingImport.json)
                 setPendingImport(null)
                 setValidation(null)
-                setMessage(
+                notify(
                   'JSON imported into the editor. Check the configuration and save when ready.',
                 )
                 setEditorKey((key) => key + 1)
@@ -780,7 +775,6 @@ function ProviderForm({
         value={json}
         onChange={(value) => {
           setJSON(value)
-          setMessage('')
         }}
         readOnly={busy}
         sourceID={sourceID}

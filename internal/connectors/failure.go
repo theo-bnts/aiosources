@@ -21,23 +21,23 @@ type FailureError struct{ code string }
 func (e *FailureError) Error() string {
 	switch e.code {
 	case "authentication":
-		return "source authentication was rejected"
+		return "Source authentication was rejected"
 	case "certificate":
-		return "source certificate verification failed"
+		return "Source certificate verification failed"
 	case "network":
-		return "source network request failed"
+		return "Source network request failed"
 	case "timeout":
-		return "source request timed out"
+		return "Source request timed out"
 	case "http":
-		return "source returned an unsuccessful HTTP response"
+		return "Source returned an unsuccessful HTTP response"
 	case "parse":
-		return "source response could not be parsed"
+		return "Source response could not be parsed"
 	case "stalled":
-		return "source pagination did not advance"
+		return "Source pagination did not advance"
 	case "configuration":
-		return "source configuration is invalid"
+		return "Source configuration is invalid"
 	default:
-		return "source operation failed"
+		return "Source operation failed"
 	}
 }
 

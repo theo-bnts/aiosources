@@ -225,7 +225,7 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 	if query.Has("limit") {
 		request.Limit, err = strconv.Atoi(query.Get("limit"))
 		if err != nil || request.Limit < 1 || request.Limit > 1000 {
-			writeError(w, http.StatusBadRequest, "limit must be between 1 and 1000")
+			writeError(w, http.StatusBadRequest, "Limit must be between 1 and 1000")
 			return
 		}
 	}

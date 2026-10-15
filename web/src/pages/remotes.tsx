@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -8,12 +9,19 @@ import {
   CloudArrowDownIcon,
   MagnifyingGlassIcon,
 } from '@phosphor-icons/react'
-import { api, ApiError, queryClient, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  ConnectionError,
+  queryClient,
+  refreshData,
+  AUTO_REFRESH_INTERVAL,
+} from '@/lib/api'
 import type { RemoteCatalog } from '@/lib/catalog-types'
 import type { Items, ProviderDocument, Run, SecretInfo, Validation } from '@/lib/types'
 import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/lib/remote-config'
 import type { RemoteDraft } from '@/lib/remote-config'
-import { useDate } from '@/lib/format'
+import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { FormStatus } from '@/components/form-status'
@@ -34,6 +42,7 @@ import {
 import { ConfirmAction, Empty, ErrorNotice, Loading, RunStatusBadge } from '@/components/common'
 
 function safeConfigurationError(error: unknown) {
+  if (error instanceof ConnectionError) return error
   if (!(error instanceof ApiError))
     return new Error(
       'The remote configuration could not be saved. Your draft is preserved; check the settings and try again.',
@@ -61,7 +70,7 @@ export default function RemotesPage() {
   const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<RemoteCatalog | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
+  const notify = useNotification()
   const remotes = useQuery({
     queryKey: ['remotes'],
     queryFn: ({ signal }) => api<Items<RemoteCatalog>>('/remotes', { signal }),
@@ -99,11 +108,6 @@ export default function RemotesPage() {
           Add remote catalog
         </Button>
       </div>
-      {notice && (
-        <p role="status" className="notice text-primary">
-          {notice}
-        </p>
-      )}
       {(items.length > 0 || filtered) && (
         <SourceFilters
           filters={filters}
@@ -191,7 +195,7 @@ export default function RemotesPage() {
                     <p className="help">Enable this connection to allow imports.</p>
                   )}
                   {remote.sync_error && (
-                    <p className="help text-destructive">{remote.sync_error}</p>
+                    <p className="help text-destructive">{messageText(remote.sync_error)}</p>
                   )}
                 </div>
                 <SourceTorrentStats
@@ -202,7 +206,7 @@ export default function RemotesPage() {
                 />
                 {remote.last_run?.error && (
                   <p role="status" className="notice notice-error break-words">
-                    Latest run error: {remote.last_run.error}
+                    Latest run error: {messageText(remote.last_run.error)}
                   </p>
                 )}
                 {remote.last_run?.status === 'paused' && (
@@ -303,7 +307,7 @@ export default function RemotesPage() {
               onSaving={setSaving}
               onSaved={() => {
                 setEditing(null)
-                setNotice(
+                notify(
                   'Remote connection and automatic sync settings saved. Use Sync now to import immediately.',
                 )
               }}

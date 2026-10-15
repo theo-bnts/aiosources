@@ -11,8 +11,9 @@ export class ApiError extends Error {
   }
 }
 
-// Transport failures share one notification; HTTP and validation errors stay
-// beside the operation that failed. Invalid JSON is not a connection failure.
+// Transport failures are distinct from invalid responses and validation errors.
+// The console shares service failures in its notification area; field and
+// conflict errors remain beside the form that needs attention.
 export class ConnectionError extends ApiError {
   constructor(message: string) {
     super(0, message)

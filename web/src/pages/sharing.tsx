@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -45,7 +46,7 @@ export default function SharingPage() {
   const [editing, setEditing] = useState<CatalogShare | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
   const [credential, setCredential] = useState<SharePassword | null>(null)
-  const [notice, setNotice] = useState('')
+  const notify = useNotification()
   const shares = useQuery({
     queryKey: ['shares'],
     queryFn: ({ signal }) => api<CatalogShares>('/shares', { signal }),
@@ -78,11 +79,6 @@ export default function SharingPage() {
             without it. The browser’s address does not establish this configuration.
           </p>
         </section>
-      )}
-      {notice && (
-        <p className="notice text-primary" role="status">
-          {notice}
-        </p>
       )}
       <ErrorNotice error={shares.error} retry={() => void shares.refetch()} />
       {shares.isPending ? (
@@ -210,9 +206,7 @@ export default function SharingPage() {
                       method: 'PUT',
                       body: JSON.stringify({ ...shareBody(share), enabled: !share.enabled }),
                     })
-                    setNotice(
-                      `Access ${share.enabled ? 'disabled' : 'enabled'} for “${share.name}”.`,
-                    )
+                    notify(`Access ${share.enabled ? 'disabled' : 'enabled'} for “${share.name}”.`)
                     await refreshData()
                   }}
                 />
@@ -251,7 +245,7 @@ export default function SharingPage() {
                       method: 'DELETE',
                       body: JSON.stringify({ revision: share.revision }),
                     })
-                    setNotice(`Share “${share.name}” revoked.`)
+                    notify(`Share “${share.name}” revoked.`)
                     await refreshData()
                   }}
                 />
@@ -300,7 +294,7 @@ export default function SharingPage() {
               onSaved={(result) => {
                 setEditing(null)
                 if (result) setCredential(result)
-                else setNotice('Share permissions saved.')
+                else notify('Share permissions saved.')
               }}
             />
           )}

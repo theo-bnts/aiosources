@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { PlusIcon, KeyIcon, ArrowClockwiseIcon, TrashIcon } from '@phosphor-icons/react'
@@ -42,7 +43,7 @@ export default function SecretsPage() {
   } | null>(null)
   const [name, setName] = useState('')
   const [value, setValue] = useState('')
-  const [notice, setNotice] = useState('')
+  const notify = useNotification()
   const save = useMutation({
     gcTime: 0,
     mutationFn: async () => {
@@ -52,7 +53,7 @@ export default function SecretsPage() {
       })
     },
     onSuccess: async () => {
-      setNotice(
+      notify(
         editing?.rotate ? `The value of “${name}” was replaced.` : `Secret “${name}” was created.`,
       )
       setValue('')
@@ -108,11 +109,6 @@ export default function SecretsPage() {
           </Button>
         }
       />
-      {notice && (
-        <p className="notice text-primary" role="status">
-          {notice}
-        </p>
-      )}
       <div className="notice flex items-start gap-3">
         <KeyIcon className="mt-1 shrink-0 text-primary" />
         <p>
@@ -170,7 +166,7 @@ export default function SecretsPage() {
                             method: 'DELETE',
                             body: JSON.stringify({ revision: secret.revision }),
                           })
-                          setNotice(`Secret “${secret.name}” was deleted.`)
+                          notify(`Secret “${secret.name}” was deleted.`)
                           await queryClient.invalidateQueries({ queryKey: ['secrets'] })
                         }}
                       />

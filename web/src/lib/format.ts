@@ -5,6 +5,15 @@ const integers = new Intl.NumberFormat('en-GB')
 const decimals = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 })
 const percentages = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 1 })
 
+// Historical diagnostics can predate the current wording. Format only their
+// first letter; preserve identifiers, acronyms, punctuation and raw data.
+export function messageText(value: string) {
+  return value.replace(
+    /^(\s*)(\p{Ll})/u,
+    (_, space: string, letter: string) => space + letter.toUpperCase(),
+  )
+}
+
 export function percentage(value: number, total: number) {
   if (value > 0 && total > 0 && value / total < 0.001) return '<0.1%'
   return percentages.format(total > 0 ? value / total : 0)

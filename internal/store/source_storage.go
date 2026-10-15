@@ -11,6 +11,15 @@ import (
 // provider caches belong to their own categories, not to an individual source.
 const sourceStorageRelations = `(c.relname IN ('torrents','staged_torrents','raw_records','pages','events','runs','collection_state','legacy_imports','schedule_clocks','torrent_history','torrent_history_baselines','torrent_history_metadata') OR c.relname LIKE 'run_%')`
 
+// Expand only identifier distributions, shared by source and run estimates.
+const storageDistributionSQL = ` CROSS JOIN LATERAL (
+  SELECT value,frequency::double precision FROM unnest(s.most_common_vals::text::text[],s.most_common_freqs) common(value,frequency)
+  UNION ALL
+  SELECT value,(1-COALESCE((SELECT sum(f) FROM unnest(s.most_common_freqs) f),0)-s.null_frac)
+   /NULLIF(cardinality(s.histogram_bounds::text::text[]),0)
+  FROM unnest(s.histogram_bounds::text::text[]) histogram(value)
+ ) d`
+
 // Estimate ownership of allocated tables, TOAST and indexes from PostgreSQL's
 // ANALYZE distributions. This reads catalog statistics, never source records or
 // response bodies. Sparse/unanalysed relations have no attributable estimate.
@@ -25,13 +34,7 @@ func sourceStorageEstimates(ctx context.Context, tx pgx.Tx) ([]model.SourceStora
 ), distributions AS (
  SELECT rel.oid,rel.attname,d.value,d.frequency FROM relations rel
  JOIN pg_stats s ON s.schemaname='ingest' AND s.tablename=rel.relname AND s.attname=rel.attname AND NOT s.inherited
- CROSS JOIN LATERAL (
-  SELECT value,frequency::double precision FROM unnest(s.most_common_vals::text::text[],s.most_common_freqs) common(value,frequency)
-  UNION ALL
-  SELECT value,(1-COALESCE((SELECT sum(f) FROM unnest(s.most_common_freqs) f),0)-s.null_frac)
-   /NULLIF(cardinality(s.histogram_bounds::text::text[]),0)
-  FROM unnest(s.histogram_bounds::text::text[]) histogram(value)
- ) d
+`+storageDistributionSQL+`
 ), attributed AS (
  SELECT CASE WHEN d.attname='provider_id' THEN d.value ELSE r.provider_id END AS provider_id,
  pg_total_relation_size(d.oid)*GREATEST(d.frequency,0) AS bytes

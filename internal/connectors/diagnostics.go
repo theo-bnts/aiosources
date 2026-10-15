@@ -10,31 +10,31 @@ import (
 func FailureReasonMessage(reason string) string {
 	switch reason {
 	case "invalid_position":
-		return "source pagination position is missing or is not a nonnegative integer"
+		return "Source pagination position is missing or is not a nonnegative integer"
 	case "position_mismatch":
-		return "source returned a different pagination position than requested"
+		return "Source returned a different pagination position than requested"
 	case "invalid_total":
-		return "source pagination total is missing or is not a nonnegative integer"
+		return "Source pagination total is missing or is not a nonnegative integer"
 	case "total_changed":
-		return "source pagination total changed beyond this run's allowed policy"
+		return "Source pagination total changed beyond this run's allowed policy"
 	case "records_exceed_total":
-		return "source records extend beyond the advertised total"
+		return "Source records extend beyond the advertised total"
 	case "empty_before_total":
-		return "source returned an empty page before the advertised total"
+		return "Source returned an empty page before the advertised total"
 	case "invalid_continuation":
-		return "source continuation is missing, invalid or outside the allowed origin"
+		return "Source continuation is missing, invalid or outside the allowed origin"
 	case "continuation_repeated":
-		return "source repeated its previous continuation"
+		return "Source repeated its previous continuation"
 	case "continuation_mismatch":
-		return "source next position skips or repeats records"
+		return "Source next position skips or repeats records"
 	case "premature_end":
-		return "source pagination ended before the advertised total"
+		return "Source pagination ended before the advertised total"
 	case "unexpected_continuation":
-		return "source continuation contradicts page completion or disabled pagination"
+		return "Source continuation contradicts page completion or disabled pagination"
 	case "pagination_overflow":
-		return "source pagination position exceeds the supported integer range"
+		return "Source pagination position exceeds the supported integer range"
 	case "publication_order_invalid":
-		return "source publication dates are not in descending order"
+		return "Source publication dates are not in descending order"
 	default:
 		return ""
 	}

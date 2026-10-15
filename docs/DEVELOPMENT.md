@@ -6,6 +6,8 @@ The production binary embeds the frontend. Node.js is needed to build or develop
 
 See [Application logic and shared contracts](APPLICATION_LOGIC.md) for cross-application editing, concurrency, lifecycle and request rules, including versioned secret updates and consolidated activity logs.
 
+See [Performance verification](PERFORMANCE.md) for reproducible synthetic benchmarks, measured improvements and their workload limits.
+
 ## Local development
 
 Requirements: Go 1.26.8+, Node.js 22.19+ and PostgreSQL. CI reads the Go version from `go.mod`; keep both modules and the Docker compiler aligned when updating security patches.

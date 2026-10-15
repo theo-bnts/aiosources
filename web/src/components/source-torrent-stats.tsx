@@ -58,12 +58,13 @@ export function SourceTorrentStats({
               )}
             </Link>
             {counts.storage && (
-              <span
-                className="text-xs text-muted-foreground"
-                title={`Estimated PostgreSQL source data and indexes, including retained import history. Measured ${date(counts.storage.measured_at)}. Shared metadata and caches are separate.`}
+              <Link
+                to="/health#source-storage"
+                className="data-link text-xs text-muted-foreground"
+                title={`Estimated PostgreSQL source data and indexes, including retained import history. Measured ${date(counts.storage.measured_at)}. View storage details.`}
               >
                 · {bytes(counts.storage.bytes)} estimated
-              </span>
+              </Link>
             )}
             {!counts.storage && (
               <span className="text-xs text-muted-foreground">· Size not yet estimated</span>

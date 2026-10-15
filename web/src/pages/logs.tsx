@@ -5,7 +5,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
 import { activityLevels, activityServices, type LogEntry } from '@/lib/activity-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
-import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
+import { messageText, dateTimeToISO, localDateTime, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { ActivityLinks, LevelBadge } from '@/components/activity-common'
@@ -220,7 +220,7 @@ export function LogsPage() {
                         <TableCell className="min-w-64 max-w-xl whitespace-normal align-top">
                           {entry.title && <p className="font-medium">{entry.title}</p>}
                           <p className="mono text-muted-foreground">{entry.kind}</p>
-                          <p className="mt-1 break-words leading-6">{entry.message}</p>
+                          <p className="mt-1 break-words leading-6">{messageText(entry.message)}</p>
                         </TableCell>
                         <TableCell className="align-top">
                           <ActivityLinks {...entry} />

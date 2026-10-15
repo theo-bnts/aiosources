@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { bytes, dateTimeToISO, localDateTime, percentage } from '../src/lib/format.ts'
+import { bytes, dateTimeToISO, localDateTime, messageText, percentage } from '../src/lib/format.ts'
+
+test('historical diagnostics use sentence case without changing the rest of the message', () => {
+  assert.equal(
+    messageText('source response could not be processed'),
+    'Source response could not be processed',
+  )
+  assert.equal(
+    messageText('page budget reached; resume to continue.'),
+    'Page budget reached; resume to continue.',
+  )
+  assert.equal(messageText('TMDB returned HTTP 429.'), 'TMDB returned HTTP 429.')
+  assert.equal(messageText('  échec de la requête.'), '  Échec de la requête.')
+  assert.equal(messageText('123: invalid response.'), '123: invalid response.')
+  assert.equal(messageText(''), '')
+})
 
 test('statistics use their own denominators and never display NaN for empty catalogues', () => {
   assert.equal(percentage(2333, 5555), '42%')

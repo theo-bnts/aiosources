@@ -14,6 +14,25 @@ import (
 	"github.com/theo-bnts/aiosources/internal/providers"
 )
 
+func TestSourceFailureMessagesRemainSafeAndReadable(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		metadata map[string]any
+		want     string
+	}{
+		{"unknown response", map[string]any{"failure_reason": "credential-secret"}, "Source response could not be processed"},
+		{"known reason", map[string]any{"failure_reason": "position_mismatch"}, "Source returned a different pagination position than requested; checkpoint unchanged; review run events for details"},
+		{"coverage", map[string]any{"coverage_incomplete": true}, coverageFailureMessage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			message := sourceFailureMessage(model.Page{Error: "credential-secret", Metadata: tc.metadata})
+			if message != tc.want || strings.Contains(message, "credential-secret") {
+				t.Fatalf("unsafe or inconsistent source diagnostic: %q", message)
+			}
+		})
+	}
+}
+
 func TestPaginationDiagnosticsSurviveRetriesAndSuccess(t *testing.T) {
 	ctx, _, db := schedulerDatabase(t)
 	var corrected atomic.Bool

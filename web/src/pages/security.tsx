@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useEffect, useRef, useState } from 'react'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useQuery } from '@tanstack/react-query'
@@ -60,7 +61,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
-  const [notice, setNotice] = useState<{ message: string; warning?: boolean } | null>(null)
+  const notify = useNotification()
   const [enrollment, setEnrollment] = useState<MFAEnrollment | null>(null)
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
   const [savedCodes, setSavedCodes] = useState(false)
@@ -73,7 +74,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
     const timeout = window.setTimeout(
       () => {
         setEnrollment(null)
-        setNotice({
+        notify({
           message: 'The enrollment expired. Start setup again to obtain a new key.',
           warning: true,
         })
@@ -81,7 +82,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
       Math.max(0, new Date(enrollment.expires_at).getTime() - Date.now()),
     )
     return () => window.clearTimeout(timeout)
-  }, [enrollment])
+  }, [enrollment, notify])
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ['security'] })
@@ -134,7 +135,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
           setSavedCodes(false)
           setRecoveryCodes(result.recovery_codes)
         }
-        setNotice({
+        notify({
           message:
             selected === 'cancel'
               ? 'Pending enrollment cancelled.'
@@ -161,11 +162,6 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
 
   return (
     <div className="page">
-      {notice && (
-        <p className={`notice ${notice.warning ? 'notice-warning' : 'text-primary'}`} role="status">
-          {notice.message}
-        </p>
-      )}
       {view === 'mfa' && (
         <section className="section-card" aria-label="Two-step verification">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -274,7 +270,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
               }
               action={async () => {
                 await api<void>('/security/sessions/revoke-others', { method: 'POST' })
-                setNotice({ message: 'All other sessions were revoked.' })
+                notify({ message: 'All other sessions were revoked.' })
                 await refresh()
               }}
             />
@@ -337,7 +333,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                               await api<void>(`/security/sessions/${item.id}`, { method: 'DELETE' })
                               if (item.current) signedOut()
                               else {
-                                setNotice({ message: 'Session revoked.' })
+                                notify({ message: 'Session revoked.' })
                                 await refresh()
                               }
                             }}

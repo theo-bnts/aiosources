@@ -34,7 +34,7 @@ func (s *server) updateCollectionSettings(w http.ResponseWriter, r *http.Request
 	}
 	if input.Workers == nil || input.MaxQuotaRetries == nil || input.MaxQuotaWaitSeconds == nil ||
 		input.NoProgressRequests == nil || input.NoProgressAction == nil || input.Revision == nil {
-		writeError(w, http.StatusBadRequest, "a complete collection settings object and revision are required")
+		writeError(w, http.StatusBadRequest, "A complete collection settings object and revision are required")
 		return
 	}
 	settings := model.CollectionSettings{
@@ -44,7 +44,7 @@ func (s *server) updateCollectionSettings(w http.ResponseWriter, r *http.Request
 		Revision: *input.Revision,
 	}
 	if !settings.Valid() {
-		writeError(w, http.StatusBadRequest, "collection settings contain an invalid value or revision")
+		writeError(w, http.StatusBadRequest, "Collection settings contain an invalid value or revision")
 		return
 	}
 	if err := s.options.Store.UpdateCollectionSettings(r.Context(), settings); err != nil {

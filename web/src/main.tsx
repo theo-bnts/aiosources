@@ -27,7 +27,7 @@ import { Empty } from '@/components/common'
 import { WorkspaceLayout } from '@/components/workspace-layout'
 import { Button } from '@/components/ui/button'
 import { AboutDialog } from '@/components/about-dialog'
-import { ConnectionNoticeProvider } from '@/components/connection-notice'
+import { NotificationProvider } from '@/components/notifications'
 import './index.css'
 
 const SourceStatisticsPage = lazy(() =>
@@ -310,9 +310,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <IconContext.Provider value={{ weight: 'regular', size: 18 }}>
         <QueryClientProvider client={queryClient}>
-          <ConnectionNoticeProvider>
+          <NotificationProvider>
             <RouterProvider router={router} />
-          </ConnectionNoticeProvider>
+          </NotificationProvider>
         </QueryClientProvider>
       </IconContext.Provider>
     </React.StrictMode>

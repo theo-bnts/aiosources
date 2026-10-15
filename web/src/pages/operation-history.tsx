@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
-import { number, statusLabels, useDate } from '@/lib/format'
+import { messageText, number, statusLabels, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
@@ -211,7 +211,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
                             <p
                               className={`mt-2 max-w-sm text-xs leading-5 ${run.status === 'failed' ? 'text-destructive' : 'text-amber-300'}`}
                             >
-                              {run.error}
+                              {messageText(run.error)}
                             </p>
                           )}
                         </TableCell>
@@ -309,7 +309,7 @@ export function OperationDetailPage({ section }: { section: Section }) {
                 role={result.status === 'failed' ? 'alert' : 'status'}
                 className={`notice ${result.status === 'failed' ? 'notice-error' : 'notice-warning'}`}
               >
-                {result.error}
+                {messageText(result.error)}
               </p>
             )}
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">

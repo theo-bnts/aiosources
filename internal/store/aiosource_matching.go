@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -83,8 +84,27 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	if err != nil {
 		return nil, databaseError("read locked correspondences", err)
 	}
+	// Repeated releases often ask for the same candidates. Reuse only within
+	// this small batch's metadata fence, never across commits or generations.
+	// Every filter field is in the key, including numbering and missing years.
+	type candidateResult struct {
+		works    []model.AIOWork
+		overflow bool
+	}
+	candidates := map[string]candidateResult{}
 	search := func(filter model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
-		return searchAIOCandidates(ctx, tx, filter)
+		key, err := json.Marshal(filter)
+		if err != nil {
+			return nil, false, err
+		}
+		if previous, ok := candidates[string(key)]; ok {
+			return previous.works, previous.overflow, nil
+		}
+		works, overflow, err := searchAIOCandidates(ctx, tx, filter)
+		if err == nil {
+			candidates[string(key)] = candidateResult{works, overflow}
+		}
+		return works, overflow, err
 	}
 	results := make([]model.AIOMatchResult, 0, len(records))
 	seasons := []model.AIOSeasonRequest{}

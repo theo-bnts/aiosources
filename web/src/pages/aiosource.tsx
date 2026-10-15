@@ -1,3 +1,4 @@
+import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -326,7 +327,8 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   )
   return (
     <div className="page">
-      <ErrorNotice error={query.error ?? secrets.error ?? providers.error ?? action.error} />
+      <ErrorNotice error={query.error ?? secrets.error ?? providers.error} />
+      <ErrorNotice error={action.error} scope="action" />
       {section === 'metadata' && (
         <>
           {status.rebuild_required && (
@@ -339,7 +341,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           <Disclosure title="Manual actions">
             {status.error && (
               <p role="status" className="notice notice-warning">
-                {status.error}{' '}
+                {messageText(status.error)}{' '}
                 <Link className="data-link" to="/metadata/history">
                   View history
                 </Link>

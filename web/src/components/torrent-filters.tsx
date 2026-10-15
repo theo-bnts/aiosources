@@ -1,3 +1,4 @@
+import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, queryClient } from '@/lib/api'
@@ -255,7 +256,7 @@ export function SavedTorrentViews({
   const [selectedId, setSelectedId] = useState('')
   const [original, setOriginal] = useState<SavedView | null>(null)
   const [name, setName] = useState('')
-  const [message, setMessage] = useState('')
+  const notify = useNotification()
   const selected = views.data?.items?.find((view) => view.id === selectedId)
   const save = useMutation({
     mutationFn: (update: boolean) => {
@@ -283,7 +284,7 @@ export function SavedTorrentViews({
       setSelectedId(saved.id)
       setOriginal(saved)
       setName(saved.name)
-      setMessage('Saved the currently applied search filters.')
+      notify('Saved the currently applied search filters.')
       void queryClient.invalidateQueries({ queryKey: ['saved-views'] })
     },
     onError: (error) => {
@@ -323,7 +324,6 @@ export function SavedTorrentViews({
                       setSelectedId(id)
                       setOriginal(view)
                       setName(view?.name ?? '')
-                      setMessage('')
                       save.reset()
                     })
                   }}
@@ -342,7 +342,7 @@ export function SavedTorrentViews({
                 onClick={() => {
                   if (selected) {
                     onApply(selected.filters)
-                    setMessage(`Applied “${selected.name}”.`)
+                    notify(`Applied “${selected.name}”.`)
                   }
                 }}
               >
@@ -370,7 +370,7 @@ export function SavedTorrentViews({
                   setSelectedId('')
                   setOriginal(null)
                   setName('')
-                  setMessage('Saved view deleted. Published records are unchanged.')
+                  notify('Saved view deleted. Published records are unchanged.')
                   await queryClient.invalidateQueries({ queryKey: ['saved-views'] })
                 }}
               />
@@ -387,7 +387,6 @@ export function SavedTorrentViews({
         className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end"
         onSubmit={(event) => {
           event.preventDefault()
-          setMessage('')
           save.mutate(false)
         }}
       >
@@ -410,7 +409,6 @@ export function SavedTorrentViews({
           type="button"
           disabled={!selected || !name.trim() || save.isPending || conflict}
           onClick={() => {
-            setMessage('')
             save.mutate(true)
           }}
         >
@@ -440,11 +438,6 @@ export function SavedTorrentViews({
             Load latest view
           </Button>
         </div>
-      )}
-      {message && (
-        <p role="status" className="help">
-          {message}
-        </p>
       )}
     </Disclosure>
   )

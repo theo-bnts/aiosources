@@ -54,7 +54,7 @@ func (s *server) activityLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if options.From != nil && options.To != nil && options.From.After(*options.To) {
-		writeError(w, http.StatusBadRequest, "from must not be later than to")
+		writeError(w, http.StatusBadRequest, "From must not be later than to")
 		return
 	}
 	result, err := s.options.Store.Logs(r.Context(), options)

@@ -10,8 +10,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/jackc/pgx/v5/pgconn"
-
 	"github.com/theo-bnts/aiosources/internal/connectors"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -144,6 +142,13 @@ VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID
 		deleted  bool
 	}
 	var stagedUpdates []stagedUpdate
+	bulkValidated := false
+	if run.StorageMode == model.StorageCompact && run.Mode != model.ModePreview && page.Error == "" {
+		bulkValidated, err = validateCompactRecords(ctx, tx, page.Items, page.ContentType)
+		if err != nil {
+			return model.Run{}, err
+		}
+	}
 	for _, record := range page.Items {
 		if !record.Auxiliary && record.SourceID == "" && record.Error == "" {
 			record.Error = "Record has no stable source identity"
@@ -169,40 +174,41 @@ $8,$9,$10,FALSE) RETURNING id`
 		// Evaluate the JSONB interpretation in every mode, even when its fields
 		// are not retained here. PostgreSQL can reject otherwise valid wire JSON
 		// (for example U+0000 or an overflowing exponent).
-		itemTx, err := tx.Begin(ctx)
-		if err != nil {
-			return model.Run{}, databaseError("begin record retention", err)
-		}
 		retainObservation := run.StorageMode != model.StorageCompact || run.Mode == model.ModePreview || record.Error != "" || page.Error != ""
-		if retainObservation {
-			err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID)
-		} else {
-			// Validate the same interpretation without writing millions of empty
-			// success observations. Durable identity/scope/filter ledgers below,
-			// not diagnostic rows, establish coverage and recovery boundaries.
-			var kind string
-			var sourceLength, typeLength int
-			err = itemTx.QueryRow(ctx, `SELECT jsonb_typeof($1::jsonb),length($2::text),length($3::text)`, fields, record.SourceID, contentType).Scan(&kind, &sourceLength, &typeLength)
-		}
-		if err != nil {
-			rollback(itemTx)
-			var dataError *pgconn.PgError
-			if !errors.As(err, &dataError) || (dataError.Code != "22P02" && dataError.Code != "22P05" && dataError.Code != "22003" && dataError.Code != "22021") {
-				return model.Run{}, databaseError("save record observation", err)
+		if retainObservation || !bulkValidated {
+			itemTx, err := tx.Begin(ctx)
+			if err != nil {
+				return model.Run{}, databaseError("begin record retention", err)
 			}
-			if strings.IndexByte(record.SourceID, 0) >= 0 || !utf8.ValidString(record.SourceID) {
-				record.SourceID = ""
+			if retainObservation {
+				err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID)
+			} else {
+				// Validate the same interpretation without writing millions of empty
+				// success observations. Durable identity/scope/filter ledgers below,
+				// not diagnostic rows, establish coverage and recovery boundaries.
+				var kind string
+				var sourceLength, typeLength int
+				err = itemTx.QueryRow(ctx, `SELECT jsonb_typeof($1::jsonb),length($2::text),length($3::text)`, fields, record.SourceID, contentType).Scan(&kind, &sourceLength, &typeLength)
 			}
-			if strings.IndexByte(contentType, 0) >= 0 || !utf8.ValidString(contentType) {
-				contentType = ""
+			if err != nil {
+				rollback(itemTx)
+				if !recordRepresentationError(err) {
+					return model.Run{}, databaseError("save record observation", err)
+				}
+				if strings.IndexByte(record.SourceID, 0) >= 0 || !utf8.ValidString(record.SourceID) {
+					record.SourceID = ""
+				}
+				if strings.IndexByte(contentType, 0) >= 0 || !utf8.ValidString(contentType) {
+					contentType = ""
+				}
+				record.Error = "Record interpretation cannot be represented in database fields"
+				fields = []byte("{}")
+				if err := tx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID); err != nil {
+					return model.Run{}, databaseError("retain uninterpretable record", err)
+				}
+			} else if err := itemTx.Commit(ctx); err != nil {
+				return model.Run{}, databaseError("finish record retention", err)
 			}
-			record.Error = "Record interpretation cannot be represented in database fields"
-			fields = []byte("{}")
-			if err := tx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID); err != nil {
-				return model.Run{}, databaseError("retain uninterpretable record", err)
-			}
-		} else if err := itemTx.Commit(ctx); err != nil {
-			return model.Run{}, databaseError("finish record retention", err)
 		}
 		if record.Error != "" && !record.Auxiliary {
 			rejectedPrimary = true
