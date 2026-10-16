@@ -40,14 +40,8 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
  `); err != nil {
 		t.Fatal(err)
 	}
-	mixed, err := db.CreateShare(ctx, model.ShareInput{Name: "Mixed share", Scope: "all", Fields: []string{"title"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	only, err := db.CreateShare(ctx, model.ShareInput{Name: "Count-only share", Scope: "all", Fields: []string{"title"}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	mixed := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Mixed share", Scope: "all", Fields: []string{"title"}})
+	only := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Count-only share", Scope: "all", Fields: []string{"title"}})
 	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET enabled=TRUE,fields=CASE WHEN id=$1 THEN ARRAY['title','seeders'] ELSE ARRAY['seeders'] END WHERE id IN ($1,$2)`, mixed.Share.ID, only.Share.ID); err != nil {
 		t.Fatal(err)
 	}

@@ -164,8 +164,8 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		hasAnnounces := len(input.Announces) > 0
 		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, input.Services, input.Announces)
-		if err == nil && input.Preferences.Mode != "" {
-			configuration += "~" + input.Preferences.Language + "~" + input.Preferences.Mode
+		if err == nil {
+			configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
 		}
 		clear(input.Services)
 		clear(input.Announces)
@@ -213,9 +213,9 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			next(w, r, visitor)
 		}
 	}
-	mux.HandleFunc("GET /public/stremio/{configuration}/manifest.json", protect(5*time.Second, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) {
+	mux.HandleFunc("GET /public/stremio/{configuration}/manifest.json", protect(5*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
 		s.options.AIOSource.RecordAddonRequest("public", "manifest", "", "", time.Now(), nil)
-		writeJSON(w, 200, aiosource.Manifest())
+		writeJSON(w, 200, aiosource.InstallationManifest(visitor.Preferences))
 	}))
 	mux.HandleFunc("GET /public/stremio/{configuration}/configure", protect(5*time.Second, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) {
 		http.Redirect(w, r, "/public", http.StatusSeeOther)

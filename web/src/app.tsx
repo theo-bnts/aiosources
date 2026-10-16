@@ -31,6 +31,7 @@ import {
   DownloadSimpleIcon,
   GearSixIcon,
   ListChecksIcon,
+  BroadcastIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -163,6 +164,12 @@ const navigationGroups = [
         label: 'Catalog sharing',
         description: 'Share published catalogs and synchronize remote copies.',
         icon: ShareNetworkIcon,
+      },
+      {
+        to: '/torznab',
+        label: 'Torznab',
+        description: 'Connect external applications to your published catalog.',
+        icon: BroadcastIcon,
       },
     ],
   },

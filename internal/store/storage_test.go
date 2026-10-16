@@ -353,8 +353,8 @@ func TestStorageMigrationClearsUnusedSharingWithoutRewritingCatalogOrOldRunModes
 			var grant model.ShareCredential
 			var first model.CatalogEnvelope
 			if active {
-				grant = sharingGrant(t, ctx, db)
-				first = sharingPage(t, ctx, db, grant, CatalogPageRequest{Limit: 1})
+				grant = legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Legacy recipient", Scope: "all", Enabled: true, Fields: CatalogFields()})
+				first = legacyCatalogPageFixture(t, ctx, db, grant, CatalogPageRequest{Limit: 1})
 			}
 			if err := db.Migrate(ctx); err != nil {
 				t.Fatal(err)

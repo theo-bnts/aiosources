@@ -3,6 +3,7 @@ import {
   useLanguagePreferences,
   resolvedLanguage,
   preferenceManifest,
+  preferenceManifestError,
 } from '@/lib/language-preferences'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -16,6 +17,8 @@ import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
 import { Disclosure } from '@/components/ui/disclosure'
+import { InstallationFilters } from '@/components/installation-filters'
+import type { InstallationOptions } from '@/lib/language-preferences'
 
 type PublicInfo = {
   enabled: boolean
@@ -24,6 +27,7 @@ type PublicInfo = {
 }
 export function PublicEntry({ authenticated = false }: { authenticated?: boolean }) {
   const [preferences, setPreferences] = useLanguagePreferences()
+  const [installationOptions, setInstallationOptions] = useState<InstallationOptions>({})
   const info = useQuery({
     queryKey: ['public-config'],
     queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
@@ -31,6 +35,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
     retry: false,
   })
   const [manifest, setManifest] = useState('')
+  const manifestError = preferenceManifestError(manifest, installationOptions, preferences)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const request = useRef<AbortController | null>(null)
@@ -71,7 +76,11 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
         cache: 'no-store',
         body: JSON.stringify({
           services,
-          preferences: { ...preferences, language: resolvedLanguage(preferences) },
+          preferences: {
+            ...preferences,
+            language: resolvedLanguage(preferences),
+            ...installationOptions,
+          },
           ...(Object.keys(announces).length ? { announces } : {}),
         }),
         signal: controller.signal,
@@ -171,15 +180,33 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
             value={preferences}
             onChange={(next) => {
               setPreferences(next)
-              setManifest((current) => (current ? preferenceManifest(current, next) : ''))
+              setManifest((current) =>
+                current ? preferenceManifest(current, next, installationOptions) : '',
+              )
             }}
           />
+          <InstallationFilters
+            value={installationOptions}
+            onChange={(next) => {
+              setInstallationOptions(next)
+              setManifest((current) =>
+                current ? preferenceManifest(current, preferences, next) : '',
+              )
+            }}
+            sources={info.data.private_sources ?? []}
+            services={info.data.providers ?? []}
+          />
           <ErrorNotice error={error || info.error} />
-          <Button type="submit" disabled={pending}>
+          {manifestError && (
+            <p className="text-sm text-destructive" role="alert">
+              {manifestError}
+            </p>
+          )}
+          <Button type="submit" disabled={pending || Boolean(manifestError)}>
             {pending ? 'Checking services…' : 'Create installation link'}
           </Button>
         </form>
-        {manifest && (
+        {manifest && !manifestError && (
           <section className="section-card">
             <div className="field">
               <Label htmlFor="public-manifest">Manifest URL</Label>

@@ -1,6 +1,8 @@
 import type { Run, CatalogSync, ScheduleSummary } from './types'
 
 export interface CatalogShare {
+  format?: 'catalog' | 'torznab'
+  media_types?: string[]
   id: string
   name: string
   enabled: boolean

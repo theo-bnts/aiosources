@@ -111,7 +111,7 @@ func (s *Service) Authorized(ctx context.Context, token string) bool {
 }
 
 func (s *Service) ValidateToken(ctx context.Context, token string) error {
-	if len(token) > 128 {
+	if len(token) > MaxPublicInstallationSize {
 		return ErrAuth
 	}
 	credential, _, parseErr := InstallationPreferences(token)

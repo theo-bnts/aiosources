@@ -66,6 +66,7 @@ const RawDetailPage = lazy(() =>
 const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default: m.RawPageView })))
 const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
 const SharingPage = lazy(() => import('@/pages/catalog-sharing'))
+const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
 const SecurityPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecurityPage })),
@@ -281,6 +282,7 @@ const router = createBrowserRouter(
         </Route>
         <Route path="remotes" element={<LegacyRemotes />} />
         <Route path="sharing" element={<SharingPage />} />
+        <Route path="torznab" element={<TorznabPage />} />
         <Route path="sharing/remotes" element={<SharingPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="notifications" element={<LegacyActivity />} />

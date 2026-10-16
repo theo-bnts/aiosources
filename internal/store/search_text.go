@@ -73,6 +73,19 @@ func torrentSearchGroups(query string) [][]torrentSearchTerm {
 var escapeSearchFragment = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func torrentTextSearchSQL(query string, bind func(any) string) string {
+	return torrentTextSearchSQLFor("", query, bind)
+}
+
+// Alias is supplied by our SQL templates, never a request parameter.
+func torrentTextSearchSQLFor(alias, query string, bind func(any) string) string {
+	prefix := ""
+	if alias != "" {
+		prefix = alias + "."
+	}
+	document := torrentSearchTextSQL
+	if prefix != "" {
+		document = "ingest.torrent_search_text(" + prefix + "provider_id," + prefix + "source_id," + prefix + "fields)"
+	}
 	var alternatives []string
 	for _, group := range torrentSearchGroups(query) {
 		var terms []string
@@ -83,7 +96,7 @@ func torrentTextSearchSQL(query string, bind func(any) string) string {
 				if term.excluded {
 					query = "!!" + query
 				}
-				predicate = "search_document @@ " + query
+				predicate = prefix + "search_document @@ " + query
 			} else {
 				fragments := []string{term.text}
 				if !strings.ContainsAny(term.text, `%_\`) {
@@ -91,7 +104,7 @@ func torrentTextSearchSQL(query string, bind func(any) string) string {
 				}
 				parts := []string{}
 				for _, fragment := range fragments {
-					parts = append(parts, torrentSearchTextSQL+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%"))
+					parts = append(parts, document+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%"))
 				}
 				if len(parts) == 0 {
 					predicate = "FALSE"
@@ -102,7 +115,7 @@ func torrentTextSearchSQL(query string, bind func(any) string) string {
 				// preserving literal title/ID matches and the query's operators.
 				if len(term.text) == 32 {
 					if decoded, err := base32.StdEncoding.DecodeString(strings.ToUpper(term.text)); err == nil {
-						predicate = "(" + predicate + " OR (search_info_hash IS NOT NULL AND search_info_hash=" + bind(hex.EncodeToString(decoded)) + "))"
+						predicate = "(" + predicate + " OR (" + prefix + "search_info_hash IS NOT NULL AND " + prefix + "search_info_hash=" + bind(hex.EncodeToString(decoded)) + "))"
 					}
 				}
 				if term.excluded {

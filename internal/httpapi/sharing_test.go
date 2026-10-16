@@ -18,6 +18,7 @@ import (
 )
 
 type sharingAPIFixture struct {
+	dsn     string
 	ctx     context.Context
 	db      *store.Store
 	handler http.Handler
@@ -63,7 +64,7 @@ func sharingAPI(t *testing.T, origin string) sharingAPIFixture {
 	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &session) != nil || len(w.Result().Cookies()) != 1 {
 		t.Fatalf("fixture login failed: %d %s", w.Code, w.Body.String())
 	}
-	return sharingAPIFixture{ctx: ctx, db: db, handler: handler, cookie: w.Result().Cookies()[0], csrf: session.CSRF}
+	return sharingAPIFixture{dsn: endpoint, ctx: ctx, db: db, handler: handler, cookie: w.Result().Cookies()[0], csrf: session.CSRF}
 }
 
 func (f sharingAPIFixture) request(method, path, body string, admin bool, password string) *httptest.ResponseRecorder {

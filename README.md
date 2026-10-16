@@ -11,6 +11,7 @@ AIOSources is a self-hosted application that organizes torrent metadata from you
 - **Identify films and series:** use TMDB information to verify IMDb, TMDB and TVDB identifiers, then review or correct uncertain results.
 - **Check availability:** connect AllDebrid or TorBox to see cached availability and prepare playback when you select a stream.
 - **Connect Stremio and AIOStreams:** install your private addon link and browse the results from your catalog.
+- **Connect Torznab applications:** expose a revocable, read-only endpoint for Prowlarr and other clients, with optional source and media filters in each URL.
 - **Offer optional public access:** let visitors install the addon with their own debrid keys and reuse shared cache observations, while keeping administration private.
 - **Share selected metadata:** create revocable, read-only catalog shares and import catalogs shared with you.
 - **Follow activity:** see source statistics, processing history, returned Stremio results, logs and storage usage.
@@ -112,6 +113,14 @@ Filter titles by type and an optional single year. Films match any locally known
 **Download** opens the file when its link is ready. **Add to debrid** explicitly starts preparation for an uncached version, then checks readiness automatically. Keep the search page open during preparation; a direct link remains available if your browser blocks the download tab. Private sources need your announce URL for uncached downloads. Download preparation and sanitized provider calls appear in **Debrid → History**. Download links stay in memory and are not retained in history.
 
 Versions are largest first. The optional language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. The same controls in **Stremio → Settings** travel with the installation link: copy or reinstall the updated link after changing them. Existing installed links continue working without a language filter.
+
+**Connection filters** also let each Stremio link select sources, debrid services, media types and cached-only results. Copy separate links for different configurations. These choices stay in the URL and do not change your instance settings or previously installed links. They are filters, not separate access credentials: replacing the installation token revokes every link derived from it.
+
+### Torznab
+
+Open **Connections → Torznab**, create an access key and enable it when ready. Use **Client setup & filters** for the exact URL, API path and optional parameters to paste into Prowlarr's **Generic Torznab** configuration. A single key can be used with multiple filtered URLs; you do not need a key or saved profile for each configuration.
+
+Requests search your published local data without contacting your sources or TMDB. Standard categories select movies, TV or other releases. Optional `sources` and `media` URL parameters can narrow each connection further. Private-source magnets contain no administrator announce URL: the recipient needs their own source access to download them. No debrid account is shared through Torznab. See the [Torznab setup and parameter reference](docs/TORZNAB.md).
 
 **Sources → Torrent search** searches the individual imported records, including title fragments, source IDs and complete or partial info hashes. **Metadata → Identification** accepts the same search syntax when reviewing matches. Each list shows its filtered result count above the rows.
 

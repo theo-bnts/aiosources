@@ -13,6 +13,16 @@ type streamLanguage struct {
 	code, flag string
 }
 
+// ReleaseLanguageCodes exposes the same bounded, normalized audio evidence used
+// by Stremio presentation. Arbitrary native strings are never exported as tags.
+func ReleaseLanguageCodes(record model.AIORecord) []string {
+	codes := []string{}
+	for _, item := range streamLanguages(record) {
+		codes = append(codes, item.code)
+	}
+	return codes
+}
+
 // Source APIs use ISO 639-1, ISO 639-2 and language names interchangeably.
 // Keep this normalization at the presentation boundary: native values and
 // correspondence evidence remain unchanged.

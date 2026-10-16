@@ -23,6 +23,32 @@ func (s *server) registerSharingRoutes(mux *http.ServeMux) {
 	// Own every method at this exact path. Never route a sharing credential to
 	// administrator authentication or permit write methods on the public feed.
 	mux.HandleFunc("/api/catalogs/{id}", s.catalogFeed)
+	mux.HandleFunc("GET /api/torznab/endpoints", s.auth.protect(s.listShares))
+	mux.HandleFunc("POST /api/torznab/endpoints", s.auth.protect(s.createShare))
+	mux.HandleFunc("PUT /api/torznab/endpoints/{id}", s.auth.protect(s.updateShare))
+	mux.HandleFunc("POST /api/torznab/endpoints/{id}/rotate", s.auth.protect(s.rotateShare))
+	mux.HandleFunc("DELETE /api/torznab/endpoints/{id}", s.auth.protect(s.deleteShare))
+	mux.HandleFunc("/torznab/{id}/api", s.torznabFeed)
+}
+
+func shareRequestFormat(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, "/api/torznab/") {
+		return "torznab"
+	}
+	return "catalog"
+}
+
+func (s *server) shareRequestAllowed(w http.ResponseWriter, r *http.Request) bool {
+	item, err := s.options.Store.Share(r.Context(), r.PathValue("id"))
+	if err != nil {
+		respondError(w, err)
+		return false
+	}
+	if item.Format != shareRequestFormat(r) {
+		respondError(w, model.ErrNotFound)
+		return false
+	}
+	return true
 }
 
 func (s *server) sharingPublicURL() string {
@@ -35,7 +61,11 @@ func (s *server) sharingPublicURL() string {
 
 func (s *server) shareURL(share *model.Share) {
 	if origin := s.sharingPublicURL(); origin != "" {
-		share.URL = origin + "/api/catalogs/" + url.PathEscape(share.ID)
+		if share.Format == "torznab" {
+			share.URL = origin + "/torznab/" + url.PathEscape(share.ID) + "/api"
+		} else {
+			share.URL = origin + "/api/catalogs/" + url.PathEscape(share.ID)
+		}
 	}
 }
 
@@ -45,7 +75,7 @@ type sharingSource struct {
 }
 
 func (s *server) listShares(w http.ResponseWriter, r *http.Request) {
-	items, err := s.options.Store.Shares(r.Context())
+	items, err := s.options.Store.SharesByFormat(r.Context(), shareRequestFormat(r))
 	if err != nil {
 		respondError(w, err)
 		return
@@ -112,7 +142,7 @@ func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input mod
 
 func (s *server) createShare(w http.ResponseWriter, r *http.Request) {
 	var input model.ShareInput
-	if !decodeJSON(w, r, &input) || !s.validateShare(w, r, input) {
+	if !s.decodeShare(w, r, &input) || !s.validateShare(w, r, input) {
 		return
 	}
 	result, err := s.options.Store.CreateShare(r.Context(), input)
@@ -126,7 +156,7 @@ func (s *server) createShare(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) updateShare(w http.ResponseWriter, r *http.Request) {
 	var input model.ShareInput
-	if !decodeJSON(w, r, &input) || !s.validateShare(w, r, input) {
+	if !s.shareRequestAllowed(w, r) || !s.decodeShare(w, r, &input) || !s.validateShare(w, r, input) {
 		return
 	}
 	if input.RequestsPerMinute == nil || input.MaxConcurrentDownloads == nil {
@@ -143,6 +173,9 @@ func (s *server) updateShare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) rotateShare(w http.ResponseWriter, r *http.Request) {
+	if !s.shareRequestAllowed(w, r) {
+		return
+	}
 	var input struct {
 		Revision int64 `json:"revision"`
 	}
@@ -159,6 +192,9 @@ func (s *server) rotateShare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) deleteShare(w http.ResponseWriter, r *http.Request) {
+	if !s.shareRequestAllowed(w, r) {
+		return
+	}
 	var input struct {
 		Revision int64 `json:"revision"`
 	}
@@ -170,6 +206,22 @@ func (s *server) deleteShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *server) decodeShare(w http.ResponseWriter, r *http.Request, input *model.ShareInput) bool {
+	if !decodeJSON(w, r, input) {
+		return false
+	}
+	format := shareRequestFormat(r)
+	if input.Format != "" && input.Format != format {
+		respondError(w, model.ErrInvalid)
+		return false
+	}
+	input.Format = format
+	if format == "torznab" {
+		input.Fields = store.CatalogFields()
+	}
+	return true
 }
 
 func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {

@@ -126,6 +126,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if visitor != nil {
 		preferences = visitor.Preferences
 	}
+	if !AllowsInstallation(preferences, "", "", mediaType) {
+		return []Stream{}, nil
+	}
 	history.Matched = len(rows)
 	c, err := s.DB.AIOConfig(ctx)
 	if err != nil {
@@ -138,6 +141,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	eligible := []model.AIORecord{}
 	hashes := []string{}
 	for _, rec := range rows {
+		if !AllowsInstallation(preferences, rec.Provider, "", mediaType) {
+			continue
+		}
 		if !hashRE.MatchString(rec.Hash) {
 			history.InvalidHash++
 			continue
@@ -158,10 +164,26 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 		return []Stream{}, nil
 	}
 	var availability map[string]map[string]model.AIOAvailability
+	// Filter before availability checks, so an unselected service is never
+	// contacted. The stored configuration and visitor credential remain intact.
+	if !AllowsInstallation(preferences, "", "alldebrid", mediaType) {
+		c.AllDebridSecret = ""
+	}
+	if !AllowsInstallation(preferences, "", "torbox", mediaType) {
+		c.TorBoxSecret = ""
+	}
 	if visitor == nil {
 		availability, err = s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
 	} else {
-		availability, err = s.publicAvailability(ctx, c, streamResourceKey(r, rows), hashes, visitor)
+		filtered := *visitor
+		filtered.Services = map[string]string{}
+		for service, key := range visitor.Services {
+			if AllowsInstallation(preferences, "", service, mediaType) {
+				filtered.Services[service] = key
+			}
+		}
+		availability, err = s.publicAvailability(ctx, c, streamResourceKey(r, rows), hashes, &filtered)
+		clear(filtered.Services)
 	}
 	if err != nil {
 		return nil, err
@@ -173,6 +195,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	for _, rec := range eligible {
 		stream := baseStream(rec, r, names[rec.Provider])
 		if visitor == nil && len(availability) == 0 {
+			if !AllowsInstallation(preferences, "", "direct", mediaType) || preferences.CachedOnly {
+				continue
+			}
 			if tracker := c.Trackers[rec.Provider]; tracker.Private && tracker.AnnounceSecret == "" {
 				history.PrivateUnavailable++
 				continue
@@ -195,6 +220,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 				continue
 			}
 			observed, known := states[rec.Hash]
+			if preferences.CachedOnly && (!known || !observed.Cached) {
+				continue
+			}
 			tracker, configured := c.Trackers[rec.Provider]
 			if !configured {
 				tracker.Private = true
@@ -266,11 +294,20 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 func (s *Service) Playback(ctx context.Context, service, provider, sourceID, mediaType, id string) (string, error) {
 	return s.playback(ctx, service, provider, sourceID, mediaType, id, nil)
 }
+func (s *Service) PlaybackWithPreferences(ctx context.Context, service, provider, sourceID, mediaType, id string, p model.StreamPreferences) (string, error) {
+	if !ValidStreamPreferences(p) || !AllowsInstallation(p, provider, service, mediaType) {
+		return "", model.ErrInvalid
+	}
+	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, nil, playbackPolicy{CachedOnly: p.CachedOnly})
+}
 func (s *Service) PublicPlayback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	if visitor == nil || !validPublicKeys(visitor.Services) || visitor.Services[service] == "" {
 		return "", ErrAuth
 	}
-	return s.playback(ctx, service, provider, sourceID, mediaType, id, visitor)
+	if !AllowsInstallation(visitor.Preferences, provider, service, mediaType) {
+		return "", model.ErrInvalid
+	}
+	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{CachedOnly: visitor.Preferences.CachedOnly})
 }
 func (s *Service) playback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{})
@@ -381,6 +418,10 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			}
 		}
 		magnet = publicMagnet(rec, announce)
+		if policy.CachedOnly {
+			cachedOnly = true
+			magnet = publicMagnet(rec, "")
+		}
 	}
 	var link string
 	generation, err := s.DB.AIOCacheGeneration(life)

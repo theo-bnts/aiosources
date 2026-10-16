@@ -1,3 +1,4 @@
+import { TorznabSetup } from '@/components/torznab-setup'
 import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -25,6 +26,8 @@ import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 
 function shareBody(share: CatalogShare) {
   return {
+    format: share.format,
+    media_types: share.media_types,
     name: share.name,
     enabled: share.enabled,
     scope: share.scope,
@@ -41,7 +44,9 @@ function shareExpired(share: CatalogShare) {
   return Boolean(share.expires_at && Date.parse(share.expires_at) <= Date.now())
 }
 
-export default function SharingPage() {
+export default function SharingPage({ format = 'catalog' }: { format?: 'catalog' | 'torznab' }) {
+  const torznab = format === 'torznab'
+  const endpoint = torznab ? '/torznab/endpoints' : '/shares'
   const date = useDate()
   const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<CatalogShare | 'new' | null>(null)
@@ -49,8 +54,8 @@ export default function SharingPage() {
   const [credential, setCredential] = useState<SharePassword | null>(null)
   const notify = useNotification()
   const shares = useQuery({
-    queryKey: ['shares'],
-    queryFn: ({ signal }) => api<CatalogShares>('/shares', { signal }),
+    queryKey: ['shares', format],
+    queryFn: ({ signal }) => api<CatalogShares>(endpoint, { signal }),
     refetchInterval: AUTO_REFRESH_INTERVAL,
     structuralSharing: false,
   })
@@ -68,7 +73,7 @@ export default function SharingPage() {
       <div className="flex justify-end">
         <Button disabled={!shares.data} onClick={() => openEditor('new')}>
           <PlusIcon />
-          Create share
+          {torznab ? 'Create access' : 'Create share'}
         </Button>
       </div>
       {shares.data && !httpsReady && (
@@ -82,7 +87,12 @@ export default function SharingPage() {
         </section>
       )}
       <ErrorNotice error={shares.error} retry={() => void shares.refetch()} />
-      {shares.data && <ResultCount total={shares.data.items?.length ?? 0} label="shares" />}
+      {shares.data && (
+        <ResultCount
+          total={shares.data.items?.length ?? 0}
+          label={torznab ? 'access keys' : 'shares'}
+        />
+      )}
       {shares.isPending ? (
         <Loading />
       ) : shares.data?.items?.length ? (
@@ -121,20 +131,37 @@ export default function SharingPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Authorized fields</dt>
-                  <dd className="mono mt-1 break-words">{share.fields.join(', ')}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Last completed download</dt>
-                  <dd className="mt-1">
-                    {share.last_sync_at ? date(share.last_sync_at) : 'No completed download'}
+                  <dt className="text-muted-foreground">
+                    {torznab ? 'Media permissions' : 'Authorized fields'}
+                  </dt>
+                  <dd className="mt-1 break-words">
+                    {torznab
+                      ? share.media_types?.length
+                        ? share.media_types
+                            .map(
+                              (type) =>
+                                ({ movie: 'Movies', tv: 'TV', other: 'Other' })[type] ?? type,
+                            )
+                            .join(', ')
+                        : 'All media'
+                      : share.fields.join(', ')}
                   </dd>
-                  <p className="help mt-1">
-                    Final page delivered, not confirmation the recipient saved it.
-                  </p>
                 </div>
+                {!torznab && (
+                  <div>
+                    <dt className="text-muted-foreground">Last completed download</dt>
+                    <dd className="mt-1">
+                      {share.last_sync_at ? date(share.last_sync_at) : 'No completed download'}
+                    </dd>
+                    <p className="help mt-1">
+                      Final page delivered, not confirmation the recipient saved it.
+                    </p>
+                  </div>
+                )}
                 <div>
-                  <dt className="text-muted-foreground">Last access</dt>
+                  <dt className="text-muted-foreground">
+                    {torznab ? 'Last search' : 'Last access'}
+                  </dt>
                   <dd className="mt-1">
                     {share.last_access_at ? date(share.last_access_at) : 'No access recorded'}
                   </dd>
@@ -151,7 +178,9 @@ export default function SharingPage() {
                   )}
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Download limits</dt>
+                  <dt className="text-muted-foreground">
+                    {torznab ? 'Request limits' : 'Download limits'}
+                  </dt>
                   <dd className="mt-1">
                     {share.requests_per_minute} requests per minute ·{' '}
                     {share.max_concurrent_downloads} concurrent
@@ -168,7 +197,11 @@ export default function SharingPage() {
                 </p>
               )}
               <div className="field">
-                <Label htmlFor={`share-url-${share.id}`}>Catalog URL (no password included)</Label>
+                <Label htmlFor={`share-url-${share.id}`}>
+                  {torznab
+                    ? 'Torznab URL (no API key included)'
+                    : 'Catalog URL (no password included)'}
+                </Label>
                 <Input
                   id={`share-url-${share.id}`}
                   readOnly
@@ -176,8 +209,12 @@ export default function SharingPage() {
                   placeholder="Available after HTTPS public origin is configured"
                   className="font-mono text-xs"
                 />
-                <CopyButton value={share.url} label="Copy catalog URL" />
+                <CopyButton
+                  value={share.url}
+                  label={torznab ? 'Copy Torznab URL' : 'Copy catalog URL'}
+                />
               </div>
+              {torznab && <TorznabSetup share={share} sources={shares.data?.sources ?? []} />}
               <div className="toolbar">
                 <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
                   Edit permissions & limits
@@ -187,7 +224,9 @@ export default function SharingPage() {
                   description={
                     share.enabled
                       ? 'New requests will be denied immediately. Existing downloaded copies cannot be recalled. You can enable this share again later.'
-                      : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
+                      : torznab
+                        ? `This API key grants read-only access to published titles, verified identifiers and tracker-free magnets from ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}.`
+                        : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
                   }
                   label={share.enabled ? 'Disable access' : 'Enable access'}
                   variant={share.enabled ? 'warning' : 'default'}
@@ -204,7 +243,7 @@ export default function SharingPage() {
                     </Button>
                   }
                   action={async () => {
-                    await api<CatalogShare>(`/shares/${encodeURIComponent(share.id)}`, {
+                    await api<CatalogShare>(`${endpoint}/${encodeURIComponent(share.id)}`, {
                       method: 'PUT',
                       body: JSON.stringify({ ...shareBody(share), enabled: !share.enabled }),
                     })
@@ -213,19 +252,19 @@ export default function SharingPage() {
                   }}
                 />
                 <ConfirmAction
-                  title={`Rotate password for “${share.name}”?`}
+                  title={`Replace ${torznab ? 'API key' : 'password'} for “${share.name}”?`}
                   description="The previous password will stop working immediately. Give the replacement to the recipient through a secure channel. Permissions and enabled state are unchanged."
-                  label="Rotate password"
+                  label={torznab ? 'Rotate API key' : 'Rotate password'}
                   variant="warning"
                   trigger={
                     <Button variant="warning" size="sm">
-                      Rotate password
+                      {torznab ? 'Rotate API key' : 'Rotate password'}
                     </Button>
                   }
                   action={async () => {
                     rememberFocus()
                     const result = await api<SharePassword>(
-                      `/shares/${encodeURIComponent(share.id)}/rotate`,
+                      `${endpoint}/${encodeURIComponent(share.id)}/rotate`,
                       { method: 'POST', body: JSON.stringify({ revision: share.revision }) },
                     )
                     setCredential(result)
@@ -235,7 +274,7 @@ export default function SharingPage() {
                 <ConfirmAction
                   title={`Revoke “${share.name}” permanently?`}
                   description="This share and its password will stop working. The recipient’s existing downloaded data is not deleted. Create a new share if you want to grant access again."
-                  label="Revoke share"
+                  label={torznab ? 'Revoke access' : 'Revoke share'}
                   variant="destructive"
                   trigger={
                     <Button variant="destructive" size="sm">
@@ -243,7 +282,7 @@ export default function SharingPage() {
                     </Button>
                   }
                   action={async () => {
-                    await api<void>(`/shares/${encodeURIComponent(share.id)}`, {
+                    await api<void>(`${endpoint}/${encodeURIComponent(share.id)}`, {
                       method: 'DELETE',
                       body: JSON.stringify({ revision: share.revision }),
                     })
@@ -259,8 +298,12 @@ export default function SharingPage() {
         !shares.isError && (
           <Empty
             icon={ShareNetworkIcon}
-            title="No catalog shares"
-            description="Create a disabled share, choose its source permissions and safe fields, then enable it when you are ready."
+            title={torznab ? 'No Torznab access' : 'No catalog shares'}
+            description={
+              torznab
+                ? 'Create an access key, choose the allowed sources and media, then enable it for your client.'
+                : 'Create a disabled share, choose its source permissions and safe fields, then enable it when you are ready.'
+            }
           />
         )
       )}
@@ -280,15 +323,21 @@ export default function SharingPage() {
         >
           <DialogHeader>
             <DialogTitle>
-              {editing === 'new' ? 'Create disabled share' : 'Edit share permissions & limits'}
+              {editing === 'new'
+                ? torznab
+                  ? 'Create disabled access'
+                  : 'Create disabled share'
+                : 'Edit permissions & limits'}
             </DialogTitle>
             <DialogDescription>
-              Only the selected published fields are exposed. Passwords never grant access to
-              administrative APIs.
+              {torznab
+                ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
+                : 'Only the selected published fields are exposed. Passwords never grant access to administrative APIs.'}
             </DialogDescription>
           </DialogHeader>
           {editing && shares.data && (
             <ShareForm
+              format={format}
               key={editing === 'new' ? 'new' : editing.id}
               share={editing === 'new' ? undefined : editing}
               data={shares.data}
@@ -296,7 +345,7 @@ export default function SharingPage() {
               onSaved={(result) => {
                 setEditing(null)
                 if (result) setCredential(result)
-                else notify('Share permissions saved.')
+                else notify(torznab ? 'Access permissions saved.' : 'Share permissions saved.')
               }}
             />
           )}
@@ -316,16 +365,21 @@ export default function SharingPage() {
 }
 
 function ShareForm({
+  format,
   share,
   data,
   onSaving,
   onSaved,
 }: {
+  format: 'catalog' | 'torznab'
   share?: CatalogShare
   data: CatalogShares
   onSaving: (saving: boolean) => void
   onSaved: (credential?: SharePassword) => void
 }) {
+  const torznab = format === 'torznab'
+  const endpoint = torznab ? '/torznab/endpoints' : '/shares'
+  const [mediaTypes, setMediaTypes] = useState(share?.media_types ?? [])
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? 'selected')
@@ -355,6 +409,8 @@ function ShareForm({
       if (expiresAt && !Number.isFinite(new Date(expiresAt).getTime()))
         throw new Error('Choose a valid expiration date and time.')
       const body = {
+        format,
+        media_types: torznab ? mediaTypes : [],
         name: name.trim(),
         enabled: original?.enabled ?? false,
         scope,
@@ -366,13 +422,13 @@ function ShareForm({
         ...(original ? { revision: original.revision } : {}),
       }
       if (original) {
-        await api<CatalogShare>(`/shares/${encodeURIComponent(original.id)}`, {
+        await api<CatalogShare>(`${endpoint}/${encodeURIComponent(original.id)}`, {
           method: 'PUT',
           body: JSON.stringify(body),
         })
         onSaved()
       } else {
-        const result = await api<SharePassword>('/shares', {
+        const result = await api<SharePassword>(endpoint, {
           method: 'POST',
           body: JSON.stringify(body),
         })
@@ -385,7 +441,7 @@ function ShareForm({
   })
   const reload = useMutation({
     mutationFn: async () => {
-      const latest = await api<CatalogShares>('/shares')
+      const latest = await api<CatalogShares>(endpoint)
       const current = latest.items?.find((item) => item.id === original?.id)
       if (!current)
         throw new Error(
@@ -402,6 +458,7 @@ function ShareForm({
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const busy = save.isPending || reload.isPending
   const dirty =
+    JSON.stringify(mediaTypes) !== JSON.stringify(original?.media_types ?? []) ||
     name !== (original?.name ?? '') ||
     scope !== (original?.scope ?? 'selected') ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
@@ -422,7 +479,7 @@ function ShareForm({
     >
       <fieldset className="space-y-5" disabled={busy}>
         <div className="field">
-          <Label htmlFor="share-name">Recipient / share name</Label>
+          <Label htmlFor="share-name">{torznab ? 'Access name' : 'Recipient / share name'}</Label>
           <Input
             id="share-name"
             required
@@ -499,32 +556,60 @@ function ShareForm({
             </label>
           </div>
         )}
-        <fieldset className="space-y-3">
-          <legend className="mb-2 text-sm font-medium">Safe fields to share</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {data.fields.map((field) => (
-              <label key={field} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="accent-primary"
-                  checked={fields.includes(field)}
-                  onChange={(event) =>
-                    setFields(
-                      event.target.checked
-                        ? [...fields, field]
-                        : fields.filter((value) => value !== field),
-                    )
-                  }
-                />
-                <span className="mono">{field}</span>
-              </label>
-            ))}
-          </div>
-          <p className="help">
-            No download URLs, magnets, tracker passkeys, arbitrary metadata or raw data. Original
-            provenance accompanies authorized fields.
-          </p>
-        </fieldset>
+        {torznab ? (
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-medium">Allowed media</legend>
+            <div className="field">
+              <Label htmlFor="torznab-media">Media permissions</Label>
+              <select
+                id="torznab-media"
+                className="native-select w-full"
+                value={mediaTypes.length ? mediaTypes[0] : ''}
+                onChange={(event) => setMediaTypes(event.target.value ? [event.target.value] : [])}
+              >
+                <option value="">All media</option>
+                <option value="movie">Movies</option>
+                <option value="tv">TV</option>
+                <option value="other">Other / not identified</option>
+              </select>
+            </div>
+            <p className="help">
+              Movies and TV use current verified identification. Unclassified releases appear under
+              Other. Magnets contain no announce URLs; private downloads require the recipient’s own
+              source access.
+            </p>
+          </fieldset>
+        ) : (
+          <>
+            {' '}
+            <fieldset className="space-y-3">
+              <legend className="mb-2 text-sm font-medium">Safe fields to share</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.fields.map((field) => (
+                  <label key={field} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="accent-primary"
+                      checked={fields.includes(field)}
+                      onChange={(event) =>
+                        setFields(
+                          event.target.checked
+                            ? [...fields, field]
+                            : fields.filter((value) => value !== field),
+                        )
+                      }
+                    />
+                    <span className="mono">{field}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="help">
+                No download URLs, magnets, tracker passkeys, arbitrary metadata or raw data.
+                Original provenance accompanies authorized fields.
+              </p>
+            </fieldset>
+          </>
+        )}
         <fieldset className="space-y-4 border-t border-border pt-4">
           <legend className="px-1 text-sm font-medium">Access policy</legend>
           <div className="field">
@@ -563,7 +648,9 @@ function ShareForm({
               />
             </div>
             <div className="field">
-              <Label htmlFor="share-concurrent-limit">Concurrent downloads</Label>
+              <Label htmlFor="share-concurrent-limit">
+                {torznab ? 'Concurrent requests' : 'Concurrent downloads'}
+              </Label>
               <Input
                 id="share-concurrent-limit"
                 type="number"
@@ -622,7 +709,13 @@ function ShareForm({
             (scope === 'selected' ? sourceIDs.length === 0 : !acknowledged)
           }
         >
-          {save.isPending ? 'Saving…' : original ? 'Save permissions' : 'Create disabled share'}
+          {save.isPending
+            ? 'Saving…'
+            : original
+              ? 'Save permissions'
+              : torznab
+                ? 'Create disabled access'
+                : 'Create disabled share'}
         </Button>
       </DialogFooter>
     </form>
@@ -637,6 +730,7 @@ function PasswordDialog({
   onClose: () => void
 }) {
   const [visible, setVisible] = useState(false)
+  const torznab = credential.share.format === 'torznab'
   return (
     <Dialog
       open
@@ -647,14 +741,17 @@ function PasswordDialog({
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Save this password now</DialogTitle>
+          <DialogTitle>{torznab ? 'Save this API key now' : 'Save this password now'}</DialogTitle>
           <DialogDescription>
-            This is the only time the password for “{credential.share.name}” is shown. Closing this
-            dialog clears it from the page. The server cannot retrieve it later.
+            This is the only time the {torznab ? 'API key' : 'password'} for “
+            {credential.share.name}” is shown. Closing this dialog clears it from the page. The
+            server cannot retrieve it later.
           </DialogDescription>
         </DialogHeader>
         <div className="field">
-          <Label htmlFor="created-share-password">Sharing password</Label>
+          <Label htmlFor="created-share-password">
+            {torznab ? 'Torznab API key' : 'Sharing password'}
+          </Label>
           <Input
             id="created-share-password"
             type={visible ? 'text' : 'password'}
@@ -667,11 +764,17 @@ function PasswordDialog({
         </div>
         <div className="toolbar items-start">
           <Button variant="outline" onClick={() => setVisible(!visible)}>
-            {visible ? 'Hide password' : 'Reveal password'}
+            {visible
+              ? torznab
+                ? 'Hide API key'
+                : 'Hide password'
+              : torznab
+                ? 'Reveal API key'
+                : 'Reveal password'}
           </Button>
           <CopyButton
             value={credential.password}
-            label="Copy password"
+            label={torznab ? 'Copy API key' : 'Copy password'}
             manualCopyMessage="Clipboard access is unavailable. Reveal the password and copy it manually."
             successMessage="Copied to your clipboard. Clear it after storing or sending the password securely."
           />
@@ -682,23 +785,29 @@ function PasswordDialog({
             : credential.share.enabled
               ? 'This share is enabled.'
               : 'This share is disabled; enable it separately.'}{' '}
-          Send the catalog URL and password through a secure channel. Never append the password to
-          the URL.
+          {torznab
+            ? 'Enter the URL and API key in your Torznab client. Keep the key private; it grants access to the permitted catalog.'
+            : 'Send the catalog URL and password through a secure channel. Never append the password to the URL.'}
         </p>
         {credential.share.url && (
           <div className="field">
-            <Label htmlFor="created-share-url">Catalog URL</Label>
+            <Label htmlFor="created-share-url">{torznab ? 'Torznab URL' : 'Catalog URL'}</Label>
             <Input
               id="created-share-url"
               readOnly
               value={credential.share.url}
               className="font-mono text-xs"
             />
-            <CopyButton value={credential.share.url} label="Copy catalog URL" />
+            <CopyButton
+              value={credential.share.url}
+              label={torznab ? 'Copy Torznab URL' : 'Copy catalog URL'}
+            />
           </div>
         )}
         <DialogFooter>
-          <Button onClick={onClose}>I have saved the password</Button>
+          <Button onClick={onClose}>
+            {torznab ? 'I have saved the API key' : 'I have saved the password'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

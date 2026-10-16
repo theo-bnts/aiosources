@@ -8,6 +8,8 @@ import (
 
 // Share contains only owner-visible configuration, never credential material.
 type Share struct {
+	Format                 string     `json:"format"`
+	MediaTypes             []string   `json:"media_types"`
 	ID                     string     `json:"id"`
 	Name                   string     `json:"name"`
 	Enabled                bool       `json:"enabled"`
@@ -26,6 +28,8 @@ type Share struct {
 }
 
 type ShareInput struct {
+	Format                 string     `json:"format,omitempty"`
+	MediaTypes             []string   `json:"media_types,omitempty"`
 	Name                   string     `json:"name"`
 	Enabled                bool       `json:"enabled"`
 	Scope                  string     `json:"scope"`

@@ -165,6 +165,9 @@ func (s *Store) CatalogPage(ctx context.Context, shareID, password string, reque
 }
 
 func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) (model.CatalogEnvelope, error) {
+	if d.format != "catalog" {
+		return model.CatalogEnvelope{}, ErrCatalogAuthentication
+	}
 	ctx, cancel := context.WithDeadline(ctx, d.deadline)
 	defer cancel()
 	result := model.CatalogEnvelope{Version: 1, Items: []model.CatalogItem{}}

@@ -40,12 +40,21 @@ type CatalogDownload struct {
 	id        string
 	shareID   string
 	revision  int64
+	format    string
 	deadline  time.Time
 	closeOnce sync.Once
 	closeErr  error
 }
 
 func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password string) (*CatalogDownload, error) {
+	return s.beginShareRequest(ctx, shareID, password, "catalog")
+}
+
+func (s *Store) BeginTorznabRequest(ctx context.Context, shareID, password string) (*CatalogDownload, error) {
+	return s.beginShareRequest(ctx, shareID, password, "torznab")
+}
+
+func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format string) (*CatalogDownload, error) {
 	deadline := time.Now().Add(CatalogDownloadTimeout)
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
@@ -58,7 +67,7 @@ func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password stri
 	candidate := sharingPasswordHash(shareID, password)
 	// Unauthenticated requests must never queue for a recipient's row lock.
 	// A normal MVCC read can reject them while an active download holds it.
-	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp() FROM ingest.shares WHERE id=$1`, shareID).Scan(&hash, &enabled, &unexpired)
+	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp() FROM ingest.shares WHERE id=$1 AND format=$2`, shareID, format).Scan(&hash, &enabled, &unexpired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
 	}
@@ -77,7 +86,7 @@ func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password stri
 	var requests, concurrent int
 	// Recheck under the lock: rotation, revocation and expiry may have changed
 	// since the first read. Admissions and quota changes remain atomic.
-	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads FROM ingest.shares WHERE id=$1 FOR UPDATE`, shareID).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent)
+	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads FROM ingest.shares WHERE id=$1 AND format=$2 FOR UPDATE`, shareID, format).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
 	}
@@ -120,7 +129,7 @@ func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password stri
 	if err := tx.Commit(ctx); err != nil {
 		return nil, databaseError("commit catalogue admission", err)
 	}
-	return &CatalogDownload{store: s, id: id, shareID: shareID, revision: revision, deadline: deadline}, nil
+	return &CatalogDownload{store: s, id: id, shareID: shareID, revision: revision, format: format, deadline: deadline}, nil
 }
 
 // Validate must run after encoding and immediately before sending a response.

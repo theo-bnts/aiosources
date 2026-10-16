@@ -13,6 +13,52 @@ import (
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
+// Partial-schema publication tests already install unrelated access-control
+// columns needed by the current reader. These columns do not alter the catalog
+// identity/publication migration being exercised, and those fixtures are never
+// passed through the complete migration sequence.
+const testShareFormatColumns = `ALTER TABLE ingest.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}';`
+
+// Historical upgrade fixtures must be written in their original schema, rather
+// than by a current writer which depends on columns added in later migrations.
+func legacyShareFixture(t *testing.T, ctx context.Context, db *Store, input model.ShareInput) model.ShareCredential {
+	t.Helper()
+	id, err := newRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	password, hash, err := sharingPassword(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if input.SourceIDs == nil {
+		input.SourceIDs = []string{}
+	}
+	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash); err != nil {
+		t.Fatal(err)
+	}
+	return model.ShareCredential{Share: model.Share{ID: id, Revision: 1}, Password: password}
+}
+
+func legacyCatalogPageFixture(t *testing.T, ctx context.Context, db *Store, grant model.ShareCredential, q CatalogPageRequest) model.CatalogEnvelope {
+	t.Helper()
+	id, err := newRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(CatalogDownloadTimeout)
+	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,clock_timestamp(),$3)`, id, grant.Share.ID, deadline.Add(5*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	d := &CatalogDownload{store: db, id: id, shareID: grant.Share.ID, revision: grant.Share.Revision, format: "catalog", deadline: deadline}
+	defer d.Close()
+	v, err := d.Page(ctx, q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
 func sharingDatabase(t testing.TB) (context.Context, *Store) {
 	t.Helper()
 	ctx, endpoint := testutil.NewDatabase(t)
@@ -281,7 +327,7 @@ func TestCatalogMigrationSeedsExistingRowsAndDurableIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+"COMMIT;"); err != nil {
+	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+"COMMIT;"); err != nil {
 		t.Fatal(err)
 	}
 	grant := sharingGrant(t, ctx, db)
@@ -367,7 +413,7 @@ func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema); err != nil {
+	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns); err != nil {
 		t.Fatal(err)
 	}
 	source := "https://tracker.invalid/file?passkey=private-passkey"

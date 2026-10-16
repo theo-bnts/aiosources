@@ -45,7 +45,8 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/aiosource/{action}", s.auth.protect(s.aioAction))
 	mux.HandleFunc("GET /stremio/{token}/manifest.json", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
 		s.options.AIOSource.RecordAddonRequest("private", "manifest", "", "", time.Now(), nil)
-		writeJSON(w, 200, aiosource.Manifest())
+		_, preferences, _ := aiosource.InstallationPreferences(r.PathValue("token"))
+		writeJSON(w, 200, aiosource.InstallationManifest(preferences))
 	}))
 	mux.HandleFunc("GET /stremio/{token}/configure", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/addon/settings", http.StatusSeeOther)
@@ -233,8 +234,9 @@ func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"streams": streams})
 }
 func (s *server) aioPlayback(w http.ResponseWriter, r *http.Request) {
+	_, preferences, _ := aiosource.InstallationPreferences(r.PathValue("token"))
 	link, err := s.options.AIOSource.TracePlayback(r.Context(), "private", r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
-		return s.options.AIOSource.Playback(ctx, r.PathValue("service"), r.PathValue("provider"), r.PathValue("source"), r.PathValue("type"), r.PathValue("id"))
+		return s.options.AIOSource.PlaybackWithPreferences(ctx, r.PathValue("service"), r.PathValue("provider"), r.PathValue("source"), r.PathValue("type"), r.PathValue("id"), preferences)
 	})
 	if errors.Is(err, aiosource.ErrPending) {
 		w.Header().Set("Retry-After", "10")

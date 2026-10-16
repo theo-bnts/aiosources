@@ -1,5 +1,11 @@
 import { LanguageFilter } from '@/components/language-filter'
-import { useLanguagePreferences, preferenceManifest } from '@/lib/language-preferences'
+import { InstallationFilters } from '@/components/installation-filters'
+import type { InstallationOptions } from '@/lib/language-preferences'
+import {
+  useLanguagePreferences,
+  preferenceManifest,
+  preferenceManifestError,
+} from '@/lib/language-preferences'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
@@ -46,6 +52,7 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 }
 export default function AIOSourcePage({ section }: { section: 'metadata' | 'debrid' | 'stremio' }) {
   const [languagePreferences, setLanguagePreferences] = useLanguagePreferences()
+  const [installationOptions, setInstallationOptions] = useState<InstallationOptions>({})
   const location = useLocation()
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
@@ -225,9 +232,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
     )
   const status = query.data
   const manifest = new URL(
-    preferenceManifest(status.manifest_path, languagePreferences),
+    preferenceManifest(status.manifest_path, languagePreferences, installationOptions),
     window.location.origin,
   ).toString()
+  const manifestError = preferenceManifestError(manifest, installationOptions, languagePreferences)
   const busy = status.syncing || status.matching || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
@@ -397,19 +405,40 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       {section === 'stremio' && (
         <Panel title="Install addon">
           <LanguageFilter value={languagePreferences} onChange={setLanguagePreferences} />
+          <InstallationFilters
+            value={installationOptions}
+            onChange={setInstallationOptions}
+            sources={providers.data?.items ?? []}
+            services={[
+              ...(config.alldebrid_secret ? [{ id: 'alldebrid', name: 'AllDebrid' }] : []),
+              ...(config.torbox_secret ? [{ id: 'torbox', name: 'TorBox' }] : []),
+            ]}
+          />
           <p className="help">
             Language choices travel with this link. Copy or reinstall it after changing them.
           </p>
           <div className="field">
             <Label htmlFor="manifest">Manifest URL</Label>
-            <Input id="manifest" readOnly value={manifest} />
+            <Input
+              id="manifest"
+              readOnly
+              value={manifestError ? '' : manifest}
+              aria-invalid={Boolean(manifestError)}
+            />
+            {manifestError && (
+              <p className="text-sm text-destructive" role="alert">
+                {manifestError}
+              </p>
+            )}
           </div>
-          <div className="flex flex-wrap items-start gap-3">
-            <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
-            <Button asChild variant="outline">
-              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
-            </Button>
-          </div>
+          {!manifestError && (
+            <div className="flex flex-wrap items-start gap-3">
+              <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
+              <Button asChild variant="outline">
+                <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
+              </Button>
+            </div>
+          )}
         </Panel>
       )}
       {section === 'stremio' && <PublicAccessSettings />}
