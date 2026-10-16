@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useViewSearchParams } from '@/lib/detail-navigation'
@@ -191,6 +192,7 @@ export function LogsPage() {
       ) : (
         logs.data && (
           <>
+            <ResultCount total={logs.data.total} label="log entries" />
             {logs.data.items?.length ? (
               <div className="table-frame">
                 <Table>

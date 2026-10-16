@@ -145,6 +145,9 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 	works := make([]model.AIOWork, len(inputs))
 	for i, input := range inputs {
 		works[i] = input.Work
+		if works[i].DisplayTitle == "" && len(input.Work.Titles) > 0 {
+			works[i].DisplayTitle = input.Work.Titles[0]
+		}
 		if previous[keys[i]] != aioWorkSignature(input.Work, input.Normalized) {
 			changedKeys = append(changedKeys, keys[i])
 			changed[keys[i]] = true
@@ -154,9 +157,10 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 	if err != nil {
 		return model.ErrInvalid
 	}
-	rows, err = tx.Query(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult)
-SELECT type,tmdb,imdb,tvdb,years,adult FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean) ORDER BY type,tmdb
+	rows, err = tx.Query(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult,display_title)
+SELECT type,tmdb,imdb,tvdb,years,adult,display_title FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean,display_title text) ORDER BY type,tmdb
 ON CONFLICT(media_type,tmdb_id) DO UPDATE SET imdb_id=EXCLUDED.imdb_id,tvdb_id=EXCLUDED.tvdb_id,years=EXCLUDED.years,adult=EXCLUDED.adult,
+display_title=EXCLUDED.display_title,
 revision=ingest.aio_works.revision+CASE WHEN (EXCLUDED.media_type||':'||EXCLUDED.tmdb_id)=ANY($2::text[]) THEN 1 ELSE 0 END,updated_at=now()
 RETURNING id,media_type,tmdb_id`, body, changedKeys)
 	if err != nil {

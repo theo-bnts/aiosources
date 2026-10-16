@@ -22,9 +22,11 @@ import {
 import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 
 function WorkSummary({ work }: { work: ReviewWork }) {
+  const title = work.display_title || work.titles[0] || `TMDB ${work.tmdb}`
+  const aliases = work.titles.filter((alias) => alias !== title).slice(0, 2)
   return (
     <div className="min-w-0 space-y-1">
-      <p className="break-words font-medium">{work.titles[0] || `TMDB ${work.tmdb}`}</p>
+      <p className="break-words font-medium">{title}</p>
       <p className="help">
         {work.type === 'movie' ? 'Film' : 'Series'} · {work.years.join(', ') || 'Year unknown'}
       </p>
@@ -32,8 +34,8 @@ function WorkSummary({ work }: { work: ReviewWork }) {
         {work.imdb && `${work.imdb} · `}TMDB {work.tmdb}
         {work.tvdb && ` · TVDB ${work.tvdb}`}
       </p>
-      {work.titles.length > 1 && (
-        <p className="help break-words">Also known as: {work.titles.slice(1, 3).join(' · ')}</p>
+      {aliases.length > 0 && (
+        <p className="help break-words">Also known as: {aliases.join(' · ')}</p>
       )}
     </div>
   )

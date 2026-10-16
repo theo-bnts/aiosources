@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
@@ -81,6 +82,7 @@ export default function SharingPage() {
         </section>
       )}
       <ErrorNotice error={shares.error} retry={() => void shares.refetch()} />
+      {shares.data && <ResultCount total={shares.data.items?.length ?? 0} label="shares" />}
       {shares.isPending ? (
         <Loading />
       ) : shares.data?.items?.length ? (

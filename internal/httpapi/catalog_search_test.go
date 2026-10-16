@@ -1,0 +1,176 @@
+package httpapi
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+
+	"github.com/theo-bnts/aiosources/internal/model"
+)
+
+func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
+	f, addon, conn := addonAPI(t)
+	w := model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie: New Day"}, Years: []int{2026}}
+	if err := f.db.SaveAIOWork(f.ctx, w, []string{"example movie new day"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567","private_note":"synthetic-source-secret","announce":"https://source.invalid/private-announce"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := addon.Match(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	response := f.request("GET", "/api/catalog/search?q=Example.Movie", "", true, "")
+	var titles model.List[model.CatalogTitle]
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &titles) != nil || titles.Total != 1 {
+		t.Fatalf("catalog search failed: %d %s", response.Code, response.Body)
+	}
+	workID := titles.Items[0].ID
+	var id string
+	if err := conn.QueryRow(f.ctx, `SELECT id::text FROM ingest.aio_works WHERE id=$1`, workID).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/catalog/search?q=Example", "/api/catalog/" + id, "/api/catalog/" + id + "/releases"} {
+		if res := f.request("GET", path, "", false, ""); res.Code != 401 {
+			t.Fatalf("anonymous access to %s: %d", path, res.Code)
+		}
+	}
+	// A public instance never grants the administration session needed here.
+	access, _ := f.db.PublicAccess(f.ctx)
+	access.Enabled = true
+	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.request("GET", "/api/catalog/"+id, "", false, ""); res.Code != 401 {
+		t.Fatal("public mode bypassed administration")
+	}
+	res := f.request("GET", "/api/catalog/"+id+"/releases", "", true, "")
+	if res.Code != 200 || strings.Contains(res.Body.String(), "synthetic-source-secret") || strings.Contains(res.Body.String(), "private-announce") || strings.Contains(res.Body.String(), "aaaaaaaa") || strings.Contains(res.Body.String(), "source_id") {
+		t.Fatalf("catalog release projection unsafe: %d %s", res.Code, res.Body)
+	}
+	rows, err := f.db.CatalogRecords(f.ctx, workID)
+	if err != nil || len(rows) != 1 {
+		t.Fatal(err)
+	}
+	body := `{"occurrence_id":"` + rows[0].OccurrenceID + `","service":"torbox","allow_uncached":true}`
+	for _, origin := range []string{"https://addon.example", "https://other.example"} {
+		req := httptest.NewRequest("POST", "/api/catalog/"+id+"/download", strings.NewReader(body)).WithContext(f.ctx)
+		req.AddCookie(f.cookie)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", origin)
+		if origin == "https://other.example" {
+			req.Header.Set("X-CSRF-Token", f.csrf)
+		}
+		out := httptest.NewRecorder()
+		f.handler.ServeHTTP(out, req)
+		if out.Code != http.StatusForbidden {
+			t.Fatalf("missing CSRF/foreign origin accepted: %d", out.Code)
+		}
+	}
+	for _, query := range []string{"q=x", "q=Example&type=unsupported", "q=Example&q=Other", "q=%00Example"} {
+		out := f.request("GET", "/api/catalog/search?"+query, "", true, "")
+		if out.Code < 400 || out.Code >= 500 {
+			t.Fatalf("invalid catalog search accepted: %s / %d", query, out.Code)
+		}
+	}
+	for _, body := range []string{`{"service":"unknown"}`, `{"service":"torbox","occurrence_id":"invalid"}`, `{"service":"torbox","url":"https://other.example"}`} {
+		out := f.request("POST", "/api/catalog/"+id+"/download", body, true, "")
+		if out.Code < 400 || out.Code >= 500 {
+			t.Fatalf("invalid download accepted: %d", out.Code)
+		}
+	}
+	var operations int
+	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.operation_runs WHERE kind='download'`).Scan(&operations); err != nil || operations != 0 {
+		t.Fatal("invalid request started a download", err)
+	}
+	if cache := res.Header().Get("Cache-Control"); !strings.Contains(cache, "no-store") {
+		t.Fatalf("private catalog response could be cached: %q", cache)
+	}
+}
+
+func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
+	for _, service := range []string{"alldebrid", "torbox"} {
+		t.Run(service, func(t *testing.T) {
+			f, addon, conn := addonAPI(t)
+			hash := strings.Repeat("a", 40)
+			if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Film"}, Years: []int{2026}}, []string{"example film"}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Film.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
+				t.Fatal(err)
+			}
+			if err := addon.Match(f.ctx); err != nil {
+				t.Fatal(err)
+			}
+			if err := addon.Vault.Put(f.ctx, "debrid", "synthetic-download-key"); err != nil {
+				t.Fatal(err)
+			}
+			c, _ := f.db.AIOConfig(f.ctx)
+			if service == "alldebrid" {
+				c.AllDebridSecret = "debrid"
+			} else {
+				c.TorBoxSecret = "debrid"
+			}
+			c.Trackers["source"] = model.AIOTracker{Private: true}
+			if err := addon.SaveConfig(f.ctx, c); err != nil {
+				t.Fatal(err)
+			}
+			var ready atomic.Bool
+			ready.Store(true)
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/v4.1/magnet/status":
+					status := 0
+					if ready.Load() {
+						status = 4
+					}
+					fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"statusCode":%d}]}}`, hash, status)
+				case "/v4/magnet/files":
+					fmt.Fprint(w, `{"status":"success","data":{"magnets":[{"id":7,"files":[{"n":"Example.Film.2026.mkv","s":100,"l":"https://files.example/selected"}]}]}}`)
+				case "/v4/link/unlock":
+					fmt.Fprint(w, `{"status":"success","data":{"link":"https://files.example/download"}}`)
+				case "/torrents/createtorrent":
+					if r.ParseMultipartForm(4096) != nil || r.FormValue("add_only_if_cached") != "true" {
+						t.Error("private HTTP download bypassed cached-only policy")
+					}
+					fmt.Fprintf(w, `{"success":true,"data":{"torrent_id":7,"hash":%q}}`, hash)
+				case "/torrents/mylist":
+					fmt.Fprintf(w, `{"success":true,"data":{"hash":%q,"download_finished":%t,"download_present":%t,"files":[{"id":0,"name":"Example.Film.2026.mkv","size":100}]}}`, hash, ready.Load(), ready.Load())
+				case "/torrents/requestdl":
+					fmt.Fprint(w, `{"success":true,"data":"https://files.example/download"}`)
+				default:
+					t.Error("unexpected download request")
+					w.WriteHeader(500)
+				}
+			}))
+			defer upstream.Close()
+			addon.Providers.ADBase, addon.Providers.TBBase, addon.Providers.Client = upstream.URL, upstream.URL, upstream.Client()
+			var id int64
+			if err := conn.QueryRow(f.ctx, `SELECT id FROM ingest.aio_works`).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			rows, err := f.db.CatalogRecords(f.ctx, id)
+			if err != nil || len(rows) != 1 {
+				t.Fatal(err)
+			}
+			input := model.CatalogDownloadInput{OccurrenceID: rows[0].OccurrenceID, Fingerprint: rows[0].Fingerprint, Service: service, AllowUncached: true}
+			body, _ := json.Marshal(input)
+			path := fmt.Sprintf("/api/catalog/%d/download", id)
+			response := f.request("POST", path, string(body), true, "")
+			var result model.CatalogDownload
+			if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Status != "ready" || result.URL != "https://files.example/download" || result.OperationID == "" {
+				t.Fatalf("ready download response: %d %s", response.Code, response.Body)
+			}
+			ready.Store(false)
+			response = f.request("POST", path, string(body), true, "")
+			result = model.CatalogDownload{}
+			if response.Code != 202 || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Status != "pending" || result.URL != "" || response.Header().Get("Retry-After") != "15" {
+				t.Fatalf("pending download response: %d %s", response.Code, response.Body)
+			}
+		})
+	}
+}

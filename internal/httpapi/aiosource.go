@@ -17,6 +17,10 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 		return
 	}
 	s.registerPublicInstance(mux)
+	mux.HandleFunc("GET /api/catalog/search", s.auth.protect(s.catalogSearch))
+	mux.HandleFunc("GET /api/catalog/{id}", s.auth.protect(s.catalogTitle))
+	mux.HandleFunc("GET /api/catalog/{id}/releases", s.auth.protect(s.catalogReleases))
+	mux.HandleFunc("POST /api/catalog/{id}/download", s.auth.protect(s.catalogDownload))
 	mux.HandleFunc("GET /api/aiosource", s.auth.protect(s.aioStatus))
 	mux.HandleFunc("GET /api/debrid/statistics", s.auth.protect(s.cacheStatistics))
 	mux.HandleFunc("GET /api/operations", s.auth.protect(s.operationHistory))

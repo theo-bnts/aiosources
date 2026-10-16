@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -186,6 +187,7 @@ export function RunsPage() {
       ) : (
         runs.data && (
           <>
+            <ResultCount total={runs.data.total} label="runs" />
             {runs.data.items?.length ? (
               <RunsTable runs={runs.data.items} />
             ) : (
@@ -318,6 +320,7 @@ function EventsView({ runId }: { runId: string }) {
   return (
     <section className="space-y-3" aria-label="Run events">
       <ErrorNotice error={events.error} retry={() => void events.refetch()} />
+      {events.data && <ResultCount total={events.data.total} label="events" />}
       <p className="sr-only" role="status">
         Events page {number(page + 1)}
         {events.data && ` of ${number(pageCount)}`}

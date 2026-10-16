@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRightIcon, CaretRightIcon } from '@phosphor-icons/react'
@@ -83,31 +84,34 @@ function AllocationDetails({ category }: { category: StorageCategory }) {
         <p className="help">{explanations[category.details[0].key]}</p>
       )}
       {category.details && category.details.length > 1 && (
-        <div className="table-frame">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Purpose</TableHead>
-                <TableHead className="text-right">Data</TableHead>
-                <TableHead className="text-right">Indexes</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {category.details.map((part) => (
-                <TableRow key={part.key}>
-                  <TableCell className="min-w-52 whitespace-normal">
-                    <p>{labels[part.key] || part.key}</p>
-                    <p className="help mt-1 max-w-xl">{explanations[part.key]}</p>
-                  </TableCell>
-                  <TableCell className="text-right mono">{bytes(part.table_bytes)}</TableCell>
-                  <TableCell className="text-right mono">{bytes(part.index_bytes)}</TableCell>
-                  <TableCell className="text-right mono">{bytes(part.bytes)}</TableCell>
+        <>
+          <ResultCount total={category.details.length} label="storage groups" />
+          <div className="table-frame">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Purpose</TableHead>
+                  <TableHead className="text-right">Data</TableHead>
+                  <TableHead className="text-right">Indexes</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {category.details.map((part) => (
+                  <TableRow key={part.key}>
+                    <TableCell className="min-w-52 whitespace-normal">
+                      <p>{labels[part.key] || part.key}</p>
+                      <p className="help mt-1 max-w-xl">{explanations[part.key]}</p>
+                    </TableCell>
+                    <TableCell className="text-right mono">{bytes(part.table_bytes)}</TableCell>
+                    <TableCell className="text-right mono">{bytes(part.index_bytes)}</TableCell>
+                    <TableCell className="text-right mono">{bytes(part.bytes)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
     </div>
   )
@@ -124,6 +128,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
   return (
     <div className="space-y-4">
       <Disclosure title="By source (estimated)">
+        <ResultCount total={sources.length} label="sources" />
         {sources.length ? (
           <div className="table-frame">
             <Table className="table-fixed">
@@ -183,6 +188,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                 resuming. This data does not expire after seven days.
               </p>
             )}
+            <ResultCount total={report.retained_import_count ?? 0} label="retained imports" />
             <div className="table-frame">
               <Table>
                 <TableHeader>
@@ -270,6 +276,7 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
       </h2>
       {report.database.measured_at ? (
         <>
+          <ResultCount total={items.length} label="storage categories" />
           <div className="table-frame">
             <Table className="table-fixed">
               <TableHeader>

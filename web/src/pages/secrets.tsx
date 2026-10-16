@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -118,6 +119,7 @@ export default function SecretsPage() {
         </p>
       </div>
       <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
+      {secrets.data && <ResultCount total={secrets.data.items?.length ?? 0} label="secrets" />}
       {secrets.isPending ? (
         <Loading />
       ) : secrets.data?.items?.length ? (

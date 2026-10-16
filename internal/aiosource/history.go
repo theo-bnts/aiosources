@@ -53,9 +53,11 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 			h.run.Error = "Cache verification failed. Saved availability is preserved and the check can be retried."
 		case "cleanup":
 			h.run.Error = "Temporary magnet cleanup failed. Pending cleanup is preserved for a later attempt."
+		case "download":
+			h.run.Error = "The download could not be prepared. Check the debrid service and try again."
 		}
 		var remote *ProviderError
-		if (h.run.Kind == "cache" || h.run.Kind == "cleanup") && errors.As(err, &remote) {
+		if (h.run.Kind == "cache" || h.run.Kind == "cleanup" || h.run.Kind == "download") && errors.As(err, &remote) {
 			h.run.Error += " " + remote.Error()
 		}
 	}

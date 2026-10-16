@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -473,6 +474,7 @@ export function OccurrenceDialog({
                           </div>
                         </Disclosure>
                       )}
+                      <ResultCount total={history.data.total} label="changes" />
                       {history.data.items?.length ? (
                         history.data.items.map((change) => (
                           <ChangeEntry key={change.id} change={change} />
@@ -515,6 +517,7 @@ export function OccurrenceDialog({
                 ) : (
                   related.data && (
                     <>
+                      <ResultCount total={related.data.total} label="related torrents" />
                       {related.data.items?.length ? (
                         <TorrentTable items={related.data.items} onOpen={onOpen} />
                       ) : (
@@ -583,6 +586,7 @@ export function RunChangesList({
   const sourceName = useSourceNames()
   return (
     <div className="space-y-4">
+      <ResultCount total={data.total} label="changes" />
       {data.items?.length ? (
         data.items.map((change) => (
           <section className="space-y-3" key={change.id}>

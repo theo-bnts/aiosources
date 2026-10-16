@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -44,6 +45,7 @@ const kinds = {
   matching: 'Torrent identification',
   cache: 'Cache verification',
   cleanup: 'Temporary magnet cleanup',
+  download: 'Download preparation',
 }
 const services = {
   tmdb: 'TMDB',
@@ -63,6 +65,8 @@ const phases: Record<string, string> = {
   availability: 'Verifying cache availability',
   cleanup: 'Cleaning temporary magnets',
   storage: 'Saving information',
+  download: 'Preparing download',
+  waiting: 'Waiting for debrid',
   succeeded: statusLabels.succeeded,
   failed: statusLabels.failed,
   cancelled: statusLabels.cancelled,
@@ -90,7 +94,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   const [search, setSearch] = useViewSearchParams()
   const pagination = useURLPagination()
   const { limit, offset } = pagination
-  const kind = section === 'debrid' ? '' : search.get('kind') || ''
+  const kind = search.get('kind') || ''
   const service = section === 'metadata' ? '' : search.get('service') || ''
   const status = search.get('status') || ''
   const date = useDate()
@@ -140,6 +144,24 @@ export function OperationHistoryPage({ section }: { section: Section }) {
             </select>
           )}
         </div>
+        {section === 'debrid' && (
+          <div className="field">
+            <Label htmlFor="debrid-operation-kind" className="sr-only">
+              Filter by operation
+            </Label>
+            <select
+              id="debrid-operation-kind"
+              className="native-select"
+              value={kind}
+              onChange={(event) => filter('kind', event.target.value)}
+            >
+              <option value="">All operations</option>
+              <option value="cache">Cache verifications</option>
+              <option value="download">Download preparations</option>
+              <option value="cleanup">Temporary magnet cleanup</option>
+            </select>
+          </div>
+        )}
         <div className="field">
           <Label htmlFor="operation-status" className="sr-only">
             Filter by status
@@ -169,6 +191,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
       ) : (
         query.data && (
           <>
+            <ResultCount total={query.data.total} label="operations" />
             {query.data.items?.length ? (
               <div className="table-frame">
                 <Table>
@@ -355,6 +378,7 @@ export function OperationDetailPage({ section }: { section: Section }) {
               ) : (
                 events.data && (
                   <>
+                    <ResultCount total={events.data.total} label="events" />
                     {events.data.items?.length ? (
                       <div className="table-frame">
                         <Table>

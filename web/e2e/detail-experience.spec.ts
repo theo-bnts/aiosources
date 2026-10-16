@@ -198,11 +198,13 @@ test('empty identification and operation event pages recover without discarding 
   await expect(results.getByLabel('Identification result', { exact: true })).toHaveValue(
     'unmatched',
   )
-  await expect(results.getByLabel('Title or source ID', { exact: true })).toHaveValue('missing')
+  await expect(results.getByLabel('Title, source ID or info hash', { exact: true })).toHaveValue(
+    'missing',
+  )
   await results.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(results.getByLabel('Identification result', { exact: true })).toHaveValue('all')
   await expect(results.getByLabel('Source', { exact: true })).toHaveValue('')
-  await expect(results.getByLabel('Title or source ID', { exact: true })).toHaveValue('')
+  await expect(results.getByLabel('Title, source ID or info hash', { exact: true })).toHaveValue('')
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {

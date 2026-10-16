@@ -32,7 +32,7 @@ type Behavior struct {
 }
 
 func Manifest() map[string]any {
-	return map[string]any{"id": "org.aiosource.v2", "version": "2.0.0", "name": "AIOSources", "description": "Local sources with verified IMDb mapping and optional AllDebrid / TorBox playback", "resources": []any{map[string]any{"name": "stream", "types": []string{"movie", "series", "anime"}, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}, "types": []string{"movie", "series", "anime"}, "catalogs": []any{}, "behaviorHints": map[string]bool{"configurable": true}}
+	return map[string]any{"id": "org.aiosource.v2", "version": "2.1.0", "name": "AIOSources", "description": "Local sources with verified IMDb mapping and optional AllDebrid / TorBox playback", "resources": []any{map[string]any{"name": "stream", "types": []string{"movie", "series", "anime"}, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}, "types": []string{"movie", "series", "anime"}, "catalogs": []any{}, "behaviorHints": map[string]bool{"configurable": true}}
 }
 func (s *Service) magnet(ctx context.Context, rec model.AIORecord, c model.AIOConfig) (string, []string, error) {
 	q := url.Values{"dn": {rec.Title}}
@@ -156,15 +156,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	}
 	// Resolve names once for the whole response, including remote catalogs.
 	// Presentation must not prevent playback if a definition becomes unreadable.
-	if s.sources != nil {
-		if sources, err := s.sources.List(); err == nil {
-			for _, source := range sources {
-				if name := strings.TrimSpace(source.Name); name != "" {
-					names[source.ID] = name
-				}
-			}
-		}
-	}
+	names = s.sourceNames()
 	out := []Stream{}
 	for _, rec := range eligible {
 		stream := baseStream(rec, r, names[rec.Provider])
@@ -269,6 +261,15 @@ func (s *Service) PublicPlayback(ctx context.Context, service, provider, sourceI
 	return s.playback(ctx, service, provider, sourceID, mediaType, id, visitor)
 }
 func (s *Service) playback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
+	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{})
+}
+
+type playbackPolicy struct {
+	CachedOnly  bool
+	Fingerprint string
+}
+
+func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation, policy playbackPolicy) (string, error) {
 	if service != "alldebrid" && service != "torbox" {
 		return "", model.ErrInvalid
 	}
@@ -283,6 +284,9 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 	rec, err := s.DB.AIOTorrent(life, provider, sourceID)
 	if err != nil {
 		return "", err
+	}
+	if policy.Fingerprint != "" && rec.Fingerprint != policy.Fingerprint {
+		return "", model.ErrConflict
 	}
 	if !hashRE.MatchString(rec.Hash) || !MatchesEpisode(rec, ParseRelease(rec.Title), r) {
 		return "", model.ErrInvalid
@@ -321,7 +325,13 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 		if err != nil {
 			return "", err
 		}
-		magnet, _, err = s.magnet(life, rec, c)
+		tracker, configured := c.Trackers[rec.Provider]
+		cachedOnly = policy.CachedOnly || ((!configured || tracker.Private) && tracker.AnnounceSecret == "")
+		magnetConfig := c
+		if cachedOnly {
+			magnetConfig.Trackers = nil
+		}
+		magnet, _, err = s.magnet(life, rec, magnetConfig)
 		if err != nil {
 			return "", err
 		}
@@ -391,16 +401,18 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 				stage = "add"
 				item, err = s.Providers.ADAdd(life, key, rec.Hash, magnet)
 				if err != nil {
-					if visitor != nil && cachedOnly {
-						s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
+					if cachedOnly {
+						s.cleanupCachedOnlyMagnet(life, key, rec.Hash, item, inventory, visitor == nil)
 					}
 					return err
 				}
 			}
 			if item.Ready == nil || !*item.Ready {
-				if visitor != nil && cachedOnly && existing == nil && item.ID > 0 {
-					s.cleanupPublicMagnet(life, key, rec.Hash, item, inventory)
-					_ = s.DB.ForgetSharedAvailability(life, service, rec.Hash, observed.CheckedAt)
+				if cachedOnly && existing == nil && item.ID > 0 {
+					s.cleanupCachedOnlyMagnet(life, key, rec.Hash, item, inventory, visitor == nil)
+					if !observed.CheckedAt.IsZero() {
+						_ = s.DB.ForgetSharedAvailability(life, service, rec.Hash, observed.CheckedAt)
+					}
 				}
 				return ErrPending
 			}

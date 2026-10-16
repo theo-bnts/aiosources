@@ -84,6 +84,22 @@ func TestTorrentSearchFragmentsAndQueryOperators(t *testing.T) {
 			if !reflect.DeepEqual(ids, test.want) || page.Total != int64(len(test.want)) {
 				t.Fatalf("query %q: got %v (%d total), want %v", test.query, ids, page.Total, test.want)
 			}
+			// Identification must accept exactly the same fragments, hash forms,
+			// operators and literal SQL pattern characters as source search.
+			for _, status := range []string{"", "pending"} {
+				results, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Query: test.query, Status: status})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var identifiedIDs []string
+				for _, item := range results.Items {
+					identifiedIDs = append(identifiedIDs, item.SourceID)
+				}
+				sort.Strings(identifiedIDs)
+				if results.Total != page.Total || !reflect.DeepEqual(identifiedIDs, ids) {
+					t.Fatalf("identification search diverged for %q / %q: %v, want %v", test.query, status, identifiedIDs, ids)
+				}
+			}
 		})
 	}
 	// A saved fragment query must share the live query and source-filter

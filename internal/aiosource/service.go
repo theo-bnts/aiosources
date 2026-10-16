@@ -38,6 +38,7 @@ type Service struct {
 	flights                   map[string]*flight
 	probes                    map[string]*adProbe
 	slots                     chan struct{}
+	downloadSlots             chan struct{}
 	cleanupSlots              chan struct{}
 	publicProbe               chan struct{}
 	publicADMu                sync.Mutex
@@ -68,6 +69,7 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	}
 	defer release()
 	s.automationWake = make(chan struct{}, 1)
+	s.downloadSlots = make(chan struct{}, 4)
 	// Public cache checks must leave connection capacity for administration.
 	s.publicProbe = make(chan struct{}, 1)
 	if _, err = v.Resolve(ctx, installationSecret); errors.Is(err, model.ErrNotFound) {

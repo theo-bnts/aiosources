@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -203,6 +204,7 @@ export function TorrentsPage() {
       ) : (
         torrents.data && (
           <>
+            <ResultCount total={torrents.data.total} label="torrents" />
             {torrents.data.items?.length ? (
               <TorrentTable items={torrents.data.items} onOpen={openOccurrence} />
             ) : (
@@ -348,6 +350,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
       ) : (
         records.data && (
           <>
+            <ResultCount total={records.data.total} label="processed records" />
             {records.data.items?.length ? (
               <div className="table-frame">
                 <Table>

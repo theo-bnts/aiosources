@@ -309,7 +309,7 @@ test.describe('return navigation', () => {
     await page.getByRole('link', { name: 'Open processed record for record', exact: true }).click()
     await expect(page).toHaveURL(/\/raw\/[0-9]+$/)
     await page.reload()
-    await page.locator('main').getByRole('link', { name: 'Search', exact: true }).click()
+    await page.locator('main').getByRole('link', { name: 'Torrent search', exact: true }).click()
     await expect(page).toHaveURL(origin)
     await expect(page.getByLabel('Search text', { exact: true })).toHaveValue('example')
   })

@@ -26,6 +26,7 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
+	DisplayTitle string         `json:"display_title"`
 	Adult        bool           `json:"adult"`
 	ID           int64          `json:"id"`
 	Type         string         `json:"type"`

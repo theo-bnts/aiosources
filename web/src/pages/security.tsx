@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useEffect, useRef, useState } from 'react'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -276,6 +277,7 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
             />
           </div>
           <ErrorNotice error={sessions.error} retry={() => void sessions.refetch()} />
+          {sessions.data && <ResultCount total={sessionItems.length} label="sessions" />}
           {sessions.isPending ? (
             <Loading label="Loading sessions" />
           ) : (

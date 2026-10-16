@@ -1,0 +1,56 @@
+package model
+
+import "time"
+
+// CatalogTitle is a local, identified title. It never contains source payloads
+// or account credentials. The media type determines the selection controls.
+type CatalogTitle struct {
+	Selection CatalogSelection `json:"selection"`
+	Seasons   []int            `json:"seasons"`
+	ID        int64            `json:"id"`
+	Type      string           `json:"type"`
+	Title     string           `json:"title"`
+	Years     []int            `json:"years"`
+	TMDB      string           `json:"tmdb"`
+	IMDb      string           `json:"imdb"`
+	Releases  int64            `json:"releases"`
+	Providers []string         `json:"providers"`
+}
+
+type CatalogRelease struct {
+	Fingerprint  string                `json:"fingerprint"`
+	OccurrenceID string                `json:"occurrence_id"`
+	Provider     string                `json:"provider"`
+	Title        string                `json:"title"`
+	Size         int64                 `json:"size"`
+	PublishedAt  *time.Time            `json:"published_at,omitempty"`
+	Languages    []string              `json:"languages"`
+	Services     []CatalogAvailability `json:"services"`
+}
+
+type CatalogAvailability struct {
+	Service  string `json:"service"`
+	State    string `json:"state"`
+	CanAdd   bool   `json:"can_add"`
+	Filename string `json:"filename,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+}
+
+type CatalogSelection struct {
+	Season  *int `json:"season,omitempty"`
+	Episode *int `json:"episode,omitempty"`
+}
+
+type CatalogDownloadInput struct {
+	CatalogSelection
+	Fingerprint   string `json:"fingerprint"`
+	OccurrenceID  string `json:"occurrence_id"`
+	Service       string `json:"service"`
+	AllowUncached bool   `json:"allow_uncached"`
+}
+
+type CatalogDownload struct {
+	Status      string `json:"status"`
+	URL         string `json:"url,omitempty"`
+	OperationID string `json:"operation_id"`
+}

@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -7,7 +8,7 @@ import type { MatchDiagnostic } from '@/lib/aiosource-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
 import { useURLPagination } from '@/lib/pagination'
 import { useViewSearchParams } from '@/lib/detail-navigation'
-import { number, useDate } from '@/lib/format'
+import { useDate } from '@/lib/format'
 import { identificationResults } from '@/lib/identification'
 import { ClearFiltersButton, ListEmpty, ErrorNotice, Loading, Pager } from '@/components/common'
 import { Input } from '@/components/ui/input'
@@ -129,7 +130,7 @@ export function MatchingDiagnostics() {
         }}
       >
         <div className="field min-w-0 basis-full sm:basis-auto sm:flex-1">
-          <Label htmlFor="matching-search">Title or source ID</Label>
+          <Label htmlFor="matching-search">Title, source ID or info hash</Label>
           <Input key={q} id="matching-search" name="q" defaultValue={q} />
         </div>
         <Button type="submit" variant="outline" className="self-end">
@@ -154,9 +155,7 @@ export function MatchingDiagnostics() {
       ) : (
         records.data && (
           <>
-            <p className="help" role="status">
-              {number(records.data.total)} torrents in this view.
-            </p>
+            <ResultCount total={records.data.total} label="torrents" />
             {records.data.items?.length ? (
               <>
                 <div

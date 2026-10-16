@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -18,8 +20,13 @@ LEFT JOIN ingest.aio_works w ON w.id=m.work_id`
 const aioDiagnosticSource = ` FROM ingest.torrents t` + aioDiagnosticJoins
 
 func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOptions) (model.List[model.AIOMatchDiagnostic], error) {
-	opts = pageOptions(opts)
+	status := opts.Status
+	opts, err := torrentSearchOptions(opts)
+	opts.Status = status
 	result := model.List[model.AIOMatchDiagnostic]{Items: []model.AIOMatchDiagnostic{}, Limit: opts.Limit, Offset: opts.Offset}
+	if err != nil {
+		return result, err
+	}
 	if opts.Status != "" && opts.Status != "pending" && opts.Status != "matched" && opts.Status != "ambiguous" && opts.Status != "unmatched" {
 		return result, model.ErrInvalid
 	}
@@ -28,36 +35,35 @@ func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOpti
 		return result, databaseError("begin identification diagnostics", err)
 	}
 	defer rollback(tx)
-	const filter = ` WHERE ($1='' OR provider_id=$1) AND ($2='' OR status=$2)
-AND ($3='' OR strpos(lower(title),lower($3))>0 OR strpos(lower(source_id),lower($3))>0)`
-	const projection = `WITH diagnostics AS (SELECT t.occurrence_id,t.provider_id,t.source_id,
+	sourceFilter, _, args, _ := torrentSearchSQL(opts)
+	selected := `SELECT occurrence_id,provider_id,source_id,fields,fields_fingerprint` + sourceFilter
+	projection := `WITH selected AS (` + selected + `), diagnostics AS (SELECT t.occurrence_id,t.provider_id,t.source_id,
 COALESCE(t.fields->>'title','') AS title,` + aioDiagnosticStatus + ` AS status,
-m.reason, w.imdb_id, m.updated_at` + aioDiagnosticSource + `)`
+m.reason, w.imdb_id, m.updated_at FROM selected t` + aioDiagnosticJoins + `)`
+	filter := fmt.Sprintf(` WHERE status=$%d`, len(args)+1)
 	countSQL := projection + ` SELECT count(*) FROM diagnostics` + filter
-	countArgs := []any{opts.ProviderID, opts.Status, opts.Query}
+	countArgs := append(append([]any{}, args...), opts.Status)
 	listSQL := projection + ` SELECT occurrence_id,provider_id,source_id,title,status,
 CASE WHEN status='pending' THEN 'awaiting identification' ELSE COALESCE(reason,'') END,
 CASE WHEN status='matched' THEN COALESCE(imdb_id,'') ELSE '' END,
 CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics` + filter + `
-ORDER BY provider_id,source_id LIMIT $4 OFFSET $5`
-	listArgs := []any{opts.ProviderID, opts.Status, opts.Query, opts.Limit, opts.Offset}
+ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(countArgs)+1, len(countArgs)+2)
+	listArgs := append(append([]any{}, countArgs...), opts.Limit, opts.Offset)
 	if opts.Status == "" {
 		// Without a decision filter, count only the catalog and join decisions
 		// after selecting the visible page. Otherwise even an ordinary list
 		// computes fingerprints and joins metadata for the entire catalog twice.
-		const sourceFilter = ` WHERE ($1='' OR provider_id=$1)
-AND ($2='' OR strpos(lower(COALESCE(fields->>'title','')),lower($2))>0 OR strpos(lower(source_id),lower($2))>0)`
-		countSQL = `SELECT count(*) FROM ingest.torrents` + sourceFilter
-		countArgs = []any{opts.ProviderID, opts.Query}
-		listSQL = `WITH selected AS MATERIALIZED (SELECT occurrence_id,provider_id,source_id,fields,fields_fingerprint FROM ingest.torrents` + sourceFilter + `
-ORDER BY provider_id,source_id LIMIT $3 OFFSET $4), diagnostics AS (
+		countSQL = `SELECT count(*)` + sourceFilter
+		countArgs = args
+		listSQL = `WITH selected AS MATERIALIZED (` + selected + `
+ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(args)+1, len(args)+2) + `), diagnostics AS (
 SELECT t.occurrence_id,t.provider_id,t.source_id,COALESCE(t.fields->>'title','') AS title,` + aioDiagnosticStatus + ` AS status,
 m.reason,w.imdb_id,m.updated_at FROM selected t` + aioDiagnosticJoins + `)
 SELECT occurrence_id,provider_id,source_id,title,status,
 CASE WHEN status='pending' THEN 'awaiting identification' ELSE COALESCE(reason,'') END,
 CASE WHEN status='matched' THEN COALESCE(imdb_id,'') ELSE '' END,
 CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics ORDER BY provider_id,source_id`
-		listArgs = []any{opts.ProviderID, opts.Query, opts.Limit, opts.Offset}
+		listArgs = append(append([]any{}, args...), opts.Limit, opts.Offset)
 	}
 	if err = tx.QueryRow(ctx, countSQL, countArgs...).Scan(&result.Total); err != nil {
 		return result, databaseError("count identification diagnostics", err)

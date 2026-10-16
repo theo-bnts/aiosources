@@ -416,6 +416,9 @@ func (s *Service) RecoverCleanup(ctx context.Context, key string, retry bool) (c
 	return err
 }
 func (s *Service) Availability(ctx context.Context, c model.AIOConfig, resource string, hashes []string) (map[string]map[string]model.AIOAvailability, error) {
+	return s.availability(ctx, c, resource, hashes, "playback")
+}
+func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource string, hashes []string, trigger string) (map[string]map[string]model.AIOAvailability, error) {
 	sort.Strings(hashes)
 	hashes = uniqueStrings(hashes)
 	out := map[string]map[string]model.AIOAvailability{}
@@ -455,7 +458,7 @@ func (s *Service) Availability(ctx context.Context, c model.AIOConfig, resource 
 			return nil, err
 		}
 		warm := found && freshResource(resourceState, missing, time.Now(), time.Duration(c.CacheMinutes)*time.Minute)
-		f, err := s.cacheFlightTriggered(service, key, resource, missing, c, "playback", warm)
+		f, err := s.cacheFlightTriggered(service, key, resource, missing, c, trigger, warm)
 		if err == nil && (!warm || !f.warm) {
 			flights = append(flights, f)
 		} else if err != nil && !errors.Is(err, model.ErrBusy) {

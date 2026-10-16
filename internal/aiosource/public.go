@@ -575,7 +575,7 @@ func publicMagnet(rec model.AIORecord, announce string) string {
 	return magnet
 }
 
-func (s *Service) cleanupPublicMagnet(ctx context.Context, key, hash string, item adMagnet, inventory []adMagnet) {
+func (s *Service) cleanupCachedOnlyMagnet(ctx context.Context, key, hash string, item adMagnet, inventory []adMagnet, administrator bool) {
 	if item.ID <= 0 || !strings.EqualFold(item.Hash, hash) {
 		return
 	}
@@ -585,9 +585,20 @@ func (s *Service) cleanupPublicMagnet(ctx context.Context, key, hash string, ite
 		}
 	}
 	// Even an incomplete readiness response can return a confirmed new ID.
-	// Compensate while the request still owns its key; never save a guest job.
+	// The administrator's configured account can recover cleanup after restart.
+	// Visitor jobs stay ephemeral because their credentials are never retained.
 	cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer stop()
+	if administrator {
+		if err := s.DB.AddAIOCleanup(cleanup, model.AIOCleanup{Account: fingerprint(key), Hash: hash, ID: item.ID}); err == nil {
+			if err = s.cleanupHash(cleanup, key, hash, false); err != nil {
+				s.recordPlaybackFailure("alldebrid", &playbackError{stage: "cleanup", cause: err})
+			}
+			return
+		}
+		// If ownership could not be saved, still compensate directly while its
+		// identity is confirmed, as for an ephemeral visitor request.
+	}
 	if err := s.Providers.ADDelete(cleanup, key, item.ID); err != nil {
 		s.recordPlaybackFailure("alldebrid", &playbackError{stage: "cleanup", cause: err})
 	}

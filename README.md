@@ -105,6 +105,10 @@ TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets*
 3. Optionally add your AllDebrid or TorBox key in **Debrid → Settings**. AllDebrid availability checks can create temporary entries in your account; AIOSources only cleans up entries it has confirmed it created.
 4. In **Stremio → Settings**, copy your manifest URL into Stremio or AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
 
+**Connections → Search** finds clean film and series titles in your identified catalog. Open a title to compare its source releases, sort by date, size or source name, and select a season and episode for a series. Cached versions can produce a download link; **Add to debrid** explicitly starts preparation for an uncached version. Private sources need your announce URL for uncached downloads. Download preparation and sanitized provider calls appear in **Debrid → History**. Download links stay in memory and are not retained in history.
+
+**Sources → Torrent search** searches the individual imported records, including title fragments, source IDs and complete or partial info hashes. **Metadata → Identification** accepts the same search syntax when reviewing matches. Each list shows its filtered result count above the rows.
+
 Treat the manifest URL like a password: it grants access to your catalog and configured playback services. Replace its token in Stremio settings to revoke an old link. Use your service accounts according to their terms; a catalog or playback link does not grant rights to its content.
 
 Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links.

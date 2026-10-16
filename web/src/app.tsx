@@ -16,6 +16,7 @@ import {
   DatabaseIcon,
   PlugsConnectedIcon,
   MagnifyingGlassIcon,
+  ListMagnifyingGlassIcon,
   FilmSlateIcon,
   CloudCheckIcon,
   PlayCircleIcon,
@@ -91,9 +92,9 @@ const navigationGroups = [
       },
       {
         to: '/torrents',
-        label: 'Search',
+        label: 'Torrent search',
         description: 'Search torrents imported from your sources.',
-        icon: MagnifyingGlassIcon,
+        icon: ListMagnifyingGlassIcon,
       },
     ],
   },
@@ -142,6 +143,12 @@ const navigationGroups = [
         label: 'Stremio',
         description: 'Connect your catalog to Stremio or AIOStreams.',
         icon: PlayCircleIcon,
+      },
+      {
+        to: '/search',
+        label: 'Search',
+        description: 'Find identified titles and download through your debrid services.',
+        icon: MagnifyingGlassIcon,
       },
       {
         to: '/sharing',

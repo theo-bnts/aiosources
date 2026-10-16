@@ -126,7 +126,7 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 	return queueAIOManyAliases(ctx, tx, []int64{workID}, aliases)
 }
 
-const aioWorkColumns = `w.id,w.media_type,w.tmdb_id,w.imdb_id,w.tvdb_id,w.years,w.revision,w.adult,
+const aioWorkColumns = `w.id,w.media_type,w.tmdb_id,w.imdb_id,w.tvdb_id,w.years,w.revision,w.adult,w.display_title,
 ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title),
 COALESCE((SELECT jsonb_object_agg(season,year) FROM ingest.aio_seasons WHERE work_id=w.id),'{}'),
 COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}')`
@@ -134,7 +134,7 @@ COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM in
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork
 	var seasons, episodes []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.Titles, &seasons, &episodes)
+	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.Titles, &seasons, &episodes)
 	if err != nil {
 		return w, err
 	}
@@ -383,7 +383,7 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 		typ = "movie"
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
-	query := `SELECT ` + aioRecordColumns + `,w.imdb_id,w.tmdb_id,w.tvdb_id FROM ingest.torrents t JOIN ingest.aio_matches m USING(provider_id,source_id) JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.status='matched' AND m.fingerprint=t.fields_fingerprint AND m.revision=w.revision AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id) AND NOT w.adult AND w.media_type=$2 AND w.` + column + `=$1` + order
+	query := `SELECT ` + aioRecordColumns + `,w.imdb_id,w.tmdb_id,w.tvdb_id FROM ingest.torrents t JOIN ingest.aio_matches m USING(provider_id,source_id) JOIN ingest.aio_works w ON w.id=m.work_id WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
 	if kind == "mal" {
 		query = `SELECT ` + aioRecordColumns + ` FROM ingest.torrents t WHERE (` + aioMALAssertionPredicate + `) AND ingest.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
 		rows, err := s.pool.Query(ctx, query, id)

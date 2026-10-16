@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -226,6 +227,7 @@ export function StremioHistoryPage() {
       ) : (
         query.data && (
           <>
+            <ResultCount total={query.data.total} label="requests" />
             {query.data.items?.length ? (
               <div className="table-frame">
                 <Table>
@@ -404,6 +406,7 @@ export function StremioRequestPage() {
                 </section>
                 <section className="space-y-4">
                   <h2 className="section-title">Returned results</h2>
+                  <ResultCount total={item.results?.length ?? 0} label="saved results" />
                   {item.results?.length ? (
                     <div className="table-frame">
                       <Table>
@@ -480,6 +483,7 @@ export function StremioRequestPage() {
             {Boolean(item.calls?.length) && (
               <section className="space-y-4" aria-label="Provider calls">
                 <h2 className="section-title">Provider calls</h2>
+                <ResultCount total={item.calls?.length ?? 0} label="calls" />
                 <div className="table-frame">
                   <Table>
                     <TableHeader>

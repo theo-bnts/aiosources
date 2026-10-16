@@ -1,3 +1,4 @@
+import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useMemo, useRef, useState } from 'react'
@@ -414,6 +415,7 @@ export function ProviderEditor() {
         }
       />
       <ErrorNotice error={adapters.error} retry={() => void adapters.refetch()} />
+      {adapters.data && <ResultCount total={adapters.data.items?.length ?? 0} label="templates" />}
       {adapters.isPending ? (
         <Loading />
       ) : adapters.data?.items?.length ? (

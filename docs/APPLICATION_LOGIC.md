@@ -99,3 +99,13 @@ Migrations 44–45 queue prior misses and affected numbering decisions once, pre
 Authentication forms provide named password and one-time-code fields with the appropriate autocomplete hints. Submission reads the native form values, including password-manager fills that do not emit React change events. Authenticator enrollment uses a six-digit text field with a numeric keyboard, preserving leading zeroes; login and recovery proof fields continue to accept recovery codes.
 
 Creating a source commits the saved editor's replacement synchronously with its URL change. The outgoing creation form cannot accept an edit that would disappear on remount. Ordinary updates retain their draft, revision and pending-write rules.
+
+## Catalog discovery and downloads
+
+Connections Search is an administrator-only view over local identified works. Title search uses normalized aliases and the existing trigram index; published releases use the same source fingerprint, work revision and empty-queue fence as Stremio. Clean display titles are recorded during information updates without changing identification revisions. Existing aliases remain searchable immediately after migration. No TMDB request is made by search.
+
+Series use the existing episode parser, reviewed episode evidence and unambiguous file selection, including season packs. The initial episode is chosen from local release numbering. Release availability reuses the existing per-service shared/account cache and bounded provider checks. Public homepage and installation routes do not grant access to this search API.
+
+Downloads require an authenticated, same-origin CSRF-protected POST, a current work/release relationship and a configured service. Uncached preparation must be explicit; readiness checks use cached-only provider safeguards. Private or unconfigured sources without an announce reference remain cached-only even if a forged request asks for uncached preparation. Existing provider error categories, URL validation, ownership-aware cleanup and limits apply. Four local download slots and a cross-instance release/service lock bound preparation.
+
+Preparation records and sanitized provider calls appear in Debrid history under Download preparation. Waiting is a completed preparation step, not a failed check or a promise that downloading has completed. The browser retries readiness every 15 seconds for at most 20 checks after an explicit uncached addition, and stops on failure or navigation. Resolved URLs are not persisted by the server or browser storage; the browser discards its in-memory link after ten minutes or when changing the selected episode/release.

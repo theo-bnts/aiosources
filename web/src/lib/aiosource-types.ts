@@ -50,6 +50,7 @@ export type MatchDiagnostic = {
 }
 
 export type ReviewWork = {
+  display_title?: string
   id: number
   type: 'movie' | 'tv'
   tmdb: string

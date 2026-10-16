@@ -184,6 +184,18 @@ export function Empty({
   )
 }
 
+export function ResultCount({ total, label = 'results' }: { total: number; label?: string }) {
+  const singular = label
+    .replace(/entries$/, 'entry')
+    .replace(/categories$/, 'category')
+    .replace(/s$/, '')
+  return (
+    <p className="help" role="status" data-result-count>
+      {number(total)} {total === 1 ? singular : label}
+    </p>
+  )
+}
+
 export function Pager({
   total,
   limit,

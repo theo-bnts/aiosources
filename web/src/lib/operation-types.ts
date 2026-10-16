@@ -1,5 +1,5 @@
 export type OperationStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
-export type OperationKind = 'metadata' | 'matching' | 'cache' | 'cleanup'
+export type OperationKind = 'metadata' | 'matching' | 'cache' | 'cleanup' | 'download'
 export type OperationRun = {
   id: string
   kind: OperationKind

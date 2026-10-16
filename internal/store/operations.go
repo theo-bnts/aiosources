@@ -65,7 +65,7 @@ func (s *Store) BeginOperation(ctx context.Context, run model.OperationRun, lock
 }
 
 func validOperation(run model.OperationRun) bool {
-	serviceOK := (run.Kind == "metadata" && run.Service == "tmdb") || (run.Kind == "matching" && run.Service == "local") || (run.Kind == "cache" && (run.Service == "alldebrid" || run.Service == "torbox")) || (run.Kind == "cleanup" && run.Service == "alldebrid")
+	serviceOK := (run.Kind == "metadata" && run.Service == "tmdb") || (run.Kind == "matching" && run.Service == "local") || ((run.Kind == "cache" || run.Kind == "download") && (run.Service == "alldebrid" || run.Service == "torbox")) || (run.Kind == "cleanup" && run.Service == "alldebrid")
 	return serviceOK && (run.Trigger == "manual" || run.Trigger == "automatic" || run.Trigger == "playback") && len(run.Resource) <= 256
 }
 
@@ -117,7 +117,7 @@ func (s *Store) Operation(ctx context.Context, id string) (model.OperationRun, e
 func (s *Store) ListOperations(ctx context.Context, opts model.OperationFilter) (model.List[model.OperationRun], error) {
 	opts.ListOptions = pageOptions(opts.ListOptions)
 	result := model.List[model.OperationRun]{Items: []model.OperationRun{}, Limit: opts.Limit, Offset: opts.Offset}
-	where := ` WHERE ($1='' OR kind=$1) AND ($2='' OR service=$2) AND ($3='' OR status=$3) AND ($4<>'metadata' OR kind IN ('metadata','matching')) AND ($4<>'debrid' OR kind IN ('cache','cleanup'))`
+	where := ` WHERE ($1='' OR kind=$1) AND ($2='' OR service=$2) AND ($3='' OR status=$3) AND ($4<>'metadata' OR kind IN ('metadata','matching')) AND ($4<>'debrid' OR kind IN ('cache','cleanup','download'))`
 	args := []any{opts.Kind, opts.Service, opts.Status, opts.Group}
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_runs`+where, args...).Scan(&result.Total); err != nil {
 		return result, databaseError("count operation history", err)

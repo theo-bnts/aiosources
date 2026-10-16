@@ -125,6 +125,12 @@ function LegacyRawHistory() {
 }
 
 const AIOSourcePage = lazy(() => import('@/pages/aiosource'))
+const CatalogSearchPage = lazy(() =>
+  import('@/pages/catalog-search').then((m) => ({ default: m.CatalogSearchPage })),
+)
+const CatalogTitlePage = lazy(() =>
+  import('@/pages/catalog-search').then((m) => ({ default: m.CatalogTitlePage })),
+)
 const OperationHistoryPage = lazy(() =>
   import('@/pages/operation-history').then((m) => ({ default: m.OperationHistoryPage })),
 )
@@ -280,6 +286,8 @@ const router = createBrowserRouter(
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
         <Route path="torrents" element={<TorrentsPage />} />
+        <Route path="search" element={<CatalogSearchPage />} />
+        <Route path="search/:id" element={<CatalogTitlePage />} />
         <Route path="secrets" element={<Navigate to="/security" replace />} />
         <Route path="schedules" element={<Navigate to="/providers/settings" replace />} />
         <Route path="settings" element={<Navigate to="/providers/settings" replace />} />
