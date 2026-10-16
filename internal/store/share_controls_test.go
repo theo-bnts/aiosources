@@ -76,7 +76,9 @@ func TestCatalogAdmissionRechecksRevocationAfterWaitingForItsLock(t *testing.T) 
 	defer cancel()
 	for {
 		var waiting bool
-		if err := control.QueryRow(deadline, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE '%FROM ingest.shares WHERE id=$1%FOR UPDATE%')`).Scan(&waiting); err != nil {
+		// Inspect live locks, not pg_stat_activity: activity is cached for the
+		// lifetime of this transaction and can miss a waiter on later polls.
+		if err := control.QueryRow(deadline, `SELECT EXISTS(SELECT 1 FROM pg_locks WHERE NOT granted AND pg_backend_pid()=ANY(pg_blocking_pids(pid)))`).Scan(&waiting); err != nil {
 			t.Fatal("admission did not reach its locked recheck:", err)
 		}
 		if waiting {
