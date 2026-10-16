@@ -373,6 +373,10 @@ export function StremioRequestPage() {
                       <dd className="mt-1 tabular-nums">{number(item.invalid_hash)}</dd>
                     </div>
                     <div>
+                      <dt className="help">Excluded by language filter</dt>
+                      <dd className="mt-1 tabular-nums">{number(item.language_excluded ?? 0)}</dd>
+                    </div>
+                    <div>
                       <dt className="help">Different episode</dt>
                       <dd className="mt-1 tabular-nums">{number(item.wrong_episode)}</dd>
                     </div>
@@ -393,9 +397,11 @@ export function StremioRequestPage() {
                     <p className="notice notice-warning">
                       {item.matched === 0
                         ? 'No current identification was published for this resource.'
-                        : item.eligible === 0
-                          ? 'All source records were excluded by their info hash or episode.'
-                          : 'The configured playback services returned no eligible results.'}
+                        : (item.language_excluded ?? 0) > 0
+                          ? 'The installed language filter excluded source records. Disable it or include more languages in the installation link.'
+                          : item.eligible === 0
+                            ? 'All source records were excluded by their info hash or episode.'
+                            : 'The configured playback services returned no eligible results.'}
                     </p>
                   )}
                   {item.outcome === 'failed' && (

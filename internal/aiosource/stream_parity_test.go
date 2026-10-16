@@ -42,8 +42,17 @@ func TestV1StreamPresentationAndEpisodeEligibility(t *testing.T) {
 	for _, fixture := range fixtures.Languages {
 		t.Run("languages/"+fixture.Title+"/"+strings.Join(fixture.Languages, ","), func(t *testing.T) {
 			stream := baseStream(model.AIORecord{Provider: "example", Title: fixture.Title, Languages: fixture.Languages}, Resource{Type: "movie", Kind: "imdb", ID: "tt1234567"}, "")
-			got := flags.FindAllString(stream.Title, -1)
-			if !slices.Equal(got, fixture.Flags) {
+			got := flags.FindAllString(stream.Name+stream.Title, -1)
+			want := fixture.Flags
+			// V1 conflated subtitle markers with spoken French. With a language
+			// filter this would hide original audio and invent audio metadata.
+			if strings.Contains(fixture.Title, "VOSTFR") && len(fixture.Languages) == 0 {
+				want = nil
+				if !strings.Contains(stream.Title, "FR subtitles") {
+					t.Fatal("subtitle information lost")
+				}
+			}
+			if !slices.Equal(got, want) {
 				t.Fatalf("language flags %v, want v1 %v", got, fixture.Flags)
 			}
 		})

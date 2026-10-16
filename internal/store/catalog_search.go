@@ -12,9 +12,15 @@ import (
 const aioPublishedMatch = `m.status='matched' AND m.fingerprint=t.fields_fingerprint AND m.revision=w.revision
 AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id) AND NOT w.adult`
 const catalogReleaseSource = ` FROM ingest.aio_matches m JOIN ingest.torrents t USING(provider_id,source_id) WHERE m.work_id=w.id AND ` + aioPublishedMatch
-const catalogTitleColumns = `w.id,w.media_type,COALESCE(NULLIF(w.display_title,''),
-(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1),'Untitled'),w.years,w.tmdb_id,w.imdb_id,
-(SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id)`
+
+// Localized labels do not change correspondence. A matching local alias is the
+// query-language fallback, followed by the English primary title.
+func catalogTitleColumns(locale, alias string) string {
+	label := `COALESCE(NULLIF(w.localized_titles->>` + locale + `,''),` + alias + `,NULLIF(w.localized_titles->>'en',''),NULLIF(w.display_title,''),
+ (SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1),'Untitled')`
+	return `w.id,w.media_type,` + label + `,w.years,w.tmdb_id,w.imdb_id,
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id)`
+}
 
 func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	var title model.CatalogTitle
@@ -22,22 +28,32 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	return title, err
 }
 
-func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized, kind string) (model.List[model.CatalogTitle], error) {
+func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized, kind string, locales ...string) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
 	if !validSearchText(opts.Query, 500) || len([]rune(normalized)) < 2 || (kind != "" && kind != "movie" && kind != "tv") {
 		return result, model.ErrInvalid
 	}
-	args := []any{strings.TrimSpace(opts.Query), kind}
+	locale := "en"
+	if len(locales) > 0 && locales[0] != "" {
+		locale = locales[0]
+	}
+	args := []any{strings.TrimSpace(opts.Query), kind, normalized}
 	terms := []string{}
 	for _, word := range strings.Fields(normalized) {
 		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
 		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
 	}
-	filter := ` FROM (SELECT id FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
-UNION SELECT work_id FROM ingest.aio_titles WHERE ` + strings.Join(terms, " AND ") + `) candidates
-JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND ($2='' OR w.media_type=$2)
-AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
+	matching := strings.Join(terms, " AND ")
+	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
+ SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
+ UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
+ public.similarity($3,normalized) FROM ingest.aio_titles WHERE ` + matching + `) matches GROUP BY id) candidates
+ JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND ($2='' OR w.media_type=$2)
+ AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
+	alias := `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + matching + ` ORDER BY public.similarity($3,normalized) DESC,length(normalized),title LIMIT 1)`
+	columns := catalogTitleColumns(fmt.Sprintf("$%d", len(args)+1), alias)
+
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return result, databaseError("begin catalog search", err)
@@ -46,8 +62,8 @@ AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	if err = tx.QueryRow(ctx, `SELECT count(*)`+filter, args...).Scan(&result.Total); err != nil {
 		return result, databaseError("count catalog titles", err)
 	}
-	args = append(args, opts.Limit, opts.Offset)
-	rows, err := tx.Query(ctx, `SELECT `+catalogTitleColumns+filter+fmt.Sprintf(` ORDER BY lower(COALESCE(NULLIF(w.display_title,''),(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1))),w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
+	args = append(args, locale, opts.Limit, opts.Offset)
+	rows, err := tx.Query(ctx, `SELECT `+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
 	}
@@ -67,8 +83,26 @@ AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	return result, databaseError("finish catalog search", tx.Commit(ctx))
 }
 
-func (s *Store) CatalogTitle(ctx context.Context, id int64) (model.CatalogTitle, error) {
-	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns+` FROM ingest.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, id))
+func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (model.CatalogTitle, error) {
+	locale := "en"
+	if len(locales) > 0 && locales[0] != "" {
+		locale = locales[0]
+	}
+	args := []any{id, locale}
+	alias := "NULL"
+	if len(locales) > 1 && locales[1] != "" && len(locales[1]) <= 500 {
+		normalized := locales[1]
+		args = append(args, normalized)
+		terms := []string{}
+		for _, word := range strings.Fields(normalized) {
+			args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
+			terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
+		}
+		if len(terms) > 0 {
+			alias = `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + strings.Join(terms, " AND ") + ` ORDER BY public.similarity($3,normalized) DESC,length(normalized),title LIMIT 1)`
+		}
+	}
+	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM ingest.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, args...))
 	return title, databaseError("read catalog title", err)
 }
 

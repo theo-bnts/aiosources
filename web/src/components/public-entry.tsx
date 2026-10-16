@@ -1,3 +1,9 @@
+import { LanguageFilter } from '@/components/language-filter'
+import {
+  useLanguagePreferences,
+  resolvedLanguage,
+  preferenceManifest,
+} from '@/lib/language-preferences'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -17,6 +23,7 @@ type PublicInfo = {
   private_sources?: { id: string; name: string }[]
 }
 export function PublicEntry({ authenticated = false }: { authenticated?: boolean }) {
+  const [preferences, setPreferences] = useLanguagePreferences()
   const info = useQuery({
     queryKey: ['public-config'],
     queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
@@ -64,6 +71,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
         cache: 'no-store',
         body: JSON.stringify({
           services,
+          preferences: { ...preferences, language: resolvedLanguage(preferences) },
           ...(Object.keys(announces).length ? { announces } : {}),
         }),
         signal: controller.signal,
@@ -159,6 +167,13 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
               ))}
             </Disclosure>
           )}
+          <LanguageFilter
+            value={preferences}
+            onChange={(next) => {
+              setPreferences(next)
+              setManifest((current) => (current ? preferenceManifest(current, next) : ''))
+            }}
+          />
           <ErrorNotice error={error || info.error} />
           <Button type="submit" disabled={pending}>
             {pending ? 'Checking services…' : 'Create installation link'}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
@@ -67,15 +68,11 @@ func baseStream(rec model.AIORecord, r Resource, sourceName string) Stream {
 	}
 	q := quality(rec.Title)
 	languages := streamLanguages(rec)
-	details := "📦 " + streamSize(rec.Size) + "  🌐 " + sourceName
-	if label := streamLanguageLabel(languages); label != "" {
-		details += "  🏷️ " + label
-	}
 	hints := Behavior{BingeGroup: streamBingeGroup(rec, r, q, languages), Size: max(0, rec.Size), Filename: rec.Title, NotWebReady: true, Indexer: sourceName, Duration: rec.DurationSeconds}
 	if rec.PublishedAt != nil {
 		hints.PublishDate = rec.PublishedAt.UTC().Format(time.RFC3339Nano)
 	}
-	return Stream{Name: "［AIO " + sourceName + "］ " + q, InfoHash: rec.Hash, Title: rec.Title + "\n" + details, Hints: hints}
+	return formatStream(Stream{InfoHash: rec.Hash, Hints: hints}, rec)
 }
 func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string) (streams []Stream, streamErr error) {
 	return s.streams(ctx, base, token, mediaType, id, nil)
@@ -101,13 +98,17 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			}
 			history.Returned = len(streams)
 		}
+		if streamErr == nil {
+			sort.SliceStable(streams, func(i, j int) bool { return streams[i].Hints.Size > streams[j].Hints.Size })
+			sort.SliceStable(history.Results, func(i, j int) bool { return history.Results[i].Size > history.Results[j].Size })
+			if len(history.Results) > 1000 {
+				history.Results = history.Results[:1000]
+				history.Truncated = true
+			}
+		}
 		s.saveStremioHistory(history)
 	}()
 	recordResult := func(rec model.AIORecord, item Stream, service, cache string) {
-		if len(history.Results) >= 1000 {
-			history.Truncated = true
-			return
-		}
 		history.Results = append(history.Results, model.StremioResult{Name: item.Name, Provider: rec.Provider, ProviderName: names[rec.Provider], SourceID: rec.SourceID, Title: item.Title, Service: service, Cache: cache, Filename: item.Hints.Filename, Size: max(0, item.Hints.Size)})
 	}
 	r, err := ParseID(id, mediaType)
@@ -117,6 +118,13 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	rows, err := s.DB.AIOStreams(ctx, r.Kind, r.ID, mediaType)
 	if err != nil {
 		return nil, err
+	}
+	_, preferences, err := InstallationPreferences(token)
+	if err != nil {
+		return nil, model.ErrInvalid
+	}
+	if visitor != nil {
+		preferences = visitor.Preferences
 	}
 	history.Matched = len(rows)
 	c, err := s.DB.AIOConfig(ctx)
@@ -136,6 +144,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 		}
 		if !MatchesEpisode(rec, ParseRelease(rec.Title), r) {
 			history.WrongEpisode++
+			continue
+		}
+		if !AllowsLanguage(rec, preferences) {
+			history.LanguageExcluded++
 			continue
 		}
 		eligible = append(eligible, rec)

@@ -27,11 +27,12 @@ type PublicProvider struct {
 var PublicProviders = []PublicProvider{{"alldebrid", "AllDebrid"}, {"torbox", "TorBox"}}
 
 type PublicInstallation struct {
-	Version    int               `json:"version"`
-	Generation int64             `json:"generation"`
-	Audience   string            `json:"audience"`
-	Services   map[string]string `json:"services"`
-	Announces  map[string]string `json:"announces,omitempty"`
+	Preferences model.StreamPreferences `json:"-"`
+	Version     int                     `json:"version"`
+	Generation  int64                   `json:"generation"`
+	Audience    string                  `json:"audience"`
+	Services    map[string]string       `json:"services"`
+	Announces   map[string]string       `json:"announces,omitempty"`
 }
 
 // This is a consented list of source names, never a source definition or secret
@@ -237,7 +238,11 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 	if !access.Enabled {
 		return nil, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(value)
+	credential, preferences, err := InstallationPreferences(value)
+	if err != nil {
+		return nil, ErrAuth
+	}
+	sealed, err := base64.RawURLEncoding.DecodeString(credential)
 	if err != nil {
 		return nil, ErrAuth
 	}
@@ -250,6 +255,7 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
 		return nil, ErrAuth
 	}
+	out.Preferences = preferences
 	return &out, nil
 }
 func (s *Service) PublicStreams(ctx context.Context, base, configuration, mediaType, id string, visitor *PublicInstallation) ([]Stream, error) {

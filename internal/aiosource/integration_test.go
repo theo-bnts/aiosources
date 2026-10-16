@@ -99,7 +99,7 @@ func TestLocalPublicationProvenanceAndStaleRevision(t *testing.T) {
 	if err != nil || len(out) != 2 {
 		t.Fatalf("streams %+v %v", out, err)
 	}
-	if out[0].InfoHash != hash || !strings.Contains(out[0].Title, "🇫🇷") || out[0].Hints.Size != 5000000000 {
+	if out[0].InfoHash != hash || !strings.Contains(out[0].Name, "🇫🇷") || out[0].Hints.Size != 5000000000 {
 		t.Fatal("missing stream metadata")
 	}
 	if _, err = conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Different.Movie.2021"') WHERE provider_id='one'`); err != nil {

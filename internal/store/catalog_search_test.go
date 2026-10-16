@@ -23,7 +23,12 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 	}
 	for _, q := range []struct{ raw, normalized string }{{"Example Movie New Day", "example movie new day"}, {"Movie", "movie"}, {"autre", "autre"}, {"tt1234567", "tt1234567"}, {"101", "101"}} {
 		page, err := db.CatalogTitles(ctx, model.ListOptions{Query: q.raw}, q.normalized, "")
-		if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].Title != work.Titles[0] || page.Items[0].Releases != 2 {
+		if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].Title != func() string {
+			if q.raw == "autre" {
+				return "Un autre titre"
+			}
+			return work.Titles[0]
+		}() || page.Items[0].Releases != 2 {
 			t.Fatalf("search %q: %+v %v", q.raw, page, err)
 		}
 		rows, err := db.CatalogRecords(ctx, page.Items[0].ID)
@@ -76,5 +81,46 @@ func TestDisplayTitleDoesNotInvalidateMatching(t *testing.T) {
 	var revision int
 	if err := db.pool.QueryRow(ctx, `SELECT display_title,revision FROM ingest.aio_works`).Scan(&title, &revision); err != nil || title != "Alternative title" || revision != 1 {
 		t.Fatalf("presentation change invalidated matching: %q %d %v", title, revision, err)
+	}
+}
+
+func TestCatalogLocalTitlesUseBrowserQueryEnglishFallbackAndRelevance(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	for i, w := range []model.AIOWork{
+		{Type: "movie", TMDB: "101", Titles: []string{"Example Ocean", "Océan Exemple"}, Years: []int{2000}, LocalizedTitles: map[string]string{"en": "Example Ocean", "fr": "Océan Exemple"}},
+		{Type: "movie", TMDB: "102", Titles: []string{"Example Ocean", "Océan Exemple"}, Years: []int{2026}, LocalizedTitles: map[string]string{"en": "Example Ocean", "fr": "Océan Exemple"}},
+		{Type: "movie", TMDB: "103", Titles: []string{"Example Oceanic Adventure"}, Years: []int{2030}, LocalizedTitles: map[string]string{"en": "Example Oceanic Adventure"}},
+		{Type: "movie", TMDB: "104", Titles: []string{"The Example Ocean"}, Years: []int{2040}, LocalizedTitles: map[string]string{"en": "The Example Ocean"}},
+	} {
+		normalized := []string{"example ocean", "ocean exemple"}
+		if i == 2 {
+			normalized = []string{"example oceanic adventure"}
+		}
+		if i == 3 {
+			normalized = []string{"the example ocean"}
+		}
+		if err := db.SaveAIOWork(ctx, w, normalized); err != nil {
+			t.Fatal(err)
+		}
+		publishSharingRow(t, ctx, db, "source", w.TMDB, `{"title":"Example","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
+	}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM ingest.aio_match_queue;`); err != nil {
+		t.Fatal(err)
+	}
+	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example ocean"}, "example ocean", "", "fr")
+	if err != nil || page.Total != 4 {
+		t.Fatal(page, err)
+	}
+	if page.Items[0].TMDB != "102" || page.Items[1].TMDB != "101" || page.Items[2].TMDB != "104" || page.Items[3].TMDB != "103" || page.Items[0].Title != "Océan Exemple" {
+		t.Fatal("relevance, year or browser title incorrect", page)
+	}
+	fallback, err := db.CatalogTitles(ctx, model.ListOptions{Query: "océan exemple"}, "ocean exemple", "", "ja")
+	if err != nil || fallback.Total != 2 || fallback.Items[0].Title != "Océan Exemple" {
+		t.Fatal("query-language alias fallback lost", fallback, err)
+	}
+	detail, err := db.CatalogTitle(ctx, page.Items[0].ID, "ja")
+	if err != nil || detail.Title != "Example Ocean" {
+		t.Fatal("English fallback lost", detail, err)
 	}
 }

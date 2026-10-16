@@ -10,3 +10,6 @@ ALTER TABLE ingest.operation_runs ADD CONSTRAINT operation_runs_kind_service_che
  CHECK ((kind='metadata' AND service='tmdb') OR (kind='matching' AND service='local')
  OR (kind IN ('cache','download') AND service IN ('alldebrid','torbox')) OR (kind='cleanup' AND service='alldebrid'));
 `
+
+const localizedTitlesSchema = `ALTER TABLE ingest.aio_works ADD COLUMN localized_titles JSONB NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(localized_titles)='object');
+ALTER TABLE ingest.stremio_requests ADD COLUMN language_excluded INTEGER NOT NULL DEFAULT 0 CHECK(language_excluded>=0);`

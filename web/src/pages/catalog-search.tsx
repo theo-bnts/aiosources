@@ -1,3 +1,9 @@
+import { LanguageFilter } from '@/components/language-filter'
+import {
+  useLanguagePreferences,
+  resolvedLanguage,
+  browserLanguage,
+} from '@/lib/language-preferences'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
@@ -33,16 +39,17 @@ function TitleDetails({ title }: { title: CatalogTitle }) {
 }
 
 export function CatalogSearchPage() {
+  const language = browserLanguage()
   const [search, setSearch] = useViewSearchParams()
   const listState = useListViewState()
   const pagination = useURLPagination()
   const q = search.get('q') || ''
   const kind = search.get('type') || ''
   const query = useQuery({
-    queryKey: ['catalog-search', q, kind, pagination.limit, pagination.offset],
+    queryKey: ['catalog-search', q, kind, language, pagination.limit, pagination.offset],
     queryFn: ({ signal }) =>
       api<Page<CatalogTitle>>(
-        `/catalog/search?${params({ q, type: kind, limit: pagination.limit, offset: pagination.offset })}`,
+        `/catalog/search?${params({ q, type: kind, language, limit: pagination.limit, offset: pagination.offset })}`,
         { signal },
       ),
     enabled: q.trim().length >= 2,
@@ -117,7 +124,7 @@ export function CatalogSearchPage() {
                       <TableRow key={title.id}>
                         <TableCell className="whitespace-normal">
                           <Link
-                            to={`/search/${title.id}`}
+                            to={`/search/${title.id}?${params({ q })}`}
                             state={listState}
                             className="font-medium break-words"
                           >
@@ -129,7 +136,7 @@ export function CatalogSearchPage() {
                         <TableCell>
                           <Button asChild size="icon-sm" variant="ghost">
                             <Link
-                              to={`/search/${title.id}`}
+                              to={`/search/${title.id}?${params({ q })}`}
                               state={listState}
                               aria-label={`Show releases for ${title.title}`}
                             >
@@ -163,14 +170,21 @@ export function CatalogSearchPage() {
 }
 
 export function CatalogTitlePage() {
+  const [preferences, setPreferences] = useLanguagePreferences()
+  const language = resolvedLanguage(preferences)
+  const titleLanguage = browserLanguage()
   const { id = '' } = useParams()
   const [search, setSearch] = useViewSearchParams()
   const pagination = useURLPagination()
   const sourceName = useSourceNames()
   const date = useDate()
   const title = useQuery({
-    queryKey: ['catalog-title', id],
-    queryFn: ({ signal }) => api<CatalogTitle>(`/catalog/${id}`, { signal }),
+    queryKey: ['catalog-title', id, titleLanguage, search.get('q')],
+    queryFn: ({ signal }) =>
+      api<CatalogTitle>(
+        `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`,
+        { signal },
+      ),
   })
   const selection: CatalogSelection =
     title.data?.type === 'tv'
@@ -179,10 +193,12 @@ export function CatalogTitlePage() {
           episode: Number(search.get('episode') ?? title.data.selection.episode ?? 1),
         }
       : {}
-  const sort = search.get('sort') || 'recent'
+  const sort = search.get('sort') || 'size_desc'
   const provider = search.get('provider') || ''
   const query = params({
     ...selection,
+    language,
+    language_mode: preferences.mode,
     sort,
     provider,
     limit: pagination.limit,
@@ -217,6 +233,13 @@ export function CatalogTitlePage() {
         title.data && (
           <>
             <TitleDetails title={title.data} />
+            <LanguageFilter
+              value={preferences}
+              onChange={(next) => {
+                setPreferences(next)
+                pagination.setOffset(0)
+              }}
+            />
             <div className="flex flex-wrap items-end gap-3">
               {title.data.type === 'tv' && (
                 <form
@@ -382,8 +405,8 @@ export function CatalogTitlePage() {
                       title="No source releases"
                       description={
                         title.data.type === 'tv'
-                          ? 'No current releases match this season and episode. Try another episode or check identification.'
-                          : 'This title no longer has current source releases.'
+                          ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
+                          : 'No releases match the selected source and language filters. Adjust them to see other versions.'
                       }
                     />
                   )}

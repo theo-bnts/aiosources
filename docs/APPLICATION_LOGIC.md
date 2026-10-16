@@ -109,3 +109,12 @@ Series use the existing episode parser, reviewed episode evidence and unambiguou
 Downloads require an authenticated, same-origin CSRF-protected POST, a current work/release relationship and a configured service. Uncached preparation must be explicit; readiness checks use cached-only provider safeguards. Private or unconfigured sources without an announce reference remain cached-only even if a forged request asks for uncached preparation. Existing provider error categories, URL validation, ownership-aware cleanup and limits apply. Four local download slots and a cross-instance release/service lock bound preparation.
 
 Preparation records and sanitized provider calls appear in Debrid history under Download preparation. Waiting is a completed preparation step, not a failed check or a promise that downloading has completed. The browser retries readiness every 15 seconds for at most 20 checks after an explicit uncached addition, and stops on failure or navigation. Resolved URLs are not persisted by the server or browser storage; the browser discards its in-memory link after ten minutes or when changing the selected episode/release.
+
+
+### Local discovery and installation language preferences
+
+Catalog title search reads PostgreSQL only. Metadata synchronization retains TMDB translation language codes; existing entries without language codes use the closest matching local alias, then the English primary title. Search never refetches a title from TMDB. Exact and close title matches rank before newer release years; popularity is not stored.
+
+Source versions and addon responses default to largest first. The optional shared language filter includes the browser's language, MULTI and unknown audio by default; it can include fewer groups or be disabled. Browser preferences contain no credentials. Addon preferences are validated non-secret suffixes on installation URLs so a server-side client does not substitute its own locale. Old installation URLs retain their previous unfiltered behavior. Key validation, public-mode revocation and private-source playback safeguards run unchanged. Changing an installed filter requires copying or installing the updated URL.
+
+Audio language evidence is separate from subtitle markers. VOSTFR indicates French subtitles and cannot alone establish French audio. Stream history records language exclusions. Presentation keeps the original filename and supported behavior hints for AIOStreams; formatted text is never matching evidence, and formatting makes no provider requests.

@@ -101,16 +101,17 @@ type tmdbSeasonDetails struct {
 	} `json:"episodes"`
 }
 type tmdbDetails struct {
-	Adult         *bool  `json:"adult"`
-	ID            int64  `json:"id"`
-	Title         string `json:"title"`
-	OriginalTitle string `json:"original_title"`
-	Name          string `json:"name"`
-	OriginalName  string `json:"original_name"`
-	Date          string `json:"release_date"`
-	AirDate       string `json:"first_air_date"`
-	IMDb          string `json:"imdb_id"`
-	External      *struct {
+	Adult            *bool  `json:"adult"`
+	ID               int64  `json:"id"`
+	Title            string `json:"title"`
+	OriginalTitle    string `json:"original_title"`
+	OriginalLanguage string `json:"original_language"`
+	Name             string `json:"name"`
+	OriginalName     string `json:"original_name"`
+	Date             string `json:"release_date"`
+	AirDate          string `json:"first_air_date"`
+	IMDb             string `json:"imdb_id"`
+	External         *struct {
 		IMDb string `json:"imdb_id"`
 		TVDB *int64 `json:"tvdb_id"`
 	} `json:"external_ids"`
@@ -124,7 +125,8 @@ type tmdbDetails struct {
 	} `json:"alternative_titles"`
 	Translations *struct {
 		Items []struct {
-			Data struct{ Title, Name string } `json:"data"`
+			Language string                       `json:"iso_639_1"`
+			Data     struct{ Title, Name string } `json:"data"`
 		} `json:"translations"`
 	} `json:"translations"`
 	Releases *struct {
@@ -173,6 +175,10 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 	if strings.TrimSpace(primary) == "" {
 		return w, ErrInvalidResponse
 	}
+	w.LocalizedTitles = map[string]string{"en": primary}
+	if lang := NormalizeLanguage(d.OriginalLanguage); lang != "" && Normalize(original) != "" {
+		w.LocalizedTitles[lang] = original
+	}
 	titles := []string{primary, original}
 	for _, a := range d.Alternatives.Titles {
 		titles = append(titles, a.Title)
@@ -182,6 +188,15 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 	}
 	for _, a := range d.Translations.Items {
 		titles = append(titles, a.Data.Title, a.Data.Name)
+		if lang := NormalizeLanguage(a.Language); lang != "" {
+			title := a.Data.Title
+			if typ == "tv" {
+				title = a.Data.Name
+			}
+			if Normalize(title) != "" {
+				w.LocalizedTitles[lang] = title
+			}
+		}
 	}
 	seen := map[string]bool{}
 	for _, t := range titles {

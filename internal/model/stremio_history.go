@@ -30,6 +30,7 @@ type StremioRequest struct {
 	Matched            int             `json:"matched"`
 	Eligible           int             `json:"eligible"`
 	InvalidHash        int             `json:"invalid_hash"`
+	LanguageExcluded   int             `json:"language_excluded"`
 	WrongEpisode       int             `json:"wrong_episode"`
 	PrivateUnavailable int             `json:"private_unavailable"`
 	FileUnavailable    int             `json:"file_unavailable"`

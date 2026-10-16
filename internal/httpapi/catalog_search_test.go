@@ -174,3 +174,42 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 		})
 	}
 }
+
+func TestCatalogLocaleAndPreferenceTokensDoNotChangeAuthorization(t *testing.T) {
+	f, addon, conn := addonAPI(t)
+	work := model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie New Day"}, Years: []int{2026}, LocalizedTitles: map[string]string{"fr": "Film Exemple", "en": "Example Movie New Day"}}
+	if err := f.db.SaveAIOWork(f.ctx, work, []string{"example movie new day"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026.FRENCH","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := addon.Match(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	response := f.request("GET", "/api/catalog/search?q=example&language=fr-CA", "", true, "")
+	var page model.List[model.CatalogTitle]
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &page) != nil || page.Total != 1 || page.Items[0].Title != "Film Exemple" {
+		t.Fatal(response.Code, response.Body.String())
+	}
+	for _, path := range []string{"/api/torrents?q=example-movie+new+day", "/api/aiosource/matches?q=example-movie+new+day"} {
+		res := f.request("GET", path, "", true, "")
+		var list struct {
+			Total int `json:"total"`
+		}
+		if res.Code != 200 || json.Unmarshal(res.Body.Bytes(), &list) != nil || list.Total != 1 {
+			t.Fatal("shared HTTP search diverged", path, res.Code, res.Body.String())
+		}
+	}
+	token, _ := addon.Token(f.ctx)
+	for _, suffix := range []string{"", "~fr~unknown", "~fr~all"} {
+		if res := f.request("GET", "/stremio/"+token+suffix+"/manifest.json", "", false, ""); res.Code != 200 {
+			t.Fatal("valid installation rejected", suffix, res.Code)
+		}
+	}
+	for _, token := range []string{"invalid~fr~all", token + "~fr~invalid", token + "~~unknown"} {
+		if res := f.request("GET", "/stremio/"+token+"/manifest.json", "", false, ""); res.Code != 401 {
+			t.Fatal("preferences bypassed authorization", res.Code)
+		}
+	}
+}

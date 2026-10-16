@@ -61,7 +61,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := f.request("GET", "/public/stremio/"+configuration+"/stream/movie/tt1234567.json", "", false, "")
+	response := f.request("GET", "/public/stremio/"+configuration+"~en~unknown/stream/movie/tt1234567.json", "", false, "")
 	var payload struct {
 		Streams []aiosource.Stream `json:"streams"`
 	}

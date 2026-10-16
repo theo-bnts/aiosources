@@ -126,7 +126,7 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 	return queueAIOManyAliases(ctx, tx, []int64{workID}, aliases)
 }
 
-const aioWorkColumns = `w.id,w.media_type,w.tmdb_id,w.imdb_id,w.tvdb_id,w.years,w.revision,w.adult,w.display_title,
+const aioWorkColumns = `w.id,w.media_type,w.tmdb_id,w.imdb_id,w.tvdb_id,w.years,w.revision,w.adult,w.display_title,w.localized_titles,
 ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title),
 COALESCE((SELECT jsonb_object_agg(season,year) FROM ingest.aio_seasons WHERE work_id=w.id),'{}'),
 COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}')`
@@ -134,7 +134,7 @@ COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM in
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork
 	var seasons, episodes []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.Titles, &seasons, &episodes)
+	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes)
 	if err != nil {
 		return w, err
 	}
@@ -286,6 +286,11 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 		for _, key := range []string{"audiolangs", "languages", "language"} {
 			addLanguages(attributes[key])
 		}
+	}
+
+	// Matching queues do not need display-only metadata.
+	if !queue {
+		readAIOPresentation(f, &r)
 	}
 	return r, nil
 }

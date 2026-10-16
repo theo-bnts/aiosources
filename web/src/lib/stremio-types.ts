@@ -28,6 +28,7 @@ export type StremioRequest = {
   matched: number
   eligible: number
   invalid_hash: number
+  language_excluded?: number
   wrong_episode: number
   private_unavailable: number
   file_unavailable: number

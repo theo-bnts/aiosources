@@ -148,8 +148,9 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		defer func() { <-s.public.slots }()
 		var input struct {
-			Services  map[string]string `json:"services"`
-			Announces map[string]string `json:"announces"`
+			Preferences model.StreamPreferences `json:"preferences"`
+			Services    map[string]string       `json:"services"`
+			Announces   map[string]string       `json:"announces"`
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
 		if !decodeJSON(w, r, &input) {
@@ -157,10 +158,21 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
+		if !aiosource.ValidStreamPreferences(input.Preferences) {
+			respondError(w, model.ErrInvalid)
+			return
+		}
 		hasAnnounces := len(input.Announces) > 0
 		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, input.Services, input.Announces)
+		if err == nil && input.Preferences.Mode != "" {
+			configuration += "~" + input.Preferences.Language + "~" + input.Preferences.Mode
+		}
 		clear(input.Services)
 		clear(input.Announces)
+		if err == nil && len(configuration) > aiosource.MaxPublicInstallationSize {
+			writeError(w, 400, "The installation link is too large. Shorten optional announce URLs.")
+			return
+		}
 		if err != nil {
 			if errors.Is(err, model.ErrNotFound) {
 				writeError(w, 404, "Public access is disabled")

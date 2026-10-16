@@ -42,7 +42,10 @@ test('public access preserves the access proxy cookie without an administrator s
     }
     if (url.pathname.startsWith('/api/public/')) publicRequests.push(url.pathname)
     if (url.pathname === '/api/public/install') {
-      expect(request.postDataJSON()).toEqual({ services: { torbox: 'synthetic-visitor-key' } })
+      expect(request.postDataJSON()).toEqual({
+        services: { torbox: 'synthetic-visitor-key' },
+        preferences: { language: 'en', mode: 'unknown' },
+      })
       return route.fulfill({
         json: {
           manifest_url: `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,

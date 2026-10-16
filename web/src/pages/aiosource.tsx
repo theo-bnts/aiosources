@@ -1,3 +1,5 @@
+import { LanguageFilter } from '@/components/language-filter'
+import { useLanguagePreferences, preferenceManifest } from '@/lib/language-preferences'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
@@ -43,6 +45,7 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 export default function AIOSourcePage({ section }: { section: 'metadata' | 'debrid' | 'stremio' }) {
+  const [languagePreferences, setLanguagePreferences] = useLanguagePreferences()
   const location = useLocation()
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
@@ -221,7 +224,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       </div>
     )
   const status = query.data
-  const manifest = new URL(status.manifest_path, window.location.origin).toString()
+  const manifest = new URL(
+    preferenceManifest(status.manifest_path, languagePreferences),
+    window.location.origin,
+  ).toString()
   const busy = status.syncing || status.matching || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
@@ -390,6 +396,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       )}
       {section === 'stremio' && (
         <Panel title="Install addon">
+          <LanguageFilter value={languagePreferences} onChange={setLanguagePreferences} />
+          <p className="help">
+            Language choices travel with this link. Copy or reinstall it after changing them.
+          </p>
           <div className="field">
             <Label htmlFor="manifest">Manifest URL</Label>
             <Input id="manifest" readOnly value={manifest} />

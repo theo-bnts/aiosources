@@ -43,7 +43,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if !stremioResourceRE.MatchString(item.Resource) && item.Resource != "Invalid resource" && !(item.Kind == "manifest" && item.Resource == "Manifest") {
 		return model.ErrInvalid
 	}
-	if len(item.Resource) > 160 || item.DurationMS < 0 || item.Matched < 0 || item.Eligible < 0 || item.InvalidHash < 0 || item.WrongEpisode < 0 || item.PrivateUnavailable < 0 || item.FileUnavailable < 0 || item.Returned < 0 ||
+	if len(item.Resource) > 160 || item.DurationMS < 0 || item.LanguageExcluded < 0 || item.Matched < 0 || item.Eligible < 0 || item.InvalidHash < 0 || item.WrongEpisode < 0 || item.PrivateUnavailable < 0 || item.FileUnavailable < 0 || item.Returned < 0 ||
 		(item.MediaType != "movie" && item.MediaType != "series" && item.MediaType != "anime" && item.MediaType != "invalid") ||
 		(item.Outcome != "results" && item.Outcome != "empty" && item.Outcome != "failed" && item.Outcome != "cancelled" && item.Outcome != "invalid" && item.Outcome != "busy" && item.Outcome != "pending") {
 		return model.ErrInvalid
@@ -88,9 +88,9 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, providerLockKey("stremio-history")); err != nil {
 		return databaseError("lock Stremio history", err)
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls)
- SELECT created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls
- FROM jsonb_to_record($1::jsonb) AS x(created_at timestamptz,media_type text,resource text,duration_ms bigint,outcome text,matched int,eligible int,invalid_hash int,wrong_episode int,private_unavailable int,file_unavailable int,returned int,truncated boolean,results jsonb,origin text,kind text,service text,calls jsonb)`, encoded)
+	_, err = tx.Exec(ctx, `INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls,language_excluded)
+ SELECT created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls,language_excluded
+ FROM jsonb_to_record($1::jsonb) AS x(created_at timestamptz,media_type text,resource text,duration_ms bigint,outcome text,matched int,eligible int,invalid_hash int,wrong_episode int,private_unavailable int,file_unavailable int,returned int,truncated boolean,results jsonb,origin text,kind text,service text,calls jsonb,language_excluded int)`, encoded)
 	if err != nil {
 		return databaseError("save Stremio request", err)
 	}
@@ -100,12 +100,12 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	return databaseError("commit Stremio history", tx.Commit(ctx))
 }
 
-const stremioSummaryColumns = `id,created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,origin,kind,service`
+const stremioSummaryColumns = `id,created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,origin,kind,service,language_excluded`
 
 func scanStremioRequest(row scanner, detail bool) (model.StremioRequest, error) {
 	var item model.StremioRequest
 	var results, calls []byte
-	fields := []any{&item.ID, &item.CreatedAt, &item.MediaType, &item.Resource, &item.DurationMS, &item.Outcome, &item.Matched, &item.Eligible, &item.InvalidHash, &item.WrongEpisode, &item.PrivateUnavailable, &item.FileUnavailable, &item.Returned, &item.Truncated, &item.Origin, &item.Kind, &item.Service}
+	fields := []any{&item.ID, &item.CreatedAt, &item.MediaType, &item.Resource, &item.DurationMS, &item.Outcome, &item.Matched, &item.Eligible, &item.InvalidHash, &item.WrongEpisode, &item.PrivateUnavailable, &item.FileUnavailable, &item.Returned, &item.Truncated, &item.Origin, &item.Kind, &item.Service, &item.LanguageExcluded}
 	if detail {
 		fields = append(fields, &results, &calls)
 	}

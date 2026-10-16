@@ -111,6 +111,14 @@ func (s *Service) Authorized(ctx context.Context, token string) bool {
 }
 
 func (s *Service) ValidateToken(ctx context.Context, token string) error {
+	if len(token) > 128 {
+		return ErrAuth
+	}
+	credential, _, parseErr := InstallationPreferences(token)
+	if parseErr != nil {
+		return ErrAuth
+	}
+	token = credential
 	if len(token) != 43 {
 		return ErrAuth
 	}

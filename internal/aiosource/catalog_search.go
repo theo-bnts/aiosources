@@ -11,14 +11,14 @@ import (
 	"github.com/theo-bnts/aiosources/internal/store"
 )
 
-func (s *Service) CatalogSearch(ctx context.Context, opts model.ListOptions, kind string) (model.List[model.CatalogTitle], error) {
-	return s.DB.CatalogTitles(ctx, opts, Normalize(opts.Query), kind)
+func (s *Service) CatalogSearch(ctx context.Context, opts model.ListOptions, kind string, locales ...string) (model.List[model.CatalogTitle], error) {
+	return s.DB.CatalogTitles(ctx, opts, Normalize(opts.Query), kind, locales...)
 }
 
 // Start a series at an episode actually represented by its local releases.
 // No remote metadata request or download is needed to choose the controls.
-func (s *Service) CatalogTitle(ctx context.Context, workID int64) (model.CatalogTitle, error) {
-	title, err := s.DB.CatalogTitle(ctx, workID)
+func (s *Service) CatalogTitle(ctx context.Context, workID int64, locales ...string) (model.CatalogTitle, error) {
+	title, err := s.DB.CatalogTitle(ctx, workID, locales...)
 	if err != nil || title.Type != "tv" {
 		return title, err
 	}
@@ -90,7 +90,7 @@ func catalogResource(title model.CatalogTitle, selection model.CatalogSelection)
 	return r, id, nil
 }
 
-func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions) (model.List[model.CatalogRelease], error) {
+func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, preferences ...model.StreamPreferences) (model.List[model.CatalogRelease], error) {
 	limit := opts.Limit
 	if limit < 1 || limit > 200 {
 		limit = 50
@@ -113,10 +113,18 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 		return result, err
 	}
 	rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !MatchesEpisode(rec.AIORecord, ParseRelease(rec.Title), r) })
+	prefs := model.StreamPreferences{}
+	if len(preferences) > 0 {
+		prefs = preferences[0]
+	}
+	if !ValidStreamPreferences(prefs) {
+		return result, model.ErrInvalid
+	}
+	rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !AllowsLanguage(rec.AIORecord, prefs) })
 	if opts.ProviderID != "" {
 		rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return rec.Provider != opts.ProviderID })
 	}
-	if opts.Sort == "size_desc" {
+	if opts.Sort == "" || opts.Sort == "size_desc" {
 		slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
 			if a.Size > b.Size {
 				return -1

@@ -19,8 +19,8 @@ type streamLanguage struct {
 var streamLanguageAliases = func() map[string]streamLanguage {
 	groups := []struct{ aliases, flag string }{
 		{"fr fra fre french", "🇫🇷"}, {"en eng english", "🇬🇧"},
-		{"es spa spanish", "🇪🇸"}, {"de ger deu german deutsch", "🇩🇪"},
-		{"it ita italian", "🇮🇹"}, {"pt por portuguese", "🇵🇹"},
+		{"es spa esp spanish", "🇪🇸"}, {"de ger deu german deutsch", "🇩🇪"},
+		{"it ita italian", "🇮🇹"}, {"pt por pob ptbr brazilian portuguese", "🇵🇹"},
 		{"nl dut nld dutch", "🇳🇱"}, {"ru rus russian", "🇷🇺"},
 		{"ja jpn japanese", "🇯🇵"}, {"ko kor korean", "🇰🇷"},
 		{"zh zho chi chinese", "🇨🇳"}, {"hi hin hindi", "🇮🇳"},
@@ -53,44 +53,55 @@ func streamLanguages(r model.AIORecord) []streamLanguage {
 	seen := map[string]bool{}
 	add := func(value string) {
 		value = strings.ToLower(strings.TrimSpace(value))
-		if value == "" {
+		if value == "" || value == "und" || value == "unknown" || value == "vo" {
 			return
+		}
+		if strings.ContainsAny(value, "-_") {
+			if normalized := NormalizeLanguage(strings.ReplaceAll(value, "_", "-")); normalized != "" {
+				value = normalized
+			}
 		}
 		language, known := streamLanguageAliases[value]
 		if !known {
-			language.code = string([]rune(value)[:min(8, len([]rune(value)))])
+			if value == "multi" || value == "multilingual" {
+				language.code = "multi"
+			} else {
+				language.code = NormalizeLanguage(value)
+				if language.code == "" {
+					return
+				}
+			}
 		}
 		if !seen[language.code] {
 			out = append(out, language)
 			seen[language.code] = true
 		}
 	}
-	metadataAt := len(r.Title)
-	for _, marker := range []*regexp.Regexp{yearRE, seasonRE, crossRE, technicalRE} {
-		if at := marker.FindStringIndex(r.Title); at != nil && at[0] < metadataAt {
-			metadataAt = at[0]
-		}
-	}
+	metadataAt := presentationMetadataStart(r.Title)
 	for _, at := range streamLanguageTokenRE.FindAllStringIndex(r.Title, -1) {
 		token := strings.ToLower(r.Title[at[0]:at[1]])
 		switch token {
-		case "truefrench", "vff", "vfq", "vostfr":
+		case "truefrench", "vff", "vfq", "vf2":
 			add("fr")
 		case "vf":
 			if at[0] >= metadataAt {
 				add("fr")
 			}
 		case "multi":
-			// Multiple tracks do not identify any particular language.
-			add("multi")
+			// An ordinary word in the work title is not an audio-track label.
+			if at[0] >= metadataAt {
+				add("multi")
+			}
 		default:
-			if _, known := streamLanguageAliases[token]; known && (len(token) > 2 || at[0] >= metadataAt) {
+			if _, known := streamLanguageAliases[token]; known && at[0] >= metadataAt {
 				add(token)
 			}
 		}
 	}
 	for _, value := range r.Languages {
-		add(value)
+		for _, part := range strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' || r == '/' || r == '|' }) {
+			add(part)
+		}
 	}
 	return out
 }
@@ -133,21 +144,6 @@ func playbackStream(stream Stream, rec model.AIORecord, service string, cached *
 	stream.Hints.Service = service
 	stream.Hints.Cached = cached
 	stream.Hints.BingeGroup += "|" + service
-	marker, label := "TB", "TorBox"
-	if service == "alldebrid" {
-		marker, label = "AD", "AllDebrid"
-	}
-	if cached != nil {
-		status := " download"
-		if *cached {
-			status = "+"
-		}
-		stream.Name = "[" + marker + status + "] " + stream.Name
-	}
-	stream.Title += "\n" + label
-	if cached == nil {
-		stream.Title += " · Cache unknown"
-	}
 	if ParseRelease(rec.Title).Pack {
 		stream.Hints.Duration = 0
 	}
@@ -160,7 +156,7 @@ func playbackStream(stream Stream, rec model.AIORecord, service string, cached *
 		// aggregate duration is not the selected episode's duration.
 		stream.Hints.NotWebReady = !strings.HasPrefix(playbackURL, "https://") || !strings.HasSuffix(strings.ToLower(file.Path), ".mp4")
 	}
-	return stream
+	return formatStream(stream, rec)
 }
 
 func streamBingeGroup(rec model.AIORecord, r Resource, quality string, observedLanguages []streamLanguage) string {
@@ -173,4 +169,18 @@ func streamBingeGroup(rec model.AIORecord, r Resource, quality string, observedL
 	}
 	slices.Sort(languages)
 	return "aiosource|" + fingerprint(rec.Provider+"|"+streamResourceKey(r, []model.AIORecord{rec})+"|"+quality+"|"+strings.Join(languages, ","))
+}
+
+var presentationCodecBoundary = regexp.MustCompile(`(?i)\b(?:HEVC|AV1|[HX][ .]?26[45])\b`)
+
+func presentationMetadataStart(title string) int {
+	start := len(title)
+	// Language names and words such as CAM can be part of the actual title.
+	// Only unambiguous numbering, resolution or codecs delimit presentation tags.
+	for _, marker := range []*regexp.Regexp{yearRE, seasonRE, crossRE, compiledPresentationTags[0], presentationCodecBoundary} {
+		if at := marker.FindStringIndex(title); at != nil && at[0] < start {
+			start = at[0]
+		}
+	}
+	return start
 }

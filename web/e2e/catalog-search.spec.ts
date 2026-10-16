@@ -82,7 +82,12 @@ test('identification and torrent search accept the same spaced and dotted title 
   server,
 }) => {
   await seedCatalog(page, server)
-  for (const q of ['Example.Film.New.Day', 'Example Film New Day', 'xample New']) {
+  for (const q of [
+    'Example.Film.New.Day',
+    'Example Film New Day',
+    'Example-Film New Day',
+    'xample New',
+  ]) {
     await page.goto(`/torrents?q=${encodeURIComponent(q)}`)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
@@ -105,7 +110,10 @@ test('connection search groups clean titles, sorts source versions and retains t
   await expect(page.locator('[data-result-count]')).toHaveText('1 title')
   await expect(page.locator('main tbody tr')).toHaveCount(1)
   await page.getByRole('link', { name: 'Example Film: New Day', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`/search/${ids.movie}$`))
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
+  )
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
@@ -201,4 +209,47 @@ test('mobile download controls handle pending and ready responses without keepin
   await page.getByLabel('Episode', { exact: true }).fill('4')
   await page.getByRole('button', { name: 'Show episode', exact: true }).click()
   await expect(link).toHaveCount(0)
+})
+
+test.describe('browser language preferences', () => {
+  test.use({ locale: 'fr-FR' })
+  test('localized titles and the optional shared language filter remain offline and largest first', async ({
+    page,
+    server,
+  }) => {
+    const ids = await seedCatalog(page, server)
+    const db = new pg.Client({ connectionString: server.databaseURL })
+    await db.connect()
+    try {
+      await db.query(`UPDATE ingest.aio_works SET localized_titles='{"fr":"Film Exemple","en":"Example Film: New Day"}' WHERE media_type='movie';
+    INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+     ('alpha','french','{"title":"Example.Film.New.Day.2026.FRENCH","info_hash":"dddddddddddddddddddddddddddddddddddddddd","size":500,"imdb_id":"tt1234567"}'),
+     ('alpha','german','{"title":"Example.Film.New.Day.2026.GERMAN","info_hash":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","size":1000,"imdb_id":"tt1234567"}'),
+     ('alpha','multi','{"title":"Example.Film.New.Day.2026.MULTI","info_hash":"ffffffffffffffffffffffffffffffffffffffff","size":300,"imdb_id":"tt1234567"}');
+    INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+     SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.imdb_id=t.fields->>'imdb_id' WHERE t.source_id IN ('french','german','multi');DELETE FROM ingest.aio_match_queue;`)
+    } finally {
+      await db.end()
+    }
+    await page.goto('/search?q=example')
+    await expect(page.getByRole('link', { name: 'Film Exemple', exact: true })).toBeVisible()
+    await page.goto(`/search/${ids.movie}`)
+    await expect(page.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
+    await expect(page.locator('[data-result-count]')).toHaveText('4 source releases')
+    await expect(page.locator('main tbody tr').first()).toContainText('FRENCH')
+    await expect(page.locator('main tbody')).not.toContainText('GERMAN')
+    await page.getByLabel('Include', { exact: true }).selectOption('preferred')
+    await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
+    await page.getByRole('switch', { name: 'Filter languages', exact: true }).click()
+    await expect(page.locator('[data-result-count]')).toHaveText('5 source releases')
+    await expect(page.locator('main tbody tr').first()).toContainText('GERMAN')
+    await page.goto('/addon/settings')
+    await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveValue(
+      /~fr~all\/manifest\.json$/,
+    )
+    await page.getByRole('switch', { name: 'Filter languages', exact: true }).click()
+    await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveValue(
+      /~fr~unknown\/manifest\.json$/,
+    )
+  })
 })

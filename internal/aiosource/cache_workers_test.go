@@ -105,7 +105,7 @@ func TestStremioEpisodeNeedsFileEvidenceForCachedMarker(t *testing.T) {
 		t.Fatal(err)
 	}
 	streams, err = s.Streams(ctx, "http://local", "token", "series", "tt7654321:1:2")
-	if err != nil || len(streams) != 1 || strings.Contains(streams[0].Name, "TB+") || !strings.Contains(streams[0].Title, "Cache unknown") {
+	if err != nil || len(streams) != 1 || strings.Contains(streams[0].Name, "TB+") || !strings.Contains(streams[0].Name, "Cache unknown") {
 		t.Fatal("global readiness advertised an unverified episode", streams, err)
 	}
 }

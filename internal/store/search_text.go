@@ -85,7 +85,19 @@ func torrentTextSearchSQL(query string, bind func(any) string) string {
 				}
 				predicate = "search_document @@ " + query
 			} else {
-				predicate = torrentSearchTextSQL + " ILIKE " + bind("%"+escapeSearchFragment.Replace(term.text)+"%")
+				fragments := []string{term.text}
+				if !strings.ContainsAny(term.text, `%_\`) {
+					fragments = strings.FieldsFunc(term.text, unicode.IsPunct)
+				}
+				parts := []string{}
+				for _, fragment := range fragments {
+					parts = append(parts, torrentSearchTextSQL+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%"))
+				}
+				if len(parts) == 0 {
+					predicate = "FALSE"
+				} else {
+					predicate = "(" + strings.Join(parts, " AND ") + ")"
+				}
 				// The merged search box retains complete base32 hash support while
 				// preserving literal title/ID matches and the query's operators.
 				if len(term.text) == 32 {

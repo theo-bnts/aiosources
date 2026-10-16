@@ -111,7 +111,7 @@ func TestPublishedStreamMetadataUsesOrdinaryAndTorznabLanguageFields(t *testing.
 	}
 	stream := baseStream(record, Resource{Type: "movie"}, "Example Library")
 	encoded, _ := json.Marshal(stream)
-	if strings.Contains(string(encoded), "not-for-publication") || !strings.Contains(stream.Title, "🇩🇪") {
+	if strings.Contains(string(encoded), "not-for-publication") || !strings.Contains(stream.Name, "🇩🇪") {
 		t.Fatal("private attributes exposed or audio metadata lost")
 	}
 	fields["published_at"], fields["duration"] = "invalid", "NaN"

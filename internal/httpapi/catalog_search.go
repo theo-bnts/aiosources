@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -26,7 +27,7 @@ func (s *server) catalogSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "Enter at least two letters or digits to search.")
 		return
 	}
-	items, err := s.options.AIOSource.CatalogSearch(r.Context(), opts, r.URL.Query().Get("type"))
+	items, err := s.options.AIOSource.CatalogSearch(r.Context(), opts, r.URL.Query().Get("type"), catalogLanguage(r))
 	if err != nil {
 		respondError(w, err)
 		return
@@ -38,7 +39,11 @@ func (s *server) catalogTitle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	item, err := s.options.AIOSource.CatalogTitle(r.Context(), id)
+	if len(r.URL.Query().Get("q")) > 500 {
+		respondError(w, model.ErrInvalid)
+		return
+	}
+	item, err := s.options.AIOSource.CatalogTitle(r.Context(), id, catalogLanguage(r), aiosource.Normalize(r.URL.Query().Get("q")))
 	if err != nil {
 		respondError(w, err)
 		return
@@ -66,7 +71,12 @@ func (s *server) catalogReleases(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	opts.Sort = r.URL.Query().Get("sort")
-	items, err := s.options.AIOSource.CatalogReleases(r.Context(), id, selection, opts)
+	preferences := model.StreamPreferences{Language: catalogLanguage(r), Mode: r.URL.Query().Get("language_mode")}
+	if !aiosource.ValidStreamPreferences(preferences) {
+		respondError(w, model.ErrInvalid)
+		return
+	}
+	items, err := s.options.AIOSource.CatalogReleases(r.Context(), id, selection, opts, preferences)
 	if err != nil {
 		respondError(w, err)
 		return
@@ -93,4 +103,15 @@ func (s *server) catalogDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
+}
+
+func catalogLanguage(r *http.Request) string {
+	value := r.URL.Query().Get("language")
+	if value == "" {
+		value = strings.Split(strings.Split(r.Header.Get("Accept-Language"), ",")[0], ";")[0]
+	}
+	if lang := aiosource.NormalizeLanguage(value); lang != "" {
+		return lang
+	}
+	return "en"
 }

@@ -26,39 +26,43 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
-	DisplayTitle string         `json:"display_title"`
-	Adult        bool           `json:"adult"`
-	ID           int64          `json:"id"`
-	Type         string         `json:"type"`
-	TMDB         string         `json:"tmdb"`
-	IMDb         string         `json:"imdb"`
-	TVDB         string         `json:"tvdb"`
-	Titles       []string       `json:"titles"`
-	Years        []int          `json:"years"`
-	SeasonYears  map[int]int    `json:"season_years"`
-	EpisodeYears map[string]int `json:"episode_years"`
-	Revision     int64          `json:"revision"`
+	LocalizedTitles map[string]string `json:"localized_titles"`
+	DisplayTitle    string            `json:"display_title"`
+	Adult           bool              `json:"adult"`
+	ID              int64             `json:"id"`
+	Type            string            `json:"type"`
+	TMDB            string            `json:"tmdb"`
+	IMDb            string            `json:"imdb"`
+	TVDB            string            `json:"tvdb"`
+	Titles          []string          `json:"titles"`
+	Years           []int             `json:"years"`
+	SeasonYears     map[int]int       `json:"season_years"`
+	EpisodeYears    map[string]int    `json:"episode_years"`
+	Revision        int64             `json:"revision"`
 }
 type AIORecord struct {
-	ReviewedEpisode     bool       `json:"reviewed_episode,omitempty"`
-	Normalized          string     `json:"-"`
-	QueueVersion        int64      `json:"-"`
-	CandidateGeneration int64      `json:"-"`
-	Provider            string     `json:"provider"`
-	SourceID            string     `json:"source_id"`
-	Title               string     `json:"title"`
-	Hash                string     `json:"hash"`
-	Size                int64      `json:"size"`
-	IMDb                string     `json:"imdb"`
-	TMDB                string     `json:"tmdb"`
-	TVDB                string     `json:"tvdb"`
-	MAL                 string     `json:"mal"`
-	Season              *int       `json:"season"`
-	Episode             *int       `json:"episode"`
-	Languages           []string   `json:"languages"`
-	PublishedAt         *time.Time `json:"published_at,omitempty"`
-	DurationSeconds     float64    `json:"duration_seconds,omitempty"`
-	Fingerprint         string     `json:"fingerprint"`
+	Presentation        map[string][]string `json:"-"`
+	SubtitleLanguages   []string            `json:"-"`
+	Bitrate             float64             `json:"-"`
+	ReviewedEpisode     bool                `json:"reviewed_episode,omitempty"`
+	Normalized          string              `json:"-"`
+	QueueVersion        int64               `json:"-"`
+	CandidateGeneration int64               `json:"-"`
+	Provider            string              `json:"provider"`
+	SourceID            string              `json:"source_id"`
+	Title               string              `json:"title"`
+	Hash                string              `json:"hash"`
+	Size                int64               `json:"size"`
+	IMDb                string              `json:"imdb"`
+	TMDB                string              `json:"tmdb"`
+	TVDB                string              `json:"tvdb"`
+	MAL                 string              `json:"mal"`
+	Season              *int                `json:"season"`
+	Episode             *int                `json:"episode"`
+	Languages           []string            `json:"languages"`
+	PublishedAt         *time.Time          `json:"published_at,omitempty"`
+	DurationSeconds     float64             `json:"duration_seconds,omitempty"`
+	Fingerprint         string              `json:"fingerprint"`
 }
 
 // Eligibility belongs in candidate discovery, before the bounded safety cap.

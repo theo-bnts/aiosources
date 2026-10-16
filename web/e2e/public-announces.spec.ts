@@ -50,6 +50,7 @@ test('visitor announce fields are opt-in, use source names and never retain cred
       submissions++
       expect(route.request().postDataJSON()).toEqual({
         services: { torbox: 'synthetic-visitor-key' },
+        preferences: { language: 'en', mode: 'unknown' },
         announces: { 'private-example': ownAnnounce },
       })
       return route.fulfill({

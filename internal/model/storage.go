@@ -43,7 +43,8 @@ var compactAttributeKeys = []string{
 	"season", "seasons", "episode", "episodes", "audiolangs", "languages", "language", "sublangs",
 	"category", "categories", "size", "infohash",
 	"resolution", "quality", "source", "codec", "videocodec", "audiocodec", "audiochannels", "hdr",
-	"year", "duration", "private",
+	"year", "duration", "private", "bitrate", "release_group", "edition", "proper", "repack",
+	"video_codec", "audio_codec", "audio_channels", "subtitles",
 }
 
 func CompactTorrentField(name string) bool { return slices.Contains(compactTorrentKeys, name) }

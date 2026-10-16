@@ -87,6 +87,9 @@ export function DownloadAction({
     const timer = window.setTimeout(() => setReady(null), 10 * 60_000)
     return () => window.clearTimeout(timer)
   }, [ready])
+  const details = [service.filename, service.size ? bytes(service.size) : null]
+    .filter(Boolean)
+    .join(' · ')
   const blocked = service.state === 'invalid' || service.state === 'unavailable'
   const cached = service.state === 'cached' && !notReady
   return (
@@ -106,6 +109,7 @@ export function DownloadAction({
       {ready?.url ? (
         <Button asChild size="sm">
           <a
+            title={details || undefined}
             href={ready.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -118,6 +122,7 @@ export function DownloadAction({
       ) : (
         <Button
           size="sm"
+          title={details || undefined}
           variant={cached ? 'default' : 'outline'}
           disabled={
             mutation.isPending ||
@@ -155,12 +160,6 @@ export function DownloadAction({
           {service.can_add
             ? ' You can add it to debrid.'
             : ' Only cached files can be downloaded from this private source.'}
-        </p>
-      )}
-      {service.filename && (
-        <p className="help max-w-72 break-words">
-          {service.filename}
-          {service.size ? ` · ${bytes(service.size)}` : ''}
         </p>
       )}
       {operation && (
