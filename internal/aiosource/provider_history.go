@@ -49,7 +49,7 @@ func recordProviderCall(ctx context.Context, path string, status int, started ti
 		phase = "provider_inventory"
 	case "v4/magnet/upload":
 		phase = "provider_add"
-	case "v4/magnet/files":
+	case "v4/magnet/files", "torrents/mylist":
 		phase = "provider_files"
 	case "v4/magnet/delete":
 		phase = "provider_cleanup"

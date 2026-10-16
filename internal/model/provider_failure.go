@@ -20,6 +20,8 @@ func ProviderFailureMessage(code string) string {
 		return "The file exceeds the provider or account size limit."
 	case "not_found":
 		return "The requested torrent or file is no longer available at the provider."
+	case "not_cached":
+		return "The file is no longer cached at the provider. Add it to debrid again if this source allows it."
 	case "timeout":
 		return "The provider request timed out. Try again later."
 	default:

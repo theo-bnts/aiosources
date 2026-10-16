@@ -71,10 +71,20 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 			t.Fatalf("missing CSRF/foreign origin accepted: %d", out.Code)
 		}
 	}
-	for _, query := range []string{"q=x", "q=Example&type=unsupported", "q=Example&q=Other", "q=%00Example"} {
+	for _, query := range []string{"q=x", "q=Example&type=unsupported", "q=Example&q=Other", "q=%00Example", "q=Example&year=2020-2026", "q=Example&year=2026&year=2025", "q=Example&year=0", "q=Example&year=2026.0", "q=Example&year=10000", "q=Example&year=20e2"} {
 		out := f.request("GET", "/api/catalog/search?"+query, "", true, "")
 		if out.Code < 400 || out.Code >= 500 {
 			t.Fatalf("invalid catalog search accepted: %s / %d", query, out.Code)
+		}
+	}
+	for _, tc := range []struct {
+		year string
+		want int64
+	}{{"2026", 1}, {"2025", 0}} {
+		response := f.request("GET", "/api/catalog/search?q=Example&year="+tc.year, "", true, "")
+		var page model.List[model.CatalogTitle]
+		if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &page) != nil || page.Total != tc.want {
+			t.Fatalf("year filter %q: %d %s", tc.year, response.Code, response.Body)
 		}
 	}
 	for _, body := range []string{`{"service":"unknown"}`, `{"service":"torbox","occurrence_id":"invalid"}`, `{"service":"torbox","url":"https://other.example"}`} {
@@ -84,6 +94,12 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 		}
 	}
 	var operations int
+	for _, preparation := range []string{"-1", "00", "1.5", "1e2", "9223372036854775808", "https://other.example"} {
+		body := fmt.Sprintf(`{"service":"torbox","occurrence_id":%q,"fingerprint":%q,"preparation_id":%q}`, rows[0].OccurrenceID, rows[0].Fingerprint, preparation)
+		if out := f.request("POST", "/api/catalog/"+id+"/download", body, true, ""); out.Code != 422 {
+			t.Fatalf("invalid preparation accepted: %d", out.Code)
+		}
+	}
 	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.operation_runs WHERE kind='download'`).Scan(&operations); err != nil || operations != 0 {
 		t.Fatal("invalid request started a download", err)
 	}
@@ -120,16 +136,25 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 				t.Fatal(err)
 			}
 			var ready atomic.Bool
+			var deleted atomic.Bool
 			ready.Store(true)
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/v4.1/magnet/status":
+					if deleted.Load() {
+						fmt.Fprint(w, `{"status":"success","data":{"magnets":[]}}`)
+						return
+					}
 					status := 0
 					if ready.Load() {
 						status = 4
 					}
 					fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"statusCode":%d}]}}`, hash, status)
 				case "/v4/magnet/files":
+					if deleted.Load() {
+						fmt.Fprint(w, `{"status":"error","error":{"code":"MAGNET_INVALID_ID","message":"synthetic-private-key"}}`)
+						return
+					}
 					fmt.Fprint(w, `{"status":"success","data":{"magnets":[{"id":7,"files":[{"n":"Example.Film.2026.mkv","s":100,"l":"https://files.example/selected"}]}]}}`)
 				case "/v4/link/unlock":
 					fmt.Fprint(w, `{"status":"success","data":{"link":"https://files.example/download"}}`)
@@ -137,8 +162,17 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 					if r.ParseMultipartForm(4096) != nil || r.FormValue("add_only_if_cached") != "true" {
 						t.Error("private HTTP download bypassed cached-only policy")
 					}
+					if deleted.Load() {
+						w.WriteHeader(400)
+						fmt.Fprint(w, `{"success":false,"error":"DOWNLOAD_NOT_CACHED","detail":"synthetic-private-key","data":null}`)
+						return
+					}
 					fmt.Fprintf(w, `{"success":true,"data":{"torrent_id":7,"hash":%q}}`, hash)
 				case "/torrents/mylist":
+					if deleted.Load() {
+						fmt.Fprint(w, `{"success":true,"error":"ITEM_NOT_FOUND","detail":"synthetic-private-key","data":null}`)
+						return
+					}
 					fmt.Fprintf(w, `{"success":true,"data":{"hash":%q,"download_finished":%t,"download_present":%t,"files":[{"id":0,"name":"Example.Film.2026.mkv","size":100}]}}`, hash, ready.Load(), ready.Load())
 				case "/torrents/requestdl":
 					fmt.Fprint(w, `{"success":true,"data":"https://files.example/download"}`)
@@ -170,6 +204,24 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 			result = model.CatalogDownload{}
 			if response.Code != 202 || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Status != "pending" || result.URL != "" || response.Header().Get("Retry-After") != "15" {
 				t.Fatalf("pending download response: %d %s", response.Code, response.Body)
+			}
+			if result.PreparationID != "7" {
+				t.Fatal("pending download lost its account item reference")
+			}
+			// The account item can disappear between readiness checks. Never
+			// turn its cache miss into a 502 or retry an uncached creation.
+			ready.Store(true)
+			deleted.Store(true)
+			input.AllowUncached = false
+			input.PreparationID = result.PreparationID
+			body, _ = json.Marshal(input)
+			response = f.request("POST", path, string(body), true, "")
+			wantStatus, wantCode := 404, "not_found"
+			var failure struct {
+				Code string `json:"code"`
+			}
+			if response.Code != wantStatus || json.Unmarshal(response.Body.Bytes(), &failure) != nil || failure.Code != wantCode || strings.Contains(response.Body.String(), "synthetic-private-key") {
+				t.Fatalf("deleted download response: %d %s", response.Code, response.Body)
 			}
 		})
 	}

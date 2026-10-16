@@ -69,7 +69,7 @@ func TestCatalogDownloadUsesExistingProvidersAndSanitizedHistory(t *testing.T) {
 					w.WriteHeader(500)
 				}
 			})
-			page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example.Movie"}, "")
+			page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example.Movie"}, model.CatalogSearchFilters{})
 			if err != nil || page.Total != 1 {
 				t.Fatalf("title search: %+v %v", page, err)
 			}
@@ -157,7 +157,7 @@ func TestCatalogEpisodeSelectionUsesVerifiedFilesAndSeasonPacks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Series"}, "tv")
+	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Series"}, model.CatalogSearchFilters{Type: "tv"})
 	if err != nil || page.Total != 1 {
 		t.Fatalf("series missing: %+v %v", page, err)
 	}
@@ -254,7 +254,7 @@ func TestCatalogUncachedPreparationAndReadinessPreserveOwnedDownloads(t *testing
 					w.WriteHeader(500)
 				}
 			})
-			page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Movie"}, "")
+			page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Movie"}, model.CatalogSearchFilters{})
 			if err != nil || page.Total != 1 {
 				t.Fatal(err)
 			}
@@ -319,7 +319,7 @@ func TestCachedOnlyAdministratorCleanupCanBeRetriedAfterFailure(t *testing.T) {
 			w.WriteHeader(500)
 		}
 	})
-	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Movie"}, "")
+	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Movie"}, model.CatalogSearchFilters{})
 	if err != nil || page.Total != 1 {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestCatalogSeasonChoicesKeepEverySeasonInAnAnchoredPack(t *testing.T) {
 	if err := s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Series"}, "")
+	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example Series"}, model.CatalogSearchFilters{})
 	if err != nil || page.Total != 1 {
 		t.Fatalf("anchored pack was not identified: %+v %v", page, err)
 	}

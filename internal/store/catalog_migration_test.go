@@ -57,7 +57,7 @@ INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finish
 		if snapshot() != before {
 			t.Fatal("upgrade changed torrents, matching, history or previous migrations")
 		}
-		items, err := db.CatalogTitles(ctx, model.ListOptions{Query: "Example"}, "example", "")
+		items, err := db.CatalogTitles(ctx, model.ListOptions{Query: "Example"}, "example", model.CatalogSearchFilters{})
 		if err != nil || items.Total != 1 || items.Items[0].Title != "Example Film" {
 			t.Fatalf("existing metadata not searchable after upgrade: %+v %v", items, err)
 		}

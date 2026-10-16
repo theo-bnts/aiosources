@@ -28,17 +28,17 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	return title, err
 }
 
-func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized, kind string, locales ...string) (model.List[model.CatalogTitle], error) {
+func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
-	if !validSearchText(opts.Query, 500) || len([]rune(normalized)) < 2 || (kind != "" && kind != "movie" && kind != "tv") {
+	if !validSearchText(opts.Query, 500) || len([]rune(normalized)) < 2 || (filters.Type != "" && filters.Type != "movie" && filters.Type != "tv") || (filters.Year != 0 && (filters.Year < 1000 || filters.Year > 9999)) {
 		return result, model.ErrInvalid
 	}
 	locale := "en"
-	if len(locales) > 0 && locales[0] != "" {
-		locale = locales[0]
+	if filters.Language != "" {
+		locale = filters.Language
 	}
-	args := []any{strings.TrimSpace(opts.Query), kind, normalized}
+	args := []any{strings.TrimSpace(opts.Query), filters.Type, normalized}
 	terms := []string{}
 	for _, word := range strings.Fields(normalized) {
 		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
@@ -51,6 +51,15 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
  public.similarity($3,normalized) FROM ingest.aio_titles WHERE ` + matching + `) matches GROUP BY id) candidates
  JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND ($2='' OR w.media_type=$2)
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
+	if filters.Year != 0 {
+		args = append(args, filters.Year)
+		year := fmt.Sprintf("$%d::int", len(args))
+		// Film release dates are alternatives, not a continuous range. Series
+		// span their locally known work/season/episode years, including gaps.
+		filter += ` AND (` + year + `=ANY(w.years) OR (w.media_type='tv' AND EXISTS(
+ SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM ingest.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM ingest.aio_episodes WHERE work_id=w.id) known_years
+ HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
+	}
 	alias := `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + matching + ` ORDER BY public.similarity($3,normalized) DESC,length(normalized),title LIMIT 1)`
 	columns := catalogTitleColumns(fmt.Sprintf("$%d", len(args)+1), alias)
 

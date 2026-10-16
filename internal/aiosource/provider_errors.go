@@ -26,7 +26,7 @@ func (e *ProviderError) HTTPStatus() int {
 	switch e.Code {
 	case "rate_limit":
 		return http.StatusTooManyRequests
-	case "account_limit":
+	case "account_limit", "not_cached":
 		return http.StatusConflict
 	case "subscription":
 		return http.StatusForbidden
@@ -71,6 +71,8 @@ func providerResponseError(raw json.RawMessage) *ProviderError {
 		category = "file_too_large"
 	case "MAGNET_INVALID_ID", "LINK_DOWN", "ITEM_NOT_FOUND", "LINK_OFFLINE":
 		category = "not_found"
+	case "DOWNLOAD_NOT_CACHED":
+		category = "not_cached"
 	}
 	return newProviderError(category, "")
 }

@@ -28,4 +28,9 @@ export type CatalogRelease = {
   languages: string[]
   services: CatalogAvailability[]
 }
-export type CatalogDownload = { status: 'ready' | 'pending'; url?: string; operation_id: string }
+export type CatalogDownload = {
+  status: 'ready' | 'pending'
+  url?: string
+  operation_id: string
+  preparation_id?: string
+}

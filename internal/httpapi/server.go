@@ -143,7 +143,7 @@ func respondError(w http.ResponseWriter, err error) {
 		if provider.RetryAfter > 0 {
 			w.Header().Set("Retry-After", strconv.Itoa(provider.RetryAfter))
 		}
-		writeError(w, provider.HTTPStatus(), provider.Error())
+		writeJSON(w, provider.HTTPStatus(), map[string]string{"error": provider.Error(), "code": provider.Code})
 		return
 	}
 	switch {

@@ -80,7 +80,7 @@ func TestCatalogAndStremioShareLanguageFilterAndLargestFirstOffline(t *testing.T
 	if err := s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example"}, "")
+	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Example"}, model.CatalogSearchFilters{})
 	if err != nil || page.Total != 1 {
 		t.Fatal(page, err)
 	}

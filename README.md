@@ -107,6 +107,8 @@ TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets*
 
 **Search** finds clean film and series titles in your identified catalog. Open a title to compare its source releases, sort by date, size or source name, and select a season and episode for a series. Titles and relevance ranking use your local metadata, without contacting TMDB during a search. Titles prefer your browser language, a matching local alias, then English. Translation language codes become available as metadata updates normally.
 
+Filter titles by type and an optional single year. Films match any locally known release year; series match the span of their locally known release, season and episode years. Year filtering makes no TMDB request.
+
 **Download** opens the file when its link is ready. **Add to debrid** explicitly starts preparation for an uncached version, then checks readiness automatically. Keep the search page open during preparation; a direct link remains available if your browser blocks the download tab. Private sources need your announce URL for uncached downloads. Download preparation and sanitized provider calls appear in **Debrid → History**. Download links stay in memory and are not retained in history.
 
 Versions are largest first. The optional language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. The same controls in **Stremio → Settings** travel with the installation link: copy or reinstall the updated link after changing them. Existing installed links continue working without a language filter.
@@ -152,7 +154,7 @@ Keep both data volumes. Interrupted collections resume from saved progress where
 
 ## Help and contributions
 
-- [Source setup](docs/CONFIGURATION.md) and [complete configuration reference](docs/JSON_REFERENCE.md)
+- [Source setup](docs/CONFIGURATION.md), [connector compatibility and Prowlarr](docs/CONNECTORS.md), and [complete configuration reference](docs/JSON_REFERENCE.md)
 - [Environment settings](docs/SETTINGS.md), [operations](docs/OPERATIONS.md) and [catalog sharing](docs/SHARING.md)
 - [Security and private vulnerability reporting](SECURITY.md)
 - [Contributing](CONTRIBUTING.md), [development](docs/DEVELOPMENT.md) and [verification](docs/VERIFICATION.md)

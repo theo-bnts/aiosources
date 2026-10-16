@@ -22,10 +22,13 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 		{"alldebrid", "MAGNET_TOO_MANY_ACTIVE", "account_limit", 429, 409},
 		{"alldebrid", "MAGNET_MUST_BE_PREMIUM", "subscription", 200, 403},
 		{"alldebrid", "AUTH_BAD_APIKEY", "authentication", 401, 502},
+		{"alldebrid", "MAGNET_INVALID_ID", "not_found", 200, 404},
 		{"torbox", "ACTIVE_LIMIT", "account_limit", 400, 409},
 		{"torbox", "COOLDOWN_LIMIT", "rate_limit", 429, 429},
 		{"torbox", "DOWNLOAD_TOO_LARGE", "file_too_large", 400, 422},
 		{"torbox", "DATABASE_ERROR", "provider_unavailable", 503, 503},
+		{"torbox", "ITEM_NOT_FOUND", "not_found", 200, 404},
+		{"torbox", "DOWNLOAD_NOT_CACHED", "not_cached", 400, 409},
 	} {
 		t.Run(tc.service+"/"+tc.apiCode, func(t *testing.T) {
 			f, addon, conn := addonAPI(t)
@@ -86,6 +89,9 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 			defer upstream.Close()
 			addon.Providers.ADBase, addon.Providers.TBBase, addon.Providers.Client = upstream.URL, upstream.URL, upstream.Client()
 			for _, origin := range []string{"private", "public"} {
+				if err := f.db.SaveSharedAvailability(f.ctx, tc.service, model.AIOAvailability{Generation: generation, Hash: hash, Cached: true, CheckedAt: time.Now(), Files: []model.AIOFile{{Path: "Example.Movie.2021.mp4", Size: 100}}}); err != nil {
+					t.Fatal(err)
+				}
 				var streams []aiosource.Stream
 				var err error
 				if origin == "public" {
@@ -113,6 +119,16 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 				response := f.request("GET", strings.TrimPrefix(streams[0].URL, "https://addon.example"), "", false, "")
 				if response.Code != tc.responseStatus || !strings.Contains(response.Body.String(), model.ProviderFailureMessage(tc.category)) {
 					t.Fatalf("provider error lost in %s playback: %d %s", origin, response.Code, response.Body.String())
+				}
+				var failure struct {
+					Code string `json:"code"`
+				}
+				if json.Unmarshal(response.Body.Bytes(), &failure) != nil || failure.Code != tc.category {
+					t.Fatal("provider category missing from response", response.Body.String())
+				}
+				cached, e := f.db.SharedAvailability(f.ctx, tc.service, []string{hash}, time.Now().Add(-time.Minute))
+				if e != nil || len(cached) != 1 || cached[0].Cached != (tc.category != "not_cached") {
+					t.Fatal("account error invalidated shared cache, or cache miss retained stale positive evidence", cached, e)
 				}
 				if tc.category == "rate_limit" || tc.category == "provider_unavailable" {
 					if response.Header().Get("Retry-After") != "120" {
@@ -151,6 +167,12 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 			}
 			if failures != 2 {
 				t.Fatal("repeated public/private failures were hidden", failures)
+			}
+			if tc.category == "not_found" || tc.category == "not_cached" {
+				var unavailable bool
+				if err := conn.QueryRow(f.ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_incidents WHERE service=$1 AND active)`, tc.service).Scan(&unavailable); err != nil || unavailable {
+					t.Fatal("a missing resource marked the whole provider unavailable", unavailable, err)
+				}
 			}
 			if session := f.request("GET", "/api/session", "", true, ""); session.Code != 200 || !strings.Contains(session.Body.String(), `"authenticated":true`) {
 				t.Fatal("provider failure revoked administrator session")

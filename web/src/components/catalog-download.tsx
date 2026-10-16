@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { DownloadSimpleIcon, PlusIcon, ArrowRightIcon } from '@phosphor-icons/react'
-import { api, queryClient } from '@/lib/api'
+import { api, ApiError, queryClient } from '@/lib/api'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import { prepareBrowserDownload } from '@/lib/browser-download'
@@ -40,6 +40,7 @@ export function DownloadAction({
   const [waiting, setWaiting] = useState(false)
   const [notReady, setNotReady] = useState(false)
   const [operation, setOperation] = useState('')
+  const [preparationID, setPreparationID] = useState('')
   const notify = useNotification()
   const attempts = useRef(0)
   const controller = useRef<AbortController | null>(null)
@@ -64,12 +65,14 @@ export function DownloadAction({
           fingerprint: release.fingerprint,
           service: service.service,
           allow_uncached: allowUncached,
+          ...(!allowUncached && preparationID ? { preparation_id: preparationID } : {}),
         }),
       })
     },
     onSuccess: (result, allowUncached) => {
       setOperation(result.operation_id)
       const pending = result.status === 'pending'
+      setPreparationID(pending ? result.preparation_id || '' : '')
       setWaiting(pending && (allowUncached || waiting))
       setNotReady(pending)
       if (!pending) {
@@ -90,9 +93,16 @@ export function DownloadAction({
       mutation.reset()
       void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
     },
-    onError: () => {
+    onError: (error) => {
       download.current?.cancel()
       download.current = null
+      if (error instanceof ApiError && ['not_found', 'not_cached'].includes(error.code || '')) {
+        setWaiting(false)
+        setNotReady(true)
+        setReady(null)
+        setPreparationID('')
+      }
+      void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
     },
   })
   const run = mutation.mutate

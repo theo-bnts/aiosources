@@ -22,7 +22,7 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 		t.Fatal(err)
 	}
 	for _, q := range []struct{ raw, normalized string }{{"Example Movie New Day", "example movie new day"}, {"Movie", "movie"}, {"autre", "autre"}, {"tt1234567", "tt1234567"}, {"101", "101"}} {
-		page, err := db.CatalogTitles(ctx, model.ListOptions{Query: q.raw}, q.normalized, "")
+		page, err := db.CatalogTitles(ctx, model.ListOptions{Query: q.raw}, q.normalized, model.CatalogSearchFilters{})
 		if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].Title != func() string {
 			if q.raw == "autre" {
 				return "Un autre titre"
@@ -41,20 +41,20 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 			}
 		}
 	}
-	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example", Limit: 1, Offset: 1}, "example", "")
+	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example", Limit: 1, Offset: 1}, "example", model.CatalogSearchFilters{})
 	if err != nil || page.Total != 1 || len(page.Items) != 0 {
 		t.Fatalf("offset changed total: %+v %v", page, err)
 	}
-	page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "example"}, "example", "tv")
+	page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "example"}, "example", model.CatalogSearchFilters{Type: "tv"})
 	if err != nil || page.Total != 0 {
 		t.Fatal("media filter bypassed", err)
 	}
-	page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "private value"}, "private value", "")
+	page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "private value"}, "private value", model.CatalogSearchFilters{})
 	if err != nil || page.Total != 0 {
 		t.Fatal("private fields were searchable", err)
 	}
 	for _, q := range []string{"", "x"} {
-		if _, err := db.CatalogTitles(ctx, model.ListOptions{Query: q}, q, ""); !errors.Is(err, model.ErrInvalid) {
+		if _, err := db.CatalogTitles(ctx, model.ListOptions{Query: q}, q, model.CatalogSearchFilters{}); !errors.Is(err, model.ErrInvalid) {
 			t.Fatal("short query accepted", err)
 		}
 	}
@@ -84,6 +84,42 @@ func TestDisplayTitleDoesNotInvalidateMatching(t *testing.T) {
 	}
 }
 
+func TestCatalogSearchYearUsesKnownFilmDatesAndSeriesSpan(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	for _, work := range []model.AIOWork{
+		{Type: "movie", TMDB: "101", Titles: []string{"Example Film"}, Years: []int{2020, 2022}},
+		{Type: "tv", TMDB: "202", Titles: []string{"Example Series"}, Years: []int{2018}, SeasonYears: map[int]int{2: 2020}, EpisodeYears: map[string]int{"2:8": 2022}},
+		{Type: "movie", TMDB: "303", Titles: []string{"Example Undated"}, Years: []int{}},
+	} {
+		if err := db.SaveAIOWork(ctx, work, []string{"example " + work.Type}); err != nil {
+			t.Fatal(err)
+		}
+		publishSharingRow(t, ctx, db, "source", work.TMDB, `{"title":"Example","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
+	}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM ingest.aio_match_queue;`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		year int
+		kind string
+		want int64
+	}{
+		{0, "", 3}, {2020, "", 2}, {2021, "", 1}, {2022, "", 2},
+		{2019, "tv", 1}, {2021, "movie", 0}, {2022, "tv", 1}, {2023, "", 0},
+	} {
+		page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example", Limit: 1}, "example", model.CatalogSearchFilters{Type: tc.kind, Year: tc.year})
+		if err != nil || page.Total != tc.want || len(page.Items) != min(1, int(tc.want)) {
+			t.Fatalf("year %d type %q: %+v %v", tc.year, tc.kind, page, err)
+		}
+	}
+	for _, year := range []int{-1, 999, 10000} {
+		if _, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example"}, "example", model.CatalogSearchFilters{Year: year}); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal("invalid year accepted", year, err)
+		}
+	}
+}
+
 func TestCatalogLocalTitlesUseBrowserQueryEnglishFallbackAndRelevance(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	for i, w := range []model.AIOWork{
@@ -108,14 +144,14 @@ func TestCatalogLocalTitlesUseBrowserQueryEnglishFallbackAndRelevance(t *testing
  SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM ingest.aio_match_queue;`); err != nil {
 		t.Fatal(err)
 	}
-	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example ocean"}, "example ocean", "", "fr")
+	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example ocean"}, "example ocean", model.CatalogSearchFilters{Language: "fr"})
 	if err != nil || page.Total != 4 {
 		t.Fatal(page, err)
 	}
 	if page.Items[0].TMDB != "102" || page.Items[1].TMDB != "101" || page.Items[2].TMDB != "104" || page.Items[3].TMDB != "103" || page.Items[0].Title != "Océan Exemple" {
 		t.Fatal("relevance, year or browser title incorrect", page)
 	}
-	fallback, err := db.CatalogTitles(ctx, model.ListOptions{Query: "océan exemple"}, "ocean exemple", "", "ja")
+	fallback, err := db.CatalogTitles(ctx, model.ListOptions{Query: "océan exemple"}, "ocean exemple", model.CatalogSearchFilters{Language: "ja"})
 	if err != nil || fallback.Total != 2 || fallback.Items[0].Title != "Océan Exemple" {
 		t.Fatal("query-language alias fallback lost", fallback, err)
 	}

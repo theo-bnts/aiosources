@@ -2,6 +2,14 @@ package model
 
 import "time"
 
+// CatalogSearchFilters apply to local metadata, independently of release filters.
+// A year selects any known release year, or a year within a series' known span.
+type CatalogSearchFilters struct {
+	Type     string
+	Year     int
+	Language string
+}
+
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
@@ -47,10 +55,12 @@ type CatalogDownloadInput struct {
 	OccurrenceID  string `json:"occurrence_id"`
 	Service       string `json:"service"`
 	AllowUncached bool   `json:"allow_uncached"`
+	PreparationID string `json:"preparation_id,omitempty"`
 }
 
 type CatalogDownload struct {
-	Status      string `json:"status"`
-	URL         string `json:"url,omitempty"`
-	OperationID string `json:"operation_id"`
+	Status        string `json:"status"`
+	URL           string `json:"url,omitempty"`
+	OperationID   string `json:"operation_id"`
+	PreparationID string `json:"preparation_id,omitempty"`
 }

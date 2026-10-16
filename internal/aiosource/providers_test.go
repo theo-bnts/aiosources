@@ -188,3 +188,60 @@ func TestProviderCancellationAndBatchLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTorBoxReadinessChecksAnExistingItemWithoutCreatingAgain(t *testing.T) {
+	for _, state := range []string{"pending", "deleted", "ready", "wrong_hash"} {
+		t.Run(state, func(t *testing.T) {
+			hash := strings.Repeat("a", 40)
+			requests := []string{}
+			p := providerTest(t, func(w http.ResponseWriter, r *http.Request) {
+				requests = append(requests, r.URL.Path)
+				switch r.URL.Path {
+				case "/torrents/mylist":
+					if r.URL.Query().Get("id") != "0" || r.URL.Query().Get("bypass_cache") != "true" {
+						t.Error("readiness did not target the existing account item")
+					}
+					if state == "deleted" {
+						fmt.Fprint(w, `{"success":true,"error":"ITEM_NOT_FOUND","data":null}`)
+						return
+					}
+					responseHash := hash
+					if state == "wrong_hash" {
+						responseHash = strings.Repeat("b", 40)
+					}
+					fmt.Fprintf(w, `{"success":true,"data":{"hash":%q,"download_finished":%t,"download_present":%t,"files":[{"id":0,"name":"Example.Movie.mkv","size":100}]}}`, responseHash, state != "pending", state != "pending")
+				case "/torrents/requestdl":
+					if state != "ready" || r.URL.Query().Get("torrent_id") != "0" {
+						t.Error("readiness unlocked a missing, wrong or unfinished item")
+					}
+					fmt.Fprint(w, `{"success":true,"data":"https://files.example/download"}`)
+				default:
+					t.Error("readiness created or changed an account torrent")
+					w.WriteHeader(500)
+				}
+			})
+			link, prepared, err := p.tbPrepare(t.Context(), "synthetic-key", hash, "", Resource{Type: "movie"}, true, "0")
+			if prepared != "0" || len(requests) == 0 {
+				t.Fatal("lost preparation identity", err)
+			}
+			switch state {
+			case "ready":
+				if err != nil || link != "https://files.example/download" || len(requests) != 2 {
+					t.Fatal("ready file was not resolved", err)
+				}
+			case "pending":
+				if !errors.Is(err, ErrPending) || link != "" || len(requests) != 1 {
+					t.Fatal("pending download was recreated or unlocked", err)
+				}
+			case "deleted":
+				if providerFailureCode(err) != "not_found" || link != "" || len(requests) != 1 {
+					t.Fatal("deleted download was recreated or unlocked", err)
+				}
+			case "wrong_hash":
+				if providerFailureCode(err) != "not_found" || link != "" || len(requests) != 1 {
+					t.Fatal("another account item could be downloaded", err)
+				}
+			}
+		})
+	}
+}

@@ -389,6 +389,10 @@ func (s *Service) observe(service string, err error) {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return
 	}
+	if code := providerFailureCode(err); code == "not_found" || code == "not_cached" {
+		// A missing account item or cache entry does not mean the service is down.
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(s.ctx), 5*time.Second)
 	defer cancel()
 	_ = s.DB.AIOIncident(ctx, service, err != nil)

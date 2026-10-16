@@ -19,7 +19,7 @@ func (c ProviderCall) Valid() bool {
 		return false
 	}
 	switch c.ErrorCode {
-	case "", "provider_error", "authentication", "cancelled", "timeout", "rate_limit", "account_limit", "subscription", "provider_unavailable", "invalid_torrent", "file_too_large", "not_found":
+	case "", "provider_error", "authentication", "cancelled", "timeout", "rate_limit", "account_limit", "subscription", "provider_unavailable", "invalid_torrent", "file_too_large", "not_found", "not_cached":
 		return true
 	default:
 		return false

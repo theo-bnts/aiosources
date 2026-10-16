@@ -277,8 +277,10 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 }
 
 type playbackPolicy struct {
-	CachedOnly  bool
-	Fingerprint string
+	CachedOnly    bool
+	Fingerprint   string
+	PreparationID string
+	PreparedID    *string
 }
 
 func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation, policy playbackPolicy) (string, error) {
@@ -386,7 +388,18 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		return "", err
 	}
 	if service == "torbox" {
-		link, err = s.Providers.tbPlay(life, key, rec.Hash, magnet, r, cachedOnly)
+		var prepared string
+		link, prepared, err = s.Providers.tbPrepare(life, key, rec.Hash, magnet, r, cachedOnly, policy.PreparationID)
+		if policy.PreparedID != nil {
+			*policy.PreparedID = prepared
+		}
+		if providerFailureCode(err) == "not_cached" {
+			// This response describes provider-wide cache availability, unlike
+			// ITEM_NOT_FOUND, which may only describe the caller's account.
+			_ = s.DB.SaveAIOAvailability(life, service, fingerprint(key), model.AIOAvailability{
+				Hash: rec.Hash, CheckedAt: time.Now(), Generation: generation, Shareable: true,
+			})
+		}
 	} else {
 		stage := "cleanup"
 		err = s.withHash(life, fingerprint(key), rec.Hash, func() error {
@@ -401,6 +414,18 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 				return err
 			}
 			existing := existingAD(inventory, rec.Hash)
+			if policy.PreparationID != "" {
+				existing = nil
+				for i := range inventory {
+					if itoa64(inventory[i].ID) == policy.PreparationID && strings.EqualFold(inventory[i].Hash, rec.Hash) {
+						existing = &inventory[i]
+						break
+					}
+				}
+				if existing == nil {
+					return newProviderError("not_found", "")
+				}
+			}
 			var item adMagnet
 			if existing != nil {
 				if *existing.Status < 0 || *existing.Status > 4 {
@@ -418,6 +443,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 					}
 					return err
 				}
+			}
+			if policy.PreparedID != nil {
+				*policy.PreparedID = itoa64(item.ID)
 			}
 			if item.Ready == nil || !*item.Ready {
 				if cachedOnly && existing == nil && item.ID > 0 {

@@ -20,4 +20,5 @@ export const providerErrors: Record<string, string> = {
   invalid_torrent: 'Torrent rejected',
   file_too_large: 'File exceeds provider or plan limit',
   not_found: 'Torrent or file unavailable',
+  not_cached: 'File no longer cached',
 }

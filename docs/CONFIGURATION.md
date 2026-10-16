@@ -1,6 +1,6 @@
 # Source configuration
 
-[Back to README](../README.md) · [Complete JSON reference](JSON_REFERENCE.md) · [Deployment settings](SETTINGS.md) · [Remote catalogs](SHARING.md)
+[Back to README](../README.md) · [Complete JSON reference](JSON_REFERENCE.md) · [Connector compatibility](CONNECTORS.md) · [Deployment settings](SETTINGS.md) · [Remote catalogs](SHARING.md)
 
 Source behavior belongs in strict JSON, not application code. This narrative guide covers native Torznab and HTTP/JSON sources. For every accepted field, its exact default, validation constraints, standalone SDK differences and Compose controls, see the [complete JSON reference](JSON_REFERENCE.md). Existing source YAML requires [offline migration](#migrating-existing-sources); Compose and CI configuration remain YAML.
 

@@ -45,11 +45,12 @@ export function CatalogSearchPage() {
   const pagination = useURLPagination()
   const q = search.get('q') || ''
   const kind = search.get('type') || ''
+  const year = search.get('year') || ''
   const query = useQuery({
-    queryKey: ['catalog-search', q, kind, language, pagination.limit, pagination.offset],
+    queryKey: ['catalog-search', q, kind, year, language, pagination.limit, pagination.offset],
     queryFn: ({ signal }) =>
       api<Page<CatalogTitle>>(
-        `/catalog/search?${params({ q, type: kind, language, limit: pagination.limit, offset: pagination.offset })}`,
+        `/catalog/search?${params({ q, type: kind, year, language, limit: pagination.limit, offset: pagination.offset })}`,
         { signal },
       ),
     enabled: q.trim().length >= 2,
@@ -57,7 +58,7 @@ export function CatalogSearchPage() {
   return (
     <div className="page">
       <form
-        key={`${q}:${kind}`}
+        key={`${q}:${kind}:${year}`}
         className="flex flex-wrap items-end gap-3 rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
@@ -65,6 +66,7 @@ export function CatalogSearchPage() {
           const next = new URLSearchParams()
           next.set('q', String(data.get('q') || '').trim())
           if (data.get('type')) next.set('type', String(data.get('type')))
+          if (data.get('year')) next.set('year', String(data.get('year')))
           setSearch(next)
         }}
       >
@@ -88,6 +90,19 @@ export function CatalogSearchPage() {
             <option value="movie">Films</option>
             <option value="tv">Series</option>
           </select>
+        </div>
+        <div className="field w-28">
+          <Label htmlFor="catalog-year">Year</Label>
+          <Input
+            id="catalog-year"
+            name="year"
+            type="number"
+            min={1000}
+            max={9999}
+            step={1}
+            defaultValue={year}
+            placeholder="Any year"
+          />
         </div>
         <Button type="submit">
           <MagnifyingGlassIcon />

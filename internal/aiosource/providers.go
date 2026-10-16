@@ -406,44 +406,56 @@ func (p *ProviderHTTP) TBCheck(ctx context.Context, key string, hashes []string)
 	return out, nil
 }
 func (p *ProviderHTTP) TBPlay(ctx context.Context, key, hash, magnet string, r Resource) (link string, playErr error) {
-	return p.tbPlay(ctx, key, hash, magnet, r, false)
+	link, _, playErr = p.tbPrepare(ctx, key, hash, magnet, r, false, "")
+	return
 }
-func (p *ProviderHTTP) tbPlay(ctx context.Context, key, hash, magnet string, r Resource, cachedOnly bool) (link string, playErr error) {
+
+// Preparation IDs stay in the administrator's open view. Readiness checks
+// read that account item without recreating a deleted or unfinished download.
+// Verify its hash again before selecting or unlocking any file.
+func (p *ProviderHTTP) tbPrepare(ctx context.Context, key, hash, magnet string, r Resource, cachedOnly bool, preparationID string) (link, prepared string, playErr error) {
 	stage := "add"
+	resuming := preparationID != ""
 	defer func() {
 		if playErr != nil {
 			playErr = &playbackError{stage: stage, cause: playErr}
 		}
 	}()
-	var body bytes.Buffer
-	form := multipart.NewWriter(&body)
-	if cachedOnly {
-		if err := form.WriteField("add_only_if_cached", "true"); err != nil {
-			return "", err
+	var b json.RawMessage
+	var err error
+	if preparationID == "" {
+		var body bytes.Buffer
+		form := multipart.NewWriter(&body)
+		if cachedOnly {
+			if err := form.WriteField("add_only_if_cached", "true"); err != nil {
+				return "", prepared, err
+			}
 		}
+		if err := form.WriteField("magnet", magnet); err != nil {
+			return "", prepared, err
+		}
+		if err := form.Close(); err != nil {
+			return "", prepared, err
+		}
+		b, err = p.request(ctx, "torbox", key, "POST", "torrents/createtorrent", &body, form.FormDataContentType())
+		if err != nil {
+			return "", prepared, err
+		}
+		var created struct {
+			ID   *int64 `json:"torrent_id"`
+			Hash string `json:"hash"`
+		}
+		if json.Unmarshal(b, &created) != nil || created.ID == nil || *created.ID < 0 || !strings.EqualFold(created.Hash, hash) {
+			return "", prepared, ErrInvalidResponse
+		}
+		preparationID = itoa64(*created.ID)
 	}
-	if err := form.WriteField("magnet", magnet); err != nil {
-		return "", err
-	}
-	if err := form.Close(); err != nil {
-		return "", err
-	}
-	b, err := p.request(ctx, "torbox", key, "POST", "torrents/createtorrent", &body, form.FormDataContentType())
-	if err != nil {
-		return "", err
-	}
-	var created struct {
-		ID   *int64 `json:"torrent_id"`
-		Hash string `json:"hash"`
-	}
-	if json.Unmarshal(b, &created) != nil || created.ID == nil || *created.ID < 0 || !strings.EqualFold(created.Hash, hash) {
-		return "", ErrInvalidResponse
-	}
-	q := url.Values{"bypass_cache": {"true"}, "id": {itoa64(*created.ID)}}
+	prepared = preparationID
+	q := url.Values{"bypass_cache": {"true"}, "id": {prepared}}
 	stage = "file_list"
 	b, err = p.request(ctx, "torbox", key, "GET", "torrents/mylist?"+q.Encode(), nil, "")
 	if err != nil {
-		return "", err
+		return "", prepared, err
 	}
 	var item struct {
 		Hash     string
@@ -451,29 +463,36 @@ func (p *ProviderHTTP) tbPlay(ctx context.Context, key, hash, magnet string, r R
 		Present  bool `json:"download_present"`
 		Files    json.RawMessage
 	}
-	if json.Unmarshal(b, &item) != nil || !strings.EqualFold(item.Hash, hash) {
-		return "", ErrInvalidResponse
+	if json.Unmarshal(b, &item) != nil {
+		return "", prepared, ErrInvalidResponse
+	}
+	if !strings.EqualFold(item.Hash, hash) {
+		if resuming && item.Hash != "" {
+			return "", prepared, newProviderError("not_found", "")
+		}
+		return "", prepared, ErrInvalidResponse
 	}
 	if !item.Finished || !item.Present {
-		return "", ErrPending
+		return "", prepared, ErrPending
 	}
 	files, ok := tbFiles(item.Files)
 	if !ok {
-		return "", ErrInvalidResponse
+		return "", prepared, ErrInvalidResponse
 	}
 	stage = "file_selection"
 	file, ok := SelectFile(files, r)
 	if !ok {
-		return "", errors.New("no unambiguous matching video")
+		return "", prepared, errors.New("no unambiguous matching video")
 	}
-	q = url.Values{"token": {key}, "torrent_id": {itoa64(*created.ID)}, "file_id": {itoa64(file.ID)}, "redirect": {"false"}}
+	q = url.Values{"token": {key}, "torrent_id": {prepared}, "file_id": {itoa64(file.ID)}, "redirect": {"false"}}
 	stage = "unlock"
 	b, err = p.request(ctx, "torbox", key, "GET", "torrents/requestdl?"+q.Encode(), nil, "")
 	if err != nil {
-		return "", err
+		return "", prepared, err
 	}
 	if json.Unmarshal(b, &link) != nil {
-		return "", ErrInvalidResponse
+		return "", prepared, ErrInvalidResponse
 	}
-	return HTTPSLink(link)
+	link, err = HTTPSLink(link)
+	return link, prepared, err
 }

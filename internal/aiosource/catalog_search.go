@@ -11,8 +11,8 @@ import (
 	"github.com/theo-bnts/aiosources/internal/store"
 )
 
-func (s *Service) CatalogSearch(ctx context.Context, opts model.ListOptions, kind string, locales ...string) (model.List[model.CatalogTitle], error) {
-	return s.DB.CatalogTitles(ctx, opts, Normalize(opts.Query), kind, locales...)
+func (s *Service) CatalogSearch(ctx context.Context, opts model.ListOptions, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
+	return s.DB.CatalogTitles(ctx, opts, Normalize(opts.Query), filters)
 }
 
 // Start a series at an episode actually represented by its local releases.
@@ -216,6 +216,12 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 	if (input.Service != "alldebrid" && input.Service != "torbox") || !store.ValidOccurrenceID(input.OccurrenceID) || input.Fingerprint == "" || len(input.Fingerprint) > 128 {
 		return result, model.ErrInvalid
 	}
+	if input.PreparationID != "" {
+		id, err := strconv.ParseInt(input.PreparationID, 10, 64)
+		if input.AllowUncached || err != nil || id < 0 || (input.Service == "alldebrid" && id == 0) || strconv.FormatInt(id, 10) != input.PreparationID {
+			return result, model.ErrInvalid
+		}
+	}
 	select {
 	case s.downloadSlots <- struct{}{}:
 		defer func() { <-s.downloadSlots }()
@@ -271,7 +277,7 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 		}
 	}()
 	h.checkpoint(ctx, "download")
-	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, nil, playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint})
+	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, nil, playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, PreparationID: input.PreparationID, PreparedID: &result.PreparationID})
 	result.Status = "ready"
 	if errors.Is(downloadErr, ErrPending) {
 		result.Status = "pending"
@@ -280,5 +286,6 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 	if downloadErr == nil {
 		h.run.Processed = 1
 	}
+	result.PreparationID = ""
 	return result, downloadErr
 }

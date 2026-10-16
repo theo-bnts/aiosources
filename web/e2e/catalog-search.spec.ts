@@ -77,7 +77,7 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
   }
 }
 
-test('identification and torrent search accept the same spaced and dotted title fragments and show totals', async ({
+test('all three searches accept spaced and dotted title fragments and show totals', async ({
   page,
   server,
 }) => {
@@ -89,6 +89,8 @@ test('identification and torrent search accept the same spaced and dotted title 
     'Example-Film New Day',
     'xample New',
   ]) {
+    await page.goto(`/search?q=${encodeURIComponent(q)}`)
+    await expect(page.locator('[data-result-count]')).toHaveText('1 title')
     await page.goto(`/torrents?q=${encodeURIComponent(q)}`)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
@@ -158,6 +160,72 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await expect(page.locator('[data-result-count]')).toHaveText('0 source releases')
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(0)
 })
+
+test('catalog year is a single optional filter and survives opening a title and returning', async ({
+  page,
+  server,
+}) => {
+  await seedCatalog(page, server)
+  await page.goto('/search')
+  await page.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('example')
+  await page.getByLabel('Year', { exact: true }).fill('2025')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
+  await page.getByLabel('Year', { exact: true }).fill('2026')
+  await page.getByLabel('Type', { exact: true }).selectOption('tv')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.locator('[data-result-count]')).toHaveText('1 title')
+  await page.getByRole('link', { name: 'Example Series', exact: true }).click()
+  await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
+  await expect(page.getByLabel('Year', { exact: true })).toHaveValue('2026')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('tv')
+  await page.getByLabel('Year', { exact: true }).fill('')
+  await page.getByLabel('Type', { exact: true }).selectOption('')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
+})
+
+for (const [code, status] of [
+  ['not_cached', 409],
+  ['not_found', 404],
+] as const) {
+  test(`readiness stops when the provider returns ${code} without starting an uncached transfer`, async ({
+    page,
+    server,
+  }) => {
+    const ids = await seedCatalog(page, server, true)
+    await page.clock.install()
+    let calls = 0
+    await page.route('**/api/catalog/*/download', async (route) => {
+      calls++
+      const input = route.request().postDataJSON()
+      expect(input.allow_uncached).toBe(calls === 1)
+      expect(input.preparation_id).toBe(calls === 1 ? undefined : '7')
+      await route.fulfill({
+        status: calls === 1 ? 202 : status,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          calls === 1
+            ? { status: 'pending', operation_id: 'synthetic-preparation', preparation_id: '7' }
+            : { code, error: 'The file is no longer available at the provider.' },
+        ),
+      })
+    })
+    await page.goto(`/search/${ids.movie}`)
+    await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+    await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
+    await page.clock.runFor(15_001)
+    await expect(page.getByText('Not ready', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-request-notice]')).toContainText(
+      'The file is no longer available',
+    )
+    await expect.poll(() => page.context().pages().length).toBe(1)
+    await page.clock.runFor(60_001)
+    expect(calls).toBe(2)
+    await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveCount(0)
+  })
+}
 
 test('mobile download controls handle pending and ready responses without keeping links across episode changes', async ({
   page,
@@ -272,12 +340,14 @@ test('an uncached download starts automatically when the provider becomes ready'
   await page.route('**/api/catalog/*/download', async (route) => {
     calls++
     expect(route.request().postDataJSON().allow_uncached).toBe(calls === 1)
+    expect(route.request().postDataJSON().preparation_id).toBe(calls === 1 ? undefined : '7')
     await route.fulfill({
       status: calls === 1 ? 202 : 200,
       contentType: 'application/json',
       body: JSON.stringify({
         status: calls === 1 ? 'pending' : 'ready',
         operation_id: 'synthetic-preparation',
+        ...(calls === 1 ? { preparation_id: '7' } : {}),
         ...(calls > 1 ? { url: 'https://files.example/prepared-download' } : {}),
       }),
     })

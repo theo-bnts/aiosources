@@ -3,11 +3,13 @@ import { QueryClient } from '@tanstack/react-query'
 export class ApiError extends Error {
   status: number
   details: string[]
-  constructor(status: number, message: string, details: string[] = []) {
+  code?: string
+  constructor(status: number, message: string, details: string[] = [], code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.details = details
+    this.code = code
   }
 }
 
@@ -65,13 +67,14 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
     throw new ConnectionError('The server is unreachable. Check your connection and try again.')
   }
   if (!response.ok) {
-    let payload: { error?: string; details?: string[] } = {}
+    let payload: { error?: string; details?: string[]; code?: string } = {}
     try {
       const value: unknown = await response.json()
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const fields = value as Record<string, unknown>
         payload = {
           error: typeof fields.error === 'string' ? fields.error : undefined,
+          code: typeof fields.code === 'string' ? fields.code : undefined,
           details: Array.isArray(fields.details)
             ? fields.details.filter((item): item is string => typeof item === 'string')
             : [],
@@ -90,7 +93,12 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
       response.status === 403
         ? 'The security session must be refreshed. Try again after refreshing.'
         : `The request failed (HTTP ${response.status}).`
-    throw new ApiError(response.status, payload.error || fallback, payload.details ?? [])
+    throw new ApiError(
+      response.status,
+      payload.error || fallback,
+      payload.details ?? [],
+      payload.code,
+    )
   }
   return response
 }

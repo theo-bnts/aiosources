@@ -27,7 +27,16 @@ func (s *server) catalogSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "Enter at least two letters or digits to search.")
 		return
 	}
-	items, err := s.options.AIOSource.CatalogSearch(r.Context(), opts, r.URL.Query().Get("type"), catalogLanguage(r))
+	filters := model.CatalogSearchFilters{Type: r.URL.Query().Get("type"), Language: catalogLanguage(r)}
+	if raw := r.URL.Query().Get("year"); raw != "" {
+		year, err := strconv.Atoi(raw)
+		if err != nil || len(raw) != 4 || year < 1000 || year > 9999 {
+			writeError(w, http.StatusUnprocessableEntity, "Enter a single four-digit year.")
+			return
+		}
+		filters.Year = year
+	}
+	items, err := s.options.AIOSource.CatalogSearch(r.Context(), opts, filters)
 	if err != nil {
 		respondError(w, err)
 		return
