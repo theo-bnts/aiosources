@@ -27,34 +27,36 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Debrid', 'Debrid', '/debrid/settings'],
     ['Debrid', 'Debrid', '/debrid/history'],
     ['Debrid', 'Debrid', '/debrid/history/missing'],
-    ['Connections', 'Search', '/search'],
-    ['Connections', 'Search', '/search/999999'],
+    ['Search', 'Search', '/search'],
+    ['Search', 'Search', '/search/999999'],
     ['Connections', 'Stremio', '/addon'],
     ['Connections', 'Stremio', '/addon/settings'],
     ['Connections', 'Stremio', '/addon/history'],
     ['Connections', 'Catalog sharing', '/sharing'],
     ['Connections', 'Catalog sharing', '/sharing/remotes'],
     ['Connections', 'Catalog sharing', '/remotes'],
-    ['Database', 'Storage', '/health'],
-    ['Security', 'Security', '/security'],
-    ['Security', 'Security', '/secrets'],
-    ['Security', 'Security', '/security/secrets'],
-    ['Security', 'Security', '/security/verification'],
-    ['Security', 'Security', '/security/sessions'],
-    ['Logs', 'Logs', '/logs'],
-    ['Logs', 'Logs', '/notifications'],
-    ['Logs', 'Logs', '/webhooks'],
+    ['Administration', 'Storage', '/health'],
+    ['Administration', 'Security', '/security'],
+    ['Administration', 'Security', '/secrets'],
+    ['Administration', 'Security', '/security/secrets'],
+    ['Administration', 'Security', '/security/verification'],
+    ['Administration', 'Security', '/security/sessions'],
+    ['Administration', 'Logs', '/logs'],
+    ['Administration', 'Logs', '/notifications'],
+    ['Administration', 'Logs', '/webhooks'],
   ]
   for (const [group, label, url] of destinations) {
     await page.goto(url)
     await expect(
       page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
     ).toHaveText(
-      ['Sources', 'Metadata', 'Connections'].includes(group) ? [`${group}/`, label] : [label],
+      ['Sources', 'Metadata', 'Connections', 'Administration'].includes(group)
+        ? [`${group}/`, label]
+        : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
     await expect(navigation.locator('a[aria-current="page"]')).toHaveText(label)
-    if (['Sources', 'Metadata', 'Connections'].includes(group))
+    if (['Sources', 'Metadata', 'Connections', 'Administration'].includes(group))
       await expect(navigation.getByRole('button', { name: group, exact: true })).toHaveAttribute(
         'aria-expanded',
         'true',
@@ -65,18 +67,23 @@ test('navigation and page tabs remain coherent on every current and legacy route
   }
   await page.goto('/providers')
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
-  await expect(navigation.getByRole('button')).toHaveText(['Sources', 'Metadata', 'Connections'])
+  await expect(navigation.getByRole('button')).toHaveText([
+    'Sources',
+    'Metadata',
+    'Connections',
+    'Administration',
+  ])
   await expect(navigation.getByRole('link')).toHaveText([
     'Sources',
     'Torrent search',
     'Metadata',
     'Identification',
     'Debrid',
-    'Stremio',
     'Search',
+    'Stremio',
     'Catalog sharing',
-    'Storage',
     'Security',
+    'Storage',
     'Logs',
   ])
   for (const name of [
@@ -136,7 +143,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   await navigation.getByRole('link', { name: 'Storage', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByRole('tab')).toHaveCount(0)
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Storage'])
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await navigation.getByRole('link', { name: 'Security', exact: true }).click()

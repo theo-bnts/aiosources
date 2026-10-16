@@ -29,7 +29,7 @@ import {
   ShieldCheckIcon,
   CaretDownIcon,
   DownloadSimpleIcon,
-  ChartLineIcon,
+  GearSixIcon,
   ListChecksIcon,
 } from '@phosphor-icons/react'
 import {
@@ -133,6 +133,20 @@ const navigationGroups = [
     ],
   },
   {
+    id: 'search',
+    label: 'Search',
+    icon: MagnifyingGlassIcon,
+    defaultOpen: true,
+    items: [
+      {
+        to: '/search',
+        label: 'Search',
+        description: 'Find identified titles and download through your debrid services.',
+        icon: MagnifyingGlassIcon,
+      },
+    ],
+  },
+  {
     id: 'integrations',
     label: 'Connections',
     icon: PlugsConnectedIcon,
@@ -145,12 +159,6 @@ const navigationGroups = [
         icon: PlayCircleIcon,
       },
       {
-        to: '/search',
-        label: 'Search',
-        description: 'Find identified titles and download through your debrid services.',
-        icon: MagnifyingGlassIcon,
-      },
-      {
         to: '/sharing',
         label: 'Catalog sharing',
         description: 'Share published catalogs and synchronize remote copies.',
@@ -159,24 +167,10 @@ const navigationGroups = [
     ],
   },
   {
-    id: 'database',
-    label: 'Database',
-    icon: DatabaseIcon,
+    id: 'administration',
+    label: 'Administration',
+    icon: GearSixIcon,
     defaultOpen: true,
-    items: [
-      {
-        to: '/health',
-        label: 'Storage',
-        description: 'PostgreSQL storage and local available space.',
-        icon: DatabaseIcon,
-      },
-    ],
-  },
-  {
-    id: 'security',
-    label: 'Access',
-    icon: ShieldCheckIcon,
-    defaultOpen: false,
     items: [
       {
         to: '/security',
@@ -184,14 +178,12 @@ const navigationGroups = [
         description: 'Encrypted secrets, sign-in protection and active sessions.',
         icon: ShieldCheckIcon,
       },
-    ],
-  },
-  {
-    id: 'activity',
-    label: 'Activity',
-    icon: ChartLineIcon,
-    defaultOpen: true,
-    items: [
+      {
+        to: '/health',
+        label: 'Storage',
+        description: 'PostgreSQL storage and local available space.',
+        icon: DatabaseIcon,
+      },
       {
         to: '/logs',
         label: 'Logs',

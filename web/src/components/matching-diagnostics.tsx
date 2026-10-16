@@ -131,7 +131,13 @@ export function MatchingDiagnostics() {
       >
         <div className="field min-w-0 basis-full sm:basis-auto sm:flex-1">
           <Label htmlFor="matching-search">Title, source ID or info hash</Label>
-          <Input key={q} id="matching-search" name="q" defaultValue={q} />
+          <Input
+            key={q}
+            id="matching-search"
+            name="q"
+            defaultValue={q}
+            placeholder="Search title fragments, source IDs or info hashes"
+          />
         </div>
         <Button type="submit" variant="outline" className="self-end">
           Search

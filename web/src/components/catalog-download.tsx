@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { DownloadSimpleIcon, PlusIcon } from '@phosphor-icons/react'
+import { DownloadSimpleIcon, PlusIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import { api, queryClient } from '@/lib/api'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
+import { prepareBrowserDownload } from '@/lib/browser-download'
 import type {
   CatalogRelease,
   CatalogSelection,
@@ -42,7 +43,14 @@ export function DownloadAction({
   const notify = useNotification()
   const attempts = useRef(0)
   const controller = useRef<AbortController | null>(null)
-  useEffect(() => () => controller.current?.abort(), [])
+  const download = useRef<ReturnType<typeof prepareBrowserDownload> | null>(null)
+  useEffect(
+    () => () => {
+      controller.current?.abort()
+      download.current?.cancel()
+    },
+    [],
+  )
   const mutation = useMutation({
     gcTime: 0,
     mutationFn: (allowUncached: boolean) => {
@@ -66,11 +74,25 @@ export function DownloadAction({
       setNotReady(pending)
       if (!pending) {
         setReady(result)
-        notify('The download link is ready.')
+        const started = result.url && download.current?.start(result.url)
+        if (!started) download.current?.cancel()
+        download.current = null
+        notify(
+          started
+            ? 'The download link is ready.'
+            : 'The download link is ready. Use Download file if your browser blocked the new tab.',
+        )
+      } else if (!(allowUncached || waiting) || attempts.current >= 20) {
+        download.current?.cancel()
+        download.current = null
       }
       // Keep the temporary URL only in this view's expiring local state.
       mutation.reset()
       void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
+    },
+    onError: () => {
+      download.current?.cancel()
+      download.current = null
     },
   })
   const run = mutation.mutate
@@ -106,46 +128,59 @@ export function DownloadAction({
                 : cacheLabels[service.state]}
         </Badge>
       </div>
-      {ready?.url ? (
-        <Button asChild size="sm">
-          <a
+      <div className="flex flex-wrap items-center gap-2">
+        {ready?.url ? (
+          <Button asChild size="sm">
+            <a
+              title={details || undefined}
+              href={ready.url}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+            >
+              <DownloadSimpleIcon />
+              Download file
+            </a>
+          </Button>
+        ) : (
+          <Button
+            size="sm"
             title={details || undefined}
-            href={ready.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            referrerPolicy="no-referrer"
+            variant={cached ? 'default' : 'outline'}
+            disabled={
+              mutation.isPending ||
+              blocked ||
+              (!service.can_add && service.state === 'uncached' && !waiting)
+            }
+            onClick={() => {
+              attempts.current = 0
+              download.current?.cancel()
+              download.current = prepareBrowserDownload()
+              mutation.mutate(!waiting && !cached && service.can_add)
+            }}
           >
-            <DownloadSimpleIcon />
-            Download file
-          </a>
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          title={details || undefined}
-          variant={cached ? 'default' : 'outline'}
-          disabled={
-            mutation.isPending ||
-            blocked ||
-            (!service.can_add && service.state === 'uncached' && !waiting)
-          }
-          onClick={() => {
-            attempts.current = 0
-            mutation.mutate(!waiting && !cached && service.can_add)
-          }}
-        >
-          {cached || waiting ? <DownloadSimpleIcon /> : <PlusIcon />}
-          {mutation.isPending
-            ? 'Preparing…'
-            : waiting
-              ? 'Check readiness'
-              : cached
-                ? 'Download'
-                : service.can_add
-                  ? 'Add to debrid'
-                  : 'Check cached file'}
-        </Button>
-      )}
+            {cached || waiting ? <DownloadSimpleIcon /> : <PlusIcon />}
+            {mutation.isPending
+              ? 'Preparing…'
+              : waiting
+                ? 'Check readiness'
+                : cached
+                  ? 'Download'
+                  : service.can_add
+                    ? 'Add to debrid'
+                    : 'Check cached file'}
+          </Button>
+        )}
+        {operation && (
+          <Button asChild size="sm" variant="ghost">
+            <Link to={`/debrid/history/${encodeURIComponent(operation)}`}>
+              View operation
+              <ArrowRightIcon />
+            </Link>
+          </Button>
+        )}
+      </div>
       {waiting && (
         <p className="help max-w-60">
           The debrid service is preparing this file.
@@ -161,11 +196,6 @@ export function DownloadAction({
             ? ' You can add it to debrid.'
             : ' Only cached files can be downloaded from this private source.'}
         </p>
-      )}
-      {operation && (
-        <Link className="text-xs" to={`/debrid/history/${encodeURIComponent(operation)}`}>
-          View operation
-        </Link>
       )}
       <ErrorNotice error={mutation.error} scope="action" />
     </div>

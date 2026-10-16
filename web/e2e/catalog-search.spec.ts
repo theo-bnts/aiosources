@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Download, Page } from '@playwright/test'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 import type { TestServer } from './server'
@@ -57,8 +57,8 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
       VALUES('movie','101','tt1234567',ARRAY[2026],'Example Film: New Day'),('tv','202','tt2345678',ARRAY[2026],'Example Series');
       INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,display_title,CASE WHEN media_type='movie' THEN 'example film new day' ELSE 'example series' END FROM ingest.aio_works;
       INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
-      ('alpha','film-one','{"title":"Example.Film.New.Day.2026.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"imdb_id":"tt1234567"}'),
-      ('zulu','film-two','{"title":"Example.Film.New.Day.2026.2160p","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200,"imdb_id":"tt1234567"}'),
+      ('alpha','film-one','{"title":"Example-Film.New.Day.2026.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"imdb_id":"tt1234567"}'),
+      ('zulu','film-two','{"title":"Example-Film.New.Day.2026.2160p","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200,"imdb_id":"tt1234567"}'),
       ('alpha','series-one','{"title":"Example.Series.S02E03.1080p","info_hash":"cccccccccccccccccccccccccccccccccccccccc","size":100,"imdb_id":"tt2345678"}');
       INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
       SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','native identifier' FROM ingest.torrents t JOIN ingest.aio_works w ON w.imdb_id=t.fields->>'imdb_id';
@@ -83,6 +83,7 @@ test('identification and torrent search accept the same spaced and dotted title 
 }) => {
   await seedCatalog(page, server)
   for (const q of [
+    'Example-Film.New.Day',
     'Example.Film.New.Day',
     'Example Film New Day',
     'Example-Film New Day',
@@ -92,14 +93,26 @@ test('identification and torrent search accept the same spaced and dotted title 
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
     await page.goto('/metadata/identification?match_status=all')
-    await page.getByLabel('Title, source ID or info hash', { exact: true }).fill(q)
+    const input = page.getByLabel('Title, source ID or info hash', { exact: true })
+    await expect(input).toHaveAttribute(
+      'placeholder',
+      'Search title fragments, source IDs or info hashes',
+    )
+    await input.fill(q)
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
   }
+  await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await page
+    .getByLabel('Title, source ID or info hash', { exact: true })
+    .fill('example film new day')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
+  await expect(page.locator('main tbody tr')).toHaveCount(2)
 })
 
-test('connection search groups clean titles, sorts source versions and retains the list when returning', async ({
+test('catalog search groups clean titles, sorts source versions and retains the list when returning', async ({
   page,
   server,
 }) => {
@@ -115,6 +128,9 @@ test('connection search groups clean titles, sorts source versions and retains t
       url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
   )
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
+  const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
+  await expect(filters.getByLabel('Sort versions', { exact: true })).toHaveValue('size_desc')
+  await expect(filters.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
   await page.getByLabel('Sort versions', { exact: true }).selectOption('size_desc')
@@ -151,6 +167,15 @@ test('mobile download controls handle pending and ready responses without keepin
   await page.setViewportSize({ width: 390, height: 844 })
   await page.clock.install()
   let calls = 0
+  let referrer: string | undefined
+  await page.context().route('https://files.example/ephemeral-link', async (route) => {
+    referrer = route.request().headers()['referer']
+    await route.fulfill({
+      contentType: 'application/octet-stream',
+      headers: { 'Content-Disposition': 'attachment; filename="example.mkv"' },
+      body: 'Synthetic download contents',
+    })
+  })
   // Only provider resolution is simulated in this browser scenario. Search,
   // authorization, data, cache evidence and selection use the real backend;
   // HTTP/service tests exercise both real provider adapters against local stubs.
@@ -183,10 +208,27 @@ test('mobile download controls handle pending and ready responses without keepin
   await page.goto(`/search/${ids.tv}`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.getByText('Not ready', { exact: true })).toBeVisible()
+  await expect.poll(() => page.context().pages().length).toBe(1)
+  const started = new Promise<Download>((resolve) =>
+    page.context().once('page', (popup) => popup.once('download', resolve)),
+  )
   await page.getByRole('button', { name: 'Check cached file', exact: true }).click()
+  const downloaded = await started
+  expect(downloaded.suggestedFilename()).toBe('example.mkv')
+  expect(await downloaded.failure()).toBeNull()
+  expect(referrer).toBeUndefined()
   const link = page.getByRole('link', { name: 'Download file', exact: true })
   await expect(link).toHaveAttribute('href', 'https://files.example/ephemeral-link')
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(link).toHaveAttribute('download', '')
+  const operation = page.getByRole('link', { name: 'View operation', exact: true })
+  await expect(operation).toHaveAttribute('data-slot', 'button')
+  const actions = await Promise.all([link.boundingBox(), operation.boundingBox()])
+  expect(actions.every(Boolean)).toBe(true)
+  expect(
+    actions[1]!.x >= actions[0]!.x + actions[0]!.width + 6 ||
+      actions[1]!.y >= actions[0]!.y + actions[0]!.height + 6,
+  ).toBe(true)
   await expect(page.locator('[data-notification]')).toContainText('The download link is ready.')
   expect(
     await page.evaluate(() => ({
@@ -209,6 +251,130 @@ test('mobile download controls handle pending and ready responses without keepin
   await page.getByLabel('Episode', { exact: true }).fill('4')
   await page.getByRole('button', { name: 'Show episode', exact: true }).click()
   await expect(link).toHaveCount(0)
+})
+
+test('an uncached download starts automatically when the provider becomes ready', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  await page.clock.install()
+  let calls = 0
+  let downloadReferrer: string | undefined
+  await page.context().route('https://files.example/prepared-download', async (route) => {
+    downloadReferrer = route.request().headers()['referer']
+    await route.fulfill({
+      contentType: 'application/octet-stream',
+      headers: { 'Content-Disposition': 'attachment; filename="prepared.mkv"' },
+      body: 'Synthetic prepared download',
+    })
+  })
+  await page.route('**/api/catalog/*/download', async (route) => {
+    calls++
+    expect(route.request().postDataJSON().allow_uncached).toBe(calls === 1)
+    await route.fulfill({
+      status: calls === 1 ? 202 : 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: calls === 1 ? 'pending' : 'ready',
+        operation_id: 'synthetic-preparation',
+        ...(calls > 1 ? { url: 'https://files.example/prepared-download' } : {}),
+      }),
+    })
+  })
+  await page.goto(`/search/${ids.movie}`)
+  const started = new Promise<Download>((resolve) =>
+    page.context().once('page', (popup) => popup.once('download', resolve)),
+  )
+  await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+  await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
+  const pending = page
+    .context()
+    .pages()
+    .find((tab) => tab !== page)!
+  await expect(pending.getByRole('heading', { name: 'Preparing your download…' })).toBeVisible()
+  expect(await pending.evaluate(() => window.opener === null)).toBe(true)
+  await page.clock.runFor(15_001)
+  const downloaded = await started
+  expect(calls).toBe(2)
+  expect(downloaded.suggestedFilename()).toBe('prepared.mkv')
+  expect(await downloaded.failure()).toBeNull()
+  expect(downloadReferrer).toBeUndefined()
+  await expect(page.getByRole('link', { name: 'Download file', exact: true })).toBeVisible()
+})
+
+test('failed preparations close their temporary tab and blocked popups retain a direct download', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  let fail = true
+  await page.route('**/api/catalog/*/download', async (route) => {
+    await route.fulfill({
+      status: fail ? 503 : 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        fail
+          ? { error: 'Temporary provider failure' }
+          : {
+              status: 'ready',
+              operation_id: 'synthetic-ready',
+              url: 'https://files.example/manual-fallback',
+            },
+      ),
+    })
+  })
+  await page.goto(`/search/${ids.movie}`)
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await expect(page.locator('[data-request-notice]')).toContainText('Temporary provider failure')
+  await expect.poll(() => page.context().pages().length).toBe(1)
+  fail = false
+  await page.evaluate(() => {
+    window.open = () => null
+  })
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveAttribute(
+    'href',
+    'https://files.example/manual-fallback',
+  )
+  await expect(page.locator('[data-notification]')).toContainText('Use Download file')
+  expect(page.context().pages()).toHaveLength(1)
+})
+
+test('leaving a title cancels its unfinished download and closes only its preparation tab', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  let finish = () => {}
+  let markRequested = () => {}
+  const requested = new Promise<void>((resolve) => {
+    markRequested = resolve
+  })
+  await page.route('**/api/catalog/*/download', async (route) => {
+    await new Promise<void>((resolve) => {
+      finish = () => {
+        void route
+          .abort()
+          .catch(() => {})
+          .finally(resolve)
+      }
+      markRequested()
+    })
+  })
+  await page.goto(`/search/${ids.movie}`)
+  const opened = page.waitForEvent('popup')
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  const pending = await opened
+  try {
+    await requested
+    await expect(pending.getByRole('heading', { name: 'Preparing your download…' })).toBeVisible()
+    await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
+    await expect.poll(() => pending.isClosed()).toBe(true)
+    await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveCount(0)
+  } finally {
+    finish()
+  }
 })
 
 test.describe('browser language preferences', () => {

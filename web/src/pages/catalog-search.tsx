@@ -233,105 +233,110 @@ export function CatalogTitlePage() {
         title.data && (
           <>
             <TitleDetails title={title.data} />
-            <LanguageFilter
-              value={preferences}
-              onChange={(next) => {
-                setPreferences(next)
-                pagination.setOffset(0)
-              }}
-            />
-            <div className="flex flex-wrap items-end gap-3">
-              {title.data.type === 'tv' && (
-                <form
-                  key={`${selection.season}:${selection.episode}`}
-                  className="flex flex-wrap items-end gap-3"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    const data = new FormData(event.currentTarget)
-                    const next = new URLSearchParams(search)
-                    next.set('season', String(data.get('season')))
-                    next.set('episode', String(data.get('episode')))
-                    next.delete('offset')
-                    setSearch(next)
-                  }}
-                >
-                  <div className="field w-24">
-                    <Label htmlFor="catalog-season">Season</Label>
-                    {title.data.seasons?.length ? (
-                      <select
-                        id="catalog-season"
-                        name="season"
-                        className="native-select"
-                        defaultValue={selection.season}
-                      >
-                        {!title.data.seasons.includes(selection.season ?? 1) && (
-                          <option value={selection.season}>{selection.season}</option>
-                        )}
-                        {title.data.seasons.map((season) => (
-                          <option key={season} value={season}>
-                            {season}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
+            <section
+              aria-label="Source release filters"
+              className="space-y-4 rounded-md border border-border p-4"
+            >
+              <LanguageFilter
+                value={preferences}
+                onChange={(next) => {
+                  setPreferences(next)
+                  pagination.setOffset(0)
+                }}
+              />
+              <div className="flex flex-wrap items-end gap-3">
+                {title.data.type === 'tv' && (
+                  <form
+                    key={`${selection.season}:${selection.episode}`}
+                    className="flex flex-wrap items-end gap-3"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      const data = new FormData(event.currentTarget)
+                      const next = new URLSearchParams(search)
+                      next.set('season', String(data.get('season')))
+                      next.set('episode', String(data.get('episode')))
+                      next.delete('offset')
+                      setSearch(next)
+                    }}
+                  >
+                    <div className="field w-24">
+                      <Label htmlFor="catalog-season">Season</Label>
+                      {title.data.seasons?.length ? (
+                        <select
+                          id="catalog-season"
+                          name="season"
+                          className="native-select"
+                          defaultValue={selection.season}
+                        >
+                          {!title.data.seasons.includes(selection.season ?? 1) && (
+                            <option value={selection.season}>{selection.season}</option>
+                          )}
+                          {title.data.seasons.map((season) => (
+                            <option key={season} value={season}>
+                              {season}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="catalog-season"
+                          name="season"
+                          type="number"
+                          min={0}
+                          max={999}
+                          required
+                          defaultValue={selection.season}
+                        />
+                      )}
+                    </div>
+                    <div className="field w-24">
+                      <Label htmlFor="catalog-episode">Episode</Label>
                       <Input
-                        id="catalog-season"
-                        name="season"
+                        id="catalog-episode"
+                        name="episode"
                         type="number"
-                        min={0}
-                        max={999}
+                        min={1}
+                        max={9999}
                         required
-                        defaultValue={selection.season}
+                        defaultValue={selection.episode}
                       />
-                    )}
-                  </div>
-                  <div className="field w-24">
-                    <Label htmlFor="catalog-episode">Episode</Label>
-                    <Input
-                      id="catalog-episode"
-                      name="episode"
-                      type="number"
-                      min={1}
-                      max={9999}
-                      required
-                      defaultValue={selection.episode}
-                    />
-                  </div>
-                  <Button type="submit" variant="outline">
-                    Show episode
-                  </Button>
-                </form>
-              )}
-              <div className="field">
-                <Label htmlFor="release-sort">Sort versions</Label>
-                <select
-                  id="release-sort"
-                  className="native-select"
-                  value={sort}
-                  onChange={(event) => filter('sort', event.target.value)}
-                >
-                  <option value="recent">Newest first</option>
-                  <option value="size_desc">Largest first</option>
-                  <option value="source">Source name</option>
-                </select>
+                    </div>
+                    <Button type="submit" variant="outline">
+                      Show episode
+                    </Button>
+                  </form>
+                )}
+                <div className="field">
+                  <Label htmlFor="release-sort">Sort versions</Label>
+                  <select
+                    id="release-sort"
+                    className="native-select"
+                    value={sort}
+                    onChange={(event) => filter('sort', event.target.value)}
+                  >
+                    <option value="recent">Newest first</option>
+                    <option value="size_desc">Largest first</option>
+                    <option value="source">Source name</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <Label htmlFor="release-source">Source</Label>
+                  <select
+                    id="release-source"
+                    className="native-select"
+                    value={provider}
+                    onChange={(event) => filter('provider', event.target.value)}
+                  >
+                    <option value="">All sources</option>
+                    {sourceOptions.map((value) => (
+                      <option key={value} value={value}>
+                        {sourceName(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="field">
-                <Label htmlFor="release-source">Source</Label>
-                <select
-                  id="release-source"
-                  className="native-select"
-                  value={provider}
-                  onChange={(event) => filter('provider', event.target.value)}
-                >
-                  <option value="">All sources</option>
-                  {sourceOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {sourceName(value)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            </section>
             <ErrorNotice error={releases.error} retry={() => void releases.refetch()} />
             {releases.isPending ? (
               <Loading label="Checking source releases" />
