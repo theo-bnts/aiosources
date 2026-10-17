@@ -197,3 +197,44 @@ INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_
 		}
 	}
 }
+
+func TestPrivateTorznabCachedOnlyReturnsNoAnnouncesAndExcludesExpiredCache(t *testing.T) {
+	f := sharingAPI(t, "https://owner.example.test")
+	conn, err := pgx.Connect(f.ctx, f.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(f.ctx)
+	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+ ('fixture','cached','{"title":"Example Cached Film","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","announce_url":"https://announce.example.invalid/admin-private-passkey/announce","download_url":"https://private.example.invalid/admin-private-passkey/file"}'),
+ ('fixture','uncached','{"title":"Example Uncached Film","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}');
+ INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]');`); err != nil {
+		t.Fatal(err)
+	}
+	response := f.request("POST", "/api/torznab/endpoints", `{"name":"Cached client","scope":"all","enabled":true}`, true, "")
+	var grant model.ShareCredential
+	if response.Code != 201 || json.Unmarshal(response.Body.Bytes(), &grant) != nil {
+		t.Fatal("access creation failed", response.Code)
+	}
+	path := "/torznab/" + grant.Share.ID + "/api?t=search&cached_only=true&services=torbox&apikey=" + grant.Password
+	response = f.request("GET", path, "", false, "")
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="1"`) {
+		t.Fatal("cached-only result absent", response.Code)
+	}
+	for _, secret := range []string{"admin-private-passkey", "announce.example.invalid", "tr=", "Example Uncached Film"} {
+		if strings.Contains(response.Body.String(), secret) {
+			t.Fatal("cached-only Torznab disclosed an announce or uncached result")
+		}
+	}
+	config, err := f.db.AIOConfig(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, config.CacheMinutes); err != nil {
+		t.Fatal(err)
+	}
+	response = f.request("GET", path, "", false, "")
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="0"`) || strings.Contains(response.Body.String(), "tr=") {
+		t.Fatal("expired cache was offered or fell back to an announce", response.Code)
+	}
+}

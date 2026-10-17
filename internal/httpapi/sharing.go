@@ -117,7 +117,9 @@ func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input mod
 	if err := store.ValidateShare(input); err != nil {
 		message := "Provide a name, safe fields, source permissions, requests per minute between 1 and 3600, and concurrent downloads between 1 and 16"
 		if input.Format == "stremio" {
-			message = "Provide a name, source permissions, valid playback filters, requests per minute between 1 and 3600, and concurrent requests between 1 and 16"
+			message = "Provide a name, source permissions, valid playback filters and limits within their allowed ranges (zero means no limit)"
+		} else if input.Format == "torznab" {
+			message = "Provide a name, source permissions, valid media types and limits within their allowed ranges (zero means no limit)"
 		}
 		writeError(w, http.StatusUnprocessableEntity, message)
 		return false

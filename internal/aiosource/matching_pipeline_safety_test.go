@@ -55,7 +55,7 @@ func TestSeriesMatchingPublicationAndPackScopes(t *testing.T) {
 			t.Fatalf("%s: %s, want %s (%v)", tc.source, got, tc.status, err)
 		}
 	}
-	token, err := service.Token(ctx)
+	token, err := testPrivateInstallation(t, ctx, service)
 	if err != nil {
 		t.Fatal(err)
 	}

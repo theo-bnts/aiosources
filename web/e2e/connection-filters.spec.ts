@@ -9,10 +9,6 @@ test('Torznab uses the shared access editor, keeps keys transient and generates 
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Access name', { exact: true }).fill('External application')
-  await dialog.getByLabel('Source access', { exact: true }).selectOption('all')
-  await dialog
-    .getByText('I authorize access to all current and future sources.', { exact: true })
-    .click()
   await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
   await expect(
     dialog.getByRole('heading', { name: 'Save this API key now', exact: true }),
@@ -54,10 +50,6 @@ test('saved Stremio access updates the same manifest and can be independently re
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Access name', { exact: true }).fill('Living room')
-  await dialog.getByLabel('Source access', { exact: true }).selectOption('all')
-  await dialog
-    .getByText('I authorize access to all current and future sources.', { exact: true })
-    .click()
   await expect(dialog.getByLabel('Media type', { exact: true })).toBeHidden()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
   await dialog.getByLabel('Media type', { exact: true }).selectOption('movie')
@@ -145,35 +137,6 @@ test('saved Stremio access updates the same manifest and can be independently re
   expect(storage.includes('s1.')).toBe(false)
 })
 
-test('legacy Stremio filters change only the generated link and can be cleared', async ({
-  page,
-}) => {
-  await page.goto('/addon/settings')
-  await page.locator('summary', { hasText: 'Legacy installation' }).click()
-  const before = (await page.request.get('/api/aiosource')).json()
-  await page.getByText('Filters', { exact: true }).click()
-  const manifest = page.getByLabel('Manifest URL', { exact: true })
-  const original = await manifest.inputValue()
-  await page.getByLabel('Media type', { exact: true }).selectOption('movie')
-  const movies = await manifest.inputValue()
-  expect(movies).not.toEqual(original)
-  expect(movies).toContain('~v1~')
-  await page.getByLabel('Cached results only', { exact: true }).click()
-  const cached = await manifest.inputValue()
-  expect(cached).not.toEqual(movies)
-  const data = JSON.parse(
-    Buffer.from(new URL(cached).pathname.split('~')[2].split('/')[0], 'base64url').toString(),
-  )
-  expect(data.types).toEqual(['movie'])
-  expect(data.cached_only).toBe(true)
-  await page.getByLabel('Media type', { exact: true }).selectOption('')
-  await page.getByLabel('Cached results only', { exact: true }).click()
-  await expect(manifest).toHaveValue(original)
-  expect((await (await page.request.get('/api/aiosource')).json()).config).toEqual(
-    (await before).config,
-  )
-})
-
 test('saved service selections remain editable without widening access after a key is removed', async ({
   page,
   server,
@@ -225,3 +188,118 @@ test('saved service selections remain editable without widening access after a k
   const data = await (await page.request.get('/api/stremio/connections')).json()
   expect(data.items[0].stream_preferences.services).toEqual(['torbox'])
 })
+
+for (const format of ['stremio', 'torznab'] as const) {
+  test(`${format} defaults to all sources without limits and keeps optional policies in Advanced`, async ({
+    page,
+    server,
+  }) => {
+    const session = await (await page.request.get('/api/session')).json()
+    const headers = { 'X-CSRF-Token': session.csrf_token }
+    for (const [id, name] of [
+      ['alpha', 'Alpha library'],
+      ['beta', 'Beta library'],
+    ]) {
+      expect(
+        (
+          await page.request.put(`/api/providers/${id}`, {
+            headers,
+            data: {
+              revision: '',
+              json: JSON.stringify({
+                version: 1,
+                id,
+                name,
+                adapter: 'http_json',
+                url: server.sourceURL,
+                enabled: false,
+              }),
+            },
+          })
+        ).status(),
+      ).toBe(200)
+    }
+    const endpoint = format === 'stremio' ? '/api/stremio/connections' : '/api/torznab/endpoints'
+    await page.goto(format === 'stremio' ? '/addon/settings' : '/torznab')
+    await page.getByRole('button', { name: 'Create access', exact: true }).click()
+    const editor = page.getByRole('dialog')
+    await editor.getByLabel('Access name', { exact: true }).fill('Default access')
+    await expect(editor.getByLabel('Source access', { exact: true })).toHaveCount(0)
+    await expect(
+      editor.getByText('I authorize access to all current and future sources.', { exact: true }),
+    ).toHaveCount(0)
+    await expect(editor.getByLabel('Sources', { exact: true })).toBeHidden()
+    await expect(editor.getByLabel('Requests per minute', { exact: true })).toBeHidden()
+    await expect(editor.getByLabel('Concurrent requests', { exact: true })).toBeHidden()
+    expect(await editor.locator('summary').allTextContents()).toEqual(['Filters', 'Advanced'])
+    await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
+      'All sources',
+    )
+    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await expect(editor.getByLabel('Requests per minute', { exact: true })).toHaveValue('')
+    await expect(editor.getByLabel('Concurrent requests', { exact: true })).toHaveValue('')
+    await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
+      '',
+    )
+    await editor.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+    await page
+      .getByRole('button', {
+        name: format === 'stremio' ? 'I have saved the manifest URL' : 'I have saved the API key',
+        exact: true,
+      })
+      .click()
+    let access = (await (await page.request.get(endpoint)).json()).items[0]
+    expect(access).toMatchObject({
+      scope: 'all',
+      source_ids: [],
+      requests_per_minute: 0,
+      max_concurrent_downloads: 0,
+      expires_at: null,
+    })
+    const card = page.getByRole('region', { name: 'Access Default access', exact: true })
+    await expect(card.getByText('Request limits', { exact: true })).toHaveCount(0)
+    await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+    await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    await editor.getByRole('button', { name: 'Sources', exact: true }).click()
+    await page.getByRole('menuitemcheckbox', { name: 'Alpha library', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await editor.getByLabel('Requests per minute', { exact: true }).fill('9')
+    await editor.getByLabel('Concurrent requests', { exact: true }).fill('1')
+    await editor
+      .getByLabel('Expires at (browser local time)', { exact: true })
+      .fill('2032-01-01T12:00')
+    await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
+    await expect(editor).toHaveCount(0)
+    access = (await (await page.request.get(endpoint)).json()).items[0]
+    expect(access).toMatchObject({
+      scope: 'selected',
+      source_ids: ['alpha'],
+      requests_per_minute: 9,
+      max_concurrent_downloads: 1,
+    })
+    expect(access.expires_at).not.toBeNull()
+    await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+    await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
+      'Alpha library',
+    )
+    await editor.getByRole('button', { name: 'Sources', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'All sources', exact: true }).click()
+    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await editor.getByLabel('Requests per minute', { exact: true }).fill('')
+    await editor.getByLabel('Concurrent requests', { exact: true }).fill('')
+    await editor.getByLabel('Expires at (browser local time)', { exact: true }).fill('')
+    await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
+    await expect(editor).toHaveCount(0)
+    access = (await (await page.request.get(endpoint)).json()).items[0]
+    expect(access).toMatchObject({
+      scope: 'all',
+      source_ids: [],
+      requests_per_minute: 0,
+      max_concurrent_downloads: 0,
+      expires_at: null,
+    })
+  })
+}

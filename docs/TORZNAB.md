@@ -5,7 +5,7 @@ AIOSources can serve its published local catalog to Prowlarr and other Torznab c
 ## Connect a client
 
 1. Set `PUBLIC_URL` to your HTTPS public origin, as for catalog sharing.
-2. Open **Connections → Torznab** and create an access key. Keep all sources and media, or limit the recipient's permissions. Save the generated key; only its hash is retained and the key cannot be retrieved later.
+2. Open **Connections → Torznab** and create an access key. New accesses include all current and future sources. Choose source and media permissions in **Filters**; optional expiration and per-access limits belong to **Advanced**. Save the generated key; only its hash is retained and the key cannot be retrieved later.
 3. Enable access. In Prowlarr, add **Generic Torznab**. Copy **URL**, **API path** and the generated **API key** into their respective fields.
 4. Optionally choose sources and a media type in **Client setup & filters**, then copy **Additional parameters** into Prowlarr's field with that name. Do not append another `cat` there: Prowlarr already supplies its selected categories.
 
@@ -43,7 +43,7 @@ Results contain a release title, size, publication date (first import time when 
 
 Torznab access is separate from visitor Stremio access. Explicitly enabling a Torznab key authorizes its selected published metadata, including uncached releases. Disabling public visitor mode does not revoke a separately enabled Torznab key. Revoke that key in Torznab settings when needed.
 
-Per-key request and concurrency limits apply across replicas. Slow searches have a 20-second deadline. HTTP 429 includes `Retry-After`; other errors use Torznab XML codes. API keys travel as standard Torznab query parameters: protect them and redact query strings in any external proxy/access logs. The application records only safe request counts and timings in Logs (debug level), never the key, visitor IP, query, hashes, magnets or credentials. Its ordinary seven-day log retention applies. This feature reads current publications directly and does not enable catalog-sharing snapshots or copy the catalog.
+Per-key request and concurrency limits are disabled by default. When configured in **Advanced**, they apply across replicas. Empty limit fields (API value `0`) mean no per-key limit; instance-wide resource protections remain in effect. Existing configured policies are preserved on upgrade. Slow searches have a 20-second deadline. HTTP 429 includes `Retry-After`; other errors use Torznab XML codes. API keys travel as standard Torznab query parameters: protect them and redact query strings in any external proxy/access logs. The application records only safe request counts and timings in Logs (debug level), never the key, visitor IP, query, hashes, magnets or credentials. Its ordinary seven-day log retention applies. This feature reads current publications directly and does not enable catalog-sharing snapshots or copy the catalog.
 
 Protocol references: [Torznab specification](https://torznab.github.io/spec-1.3-draft/torznab/Specification-v1.3.html), [Prowlarr request generation](https://github.com/Prowlarr/Prowlarr/blob/develop/src/NzbDrone.Core/Indexers/Definitions/Newznab/NewznabRequestGenerator.cs).
 

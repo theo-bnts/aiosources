@@ -1,11 +1,3 @@
-import { LanguageFilter } from '@/components/language-filter'
-import { InstallationFilters } from '@/components/installation-filters'
-import type { InstallationOptions } from '@/lib/language-preferences'
-import {
-  useLanguagePreferences,
-  preferenceManifest,
-  preferenceManifestError,
-} from '@/lib/language-preferences'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
@@ -20,7 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { SecretPicker } from '@/components/secret-picker'
-import { CopyButton } from '@/components/copy-button'
 import { FormStatus } from '@/components/form-status'
 import type { Config, Status, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
@@ -51,8 +42,6 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 export default function AIOSourcePage({ section }: { section: 'metadata' | 'debrid' | 'stremio' }) {
-  const [languagePreferences, setLanguagePreferences] = useLanguagePreferences()
-  const [installationOptions, setInstallationOptions] = useState<InstallationOptions>({})
   const location = useLocation()
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
@@ -231,11 +220,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       </div>
     )
   const status = query.data
-  const manifest = new URL(
-    preferenceManifest(status.manifest_path, languagePreferences, installationOptions),
-    window.location.origin,
-  ).toString()
-  const manifestError = preferenceManifestError(manifest, installationOptions, languagePreferences)
   const busy = status.syncing || status.matching || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
@@ -412,49 +396,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               { id: 'direct', name: 'Direct torrents' },
             ]}
           />
-          <Disclosure title="Legacy installation">
-            <p className="help">
-              Existing links remain valid. Use named access keys above for independent settings and
-              revocation.
-            </p>
-            <div className="space-y-4">
-              <InstallationFilters
-                value={installationOptions}
-                onChange={setInstallationOptions}
-                sources={providers.data?.items ?? []}
-                services={[
-                  ...(config.alldebrid_secret ? [{ id: 'alldebrid', name: 'AllDebrid' }] : []),
-                  ...(config.torbox_secret ? [{ id: 'torbox', name: 'TorBox' }] : []),
-                ]}
-              >
-                <LanguageFilter value={languagePreferences} onChange={setLanguagePreferences} />
-              </InstallationFilters>
-              <div className="field">
-                <Label htmlFor="manifest">Manifest URL</Label>
-                <Input
-                  id="manifest"
-                  readOnly
-                  value={manifestError ? '' : manifest}
-                  aria-invalid={Boolean(manifestError)}
-                />
-                {manifestError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {manifestError}
-                  </p>
-                )}
-              </div>
-              {!manifestError && (
-                <div className="flex flex-wrap items-start gap-3">
-                  <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
-                  <Button asChild variant="outline">
-                    <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
-                      Install in Stremio
-                    </a>
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Disclosure>
         </>
       )}
       {section === 'debrid' && settingsForm}
@@ -528,85 +469,71 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           </Button>
         </Disclosure>
       )}
-      <Disclosure
-        id="maintenance"
-        title="Maintenance"
-        open={maintenanceOpen}
-        onOpenChange={setMaintenanceOpen}
-      >
-        {section === 'metadata' && (
-          <>
-            <p className="help">
-              Rebuild information or identification results when needed. Each action explains what
-              it removes before confirmation.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <ConfirmAction
-                title="Reset metadata catalog?"
-                description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
-                label="Reset metadata"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-metadata')}
-                trigger={
-                  <Button variant="destructive" disabled={busy}>
-                    Reset metadata
-                  </Button>
-                }
-              />
-              <ConfirmAction
-                title="Reset title matches?"
-                description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
-                label="Reset matches"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-mapping')}
-                trigger={
-                  <Button variant="destructive" disabled={busy}>
-                    Reset matches
-                  </Button>
-                }
-              />
-            </div>
-          </>
-        )}
-        {section === 'debrid' && (
-          <>
-            <p className="help">
-              Available, absent and unknown results stay distinct. Cache observations and retries
-              survive restart and are isolated by provider account.
-            </p>
-            <div className="flex flex-wrap items-center gap-4">
-              <ConfirmAction
-                title="Reset cache observations?"
-                description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
-                label="Reset cache"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-cache')}
-                trigger={
-                  <Button variant="destructive" disabled={action.isPending}>
-                    Reset cache
-                  </Button>
-                }
-              />
-            </div>
-          </>
-        )}
-        {section === 'stremio' && (
-          <>
-            <ConfirmAction
-              title="Replace installation token?"
-              description="Legacy addon URLs will stop working. Reinstall those links using the replacement token. Named access keys are unaffected."
-              label="Replace token"
-              variant="warning"
-              action={() => action.mutateAsync('token')}
-              trigger={
-                <Button variant="warning" disabled={action.isPending}>
-                  Replace token
-                </Button>
-              }
-            />
-          </>
-        )}
-      </Disclosure>
+      {section !== 'stremio' && (
+        <Disclosure
+          id="maintenance"
+          title="Maintenance"
+          open={maintenanceOpen}
+          onOpenChange={setMaintenanceOpen}
+        >
+          {section === 'metadata' && (
+            <>
+              <p className="help">
+                Rebuild information or identification results when needed. Each action explains what
+                it removes before confirmation.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <ConfirmAction
+                  title="Reset metadata catalog?"
+                  description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
+                  label="Reset metadata"
+                  variant="destructive"
+                  action={() => action.mutateAsync('reset-metadata')}
+                  trigger={
+                    <Button variant="destructive" disabled={busy}>
+                      Reset metadata
+                    </Button>
+                  }
+                />
+                <ConfirmAction
+                  title="Reset title matches?"
+                  description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
+                  label="Reset matches"
+                  variant="destructive"
+                  action={() => action.mutateAsync('reset-mapping')}
+                  trigger={
+                    <Button variant="destructive" disabled={busy}>
+                      Reset matches
+                    </Button>
+                  }
+                />
+              </div>
+            </>
+          )}
+          {section === 'debrid' && (
+            <>
+              <p className="help">
+                Available, absent and unknown results stay distinct. Cache observations and retries
+                survive restart and are isolated by provider account.
+              </p>
+              <div className="flex flex-wrap items-center gap-4">
+                <ConfirmAction
+                  title="Reset cache observations?"
+                  description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
+                  label="Reset cache"
+                  variant="destructive"
+                  action={() => action.mutateAsync('reset-cache')}
+                  trigger={
+                    <Button variant="destructive" disabled={action.isPending}>
+                      Reset cache
+                    </Button>
+                  }
+                />
+              </div>
+            </>
+          )}
+        </Disclosure>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, createStremioAccess } from './fixtures'
 
 test('manual review selects a local work, protects drafts, publishes it and supports undo', async ({
   page,
@@ -63,7 +63,7 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   await expect(dialog).toBeHidden()
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
   await expect(page.locator('#matching-results')).toContainText('tt1234567')
-  const manifestPath = (await (await page.request.get('/api/aiosource')).json()).manifest_path
+  const { manifestPath } = await createStremioAccess(page)
   const streams = await page.request.get(
     manifestPath.replace('/manifest.json', '/stream/movie/tt1234567.json'),
   )

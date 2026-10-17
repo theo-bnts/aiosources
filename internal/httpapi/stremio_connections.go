@@ -13,16 +13,12 @@ import (
 type privateConnectionContextKey struct{}
 
 // Named installations share the durable admission policy used by Torznab,
-// with enough time for the existing playback preparation deadline. Public and
-// legacy installations never create a named access or admission record here.
+// with enough time for the existing playback preparation deadline. Public
+// installations do not use this middleware or create saved access records.
 func (s *server) privateConnectionRequest(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	id, key, named, err := aiosource.PrivateConnectionKey(r.PathValue("token"))
+	id, key, err := aiosource.PrivateConnectionKey(r.PathValue("token"))
 	if err != nil {
 		privateConnectionError(w, err)
-		return
-	}
-	if !named {
-		next(w, r)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), store.StremioRequestTimeout)

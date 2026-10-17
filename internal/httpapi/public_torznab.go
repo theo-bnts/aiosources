@@ -149,6 +149,9 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 				names[source.ID] = source.Name
 			}
 		}
+		if q.CachedOnly {
+			announces = nil
+		}
 		response = torznabResults(result, names, s.auth.origin, announces)
 		if e = s.options.Store.RecordActivity(ctx, "debug", "torznab.public_searched", "", "", "", map[string]any{"records": len(result.Items), "duration_ms": time.Since(start).Milliseconds()}); e != nil {
 			torznabError(w, 503, 910, "Could not record request")

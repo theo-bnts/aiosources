@@ -2,9 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
-	"encoding/base64"
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/providers"
@@ -16,8 +13,6 @@ import (
 	"sync"
 	"time"
 )
-
-const installationSecret = "aiosource_installation"
 
 type Service struct {
 	sources                   *providers.Registry
@@ -72,15 +67,6 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	s.downloadSlots = make(chan struct{}, 4)
 	// Public cache checks must leave connection capacity for administration.
 	s.publicProbe = make(chan struct{}, 1)
-	if _, err = v.Resolve(ctx, installationSecret); errors.Is(err, model.ErrNotFound) {
-		if _, err = s.RotateToken(ctx); err != nil {
-			cancel()
-			return nil, err
-		}
-	} else if err != nil {
-		cancel()
-		return nil, err
-	}
 	if err = db.RecoverOperations(ctx); err != nil {
 		cancel()
 		return nil, err
@@ -95,17 +81,6 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	go s.automation()
 	return s, nil
 }
-func (s *Service) RotateToken(ctx context.Context) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	token := base64.RawURLEncoding.EncodeToString(b)
-	return token, s.Vault.Put(ctx, installationSecret, token)
-}
-func (s *Service) Token(ctx context.Context) (string, error) {
-	return s.Vault.Resolve(ctx, installationSecret)
-}
 func (s *Service) Authorized(ctx context.Context, token string) bool {
 	return s.ValidateToken(ctx, token) == nil
 }
@@ -114,26 +89,8 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	if len(token) > MaxPublicInstallationSize {
 		return ErrAuth
 	}
-	if strings.HasPrefix(token, "s1.") {
-		_, err := s.privateConnection(ctx, token)
-		return err
-	}
-	credential, _, parseErr := InstallationPreferences(token)
-	if parseErr != nil {
-		return ErrAuth
-	}
-	token = credential
-	if len(token) != 43 {
-		return ErrAuth
-	}
-	expected, err := s.Token(ctx)
-	if err != nil {
-		return err
-	}
-	if subtle.ConstantTimeCompare([]byte(expected), []byte(token)) != 1 {
-		return ErrAuth
-	}
-	return nil
+	_, err := s.privateConnection(ctx, token)
+	return err
 }
 func (s *Service) Close(ctx context.Context) error {
 	s.mu.Lock()
@@ -189,7 +146,7 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 		if name == "" {
 			continue
 		}
-		if !secretRefRE.MatchString(name) || name == installationSecret {
+		if !secretRefRE.MatchString(name) {
 			return model.ErrInvalid
 		}
 		if _, err := s.Vault.Resolve(ctx, name); err != nil {

@@ -49,7 +49,7 @@ func TestIdentificationReviewAndStremioHistoryRequireAdministratorAndCSRF(t *tes
 	if response = f.request("PUT", "/api/aiosource/matches/"+id, string(input), true, ""); response.Code != 204 {
 		t.Fatalf("review rejected: %d %s", response.Code, response.Body.String())
 	}
-	token, _ := addon.Token(f.ctx)
+	token, _ := testPrivateInstallation(t, f.ctx, addon)
 	response = f.request("GET", "/stremio/"+token+"/stream/movie/tt1234567.json", "", false, "")
 	if response.Code != 200 {
 		t.Fatal("public stream failed")

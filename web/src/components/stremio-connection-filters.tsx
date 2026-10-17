@@ -11,18 +11,28 @@ export function StremioConnectionFilters({
   value,
   onChange,
   services,
+  sources,
+  sourceIDs,
+  onSourceIDsChange,
 }: {
   value: StremioPreferences
   onChange: (value: StremioPreferences) => void
   services: { id: string; name: string }[]
+  sources: { id: string; name: string }[]
+  sourceIDs: string[]
+  onSourceIDsChange: (value: string[]) => void
 }) {
   return (
     <InstallationFilters
-      value={value}
-      onChange={(options) => onChange({ ...value, ...options })}
-      sources={[]}
+      value={{ ...value, sources: sourceIDs }}
+      onChange={({ sources: selected, ...options }) => {
+        onSourceIDsChange(selected ?? [])
+        onChange({ ...value, ...options })
+      }}
+      sources={sources}
       services={services}
       showHelp={false}
+      showSources
     >
       <LanguageFilter value={value} onChange={(language) => onChange({ ...value, ...language })} />
     </InstallationFilters>

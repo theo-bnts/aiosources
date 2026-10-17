@@ -117,15 +117,17 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	if err != nil {
 		return nil, databaseError("read catalogue admission", err)
 	}
-	if recent >= requests || active >= concurrent {
+	requestLimited := requests > 0 && recent >= requests
+	concurrencyLimited := concurrent > 0 && active >= concurrent
+	if requestLimited || concurrencyLimited {
 		retry := 1
-		if recent >= requests && firstRequest != nil {
+		if requestLimited && firstRequest != nil {
 			retry = max(retry, int(math.Ceil(firstRequest.Add(time.Minute).Sub(now).Seconds())))
 		}
-		if active >= concurrent && firstLease != nil {
+		if concurrencyLimited && firstLease != nil {
 			retry = max(retry, int(math.Ceil(firstLease.Sub(now).Seconds())))
 		}
-		return nil, &CatalogQuotaError{RetryAfter: retry, Concurrent: active >= concurrent}
+		return nil, &CatalogQuotaError{RetryAfter: retry, Concurrent: concurrencyLimited}
 	}
 	id, err := newRunID()
 	if err != nil {

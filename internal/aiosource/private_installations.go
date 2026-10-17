@@ -11,19 +11,16 @@ import (
 
 // Named private installations deliberately have no URL settings. Their current
 // database configuration is authoritative, including playback authorization.
-func PrivateConnectionKey(value string) (id, key string, named bool, err error) {
-	if !strings.HasPrefix(value, "s1.") {
-		return "", "", false, nil
-	}
+func PrivateConnectionKey(value string) (id, key string, err error) {
 	parts := strings.Split(value, ".")
-	if len(parts) != 3 || len(parts[1]) != 36 || len(parts[2]) != 43 || strings.Contains(value, "~") {
-		return "", "", true, ErrAuth
+	if len(parts) != 3 || parts[0] != "s1" || len(parts[1]) != 36 || len(parts[2]) != 43 || strings.Contains(value, "~") {
+		return "", "", ErrAuth
 	}
-	return parts[1], parts[2], true, nil
+	return parts[1], parts[2], nil
 }
 func (s *Service) privateConnection(ctx context.Context, token string) (model.Share, error) {
-	id, key, named, err := PrivateConnectionKey(token)
-	if err != nil || !named {
+	id, key, err := PrivateConnectionKey(token)
+	if err != nil {
 		return model.Share{}, ErrAuth
 	}
 	connection, err := s.DB.StremioConnection(ctx, id, key)
@@ -33,15 +30,11 @@ func (s *Service) privateConnection(ctx context.Context, token string) (model.Sh
 	return connection, err
 }
 func (s *Service) PrivatePreferences(ctx context.Context, token string) (model.StreamPreferences, error) {
-	if strings.HasPrefix(token, "s1.") {
-		c, err := s.privateConnection(ctx, token)
-		if err != nil {
-			return model.StreamPreferences{}, err
-		}
-		return connectionPreferences(c), nil
+	c, err := s.privateConnection(ctx, token)
+	if err != nil {
+		return model.StreamPreferences{}, err
 	}
-	_, p, err := InstallationPreferences(token)
-	return p, err
+	return connectionPreferences(c), nil
 }
 
 func connectionPreferences(connection model.Share) model.StreamPreferences {
@@ -53,22 +46,15 @@ func connectionPreferences(connection model.Share) model.StreamPreferences {
 }
 
 func (s *Service) PrivateManifest(ctx context.Context, token string) (map[string]any, error) {
-	if strings.HasPrefix(token, "s1.") {
-		c, err := s.privateConnection(ctx, token)
-		if err != nil {
-			return nil, err
-		}
-		// Clients may retain the manifest. Advertise the stable supported types;
-		// the current saved media filter is enforced on every stream/play request.
-		// Changing it therefore does not require reinstalling the addon.
-		manifest := Manifest()
-		manifest["id"] = "org.aiosource.v2.connection." + strings.ReplaceAll(c.ID, "-", "")
-		manifest["name"] = "AIOSources · " + c.Name
-		return manifest, nil
-	}
-	_, preferences, err := InstallationPreferences(token)
+	c, err := s.privateConnection(ctx, token)
 	if err != nil {
 		return nil, err
 	}
-	return InstallationManifest(preferences), nil
+	// Clients may retain the manifest. Advertise the stable supported types;
+	// the current saved media filter is enforced on every stream/play request.
+	// Changing it therefore does not require reinstalling the addon.
+	manifest := Manifest()
+	manifest["id"] = "org.aiosource.v2.connection." + strings.ReplaceAll(c.ID, "-", "")
+	manifest["name"] = "AIOSources · " + c.Name
+	return manifest, nil
 }

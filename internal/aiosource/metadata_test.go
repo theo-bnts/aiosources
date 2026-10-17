@@ -91,7 +91,7 @@ func TestTMDBSymbolOnlyTitleDoesNotBlockInformationUpdate(t *testing.T) {
 	if err := conn.QueryRow(ctx, `SELECT imdb_id,years,(SELECT count(*) FROM ingest.aio_titles WHERE work_id=w.id) FROM ingest.aio_works w WHERE media_type='movie' AND tmdb_id='366238'`).Scan(&imdb, &years, &titles); err != nil || imdb != "tt9876543" || len(years) != 1 || years[0] != 2020 || titles != 0 {
 		t.Fatalf("valid identifiers were lost or an empty searchable alias was created: %q %v %d %v", imdb, years, titles, err)
 	}
-	out, err := s.Streams(ctx, "http://local", "token", "movie", "tt1234567")
+	out, err := s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "movie", "tt1234567")
 	if err != nil || len(out) != 1 {
 		t.Fatalf("existing IMDb/Stremio mapping was affected: %+v %v", out, err)
 	}
@@ -174,11 +174,11 @@ func TestTMDBInventorySyncAndEpisodeYearPublication(t *testing.T) {
 	if err != nil || status.Works != 2 || status.Matched != 1 || status.Pending != 0 || status.LastSync == nil {
 		t.Fatalf("status %+v %v", status, err)
 	}
-	out, err := s.Streams(ctx, "http://local", "token", "series", "tt7654321:1:2")
+	out, err := s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "series", "tt7654321:1:2")
 	if err != nil || len(out) != 1 {
 		t.Fatalf("episode year mapping %+v %v", out, err)
 	}
-	out, err = s.Streams(ctx, "http://local", "token", "series", "tt7654321:1:1")
+	out, err = s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "series", "tt7654321:1:1")
 	if err != nil || len(out) != 0 {
 		t.Fatal("different episode returned")
 	}
@@ -204,7 +204,7 @@ func TestMetadataFailuresRetainQueueAndPublishedData(t *testing.T) {
 	if err = s.DB.FinishAIOMetadata(ctx, jobs[0], false); err != nil {
 		t.Fatal(err)
 	}
-	out, err := s.Streams(ctx, "http://local", "token", "movie", "tt1234567")
+	out, err := s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "movie", "tt1234567")
 	if err != nil || len(out) != 1 {
 		t.Fatal("failed update erased published data")
 	}
@@ -266,8 +266,8 @@ func TestConfigurationAtomicRevisionAndSecretProtection(t *testing.T) {
 	if err := s.DB.DeleteSecret(ctx, "tb"); !errors.Is(err, model.ErrConflict) {
 		t.Fatalf("configured secret deleted: %v", err)
 	}
-	if err := s.DB.DeleteSecret(ctx, installationSecret); !errors.Is(err, model.ErrConflict) {
-		t.Fatal("installation token deleted")
+	if _, err := s.Vault.Resolve(ctx, "aiosource_installation"); !errors.Is(err, model.ErrNotFound) {
+		t.Fatal("obsolete installation credential was generated", err)
 	}
 	c, _ = s.DB.AIOConfig(ctx)
 	c.CacheMinutes = 0

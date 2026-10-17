@@ -78,7 +78,7 @@ func addonAPI(t *testing.T) (sharingAPIFixture, *aiosource.Service, *pgx.Conn) {
 
 func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 	f, addon, control := addonAPI(t)
-	token, err := addon.Token(f.ctx)
+	token, err := testPrivateInstallation(t, f.ctx, addon)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,11 +86,11 @@ func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.secrets IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
 		_ = tx.Rollback(context.Background())
 		t.Fatal(err)
 	}
-	s := &server{options: Options{AIOSource: addon}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
+	s := &server{options: Options{AIOSource: addon, Store: f.db}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
 	var protected atomic.Int32
 	handler := s.aioProtect(func(w http.ResponseWriter, _ *http.Request) {
 		protected.Add(1)
@@ -113,7 +113,7 @@ func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 	for range 64 {
 		go func() {
 			w := httptest.NewRecorder()
-			handler(w, request(strings.Repeat("A", 43)))
+			handler(w, request(token[:strings.LastIndex(token, ".")+1]+strings.Repeat("A", 43)))
 			results <- w.Code
 		}()
 	}
@@ -127,7 +127,7 @@ func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 		}
 	}
 	excess := httptest.NewRecorder()
-	handler(excess, request(strings.Repeat("A", 43)))
+	handler(excess, request(token[:strings.LastIndex(token, ".")+1]+strings.Repeat("A", 43)))
 	if excess.Code != http.StatusTooManyRequests || excess.Header().Get("Retry-After") == "" || excess.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("excess installation checks entered the database queue: %d", excess.Code)
 	}
@@ -153,7 +153,7 @@ func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 
 func TestInstallationStorageTimeoutIsRetryableWithoutAuthorizingPlayback(t *testing.T) {
 	f, addon, control := addonAPI(t)
-	token, err := addon.Token(f.ctx)
+	token, err := testPrivateInstallation(t, f.ctx, addon)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,10 +162,10 @@ func TestInstallationStorageTimeoutIsRetryableWithoutAuthorizingPlayback(t *test
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
-	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.secrets IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
-	s := &server{options: Options{AIOSource: addon}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
+	s := &server{options: Options{AIOSource: addon, Store: f.db}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
 	protected := false
 	handler := s.aioProtect(func(w http.ResponseWriter, _ *http.Request) {
 		protected = true
@@ -200,11 +200,11 @@ func TestStremioAuthenticationCORSAndInstallation(t *testing.T) {
 	var payload struct {
 		ManifestPath string `json:"manifest_path"`
 	}
-	if status.Code != 200 || json.Unmarshal(status.Body.Bytes(), &payload) != nil {
+	if status.Code != 200 || json.Unmarshal(status.Body.Bytes(), &payload) != nil || payload.ManifestPath != "" {
 		t.Fatal("status failed")
 	}
-	token, _ := addon.Token(f.ctx)
-	manifest := f.request("GET", payload.ManifestPath, "", false, "")
+	token, _ := testPrivateInstallation(t, f.ctx, addon)
+	manifest := f.request("GET", "/stremio/"+token+"/manifest.json", "", false, "")
 	if manifest.Code != 200 || manifest.Header().Get("Access-Control-Allow-Origin") != "*" || manifest.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("manifest contract %d %+v", manifest.Code, manifest.Header())
 	}
@@ -212,7 +212,7 @@ func TestStremioAuthenticationCORSAndInstallation(t *testing.T) {
 		ID        string
 		Resources []any
 	}
-	if json.Unmarshal(manifest.Body.Bytes(), &m) != nil || m.ID != "org.aiosource.v2" || len(m.Resources) != 1 {
+	if json.Unmarshal(manifest.Body.Bytes(), &m) != nil || !strings.HasPrefix(m.ID, "org.aiosource.v2.connection.") || len(m.Resources) != 1 {
 		t.Fatal("invalid manifest")
 	}
 	if response := f.request("GET", "/stremio/invalid/manifest.json", "", false, ""); response.Code != 401 {
@@ -237,11 +237,8 @@ func TestStremioAuthenticationCORSAndInstallation(t *testing.T) {
 	if w.Code != 403 {
 		t.Fatal("token rotation bypassed CSRF")
 	}
-	if response := f.request("POST", "/api/aiosource/token", "", true, ""); response.Code != 200 {
-		t.Fatal("rotation failed")
-	}
-	if response := f.request("GET", payload.ManifestPath, "", false, ""); response.Code != 401 {
-		t.Fatal("old token survived rotation")
+	if response := f.request("POST", "/api/aiosource/token", "", true, ""); response.Code != 404 {
+		t.Fatal("retired token creation endpoint remains available")
 	}
 }
 
@@ -368,7 +365,7 @@ func TestStremioLocalStreamAndDeferredProviderPlayback(t *testing.T) {
 			defer server.Close()
 			addon.Providers.ADBase, addon.Providers.TBBase = server.URL, server.URL
 			addon.Providers.Client = server.Client()
-			token, _ := addon.Token(f.ctx)
+			token, _ := testPrivateInstallation(t, f.ctx, addon)
 			response := f.request("GET", "/stremio/"+token+"/stream/series/tt7654321:1:2.json", "", false, "")
 			var streams struct{ Streams []aiosource.Stream }
 			if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &streams) != nil || len(streams.Streams) != 1 {

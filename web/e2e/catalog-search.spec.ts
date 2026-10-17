@@ -480,14 +480,16 @@ test.describe('browser language preferences', () => {
     await expect(page.locator('[data-result-count]')).toHaveText('5 source releases')
     await expect(page.locator('main tbody tr').first()).toContainText('GERMAN')
     await page.goto('/addon/settings')
-    await page.locator('summary', { hasText: 'Legacy installation' }).click()
-    await page.locator('summary', { hasText: 'Filters' }).click()
-    await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveValue(
-      /~fr~all\/manifest\.json$/,
-    )
-    await page.getByRole('switch', { name: 'Filter languages', exact: true }).click()
-    await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveValue(
-      /~fr~unknown\/manifest\.json$/,
-    )
+    await page.getByRole('button', { name: 'Create access', exact: true }).click()
+    const editor = page.getByRole('dialog')
+    await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    await expect(editor.getByLabel('Preferred language', { exact: true })).toHaveValue('fr')
+    await expect(
+      editor.getByRole('switch', { name: 'Filter languages', exact: true }),
+    ).toBeChecked()
+    await editor.getByRole('switch', { name: 'Filter languages', exact: true }).click()
+    await expect(
+      editor.getByRole('switch', { name: 'Filter languages', exact: true }),
+    ).not.toBeChecked()
   })
 })

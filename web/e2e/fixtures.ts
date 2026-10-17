@@ -1,4 +1,5 @@
-import { test as base, expect } from '@playwright/test'
+import { test as base, expect, type Page } from '@playwright/test'
+import type { SharePassword } from '../src/lib/catalog-types'
 import { startServer, type TestServer } from './server'
 
 export const test = base.extend<{ server: TestServer; collectionSource: boolean }>({
@@ -64,3 +65,18 @@ export const test = base.extend<{ server: TestServer; collectionSource: boolean 
 })
 
 export { expect } from '@playwright/test'
+
+export async function createStremioAccess(page: Page, name = 'Test installation') {
+  const session = await (await page.request.get('/api/session')).json()
+  const response = await page.request.post('/api/stremio/connections', {
+    headers: { 'X-CSRF-Token': session.csrf_token },
+    data: { name, scope: 'all', enabled: true, stream_preferences: { mode: 'all', language: '' } },
+  })
+  if (response.status() !== 201) throw new Error('Could not create an isolated Stremio access.')
+  const credential: SharePassword = await response.json()
+  const manifestURL = new URL(
+    `${credential.share.url}.${credential.password}/manifest.json`,
+    page.url(),
+  ).toString()
+  return { ...credential, manifestURL, manifestPath: new URL(manifestURL).pathname }
+}

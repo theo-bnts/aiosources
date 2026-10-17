@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, createStremioAccess } from './fixtures'
 
 test('save feedback distinguishes reverted values, committed changes and discarded drafts', async ({
   page,
@@ -58,42 +58,51 @@ test('clipboard failure is recoverable and replacing the manifest clears old cop
       },
     })
   })
+  await createStremioAccess(page)
   await page.goto('/addon/settings')
-  await page.locator('summary', { hasText: 'Legacy installation' }).click()
+  const rotate = async () => {
+    await page
+      .getByRole('region', { name: 'Access Test installation', exact: true })
+      .getByRole('button', { name: 'Replace installation key', exact: true })
+      .click()
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Replace installation key', exact: true })
+      .click()
+    await expect(page.getByLabel('Manifest URL', { exact: true })).toBeVisible()
+  }
+  await rotate()
   const copy = page.getByRole('button', { name: 'Copy manifest URL', exact: true })
+  const manifestField = page.getByLabel('Manifest URL', { exact: true })
   await copy.click()
   await expect(page.getByRole('alert')).toHaveText(
-    'Clipboard access is unavailable. Select the text and copy it manually.',
+    'Clipboard access is unavailable. Reveal the manifest URL and copy it manually.',
   )
-  await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveAttribute('readonly', '')
+  await expect(manifestField).toHaveAttribute('readonly', '')
   await page.evaluate(() => {
     ;(window as unknown as { __clipboardTest: { fail: boolean } }).__clipboardTest.fail = false
   })
   await copy.click()
-  await expect(page.getByText('Copied to your clipboard.', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('Copied to your clipboard. Keep it private.', { exact: true }),
+  ).toBeVisible()
   expect(
     await page.evaluate(
-      () =>
-        (window as unknown as { __clipboardTest: { value: string } }).__clipboardTest.value ===
-        (document.getElementById('manifest') as HTMLInputElement).value,
+      () => (window as unknown as { __clipboardTest: { value: string } }).__clipboardTest.value,
     ),
-  ).toBe(true)
-  await page.getByText('Maintenance', { exact: true }).click()
-  await page.getByRole('button', { name: 'Replace token', exact: true }).click()
-  await page
-    .getByRole('alertdialog')
-    .getByRole('button', { name: 'Replace token', exact: true })
-    .click()
-  await expect(page.getByText('Copied to your clipboard.', { exact: true })).toHaveCount(0)
+  ).toBe(await manifestField.inputValue())
+  await page.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
+  await rotate()
+  await expect(
+    page.getByText('Copied to your clipboard. Keep it private.', { exact: true }),
+  ).toHaveCount(0)
   await expect(copy).toHaveText('Copy manifest URL')
   await copy.click()
   expect(
     await page.evaluate(
-      () =>
-        (window as unknown as { __clipboardTest: { value: string } }).__clipboardTest.value ===
-        (document.getElementById('manifest') as HTMLInputElement).value,
+      () => (window as unknown as { __clipboardTest: { value: string } }).__clipboardTest.value,
     ),
-  ).toBe(true)
+  ).toBe(await manifestField.inputValue())
   expect(errors).toEqual([])
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -207,9 +216,8 @@ test('getting started finishes after identification even when no safe match exis
     })
     .toBe(true)
   await page.goto('/addon/settings')
-  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   await expect(page.getByRole('heading', { name: 'Stremio', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Getting started', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Copy manifest URL', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create access', exact: true })).toBeVisible()
   expect((await (await page.request.get('/api/aiosource')).json()).config.torbox_secret).toBe('')
 })

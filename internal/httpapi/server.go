@@ -343,21 +343,10 @@ func (s *server) listSecrets(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	filtered := []model.SecretInfo{}
-	for _, item := range items {
-		if item.Name != "aiosource_installation" {
-			filtered = append(filtered, item)
-		}
-	}
-	items = filtered
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (s *server) putSecret(w http.ResponseWriter, r *http.Request) {
-	if r.PathValue("name") == "aiosource_installation" {
-		writeError(w, 409, "Use the Stremio page to replace the installation token")
-		return
-	}
 	var input struct {
 		Value    string `json:"value"`
 		Revision *int64 `json:"revision"`

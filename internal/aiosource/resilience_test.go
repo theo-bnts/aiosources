@@ -18,7 +18,7 @@ import (
 func TestMetadataRepeatedFailuresAndRestartRetainPublishedMapping(t *testing.T) {
 	ctx, s, conn := testService(t)
 	seedMovie(t, ctx, s, conn, "source", "1", strings.Repeat("a", 40))
-	token, err := s.Token(ctx)
+	token, err := testPrivateInstallation(t, ctx, s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestMetadataRepeatedFailuresAndRestartRetainPublishedMapping(t *testing.T) 
 		}
 		current := s
 		t.Cleanup(func() { _ = current.Close(context.Background()) })
-		if got, err := s.Token(ctx); err != nil || got != token {
+		if err := s.ValidateToken(ctx, token); err != nil {
 			t.Fatal("restart changed the installation token", err)
 		}
 		// Advance the durable deadline instead of waiting for minutes in a test.

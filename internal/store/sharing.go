@@ -69,8 +69,12 @@ func ValidateShare(input model.ShareInput) error {
 	if format != "catalog" && !slices.Equal(input.Fields, CatalogFields()) {
 		return model.ErrInvalid
 	}
-	if (input.RequestsPerMinute != nil && (*input.RequestsPerMinute < 1 || *input.RequestsPerMinute > 3600)) ||
-		(input.MaxConcurrentDownloads != nil && (*input.MaxConcurrentDownloads < 1 || *input.MaxConcurrentDownloads > 16)) ||
+	minimum := 1
+	if format != "catalog" {
+		minimum = 0
+	}
+	if (input.RequestsPerMinute != nil && (*input.RequestsPerMinute < minimum || *input.RequestsPerMinute > 3600)) ||
+		(input.MaxConcurrentDownloads != nil && (*input.MaxConcurrentDownloads < minimum || *input.MaxConcurrentDownloads > 16)) ||
 		(input.ExpiresAt != nil && (input.ExpiresAt.Year() < 1 || input.ExpiresAt.Year() > 9999)) {
 		return model.ErrInvalid
 	}
@@ -186,6 +190,9 @@ func (s *Store) CreateShare(ctx context.Context, input model.ShareInput) (model.
 		input.MediaTypes = []string{}
 	}
 	requests, concurrent := 120, 2
+	if shareFormat(input.Format) != "catalog" {
+		requests, concurrent = 0, 0
+	}
 	if input.RequestsPerMinute != nil {
 		requests = *input.RequestsPerMinute
 	}

@@ -1,5 +1,5 @@
 import type { TorznabOptions } from '@/lib/torznab-preferences'
-import { SourceMultiSelect } from '@/components/source-multi-select'
+import { SourceFilter } from '@/components/source-filter'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 
@@ -21,15 +21,12 @@ export function TorznabFilters({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         {sources.length > 0 && (
-          <div className="field sm:col-span-2">
-            <Label htmlFor={`${id}-sources`}>Sources</Label>
-            <SourceMultiSelect
-              id={`${id}-sources`}
-              value={value.sources ?? []}
-              options={sources.map((s) => ({ value: s.id, label: s.name }))}
-              onChange={(sources) => onChange({ ...value, sources })}
-            />
-          </div>
+          <SourceFilter
+            id={`${id}-sources`}
+            value={value.sources ?? []}
+            sources={sources}
+            onChange={(sources) => onChange({ ...value, sources })}
+          />
         )}
         <div className="field">
           <Label htmlFor={`${id}-media`}>Media type</Label>

@@ -71,7 +71,7 @@ Failed information updates keep their published catalog, pending queue and check
 
 **Manual actions** retains immediate information downloads, torrent identification and stop controls for active tasks. Stopping a current task preserves committed progress; disable its automatic option and save to prevent future runs.
 
-Metadata and matching have independent automatic toggles. Catalog resets, cache resets, cleanup retries and installation-token replacement remain available under **Maintenance** with their existing confirmations. Failed temporary AllDebrid cleanup remains visible outside the collapsed section.
+Metadata and matching have independent automatic toggles. Catalog resets, cache resets and cleanup retries remain available with their existing confirmations. Replace or revoke individual Stremio installation keys from their access cards; there is no global installation token. Failed temporary AllDebrid cleanup remains visible outside the collapsed section.
 
 Credentials for TMDB, AllDebrid, TorBox and source authentication can be added where they are used. **Store and select** creates a fresh encrypted vault entry without changing another secret or saving the surrounding configuration. Save that configuration separately to apply the reference. Cancelling clears the unsubmitted value; abandoning an already stored entry leaves it available in **Security → Secrets**. A retry after a lost response reuses the new reference rather than creating duplicates. Private announce credentials store the complete URL, including a passkey anywhere in its path or query, with an independent playback Save button.
 

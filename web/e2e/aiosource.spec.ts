@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, createStremioAccess } from './fixtures'
 import pg from 'pg'
 import type { Page } from '@playwright/test'
 
@@ -124,28 +124,29 @@ test('Stremio manifest works without admin cookies and replacement revokes the p
   page,
   server,
 }) => {
+  const access = await createStremioAccess(page)
   await page.goto('/addon/settings')
-  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   await expect(page.getByRole('heading', { name: 'Stremio', exact: true })).toBeVisible()
-  await expectMaintenanceFooter(page)
-  const manifestField = page.getByRole('textbox', { name: 'Manifest URL', exact: true })
-  const original = await manifestField.inputValue()
+  await expect(page.getByText('Legacy installation', { exact: true })).toHaveCount(0)
+  await expect(page.locator('summary', { hasText: /^Maintenance$/ })).toHaveCount(0)
+  const original = access.manifestURL
   const manifest = await page.request.get(original, { headers: { Cookie: '' } })
   expect(manifest.status()).toBe(200)
-  expect((await manifest.json()).name).toBe('AIOSources')
+  expect((await manifest.json()).name).toBe('AIOSources · Test installation')
   const streamURL = original.replace('manifest.json', 'stream/movie/tt1234567.json')
   expect((await (await page.request.get(streamURL)).json()).streams).toEqual([])
-  await page.getByText('Maintenance', { exact: true }).click()
-  await page.getByRole('button', { name: 'Replace token', exact: true }).click()
-  await expect(page.getByRole('alertdialog')).toBeVisible()
+  const card = page.getByRole('region', { name: 'Access Test installation', exact: true })
+  await card.getByRole('button', { name: 'Replace installation key', exact: true }).click()
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Replace token', exact: true })
+    .getByRole('button', { name: 'Replace installation key', exact: true })
     .click()
-  await expect(page.getByRole('alertdialog')).toHaveCount(0)
-  await expect(manifestField).not.toHaveValue(original)
-  expect((await page.request.get(original)).status()).toBe(401)
+  const manifestField = page.getByLabel('Manifest URL', { exact: true })
+  await expect(manifestField).toBeVisible()
   const updated = await manifestField.inputValue()
+  expect(updated).not.toBe(original)
+  expect((await page.request.get(original)).status()).toBe(401)
+  expect((await page.request.get(updated, { headers: { Cookie: '' } })).status()).toBe(200)
   expect(new URL(updated).origin).toBe(server.origin)
 })
 
@@ -302,7 +303,7 @@ test('private playback saves independently and fields have space below their lab
   await assertSpacing('tmdb_secret')
   await assertSpacing('sync_minutes')
   await page.goto('/addon/settings')
-  await page.locator('summary', { hasText: 'Legacy installation' }).click()
-  await assertSpacing('manifest')
+  await page.getByRole('button', { name: 'Create access', exact: true }).click()
+  await assertSpacing('share-name')
   await expect(page.getByRole('alert')).toHaveCount(0)
 })

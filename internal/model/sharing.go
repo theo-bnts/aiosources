@@ -44,7 +44,8 @@ type ShareInput struct {
 }
 
 // Null is meaningful only for expiration. Limit pointers distinguish an omitted
-// create default from an explicit zero; explicit null is not a numeric policy.
+// create default from an explicit limit. Zero means unlimited for connections;
+// explicit null is not a numeric policy.
 func (input *ShareInput) UnmarshalJSON(data []byte) error {
 	type plain ShareInput
 	var value plain

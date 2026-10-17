@@ -2,7 +2,7 @@
 
 Upstream: moodiness/ingest at b8332d4d1fc0236071cc6ddaa6f20cae5241f017 (MIT).
 
-The Go ingestion engine remains the sole owner of source records and provenance. No providers ship with this fork. The React panel extends the existing authenticated console. Stremio has its own revocable installation token; administrator cookies never authorize public stream endpoints.
+The Go ingestion engine remains the sole owner of source records and provenance. No providers ship with this fork. The React panel extends the existing authenticated console. Each private Stremio access has its own revocable installation key; administrator cookies never authorize public stream endpoints.
 
 AIOSources extensions live in `internal/aiosource`: release parsing and conservative correspondence, typed local TMDB metadata, durable import/retry queues, account-scoped availability, deferred playback and lifecycle ownership. `internal/store/aiosource*` owns SQL, transactions and migrations in the existing `ingest` schema alongside publication and recovery state. Secrets resolve through Ingest’s encrypted vault.
 
@@ -44,7 +44,7 @@ The local release parser is now Go code, covered by the previous suite's parser 
 
 Start v2 with fresh database/state volumes. Legacy data is neither selected nor erased implicitly. Native source provenance and resumable runs use Ingest's schema; the previous addon settings and Python scraper schemas are replaced. Source definitions are supplied by the administrator rather than hardcoded provider defaults. The new panel retains Ingest's English interface.
 
-Private Stremio installations use the shared access-grant lifecycle from Torznab and catalog sharing, separated by protocol. Each named access stores source permissions, playback filters, quotas and expiration, with only a hash of its independently revocable key. Saved changes apply to the same manifest; a key replacement requires reinstalling. Legacy installation tokens and their URL filters remain compatible, and legacy rotation does not affect named access. Public Stremio and Torznab remain stateless and never create these grants. Named Stremio admission leases allow 70 seconds for existing playback preparation, then recheck revision and expiration before delivery. Other export protocols retain their 20-second delivery limit.
+Private Stremio installations use the shared access-grant lifecycle from Torznab and catalog sharing, separated by protocol. Each named access stores source permissions, playback filters, quotas and expiration, with only a hash of its independently revocable key. Saved changes apply to the same manifest; a key replacement requires reinstalling. The former global installation token, its rotation endpoint and its stored credential are removed. Only named private installations authenticate. New private Stremio and Torznab grants default to all sources and unlimited per-key requests/concurrency (`0`); optional policies remain durable and existing policies survive migration. Public Stremio and Torznab remain stateless and never create these grants. Named Stremio admission leases allow 70 seconds for existing playback preparation, then recheck revision and expiration before delivery. Other export protocols retain their 20-second delivery limit.
 
 The container port remains 7000; native development retains Ingest's 8080 default. Internal package and binary names (`cmd/ingest`, `bin/ingest`) are retained where upstream compatibility benefits maintenance. The production container uses `/aiosource`.
 

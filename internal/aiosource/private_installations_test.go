@@ -34,7 +34,7 @@ func TestPrivateInstallationPoliciesSupportSavedSourceSetsAndBlockPlaybackBypass
 			t.Fatal("malformed named installation accepted", err)
 		}
 	}
-	if _, _, named, err := PrivateConnectionKey(strings.Repeat("A", 43)); err != nil || named {
-		t.Fatal("legacy token identified as a named connection")
+	if _, _, err := PrivateConnectionKey(strings.Repeat("A", 43)); !errors.Is(err, ErrAuth) {
+		t.Fatal("retired global installation token accepted")
 	}
 }

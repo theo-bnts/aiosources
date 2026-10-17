@@ -125,7 +125,6 @@ SELECT 1 FROM ingest.runs WHERE status IN ('queued','running','paused') AND (
 $1 IN (config#>>'{auth,secret_ref}',config#>>'{auth,username_ref}',config#>>'{auth,password_ref}')
 OR EXISTS (SELECT 1 FROM jsonb_each_text(CASE WHEN jsonb_typeof(config#>'{http,secret_headers}')='object'
 THEN config#>'{http,secret_headers}' ELSE '{}'::jsonb END) AS headers WHERE headers.value=$1)))
-OR $1='aiosource_installation'
 OR EXISTS(SELECT 1 FROM ingest.settings WHERE key='aiosource.config.v2' AND (
 $1 IN (value::jsonb->>'tmdb_secret',value::jsonb->>'alldebrid_secret',value::jsonb->>'torbox_secret')
 OR EXISTS(SELECT 1 FROM jsonb_each(COALESCE(value::jsonb->'trackers','{}'::jsonb)) t WHERE $1 IN (t.value->>'announce_secret',t.value->>'passkey_secret'))))`, name).Scan(&referenced); err != nil {

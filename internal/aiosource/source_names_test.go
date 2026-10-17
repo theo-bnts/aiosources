@@ -75,7 +75,7 @@ func TestStreamsUseCurrentSourceNamesWithoutChangingPlaybackIdentity(t *testing.
 					}
 				}
 			}
-			token, _ := s.Token(ctx)
+			token, _ := testPrivateInstallation(t, ctx, s)
 			first, err := s.Streams(ctx, "https://addon.example", token, "movie", "tt1234567")
 			want := 1
 			if cached {

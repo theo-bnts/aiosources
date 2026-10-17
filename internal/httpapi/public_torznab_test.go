@@ -92,6 +92,28 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="2"`) || !strings.Contains(response.Body.String(), "tr="+url.QueryEscape(own)) || !strings.Contains(response.Body.String(), "Display private-library") || strings.Contains(response.Body.String(), "admin.example.invalid") {
 		t.Fatal("personal announce or source selection lost", response.Code)
 	}
+	for _, query := range []string{"&cached_only=true", "&cached_only=true&services=torbox"} {
+		cached := feed(ownKey, query)
+		if cached.Code != 200 || !strings.Contains(cached.Body.String(), `total="1"`) || strings.Contains(cached.Body.String(), "tr=") || strings.Contains(cached.Body.String(), "own-private-passkey") {
+			t.Fatal("cached-only public Torznab included a personal announce", cached.Code)
+		}
+	}
+	cachedKey, err := aiosource.WithPublicTorznabOptions(strings.Split(ownKey, "~")[0], model.PublicTorznabOptions{Sources: []string{"private-library"}, Services: []string{"torbox"}, CachedOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached := feed(cachedKey, "&cached_only=false"); cached.Code != 200 || !strings.Contains(cached.Body.String(), `total="1"`) || strings.Contains(cached.Body.String(), "tr=") {
+		t.Fatal("query widened the installation's cached-only option")
+	}
+	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, c.CacheMinutes); err != nil {
+		t.Fatal(err)
+	}
+	if stale := feed(cachedKey, ""); stale.Code != 200 || !strings.Contains(stale.Body.String(), `total="0"`) || strings.Contains(stale.Body.String(), "tr=") {
+		t.Fatal("expired cache fell back to an announce")
+	}
+	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()`); err != nil {
+		t.Fatal(err)
+	}
 	if feed(ownKey, "&sources=open-library").Code != 200 || !strings.Contains(feed(ownKey, "&sources=open-library").Body.String(), `total="0"`) {
 		t.Fatal("URL filter widened its configuration")
 	}
@@ -107,7 +129,7 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if _, err = addon.OpenPublicInstallation(f.ctx, "https://addon.example", ownKey); err == nil {
 		t.Fatal("Torznab credential accepted as Stremio installation")
 	}
-	adminToken, _ := addon.Token(f.ctx)
+	adminToken, _ := testPrivateInstallation(t, f.ctx, addon)
 	if feed(adminToken, "").Code != 401 {
 		t.Fatal("administrator token accepted as public Torznab")
 	}
@@ -133,7 +155,7 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 		}
 	}
 	var grants, leases int
-	if err = conn.QueryRow(f.ctx, `SELECT (SELECT count(*) FROM ingest.shares),(SELECT count(*) FROM ingest.share_requests)`).Scan(&grants, &leases); err != nil || grants != 0 || leases != 0 {
+	if err = conn.QueryRow(f.ctx, `SELECT (SELECT count(*) FROM ingest.shares),(SELECT count(*) FROM ingest.share_requests)`).Scan(&grants, &leases); err != nil || grants != 1 || leases != 0 {
 		t.Fatal("public setup created visitor records", err)
 	}
 	generation := access.Generation

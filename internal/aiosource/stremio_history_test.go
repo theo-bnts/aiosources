@@ -18,7 +18,7 @@ func TestStremioHistoryRecordsActualSelectionWithoutCredentialOrPlaybackURLs(t *
 	if err := s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	token, _ := s.Token(ctx)
+	token, _ := testPrivateInstallation(t, ctx, s)
 	out, err := s.Streams(ctx, "https://public.invalid", token, "movie", "tt1234567")
 	if err != nil || len(out) != 1 {
 		t.Fatalf("stream selection changed: %d %v", len(out), err)

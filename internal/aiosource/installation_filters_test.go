@@ -13,31 +13,29 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-func TestInstallationURLFiltersAreIndependentAndRetainAuthentication(t *testing.T) {
+func TestSavedInstallationFiltersAreIndependentAndRejectURLOverrides(t *testing.T) {
 	ctx, s, conn := testService(t)
 	seedMovie(t, ctx, s, conn, "alpha", "one", strings.Repeat("a", 40))
 	seedMovie(t, ctx, s, conn, "beta", "two", strings.Repeat("b", 40))
-	token, _ := s.Token(ctx)
+	token, _ := testPrivateInstallation(t, ctx, s)
 	for _, source := range []string{"alpha", "beta"} {
 		p := model.StreamPreferences{Language: "fr", Mode: "unknown", Sources: []string{source}, Types: []string{"movie"}}
-		link, err := WithInstallationPreferences(token, p)
+		link, err := testPrivateInstallation(t, ctx, s)
+		setTestInstallationPreferences(t, ctx, s, link, p)
 		if err != nil || !s.Authorized(ctx, link) {
 			t.Fatal("preferences changed authorization", err)
-		}
-		credential, parsed, err := InstallationPreferences(link)
-		if err != nil || credential != token || len(parsed.Sources) != 1 || parsed.Sources[0] != source {
-			t.Fatal("round trip failed", err)
 		}
 		streams, err := s.Streams(ctx, "https://addon.example", link, "movie", "tt1234567")
 		if err != nil || len(streams) != 1 || streams[0].InfoHash != map[string]string{"alpha": strings.Repeat("a", 40), "beta": strings.Repeat("b", 40)}[source] {
 			t.Fatal("connections contaminated each other", source, len(streams), err)
 		}
-		if manifest := InstallationManifest(parsed); manifest["id"] == Manifest()["id"] {
+		if manifest, err := s.PrivateManifest(ctx, link); err != nil || manifest["id"] == Manifest()["id"] {
 			t.Fatal("independent configuration kept the base manifest identity")
 		}
 	}
 	for _, p := range []model.StreamPreferences{{Mode: "all", Sources: []string{"missing"}}, {Mode: "all", Types: []string{"series"}}, {Mode: "all", Services: []string{"torbox"}}, {Mode: "all", CachedOnly: true}} {
-		link, err := WithInstallationPreferences(token, p)
+		link, err := testPrivateInstallation(t, ctx, s)
+		setTestInstallationPreferences(t, ctx, s, link, p)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,8 +98,9 @@ func TestInstallationFiltersNeverContactAnUnselectedProvider(t *testing.T) {
 	if err := s.DB.SetAIOConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	token, _ := s.Token(ctx)
-	link, _ := WithInstallationPreferences(token, model.StreamPreferences{Mode: "all", Services: []string{"torbox"}})
+	token, _ := testPrivateInstallation(t, ctx, s)
+	setTestInstallationPreferences(t, ctx, s, token, model.StreamPreferences{Mode: "all", Services: []string{"torbox"}})
+	link := token
 	var calls atomic.Int64
 	s.Providers.Client = &http.Client{Transport: metadataRoundTrip(func(*http.Request) (*http.Response, error) {
 		calls.Add(1)

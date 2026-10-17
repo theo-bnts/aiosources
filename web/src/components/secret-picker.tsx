@@ -68,8 +68,7 @@ export function SecretPicker({
       await queryClient.invalidateQueries({ queryKey: ['secrets'] })
     },
   })
-  const entries =
-    secrets.data?.items?.filter((secret) => secret.name !== 'aiosource_installation') ?? []
+  const entries = secrets.data?.items ?? []
   return (
     <div className="field min-w-0 grid-cols-1">
       <Label htmlFor={id}>{label}</Label>

@@ -253,13 +253,13 @@ func TestCatalogLocaleAndPreferenceTokensDoNotChangeAuthorization(t *testing.T) 
 			t.Fatal("shared HTTP search diverged", path, res.Code, res.Body.String())
 		}
 	}
-	token, _ := addon.Token(f.ctx)
-	for _, suffix := range []string{"", "~fr~unknown", "~fr~all"} {
+	token, _ := testPrivateInstallation(t, f.ctx, addon)
+	for _, suffix := range []string{""} {
 		if res := f.request("GET", "/stremio/"+token+suffix+"/manifest.json", "", false, ""); res.Code != 200 {
 			t.Fatal("valid installation rejected", suffix, res.Code)
 		}
 	}
-	for _, token := range []string{"invalid~fr~all", token + "~fr~invalid", token + "~~unknown"} {
+	for _, token := range []string{"invalid~fr~all", token + "~fr~unknown", token + "~fr~all", token + "~fr~invalid", token + "~~unknown"} {
 		if res := f.request("GET", "/stremio/"+token+"/manifest.json", "", false, ""); res.Code != 401 {
 			t.Fatal("preferences bypassed authorization", res.Code)
 		}

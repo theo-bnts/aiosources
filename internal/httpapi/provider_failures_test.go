@@ -110,7 +110,7 @@ func TestProviderFailuresReachPlaybackResponsesLogsAndHistoryWithoutSecrets(t *t
 					}
 					streams, err = addon.PublicStreams(f.ctx, "https://addon.example", token, "movie", "tt1234567", visitor)
 				} else {
-					token, _ := addon.Token(f.ctx)
+					token, _ := testPrivateInstallation(t, f.ctx, addon)
 					streams, err = addon.Streams(f.ctx, "https://addon.example", token, "movie", "tt1234567")
 				}
 				if err != nil || len(streams) != 1 {

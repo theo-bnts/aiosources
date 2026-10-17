@@ -95,7 +95,7 @@ func TestStremioEpisodeNeedsFileEvidenceForCachedMarker(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	s.Providers.TBBase, s.Providers.Client = server.URL, server.Client()
-	streams, err := s.Streams(ctx, "http://local", "token", "series", "tt7654321:1:2")
+	streams, err := s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "series", "tt7654321:1:2")
 	if err != nil || len(streams) != 0 {
 		t.Fatal("private source without announce exposed an unverified episode", streams, err)
 	}
@@ -104,8 +104,15 @@ func TestStremioEpisodeNeedsFileEvidenceForCachedMarker(t *testing.T) {
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	streams, err = s.Streams(ctx, "http://local", "token", "series", "tt7654321:1:2")
+	streams, err = s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "series", "tt7654321:1:2")
 	if err != nil || len(streams) != 1 || strings.Contains(streams[0].Name, "TB+") || !strings.Contains(streams[0].Name, "Cache unknown") {
 		t.Fatal("global readiness advertised an unverified episode", streams, err)
 	}
+	token := testPrivateToken(t, ctx, s)
+	setTestInstallationPreferences(t, ctx, s, token, model.StreamPreferences{Mode: "all", CachedOnly: true})
+	streams, err = s.Streams(ctx, "http://local", token, "series", "tt7654321:1:2")
+	if err != nil || len(streams) != 0 {
+		t.Fatal("cached-only offered an episode with unknown file availability", err, len(streams))
+	}
+
 }

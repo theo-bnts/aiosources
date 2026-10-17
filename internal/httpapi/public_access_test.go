@@ -27,7 +27,7 @@ func TestPublicDeploymentNeverExposesPrivateDataWithoutItsOwnCredential(t *testi
 		t.Fatal("anonymous session response disclosed authentication state")
 	}
 	// The installation token is a separate, deliberately restricted credential.
-	token, err := addon.Token(fixture.ctx)
+	token, err := testPrivateInstallation(t, fixture.ctx, addon)
 	if err != nil {
 		t.Fatal(err)
 	}

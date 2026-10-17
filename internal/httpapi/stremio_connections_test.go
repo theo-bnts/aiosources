@@ -221,19 +221,13 @@ func TestStremioConnectionsSaveIndependentSettingsAndPreserveLegacyLinks(t *test
 	if w := f.request("GET", path+"~fr~all/manifest.json", "", false, ""); w.Code != 401 {
 		t.Fatal("URL settings replaced database permissions", w.Code)
 	}
-	legacy, err := addon.Token(f.ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifest("/stremio/" + legacy + "~fr~unknown")
-	if _, err = addon.RotateToken(f.ctx); err != nil {
-		t.Fatal(err)
+	for _, legacy := range []string{strings.Repeat("A", 43), strings.Repeat("A", 43) + "~fr~unknown"} {
+		if w := f.request("GET", "/stremio/"+legacy+"/manifest.json", "", false, ""); w.Code != 401 {
+			t.Fatal("retired global installation accepted", w.Code)
+		}
 	}
 	manifest(path)
 	manifest(stremioAccessPath(other))
-	if w := f.request("GET", "/stremio/"+legacy+"/manifest.json", "", false, ""); w.Code != 401 {
-		t.Fatal("legacy rotation stopped revoking the legacy token")
-	}
 	for _, endpoint := range []string{"/api/shares", "/api/torznab/endpoints"} {
 		if w := f.request("GET", endpoint, "", true, ""); w.Code != 200 || strings.Contains(w.Body.String(), grant.Share.ID) {
 			t.Fatal("installation listed under another protocol")

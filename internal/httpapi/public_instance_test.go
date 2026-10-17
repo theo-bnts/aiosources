@@ -197,7 +197,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 	if value := f.request("GET", path, "", false, ""); value.Code != 401 {
 		t.Fatal("old public manifest reactivated")
 	}
-	privateToken, _ := addon.Token(f.ctx)
+	privateToken, _ := testPrivateInstallation(t, f.ctx, addon)
 	if value := f.request("GET", "/stremio/"+privateToken+"/manifest.json", "", false, ""); value.Code != 200 {
 		t.Fatal("public revocation broke private installation")
 	}

@@ -84,14 +84,15 @@ func TestCatalogAndStremioShareLanguageFilterAndLargestFirstOffline(t *testing.T
 	if err != nil || page.Total != 1 {
 		t.Fatal(page, err)
 	}
-	token, _ := s.Token(ctx)
+	token, _ := testPrivateInstallation(t, ctx, s)
 	for _, mode := range []string{"preferred", "multi", "unknown", "all"} {
 		prefs := model.StreamPreferences{Language: "fr", Mode: mode}
 		releases, err := s.CatalogReleases(ctx, page.Items[0].ID, model.CatalogSelection{}, model.ListOptions{}, prefs)
 		if err != nil {
 			t.Fatal(err)
 		}
-		streams, err := s.Streams(ctx, "https://addon.example", token+"~fr~"+mode, "movie", "tt1234567")
+		setTestInstallationPreferences(t, ctx, s, token, prefs)
+		streams, err := s.Streams(ctx, "https://addon.example", token, "movie", "tt1234567")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +109,7 @@ func TestCatalogAndStremioShareLanguageFilterAndLargestFirstOffline(t *testing.T
 			}
 		}
 	}
-	if !s.Authorized(ctx, token+"~fr~unknown") || s.Authorized(ctx, "invalid~fr~unknown") || s.Authorized(ctx, token+"~fr~invalid") {
+	if !s.Authorized(ctx, token) || s.Authorized(ctx, token+"~fr~unknown") || s.Authorized(ctx, "invalid~fr~unknown") || s.Authorized(ctx, token+"~fr~invalid") {
 		t.Fatal("installation preference changed authorization")
 	}
 	history, err := s.DB.ListStremioRequests(ctx, model.ListOptions{})

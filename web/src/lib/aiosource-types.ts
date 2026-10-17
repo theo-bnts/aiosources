@@ -35,7 +35,6 @@ export type Status = {
   }
   error: string
   rebuild_required: boolean
-  manifest_path: string
 }
 
 export type MatchDiagnostic = {

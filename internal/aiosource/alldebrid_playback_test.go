@@ -147,7 +147,7 @@ func TestAllDebridCachedStreamResolvesPlaybackWithStringFileListID(t *testing.T)
 	}))
 	t.Cleanup(server.Close)
 	s.Providers.ADBase, s.Providers.Client = server.URL, server.Client()
-	token, err := s.Token(ctx)
+	token, err := testPrivateInstallation(t, ctx, s)
 	if err != nil {
 		t.Fatal(err)
 	}

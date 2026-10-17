@@ -1,3 +1,5 @@
+import { SourceFilter } from '@/components/source-filter'
+import { Disclosure } from '@/components/ui/disclosure'
 import { TorznabSetup } from '@/components/torznab-setup'
 import {
   StremioConnectionFilters,
@@ -202,31 +204,43 @@ export default function SharingPage({
                     {share.last_access_at ? date(share.last_access_at) : 'No access recorded'}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-muted-foreground">Expiration</dt>
-                  <dd className="mt-1">
-                    {share.expires_at ? date(share.expires_at) : 'No expiration'}
-                  </dd>
-                  {shareExpired(share) && (
+                {(!connection || share.expires_at) && (
+                  <div>
+                    <dt className="text-muted-foreground">Expiration</dt>
+                    <dd className="mt-1">
+                      {share.expires_at ? date(share.expires_at) : 'No expiration'}
+                    </dd>
+                    {shareExpired(share) && (
+                      <p className="help mt-1">
+                        Access is blocked. Edit the expiration to restore access.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {(!connection ||
+                  share.requests_per_minute > 0 ||
+                  share.max_concurrent_downloads > 0) && (
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {connection ? 'Request limits' : 'Download limits'}
+                    </dt>
+                    <dd className="mt-1">
+                      {share.requests_per_minute
+                        ? `${share.requests_per_minute} requests per minute`
+                        : 'No request limit'}{' '}
+                      ·{' '}
+                      {share.max_concurrent_downloads
+                        ? `${share.max_concurrent_downloads} concurrent`
+                        : 'No concurrency limit'}
+                    </dd>
                     <p className="help mt-1">
-                      Access is blocked. Edit the expiration to restore access.
+                      Every request counts. Responses are limited to {stremio ? '70' : '20'}{' '}
+                      seconds.
                     </p>
-                  )}
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {connection ? 'Request limits' : 'Download limits'}
-                  </dt>
-                  <dd className="mt-1">
-                    {share.requests_per_minute} requests per minute ·{' '}
-                    {share.max_concurrent_downloads} concurrent
-                  </dd>
-                  <p className="help mt-1">
-                    Every request counts. Responses are limited to {stremio ? '70' : '20'} seconds.
-                  </p>
-                </div>
+                  </div>
+                )}
               </dl>
-              {share.scope === 'all' && (
+              {!connection && share.scope === 'all' && (
                 <p className="help">
                   Future sources are automatically included. Use selected sources if new sources
                   should require your approval.
@@ -454,15 +468,20 @@ function ShareForm({
   )
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
-  const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? 'selected')
+  const defaultScope = connection ? 'all' : 'selected'
+  const requestsDefault = connection ? 0 : 120
+  const concurrentDefault = connection ? 0 : 2
+  const limitValue = (value: number | undefined, fallback: number) =>
+    connection && (value ?? fallback) === 0 ? '' : String(value ?? fallback)
+  const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? defaultScope)
   const [sourceIDs, setSourceIDs] = useState(share?.source_ids ?? [])
   const [fields, setFields] = useState(share?.fields ?? data.fields)
   const [expiresAt, setExpiresAt] = useState(localDateTime(share?.expires_at, 'seconds'))
   const [requestsPerMinute, setRequestsPerMinute] = useState(
-    String(share?.requests_per_minute ?? 120),
+    limitValue(share?.requests_per_minute, requestsDefault),
   )
   const [maxConcurrentDownloads, setMaxConcurrentDownloads] = useState(
-    String(share?.max_concurrent_downloads ?? 2),
+    limitValue(share?.max_concurrent_downloads, concurrentDefault),
   )
   const [acknowledged, setAcknowledged] = useState(share?.scope === 'all')
   const [reloaded, setReloaded] = useState(false)
@@ -474,10 +493,14 @@ function ShareForm({
       if (!fields.length) throw new Error('Select at least one safe field.')
       const requests = Number(requestsPerMinute)
       const concurrent = Number(maxConcurrentDownloads)
-      if (!Number.isInteger(requests) || requests < 1 || requests > 3600)
-        throw new Error('Requests per minute must be a whole number between 1 and 3600.')
-      if (!Number.isInteger(concurrent) || concurrent < 1 || concurrent > 16)
-        throw new Error('Concurrent downloads must be a whole number between 1 and 16.')
+      if (!Number.isInteger(requests) || requests < (connection ? 0 : 1) || requests > 3600)
+        throw new Error(
+          `Requests per minute must be a whole number between ${connection ? 0 : 1} and 3600.`,
+        )
+      if (!Number.isInteger(concurrent) || concurrent < (connection ? 0 : 1) || concurrent > 16)
+        throw new Error(
+          `Concurrent ${connection ? 'requests' : 'downloads'} must be a whole number between ${connection ? 0 : 1} and 16.`,
+        )
       if (expiresAt && !Number.isFinite(new Date(expiresAt).getTime()))
         throw new Error('Choose a valid expiration date and time.')
       const body = {
@@ -543,19 +566,98 @@ function ShareForm({
         JSON.stringify(original?.stream_preferences ?? defaultStremioPreferences())) ||
     JSON.stringify(mediaTypes) !== JSON.stringify(original?.media_types ?? []) ||
     name !== (original?.name ?? '') ||
-    scope !== (original?.scope ?? 'selected') ||
+    scope !== (original?.scope ?? defaultScope) ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
     JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
     expiresAt !== localDateTime(original?.expires_at, 'seconds') ||
-    requestsPerMinute !== String(original?.requests_per_minute ?? 120) ||
-    maxConcurrentDownloads !== String(original?.max_concurrent_downloads ?? 2) ||
-    (!original && acknowledged)
+    requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
+    maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault) ||
+    (!connection && !original && acknowledged)
   useUnsavedChanges(
     dirty,
     stremio ? 'Stremio access' : torznab ? 'Torznab access' : 'catalog sharing',
     busy,
   )
   const unavailable = sourceIDs.filter((id) => !data.sources.some((source) => source.id === id))
+  const sourceOptions = [
+    ...data.sources,
+    ...unavailable.map((id) => ({ id, name: `${id} (unavailable)` })),
+  ]
+  const selectSources = (ids: string[]) => {
+    setSourceIDs(ids)
+    setScope(ids.length ? 'selected' : 'all')
+  }
+  const sourceFilter = (
+    <SourceFilter
+      id="share-sources"
+      value={sourceIDs}
+      sources={sourceOptions}
+      onChange={selectSources}
+    />
+  )
+  const accessPolicy = (
+    <fieldset className={connection ? 'space-y-4' : 'space-y-4 border-t border-border pt-4'}>
+      {!connection && <legend className="px-1 text-sm font-medium">Access policy</legend>}
+      <div className="field">
+        <Label htmlFor="share-expires">Expires at (browser local time)</Label>
+        <Input
+          id="share-expires"
+          type="datetime-local"
+          step="1"
+          value={expiresAt}
+          onChange={(event) => setExpiresAt(event.target.value)}
+          aria-describedby="share-expires-help"
+        />
+        <p id="share-expires-help" className="help">
+          Uses the browser's timezone. Leave empty for no expiration. Expired access cannot be used.
+        </p>
+        {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
+          <p className="help text-destructive">
+            This date is in the past. Access will remain blocked.
+          </p>
+        )}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="field">
+          <Label htmlFor="share-request-limit">Requests per minute</Label>
+          <Input
+            id="share-request-limit"
+            type="number"
+            required={!connection}
+            placeholder={connection ? 'No limit' : undefined}
+            min={connection ? 0 : 1}
+            max="3600"
+            step="1"
+            value={requestsPerMinute}
+            onChange={(event) => setRequestsPerMinute(event.target.value)}
+            aria-describedby="share-limits-help"
+          />
+        </div>
+        <div className="field">
+          <Label htmlFor="share-concurrent-limit">
+            {connection ? 'Concurrent requests' : 'Concurrent downloads'}
+          </Label>
+          <Input
+            id="share-concurrent-limit"
+            type="number"
+            required={!connection}
+            placeholder={connection ? 'No limit' : undefined}
+            min={connection ? 0 : 1}
+            max="16"
+            step="1"
+            value={maxConcurrentDownloads}
+            onChange={(event) => setMaxConcurrentDownloads(event.target.value)}
+            aria-describedby="share-limits-help"
+          />
+        </div>
+      </div>
+      <p id="share-limits-help" className="help">
+        {connection
+          ? 'Leave empty or enter 0 for no limit. Limits apply to all clients using this access key.'
+          : 'Limits apply across all clients using this access key and all server instances. Every authenticated request counts toward a rolling minute. Clients exceeding a limit receive HTTP 429 with a retry delay.'}
+      </p>
+    </fieldset>
+  )
   return (
     <form
       className="space-y-5"
@@ -577,85 +679,93 @@ function ShareForm({
             onChange={(event) => setName(event.target.value)}
           />
         </div>
-        <div className="field">
-          <Label htmlFor="share-scope">Source access</Label>
-          <select
-            id="share-scope"
-            className="native-select w-full"
-            value={scope}
-            onChange={(event) => {
-              setScope(event.target.value as CatalogShare['scope'])
-              setAcknowledged(false)
-            }}
-          >
-            <option value="selected">Selected sources only</option>
-            <option value="all">All current and future sources</option>
-          </select>
-        </div>
-        {scope === 'selected' ? (
-          <fieldset className="space-y-3">
-            <legend className="mb-2 text-sm font-medium">Allowed sources</legend>
-            {data.sources.length === 0 && (
-              <p className="help">
-                No sources are available. Add a source before creating a share for selected sources.
-              </p>
-            )}
-            <div className="grid max-h-56 gap-3 overflow-y-auto p-1 sm:grid-cols-2">
-              {[
-                ...data.sources,
-                ...unavailable.map((id) => ({
-                  id,
-                  name: `${id} (unavailable; remove before saving)`,
-                })),
-              ].map((source) => (
-                <label key={source.id} className="flex items-start gap-2 text-sm">
+        {!connection && (
+          <>
+            <div className="field">
+              <Label htmlFor="share-scope">Source access</Label>
+              <select
+                id="share-scope"
+                className="native-select w-full"
+                value={scope}
+                onChange={(event) => {
+                  setScope(event.target.value as CatalogShare['scope'])
+                  setAcknowledged(false)
+                }}
+              >
+                <option value="selected">Selected sources only</option>
+                <option value="all">All current and future sources</option>
+              </select>
+            </div>
+            {scope === 'selected' ? (
+              <fieldset className="space-y-3">
+                <legend className="mb-2 text-sm font-medium">Allowed sources</legend>
+                {data.sources.length === 0 && (
+                  <p className="help">
+                    No sources are available. Add a source before creating a share for selected
+                    sources.
+                  </p>
+                )}
+                <div className="grid max-h-56 gap-3 overflow-y-auto p-1 sm:grid-cols-2">
+                  {[
+                    ...data.sources,
+                    ...unavailable.map((id) => ({
+                      id,
+                      name: `${id} (unavailable; remove before saving)`,
+                    })),
+                  ].map((source) => (
+                    <label key={source.id} className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1 accent-primary"
+                        checked={sourceIDs.includes(source.id)}
+                        onChange={(event) =>
+                          setSourceIDs(
+                            event.target.checked
+                              ? [...sourceIDs, source.id]
+                              : sourceIDs.filter((id) => id !== source.id),
+                          )
+                        }
+                      />
+                      <span className="break-words">{source.name || source.id}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : (
+              <div className="notice space-y-3">
+                <p>
+                  Access to all sources automatically includes sources added in the future,
+                  including imported catalogs that are published locally. New sources will not
+                  require another approval.
+                </p>
+                <label className="flex items-start gap-2">
                   <input
                     type="checkbox"
+                    required
+                    checked={acknowledged}
+                    onChange={(event) => setAcknowledged(event.target.checked)}
                     className="mt-1 accent-primary"
-                    checked={sourceIDs.includes(source.id)}
-                    onChange={(event) =>
-                      setSourceIDs(
-                        event.target.checked
-                          ? [...sourceIDs, source.id]
-                          : sourceIDs.filter((id) => id !== source.id),
-                      )
-                    }
                   />
-                  <span className="break-words">{source.name || source.id}</span>
+                  <span>I authorize access to all current and future sources.</span>
                 </label>
-              ))}
-            </div>
-          </fieldset>
-        ) : (
-          <div className="notice space-y-3">
-            <p>
-              Access to all sources automatically includes sources added in the future, including
-              imported catalogs that are published locally. New sources will not require another
-              approval.
-            </p>
-            <label className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                required
-                checked={acknowledged}
-                onChange={(event) => setAcknowledged(event.target.checked)}
-                className="mt-1 accent-primary"
-              />
-              <span>I authorize access to all current and future sources.</span>
-            </label>
-          </div>
+              </div>
+            )}
+          </>
         )}
         {stremio ? (
           <StremioConnectionFilters
             value={streamPreferences}
             onChange={setStreamPreferences}
             services={services}
+            sources={sourceOptions}
+            sourceIDs={sourceIDs}
+            onSourceIDsChange={selectSources}
           />
         ) : torznab ? (
-          <fieldset className="space-y-3">
-            <legend className="mb-2 text-sm font-medium">Allowed media</legend>
+          <Disclosure title="Filters">
+            {sourceFilter}
             <div className="field">
-              <Label htmlFor="torznab-media">Media permissions</Label>
+              <Label htmlFor="torznab-media">Media type</Label>
               <select
                 id="torznab-media"
                 className="native-select w-full"
@@ -668,12 +778,7 @@ function ShareForm({
                 <option value="other">Other / not identified</option>
               </select>
             </div>
-            <p className="help">
-              Movies and TV use current verified identification. Unclassified releases appear under
-              Other. Magnets contain no announce URLs; private downloads require the recipient’s own
-              source access.
-            </p>
-          </fieldset>
+          </Disclosure>
         ) : (
           <>
             {' '}
@@ -705,67 +810,7 @@ function ShareForm({
             </fieldset>
           </>
         )}
-        <fieldset className="space-y-4 border-t border-border pt-4">
-          <legend className="px-1 text-sm font-medium">Access policy</legend>
-          <div className="field">
-            <Label htmlFor="share-expires">Expires at (browser local time)</Label>
-            <Input
-              id="share-expires"
-              type="datetime-local"
-              step="1"
-              value={expiresAt}
-              onChange={(event) => setExpiresAt(event.target.value)}
-              aria-describedby="share-expires-help"
-            />
-            <p id="share-expires-help" className="help">
-              Uses the browser's timezone. Leave empty for no expiration. Expired access cannot be
-              used.
-            </p>
-            {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
-              <p className="help text-destructive">
-                This date is in the past. Access will remain blocked.
-              </p>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="field">
-              <Label htmlFor="share-request-limit">Requests per minute</Label>
-              <Input
-                id="share-request-limit"
-                type="number"
-                required
-                min="1"
-                max="3600"
-                step="1"
-                value={requestsPerMinute}
-                onChange={(event) => setRequestsPerMinute(event.target.value)}
-                aria-describedby="share-limits-help"
-              />
-            </div>
-            <div className="field">
-              <Label htmlFor="share-concurrent-limit">
-                {connection ? 'Concurrent requests' : 'Concurrent downloads'}
-              </Label>
-              <Input
-                id="share-concurrent-limit"
-                type="number"
-                required
-                min="1"
-                max="16"
-                step="1"
-                value={maxConcurrentDownloads}
-                onChange={(event) => setMaxConcurrentDownloads(event.target.value)}
-                aria-describedby="share-limits-help"
-              />
-            </div>
-          </div>
-          <p id="share-limits-help" className="help">
-            Limits apply across all clients using this access key and all server instances. Every
-            authenticated request counts toward a rolling minute. Active responses finish or time
-            out within {stremio ? '70' : '20'} seconds. Clients exceeding a limit receive HTTP 429
-            with a retry delay.
-          </p>
-        </fieldset>
+        {connection ? <Disclosure title="Advanced">{accessPolicy}</Disclosure> : accessPolicy}
       </fieldset>
       <p className="help">
         {original
@@ -801,7 +846,7 @@ function ShareForm({
             conflict ||
             !name.trim() ||
             fields.length === 0 ||
-            (scope === 'selected' ? sourceIDs.length === 0 : !acknowledged)
+            (scope === 'selected' ? sourceIDs.length === 0 : !connection && !acknowledged)
           }
         >
           {save.isPending

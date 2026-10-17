@@ -94,7 +94,7 @@ func TestLocalPublicationProvenanceAndStaleRevision(t *testing.T) {
 	hash := strings.Repeat("a", 40)
 	seedMovie(t, ctx, s, conn, "one", "1", hash)
 	seedMovie(t, ctx, s, conn, "two", "1", hash)
-	token, _ := s.Token(ctx)
+	token, _ := testPrivateInstallation(t, ctx, s)
 	out, err := s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
 	if err != nil || len(out) != 2 {
 		t.Fatalf("streams %+v %v", out, err)
@@ -128,7 +128,7 @@ func TestLocalPublicationProvenanceAndStaleRevision(t *testing.T) {
 		t.Fatalf("conflicting source IDs published %+v %v", status, err)
 	}
 	old := token
-	token, err = s.RotateToken(ctx)
+	token, err = rotateTestInstallation(t, ctx, s, token)
 	if err != nil || token == old || s.Authorized(ctx, old) || !s.Authorized(ctx, token) {
 		t.Fatal("token revocation failed")
 	}
@@ -187,7 +187,7 @@ func TestPrivateTorrentUsesStremioTrackerSourceSyntax(t *testing.T) {
 	if err = s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	token, err := s.Token(ctx)
+	token, err := testPrivateInstallation(t, ctx, s)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	token, _ := s.Token(ctx)
+	token, _ := testPrivateInstallation(t, ctx, s)
 	for i := 0; i < 2; i++ {
 		out, err := s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
 		if err != nil || len(out) != 1 || !strings.HasPrefix(out[0].Name, "[TB+]") || out[0].InfoHash != hash || out[0].Hints.Size != 123 || out[0].Hints.Service != "torbox" || out[0].Hints.Cached == nil || !*out[0].Hints.Cached {

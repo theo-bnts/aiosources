@@ -34,14 +34,6 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/stremio/requests", s.auth.protect(s.stremioRequests))
 	mux.HandleFunc("GET /api/stremio/requests/{id}", s.auth.protect(s.stremioRequest))
 	mux.HandleFunc("PUT /api/aiosource/config", s.auth.protect(s.aioConfig))
-	mux.HandleFunc("POST /api/aiosource/token", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
-		token, err := s.options.AIOSource.RotateToken(r.Context())
-		if err != nil {
-			respondError(w, err)
-			return
-		}
-		writeJSON(w, 200, map[string]string{"manifest_path": "/stremio/" + token + "/manifest.json"})
-	}))
 	mux.HandleFunc("POST /api/aiosource/{action}", s.auth.protect(s.aioAction))
 	mux.HandleFunc("GET /stremio/{token}/manifest.json", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
 		manifest, err := s.options.AIOSource.PrivateManifest(r.Context(), r.PathValue("token"))
@@ -146,18 +138,13 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	token, err := s.options.AIOSource.Token(r.Context())
-	if err != nil {
-		respondError(w, err)
-		return
-	}
 	syncing, matching, message := s.options.AIOSource.State()
 	if state.SyncError != "" {
 		message = strings.TrimSpace(state.SyncError + " " + message)
 	}
 	rebuild := state.ChangesThrough != nil && time.Since(*state.ChangesThrough) > 14*24*time.Hour
 	automation := aiosource.AutomationPlan(c, state, syncing, matching, time.Now())
-	writeJSON(w, 200, map[string]any{"config": c, "status": state, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild, "manifest_path": "/stremio/" + token + "/manifest.json"})
+	writeJSON(w, 200, map[string]any{"config": c, "status": state, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	c := model.AIOConfig{TMDBRequestsPerSecond: store.DefaultAIOConfig().TMDBRequestsPerSecond}
