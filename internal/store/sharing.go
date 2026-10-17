@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -20,7 +21,7 @@ var ErrCatalogAuthentication = errors.New("catalogue authentication required")
 var ErrCatalogCursor = errors.New("invalid catalogue continuation")
 var ErrCatalogExpired = errors.New("catalogue snapshot expired")
 
-const shareColumns = "id,name,enabled,scope,source_ids,fields,revision,created_at,updated_at,last_access_at,last_sync_at,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types"
+const shareColumns = "id,name,enabled,scope,source_ids,fields,revision,created_at,updated_at,last_access_at,last_sync_at,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences"
 
 func shareFormat(format string) string {
 	if format == "" {
@@ -45,10 +46,17 @@ func catalogField(name string) bool {
 
 func ValidateShare(input model.ShareInput) error {
 	format := shareFormat(input.Format)
-	if format != "catalog" && format != "torznab" {
+	if format != "catalog" && format != "torznab" && format != "stremio" {
 		return model.ErrInvalid
 	}
-	if format == "catalog" && len(input.MediaTypes) != 0 {
+	if format != "torznab" && len(input.MediaTypes) != 0 {
+		return model.ErrInvalid
+	}
+	if format == "stremio" {
+		if input.StreamPreferences == nil || !model.ValidStreamPreferences(*input.StreamPreferences) || len(input.StreamPreferences.Sources) > 0 {
+			return model.ErrInvalid
+		}
+	} else if input.StreamPreferences != nil {
 		return model.ErrInvalid
 	}
 	types := map[string]bool{}
@@ -58,7 +66,7 @@ func ValidateShare(input model.ShareInput) error {
 		}
 		types[typ] = true
 	}
-	if format == "torznab" && !slices.Equal(input.Fields, CatalogFields()) {
+	if format != "catalog" && !slices.Equal(input.Fields, CatalogFields()) {
 		return model.ErrInvalid
 	}
 	if (input.RequestsPerMinute != nil && (*input.RequestsPerMinute < 1 || *input.RequestsPerMinute > 3600)) ||
@@ -96,7 +104,13 @@ func ValidateShare(input model.ShareInput) error {
 
 func scanShare(row scanner) (model.Share, error) {
 	var item model.Share
-	err := row.Scan(&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes)
+	var preferences []byte
+	err := row.Scan(&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes, &preferences)
+	if err == nil && item.Format == "stremio" {
+		var p model.StreamPreferences
+		err = json.Unmarshal(preferences, &p)
+		item.StreamPreferences = &p
+	}
 	return item, err
 }
 
@@ -125,7 +139,7 @@ func (s *Store) Shares(ctx context.Context) ([]model.Share, error) {
 }
 
 func (s *Store) SharesByFormat(ctx context.Context, format string) ([]model.Share, error) {
-	if format != "catalog" && format != "torznab" {
+	if format != "catalog" && format != "torznab" && format != "stremio" {
 		return nil, model.ErrInvalid
 	}
 	rows, err := s.pool.Query(ctx, "SELECT "+shareColumns+" FROM ingest.shares WHERE format=$1 ORDER BY created_at,id", format)
@@ -183,7 +197,7 @@ func (s *Store) CreateShare(ctx context.Context, input model.ShareInput) (model.
 		return result, databaseError("begin share creation", err)
 	}
 	defer rollback(tx)
-	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes))
+	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input)))
 	if err != nil {
 		return model.ShareCredential{}, databaseError("create share", err)
 	}
@@ -237,7 +251,7 @@ func (s *Store) UpdateShare(ctx context.Context, id string, input model.ShareInp
 	if input.MediaTypes == nil {
 		input.MediaTypes = []string{}
 	}
-	item, err := scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11 WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes))
+	item, err := scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11,stream_preferences=$12 WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input)))
 	if err != nil {
 		return item, databaseError("update share", err)
 	}
@@ -298,8 +312,20 @@ func (s *Store) DeleteShare(ctx context.Context, id string, revision int64) erro
 }
 
 func shareActivity(format, action string) string {
-	if format == "torznab" {
-		return "torznab." + action
+	if format == "torznab" || format == "stremio" {
+		return format + "." + action
 	}
 	return "share." + action
+}
+
+func sharePreferencesJSON(input model.ShareInput) []byte {
+	if input.StreamPreferences == nil {
+		return []byte(`{}`)
+	}
+	preferences := *input.StreamPreferences
+	if preferences.Mode == "" {
+		preferences.Mode = "all"
+	}
+	data, _ := json.Marshal(preferences)
+	return data
 }

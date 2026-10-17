@@ -18,6 +18,9 @@ import (
 const CatalogDownloadTimeout = 20 * time.Second
 const catalogLeaseLifetime = CatalogDownloadTimeout + 5*time.Second
 
+// Preserve the existing 60-second playback and 65-second stream budgets.
+const StremioRequestTimeout = 70 * time.Second
+
 // CatalogQuotaError is safe to expose: it contains no credential or share data.
 type CatalogQuotaError struct {
 	RetryAfter int
@@ -31,7 +34,8 @@ func (e *CatalogQuotaError) Error() string {
 	return "Catalogue request limit reached; retry after the indicated delay"
 }
 
-// CatalogDownload keeps admission separate from page generation so HTTP callers
+// CatalogDownload is the admission lease shared by catalog, Torznab and
+// named Stremio access. Keeping it separate from generation lets HTTP callers
 // retain the durable lease until the complete response has been flushed. It
 // never retains the password. Close is safe to call after cancellation and more
 // than once; crashed instances leave only a short, expiring lease.
@@ -55,7 +59,11 @@ func (s *Store) BeginTorznabRequest(ctx context.Context, shareID, password strin
 }
 
 func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format string) (*CatalogDownload, error) {
-	deadline := time.Now().Add(CatalogDownloadTimeout)
+	timeout := CatalogDownloadTimeout
+	if format == "stremio" {
+		timeout = StremioRequestTimeout
+	}
+	deadline := time.Now().Add(timeout)
 	ctx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 	decoded, err := base64.RawURLEncoding.Strict().DecodeString(password)
@@ -123,8 +131,13 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO ingest.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,$3,$4)`, id, shareID, now, now.Add(catalogLeaseLifetime)); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO ingest.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,$3,$4)`, id, shareID, now, now.Add(timeout+5*time.Second)); err != nil {
 		return nil, databaseError("reserve catalogue download", err)
+	}
+	if format == "stremio" {
+		if _, err = tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp() WHERE id=$1`, shareID); err != nil {
+			return nil, databaseError("record Stremio access", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, databaseError("commit catalogue admission", err)

@@ -119,12 +119,14 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if err != nil {
 		return nil, err
 	}
-	_, preferences, err := InstallationPreferences(token)
-	if err != nil {
-		return nil, model.ErrInvalid
-	}
+	var preferences model.StreamPreferences
 	if visitor != nil {
 		preferences = visitor.Preferences
+	} else {
+		preferences, err = s.PrivatePreferences(ctx, token)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !AllowsInstallation(preferences, "", "", mediaType) {
 		return []Stream{}, nil
@@ -309,10 +311,10 @@ func (s *Service) Playback(ctx context.Context, service, provider, sourceID, med
 	return s.playback(ctx, service, provider, sourceID, mediaType, id, nil)
 }
 func (s *Service) PlaybackWithPreferences(ctx context.Context, service, provider, sourceID, mediaType, id string, p model.StreamPreferences) (string, error) {
-	if !ValidStreamPreferences(p) || !AllowsInstallation(p, provider, service, mediaType) {
+	if !model.ValidPlaybackPreferences(p) || !AllowsInstallation(p, provider, service, mediaType) {
 		return "", model.ErrInvalid
 	}
-	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, nil, playbackPolicy{CachedOnly: p.CachedOnly})
+	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, nil, playbackPolicy{CachedOnly: p.CachedOnly, Preferences: &p})
 }
 func (s *Service) PublicPlayback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	if visitor == nil || !validPublicKeys(visitor.Services) || visitor.Services[service] == "" {
@@ -321,7 +323,7 @@ func (s *Service) PublicPlayback(ctx context.Context, service, provider, sourceI
 	if !AllowsInstallation(visitor.Preferences, provider, service, mediaType) {
 		return "", model.ErrInvalid
 	}
-	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{CachedOnly: visitor.Preferences.CachedOnly})
+	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{CachedOnly: visitor.Preferences.CachedOnly, Preferences: &visitor.Preferences})
 }
 func (s *Service) playback(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	return s.playbackWithPolicy(ctx, service, provider, sourceID, mediaType, id, visitor, playbackPolicy{})
@@ -329,6 +331,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 
 type playbackPolicy struct {
 	CachedOnly    bool
+	Preferences   *model.StreamPreferences
 	Fingerprint   string
 	PreparationID string
 	PreparedID    *string
@@ -354,6 +357,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		return "", model.ErrConflict
 	}
 	if !hashRE.MatchString(rec.Hash) || !MatchesEpisode(rec, ParseRelease(rec.Title), r) {
+		return "", model.ErrInvalid
+	}
+	if policy.Preferences != nil && !AllowsLanguage(rec, *policy.Preferences) {
 		return "", model.ErrInvalid
 	}
 	// Token holders can only play a torrent still published for this resource.

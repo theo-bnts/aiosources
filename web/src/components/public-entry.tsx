@@ -15,7 +15,11 @@ import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
-import { PublicAnnounceFields, type PublicInfo } from '@/components/public-connection-fields'
+import {
+  PublicAnnounceFields,
+  clearPublicCredentials,
+  type PublicInfo,
+} from '@/components/public-connection-fields'
 import { PublicTorznabEntry } from '@/components/public-torznab-entry'
 import { InstallationFilters } from '@/components/installation-filters'
 import type { InstallationOptions } from '@/lib/language-preferences'
@@ -112,7 +116,7 @@ export function PublicEntry({
       for (const name of Object.keys(services)) delete services[name]
       for (const name of Object.keys(announces)) delete announces[name]
       for (const name of [...values.keys()]) values.delete(name)
-      form.reset()
+      clearPublicCredentials(form)
       if (request.current === controller) request.current = null
       if (!controller.signal.aborted) setPending(false)
     }
@@ -143,46 +147,49 @@ export function PublicEntry({
             void install(event.currentTarget)
           }}
         >
-          {(info.data.providers ?? []).map((provider) => (
-            <div className="field" key={provider.id}>
-              <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-              <Input
-                id={`public-${provider.id}`}
-                name={provider.id}
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                autoCapitalize="off"
-                maxLength={512}
-                disabled={pending}
+          <fieldset disabled={pending} className="space-y-5">
+            {(info.data.providers ?? []).map((provider) => (
+              <div className="field" key={provider.id}>
+                <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
+                <Input
+                  id={`public-${provider.id}`}
+                  name={provider.id}
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  maxLength={512}
+                  disabled={pending}
+                />
+              </div>
+            ))}
+            <p className="help">
+              Enter at least one key. The host processes your keys without saving them. Request
+              history retains media, results and errors for up to 7 days without identifying you.
+            </p>
+            <InstallationFilters
+              value={installationOptions}
+              onChange={(next) => {
+                setInstallationOptions(next)
+                setManifest((current) =>
+                  current ? preferenceManifest(current, preferences, next) : '',
+                )
+              }}
+              sources={info.data.sources ?? info.data.private_sources ?? []}
+              services={info.data.providers ?? []}
+            >
+              <LanguageFilter
+                value={preferences}
+                onChange={(next) => {
+                  setPreferences(next)
+                  setManifest((current) =>
+                    current ? preferenceManifest(current, next, installationOptions) : '',
+                  )
+                }}
               />
-            </div>
-          ))}
-          <p className="help">
-            Enter at least one key. The host processes your keys without saving them. Request
-            history retains media, results and errors for up to 7 days without identifying you.
-          </p>
-          <PublicAnnounceFields sources={info.data.private_sources ?? []} pending={pending} />
-          <LanguageFilter
-            value={preferences}
-            onChange={(next) => {
-              setPreferences(next)
-              setManifest((current) =>
-                current ? preferenceManifest(current, next, installationOptions) : '',
-              )
-            }}
-          />
-          <InstallationFilters
-            value={installationOptions}
-            onChange={(next) => {
-              setInstallationOptions(next)
-              setManifest((current) =>
-                current ? preferenceManifest(current, preferences, next) : '',
-              )
-            }}
-            sources={info.data.sources ?? info.data.private_sources ?? []}
-            services={info.data.providers ?? []}
-          />
+            </InstallationFilters>
+            <PublicAnnounceFields sources={info.data.private_sources ?? []} pending={pending} />
+          </fieldset>
           <ErrorNotice error={error || info.error} />
           {manifestError && (
             <p className="text-sm text-destructive" role="alert">

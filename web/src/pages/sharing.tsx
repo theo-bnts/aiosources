@@ -1,4 +1,10 @@
 import { TorznabSetup } from '@/components/torznab-setup'
+import {
+  StremioConnectionFilters,
+  defaultStremioPreferences,
+  stremioPreferenceSummary,
+} from '@/components/stremio-connection-filters'
+import { resolvedLanguage } from '@/lib/language-preferences'
 import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -6,7 +12,12 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { PlusIcon, ShareNetworkIcon } from '@phosphor-icons/react'
 import { api, ApiError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
-import type { CatalogShare, CatalogShares, SharePassword } from '@/lib/catalog-types'
+import type {
+  CatalogShare,
+  CatalogShares,
+  SharePassword,
+  ConnectionFormat,
+} from '@/lib/catalog-types'
 import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +39,7 @@ function shareBody(share: CatalogShare) {
   return {
     format: share.format,
     media_types: share.media_types,
+    stream_preferences: share.stream_preferences,
     name: share.name,
     enabled: share.enabled,
     scope: share.scope,
@@ -44,9 +56,25 @@ function shareExpired(share: CatalogShare) {
   return Boolean(share.expires_at && Date.parse(share.expires_at) <= Date.now())
 }
 
-export default function SharingPage({ format = 'catalog' }: { format?: 'catalog' | 'torznab' }) {
+function connectionEndpoint(format: ConnectionFormat) {
+  return format === 'stremio'
+    ? '/stremio/connections'
+    : format === 'torznab'
+      ? '/torznab/endpoints'
+      : '/shares'
+}
+
+export default function SharingPage({
+  format = 'catalog',
+  services = [],
+}: {
+  format?: ConnectionFormat
+  services?: { id: string; name: string }[]
+}) {
   const torznab = format === 'torznab'
-  const endpoint = torznab ? '/torznab/endpoints' : '/shares'
+  const stremio = format === 'stremio'
+  const connection = format !== 'catalog'
+  const endpoint = connectionEndpoint(format)
   const date = useDate()
   const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<CatalogShare | 'new' | null>(null)
@@ -59,7 +87,7 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
     refetchInterval: AUTO_REFRESH_INTERVAL,
     structuralSharing: false,
   })
-  const httpsReady = Boolean(shares.data?.public_url.startsWith('https://'))
+  const httpsReady = stremio || Boolean(shares.data?.public_url.startsWith('https://'))
   function rememberFocus() {
     returnFocus.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -73,7 +101,7 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
       <div className="flex justify-end">
         <Button disabled={!shares.data} onClick={() => openEditor('new')}>
           <PlusIcon />
-          {torznab ? 'Create access' : 'Create share'}
+          {connection ? 'Create access' : 'Create share'}
         </Button>
       </div>
       {shares.data && !httpsReady && (
@@ -90,7 +118,7 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
       {shares.data && (
         <ResultCount
           total={shares.data.items?.length ?? 0}
-          label={torznab ? 'access keys' : 'shares'}
+          label={connection ? 'access keys' : 'shares'}
         />
       )}
       {shares.isPending ? (
@@ -98,7 +126,11 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
       ) : shares.data?.items?.length ? (
         <div className="space-y-4">
           {shares.data.items.map((share) => (
-            <section key={share.id} className="section-card" aria-label={`Share ${share.name}`}>
+            <section
+              key={share.id}
+              className="section-card"
+              aria-label={`${connection ? 'Access' : 'Share'} ${share.name}`}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="section-title break-words">{share.name}</h2>
@@ -112,7 +144,9 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                   {shareExpired(share)
                     ? 'Expired'
                     : share.enabled
-                      ? 'Enabled · read-only'
+                      ? stremio
+                        ? 'Enabled'
+                        : 'Enabled · read-only'
                       : 'Disabled'}
                 </Badge>
               </div>
@@ -132,22 +166,24 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                 </div>
                 <div>
                   <dt className="text-muted-foreground">
-                    {torznab ? 'Media permissions' : 'Authorized fields'}
+                    {stremio ? 'Filters' : torznab ? 'Media permissions' : 'Authorized fields'}
                   </dt>
                   <dd className="mt-1 break-words">
-                    {torznab
-                      ? share.media_types?.length
-                        ? share.media_types
-                            .map(
-                              (type) =>
-                                ({ movie: 'Movies', tv: 'TV', other: 'Other' })[type] ?? type,
-                            )
-                            .join(', ')
-                        : 'All media'
-                      : share.fields.join(', ')}
+                    {stremio
+                      ? stremioPreferenceSummary(share.stream_preferences)
+                      : torznab
+                        ? share.media_types?.length
+                          ? share.media_types
+                              .map(
+                                (type) =>
+                                  ({ movie: 'Movies', tv: 'TV', other: 'Other' })[type] ?? type,
+                              )
+                              .join(', ')
+                          : 'All media'
+                        : share.fields.join(', ')}
                   </dd>
                 </div>
-                {!torznab && (
+                {!connection && (
                   <div>
                     <dt className="text-muted-foreground">Last completed download</dt>
                     <dd className="mt-1">
@@ -179,14 +215,14 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                 </div>
                 <div>
                   <dt className="text-muted-foreground">
-                    {torznab ? 'Request limits' : 'Download limits'}
+                    {connection ? 'Request limits' : 'Download limits'}
                   </dt>
                   <dd className="mt-1">
                     {share.requests_per_minute} requests per minute ·{' '}
                     {share.max_concurrent_downloads} concurrent
                   </dd>
                   <p className="help mt-1">
-                    Every page and HEAD request counts. Responses are limited to 20 seconds.
+                    Every request counts. Responses are limited to {stremio ? '70' : '20'} seconds.
                   </p>
                 </div>
               </dl>
@@ -196,24 +232,26 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                   should require your approval.
                 </p>
               )}
-              <div className="field">
-                <Label htmlFor={`share-url-${share.id}`}>
-                  {torznab
-                    ? 'Torznab URL (no API key included)'
-                    : 'Catalog URL (no password included)'}
-                </Label>
-                <Input
-                  id={`share-url-${share.id}`}
-                  readOnly
-                  value={share.url}
-                  placeholder="Available after HTTPS public origin is configured"
-                  className="font-mono text-xs"
-                />
-                <CopyButton
-                  value={share.url}
-                  label={torznab ? 'Copy Torznab URL' : 'Copy catalog URL'}
-                />
-              </div>
+              {!stremio && (
+                <div className="field">
+                  <Label htmlFor={`share-url-${share.id}`}>
+                    {torznab
+                      ? 'Torznab URL (no API key included)'
+                      : 'Catalog URL (no password included)'}
+                  </Label>
+                  <Input
+                    id={`share-url-${share.id}`}
+                    readOnly
+                    value={share.url}
+                    placeholder="Available after HTTPS public origin is configured"
+                    className="font-mono text-xs"
+                  />
+                  <CopyButton
+                    value={share.url}
+                    label={torznab ? 'Copy Torznab URL' : 'Copy catalog URL'}
+                  />
+                </div>
+              )}
               {torznab && <TorznabSetup share={share} sources={shares.data?.sources ?? []} />}
               <div className="toolbar">
                 <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
@@ -224,9 +262,11 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                   description={
                     share.enabled
                       ? 'New requests will be denied immediately. Existing downloaded copies cannot be recalled. You can enable this share again later.'
-                      : torznab
-                        ? `This API key grants read-only access to published titles, verified identifiers and tracker-free magnets from ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}.`
-                        : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
+                      : stremio
+                        ? 'This installation grants Stremio access to the selected sources and playback services. Its saved filters apply immediately to every new request.'
+                        : torznab
+                          ? `This API key grants read-only access to published titles, verified identifiers and tracker-free magnets from ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}.`
+                          : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
                   }
                   label={share.enabled ? 'Disable access' : 'Enable access'}
                   variant={share.enabled ? 'warning' : 'default'}
@@ -252,13 +292,27 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                   }}
                 />
                 <ConfirmAction
-                  title={`Replace ${torznab ? 'API key' : 'password'} for “${share.name}”?`}
-                  description="The previous password will stop working immediately. Give the replacement to the recipient through a secure channel. Permissions and enabled state are unchanged."
-                  label={torznab ? 'Rotate API key' : 'Rotate password'}
+                  title={`Replace ${connection ? 'access key' : 'password'} for “${share.name}”?`}
+                  description={
+                    stremio
+                      ? 'The previous manifest and playback URLs will stop working. Reinstall using the replacement manifest URL. Settings and enabled state are unchanged.'
+                      : 'The previous password will stop working immediately. Give the replacement to the recipient through a secure channel. Permissions and enabled state are unchanged.'
+                  }
+                  label={
+                    stremio
+                      ? 'Replace installation key'
+                      : torznab
+                        ? 'Rotate API key'
+                        : 'Rotate password'
+                  }
                   variant="warning"
                   trigger={
                     <Button variant="warning" size="sm">
-                      {torznab ? 'Rotate API key' : 'Rotate password'}
+                      {stremio
+                        ? 'Replace installation key'
+                        : torznab
+                          ? 'Rotate API key'
+                          : 'Rotate password'}
                     </Button>
                   }
                   action={async () => {
@@ -273,8 +327,12 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                 />
                 <ConfirmAction
                   title={`Revoke “${share.name}” permanently?`}
-                  description="This share and its password will stop working. The recipient’s existing downloaded data is not deleted. Create a new share if you want to grant access again."
-                  label={torznab ? 'Revoke access' : 'Revoke share'}
+                  description={
+                    stremio
+                      ? 'This installation and all its playback URLs will stop working. Other installations are unaffected. Create a new access to install it again.'
+                      : 'This share and its password will stop working. The recipient’s existing downloaded data is not deleted. Create a new share if you want to grant access again.'
+                  }
+                  label={connection ? 'Revoke access' : 'Revoke share'}
                   variant="destructive"
                   trigger={
                     <Button variant="destructive" size="sm">
@@ -286,7 +344,7 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
                       method: 'DELETE',
                       body: JSON.stringify({ revision: share.revision }),
                     })
-                    notify(`Share “${share.name}” revoked.`)
+                    notify(`${connection ? 'Access' : 'Share'} “${share.name}” revoked.`)
                     await refreshData()
                   }}
                 />
@@ -298,11 +356,15 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
         !shares.isError && (
           <Empty
             icon={ShareNetworkIcon}
-            title={torznab ? 'No Torznab access' : 'No catalog shares'}
+            title={
+              stremio ? 'No Stremio access' : torznab ? 'No Torznab access' : 'No catalog shares'
+            }
             description={
-              torznab
-                ? 'Create an access key, choose the allowed sources and media, then enable it for your client.'
-                : 'Create a disabled share, choose its source permissions and safe fields, then enable it when you are ready.'
+              stremio
+                ? 'Create an access key, choose its sources and filters, then enable it and install the manifest in Stremio or AIOStreams.'
+                : torznab
+                  ? 'Create an access key, choose the allowed sources and media, then enable it for your client.'
+                  : 'Create a disabled share, choose its source permissions and safe fields, then enable it when you are ready.'
             }
           />
         )
@@ -324,20 +386,23 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
           <DialogHeader>
             <DialogTitle>
               {editing === 'new'
-                ? torznab
+                ? connection
                   ? 'Create disabled access'
                   : 'Create disabled share'
                 : 'Edit permissions & limits'}
             </DialogTitle>
             <DialogDescription>
-              {torznab
-                ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
-                : 'Only the selected published fields are exposed. Passwords never grant access to administrative APIs.'}
+              {stremio
+                ? 'Create independent installations. Saved settings apply to the same link, and each access can be disabled, replaced or revoked separately.'
+                : torznab
+                  ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
+                  : 'Only the selected published fields are exposed. Passwords never grant access to administrative APIs.'}
             </DialogDescription>
           </DialogHeader>
           {editing && shares.data && (
             <ShareForm
               format={format}
+              services={services}
               key={editing === 'new' ? 'new' : editing.id}
               share={editing === 'new' ? undefined : editing}
               data={shares.data}
@@ -345,7 +410,7 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
               onSaved={(result) => {
                 setEditing(null)
                 if (result) setCredential(result)
-                else notify(torznab ? 'Access permissions saved.' : 'Share permissions saved.')
+                else notify(connection ? 'Access settings saved.' : 'Share permissions saved.')
               }}
             />
           )}
@@ -366,20 +431,27 @@ export default function SharingPage({ format = 'catalog' }: { format?: 'catalog'
 
 function ShareForm({
   format,
+  services,
   share,
   data,
   onSaving,
   onSaved,
 }: {
-  format: 'catalog' | 'torznab'
+  format: ConnectionFormat
+  services: { id: string; name: string }[]
   share?: CatalogShare
   data: CatalogShares
   onSaving: (saving: boolean) => void
   onSaved: (credential?: SharePassword) => void
 }) {
   const torznab = format === 'torznab'
-  const endpoint = torznab ? '/torznab/endpoints' : '/shares'
+  const stremio = format === 'stremio'
+  const connection = format !== 'catalog'
+  const endpoint = connectionEndpoint(format)
   const [mediaTypes, setMediaTypes] = useState(share?.media_types ?? [])
+  const [streamPreferences, setStreamPreferences] = useState(
+    share?.stream_preferences ?? defaultStremioPreferences(),
+  )
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? 'selected')
@@ -392,7 +464,7 @@ function ShareForm({
   const [maxConcurrentDownloads, setMaxConcurrentDownloads] = useState(
     String(share?.max_concurrent_downloads ?? 2),
   )
-  const [acknowledged, setAcknowledged] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(share?.scope === 'all')
   const [reloaded, setReloaded] = useState(false)
   const save = useMutation({
     gcTime: 0,
@@ -411,6 +483,14 @@ function ShareForm({
       const body = {
         format,
         media_types: torznab ? mediaTypes : [],
+        ...(stremio
+          ? {
+              stream_preferences: {
+                ...streamPreferences,
+                language: resolvedLanguage(streamPreferences),
+              },
+            }
+          : {}),
         name: name.trim(),
         enabled: original?.enabled ?? false,
         scope,
@@ -458,6 +538,9 @@ function ShareForm({
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const busy = save.isPending || reload.isPending
   const dirty =
+    (stremio &&
+      JSON.stringify(streamPreferences) !==
+        JSON.stringify(original?.stream_preferences ?? defaultStremioPreferences())) ||
     JSON.stringify(mediaTypes) !== JSON.stringify(original?.media_types ?? []) ||
     name !== (original?.name ?? '') ||
     scope !== (original?.scope ?? 'selected') ||
@@ -467,7 +550,11 @@ function ShareForm({
     requestsPerMinute !== String(original?.requests_per_minute ?? 120) ||
     maxConcurrentDownloads !== String(original?.max_concurrent_downloads ?? 2) ||
     (!original && acknowledged)
-  useUnsavedChanges(dirty, 'catalog sharing', busy)
+  useUnsavedChanges(
+    dirty,
+    stremio ? 'Stremio access' : torznab ? 'Torznab access' : 'catalog sharing',
+    busy,
+  )
   const unavailable = sourceIDs.filter((id) => !data.sources.some((source) => source.id === id))
   return (
     <form
@@ -479,7 +566,9 @@ function ShareForm({
     >
       <fieldset className="space-y-5" disabled={busy}>
         <div className="field">
-          <Label htmlFor="share-name">{torznab ? 'Access name' : 'Recipient / share name'}</Label>
+          <Label htmlFor="share-name">
+            {connection ? 'Access name' : 'Recipient / share name'}
+          </Label>
           <Input
             id="share-name"
             required
@@ -556,7 +645,13 @@ function ShareForm({
             </label>
           </div>
         )}
-        {torznab ? (
+        {stremio ? (
+          <StremioConnectionFilters
+            value={streamPreferences}
+            onChange={setStreamPreferences}
+            services={services}
+          />
+        ) : torznab ? (
           <fieldset className="space-y-3">
             <legend className="mb-2 text-sm font-medium">Allowed media</legend>
             <div className="field">
@@ -623,8 +718,8 @@ function ShareForm({
               aria-describedby="share-expires-help"
             />
             <p id="share-expires-help" className="help">
-              Uses the browser's timezone. Leave empty for no expiration. Expired passwords cannot
-              download data, including with a saved cursor.
+              Uses the browser's timezone. Leave empty for no expiration. Expired access cannot be
+              used.
             </p>
             {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
               <p className="help text-destructive">
@@ -649,7 +744,7 @@ function ShareForm({
             </div>
             <div className="field">
               <Label htmlFor="share-concurrent-limit">
-                {torznab ? 'Concurrent requests' : 'Concurrent downloads'}
+                {connection ? 'Concurrent requests' : 'Concurrent downloads'}
               </Label>
               <Input
                 id="share-concurrent-limit"
@@ -665,17 +760,17 @@ function ShareForm({
             </div>
           </div>
           <p id="share-limits-help" className="help">
-            Limits apply across all recipients using this password and all server instances. Every
-            authenticated page and HEAD request counts toward a rolling minute. Active responses
-            finish or time out within 20 seconds. Clients exceeding a limit receive HTTP 429 with a
-            retry delay.
+            Limits apply across all clients using this access key and all server instances. Every
+            authenticated request counts toward a rolling minute. Active responses finish or time
+            out within {stremio ? '70' : '20'} seconds. Clients exceeding a limit receive HTTP 429
+            with a retry delay.
           </p>
         </fieldset>
       </fieldset>
       <p className="help">
         {original
-          ? `Access remains ${original.enabled ? 'enabled' : 'disabled'}, unless expired. Permission and policy changes apply to every new request, including saved cursors. Already downloaded copies cannot be recalled.`
-          : 'Access starts disabled. Save the generated password securely; enable the share separately when ready.'}
+          ? `Access remains ${original.enabled ? 'enabled' : 'disabled'}, unless expired. Settings apply to every new request${stremio ? ' without reinstalling' : ', including saved cursors'}.`
+          : `Access starts disabled. Save the generated ${stremio ? 'manifest URL' : connection ? 'API key' : 'password'} securely; enable access separately when ready.`}
       </p>
       <ErrorNotice error={save.error} />
       <ErrorNotice error={reload.error} />
@@ -713,7 +808,7 @@ function ShareForm({
             ? 'Saving…'
             : original
               ? 'Save permissions'
-              : torznab
+              : connection
                 ? 'Create disabled access'
                 : 'Create disabled share'}
         </Button>
@@ -730,27 +825,35 @@ function PasswordDialog({
   onClose: () => void
 }) {
   const [visible, setVisible] = useState(false)
+  const stremio = credential.share.format === 'stremio'
   const torznab = credential.share.format === 'torznab'
+  const kind = stremio ? 'manifest URL' : torznab ? 'API key' : 'password'
+  const manifest = stremio
+    ? new URL(
+        `${credential.share.url}.${credential.password}/manifest.json`,
+        window.location.origin,
+      ).toString()
+    : ''
+  const secret = stremio ? manifest : credential.password
   return (
     <Dialog
       open
-      unsavedChanges={{ dirty: true, label: 'catalog sharing password' }}
+      unsavedChanges={{ dirty: true, label: `${credential.share.format || 'catalog'} ${kind}` }}
       onOpenChange={(open) => {
         if (!open) onClose()
       }}
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{torznab ? 'Save this API key now' : 'Save this password now'}</DialogTitle>
+          <DialogTitle>Save this {kind} now</DialogTitle>
           <DialogDescription>
-            This is the only time the {torznab ? 'API key' : 'password'} for “
-            {credential.share.name}” is shown. Closing this dialog clears it from the page. The
-            server cannot retrieve it later.
+            This is the only time the {kind} for “{credential.share.name}” is shown. Closing this
+            dialog clears it from the page. The server cannot retrieve it later.
           </DialogDescription>
         </DialogHeader>
         <div className="field">
           <Label htmlFor="created-share-password">
-            {torznab ? 'Torznab API key' : 'Sharing password'}
+            {stremio ? 'Manifest URL' : torznab ? 'Torznab API key' : 'Sharing password'}
           </Label>
           <Input
             id="created-share-password"
@@ -758,38 +861,40 @@ function PasswordDialog({
             readOnly
             autoComplete="off"
             spellCheck={false}
-            value={credential.password}
+            value={secret}
             className="font-mono text-xs"
           />
         </div>
         <div className="toolbar items-start">
           <Button variant="outline" onClick={() => setVisible(!visible)}>
-            {visible
-              ? torznab
-                ? 'Hide API key'
-                : 'Hide password'
-              : torznab
-                ? 'Reveal API key'
-                : 'Reveal password'}
+            {visible ? 'Hide' : 'Reveal'} {kind}
           </Button>
           <CopyButton
-            value={credential.password}
-            label={torznab ? 'Copy API key' : 'Copy password'}
-            manualCopyMessage="Clipboard access is unavailable. Reveal the password and copy it manually."
-            successMessage="Copied to your clipboard. Clear it after storing or sending the password securely."
+            value={secret}
+            label={`Copy ${kind}`}
+            variant={stremio ? 'default' : 'outline'}
+            manualCopyMessage={`Clipboard access is unavailable. Reveal the ${kind} and copy it manually.`}
+            successMessage="Copied to your clipboard. Keep it private."
           />
+          {stremio && (
+            <Button asChild variant="outline">
+              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
+            </Button>
+          )}
         </div>
         <p className="notice">
           {shareExpired(credential.share)
-            ? 'This share has expired; update its expiration before downloading.'
+            ? 'This access has expired; update its expiration before using it.'
             : credential.share.enabled
-              ? 'This share is enabled.'
-              : 'This share is disabled; enable it separately.'}{' '}
-          {torznab
-            ? 'Enter the URL and API key in your Torznab client. Keep the key private; it grants access to the permitted catalog.'
-            : 'Send the catalog URL and password through a secure channel. Never append the password to the URL.'}
+              ? 'This access is enabled.'
+              : 'This access is disabled; enable it separately.'}{' '}
+          {stremio
+            ? 'Use the manifest in Stremio or AIOStreams. Keep the link private. Saved settings apply without reinstalling.'
+            : torznab
+              ? 'Enter the URL and API key in your Torznab client. Keep the key private; it grants access to the permitted catalog.'
+              : 'Send the catalog URL and password through a secure channel. Never append the password to the URL.'}
         </p>
-        {credential.share.url && (
+        {!stremio && credential.share.url && (
           <div className="field">
             <Label htmlFor="created-share-url">{torznab ? 'Torznab URL' : 'Catalog URL'}</Label>
             <Input
@@ -805,9 +910,7 @@ function PasswordDialog({
           </div>
         )}
         <DialogFooter>
-          <Button onClick={onClose}>
-            {torznab ? 'I have saved the API key' : 'I have saved the password'}
-          </Button>
+          <Button onClick={onClose}>I have saved the {kind}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

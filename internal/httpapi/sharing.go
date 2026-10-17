@@ -28,10 +28,18 @@ func (s *server) registerSharingRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/torznab/endpoints/{id}", s.auth.protect(s.updateShare))
 	mux.HandleFunc("POST /api/torznab/endpoints/{id}/rotate", s.auth.protect(s.rotateShare))
 	mux.HandleFunc("DELETE /api/torznab/endpoints/{id}", s.auth.protect(s.deleteShare))
+	mux.HandleFunc("GET /api/stremio/connections", s.auth.protect(s.listShares))
+	mux.HandleFunc("POST /api/stremio/connections", s.auth.protect(s.createShare))
+	mux.HandleFunc("PUT /api/stremio/connections/{id}", s.auth.protect(s.updateShare))
+	mux.HandleFunc("POST /api/stremio/connections/{id}/rotate", s.auth.protect(s.rotateShare))
+	mux.HandleFunc("DELETE /api/stremio/connections/{id}", s.auth.protect(s.deleteShare))
 	mux.HandleFunc("/torznab/{id}/api", s.torznabFeed)
 }
 
 func shareRequestFormat(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, "/api/stremio/connections") {
+		return "stremio"
+	}
 	if strings.HasPrefix(r.URL.Path, "/api/torznab/") {
 		return "torznab"
 	}
@@ -60,6 +68,10 @@ func (s *server) sharingPublicURL() string {
 }
 
 func (s *server) shareURL(share *model.Share) {
+	if share.Format == "stremio" {
+		share.URL = strings.TrimSuffix(s.options.PublicURL, "/") + "/stremio/s1." + url.PathEscape(share.ID)
+		return
+	}
 	if origin := s.sharingPublicURL(); origin != "" {
 		if share.Format == "torznab" {
 			share.URL = origin + "/torznab/" + url.PathEscape(share.ID) + "/api"
@@ -94,15 +106,23 @@ func (s *server) listShares(w http.ResponseWriter, r *http.Request) {
 	for index := range items {
 		s.shareURL(&items[index])
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "fields": store.CatalogFields(), "sources": sources, "public_url": s.sharingPublicURL()})
+	publicURL := s.sharingPublicURL()
+	if shareRequestFormat(r) == "stremio" {
+		publicURL = s.options.PublicURL
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "fields": store.CatalogFields(), "sources": sources, "public_url": publicURL})
 }
 
 func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input model.ShareInput) bool {
 	if err := store.ValidateShare(input); err != nil {
-		writeError(w, http.StatusUnprocessableEntity, "Provide a name, safe fields, provider permissions, requests per minute between 1 and 3600, and concurrent downloads between 1 and 16")
+		message := "Provide a name, safe fields, source permissions, requests per minute between 1 and 3600, and concurrent downloads between 1 and 16"
+		if input.Format == "stremio" {
+			message = "Provide a name, source permissions, valid playback filters, requests per minute between 1 and 3600, and concurrent requests between 1 and 16"
+		}
+		writeError(w, http.StatusUnprocessableEntity, message)
 		return false
 	}
-	if input.Enabled && s.sharingPublicURL() == "" {
+	if input.Format != "stremio" && input.Enabled && s.sharingPublicURL() == "" {
 		writeError(w, http.StatusUnprocessableEntity, "Configure PUBLIC_URL with an HTTPS public origin before enabling sharing")
 		return false
 	}
@@ -218,7 +238,7 @@ func (s *server) decodeShare(w http.ResponseWriter, r *http.Request, input *mode
 		return false
 	}
 	input.Format = format
-	if format == "torznab" {
+	if format == "torznab" || format == "stremio" {
 		input.Fields = store.CatalogFields()
 	}
 	return true

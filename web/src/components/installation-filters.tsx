@@ -3,26 +3,45 @@ import { SourceMultiSelect } from '@/components/source-multi-select'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { useId, useRef, type ReactNode } from 'react'
 
 export function InstallationFilters({
   value,
   onChange,
   sources,
   services,
+  children,
+  showHelp = true,
 }: {
   value: InstallationOptions
   onChange: (value: InstallationOptions) => void
   sources: { id: string; name: string }[]
   services: { id: string; name: string }[]
+  children?: ReactNode
+  showHelp?: boolean
 }) {
-  return (
-    <Disclosure title="Connection filters">
+  const id = useId()
+  const unavailableServices = useRef(new Set<string>())
+  for (const service of value.services ?? []) {
+    if (!services.some((option) => option.id === service)) unavailableServices.current.add(service)
+  }
+  const serviceOptions = [
+    ...services,
+    ...[...unavailableServices.current]
+      .filter((id) => !services.some((service) => service.id === id))
+      .map((id) => ({
+        id,
+        name: `${{ alldebrid: 'AllDebrid', torbox: 'TorBox', direct: 'Direct torrents' }[id] || id} (not configured)`,
+      })),
+  ]
+  const fields = (
+    <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         {sources.length > 0 && (
           <div className="field sm:col-span-2">
-            <Label htmlFor="installation-sources">Sources</Label>
+            <Label htmlFor={`${id}-sources`}>Sources</Label>
             <SourceMultiSelect
-              id="installation-sources"
+              id={`${id}-sources`}
               value={value.sources ?? []}
               options={sources.map((source) => ({ value: source.id, label: source.name }))}
               onChange={(sources) => onChange({ ...value, sources })}
@@ -30,10 +49,10 @@ export function InstallationFilters({
           </div>
         )}
         <div className="field">
-          <Label htmlFor="installation-type">Media type</Label>
+          <Label htmlFor={`${id}-type`}>Media type</Label>
           <select
             className="native-select w-full"
-            id="installation-type"
+            id={`${id}-type`}
             value={value.types?.[0] ?? ''}
             onChange={(event) =>
               onChange({ ...value, types: event.target.value ? [event.target.value] : [] })
@@ -45,10 +64,10 @@ export function InstallationFilters({
             <option value="anime">Anime</option>
           </select>
         </div>
-        {services.length > 1 && (
+        {serviceOptions.length > 1 && (
           <fieldset className="space-y-2">
-            <legend className="mb-2 text-sm font-medium">Debrid services</legend>
-            {services.map((service) => (
+            <legend className="mb-2 text-sm font-medium">Playback services</legend>
+            {serviceOptions.map((service) => (
               <label className="flex items-center gap-2 text-sm" key={service.id}>
                 <input
                   type="checkbox"
@@ -58,12 +77,15 @@ export function InstallationFilters({
                   onChange={(event) => {
                     const current = value.services?.length
                       ? value.services
-                      : services.map((item) => item.id)
+                      : serviceOptions.map((item) => item.id)
                     const next = event.target.checked
                       ? [...current, service.id]
                       : current.filter((id) => id !== service.id)
                     if (next.length)
-                      onChange({ ...value, services: next.length === services.length ? [] : next })
+                      onChange({
+                        ...value,
+                        services: next.length === serviceOptions.length ? [] : next,
+                      })
                   }}
                 />
                 <span>{service.name}</span>
@@ -73,17 +95,21 @@ export function InstallationFilters({
         )}
       </div>
       <div className="flex items-center justify-between gap-3">
-        <Label htmlFor="installation-cached">Cached results only</Label>
+        <Label htmlFor={`${id}-cached`}>Cached results only</Label>
         <Switch
-          id="installation-cached"
+          id={`${id}-cached`}
           checked={value.cached_only ?? false}
           onCheckedChange={(cached_only) => onChange({ ...value, cached_only })}
         />
       </div>
-      <p className="help">
-        Filters belong to this link. Copy or install a separate link for each configuration;
-        changing these controls does not change existing installations.
-      </p>
-    </Disclosure>
+      {children}
+      {showHelp && (
+        <p className="help">
+          Filters belong to this link. Copy or install a separate link for each configuration;
+          changing these controls does not change existing installations.
+        </p>
+      )}
+    </div>
   )
+  return <Disclosure title="Filters">{fields}</Disclosure>
 }

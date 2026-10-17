@@ -59,6 +59,7 @@ test('clipboard failure is recoverable and replacing the manifest clears old cop
     })
   })
   await page.goto('/addon/settings')
+  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   const copy = page.getByRole('button', { name: 'Copy manifest URL', exact: true })
   await copy.click()
   await expect(page.getByRole('alert')).toHaveText(
@@ -206,6 +207,7 @@ test('getting started finishes after identification even when no safe match exis
     })
     .toBe(true)
   await page.goto('/addon/settings')
+  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   await expect(page.getByRole('heading', { name: 'Stremio', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Getting started', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Copy manifest URL', exact: true })).toBeVisible()

@@ -47,13 +47,15 @@ export function TorznabSetup({
             <CopyButton value={url?.pathname ?? ''} label="Copy API path" />
           </div>
         </div>
-        <TorznabFilters
-          value={value}
-          onChange={setValue}
-          sources={permitted}
-          mediaTypes={share.media_types}
-          id={`torznab-${share.id}`}
-        />
+        <Disclosure title="Filters">
+          <TorznabFilters
+            value={value}
+            onChange={setValue}
+            sources={permitted}
+            mediaTypes={share.media_types}
+            id={`torznab-${share.id}`}
+          />
+        </Disclosure>
         <div className="field">
           <Label htmlFor={`torznab-parameters-${share.id}`}>Additional parameters (optional)</Label>
           <Input

@@ -44,7 +44,9 @@ The local release parser is now Go code, covered by the previous suite's parser 
 
 Start v2 with fresh database/state volumes. Legacy data is neither selected nor erased implicitly. Native source provenance and resumable runs use Ingest's schema; the previous addon settings and Python scraper schemas are replaced. Source definitions are supplied by the administrator rather than hardcoded provider defaults. The new panel retains Ingest's English interface.
 
-The manifest URL includes an installation token and must be reinstalled in Stremio/AIOStreams. The container port remains 7000; native development retains Ingest's 8080 default. CLI/environment names (`*`, `cmd/ingest`, `bin/ingest`) are retained where upstream compatibility benefits maintenance. The production container uses `/aiosource`.
+Private Stremio installations use the shared access-grant lifecycle from Torznab and catalog sharing, separated by protocol. Each named access stores source permissions, playback filters, quotas and expiration, with only a hash of its independently revocable key. Saved changes apply to the same manifest; a key replacement requires reinstalling. Legacy installation tokens and their URL filters remain compatible, and legacy rotation does not affect named access. Public Stremio and Torznab remain stateless and never create these grants. Named Stremio admission leases allow 70 seconds for existing playback preparation, then recheck revision and expiration before delivery. Other export protocols retain their 20-second delivery limit.
+
+The container port remains 7000; native development retains Ingest's 8080 default. Internal package and binary names (`cmd/ingest`, `bin/ingest`) are retained where upstream compatibility benefits maintenance. The production container uses `/aiosource`.
 
 ## Performance and v1 parity
 

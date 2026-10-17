@@ -25,7 +25,7 @@ var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 // ValidID applies the same safe provider identifier rule used by the registry.
 func ValidID(id string) bool {
-	return identifier.MatchString(id)
+	return model.ValidSourceID(id)
 }
 
 // Defaults are applied only to absent fields, never to explicitly supplied zeroes.

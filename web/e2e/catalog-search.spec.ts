@@ -480,6 +480,8 @@ test.describe('browser language preferences', () => {
     await expect(page.locator('[data-result-count]')).toHaveText('5 source releases')
     await expect(page.locator('main tbody tr').first()).toContainText('GERMAN')
     await page.goto('/addon/settings')
+    await page.locator('summary', { hasText: 'Legacy installation' }).click()
+    await page.locator('summary', { hasText: 'Filters' }).click()
     await expect(page.getByLabel('Manifest URL', { exact: true })).toHaveValue(
       /~fr~all\/manifest\.json$/,
     )

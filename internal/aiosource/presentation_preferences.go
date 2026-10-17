@@ -11,51 +11,11 @@ import (
 	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/providers"
-	"golang.org/x/text/language"
 )
 
-func NormalizeLanguage(value string) string {
-	if len(value) > 64 {
-		return ""
-	}
-	tag, err := language.Parse(value)
-	if err != nil {
-		return ""
-	}
-	base, _ := tag.Base()
-	if base.String() == "und" {
-		return ""
-	}
-	return base.String()
-}
-
-func ValidStreamPreferences(p model.StreamPreferences) bool {
-	if len(p.Sources) > 100 || len(p.Services) > 3 || len(p.Types) > 3 {
-		return false
-	}
-	seen := map[string]bool{}
-	for _, source := range p.Sources {
-		if !providers.ValidID(source) || seen[source] {
-			return false
-		}
-		seen[source] = true
-	}
-	for _, pair := range []struct{ values, allowed []string }{{p.Services, []string{"alldebrid", "torbox", "direct"}}, {p.Types, []string{"movie", "series", "anime"}}} {
-		clear(seen)
-		for _, value := range pair.values {
-			if !slices.Contains(pair.allowed, value) || seen[value] {
-				return false
-			}
-			seen[value] = true
-		}
-	}
-	encoded, err := json.Marshal(p)
-	if err != nil || len(encoded) > 4096 {
-		return false
-	}
-	return (p.Mode == "" || p.Mode == "all" || p.Mode == "preferred" || p.Mode == "multi" || p.Mode == "unknown") &&
-		(p.Language == "" || NormalizeLanguage(p.Language) == p.Language) && (p.Mode == "" || p.Mode == "all" || p.Language != "")
+func NormalizeLanguage(value string) string { return model.NormalizeLanguage(value) }
+func ValidStreamPreferences(value model.StreamPreferences) bool {
+	return model.ValidStreamPreferences(value)
 }
 
 // Preferences travel with the installed URL: an intermediary's browser or

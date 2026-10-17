@@ -842,43 +842,45 @@ function ProviderForm({
           runs use the saved definition.
         </p>
         {sourceID && (
-          <div className="flex flex-wrap items-center gap-2">
-            <CollectDialog
-              providerId={sourceID}
-              trigger={
-                <Button
-                  disabled={
-                    dirty ||
-                    blocked ||
-                    parsed.get('enabled') !== true ||
-                    Boolean(document?.issues?.length)
-                  }
-                >
-                  <PlayIcon />
-                  Run manual import
-                </Button>
-              }
-            />
-            <ConfirmAction
-              title="Delete this source?"
-              description="The definition will be deleted. Archives and history will remain available."
-              label="Delete"
-              variant="destructive"
-              trigger={
-                <Button variant="destructive" disabled={busy}>
-                  <TrashIcon />
-                  Delete source
-                </Button>
-              }
-              action={async () => {
-                await api<void>(`/providers/${encodeURIComponent(sourceID)}`, {
-                  method: 'DELETE',
-                  body: JSON.stringify({ revision }),
-                })
-                await refreshData()
-                navigate('/providers/settings')
-              }}
-            />
+          <div className="ml-auto grid justify-items-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              <CollectDialog
+                providerId={sourceID}
+                trigger={
+                  <Button
+                    disabled={
+                      dirty ||
+                      blocked ||
+                      parsed.get('enabled') !== true ||
+                      Boolean(document?.issues?.length)
+                    }
+                  >
+                    <PlayIcon />
+                    Run manual import
+                  </Button>
+                }
+              />
+              <ConfirmAction
+                title="Delete this source?"
+                description="The definition will be deleted. Archives and history will remain available."
+                label="Delete"
+                variant="destructive"
+                trigger={
+                  <Button variant="destructive" disabled={busy}>
+                    <TrashIcon />
+                    Delete source
+                  </Button>
+                }
+                action={async () => {
+                  await api<void>(`/providers/${encodeURIComponent(sourceID)}`, {
+                    method: 'DELETE',
+                    body: JSON.stringify({ revision }),
+                  })
+                  await refreshData()
+                  navigate('/providers/settings')
+                }}
+              />
+            </div>
             {dirty && (
               <p className="help w-full text-right">Save your changes before starting a run.</p>
             )}

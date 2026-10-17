@@ -44,12 +44,21 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("POST /api/aiosource/{action}", s.auth.protect(s.aioAction))
 	mux.HandleFunc("GET /stremio/{token}/manifest.json", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
+		manifest, err := s.options.AIOSource.PrivateManifest(r.Context(), r.PathValue("token"))
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		if !validatePrivateConnection(w, r) {
+			return
+		}
 		s.options.AIOSource.RecordAddonRequest("private", "manifest", "", "", time.Now(), nil)
-		_, preferences, _ := aiosource.InstallationPreferences(r.PathValue("token"))
-		writeJSON(w, 200, aiosource.InstallationManifest(preferences))
+		writeJSON(w, 200, manifest)
 	}))
 	mux.HandleFunc("GET /stremio/{token}/configure", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/addon/settings", http.StatusSeeOther)
+		if validatePrivateConnection(w, r) {
+			http.Redirect(w, r, "/addon/settings", http.StatusSeeOther)
+		}
 	}))
 	mux.HandleFunc("GET /stremio/{token}/stream/{type}/{id}", s.aioProtect(s.aioStreams))
 	mux.HandleFunc("GET /stremio/{token}/play/{service}/{provider}/{source}/{type}/{id}", s.aioProtect(s.aioPlayback))
@@ -98,7 +107,7 @@ func (s *server) aioProtect(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, 429, "Too many active requests")
 			return
 		}
-		next(w, r)
+		s.privateConnectionRequest(w, r, next)
 	}
 }
 
@@ -231,10 +240,17 @@ func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
+	if !validatePrivateConnection(w, r) {
+		return
+	}
 	writeJSON(w, 200, map[string]any{"streams": streams})
 }
 func (s *server) aioPlayback(w http.ResponseWriter, r *http.Request) {
-	_, preferences, _ := aiosource.InstallationPreferences(r.PathValue("token"))
+	preferences, err := s.options.AIOSource.PrivatePreferences(r.Context(), r.PathValue("token"))
+	if err != nil {
+		respondError(w, err)
+		return
+	}
 	link, err := s.options.AIOSource.TracePlayback(r.Context(), "private", r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
 		return s.options.AIOSource.PlaybackWithPreferences(ctx, r.PathValue("service"), r.PathValue("provider"), r.PathValue("source"), r.PathValue("type"), r.PathValue("id"), preferences)
 	})
@@ -245,6 +261,9 @@ func (s *server) aioPlayback(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		respondError(w, err)
+		return
+	}
+	if !validatePrivateConnection(w, r) {
 		return
 	}
 	http.Redirect(w, r, link, http.StatusTemporaryRedirect)

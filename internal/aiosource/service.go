@@ -114,6 +114,10 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	if len(token) > MaxPublicInstallationSize {
 		return ErrAuth
 	}
+	if strings.HasPrefix(token, "s1.") {
+		_, err := s.privateConnection(ctx, token)
+		return err
+	}
 	credential, _, parseErr := InstallationPreferences(token)
 	if parseErr != nil {
 		return ErrAuth

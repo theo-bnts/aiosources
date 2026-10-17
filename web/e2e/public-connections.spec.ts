@@ -64,6 +64,8 @@ test('public connections share the shell and encrypted Torznab filters without v
       visitor.getByRole('heading', { name: 'Torznab', exact: true, level: 1 }),
     ).toBeVisible()
     await expect(visitor.getByLabel('Sources', { exact: true })).toHaveCount(0)
+    await expect(visitor.getByLabel('Media type', { exact: true })).toBeHidden()
+    await visitor.locator('summary', { hasText: 'Filters' }).click()
     await visitor.getByLabel('Media type', { exact: true }).selectOption('movie')
     await visitor.getByLabel('Cache service', { exact: true }).selectOption('torbox')
     await visitor.getByLabel('Cached results only', { exact: true }).check()
@@ -71,6 +73,9 @@ test('public connections share the shell and encrypted Torznab filters without v
     const key = visitor.getByLabel('API key', { exact: true })
     await expect(key).toHaveAttribute('type', 'password')
     await expect(key).not.toHaveValue('')
+    await expect(visitor.getByLabel('Media type', { exact: true })).toHaveValue('movie')
+    await expect(visitor.getByLabel('Cache service', { exact: true })).toHaveValue('torbox')
+    await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeChecked()
     let credential = await key.inputValue()
     const feed = async (k: string) =>
       context.request.get(`/public/torznab/api?t=search&apikey=${encodeURIComponent(k)}`)
@@ -83,6 +88,11 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(visitor.getByLabel('Sources', { exact: true })).toBeVisible()
     await visitor.getByLabel('Media type', { exact: true }).selectOption('')
     await visitor.getByLabel('Cached results only', { exact: true }).uncheck()
+    expect(await visitor.locator('summary').allTextContents()).toEqual([
+      'Filters',
+      'Advanced',
+      'Full endpoint URL',
+    ])
     await visitor.locator('summary', { hasText: 'Advanced' }).click()
     const own = 'https://announce.example.invalid/visitor-private-passkey/announce'
     await visitor.getByLabel('Example Library announce URL', { exact: true }).fill(own)

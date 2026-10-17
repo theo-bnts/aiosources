@@ -125,6 +125,7 @@ test('Stremio manifest works without admin cookies and replacement revokes the p
   server,
 }) => {
   await page.goto('/addon/settings')
+  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   await expect(page.getByRole('heading', { name: 'Stremio', exact: true })).toBeVisible()
   await expectMaintenanceFooter(page)
   const manifestField = page.getByRole('textbox', { name: 'Manifest URL', exact: true })
@@ -301,6 +302,7 @@ test('private playback saves independently and fields have space below their lab
   await assertSpacing('tmdb_secret')
   await assertSpacing('sync_minutes')
   await page.goto('/addon/settings')
+  await page.locator('summary', { hasText: 'Legacy installation' }).click()
   await assertSpacing('manifest')
   await expect(page.getByRole('alert')).toHaveCount(0)
 })

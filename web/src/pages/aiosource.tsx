@@ -23,6 +23,7 @@ import { SecretPicker } from '@/components/secret-picker'
 import { CopyButton } from '@/components/copy-button'
 import { FormStatus } from '@/components/form-status'
 import type { Config, Status, Tracker } from '@/lib/aiosource-types'
+import SharingPage from '@/pages/sharing'
 
 type FormScope = 'metadata' | 'debrid' | 'trackers'
 type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
@@ -402,43 +403,59 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
         </>
       )}
       {section === 'stremio' && (
-        <Panel title="Install addon">
-          <LanguageFilter value={languagePreferences} onChange={setLanguagePreferences} />
-          <InstallationFilters
-            value={installationOptions}
-            onChange={setInstallationOptions}
-            sources={providers.data?.items ?? []}
+        <>
+          <SharingPage
+            format="stremio"
             services={[
               ...(config.alldebrid_secret ? [{ id: 'alldebrid', name: 'AllDebrid' }] : []),
               ...(config.torbox_secret ? [{ id: 'torbox', name: 'TorBox' }] : []),
+              { id: 'direct', name: 'Direct torrents' },
             ]}
           />
-          <p className="help">
-            Language choices travel with this link. Copy or reinstall it after changing them.
-          </p>
-          <div className="field">
-            <Label htmlFor="manifest">Manifest URL</Label>
-            <Input
-              id="manifest"
-              readOnly
-              value={manifestError ? '' : manifest}
-              aria-invalid={Boolean(manifestError)}
-            />
-            {manifestError && (
-              <p className="text-sm text-destructive" role="alert">
-                {manifestError}
-              </p>
-            )}
-          </div>
-          {!manifestError && (
-            <div className="flex flex-wrap items-start gap-3">
-              <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
-              <Button asChild variant="outline">
-                <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
-              </Button>
+          <Disclosure title="Legacy installation">
+            <p className="help">
+              Existing links remain valid. Use named access keys above for independent settings and
+              revocation.
+            </p>
+            <div className="space-y-4">
+              <InstallationFilters
+                value={installationOptions}
+                onChange={setInstallationOptions}
+                sources={providers.data?.items ?? []}
+                services={[
+                  ...(config.alldebrid_secret ? [{ id: 'alldebrid', name: 'AllDebrid' }] : []),
+                  ...(config.torbox_secret ? [{ id: 'torbox', name: 'TorBox' }] : []),
+                ]}
+              >
+                <LanguageFilter value={languagePreferences} onChange={setLanguagePreferences} />
+              </InstallationFilters>
+              <div className="field">
+                <Label htmlFor="manifest">Manifest URL</Label>
+                <Input
+                  id="manifest"
+                  readOnly
+                  value={manifestError ? '' : manifest}
+                  aria-invalid={Boolean(manifestError)}
+                />
+                {manifestError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {manifestError}
+                  </p>
+                )}
+              </div>
+              {!manifestError && (
+                <div className="flex flex-wrap items-start gap-3">
+                  <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
+                  <Button asChild variant="outline">
+                    <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+                      Install in Stremio
+                    </a>
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
-        </Panel>
+          </Disclosure>
+        </>
       )}
       {section === 'debrid' && settingsForm}
       {section === 'debrid' && (
@@ -577,7 +594,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           <>
             <ConfirmAction
               title="Replace installation token?"
-              description="Existing addon URLs will stop working. Reinstall with the new manifest URL."
+              description="Legacy addon URLs will stop working. Reinstall those links using the replacement token. Named access keys are unaffected."
               label="Replace token"
               variant="warning"
               action={() => action.mutateAsync('token')}

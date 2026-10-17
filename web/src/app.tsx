@@ -160,16 +160,16 @@ const navigationGroups = [
         icon: PlayCircleIcon,
       },
       {
-        to: '/sharing',
-        label: 'Catalog sharing',
-        description: 'Share published catalogs and synchronize remote copies.',
-        icon: ShareNetworkIcon,
-      },
-      {
         to: '/torznab',
         label: 'Torznab',
         description: 'Connect external applications to your published catalog.',
         icon: BroadcastIcon,
+      },
+      {
+        to: '/sharing',
+        label: 'Catalog sharing',
+        description: 'Share published catalogs and synchronize remote copies.',
+        icon: ShareNetworkIcon,
       },
       {
         to: '/public-access',

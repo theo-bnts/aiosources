@@ -10,7 +10,7 @@ AIOSources is a self-hosted application that organizes torrent metadata from you
 - **Search your catalog:** find partial titles, source identifiers or info hashes, and combine filters across sources.
 - **Identify films and series:** use TMDB information to verify IMDb, TMDB and TVDB identifiers, then review or correct uncertain results.
 - **Check availability:** connect AllDebrid or TorBox to see cached availability and prepare playback when you select a stream.
-- **Connect Stremio and AIOStreams:** install your private addon link and browse the results from your catalog.
+- **Connect Stremio and AIOStreams:** create independent private installations with saved filters and browse the results from your catalog.
 - **Connect Torznab applications:** expose a revocable, read-only endpoint for Prowlarr and other clients, with optional source and media filters in each URL.
 - **Offer optional public access:** let visitors install the addon with their own debrid keys and reuse shared cache observations, while keeping administration private.
 - **Share selected metadata:** create revocable, read-only catalog shares and import catalogs shared with you.
@@ -104,7 +104,7 @@ TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets*
 1. Open **Sources → Settings → Add source**. Configure your authorized source or import its JSON definition. Add any required credential through the encrypted secret picker, save, then start a preview or import. Automatic timing belongs to that source's **Schedules** section.
 2. In **Metadata → Settings**, add your own [TMDB API read access token](https://www.themoviedb.org/settings/api). Information updates and torrent identification run automatically when enabled. Use **Identification** to review uncertain matches.
 3. Optionally add your AllDebrid or TorBox key in **Debrid → Settings**. AllDebrid availability checks can create temporary entries in your account; AIOSources only cleans up entries it has confirmed it created.
-4. In **Stremio → Settings**, copy your manifest URL into Stremio or AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
+4. In **Stremio → Settings**, create an access, save its manifest URL, enable it, then install the link in Stremio or AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
 
 **Search** finds clean film and series titles in your identified catalog. Open a title to compare its source releases, sort by date, size or source name, and select a season and episode for a series. Titles and relevance ranking use your local metadata, without contacting TMDB during a search. Titles prefer your browser language, a matching local alias, then English. Translation language codes become available as metadata updates normally.
 
@@ -112,9 +112,11 @@ Filter titles by type and an optional single year. Films match any locally known
 
 **Download** opens the file when its link is ready. **Add to debrid** explicitly starts preparation for an uncached version, then checks readiness automatically. Keep the search page open during preparation; a direct link remains available if your browser blocks the download tab. Private sources need your announce URL for uncached downloads. Download preparation and sanitized provider calls appear in **Debrid → History**. Download links stay in memory and are not retained in history.
 
-Versions are largest first. The optional language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. The same controls in **Stremio → Settings** travel with the installation link: copy or reinstall the updated link after changing them. Existing installed links continue working without a language filter.
+Versions are largest first. The optional language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. Stremio installations offer the same filters.
 
-**Connection filters** also let each Stremio link select sources, debrid services, media types and cached-only results. Copy separate links for different configurations. These choices stay in the URL and do not change your instance settings or previously installed links. They are filters, not separate access credentials: replacing the installation token revokes every link derived from it.
+**Private Stremio access:** create as many named installations as you need in **Stremio → Settings**. Each has its own source permissions, optional **Filters**, expiration and request limits. Settings are saved on the instance and apply to the same manifest URL without reinstalling. Enable, disable, replace or revoke each access independently. The full manifest URL is shown only when creating or replacing its key; save it securely. The database retains only its key’s fingerprint.
+
+Existing links remain available under **Legacy installation**. Their filters still travel in the URL, and replacing the legacy token revokes only those older links. Public Stremio and Torznab configurations remain in their connection URLs, with no saved visitor access or profile. Their optional controls are grouped under **Filters**, followed by **Advanced** for personal announce URLs when the administrator permits them.
 
 ### Torznab
 
@@ -124,7 +126,7 @@ Requests search your published local data without contacting your sources or TMD
 
 **Sources → Torrent search** searches the individual imported records, including title fragments, source IDs and complete or partial info hashes. **Metadata → Identification** accepts the same search syntax when reviewing matches. Each list shows its filtered result count above the rows.
 
-Treat the manifest URL like a password: it grants access to your catalog and configured playback services. Replace its token in Stremio settings to revoke an old link. Use your service accounts according to their terms; a catalog or playback link does not grant rights to its content.
+Treat the manifest URL like a password: it grants access to your catalog and permitted playback services. Disable, replace or revoke its named access in Stremio settings to stop an old link. Use your service accounts according to their terms; a catalog or playback link does not grant rights to its content.
 
 Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links.
 

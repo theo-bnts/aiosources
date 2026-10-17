@@ -148,6 +148,8 @@ func respondError(w http.ResponseWriter, err error) {
 		return
 	}
 	switch {
+	case errors.Is(err, aiosource.ErrAuth):
+		writeError(w, http.StatusUnauthorized, "Invalid installation token")
 	case errors.Is(err, model.ErrNotFound):
 		writeError(w, http.StatusNotFound, "Item not found")
 	case errors.Is(err, model.ErrBusy):

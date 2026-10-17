@@ -8,7 +8,11 @@ import { CopyButton } from '@/components/copy-button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Empty, ErrorNotice } from '@/components/common'
 import { TorznabFilters, type TorznabOptions } from '@/components/torznab-filters'
-import { PublicAnnounceFields, type PublicInfo } from '@/components/public-connection-fields'
+import {
+  PublicAnnounceFields,
+  clearPublicCredentials,
+  type PublicInfo,
+} from '@/components/public-connection-fields'
 
 export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   const [options, setOptions] = useState<TorznabOptions>({})
@@ -57,7 +61,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     } finally {
       for (const key of Object.keys(announces)) delete announces[key]
       for (const key of [...values.keys()]) values.delete(key)
-      form.reset()
+      clearPublicCredentials(form)
       if (request.current === controller) request.current = null
       if (!controller.signal.aborted) setPending(false)
     }
@@ -87,12 +91,14 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
           }}
         >
           <fieldset disabled={pending} className="space-y-5">
-            <TorznabFilters
-              value={options}
-              onChange={setOptions}
-              sources={info.sources ?? []}
-              id="public-torznab"
-            />
+            <Disclosure title="Filters">
+              <TorznabFilters
+                value={options}
+                onChange={setOptions}
+                sources={info.sources ?? []}
+                id="public-torznab"
+              />
+            </Disclosure>
             <PublicAnnounceFields sources={info.private_sources ?? []} pending={pending} torznab />
           </fieldset>
           <p className="help">
