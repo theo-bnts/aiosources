@@ -21,51 +21,61 @@ type publicAdmission struct {
 	slots   chan struct{}
 }
 
-func (a *publicAdmission) acquire(w http.ResponseWriter) bool {
+func (a *publicAdmission) tryAcquire() bool {
 	select {
 	case a.slots <- struct{}{}:
 		return true
 	default:
-		w.Header().Set("Retry-After", "1")
-		writeError(w, http.StatusTooManyRequests, "Too many public requests. Try again shortly.")
 		return false
 	}
 }
-
-func (a *publicAdmission) admit(w http.ResponseWriter, r *http.Request, setup bool) bool {
+func (a *publicAdmission) acquire(w http.ResponseWriter) bool {
+	if a.tryAcquire() {
+		return true
+	}
+	w.Header().Set("Retry-After", "1")
+	writeError(w, 429, "Too many public requests. Try again shortly.")
+	return false
+}
+func (a *publicAdmission) tryAdmit(r *http.Request, setup bool) bool {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	if host == "" {
 		host = "unknown"
 	}
 	a.mu.Lock()
+	defer a.mu.Unlock()
 	now := time.Now()
-	for k, v := range a.windows {
-		if !now.Before(v.until) {
-			delete(a.windows, k)
+	for key, value := range a.windows {
+		if !now.Before(value.until) {
+			delete(a.windows, key)
 		}
 	}
 	key := host
 	if setup {
 		key += "/setup"
 	}
-	v := a.windows[key]
+	value := a.windows[key]
 	limit := 60
 	if setup {
 		limit = 6
 	}
-	if len(a.windows) >= 1024 && v.until.IsZero() || v.attempts >= limit {
-		a.mu.Unlock()
-		w.Header().Set("Retry-After", "60")
-		writeError(w, 429, "Too many public requests. Try again shortly.")
+	if len(a.windows) >= 1024 && value.until.IsZero() || value.attempts >= limit {
 		return false
 	}
-	if v.until.IsZero() {
-		v.until = now.Add(time.Minute)
+	if value.until.IsZero() {
+		value.until = now.Add(time.Minute)
 	}
-	v.attempts++
-	a.windows[key] = v
-	a.mu.Unlock()
+	value.attempts++
+	a.windows[key] = value
 	return true
+}
+func (a *publicAdmission) admit(w http.ResponseWriter, r *http.Request, setup bool) bool {
+	if a.tryAdmit(r, setup) {
+		return true
+	}
+	w.Header().Set("Retry-After", "60")
+	writeError(w, 429, "Too many public requests. Try again shortly.")
+	return false
 }
 func (s *server) publicOriginAllowed() bool {
 	u, err := url.Parse(s.auth.origin)
@@ -79,7 +89,8 @@ func (s *server) publicOriginAllowed() bool {
 	return u.Scheme == "http" && ip != nil && ip.IsLoopback()
 }
 func (s *server) registerPublicInstance(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/stremio/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
+	s.registerPublicTorznab(mux)
+	mux.HandleFunc("GET /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		value, err := s.options.Store.PublicAccess(r.Context())
 		if err != nil {
 			respondError(w, err)
@@ -87,7 +98,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, value)
 	}))
-	mux.HandleFunc("PUT /api/stremio/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		var value model.PublicAccess
 		if !decodeJSON(w, r, &value) {
 			return
@@ -118,8 +129,14 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders}
-		if enabled && value.AllowPrivateDownloads {
+		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "torznab_enabled": enabled && value.TorznabEnabled}
+		if enabled && value.ExposeSources {
+			allSources, e := s.options.AIOSource.PublicSources(ctx)
+			if e != nil {
+				respondError(w, e)
+				return
+			}
+			info["sources"] = allSources
 			sources, err := s.options.AIOSource.PublicPrivateSources(ctx)
 			if err != nil {
 				respondError(w, err)
@@ -152,6 +169,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			Services    map[string]string       `json:"services"`
 			Announces   map[string]string       `json:"announces"`
 		}
+		defer func() { clear(input.Services); clear(input.Announces) }()
 		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
 		if !decodeJSON(w, r, &input) {
 			return
@@ -167,8 +185,6 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		if err == nil {
 			configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
 		}
-		clear(input.Services)
-		clear(input.Announces)
 		if err == nil && len(configuration) > aiosource.MaxPublicInstallationSize {
 			writeError(w, 400, "The installation link is too large. Shorten optional announce URLs.")
 			return

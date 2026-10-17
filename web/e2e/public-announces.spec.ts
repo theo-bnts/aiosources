@@ -34,9 +34,9 @@ test('visitor announce fields are opt-in, use source names and never retain cred
       })
     ).status(),
   ).toBe(204)
-  await page.goto('/addon/settings')
+  await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public access', exact: true })
-  await access.getByLabel('Allow visitors to use their own debrid accounts').check()
+  await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })
@@ -68,10 +68,10 @@ test('visitor announce fields are opt-in, use source names and never retain cred
     ).toBeVisible()
     await expect(visitor.locator('summary', { hasText: 'Advanced' })).toHaveCount(0)
     await access.locator('summary', { hasText: 'Advanced' }).click()
-    const permission = access.getByLabel('Allow visitor announce URLs', { exact: true })
+    const permission = access.getByLabel('Expose source names and filters', { exact: true })
     await expect(permission).not.toBeChecked()
     await permission.check()
-    await expect(access).toContainText('Publishes the names of your private sources')
+    await expect(access).toContainText('Applies to Stremio and Torznab')
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await expect(visitor.locator('summary', { hasText: 'Advanced' })).toBeVisible()
@@ -98,7 +98,7 @@ test('visitor announce fields are opt-in, use source names and never retain cred
     expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
-    await expect(visitor.getByRole('navigation')).toHaveCount(0)
+    await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await visitor.screenshot({ path: testInfo.outputPath('public-mobile.png'), fullPage: true })
     await permission.uncheck()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
@@ -115,15 +115,15 @@ test('reviewing concurrent public settings preserves only fields edited locally'
 }) => {
   const session = await (await page.request.get('/api/session')).json()
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
-  await page.goto('/addon/settings')
+  await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public access', exact: true })
-  await access.getByLabel('Allow visitors to use their own debrid accounts').check()
-  const saved = await (await page.request.get('/api/stremio/public-access')).json()
+  await access.getByLabel('Enable public access', { exact: true }).check()
+  const saved = await (await page.request.get('/api/public-access')).json()
   expect(
     (
-      await page.request.put('/api/stremio/public-access', {
+      await page.request.put('/api/public-access', {
         headers,
-        data: { ...saved, allow_private_downloads: true },
+        data: { ...saved, expose_sources: true },
       })
     ).status(),
   ).toBe(204)
@@ -132,11 +132,11 @@ test('reviewing concurrent public settings preserves only fields edited locally'
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await access.getByRole('button', { name: 'Load latest settings', exact: true }).click()
   await access.locator('summary', { hasText: 'Advanced' }).click()
-  await expect(access.getByLabel('Allow visitor announce URLs', { exact: true })).toBeChecked()
-  await expect(access.getByLabel('Allow visitors to use their own debrid accounts')).toBeChecked()
+  await expect(access.getByLabel('Expose source names and filters', { exact: true })).toBeChecked()
+  await expect(access.getByLabel('Enable public access', { exact: true })).toBeChecked()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  const after = await (await page.request.get('/api/stremio/public-access')).json()
+  const after = await (await page.request.get('/api/public-access')).json()
   expect(after.enabled).toBe(true)
-  expect(after.allow_private_downloads).toBe(true)
+  expect(after.expose_sources).toBe(true)
 })

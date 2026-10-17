@@ -4,6 +4,8 @@ package model
 type TorznabQuery struct {
 	SearchFilters
 	Mode             string
+	Services         []string
+	CachedOnly       bool
 	Categories       []int
 	MediaTypes       []string
 	IMDb, TMDB, TVDB string

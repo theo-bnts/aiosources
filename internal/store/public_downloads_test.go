@@ -25,10 +25,10 @@ func TestVisitorAnnounceUpgradeIsOptInAndAccessChangesAreAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, err := db.PublicAccess(ctx)
-	if err != nil || before.AllowPrivateDownloads || !before.Enabled || before.Revision != 7 || before.Generation != 9 {
+	if err != nil || before.ExposeSources || !before.Enabled || before.Revision != 7 || before.Generation != 9 {
 		t.Fatal("upgrade exposed sources or changed existing installation access", before, err)
 	}
-	before.AllowPrivateDownloads = true
+	before.ExposeSources = true
 	if err := db.SetPublicAccess(ctx, before); err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestVisitorAnnounceUpgradeIsOptInAndAccessChangesAreAtomic(t *testing.T) {
 		t.Fatal("stale permission update accepted")
 	}
 	current, _ := db.PublicAccess(ctx)
-	if !current.AllowPrivateDownloads || current.Generation != 9 || current.Revision != 8 {
+	if !current.ExposeSources || current.Generation != 9 || current.Revision != 8 {
 		t.Fatal("optional permission revoked ordinary cached installations")
 	}
 	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_download_permission_log() RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -45,7 +45,7 @@ CREATE TRIGGER reject_download_permission_log BEFORE INSERT ON ingest.activity_l
 		t.Fatal(err)
 	}
 	disabled := current
-	disabled.AllowPrivateDownloads = false
+	disabled.ExposeSources = false
 	if err := db.SetPublicAccess(ctx, disabled); err == nil {
 		t.Fatal("access permission committed without its log")
 	}

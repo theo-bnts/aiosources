@@ -191,9 +191,23 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	// Resolve names once for the whole response, including remote catalogs.
 	// Presentation must not prevent playback if a definition becomes unreadable.
 	names = s.sourceNames()
+	exposeNames := true
+	if visitor != nil {
+		access, e := s.DB.PublicAccess(ctx)
+		if e != nil {
+			return nil, e
+		}
+		exposeNames = access.ExposeSources
+	}
 	out := []Stream{}
 	for _, rec := range eligible {
-		stream := baseStream(rec, r, names[rec.Provider])
+		displayRecord := rec
+		sourceName := names[rec.Provider]
+		if !exposeNames {
+			displayRecord.Provider = ""
+			sourceName = ""
+		}
+		stream := baseStream(displayRecord, r, sourceName)
 		if visitor == nil && len(availability) == 0 {
 			if !AllowsInstallation(preferences, "", "direct", mediaType) || preferences.CachedOnly {
 				continue

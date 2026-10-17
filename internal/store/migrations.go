@@ -216,6 +216,7 @@ var migrations = []struct {
 	{53, catalogSearchSchema},
 	{54, localizedTitlesSchema},
 	{55, torznabSchema},
+	{56, publicConnectionsSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

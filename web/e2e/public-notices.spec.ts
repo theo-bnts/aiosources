@@ -122,9 +122,9 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await expect(password).toHaveValue('synthetic-form-draft')
     }
 
-    await page.goto('/addon/settings')
+    await page.goto('/public-access')
     const access = page.getByRole('form', { name: 'Public access', exact: true })
-    await access.getByRole('switch').check()
+    await access.getByLabel('Enable public access', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
@@ -141,16 +141,20 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await key.fill('synthetic-form-draft')
       await checkAtSamePosition(visitor, anchor)
       await expect(key).toHaveValue('synthetic-form-draft')
-      await expect(visitor.getByRole('navigation')).toHaveCount(0)
+      await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
       expect((await context.request.get('/api/providers')).status()).toBe(401)
 
+      if (width < 1024)
+        await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
       await visitor.getByRole('link', { name: 'Admin login', exact: true }).click()
       await expect(visitor.getByLabel('Administrator password', { exact: true })).toBeVisible()
       await checkAtSamePosition(visitor, anchor)
 
       await page.goto('/public')
-      await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible()
       await checkAtSamePosition(page, anchor)
+      if (width < 1024)
+        await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
+      await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible()
       await page.getByRole('link', { name: 'Administration', exact: true }).click()
       await expect(
         page.getByRole('heading', { name: 'Sources', exact: true, level: 1 }),

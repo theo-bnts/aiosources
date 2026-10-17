@@ -220,22 +220,19 @@ test('public access reviews a competing revision while preserving the local choi
 }) => {
   const session = await (await page.request.get('/api/session')).json()
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
-  await page.goto('/addon/settings')
+  await page.goto('/public-access')
   const form = page.getByRole('form', { name: 'Public access', exact: true })
-  const choice = form.getByRole('switch')
+  const choice = form.getByLabel('Enable public access', { exact: true })
   await choice.check()
-  const initial = await (await page.request.get('/api/stremio/public-access')).json()
+  const initial = await (await page.request.get('/api/public-access')).json()
   const refresh = page.waitForResponse(async (response) => {
-    if (
-      !response.url().endsWith('/api/stremio/public-access') ||
-      response.request().method() !== 'GET'
-    )
+    if (!response.url().endsWith('/api/public-access') || response.request().method() !== 'GET')
       return false
     return (await response.json()).revision > initial.revision
   })
   expect(
     (
-      await page.request.put('/api/stremio/public-access', {
+      await page.request.put('/api/public-access', {
         headers,
         data: { revision: initial.revision, enabled: false },
       })
@@ -251,7 +248,7 @@ test('public access reviews a competing revision while preserving the local choi
   await expect(choice).toBeChecked()
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  expect((await (await page.request.get('/api/stremio/public-access')).json()).enabled).toBe(true)
+  expect((await (await page.request.get('/api/public-access')).json()).enabled).toBe(true)
 })
 
 test.describe('browser local dates', () => {

@@ -259,7 +259,7 @@ func validAccessActivity(action, targetID string) bool {
 		return false
 	}
 	switch action {
-	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
+	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
 		return true
 	default:
 		return false

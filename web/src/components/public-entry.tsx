@@ -5,10 +5,9 @@ import {
   preferenceManifest,
   preferenceManifestError,
 } from '@/lib/language-preferences'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { DatabaseIcon } from '@phosphor-icons/react'
+import { useLocation } from 'react-router-dom'
 import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,16 +15,17 @@ import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
-import { Disclosure } from '@/components/ui/disclosure'
+import { PublicAnnounceFields, type PublicInfo } from '@/components/public-connection-fields'
+import { PublicTorznabEntry } from '@/components/public-torznab-entry'
 import { InstallationFilters } from '@/components/installation-filters'
 import type { InstallationOptions } from '@/lib/language-preferences'
 
-type PublicInfo = {
-  enabled: boolean
-  providers: { id: string; name: string }[]
-  private_sources?: { id: string; name: string }[]
-}
-export function PublicEntry({ authenticated = false }: { authenticated?: boolean }) {
+export function PublicEntry({
+  layout = (content) => content,
+}: {
+  layout?: (content: ReactNode) => ReactNode
+}) {
+  const location = useLocation()
   const [preferences, setPreferences] = useLanguagePreferences()
   const [installationOptions, setInstallationOptions] = useState<InstallationOptions>({})
   const info = useQuery({
@@ -40,6 +40,26 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
   const [error, setError] = useState<unknown>(null)
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => {
+    request.current?.abort()
+    request.current = null
+    setPending(false)
+    setManifest('')
+    setError(null)
+  }, [location.pathname])
+  useEffect(() => {
+    if (!info.data) return
+    const allowed = new Set(
+      (info.data.sources ?? info.data.private_sources ?? []).map((source) => source.id),
+    )
+    const selected = installationOptions.sources ?? []
+    const sources = selected.filter((id) => allowed.has(id))
+    if (selected.length !== sources.length) {
+      const next = { ...installationOptions, sources }
+      setInstallationOptions(next)
+      setManifest((current) => (current ? preferenceManifest(current, preferences, next) : ''))
+    }
+  }, [info.data, installationOptions, preferences])
   useEffect(() => {
     if (info.data && !info.data.enabled) {
       setManifest('')
@@ -110,21 +130,12 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
       </main>
     )
   if (!info.data?.enabled) return <Login />
-  return (
-    <main className="grid min-h-dvh place-items-center px-6 py-16">
-      <section className="w-full max-w-md space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <DatabaseIcon size={24} className="text-primary" />
-            <p className="font-semibold">AIOSources</p>
-          </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={authenticated ? '/providers' : '/login'}>
-              {authenticated ? 'Administration' : 'Admin login'}
-            </Link>
-          </Button>
-        </div>
-        <h1 className="page-title">Connect your debrid services</h1>
+  if (location.pathname === '/public/torznab')
+    return layout(<PublicTorznabEntry info={info.data} />)
+  return layout(
+    <div className="page max-w-4xl">
+      <section className="section-card">
+        <h2 className="section-title">Connect your debrid services</h2>
         <form
           className="space-y-5"
           onSubmit={(event) => {
@@ -151,31 +162,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
             Enter at least one key. The host processes your keys without saving them. Request
             history retains media, results and errors for up to 7 days without identifying you.
           </p>
-          {Boolean(info.data.private_sources?.length) && (
-            <Disclosure title="Advanced">
-              <p className="help">
-                Optional: supply your own complete announce URL to allow uncached playback from a
-                private source. These URLs stay in your encrypted installation link and are sent
-                only to your debrid account when needed.
-              </p>
-              {info.data.private_sources!.map((source) => (
-                <div className="field" key={source.id}>
-                  <Label htmlFor={`public-announce-${source.id}`}>{source.name} announce URL</Label>
-                  <Input
-                    id={`public-announce-${source.id}`}
-                    name={`announce:${source.id}`}
-                    type="password"
-                    autoComplete="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    placeholder="Complete announce URL"
-                    maxLength={8192}
-                    disabled={pending}
-                  />
-                </div>
-              ))}
-            </Disclosure>
-          )}
+          <PublicAnnounceFields sources={info.data.private_sources ?? []} pending={pending} />
           <LanguageFilter
             value={preferences}
             onChange={(next) => {
@@ -193,7 +180,7 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
                 current ? preferenceManifest(current, preferences, next) : '',
               )
             }}
-            sources={info.data.private_sources ?? []}
+            sources={info.data.sources ?? info.data.private_sources ?? []}
             services={info.data.providers ?? []}
           />
           <ErrorNotice error={error || info.error} />
@@ -206,24 +193,24 @@ export function PublicEntry({ authenticated = false }: { authenticated?: boolean
             {pending ? 'Checking services…' : 'Create installation link'}
           </Button>
         </form>
-        {manifest && !manifestError && (
-          <section className="section-card">
-            <div className="field">
-              <Label htmlFor="public-manifest">Manifest URL</Label>
-              <Input id="public-manifest" value={manifest} readOnly />
-            </div>
-            <p className="help">
-              This encrypted link gives access to your service configuration. Keep it private.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
-              <Button variant="outline" asChild>
-                <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
-              </Button>
-            </div>
-          </section>
-        )}
       </section>
-    </main>
+      {manifest && !manifestError && (
+        <section className="section-card">
+          <div className="field">
+            <Label htmlFor="public-manifest">Manifest URL</Label>
+            <Input id="public-manifest" value={manifest} readOnly />
+          </div>
+          <p className="help">
+            This encrypted link gives access to your service configuration. Keep it private.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
+            <Button variant="outline" asChild>
+              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
+            </Button>
+          </div>
+        </section>
+      )}
+    </div>,
   )
 }

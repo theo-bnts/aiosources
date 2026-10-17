@@ -66,6 +66,7 @@ const RawDetailPage = lazy(() =>
 const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default: m.RawPageView })))
 const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
 const SharingPage = lazy(() => import('@/pages/catalog-sharing'))
+const PublicAccessPage = lazy(() => import('@/pages/public-access'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
 const SecurityPage = lazy(() =>
@@ -147,11 +148,11 @@ const router = createBrowserRouter(
           <div className="fixed top-2.5 right-5 z-30 md:right-9 lg:top-3.5">
             <AboutDialog />
           </div>
-          <SessionGate>
-            <UnsavedChangesProvider>
+          <UnsavedChangesProvider>
+            <SessionGate>
               <Outlet />
-            </UnsavedChangesProvider>
-          </SessionGate>
+            </SessionGate>
+          </UnsavedChangesProvider>
         </>
       }
       errorElement={
@@ -283,6 +284,7 @@ const router = createBrowserRouter(
         <Route path="remotes" element={<LegacyRemotes />} />
         <Route path="sharing" element={<SharingPage />} />
         <Route path="torznab" element={<TorznabPage />} />
+        <Route path="public-access" element={<PublicAccessPage />} />
         <Route path="sharing/remotes" element={<SharingPage />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="notifications" element={<LegacyActivity />} />

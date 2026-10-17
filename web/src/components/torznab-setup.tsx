@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CatalogShare } from '@/lib/catalog-types'
-import { SourceMultiSelect } from '@/components/source-multi-select'
+import { TorznabFilters, type TorznabOptions } from '@/components/torznab-filters'
 import { CopyButton } from '@/components/copy-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,8 +13,9 @@ export function TorznabSetup({
   share: CatalogShare
   sources: { id: string; name: string }[]
 }) {
-  const [selected, setSelected] = useState<string[]>([])
-  const [category, setCategory] = useState('')
+  const [value, setValue] = useState<TorznabOptions>({})
+  const selected = value.sources ?? []
+  const category = value.media?.[0] ?? ''
   const url = share.url ? new URL(share.url) : null
   const permitted = sources.filter(
     (source) => share.scope === 'all' || share.source_ids.includes(source.id),
@@ -22,6 +23,8 @@ export function TorznabSetup({
   const filters = new URLSearchParams()
   if (selected.length) filters.set('sources', selected.join(','))
   if (category) filters.set('media', category)
+  if (value.services?.length) filters.set('services', value.services.join(','))
+  if (value.cached_only) filters.set('cached_only', 'true')
   const additional = filters.size ? '&' + filters.toString() : ''
   // Leave room for the client's ordinary query parameters and API key.
   const tooLong = selected.length > 100 || additional.length > 6000
@@ -43,40 +46,14 @@ export function TorznabSetup({
             <Input id={`torznab-path-${share.id}`} readOnly value={url?.pathname ?? ''} />
             <CopyButton value={url?.pathname ?? ''} label="Copy API path" />
           </div>
-          <div className="field">
-            <Label htmlFor={`torznab-sources-${share.id}`}>Sources</Label>
-            <SourceMultiSelect
-              id={`torznab-sources-${share.id}`}
-              value={selected}
-              options={permitted.map((source) => ({ value: source.id, label: source.name }))}
-              onChange={setSelected}
-            />
-          </div>
-          <div className="field">
-            <Label htmlFor={`torznab-category-${share.id}`}>Media type</Label>
-            <select
-              id={`torznab-category-${share.id}`}
-              className="native-select w-full"
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-            >
-              <option value="">All allowed media</option>
-              {[
-                { type: 'movie', id: 'movie', name: 'Movies' },
-                { type: 'tv', id: 'tv', name: 'TV' },
-                { type: 'other', id: 'other', name: 'Other' },
-              ]
-                .filter(
-                  (type) => !share.media_types?.length || share.media_types.includes(type.type),
-                )
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-            </select>
-          </div>
         </div>
+        <TorznabFilters
+          value={value}
+          onChange={setValue}
+          sources={permitted}
+          mediaTypes={share.media_types}
+          id={`torznab-${share.id}`}
+        />
         <div className="field">
           <Label htmlFor={`torznab-parameters-${share.id}`}>Additional parameters (optional)</Label>
           <Input

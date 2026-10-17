@@ -65,7 +65,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	var payload struct {
 		Streams []aiosource.Stream `json:"streams"`
 	}
-	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &payload) != nil || len(payload.Streams) != 1 || payload.Streams[0].InfoHash != "" || len(payload.Streams[0].Sources) != 0 {
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &payload) != nil || len(payload.Streams) != 1 || payload.Streams[0].InfoHash != "" || len(payload.Streams[0].Sources) != 0 || payload.Streams[0].Hints.Indexer != "" {
 		t.Fatal("cached public stream unavailable or exposes torrent credentials", response.Code)
 	}
 	play := f.request("GET", strings.TrimPrefix(payload.Streams[0].URL, "https://addon.example"), "", false, "")
@@ -105,10 +105,10 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"success":true,"data":{"id":1}}`) }))
 	defer upstream.Close()
 	addon.Providers.TBBase = upstream.URL
-	if response := f.request("GET", "/api/stremio/public-access", "", false, ""); response.Code != 401 {
+	if response := f.request("GET", "/api/public-access", "", false, ""); response.Code != 401 {
 		t.Fatal("public settings are not protected")
 	}
-	if response := f.request("PUT", "/api/stremio/public-access", `{"revision":1,"enabled":true}`, true, ""); response.Code != 204 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true}`, true, ""); response.Code != 204 {
 		t.Fatal("cannot enable public access", response.Code)
 	}
 	install := func(body string, origin string) *httptest.ResponseRecorder {
@@ -155,7 +155,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 		t.Fatal("public stream route failed", streams.Code)
 	}
 	configuration := strings.Split(path, "/")[3]
-	for _, route := range []string{"/api/providers", "/api/secrets", "/api/stremio/requests", "/api/logs", "/api/stremio/public-access", "/stremio/" + configuration + "/manifest.json"} {
+	for _, route := range []string{"/api/providers", "/api/secrets", "/api/stremio/requests", "/api/logs", "/api/public-access", "/stremio/" + configuration + "/manifest.json"} {
 		if value := f.request("GET", route, "", false, configuration); value.Code != 401 {
 			t.Fatal("public URL grants wider permissions", route)
 		}
@@ -185,13 +185,13 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 		}
 		rows.Close()
 	}
-	if value := f.request("PUT", "/api/stremio/public-access", `{"revision":2,"enabled":false}`, true, ""); value.Code != 204 {
+	if value := f.request("PUT", "/api/public-access", `{"revision":2,"enabled":false}`, true, ""); value.Code != 204 {
 		t.Fatal("cannot disable public access")
 	}
 	if value := f.request("GET", path, "", false, ""); value.Code != 401 {
 		t.Fatal("disabled public manifest still accessible")
 	}
-	if value := f.request("PUT", "/api/stremio/public-access", `{"revision":3,"enabled":true}`, true, ""); value.Code != 204 {
+	if value := f.request("PUT", "/api/public-access", `{"revision":3,"enabled":true}`, true, ""); value.Code != 204 {
 		t.Fatal("cannot reenable public access")
 	}
 	if value := f.request("GET", path, "", false, ""); value.Code != 401 {
@@ -235,7 +235,7 @@ func TestEnabledPublicInstallationCannotReadOrChangeAdministration(t *testing.T)
 		{"GET", "/api/providers"}, {"GET", "/api/secrets"}, {"GET", "/api/raw/1/download"},
 		{"GET", "/api/operations"}, {"GET", "/api/stremio/requests"}, {"GET", "/api/logs"},
 		{"GET", "/api/security/sessions"}, {"GET", "/api/aiosource"}, {"GET", "/api/remotes"},
-		{"PUT", "/api/stremio/public-access"}, {"PUT", "/api/aiosource/config"},
+		{"PUT", "/api/public-access"}, {"PUT", "/api/aiosource/config"},
 		{"POST", "/api/aiosource/token"}, {"POST", "/api/runs"}, {"PUT", "/api/providers/example"},
 		{"DELETE", "/api/secrets/example"}, {"POST", "/api/security/mfa/enroll"},
 		{"GET", "/stremio/" + configuration + "/manifest.json"},

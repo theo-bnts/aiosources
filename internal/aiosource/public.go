@@ -70,12 +70,34 @@ func (s *Service) publicPrivateSources(c model.AIOConfig) ([]PublicPrivateSource
 	return out, nil
 }
 
+// PublicSources discloses names only under the shared explicit admin policy.
+func (s *Service) PublicSources(ctx context.Context) ([]PublicPrivateSource, error) {
+	access, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !access.Enabled || !access.ExposeSources || s.sources == nil {
+		return nil, nil
+	}
+	list, err := s.sources.List()
+	if err != nil {
+		return nil, nil
+	}
+	out := []PublicPrivateSource{}
+	for _, source := range list {
+		if source.Valid {
+			out = append(out, PublicPrivateSource{ID: source.ID, Name: source.Name})
+		}
+	}
+	return out, nil
+}
+
 func (s *Service) PublicPrivateSources(ctx context.Context) ([]PublicPrivateSource, error) {
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !access.Enabled || !access.AllowPrivateDownloads {
+	if !access.Enabled || !access.ExposeSources {
 		return nil, nil
 	}
 	c, err := s.DB.AIOConfig(ctx)
@@ -105,7 +127,7 @@ func (s *Service) validatePublicAnnounces(ctx context.Context, access model.Publ
 	if len(announces) == 0 {
 		return nil
 	}
-	if !access.AllowPrivateDownloads || !validPublicAnnounces(announces) {
+	if !access.ExposeSources || !validPublicAnnounces(announces) {
 		return model.ErrInvalid
 	}
 	c, err := s.DB.AIOConfig(ctx)
@@ -141,7 +163,7 @@ func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visit
 	if !access.Enabled || access.Generation != visitor.Generation || !validPublicAnnounces(visitor.Announces) {
 		return nil, ErrAuth
 	}
-	if !access.AllowPrivateDownloads {
+	if !access.ExposeSources {
 		return nil, nil
 	}
 	sources, err := s.publicPrivateSources(c)
@@ -254,6 +276,9 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 	var out PublicInstallation
 	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
 		return nil, ErrAuth
+	}
+	if !access.ExposeSources {
+		preferences.Sources = nil
 	}
 	out.Preferences = preferences
 	return &out, nil

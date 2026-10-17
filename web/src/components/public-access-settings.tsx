@@ -9,12 +9,17 @@ import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
 import { Disclosure } from '@/components/ui/disclosure'
-type Access = { revision: number; enabled: boolean; allow_private_downloads: boolean }
+type Access = {
+  revision: number
+  enabled: boolean
+  expose_sources: boolean
+  torznab_enabled: boolean
+}
 type Draft = { base: Access; value: Access }
 export function PublicAccessSettings() {
   const query = useQuery({
     queryKey: ['public-access'],
-    queryFn: ({ signal }) => api<Access>('/stremio/public-access', { signal }),
+    queryFn: ({ signal }) => api<Access>('/public-access', { signal }),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const [draft, setDraft] = useState<Draft>()
@@ -22,9 +27,10 @@ export function PublicAccessSettings() {
   const dirty = Boolean(
     draft &&
     (draft.value.enabled !== query.data?.enabled ||
-      draft.value.allow_private_downloads !== query.data?.allow_private_downloads),
+      draft.value.torznab_enabled !== query.data?.torznab_enabled ||
+      draft.value.expose_sources !== query.data?.expose_sources),
   )
-  function change(value: Partial<Pick<Access, 'enabled' | 'allow_private_downloads'>>) {
+  function change(value: Partial<Pick<Access, 'enabled' | 'expose_sources' | 'torznab_enabled'>>) {
     setDraft((draft) => ({
       base: draft?.base || query.data!,
       value: { ...(draft?.value || query.data!), ...value },
@@ -34,7 +40,7 @@ export function PublicAccessSettings() {
   }
   const save = useMutation({
     mutationFn: (value: Access) =>
-      api('/stremio/public-access', { method: 'PUT', body: JSON.stringify(value) }),
+      api('/public-access', { method: 'PUT', body: JSON.stringify(value) }),
     onSuccess: async () => {
       setDraft(undefined)
       await queryClient.invalidateQueries({ queryKey: ['public-access'] })
@@ -42,7 +48,7 @@ export function PublicAccessSettings() {
     },
   })
   const review = useMutation({
-    mutationFn: () => api<Access>('/stremio/public-access'),
+    mutationFn: () => api<Access>('/public-access'),
     onSuccess: async (latest) => {
       await queryClient.cancelQueries({ queryKey: ['public-access'] })
       queryClient.setQueryData(['public-access'], latest)
@@ -54,10 +60,14 @@ export function PublicAccessSettings() {
                 ...latest,
                 enabled:
                   draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
-                allow_private_downloads:
-                  draft.value.allow_private_downloads !== draft.base.allow_private_downloads
-                    ? draft.value.allow_private_downloads
-                    : latest.allow_private_downloads,
+                torznab_enabled:
+                  draft.value.torznab_enabled !== draft.base.torznab_enabled
+                    ? draft.value.torznab_enabled
+                    : latest.torznab_enabled,
+                expose_sources:
+                  draft.value.expose_sources !== draft.base.expose_sources
+                    ? draft.value.expose_sources
+                    : latest.expose_sources,
               },
             }
           : undefined,
@@ -81,7 +91,7 @@ export function PublicAccessSettings() {
         if (dirty && current && !conflict && !busy) save.mutate(current)
       }}
     >
-      <h2 className="section-title">Public access</h2>
+      <h2 className="section-title">Visitor connections</h2>
       <ErrorNotice error={query.error || save.error || review.error} />
       {query.isPending ? (
         <Loading />
@@ -95,29 +105,41 @@ export function PublicAccessSettings() {
                 disabled={busy}
                 onCheckedChange={(enabled) => change({ enabled })}
               />
-              <Label htmlFor="public-access-enabled">
-                Allow visitors to use their own debrid accounts
-              </Label>
+              <Label htmlFor="public-access-enabled">Enable public access</Label>
             </div>
             <p className="help">
               Visitors receive an encrypted installation link. Keys are not saved, and
               administration stays protected. Turning this off revokes their links. AllDebrid uses
               your configured account to check missing cache availability.
             </p>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="public-torznab-enabled"
+                checked={current.torznab_enabled}
+                disabled={busy || !current.enabled}
+                onCheckedChange={(torznab_enabled) => change({ torznab_enabled })}
+              />
+              <Label htmlFor="public-torznab-enabled">Allow public Torznab connections</Label>
+            </div>
+            <p className="help">
+              Visitors can create encrypted Torznab configurations without an account. Disabling
+              this option revokes those links.
+            </p>
             <Disclosure title="Advanced">
               <div className="flex items-center gap-3">
                 <Switch
                   id="public-private-downloads"
-                  checked={current.allow_private_downloads}
+                  checked={current.expose_sources}
                   disabled={busy || !current.enabled}
-                  onCheckedChange={(allow_private_downloads) => change({ allow_private_downloads })}
+                  onCheckedChange={(expose_sources) => change({ expose_sources })}
                 />
-                <Label htmlFor="public-private-downloads">Allow visitor announce URLs</Label>
+                <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
               </div>
               <p className="help">
-                Publishes the names of your private sources on the public homepage. Visitors can
-                supply their own announce URLs for uncached playback. Your announce URLs stay
-                private. Turning this off restores cached-only access to private sources.
+                Applies to Stremio and Torznab. Visitors can select sources and supply their own
+                announce URLs for private sources. Your source definitions and announce URLs stay
+                private. When off, source names and source filters are hidden and private sources
+                require known cached availability.
               </p>
             </Disclosure>
             {conflict && (

@@ -171,6 +171,12 @@ const navigationGroups = [
         description: 'Connect external applications to your published catalog.',
         icon: BroadcastIcon,
       },
+      {
+        to: '/public-access',
+        label: 'Public access',
+        description: 'Visitor access, source visibility and public connections.',
+        icon: ShieldCheckIcon,
+      },
     ],
   },
   {
@@ -200,18 +206,42 @@ const navigationGroups = [
     ],
   },
 ]
+const publicNavigationGroups = [
+  {
+    id: 'integrations',
+    label: 'Connections',
+    icon: PlugsConnectedIcon,
+    defaultOpen: true,
+    items: [
+      {
+        to: '/public',
+        label: 'Stremio',
+        description: 'Connect Stremio or AIOStreams with your own debrid accounts.',
+        icon: PlayCircleIcon,
+      },
+      {
+        to: '/public/torznab',
+        label: 'Torznab',
+        description: 'Connect a Torznab client with your own optional announce URLs.',
+        icon: BroadcastIcon,
+      },
+    ],
+  },
+]
 const navigation = navigationGroups.flatMap((group) => group.items)
 const navigationStorageKey = 'ingest.navigation.groups'
 const navigationLinkClassName =
   'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary lg:min-h-9'
 
 function AppNavigation({
+  groups = navigationGroups,
   activeItem,
   activeGroupId,
   openGroups,
   onToggle,
   onNavigate,
 }: {
+  groups?: typeof navigationGroups
   activeItem: (typeof navigation)[number] | undefined
   activeGroupId: string | undefined
   openGroups: Record<string, boolean>
@@ -256,7 +286,7 @@ function AppNavigation({
       aria-label="Main navigation"
       className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]"
     >
-      {navigationGroups.map((group) =>
+      {groups.map((group) =>
         group.items.length === 1 ? (
           navigationLink(group.items[0])
         ) : (
@@ -329,10 +359,22 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       </div>
     )
-  if (location.pathname === '/public')
-    return <PublicEntry authenticated={session.data.authenticated} />
+  if (location.pathname === '/public' || location.pathname.startsWith('/public/'))
+    return (
+      <PublicEntry
+        layout={(content) => (
+          <AppShell publicMode authenticated={session.data.authenticated}>
+            {content}
+          </AppShell>
+        )}
+      />
+    )
   if (!session.data.authenticated)
-    return location.pathname === '/login' ? <Login /> : <PublicEntry />
+    return location.pathname === '/login' ? (
+      <Login />
+    ) : (
+      <PublicEntry layout={(content) => <AppShell publicMode>{content}</AppShell>} />
+    )
   if (location.pathname === '/login') return <Navigate to="/" replace />
   return (
     <>
@@ -342,9 +384,10 @@ export function SessionGate({ children }: { children: ReactNode }) {
   )
 }
 
-function useLiveUpdates() {
+function useLiveUpdates(enabled = true) {
   const [state, setState] = useState<'connecting' | 'live' | 'reconnecting'>('connecting')
   useEffect(() => {
+    if (!enabled) return
     const source = new EventSource('/api/events', { withCredentials: true })
     let timer: number | undefined
     let nextRefresh = 0
@@ -372,18 +415,32 @@ function useLiveUpdates() {
       source.close()
       clearTimeout(timer)
     }
-  }, [])
+  }, [enabled])
   return state
 }
 
-export function AppShell() {
+export function AppShell({
+  publicMode = false,
+  authenticated = false,
+  children,
+}: {
+  publicMode?: boolean
+  authenticated?: boolean
+  children?: ReactNode
+}) {
+  const groups = publicMode ? publicNavigationGroups : navigationGroups
+  const items = groups.flatMap((group) => group.items)
+  const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
-  const live = useLiveUpdates()
+  const live = useLiveUpdates(!publicMode)
   const location = useLocation()
-  const navigationPath =
-    ['/runs', '/raw', '/pages'].some(
-      (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
-    ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
+  const navigationPath = publicMode
+    ? location.pathname === '/public/torznab'
+      ? '/public/torznab'
+      : '/public'
+    : ['/runs', '/raw', '/pages'].some(
+          (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
+        ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
       ? '/providers'
       : ['/notifications', '/webhooks'].includes(location.pathname)
         ? '/logs'
@@ -392,24 +449,22 @@ export function AppShell() {
           : location.pathname === '/secrets'
             ? '/security'
             : location.pathname
-  const activeItem = [...navigation]
+  const activeItem = [...items]
     .sort((a, b) => b.to.length - a.to.length)
     .find(
       (item) =>
         navigationPath === item.to || (item.to !== '/' && navigationPath.startsWith(`${item.to}/`)),
     )
-  const activeGroup = navigationGroups.find((group) =>
-    group.items.some((item) => item === activeItem),
-  )
+  const activeGroup = groups.find((group) => group.items.some((item) => item === activeItem))
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     let stored: unknown
     try {
-      stored = JSON.parse(localStorage.getItem(navigationStorageKey) ?? 'null')
+      stored = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
     } catch {
       // Browser preferences must not prevent access to the console.
     }
     return Object.fromEntries(
-      navigationGroups.map((group) => {
+      groups.map((group) => {
         const preference =
           stored !== null && typeof stored === 'object'
             ? (stored as Record<string, unknown>)[group.id]
@@ -444,11 +499,11 @@ export function AppShell() {
   }, [location.pathname, location.state, activeGroup])
   useEffect(() => {
     try {
-      localStorage.setItem(navigationStorageKey, JSON.stringify(openGroups))
+      localStorage.setItem(storageKey, JSON.stringify(openGroups))
     } catch {
       // Keep the current session usable when browser storage is unavailable.
     }
-  }, [openGroups])
+  }, [openGroups, storageKey])
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 64rem)')
     const closeOnDesktop = (event: MediaQueryListEvent) => {
@@ -468,6 +523,7 @@ export function AppShell() {
     },
   })
   const navigationProps = {
+    groups,
     activeItem,
     activeGroupId: activeGroup?.id,
     openGroups,
@@ -480,7 +536,15 @@ export function AppShell() {
       <span className="text-2xl leading-none font-semibold tracking-tight">AIOSources</span>
     </>
   )
-  const footer = (
+  const footer = publicMode ? (
+    <div className="shrink-0 border-t border-border p-3">
+      <Button variant="outline" className="min-h-11 w-full lg:min-h-9" asChild>
+        <Link to={authenticated ? '/providers' : '/login'}>
+          {authenticated ? 'Administration' : 'Admin login'}
+        </Link>
+      </Button>
+    </div>
+  ) : (
     <div className="shrink-0 space-y-3 border-t border-border p-3">
       <ErrorNotice error={logout.error} scope="action" />
       <Button
@@ -566,11 +630,13 @@ export function AppShell() {
                 <span
                   className={`size-1.5 rounded-full ${live === 'live' ? 'bg-primary' : 'bg-muted-foreground'}`}
                 />
-                {live === 'live'
-                  ? 'Live updates'
-                  : live === 'connecting'
-                    ? 'Connecting to updates'
-                    : 'Reconnecting · refreshing every 30 s'}
+                {publicMode
+                  ? 'Public access'
+                  : live === 'live'
+                    ? 'Live updates'
+                    : live === 'connecting'
+                      ? 'Connecting to updates'
+                      : 'Reconnecting · refreshing every 30 s'}
               </span>
             </div>
           </header>
@@ -590,7 +656,7 @@ export function AppShell() {
                   }
                 >
                   <UnsavedChangesScope.Provider value={null}>
-                    <Outlet />
+                    {children ?? <Outlet />}
                   </UnsavedChangesScope.Provider>
                 </Suspense>
               </PageHeaderVisibility.Provider>

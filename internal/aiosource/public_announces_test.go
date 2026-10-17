@@ -61,7 +61,7 @@ func TestInvalidSourceDefinitionCannotAuthorizeVisitorDownloads(t *testing.T) {
 	hash := strings.Repeat("f", 40)
 	seedMovie(t, ctx, s, conn, "private-one", "one", hash)
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.AllowPrivateDownloads = true, true
+	access.Enabled, access.ExposeSources = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestVisitorAnnouncesAreOptInScopedEncryptedAndNeverStored(t *testing.T) {
 		t.Fatal("disabled optional policy contacted a provider or accepted an announce", err)
 	}
 	access, _ = s.DB.PublicAccess(ctx)
-	access.AllowPrivateDownloads = true
+	access.ExposeSources = true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 			defer upstream.Close()
 			s.Providers.ADBase, s.Providers.TBBase = upstream.URL, upstream.URL
 			access, _ := s.DB.PublicAccess(ctx)
-			access.Enabled, access.AllowPrivateDownloads = true, true
+			access.Enabled, access.ExposeSources = true, true
 			if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 				t.Fatal(err)
 			}
@@ -304,7 +304,7 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 				t.Fatal("intentional visitor download was not started or was deleted", err)
 			}
 			access, _ = s.DB.PublicAccess(ctx)
-			access.AllowPrivateDownloads = false
+			access.ExposeSources = false
 			if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 				t.Fatal(err)
 			}
@@ -318,7 +318,7 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 				t.Fatal("disabled uncached permission still advertised private results", err)
 			}
 			access, _ = s.DB.PublicAccess(ctx)
-			access.AllowPrivateDownloads = true
+			access.ExposeSources = true
 			if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 				t.Fatal(err)
 			}
@@ -331,7 +331,7 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 				t.Fatal("verified playback failed to populate the safe shared cache", cache, err)
 			}
 			access, _ = s.DB.PublicAccess(ctx)
-			access.AllowPrivateDownloads = false
+			access.ExposeSources = false
 			if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 				t.Fatal(err)
 			}
@@ -348,7 +348,7 @@ func TestVisitorInstallationRejectsPermissionWithdrawnDuringValidation(t *testin
 	ctx, s, _ := testService(t)
 	visitorSourceRegistry(t, s)
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.AllowPrivateDownloads = true, true
+	access.Enabled, access.ExposeSources = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestVisitorInstallationRejectsPermissionWithdrawnDuringValidation(t *testin
 		t.Fatal("provider validation did not start")
 	}
 	access, _ = s.DB.PublicAccess(ctx)
-	access.AllowPrivateDownloads = false
+	access.ExposeSources = false
 	err := s.DB.SetPublicAccess(ctx, access)
 	close(resume)
 	if err != nil {
@@ -397,7 +397,7 @@ func TestVisitorAnnounceSeasonPacksNeverInventCachedEpisodeAvailability(t *testi
 		t.Fatal(err)
 	}
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.AllowPrivateDownloads = true, true
+	access.Enabled, access.ExposeSources = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +532,7 @@ func TestCompactImportsAndSourceResetPreservePublicPermissionAndSharedPlayback(t
 	defer upstream.Close()
 	s.Providers.TBBase = upstream.URL
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.AllowPrivateDownloads = true, true
+	access.Enabled, access.ExposeSources = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}

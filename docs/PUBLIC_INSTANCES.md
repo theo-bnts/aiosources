@@ -1,8 +1,8 @@
 # Public instances
 
-Public access is optional and disabled by default. An administrator can enable it in **Stremio → Settings → Public access** after setting `PUBLIC_URL` to the instance's external HTTPS origin. Literal loopback HTTP addresses are accepted for local testing.
+Public access is optional and disabled by default. An administrator can enable it in **Connections → Public access** after setting `PUBLIC_URL` to the instance's external HTTPS origin. Literal loopback HTTP addresses are accepted for local testing.
 
-When enabled, the homepage lets visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
+When enabled, the homepage provides **Connections → Stremio** and **Torznab**. Stremio visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Public Torznab has a separate administrator opt-in and uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
 
 When disabled, the homepage keeps its ordinary login. Disabling public access revokes existing public installation links; enabling it again does not restore those links. Private installations and administrator sessions retain their behavior.
 
@@ -44,9 +44,9 @@ Sources explicitly marked public may provide uncached playback using a plain has
 
 ### Optional visitor announce URLs
 
-**Stremio → Settings → Public access → Advanced → Allow visitor announce URLs** is a separate permission, disabled by default, including after an upgrade. Enabling it publishes the IDs and display names of sources with valid definitions explicitly marked private. It does not publish their API addresses, definitions, secret references or administrator announce URLs. Unknown source privacy or an invalid definition cannot authorize this exception. Disabling imports alone still allows playback from an existing, valid source catalog.
+**Connections → Public access → Advanced → Expose source names and filters** is a separate permission, disabled by default. Upgrades preserve a previous explicit visitor-announce permission. Enabling it publishes the IDs and display names of valid sources for selection. The optional announce fields include only sources explicitly marked private. The same permission applies to public Stremio and Torznab; it also controls source names in their responses. It does not publish their API addresses, definitions, secret references or administrator announce URLs. Unknown source privacy or an invalid definition cannot authorize this exception. Disabling imports alone still allows playback from an existing, valid source catalog.
 
-The public homepage then has a folded **Advanced** section. Visitors may enter their own complete HTTP, HTTPS or UDP announce URL for each listed source, including any personal passkey wherever it belongs in that URL. At least one debrid key is still required. Empty fields preserve cached-only access. An announce for one source does not unlock other private sources.
+The public homepage then has a folded **Advanced** section. Visitors may enter their own complete HTTP, HTTPS or UDP announce URL for each listed source, including any personal passkey wherever it belongs in that URL. Stremio still requires at least one debrid key. Empty fields preserve cached-only private access. An announce for one source does not unlock other private sources.
 
 The visitor's URLs are included only in the encrypted installation configuration. They are cleared from the form after submission and are never returned separately in Stremio results or retained in shared availability, histories or Logs. A cached playback uses a plain hash and does not send an announce. When an uncached private item is played, only the visitor's own supplied announce is sent to their selected debrid account. There is no fallback to the administrator's announce or service credentials.
 
@@ -73,3 +73,17 @@ Public requests have bounded sizes, timeouts and separate concurrency limits. Se
 Automated backend tests cover installation encryption, revocation, administration isolation, independent cache expiry, reset fencing, error handling, account isolation, cache disappearance and history privacy. Browser tests cover enabled and disabled modes, credential clearing, mobile layout and history navigation. Provider HTTP fixtures exercise actual adapter requests and response parsing without contacting live accounts. This is not live validation with two independently subscribed provider accounts; provider account or network restrictions can still affect a particular deployment.
 
 Provider references: [AllDebrid API](https://docs.alldebrid.com/), [TorBox API](https://api-docs.torbox.app/).
+
+## Public navigation and Torznab
+
+Public visitors use the same sidebar and breadcrumb layout as administrators, with only **Connections → Stremio** and **Torznab**. Administration, storage, logs, definitions and secrets remain protected. When public access is off, the homepage returns to the ordinary login.
+
+**Connections → Public access → Allow public Torznab connections** is disabled by default, including after an upgrade. Visitors can create a configuration without an account. In Generic Torznab clients, use the displayed URL, API path and encrypted API key. Other clients can use the complete generated endpoint URL. Only personal announces are encrypted; URL preferences can be changed without re-entering them or creating a database record. Each configuration can choose sources (only when disclosed), media types, a cache service and cached-only results. It creates no share, request lease or visitor profile in the database.
+
+Torznab returns standard magnets, not debrid video links. Debrid credentials belong in the recipient's download client and are not accepted by public Torznab setup. Its cache filters use fresh, positive shared availability already known by the instance; they do not trigger provider or source calls. An unknown cache state never counts as cached. Standard pagination totals include only eligible results.
+
+Sources explicitly classified public can appear uncached. Private or unclassified sources require fresh known cached availability, or the visitor's own currently permitted announce URL for that particular source. Personal announces are encrypted in the configuration and attached only to that visitor's returned magnets. Administrator announce URLs, native source download URLs and source credentials are never used for this feed. A cached private magnet without an announce is intended for a compatible debrid-aware client; an ordinary peer-to-peer client still needs its own authorized access.
+
+Turning source disclosure off hides names and source selectors on both pages, ignores source selections in existing visitor links and withdraws their announce exceptions. Turning public Torznab off revokes its encrypted keys; enabling it again does not revive them. This does not revoke Stremio installations. Turning all public access off revokes both. The Torznab, Stremio and administrator credentials use separate authentication boundaries and cannot be interchanged.
+
+Public Torznab shares the existing bounded, volatile anonymous admission limits. It records only safe request counts, timings and failures in Logs, under the ordinary seven-day retention. It stores no visitor key, announce, query, IP, profile or configuration. Protect the generated URL/key and redact query strings in external access logs.

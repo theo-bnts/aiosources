@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -22,9 +23,13 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 	if d.format != "torznab" {
 		return result, ErrCatalogAuthentication
 	}
-	filters, err := NormalizeSearchFilters(q.SearchFilters)
-	if err != nil || q.Limit < 0 || q.Limit > 200 || q.Offset < 0 || q.Offset > 2147483647 || ((q.Season != nil || q.Episode != nil) && (episodeMatch == nil || (filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == ""))) {
-		return result, model.ErrInvalid
+	policy := TorznabVisibility{}
+	if q.CachedOnly {
+		config, e := d.store.AIOConfig(ctx)
+		if e != nil {
+			return result, e
+		}
+		policy.CacheAfter = time.Now().Add(-time.Duration(config.CacheMinutes) * time.Minute)
 	}
 	tx, err := d.store.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
@@ -40,6 +45,55 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 	if err != nil {
 		return result, databaseError("authorize Torznab query", err)
 	}
+	result, err = torznabRows(ctx, tx, q, scope, sources, media, policy, episodeMatch)
+	if err != nil {
+		return result, err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp() WHERE id=$1`, d.shareID); err != nil {
+		return result, databaseError("record Torznab access", err)
+	}
+	return result, databaseError("finish Torznab query", tx.Commit(ctx))
+}
+
+// TorznabVisibility is a request-scoped policy. Unlisted sources are private;
+// only an administrator's explicit public classification or a visitor's own
+// currently permitted announce can authorize uncached results.
+type TorznabVisibility struct {
+	Public          bool
+	UncachedSources []string
+	CacheAfter      time.Time
+}
+
+func (s *Store) PublicTorznabCatalog(ctx context.Context, q model.TorznabQuery, sources, media []string, policy TorznabVisibility, episodeMatch func(model.AIORecord) bool) (model.List[model.TorznabRecord], error) {
+	result := model.List[model.TorznabRecord]{Items: []model.TorznabRecord{}, Limit: q.Limit, Offset: q.Offset}
+	if !policy.Public {
+		return result, model.ErrInvalid
+	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return result, databaseError("begin public Torznab query", err)
+	}
+	defer rollback(tx)
+	scope := "all"
+	if len(sources) > 0 {
+		scope = "selected"
+	}
+	result, err = torznabRows(ctx, tx, q, scope, sources, media, policy, episodeMatch)
+	if err != nil {
+		return result, err
+	}
+	return result, databaseError("finish public Torznab query", tx.Commit(ctx))
+}
+
+func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope string, sources, media []string, policy TorznabVisibility, episodeMatch func(model.AIORecord) bool) (model.List[model.TorznabRecord], error) {
+	result := model.List[model.TorznabRecord]{Items: []model.TorznabRecord{}, Limit: q.Limit, Offset: q.Offset}
+	filters, err := NormalizeSearchFilters(q.SearchFilters)
+	if err != nil || q.Limit < 0 || q.Limit > 200 || q.Offset < 0 || q.Offset > 2147483647 || ((q.Season != nil || q.Episode != nil) && (episodeMatch == nil || (filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == ""))) {
+		return result, model.ErrInvalid
+	}
+	if (policy.Public || q.CachedOnly) && policy.CacheAfter.IsZero() {
+		return result, model.ErrInvalid
+	}
 	args := []any{}
 	bind := func(value any) string { args = append(args, value); return fmt.Sprintf("$%d", len(args)) }
 	clauses := []string{`length(t.search_info_hash)=40`, `jsonb_typeof(t.fields->'title')='string' AND t.fields->>'title'<>''`, `(t.search_size IS NULL OR t.search_size BETWEEN 0 AND 9223372036854775807)`}
@@ -48,6 +102,24 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 	}
 	if len(filters.Providers) > 0 {
 		clauses = append(clauses, "t.provider_id=ANY("+bind(filters.Providers)+"::text[])")
+	}
+	if policy.Public || q.CachedOnly {
+		services := q.Services
+		if services == nil {
+			services = []string{"alldebrid", "torbox"}
+		}
+		for _, service := range services {
+			if service != "alldebrid" && service != "torbox" {
+				return result, model.ErrInvalid
+			}
+		}
+		cached := "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+		if policy.Public {
+			clauses = append(clauses, "(t.provider_id=ANY("+bind(policy.UncachedSources)+"::text[]) OR "+cached+")")
+		}
+		if q.CachedOnly {
+			clauses = append(clauses, cached)
+		}
 	}
 	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 ELSE 8000 END`
 	if len(media) > 0 {
@@ -159,8 +231,5 @@ WHERE ` + strings.Join(clauses, " AND ")
 	if err != nil {
 		return result, databaseError("read Torznab results", err)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp() WHERE id=$1`, d.shareID); err != nil {
-		return result, databaseError("record Torznab access", err)
-	}
-	return result, databaseError("finish Torznab query", tx.Commit(ctx))
+	return result, nil
 }

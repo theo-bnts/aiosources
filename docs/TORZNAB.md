@@ -30,6 +30,7 @@ The endpoint is `/torznab/ACCESS_ID/api`. Every call, including capabilities, re
 | `limit`, `offset` | Page size and offset. Default 100, maximum 200. Zero limit and an offset beyond the total return an empty page with its total. |
 | `minage`, `maxage` | Minimum/maximum age in whole days, applied to known publication dates. |
 | `minsize`, `maxsize` | Minimum/maximum size in whole MiB. |
+| `services`, `cached_only` | AIOSources extensions: select known cache services (`alldebrid`, `torbox`) and require fresh positive shared cache availability. No provider calls are made. |
 | `extended`, `attrs`, `o=xml` | Compatibility parameters. Responses include all supported safe attributes. JSON output and unsupported search families are not advertised. |
 
 For example, a client can use `&sources=alpha,beta&media=movie` while another uses `&sources=beta&media=tv` with the same endpoint and key. `sources` and `media` are AIOSources extensions; `cat`, capabilities, RSS, errors and pagination follow Torznab conventions. Prefer your client's parameter fields instead of manually combining URLs with duplicate parameter names.
@@ -45,3 +46,9 @@ Torznab access is separate from visitor Stremio access. Explicitly enabling a To
 Per-key request and concurrency limits apply across replicas. Slow searches have a 20-second deadline. HTTP 429 includes `Retry-After`; other errors use Torznab XML codes. API keys travel as standard Torznab query parameters: protect them and redact query strings in any external proxy/access logs. The application records only safe request counts and timings in Logs (debug level), never the key, visitor IP, query, hashes, magnets or credentials. Its ordinary seven-day log retention applies. This feature reads current publications directly and does not enable catalog-sharing snapshots or copy the catalog.
 
 Protocol references: [Torznab specification](https://torznab.github.io/spec-1.3-draft/torznab/Specification-v1.3.html), [Prowlarr request generation](https://github.com/Prowlarr/Prowlarr/blob/develop/src/NzbDrone.Core/Indexers/Definitions/Newznab/NewznabRequestGenerator.cs).
+
+## Optional public connections
+
+Administrators can separately enable public Torznab in **Connections → Public access**. Its visitor setup uses encrypted, stateless configurations instead of the administrator's named grants. Source disclosure is shared with public Stremio and remains opt-in. Public catalog eligibility, optional personal announces, cache behavior and revocation are described in [Public instances](PUBLIC_INSTANCES.md#public-navigation-and-torznab).
+
+If Cloudflare Access or another sign-in gateway protects the instance, external clients must also be allowed through that gateway. A browser's login cookie is not sent by Prowlarr. Public Torznab uses `/public/torznab/api` and its encrypted configuration key; private Torznab uses `/torznab/ACCESS_ID/api` and its separate access key. Keep administration routes protected when configuring gateway access.

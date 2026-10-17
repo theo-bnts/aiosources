@@ -34,7 +34,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 			return q, nil, model.ErrInvalid
 		}
 		switch key {
-		case "t", "apikey", "q", "cat", "sources", "media", "imdbid", "tmdbid", "tvdbid", "season", "ep", "year", "limit", "offset", "extended", "attrs", "o", "minage", "maxage", "minsize", "maxsize":
+		case "t", "apikey", "q", "cat", "sources", "media", "imdbid", "tmdbid", "tvdbid", "season", "ep", "year", "limit", "offset", "extended", "attrs", "o", "minage", "maxage", "minsize", "maxsize", "services", "cached_only":
 		default:
 			return q, nil, model.ErrInvalid
 		}
@@ -47,6 +47,20 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 			if !slices.Contains([]string{"movie", "tv", "other"}, typ) {
 				return q, v, model.ErrInvalid
 			}
+		}
+	}
+	if v.Has("services") {
+		q.Services = strings.Split(v.Get("services"), ",")
+		for _, service := range q.Services {
+			if service != "alldebrid" && service != "torbox" {
+				return q, v, model.ErrInvalid
+			}
+		}
+	}
+	if v.Has("cached_only") {
+		q.CachedOnly, err = strconv.ParseBool(v.Get("cached_only"))
+		if err != nil {
+			return q, v, model.ErrInvalid
 		}
 	}
 	q.Query = v.Get("q")
@@ -293,7 +307,7 @@ type torznabRSS struct {
 	} `xml:"channel"`
 }
 
-func torznabResults(result model.List[model.TorznabRecord], names map[string]string, origin string) torznabRSS {
+func torznabResults(result model.List[model.TorznabRecord], names map[string]string, origin string, visitorAnnounces ...map[string]string) torznabRSS {
 	v := torznabRSS{Version: "2.0", Namespace: torznabNamespace}
 	v.Channel.Title = "AIOSources"
 	v.Channel.Description = "Published torrents"
@@ -306,6 +320,11 @@ func torznabResults(result model.List[model.TorznabRecord], names map[string]str
 		// Rebuild from a validated hash. Never forward native magnets or URLs:
 		// those can contain a source API key or an administrator's announce URL.
 		magnet := "magnet:?xt=urn:btih:" + rec.Hash + "&dn=" + strings.ReplaceAll(url.QueryEscape(rec.Title), "+", "%20")
+		if len(visitorAnnounces) > 0 {
+			if announce := visitorAnnounces[0][rec.Provider]; announce != "" {
+				magnet += "&tr=" + strings.ReplaceAll(url.QueryEscape(announce), "+", "%20")
+			}
+		}
 		item.Link = magnet
 		item.Enclosure.URL = magnet
 		item.Enclosure.Length = rec.Size
