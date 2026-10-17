@@ -10,6 +10,7 @@ import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import type { Page } from '@/lib/types'
 import type { OperationRun, OperationEvent, OperationStatus } from '@/lib/operation-types'
 import { providerSteps, providerErrors } from '@/lib/provider-call'
+import { DownloadAction } from '@/components/catalog-download'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -67,6 +68,7 @@ const phases: Record<string, string> = {
   storage: 'Saving information',
   download: 'Preparing download',
   waiting: 'Waiting for debrid',
+  ready: 'Download ready',
   succeeded: statusLabels.succeeded,
   failed: statusLabels.failed,
   cancelled: statusLabels.cancelled,
@@ -82,7 +84,9 @@ const resultLabels: Record<string, string> = {
 }
 
 function OperationBadge({ run }: { run: OperationRun }) {
-  return run.status === 'interrupted' ? (
+  return run.kind === 'download' && run.phase === 'waiting' && run.status === 'succeeded' ? (
+    <Badge variant="info">Preparing</Badge>
+  ) : run.status === 'interrupted' ? (
     <Badge variant="warning">Interrupted</Badge>
   ) : (
     <RunStatusBadge run={{ status: run.status, cancel_requested: false, pause_requested: false }} />
@@ -334,6 +338,32 @@ export function OperationDetailPage({ section }: { section: Section }) {
               >
                 {messageText(result.error)}
               </p>
+            )}
+            {result.download && (
+              <section className="section-card" aria-label="Download">
+                <h2 className="section-title">Download</h2>
+                <DownloadAction
+                  key={result.id}
+                  workID={String(result.download.work_id)}
+                  selection={result.download.input}
+                  service={{
+                    service: result.download.input.service,
+                    state: 'unknown',
+                    can_add: false,
+                  }}
+                  release={{
+                    occurrence_id: result.download.input.occurrence_id,
+                    fingerprint: result.download.input.fingerprint,
+                    title: '',
+                    provider: '',
+                    size: 0,
+                    languages: [],
+                    services: [],
+                  }}
+                  operationID={result.id}
+                  preparing={result.phase === 'waiting' && result.status === 'succeeded'}
+                />
+              </section>
             )}
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {Object.entries({

@@ -103,7 +103,7 @@ func TestInvalidSourceDefinitionCannotAuthorizeVisitorDownloads(t *testing.T) {
 
 func assertNoVisitorData(t *testing.T, ctx context.Context, conn *pgx.Conn, private ...string) {
 	t.Helper()
-	for _, table := range []string{"settings", "secrets", "aio_public_access", "stremio_requests", "operation_runs", "operation_events", "aio_availability", "aio_shared_availability", "aio_resources", "aio_cleanup", "activity_logs"} {
+	for _, table := range []string{"settings", "secrets", "aio_public_access", "stremio_requests", "operation_runs", "operation_events", "operation_downloads", "aio_availability", "aio_shared_availability", "aio_resources", "aio_cleanup", "activity_logs"} {
 		rows, err := conn.Query(ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
 		if err != nil {
 			t.Fatal(err)

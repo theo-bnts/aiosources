@@ -110,7 +110,7 @@ TMDB, AllDebrid, TorBox and source credentials belong in **Security → Secrets*
 
 Filter titles by type and an optional single year. Films match any locally known release year; series match the span of their locally known release, season and episode years. Year filtering makes no TMDB request.
 
-**Download** opens the file when its link is ready. **Add to debrid** explicitly starts preparation for an uncached version, then checks readiness automatically. Keep the search page open during preparation; a direct link remains available if your browser blocks the download tab. Private sources need your announce URL for uncached downloads. Download preparation and sanitized provider calls appear in **Debrid → History**. Download links stay in memory and are not retained in history.
+**Download** starts the file in your browser while keeping the application open. **Add to debrid** explicitly starts preparation for an uncached version; use **View operation** to follow its readiness in **Debrid → History**, including after leaving Search. Private sources need your announce URL for uncached downloads. The history retains the selection and sanitized provider calls for seven days, without API keys, announce URLs or generated download links. Browser downloads use a protected streaming relay: files consume the instance’s bandwidth but are never saved on its disk or loaded fully into memory. Stremio playback continues to use direct provider links.
 
 Versions are largest first. The optional language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. Stremio installations offer the same filters.
 
@@ -120,9 +120,9 @@ The former global installation token and its Legacy panel have been removed. Rep
 
 ### Torznab
 
-Open **Connections → Torznab**, create an access key and enable it when ready. Access defaults to all sources without per-access limits. Choose source/media permissions in **Filters** and optional expiration or limits in **Advanced**. Use **Client setup & filters** for the exact URL, API path and optional parameters to paste into Prowlarr's **Generic Torznab** configuration. A single key can be used with multiple filtered URLs; you do not need a key or saved profile for each configuration.
+Open **Connections → Torznab**, create an access key and enable it when ready. Access defaults to all sources without per-access limits. Select one or more sources and media types in **Filters** and optional expiration or limits in **Advanced**. Use **Client setup & filters** for the exact URL, API path and optional parameters to paste into Prowlarr's **Generic Torznab** configuration. A single key can be used with multiple filtered URLs; you do not need a key or saved profile for each configuration.
 
-Requests search your published local data without contacting your sources or TMDB. Standard categories select movies, TV or other releases. Optional `sources` and `media` URL parameters can narrow each connection further. Private-source magnets contain no administrator announce URL: the recipient needs their own source access to download them. No debrid account is shared through Torznab. See the [Torznab setup and parameter reference](docs/TORZNAB.md).
+Requests search your published local data without contacting your sources or TMDB. Standard categories select movies, series or other releases. Torznab can include records that are not identified; Stremio uses identified video types, including anime. Optional `sources` and `media` URL parameters can narrow each connection further. Private-source magnets contain no administrator announce URL: the recipient needs their own source access to download them. No debrid account is shared through Torznab. See the [Torznab setup and parameter reference](docs/TORZNAB.md).
 
 **Sources → Torrent search** searches the individual imported records, including title fragments, source IDs and complete or partial info hashes. **Metadata → Identification** accepts the same search syntax when reviewing matches. Each list shows its filtered result count above the rows.
 
@@ -142,7 +142,7 @@ Saving this setting affects imports started afterwards, including automatic impo
 
 To start again with the new mode, save your selection and pause any running imports, then optionally use **Reset all source data**. The button explains why it is unavailable when these steps are still needed. This removes imported torrents, remote catalog copies, source history, resume points and manual identifications. Your source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch. This reset cannot be undone.
 
-Catalog sharing keeps only fields its export protocol can use, and does not keep publication snapshots while every share is disabled or expired. Enabling sharing builds a fresh snapshot of the current catalog. Storage measurements include PostgreSQL tables and indexes; ordinary deletion makes space reusable inside PostgreSQL, while a source reset also releases the large source table files.
+**Connections → Shared catalogs** shares published data. **Sources → Remote catalogs** manages imports from other instances. Sharing keeps only fields its export protocol can use, and does not keep publication snapshots while every share is disabled or expired. Enabling sharing builds a fresh snapshot of the current catalog. Storage measurements include PostgreSQL tables and indexes; ordinary deletion makes space reusable inside PostgreSQL, while a source reset also releases the large source table files.
 
 ### Optional public access
 

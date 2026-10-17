@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('public connections share the shell and encrypted Torznab filters without visitor profiles', async ({
   page,
@@ -64,17 +64,17 @@ test('public connections share the shell and encrypted Torznab filters without v
       visitor.getByRole('heading', { name: 'Torznab', exact: true, level: 1 }),
     ).toBeVisible()
     await expect(visitor.getByLabel('Sources', { exact: true })).toHaveCount(0)
-    await expect(visitor.getByLabel('Media type', { exact: true })).toBeHidden()
+    await expect(visitor.getByLabel('Media types', { exact: true })).toBeHidden()
     await visitor.locator('summary', { hasText: 'Filters' }).click()
-    await visitor.getByLabel('Media type', { exact: true }).selectOption('movie')
-    await visitor.getByLabel('Cache service', { exact: true }).selectOption('torbox')
+    await selectMultiple(visitor, 'Media types', ['movie', 'tv'])
+    await selectMultiple(visitor, 'Services', ['torbox', 'alldebrid'])
     await visitor.getByLabel('Cached results only', { exact: true }).check()
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
     const key = visitor.getByLabel('API key', { exact: true })
     await expect(key).toHaveAttribute('type', 'password')
     await expect(key).not.toHaveValue('')
-    await expect(visitor.getByLabel('Media type', { exact: true })).toHaveValue('movie')
-    await expect(visitor.getByLabel('Cache service', { exact: true })).toHaveValue('torbox')
+    await expect(visitor.getByLabel('Media types', { exact: true })).toHaveText('Movies, Series')
+    await expect(visitor.getByLabel('Services', { exact: true })).toHaveText('TorBox, AllDebrid')
     await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeChecked()
     let credential = await key.inputValue()
     const feed = async (k: string) =>
@@ -86,7 +86,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await access.getByLabel('Expose source names and filters', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(visitor.getByLabel('Sources', { exact: true })).toBeVisible()
-    await visitor.getByLabel('Media type', { exact: true }).selectOption('')
+    await selectMultiple(visitor, 'Media types', [])
     await visitor.getByLabel('Cached results only', { exact: true }).uncheck()
     expect(await visitor.locator('summary').allTextContents()).toEqual([
       'Filters',
@@ -95,7 +95,13 @@ test('public connections share the shell and encrypted Torznab filters without v
     ])
     await visitor.locator('summary', { hasText: 'Advanced' }).click()
     const own = 'https://announce.example.invalid/visitor-private-passkey/announce'
-    await visitor.getByLabel('Example Library announce URL', { exact: true }).fill(own)
+    const announceField = visitor.getByLabel('Example Library announce URL', { exact: true })
+    await announceField.fill(own)
+    await announceField
+      .locator('..')
+      .getByRole('button', { name: 'Reveal password', exact: true })
+      .click()
+    await expect(announceField).toHaveAttribute('type', 'text')
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
     await expect(key).not.toHaveValue('')
     credential = await key.inputValue()
@@ -106,7 +112,7 @@ test('public connections share the shell and encrypted Torznab filters without v
       '',
     )
     const encryptedBase = credential.split('~')[0]
-    await visitor.getByLabel('Cache service', { exact: true }).selectOption('alldebrid')
+    await selectMultiple(visitor, 'Services', ['alldebrid'])
     credential = await key.inputValue()
     expect(credential.split('~')[0]).toBe(encryptedBase)
     const changed = await feed(credential)

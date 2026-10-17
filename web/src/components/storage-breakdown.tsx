@@ -23,7 +23,7 @@ const labels: Record<string, string> = {
   metadata: 'Metadata',
   debrid: 'Debrid',
   stremio: 'Stremio',
-  sharing: 'Catalog sharing',
+  sharing: 'Shared catalogs',
   access: 'Security',
   logs: 'Logs and operation history',
   other: 'Settings and database state',

@@ -330,6 +330,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 }
 
 type playbackPolicy struct {
+	Account       string
 	CachedOnly    bool
 	Preferences   *model.StreamPreferences
 	Fingerprint   string
@@ -395,6 +396,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		key, err = s.key(life, name)
 		if err != nil {
 			return "", err
+		}
+		if policy.Account != "" && fingerprint(key) != policy.Account {
+			return "", model.ErrConflict
 		}
 		tracker, configured := c.Trackers[rec.Provider]
 		cachedOnly = policy.CachedOnly || ((!configured || tracker.Private) && tracker.AnnounceSecret == "")

@@ -65,7 +65,8 @@ const RawDetailPage = lazy(() =>
 )
 const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default: m.RawPageView })))
 const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
-const SharingPage = lazy(() => import('@/pages/catalog-sharing'))
+const SharingPage = lazy(() => import('@/pages/sharing'))
+const RemotesPage = lazy(() => import('@/pages/remotes'))
 const PublicAccessPage = lazy(() => import('@/pages/public-access'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
@@ -97,11 +98,7 @@ function LegacyActivity() {
 function LegacyRemotes() {
   const location = useLocation()
   return (
-    <Navigate
-      to={`/sharing/remotes${location.search}${location.hash}`}
-      state={location.state}
-      replace
-    />
+    <Navigate to={`/remotes${location.search}${location.hash}`} state={location.state} replace />
   )
 }
 
@@ -281,11 +278,11 @@ const router = createBrowserRouter(
           <Route path="addon/history" element={<StremioHistoryPage />} />
           <Route path="addon/history/:id" element={<StremioRequestPage />} />
         </Route>
-        <Route path="remotes" element={<LegacyRemotes />} />
+        <Route path="remotes" element={<RemotesPage />} />
         <Route path="sharing" element={<SharingPage />} />
         <Route path="torznab" element={<TorznabPage />} />
         <Route path="public-access" element={<PublicAccessPage />} />
-        <Route path="sharing/remotes" element={<SharingPage />} />
+        <Route path="sharing/remotes" element={<LegacyRemotes />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />

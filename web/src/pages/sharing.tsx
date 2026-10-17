@@ -1,4 +1,6 @@
 import { SourceFilter } from '@/components/source-filter'
+import { MediaTypeFilter, torznabMediaTypes } from '@/components/connection-filter-fields'
+import { Switch } from '@/components/ui/switch'
 import { Disclosure } from '@/components/ui/disclosure'
 import { TorznabSetup } from '@/components/torznab-setup'
 import {
@@ -99,7 +101,7 @@ export default function SharingPage({
     setEditing(share)
   }
   return (
-    <div className="space-y-5">
+    <div className={format === 'catalog' ? 'page' : 'space-y-5'}>
       <div className="flex justify-end">
         <Button disabled={!shares.data} onClick={() => openEditor('new')}>
           <PlusIcon />
@@ -178,7 +180,8 @@ export default function SharingPage({
                           ? share.media_types
                               .map(
                                 (type) =>
-                                  ({ movie: 'Movies', tv: 'TV', other: 'Other' })[type] ?? type,
+                                  torznabMediaTypes.find((option) => option.value === type)
+                                    ?.label ?? type,
                               )
                               .join(', ')
                           : 'All media'
@@ -285,16 +288,14 @@ export default function SharingPage({
                   label={share.enabled ? 'Disable access' : 'Enable access'}
                   variant={share.enabled ? 'warning' : 'default'}
                   trigger={
-                    <Button
-                      variant={share.enabled ? 'warning' : 'default'}
-                      size="sm"
+                    <Switch
+                      checked={share.enabled}
+                      aria-label={`${share.enabled ? 'Disable' : 'Enable'} ${share.name}`}
                       disabled={
                         !share.enabled &&
                         (!httpsReady || shareExpired(share) || share.fields.length === 0)
                       }
-                    >
-                      {share.enabled ? 'Disable' : 'Enable'}
-                    </Button>
+                    />
                   }
                   action={async () => {
                     await api<CatalogShare>(`${endpoint}/${encodeURIComponent(share.id)}`, {
@@ -763,21 +764,13 @@ function ShareForm({
           />
         ) : torznab ? (
           <Disclosure title="Filters">
+            <MediaTypeFilter
+              id="torznab-media"
+              value={mediaTypes}
+              options={torznabMediaTypes}
+              onChange={setMediaTypes}
+            />
             {sourceFilter}
-            <div className="field">
-              <Label htmlFor="torznab-media">Media type</Label>
-              <select
-                id="torznab-media"
-                className="native-select w-full"
-                value={mediaTypes.length ? mediaTypes[0] : ''}
-                onChange={(event) => setMediaTypes(event.target.value ? [event.target.value] : [])}
-              >
-                <option value="">All media</option>
-                <option value="movie">Movies</option>
-                <option value="tv">TV</option>
-                <option value="other">Other / not identified</option>
-              </select>
-            </div>
           </Disclosure>
         ) : (
           <>
@@ -869,7 +862,6 @@ function PasswordDialog({
   credential: SharePassword
   onClose: () => void
 }) {
-  const [visible, setVisible] = useState(false)
   const stremio = credential.share.format === 'stremio'
   const torznab = credential.share.format === 'torznab'
   const kind = stremio ? 'manifest URL' : torznab ? 'API key' : 'password'
@@ -902,7 +894,8 @@ function PasswordDialog({
           </Label>
           <Input
             id="created-share-password"
-            type={visible ? 'text' : 'password'}
+            type="password"
+            revealLabel={kind}
             readOnly
             autoComplete="off"
             spellCheck={false}
@@ -911,9 +904,6 @@ function PasswordDialog({
           />
         </div>
         <div className="toolbar items-start">
-          <Button variant="outline" onClick={() => setVisible(!visible)}>
-            {visible ? 'Hide' : 'Reveal'} {kind}
-          </Button>
           <CopyButton
             value={secret}
             label={`Copy ${kind}`}

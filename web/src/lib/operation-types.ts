@@ -1,6 +1,15 @@
+import type { CatalogSelection } from '@/lib/catalog-search-types'
 export type OperationStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 export type OperationKind = 'metadata' | 'matching' | 'cache' | 'cleanup' | 'download'
 export type OperationRun = {
+  download?: {
+    work_id: number
+    input: CatalogSelection & {
+      occurrence_id: string
+      fingerprint: string
+      service: 'alldebrid' | 'torbox'
+    }
+  }
   id: string
   kind: OperationKind
   service: 'tmdb' | 'local' | 'alldebrid' | 'torbox'

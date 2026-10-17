@@ -1,8 +1,6 @@
 import type { InstallationOptions } from '@/lib/language-preferences'
-import { SourceFilter } from '@/components/source-filter'
+import { ConnectionFilterFields, stremioMediaTypes } from '@/components/connection-filter-fields'
 import { Disclosure } from '@/components/ui/disclosure'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { useId, useRef, type ReactNode } from 'react'
 
 export function InstallationFilters({
@@ -38,69 +36,21 @@ export function InstallationFilters({
   ]
   const fields = (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        {(showSources || sources.length > 0) && (
-          <SourceFilter
-            id={`${id}-sources`}
-            value={value.sources ?? []}
-            sources={sources}
-            onChange={(sources) => onChange({ ...value, sources })}
-          />
-        )}
-        <div className="field">
-          <Label htmlFor={`${id}-type`}>Media type</Label>
-          <select
-            className="native-select w-full"
-            id={`${id}-type`}
-            value={value.types?.[0] ?? ''}
-            onChange={(event) =>
-              onChange({ ...value, types: event.target.value ? [event.target.value] : [] })
-            }
-          >
-            <option value="">All media</option>
-            <option value="movie">Movies</option>
-            <option value="series">Series</option>
-            <option value="anime">Anime</option>
-          </select>
-        </div>
-        {serviceOptions.length > 1 && (
-          <fieldset className="space-y-2">
-            <legend className="mb-2 text-sm font-medium">Playback services</legend>
-            {serviceOptions.map((service) => (
-              <label className="flex items-center gap-2 text-sm" key={service.id}>
-                <input
-                  type="checkbox"
-                  className="accent-primary"
-                  checked={!value.services?.length || value.services.includes(service.id)}
-                  disabled={value.services?.length === 1 && value.services.includes(service.id)}
-                  onChange={(event) => {
-                    const current = value.services?.length
-                      ? value.services
-                      : serviceOptions.map((item) => item.id)
-                    const next = event.target.checked
-                      ? [...current, service.id]
-                      : current.filter((id) => id !== service.id)
-                    if (next.length)
-                      onChange({
-                        ...value,
-                        services: next.length === serviceOptions.length ? [] : next,
-                      })
-                  }}
-                />
-                <span>{service.name}</span>
-              </label>
-            ))}
-          </fieldset>
-        )}
-      </div>
-      <div className="flex items-center justify-between gap-3">
-        <Label htmlFor={`${id}-cached`}>Cached results only</Label>
-        <Switch
-          id={`${id}-cached`}
-          checked={value.cached_only ?? false}
-          onCheckedChange={(cached_only) => onChange({ ...value, cached_only })}
-        />
-      </div>
+      <ConnectionFilterFields
+        id={id}
+        media={value.types ?? []}
+        mediaOptions={stremioMediaTypes}
+        onMediaChange={(types) => onChange({ ...value, types })}
+        sources={sources}
+        sourceIDs={value.sources ?? []}
+        onSourcesChange={(sources) => onChange({ ...value, sources })}
+        services={serviceOptions}
+        serviceIDs={value.services ?? []}
+        onServicesChange={(services) => onChange({ ...value, services })}
+        cachedOnly={value.cached_only ?? false}
+        onCachedChange={(cached_only) => onChange({ ...value, cached_only })}
+        showSources={showSources}
+      />
       {children}
       {showHelp && (
         <p className="help">

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  defaultLanguagePreferences,
   preferenceManifest,
   preferenceManifestError,
   resolvedLanguage,
@@ -55,4 +56,11 @@ test('oversized connection selections cannot produce an installable link', () =>
   assert.ok(preferenceManifestError('', options))
   assert.ok(preferenceManifestError('/stremio/token~v1~' + 'a'.repeat(5463) + '/manifest.json', {}))
   assert.equal(preferenceManifestError('/stremio/token~fr~all/manifest.json', {}), null)
+})
+
+test('every new language filter starts with the browser locale, MULTI and unknown languages', () => {
+  assert.deepEqual(defaultLanguagePreferences(), { language: '', mode: 'unknown' })
+  const first = defaultLanguagePreferences()
+  first.mode = 'all'
+  assert.equal(defaultLanguagePreferences().mode, 'unknown')
 })

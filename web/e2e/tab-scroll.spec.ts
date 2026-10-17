@@ -22,7 +22,7 @@ async function retainDocumentHeight(page: Page) {
 test('horizontal tab bars have no vertical scroll range on desktop or mobile', async ({ page }) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1100 })
-    for (const path of ['/providers', '/metadata', '/debrid', '/addon', '/sharing', '/security']) {
+    for (const path of ['/providers', '/metadata', '/debrid', '/addon', '/security']) {
       await page.goto(path)
       const tabs = page.getByRole('tablist').first()
       await expect(tabs).toBeVisible()
@@ -58,12 +58,7 @@ test('opening a secondary view directly reveals its active tab without scrolling
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const path of [
-    '/metadata/history',
-    '/security/sessions',
-    '/runs/missing',
-    '/sharing/remotes',
-  ]) {
+  for (const path of ['/metadata/history', '/security/sessions', '/runs/missing']) {
     await page.goto(path)
     const tabs = page.getByRole('tablist').first()
     await expect(tabs).toBeVisible()
@@ -108,13 +103,12 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
   await expect(page.locator('#main-content')).toBeFocused()
 })
 
-test('history and catalog sharing tabs keep scroll and their selected view', async ({ page }) => {
+test('history tabs keep scroll and their selected view', async ({ page }) => {
   for (const [url, tab, target] of [
     ['/metadata', 'History', /\/metadata\/history$/],
     ['/addon', 'History', /\/addon\/history$/],
     ['/debrid', 'History', /\/debrid\/history$/],
     ['/providers', 'History', /\/runs$/],
-    ['/sharing', 'Remote catalogs', /\/sharing\/remotes$/],
   ] as const) {
     await page.goto(url)
     await retainDocumentHeight(page)
@@ -179,4 +173,20 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
   await expect(prompt).toHaveCount(0)
   const persisted = await (await page.request.get('/api/providers/tab-guard-source')).json()
   expect(persisted.provider.name).toBe('Tab guard source')
+})
+
+test('shared and remote catalogs are standalone pages without horizontal tabs', async ({
+  page,
+}) => {
+  for (const path of ['/sharing', '/remotes', '/sharing/remotes']) {
+    await page.goto(path)
+    await expect(
+      page.getByRole('heading', {
+        name: path === '/sharing' ? 'Shared catalogs' : 'Remote catalogs',
+        exact: true,
+        level: 1,
+      }),
+    ).toBeVisible()
+    await expect(page.getByRole('tablist')).toHaveCount(0)
+  }
 })

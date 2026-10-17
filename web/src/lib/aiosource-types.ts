@@ -72,6 +72,7 @@ export type MatchReview = {
 }
 export type ReviewDetail = {
   suggested_query: string
+  suggested_year: number | null
   record: {
     title: string
     provider: string

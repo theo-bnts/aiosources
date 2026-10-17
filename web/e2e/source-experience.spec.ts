@@ -30,6 +30,7 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   await page.goto('/metadata/identification')
   await page.getByRole('button', { name: 'Review Example.Film.2021.1080p', exact: true }).click()
   let dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('Year', { exact: true })).toHaveValue('2021')
   await expect(
     dialog.getByRole('radio', { name: 'Choose Example Film', exact: true }),
   ).toBeVisible()

@@ -31,7 +31,7 @@ test('password-manager form values work for sign-in and verification without cha
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Security', exact: true })).toBeVisible()
     await page.getByRole('tab', { name: 'Two-step verification', exact: true }).click()
-    await page.getByRole('button', { name: 'Set up verification', exact: true }).click()
+    await page.getByRole('switch', { name: 'Two-step verification', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const current = dialog.getByLabel('Current password', { exact: true })
     await expect(current).toHaveAttribute('type', 'password')

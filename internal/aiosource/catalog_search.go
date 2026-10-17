@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/store"
@@ -212,7 +213,11 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 
 // A download is an explicit administrator action. Readiness checks use the
 // providers' cached-only safeguards and never start a new uncached download.
-func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput) (result model.CatalogDownload, downloadErr error) {
+func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput) (model.CatalogDownload, error) {
+	return s.catalogDownload(ctx, workID, input, "", "")
+}
+
+func (s *Service) catalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput, operationID, expectedAccount string) (result model.CatalogDownload, downloadErr error) {
 	if (input.Service != "alldebrid" && input.Service != "torbox") || !store.ValidOccurrenceID(input.OccurrenceID) || input.Fingerprint == "" || len(input.Fingerprint) > 128 {
 		return result, model.ErrInvalid
 	}
@@ -262,7 +267,14 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 		return result, model.ErrBusy
 	}
 	defer release()
-	h, err := s.beginOperation(ctx, "download", input.Service, "manual", r.Type+":"+id, lock)
+	var h *operationHistory
+	if operationID != "" {
+		run, e := s.DB.ResumeDownloadOperation(ctx, operationID)
+		err = e
+		h = &operationHistory{service: s, run: run}
+	} else {
+		h, err = s.beginOperation(ctx, "download", input.Service, "manual", r.Type+":"+id, lock)
+	}
 	if err != nil {
 		return result, err
 	}
@@ -276,8 +288,36 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 			h.finish(ctx, downloadErr)
 		}
 	}()
+	config, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return result, err
+	}
+	secret := config.TorBoxSecret
+	if input.Service == "alldebrid" {
+		secret = config.AllDebridSecret
+	}
+	key, err := s.key(ctx, secret)
+	if err != nil {
+		return result, err
+	}
+	if expectedAccount != "" && fingerprint(key) != expectedAccount {
+		return result, model.ErrConflict
+	}
+	continuation := model.OperationDownload{WorkID: workID, Input: input, Account: fingerprint(key)}
+	if err = s.DB.SaveOperationDownload(ctx, result.OperationID, continuation); err != nil {
+		return result, err
+	}
 	h.checkpoint(ctx, "download")
-	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, nil, playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, PreparationID: input.PreparationID, PreparedID: &result.PreparationID})
+	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, nil, playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID})
+	if result.PreparationID != "" {
+		continuation.Input.PreparationID = result.PreparationID
+		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		err = s.DB.SaveOperationDownload(saveCtx, result.OperationID, continuation)
+		cancel()
+		if err != nil {
+			return result, err
+		}
+	}
 	result.Status = "ready"
 	if errors.Is(downloadErr, ErrPending) {
 		result.Status = "pending"
@@ -285,7 +325,41 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 	}
 	if downloadErr == nil {
 		h.run.Processed = 1
+		h.run.Phase = "ready"
 	}
 	result.PreparationID = ""
 	return result, downloadErr
+}
+
+// Following a saved preparation never starts an uncached download. It also
+// cannot reuse an object ID after the administrator changes provider accounts.
+func (s *Service) CheckOperationDownload(ctx context.Context, id string) (result model.CatalogDownload, checkErr error) {
+	defer func() {
+		if errors.Is(checkErr, model.ErrNotFound) || errors.Is(checkErr, model.ErrConflict) {
+			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			_ = s.DB.UnavailableOperationDownload(final, id)
+		}
+	}()
+	saved, err := s.DB.OperationDownload(ctx, id)
+	if err != nil {
+		return model.CatalogDownload{}, err
+	}
+	config, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return model.CatalogDownload{}, err
+	}
+	secret := config.TorBoxSecret
+	if saved.Input.Service == "alldebrid" {
+		secret = config.AllDebridSecret
+	}
+	key, err := s.key(ctx, secret)
+	if err != nil {
+		return model.CatalogDownload{}, err
+	}
+	if key == "" || fingerprint(key) != saved.Account {
+		return model.CatalogDownload{}, model.ErrConflict
+	}
+	saved.Input.AllowUncached = false
+	return s.catalogDownload(ctx, saved.WorkID, saved.Input, id, saved.Account)
 }

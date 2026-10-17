@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type Page, type Locator } from '@playwright/test'
 import type { SharePassword } from '../src/lib/catalog-types'
 import { startServer, type TestServer } from './server'
 
@@ -79,4 +79,26 @@ export async function createStremioAccess(page: Page, name = 'Test installation'
     page.url(),
   ).toString()
   return { ...credential, manifestURL, manifestPath: new URL(manifestURL).pathname }
+}
+
+export async function selectMultiple(scope: Page | Locator, label: string, values: string[]) {
+  const page = 'page' in scope ? scope.page() : scope
+  const control = scope.getByRole('button', { name: label, exact: true })
+  await control.click()
+  await page.getByRole('menuitem', { name: /^All / }).click()
+  if (!values.length) return
+  await control.click()
+  const names: Record<string, string> = {
+    movie: 'Movies',
+    series: 'Series',
+    tv: 'Series',
+    anime: 'Anime',
+    other: 'Other / not identified',
+    torbox: 'TorBox',
+    alldebrid: 'AllDebrid',
+    direct: 'Direct torrents',
+  }
+  for (const value of values)
+    await page.getByRole('menuitemcheckbox', { name: names[value] ?? value, exact: true }).check()
+  await page.keyboard.press('Escape')
 }

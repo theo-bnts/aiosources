@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { CodeEditor } from '@/components/code-editor'
 
 export interface SourceEditorContextValue {
@@ -120,28 +121,27 @@ export function BooleanField({
   const value = document.getIn(path)
   return (
     <div className="field">
-      <Label htmlFor={id}>{label}</Label>
-      <select
-        id={id}
-        className="native-select w-full"
-        value={typeof value === 'boolean' ? String(value) : ''}
-        aria-describedby={help ? `${id}-help` : undefined}
-        onChange={(event) =>
-          change((next) =>
-            event.target.value === ''
-              ? next.deleteIn(path)
-              : next.setIn(path, event.target.value === 'true'),
-          )
-        }
-      >
-        <option value="" disabled={required}>
-          {required ? 'Choose explicitly' : 'Not set (use default)'}
-        </option>
-        <option value="true" disabled={!allowEnabled}>
-          Enabled
-        </option>
-        <option value="false">Disabled</option>
-      </select>
+      <div className="flex min-h-9 items-center justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        <Switch
+          id={id}
+          checked={value === true}
+          disabled={!allowEnabled && value !== true}
+          aria-describedby={help ? `${id}-help` : undefined}
+          onCheckedChange={(enabled) => change((next) => next.setIn(path, enabled))}
+        />
+      </div>
+      {!required && typeof value === 'boolean' && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => change((next) => next.deleteIn(path))}
+        >
+          Use default
+        </Button>
+      )}
       {help && (
         <p className="help" id={`${id}-help`}>
           {help}

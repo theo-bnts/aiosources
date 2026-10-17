@@ -1,10 +1,11 @@
+import { stremioMediaTypes } from '@/components/connection-filter-fields'
 import { InstallationFilters } from '@/components/installation-filters'
 import { LanguageFilter } from '@/components/language-filter'
 import type { StremioPreferences } from '@/lib/catalog-types'
-import { browserLanguage } from '@/lib/language-preferences'
+import { defaultLanguagePreferences, resolvedLanguage } from '@/lib/language-preferences'
 
 export function defaultStremioPreferences(): StremioPreferences {
-  return { language: browserLanguage(), mode: 'unknown' }
+  return defaultLanguagePreferences()
 }
 
 export function StremioConnectionFilters({
@@ -34,7 +35,11 @@ export function StremioConnectionFilters({
       showHelp={false}
       showSources
     >
-      <LanguageFilter value={value} onChange={(language) => onChange({ ...value, ...language })} />
+      <LanguageFilter
+        layout="stacked"
+        value={value}
+        onChange={(language) => onChange({ ...value, ...language })}
+      />
     </InstallationFilters>
   )
 }
@@ -45,7 +50,7 @@ export function stremioPreferenceSummary(value?: StremioPreferences) {
   if (value.types?.length)
     filters.push(
       ...value.types.map(
-        (type) => ({ movie: 'Movies', series: 'Series', anime: 'Anime' })[type] || type,
+        (type) => stremioMediaTypes.find((option) => option.value === type)?.label || type,
       ),
     )
   if (value.services?.length)
@@ -55,8 +60,8 @@ export function stremioPreferenceSummary(value?: StremioPreferences) {
       ),
     )
   if (value.mode && value.mode !== 'all') {
-    const language =
-      new Intl.DisplayNames(['en'], { type: 'language' }).of(value.language) || value.language
+    const preferred = resolvedLanguage(value)
+    const language = new Intl.DisplayNames(['en'], { type: 'language' }).of(preferred) || preferred
     filters.push(
       language +
         (value.mode === 'preferred'

@@ -58,7 +58,7 @@ async function importSource(page: Page, json: string) {
   await expect(page.getByLabel('Display name', { exact: true })).toHaveValue(
     'Synthetic editor source',
   )
-  await expect(page.getByLabel('Source enabled', { exact: true })).toHaveValue('false')
+  await expect(page.getByRole('switch', { name: 'Source enabled', exact: true })).not.toBeChecked()
 }
 
 async function exportSource(page: Page): Promise<string> {

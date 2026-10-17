@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"net/http"
 )
@@ -36,6 +37,15 @@ func (s *server) operationDetail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, err)
 		return
+	}
+	if result.Kind == "download" {
+		continuation, e := s.options.Store.OperationDownload(r.Context(), result.ID)
+		if e == nil {
+			result.Download = &continuation
+		} else if !errors.Is(e, model.ErrNotFound) {
+			respondError(w, e)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, result)
 }

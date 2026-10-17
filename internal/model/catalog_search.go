@@ -64,3 +64,9 @@ type CatalogDownload struct {
 	OperationID   string `json:"operation_id"`
 	PreparationID string `json:"preparation_id,omitempty"`
 }
+
+type OperationDownload struct {
+	WorkID  int64                `json:"work_id"`
+	Input   CatalogDownloadInput `json:"input"`
+	Account string               `json:"-"`
+}

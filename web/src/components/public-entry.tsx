@@ -179,6 +179,7 @@ export function PublicEntry({
               services={info.data.providers ?? []}
             >
               <LanguageFilter
+                layout="stacked"
                 value={preferences}
                 onChange={(next) => {
                   setPreferences(next)

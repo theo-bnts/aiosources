@@ -17,6 +17,7 @@ type AIOMatchReview struct {
 }
 
 type AIOReviewDetail struct {
+	SuggestedYear  *int            `json:"suggested_year"`
 	SuggestedQuery string          `json:"suggested_query"`
 	Record         AIORecord       `json:"record"`
 	Review         *AIOMatchReview `json:"review"`

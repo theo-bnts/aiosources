@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('visitor announce fields are opt-in, use source names and never retain credentials', async ({
   page,
@@ -79,7 +79,7 @@ test('visitor announce fields are opt-in, use source names and never retain cred
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeHidden()
     await visitor.locator('summary', { hasText: 'Filters' }).click()
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeVisible()
-    await expect(visitor.getByLabel('Media type', { exact: true })).toBeVisible()
+    await expect(visitor.getByLabel('Media types', { exact: true })).toBeVisible()
     await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeVisible()
     const announce = visitor.getByLabel('Example Library announce URL', { exact: true })
     await expect(announce).not.toBeVisible()

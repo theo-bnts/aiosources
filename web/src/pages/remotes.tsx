@@ -101,7 +101,7 @@ export default function RemotesPage() {
     navigate(`/runs/${encodeURIComponent(run.id)}`, { state: listState })
   }
   return (
-    <div className="space-y-5">
+    <div className="page">
       <div className="flex justify-end">
         <Button onClick={() => openEditor('new')}>
           <PlusIcon />

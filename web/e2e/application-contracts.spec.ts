@@ -29,7 +29,7 @@ test('Storage is direct, sorted by size and has no backup API or duplicate avail
     metadata: 'Metadata',
     debrid: 'Debrid',
     stremio: 'Stremio',
-    sharing: 'Catalog sharing',
+    sharing: 'Shared catalogs',
     access: 'Security',
     logs: 'Logs and operation history',
     other: 'Settings and database state',

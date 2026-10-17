@@ -1,4 +1,4 @@
-import type { Download, Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 import type { TestServer } from './server'
@@ -196,21 +196,24 @@ for (const [code, status] of [
     const ids = await seedCatalog(page, server, true)
     await page.clock.install()
     let calls = 0
-    await page.route('**/api/catalog/*/download', async (route) => {
-      calls++
-      const input = route.request().postDataJSON()
-      expect(input.allow_uncached).toBe(calls === 1)
-      expect(input.preparation_id).toBe(calls === 1 ? undefined : '7')
-      await route.fulfill({
-        status: calls === 1 ? 202 : status,
-        contentType: 'application/json',
-        body: JSON.stringify(
-          calls === 1
-            ? { status: 'pending', operation_id: 'synthetic-preparation', preparation_id: '7' }
-            : { code, error: 'The file is no longer available at the provider.' },
-        ),
-      })
-    })
+    await page.route(
+      /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
+      async (route) => {
+        calls++
+        const input = route.request().postDataJSON()
+        if (calls === 1) expect(input.allow_uncached).toBe(true)
+        else expect(input).toEqual({})
+        await route.fulfill({
+          status: calls === 1 ? 202 : status,
+          contentType: 'application/json',
+          body: JSON.stringify(
+            calls === 1
+              ? { status: 'pending', operation_id: 'synthetic-preparation', preparation_id: '7' }
+              : { code, error: 'The file is no longer available at the provider.' },
+          ),
+        })
+      },
+    )
     await page.goto(`/search/${ids.movie}`)
     await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
     await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
@@ -223,7 +226,7 @@ for (const [code, status] of [
     await page.clock.runFor(60_001)
     expect(calls).toBe(2)
     await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Download file', exact: true })).toHaveCount(0)
   })
 }
 
@@ -236,59 +239,68 @@ test('mobile download controls handle pending and ready responses without keepin
   await page.clock.install()
   let calls = 0
   let referrer: string | undefined
-  await page.context().route('https://files.example/ephemeral-link', async (route) => {
+  await page.context().route('**/api/catalog-downloads/ephemeral-link', async (route) => {
     referrer = route.request().headers()['referer']
     await route.fulfill({
       contentType: 'application/octet-stream',
-      headers: { 'Content-Disposition': 'attachment; filename="example.mkv"' },
+      headers: {
+        'Content-Disposition': 'attachment; filename="example.mkv"',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Content-Security-Policy': "default-src 'none'; frame-ancestors 'self'",
+      },
       body: 'Synthetic download contents',
     })
   })
   // Only provider resolution is simulated in this browser scenario. Search,
   // authorization, data, cache evidence and selection use the real backend;
   // HTTP/service tests exercise both real provider adapters against local stubs.
-  await page.route('**/api/catalog/*/download', async (route) => {
-    const request = route.request()
-    const data = request.postDataJSON()
-    expect(request.method()).toBe('POST')
-    expect(request.headers()['x-csrf-token']).toBeTruthy()
-    expect(Object.keys(data).sort()).toEqual([
-      'allow_uncached',
-      'episode',
-      'fingerprint',
-      'occurrence_id',
-      'season',
-      'service',
-    ])
-    expect(data.service).toBe('torbox')
-    expect(data.allow_uncached).toBe(false)
-    calls++
-    await route.fulfill({
-      status: calls === 1 ? 202 : 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        status: calls === 1 ? 'pending' : 'ready',
-        operation_id: 'synthetic-download',
-        ...(calls > 1 ? { url: 'https://files.example/ephemeral-link' } : {}),
-      }),
-    })
-  })
+  await page.route(
+    /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
+    async (route) => {
+      const request = route.request()
+      const data = request.postDataJSON()
+      expect(request.method()).toBe('POST')
+      expect(request.headers()['x-csrf-token']).toBeTruthy()
+      if (calls === 0) {
+        expect(Object.keys(data).sort()).toEqual([
+          'allow_uncached',
+          'episode',
+          'fingerprint',
+          'occurrence_id',
+          'season',
+          'service',
+        ])
+        expect(data.service).toBe('torbox')
+        expect(data.allow_uncached).toBe(false)
+      } else expect(data).toEqual({})
+      calls++
+      await route.fulfill({
+        status: calls === 1 ? 202 : 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: calls === 1 ? 'pending' : 'ready',
+          operation_id: 'synthetic-download',
+          ...(calls > 1 ? { url: '/api/catalog-downloads/ephemeral-link' } : {}),
+        }),
+      })
+    },
+  )
   await page.goto(`/search/${ids.tv}`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.getByText('Not ready', { exact: true })).toBeVisible()
   await expect.poll(() => page.context().pages().length).toBe(1)
-  const started = new Promise<Download>((resolve) =>
-    page.context().once('page', (popup) => popup.once('download', resolve)),
-  )
+  const started = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Check cached file', exact: true }).click()
   const downloaded = await started
   expect(downloaded.suggestedFilename()).toBe('example.mkv')
   expect(await downloaded.failure()).toBeNull()
   expect(referrer).toBeUndefined()
-  const link = page.getByRole('link', { name: 'Download file', exact: true })
-  await expect(link).toHaveAttribute('href', 'https://files.example/ephemeral-link')
-  await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-  await expect(link).toHaveAttribute('download', '')
+  const link = page.getByRole('button', { name: 'Download file', exact: true })
+  await expect(page.locator('iframe[data-catalog-download]')).toHaveAttribute(
+    'src',
+    server.origin + '/api/catalog-downloads/ephemeral-link',
+  )
+  expect(page.context().pages()).toHaveLength(1)
   const operation = page.getByRole('link', { name: 'View operation', exact: true })
   await expect(operation).toHaveAttribute('data-slot', 'button')
   const actions = await Promise.all([link.boundingBox(), operation.boundingBox()])
@@ -329,7 +341,7 @@ test('an uncached download starts automatically when the provider becomes ready'
   await page.clock.install()
   let calls = 0
   let downloadReferrer: string | undefined
-  await page.context().route('https://files.example/prepared-download', async (route) => {
+  await page.context().route('**/api/catalog-downloads/prepared-download', async (route) => {
     downloadReferrer = route.request().headers()['referer']
     await route.fulfill({
       contentType: 'application/octet-stream',
@@ -337,81 +349,83 @@ test('an uncached download starts automatically when the provider becomes ready'
       body: 'Synthetic prepared download',
     })
   })
-  await page.route('**/api/catalog/*/download', async (route) => {
-    calls++
-    expect(route.request().postDataJSON().allow_uncached).toBe(calls === 1)
-    expect(route.request().postDataJSON().preparation_id).toBe(calls === 1 ? undefined : '7')
-    await route.fulfill({
-      status: calls === 1 ? 202 : 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        status: calls === 1 ? 'pending' : 'ready',
-        operation_id: 'synthetic-preparation',
-        ...(calls === 1 ? { preparation_id: '7' } : {}),
-        ...(calls > 1 ? { url: 'https://files.example/prepared-download' } : {}),
-      }),
-    })
-  })
-  await page.goto(`/search/${ids.movie}`)
-  const started = new Promise<Download>((resolve) =>
-    page.context().once('page', (popup) => popup.once('download', resolve)),
+  await page.route(
+    /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
+    async (route) => {
+      calls++
+      if (calls === 1) expect(route.request().postDataJSON().allow_uncached).toBe(true)
+      else expect(route.request().postDataJSON()).toEqual({})
+      await route.fulfill({
+        status: calls === 1 ? 202 : 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: calls === 1 ? 'pending' : 'ready',
+          operation_id: 'synthetic-preparation',
+          ...(calls === 1 ? { preparation_id: '7' } : {}),
+          ...(calls > 1 ? { url: '/api/catalog-downloads/prepared-download' } : {}),
+        }),
+      })
+    },
   )
+  await page.goto(`/search/${ids.movie}`)
+  const started = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
   await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
-  const pending = page
-    .context()
-    .pages()
-    .find((tab) => tab !== page)!
-  await expect(pending.getByRole('heading', { name: 'Preparing your download…' })).toBeVisible()
-  expect(await pending.evaluate(() => window.opener === null)).toBe(true)
+  expect(page.context().pages()).toHaveLength(1)
   await page.clock.runFor(15_001)
   const downloaded = await started
   expect(calls).toBe(2)
   expect(downloaded.suggestedFilename()).toBe('prepared.mkv')
   expect(await downloaded.failure()).toBeNull()
   expect(downloadReferrer).toBeUndefined()
-  await expect(page.getByRole('link', { name: 'Download file', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download file', exact: true })).toBeVisible()
 })
 
-test('failed preparations close their temporary tab and blocked popups retain a direct download', async ({
+test('failed preparations remain in the application and can be retried', async ({
   page,
   server,
 }) => {
   const ids = await seedCatalog(page, server, true)
   let fail = true
-  await page.route('**/api/catalog/*/download', async (route) => {
-    await route.fulfill({
-      status: fail ? 503 : 200,
-      contentType: 'application/json',
-      body: JSON.stringify(
-        fail
-          ? { error: 'Temporary provider failure' }
-          : {
-              status: 'ready',
-              operation_id: 'synthetic-ready',
-              url: 'https://files.example/manual-fallback',
-            },
-      ),
-    })
-  })
+  await page.route(
+    /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
+    async (route) => {
+      await route.fulfill({
+        status: fail ? 503 : 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          fail
+            ? { error: 'Temporary provider failure' }
+            : {
+                status: 'ready',
+                operation_id: 'synthetic-ready',
+                url: '/api/catalog-downloads/manual-fallback',
+              },
+        ),
+      })
+    },
+  )
   await page.goto(`/search/${ids.movie}`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.locator('[data-request-notice]')).toContainText('Temporary provider failure')
   await expect.poll(() => page.context().pages().length).toBe(1)
   fail = false
-  await page.evaluate(() => {
-    window.open = () => null
-  })
-  await page.getByRole('button', { name: 'Download', exact: true }).click()
-  await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveAttribute(
-    'href',
-    'https://files.example/manual-fallback',
+  await page.route('**/api/catalog-downloads/manual-fallback', (route) =>
+    route.fulfill({
+      contentType: 'application/octet-stream',
+      headers: { 'Content-Disposition': 'attachment; filename="retry.mkv"' },
+      body: 'Synthetic retry',
+    }),
   )
-  await expect(page.locator('[data-notification]')).toContainText('Use Download file')
+  const started = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Download file', exact: true })).toBeVisible()
+  expect((await started).suggestedFilename()).toBe('retry.mkv')
+  await expect(page.locator('[data-notification]')).toContainText('The download link is ready.')
   expect(page.context().pages()).toHaveLength(1)
 })
 
-test('leaving a title cancels its unfinished download and closes only its preparation tab', async ({
+test('leaving a title cancels its unfinished request without opening a tab', async ({
   page,
   server,
 }) => {
@@ -421,34 +435,143 @@ test('leaving a title cancels its unfinished download and closes only its prepar
   const requested = new Promise<void>((resolve) => {
     markRequested = resolve
   })
-  await page.route('**/api/catalog/*/download', async (route) => {
-    await new Promise<void>((resolve) => {
-      finish = () => {
-        void route
-          .abort()
-          .catch(() => {})
-          .finally(resolve)
-      }
-      markRequested()
-    })
-  })
+  await page.route(
+    /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
+    async (route) => {
+      await new Promise<void>((resolve) => {
+        finish = () => {
+          void route
+            .abort()
+            .catch(() => {})
+            .finally(resolve)
+        }
+        markRequested()
+      })
+    },
+  )
   await page.goto(`/search/${ids.movie}`)
-  const opened = page.waitForEvent('popup')
   await page.getByRole('button', { name: 'Download', exact: true }).click()
-  const pending = await opened
   try {
     await requested
-    await expect(pending.getByRole('heading', { name: 'Preparing your download…' })).toBeVisible()
+    expect(page.context().pages()).toHaveLength(1)
     await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
-    await expect.poll(() => pending.isClosed()).toBe(true)
-    await expect(page.getByRole('link', { name: 'Download file', exact: true })).toHaveCount(0)
+    expect(page.context().pages()).toHaveLength(1)
+    await expect(page.getByRole('button', { name: 'Download file', exact: true })).toHaveCount(0)
   } finally {
     finish()
   }
 })
 
+test('an added file can be followed and downloaded from its original history operation', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  const operation = '30000000-0000-4000-8000-000000000001'
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(
+      `INSERT INTO ingest.operation_runs(id,kind,service,trigger,resource,lock_key,status,phase,processed,finished_at) VALUES($1,'download','torbox','manual','movie:tt1234567',1,'succeeded','waiting',1,now());
+    `,
+      [operation],
+    )
+    await db.query(
+      `INSERT INTO ingest.operation_downloads(run_id,work_id,input,account)
+      SELECT $1,$2,jsonb_build_object('occurrence_id',occurrence_id,'fingerprint',fields_fingerprint,'service','torbox','allow_uncached',false,'preparation_id','7'),'synthetic-account'
+      FROM ingest.torrents WHERE source_id='film-two'`,
+      [operation, ids.movie],
+    )
+    await page.clock.install()
+    await page.route(/\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/, (route) =>
+      route.fulfill({
+        status: 202,
+        json: { status: 'pending', operation_id: operation, preparation_id: '7' },
+      }),
+    )
+    let checks = 0
+    await page.route(`**/api/operations/${operation}/download`, async (route) => {
+      expect(route.request().headers()['x-csrf-token']).toBeTruthy()
+      expect(route.request().postDataJSON()).toEqual({})
+      checks++
+      if (checks > 1)
+        await db.query("UPDATE ingest.operation_runs SET phase='ready' WHERE id=$1", [operation])
+      await route.fulfill({
+        status: checks > 1 ? 200 : 202,
+        json: {
+          status: checks > 1 ? 'ready' : 'pending',
+          operation_id: operation,
+          ...(checks > 1 ? { url: '/api/catalog-downloads/followed' } : { preparation_id: '7' }),
+        },
+      })
+    })
+    await page.route('**/api/catalog-downloads/followed', (route) =>
+      route.fulfill({
+        contentType: 'application/octet-stream',
+        headers: { 'Content-Disposition': 'attachment; filename="followed.mkv"' },
+        body: 'Synthetic followed download',
+      }),
+    )
+    await page.goto(`/search/${ids.movie}`)
+    await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+    await page.getByRole('link', { name: 'View operation', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`/debrid/history/${operation}$`))
+    await expect(page.getByRole('region', { name: 'Download', exact: true })).toBeVisible()
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(15_001)
+        return checks
+      })
+      .toBeGreaterThan(0)
+    const download = page.getByRole('button', { name: 'Download file', exact: true })
+    await expect
+      .poll(async () => {
+        await page.clock.runFor(15_001)
+        return download.isVisible()
+      })
+      .toBe(true)
+    const started = page.waitForEvent('download')
+    await download.click()
+    expect((await started).suggestedFilename()).toBe('followed.mkv')
+    expect(page.context().pages()).toHaveLength(1)
+    await expect(page).toHaveURL(new RegExp(`/debrid/history/${operation}$`))
+  } finally {
+    await db.end()
+  }
+})
+
 test.describe('browser language preferences', () => {
   test.use({ locale: 'fr-FR' })
+  test('identification review pre-fills the year and uses the same localized titles as Search', async ({
+    page,
+    server,
+  }) => {
+    await seedCatalog(page, server)
+    const db = new pg.Client({ connectionString: server.databaseURL })
+    await db.connect()
+    try {
+      await db.query(
+        `UPDATE ingest.aio_works SET localized_titles='{"fr":"Long Métrage Exemple","en":"Example Feature"}' WHERE media_type='movie'`,
+      )
+    } finally {
+      await db.end()
+    }
+    await page.goto('/metadata/identification?match_status=all&match_q=example+film')
+    await page
+      .getByRole('button', { name: 'Review Example-Film.New.Day.2026.1080p', exact: true })
+      .click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByLabel('Year', { exact: true })).toHaveValue('2026')
+    await expect(
+      dialog.getByRole('radio', { name: 'Choose Long Métrage Exemple', exact: true }),
+    ).toBeVisible()
+    await dialog.getByLabel('Year', { exact: true }).fill('2020')
+    await expect(dialog.getByRole('radio')).toHaveCount(0)
+    await dialog.getByLabel('Year', { exact: true }).fill('')
+    await expect(
+      dialog.getByRole('radio', { name: 'Choose Long Métrage Exemple', exact: true }),
+    ).toBeVisible()
+  })
   test('localized titles and the optional shared language filter remain offline and largest first', async ({
     page,
     server,
@@ -483,7 +606,7 @@ test.describe('browser language preferences', () => {
     await page.getByRole('button', { name: 'Create access', exact: true }).click()
     const editor = page.getByRole('dialog')
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
-    await expect(editor.getByLabel('Preferred language', { exact: true })).toHaveValue('fr')
+    await expect(editor.getByLabel('Preferred language', { exact: true })).toHaveValue('')
     await expect(
       editor.getByRole('switch', { name: 'Filter languages', exact: true }),
     ).toBeChecked()

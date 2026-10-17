@@ -27,3 +27,12 @@ func (s *Store) SharedAvailabilityStats(ctx context.Context, after time.Time) ([
 	}
 	return items, databaseError("count shared availability", rows.Err())
 }
+
+// Account observations include negative AllDebrid checks that cannot safely be
+// shared. This is the last result per hash, not a global cache coverage rate.
+func (s *Store) AvailabilityCheckStats(ctx context.Context, service, account string, after time.Time) (model.AvailabilityCheckStats, error) {
+	var result model.AvailabilityCheckStats
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE cached),count(*) FILTER(WHERE NOT cached),max(checked_at)
+ FROM ingest.aio_availability WHERE service=$1 AND account=$2 AND checked_at>$3 AND checked_at<=now()`, service, account, after).Scan(&result.Cached, &result.Uncached, &result.LastChecked)
+	return result, databaseError("read account availability statistics", err)
+}

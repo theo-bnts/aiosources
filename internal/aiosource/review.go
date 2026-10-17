@@ -7,9 +7,9 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-func (s *Service) ReviewCandidates(ctx context.Context, query, kind string) ([]model.AIOWork, error) {
+func (s *Service) ReviewCandidates(ctx context.Context, query, kind string, filters ...model.CatalogSearchFilters) ([]model.AIOWork, error) {
 	query = strings.TrimSpace(query)
-	return s.DB.AIOReviewCandidates(ctx, query, Normalize(query), kind)
+	return s.DB.AIOReviewCandidates(ctx, query, Normalize(query), kind, filters...)
 }
 
 func (s *Service) SaveReview(ctx context.Context, occurrence string, input model.AIOReviewInput) error {

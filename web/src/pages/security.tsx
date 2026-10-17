@@ -13,6 +13,7 @@ import type {
   RecoveryCodes,
   SecurityStatus,
 } from '@/lib/security-types'
+import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -176,9 +177,16 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
               </div>
             </div>
             {status.data && (
-              <Badge variant={status.data.mfa_enabled ? 'success' : 'warning'}>
-                {status.data.mfa_enabled ? 'Enabled' : 'Not enabled'}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="verification-enabled">Two-step verification</Label>
+                <Switch
+                  id="verification-enabled"
+                  checked={status.data.mfa_enabled}
+                  onCheckedChange={(enabled) =>
+                    open(enabled ? (enrollment ? 'confirm' : 'enroll') : 'disable')
+                  }
+                />
+              </div>
             )}
           </div>
           <ErrorNotice error={status.error} retry={() => void status.refetch()} />
@@ -203,9 +211,6 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       <Button variant="warning" onClick={() => open('recovery')}>
                         Replace recovery codes
                       </Button>
-                      <Button variant="warning" onClick={() => open('disable')}>
-                        Disable verification
-                      </Button>
                     </div>
                   </>
                 ) : (
@@ -219,18 +224,20 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       </p>
                     )}
                     <div className="toolbar">
-                      <Button
-                        variant={
-                          !enrollment && status.data.pending_expires_at ? 'warning' : 'default'
-                        }
-                        onClick={() => open(enrollment ? 'confirm' : 'enroll')}
-                      >
-                        {enrollment
-                          ? 'Continue setup'
-                          : status.data.pending_expires_at
-                            ? 'Restart setup'
-                            : 'Set up verification'}
-                      </Button>
+                      {(enrollment || status.data.pending_expires_at) && (
+                        <Button
+                          variant={
+                            !enrollment && status.data.pending_expires_at ? 'warning' : 'default'
+                          }
+                          onClick={() => open(enrollment ? 'confirm' : 'enroll')}
+                        >
+                          {enrollment
+                            ? 'Continue setup'
+                            : status.data.pending_expires_at
+                              ? 'Restart setup'
+                              : 'Set up verification'}
+                        </Button>
+                      )}
                       {status.data.pending_expires_at && (
                         <Button variant="warning" onClick={() => open('cancel')}>
                           Cancel setup

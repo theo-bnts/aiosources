@@ -6,7 +6,13 @@ import type { Config } from '@/lib/aiosource-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 
-type CacheStats = { service: string; cached: number; uncached: number; last_checked: string }
+type CacheStats = {
+  service: string
+  cached: number
+  uncached: number
+  last_checked: string
+  checks?: { cached: number; uncached: number; last_checked: string | null }
+}
 
 export function DebridStatistics({ config }: { config: Config }) {
   const date = useDate()
@@ -22,8 +28,8 @@ export function DebridStatistics({ config }: { config: Config }) {
         <Loading label="Loading cache statistics" />
       ) : (
         query.data && (
-          <section className="space-y-4" aria-label="Shared availability cache">
-            <h2 className="section-title">Shared availability cache</h2>
+          <section className="space-y-4" aria-label="Availability checks">
+            <h2 className="section-title">Availability checks</h2>
             <div className="grid gap-5 md:grid-cols-2">
               {(
                 [
@@ -32,8 +38,9 @@ export function DebridStatistics({ config }: { config: Config }) {
                 ] as const
               ).map(([service, name, configured]) => {
                 const item = query.data.items.find((item) => item.service === service)
-                const cached = item?.cached ?? 0,
-                  uncached = item?.uncached ?? 0,
+                const counts = item?.checks ?? item
+                const cached = counts?.cached ?? 0,
+                  uncached = counts?.uncached ?? 0,
                   total = cached + uncached
                 return (
                   <section className="section-card" key={service}>
@@ -59,9 +66,15 @@ export function DebridStatistics({ config }: { config: Config }) {
                     </dl>
                     <p className="help">
                       {total
-                        ? `${number(total)} valid observations · Last check: ${date(item?.last_checked)}`
-                        : 'No valid shared observations yet.'}
+                        ? `${number(total)} ${item?.checks ? 'account checks' : 'shared observations'} · Last check: ${date(counts?.last_checked ?? undefined)}`
+                        : 'No checks in the current cache period.'}
                     </p>
+                    {item?.checks && (
+                      <p className="help">
+                        Shared cache: {number(item.cached)} cached · {number(item.uncached)} not
+                        cached
+                      </p>
+                    )}
                     <Link className="data-link text-sm" to={`/debrid/history?service=${service}`}>
                       View history
                     </Link>
@@ -70,8 +83,9 @@ export function DebridStatistics({ config }: { config: Config }) {
               })}
             </div>
             <p className="help">
-              Only reusable observations within the current cache lifetime. Unchecked and expired
-              torrents are excluded.
+              Last known result per torrent and service within the cache period; not the percentage
+              of your catalog available at the provider. Negative checks may need rechecking sooner.
+              Shared cache counts include only reusable observations.
             </p>
           </section>
         )

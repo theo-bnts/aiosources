@@ -29,6 +29,7 @@ import {
   ShieldCheckIcon,
   CaretDownIcon,
   DownloadSimpleIcon,
+  CloudArrowDownIcon,
   GearSixIcon,
   ListChecksIcon,
   BroadcastIcon,
@@ -90,6 +91,12 @@ const navigationGroups = [
         label: 'Sources',
         description: 'Source connections and automatic imports.',
         icon: PlugsConnectedIcon,
+      },
+      {
+        to: '/remotes',
+        label: 'Remote catalogs',
+        description: 'Import read-only catalogs shared by other instances.',
+        icon: CloudArrowDownIcon,
       },
       {
         to: '/torrents',
@@ -167,8 +174,8 @@ const navigationGroups = [
       },
       {
         to: '/sharing',
-        label: 'Catalog sharing',
-        description: 'Share published catalogs and synchronize remote copies.',
+        label: 'Shared catalogs',
+        description: 'Share published catalogs with other instances.',
         icon: ShareNetworkIcon,
       },
       {
@@ -444,8 +451,8 @@ export function AppShell({
       ? '/providers'
       : ['/notifications', '/webhooks'].includes(location.pathname)
         ? '/logs'
-        : location.pathname === '/remotes'
-          ? '/sharing'
+        : location.pathname === '/sharing/remotes'
+          ? '/remotes'
           : location.pathname === '/secrets'
             ? '/security'
             : location.pathname

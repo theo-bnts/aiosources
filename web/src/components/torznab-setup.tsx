@@ -15,14 +15,14 @@ export function TorznabSetup({
 }) {
   const [value, setValue] = useState<TorznabOptions>({})
   const selected = value.sources ?? []
-  const category = value.media?.[0] ?? ''
+
   const url = share.url ? new URL(share.url) : null
   const permitted = sources.filter(
     (source) => share.scope === 'all' || share.source_ids.includes(source.id),
   )
   const filters = new URLSearchParams()
   if (selected.length) filters.set('sources', selected.join(','))
-  if (category) filters.set('media', category)
+  if (value.media?.length) filters.set('media', value.media.join(','))
   if (value.services?.length) filters.set('services', value.services.join(','))
   if (value.cached_only) filters.set('cached_only', 'true')
   const additional = filters.size ? '&' + filters.toString() : ''

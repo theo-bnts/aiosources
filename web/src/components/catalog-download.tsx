@@ -30,17 +30,21 @@ export function DownloadAction({
   release,
   service,
   selection,
+  operationID,
+  preparing = false,
 }: {
   workID: string
   release: CatalogRelease
   service: CatalogAvailability
   selection: CatalogSelection
+  operationID?: string
+  preparing?: boolean
 }) {
   const [ready, setReady] = useState<CatalogDownload | null>(null)
-  const [waiting, setWaiting] = useState(false)
+  const [waiting, setWaiting] = useState(preparing)
   const [notReady, setNotReady] = useState(false)
-  const [operation, setOperation] = useState('')
-  const [preparationID, setPreparationID] = useState('')
+  const [operation, setOperation] = useState(operationID ?? '')
+  const [checkVersion, setCheckVersion] = useState(0)
   const notify = useNotification()
   const attempts = useRef(0)
   const controller = useRef<AbortController | null>(null)
@@ -56,23 +60,31 @@ export function DownloadAction({
     gcTime: 0,
     mutationFn: (allowUncached: boolean) => {
       controller.current = new AbortController()
-      return api<CatalogDownload>(`/catalog/${workID}/download`, {
-        method: 'POST',
-        signal: controller.current.signal,
-        body: JSON.stringify({
-          ...selection,
-          occurrence_id: release.occurrence_id,
-          fingerprint: release.fingerprint,
-          service: service.service,
-          allow_uncached: allowUncached,
-          ...(!allowUncached && preparationID ? { preparation_id: preparationID } : {}),
-        }),
-      })
+      const continuation = operationID || (!allowUncached ? operation : '')
+      return api<CatalogDownload>(
+        continuation
+          ? `/operations/${encodeURIComponent(continuation)}/download`
+          : `/catalog/${workID}/download`,
+        {
+          method: 'POST',
+          signal: controller.current.signal,
+          body: JSON.stringify(
+            continuation
+              ? {}
+              : {
+                  ...selection,
+                  occurrence_id: release.occurrence_id,
+                  fingerprint: release.fingerprint,
+                  service: service.service,
+                  allow_uncached: allowUncached,
+                },
+          ),
+        },
+      )
     },
     onSuccess: (result, allowUncached) => {
       setOperation(result.operation_id)
       const pending = result.status === 'pending'
-      setPreparationID(pending ? result.preparation_id || '' : '')
       setWaiting(pending && (allowUncached || waiting))
       setNotReady(pending)
       if (!pending) {
@@ -83,7 +95,7 @@ export function DownloadAction({
         notify(
           started
             ? 'The download link is ready.'
-            : 'The download link is ready. Use Download file if your browser blocked the new tab.',
+            : 'The download link is ready. Use Download file to start it.',
         )
       } else if (!(allowUncached || waiting) || attempts.current >= 20) {
         download.current?.cancel()
@@ -91,18 +103,31 @@ export function DownloadAction({
       }
       // Keep the temporary URL only in this view's expiring local state.
       mutation.reset()
+      // A fast pending response can batch both mutation transitions into one
+      // render. Schedule the next check even when its visible state is unchanged.
+      setCheckVersion((version) => version + 1)
       void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
+      if (operationID) {
+        void queryClient.invalidateQueries({ queryKey: ['operation', operationID] })
+        void queryClient.invalidateQueries({ queryKey: ['operation-events', operationID] })
+      }
     },
     onError: (error) => {
       download.current?.cancel()
       download.current = null
-      if (error instanceof ApiError && ['not_found', 'not_cached'].includes(error.code || '')) {
+      if (
+        error instanceof ApiError &&
+        ['not_found', 'not_cached', 'conflict'].includes(error.code || '')
+      ) {
         setWaiting(false)
         setNotReady(true)
         setReady(null)
-        setPreparationID('')
       }
       void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
+      if (operationID) {
+        void queryClient.invalidateQueries({ queryKey: ['operation', operationID] })
+        void queryClient.invalidateQueries({ queryKey: ['operation-events', operationID] })
+      }
     },
   })
   const run = mutation.mutate
@@ -113,7 +138,7 @@ export function DownloadAction({
       run(false)
     }, 15_000)
     return () => window.clearTimeout(timer)
-  }, [waiting, mutation.isPending, mutation.isError, run])
+  }, [waiting, mutation.isPending, mutation.isError, run, checkVersion])
   useEffect(() => {
     if (!ready) return
     const timer = window.setTimeout(() => setReady(null), 10 * 60_000)
@@ -140,18 +165,13 @@ export function DownloadAction({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {ready?.url ? (
-          <Button asChild size="sm">
-            <a
-              title={details || undefined}
-              href={ready.url}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              referrerPolicy="no-referrer"
-            >
-              <DownloadSimpleIcon />
-              Download file
-            </a>
+          <Button
+            size="sm"
+            title={details || undefined}
+            onClick={() => prepareBrowserDownload().start(ready.url!)}
+          >
+            <DownloadSimpleIcon />
+            Download file
           </Button>
         ) : (
           <Button
@@ -182,7 +202,7 @@ export function DownloadAction({
                     : 'Check cached file'}
           </Button>
         )}
-        {operation && (
+        {operation && !operationID && (
           <Button asChild size="sm" variant="ghost">
             <Link to={`/debrid/history/${encodeURIComponent(operation)}`}>
               View operation

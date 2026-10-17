@@ -6,9 +6,11 @@ import { browserLanguage, type LanguagePreferences } from '@/lib/language-prefer
 export function LanguageFilter({
   value,
   onChange,
+  layout = 'inline',
 }: {
   value: LanguagePreferences
   onChange: (value: LanguagePreferences) => void
+  layout?: 'inline' | 'stacked'
 }) {
   const id = useId()
   const last = useRef<Exclude<LanguagePreferences['mode'], 'all'>>(
@@ -58,8 +60,18 @@ export function LanguageFilter({
     ),
   ].sort((a, b) => (names.of(a) || a).localeCompare(names.of(b) || b))
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="flex items-center gap-3 self-center text-sm">
+    <div
+      className={
+        layout === 'stacked' ? 'grid gap-4 sm:grid-cols-2' : 'flex flex-wrap items-end gap-3'
+      }
+    >
+      <label
+        className={
+          layout === 'stacked'
+            ? 'flex flex-row-reverse items-center justify-between gap-3 text-sm sm:col-span-2'
+            : 'flex items-center gap-3 self-center text-sm'
+        }
+      >
         <Switch
           aria-label="Filter languages"
           checked={value.mode !== 'all'}
@@ -73,7 +85,7 @@ export function LanguageFilter({
         <Label htmlFor={`${id}-language`}>Preferred language</Label>
         <select
           id={`${id}-language`}
-          className="native-select max-w-full"
+          className={layout === 'stacked' ? 'native-select w-full' : 'native-select max-w-full'}
           value={value.language}
           disabled={value.mode === 'all'}
           onChange={(e) => onChange({ ...value, language: e.target.value })}
@@ -90,16 +102,16 @@ export function LanguageFilter({
         <Label htmlFor={`${id}-include`}>Include</Label>
         <select
           id={`${id}-include`}
-          className="native-select max-w-full"
+          className={layout === 'stacked' ? 'native-select w-full' : 'native-select max-w-full'}
           disabled={value.mode === 'all'}
           value={value.mode === 'all' ? last.current : value.mode}
           onChange={(e) =>
             onChange({ ...value, mode: e.target.value as LanguagePreferences['mode'] })
           }
         >
-          <option value="preferred">Preferred language only</option>
-          <option value="multi">Preferred language + MULTI</option>
-          <option value="unknown">Preferred language + MULTI + unknown</option>
+          <option value="preferred">Preferred only</option>
+          <option value="multi">Preferred + MULTI</option>
+          <option value="unknown">Preferred + MULTI + unknown</option>
         </select>
       </div>
     </div>

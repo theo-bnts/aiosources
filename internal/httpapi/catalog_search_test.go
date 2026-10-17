@@ -14,6 +14,16 @@ import (
 
 func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 	f, addon, conn := addonAPI(t)
+	if got := f.request("POST", "/api/operations/missing/download", "{}", false, ""); got.Code != 401 {
+		t.Fatal("download continuation exposed without administration", got.Code)
+	}
+	protected := httptest.NewRequest("POST", "/api/operations/missing/download", strings.NewReader("{}"))
+	protected.AddCookie(f.cookie)
+	rejected := httptest.NewRecorder()
+	f.handler.ServeHTTP(rejected, protected)
+	if rejected.Code != 403 {
+		t.Fatal("download continuation bypassed CSRF", rejected.Code)
+	}
 	w := model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie: New Day"}, Years: []int{2026}}
 	if err := f.db.SaveAIOWork(f.ctx, w, []string{"example movie new day"}); err != nil {
 		t.Fatal(err)
@@ -196,7 +206,7 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 			path := fmt.Sprintf("/api/catalog/%d/download", id)
 			response := f.request("POST", path, string(body), true, "")
 			var result model.CatalogDownload
-			if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Status != "ready" || result.URL != "https://files.example/download" || result.OperationID == "" {
+			if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &result) != nil || result.Status != "ready" || !strings.HasPrefix(result.URL, "/api/catalog-downloads/") || result.OperationID == "" {
 				t.Fatalf("ready download response: %d %s", response.Code, response.Body)
 			}
 			ready.Store(false)
@@ -207,6 +217,28 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 			}
 			if result.PreparationID != "7" {
 				t.Fatal("pending download lost its account item reference")
+			}
+
+			original := result.OperationID
+			ready.Store(true)
+			follow := f.request("POST", "/api/operations/"+original+"/download", "{}", true, "")
+			var followed model.CatalogDownload
+			if follow.Code != 200 || json.Unmarshal(follow.Body.Bytes(), &followed) != nil || followed.OperationID != original || !strings.HasPrefix(followed.URL, "/api/catalog-downloads/") {
+				t.Fatalf("continuation did not update its original operation: %d %s", follow.Code, follow.Body)
+			}
+			detail := f.request("GET", "/api/operations/"+original, "", true, "")
+			if detail.Code != 200 || !strings.Contains(detail.Body.String(), `"download":`) || strings.Contains(detail.Body.String(), "synthetic-download-key") || strings.Contains(detail.Body.String(), "files.example") || strings.Contains(detail.Body.String(), `"account"`) {
+				t.Fatal("unsafe or missing history continuation", detail.Code)
+			}
+			if err := addon.Vault.Put(f.ctx, "debrid", "replacement-account"); err != nil {
+				t.Fatal(err)
+			}
+			changed := f.request("POST", "/api/operations/"+original+"/download", "{}", true, "")
+			if changed.Code != 409 {
+				t.Fatal("continuation used a different provider account", changed.Code)
+			}
+			if err := addon.Vault.Put(f.ctx, "debrid", "synthetic-download-key"); err != nil {
+				t.Fatal(err)
 			}
 			// The account item can disappear between readiness checks. Never
 			// turn its cache miss into a 502 or retry an uncached creation.

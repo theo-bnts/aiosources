@@ -32,11 +32,11 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Connections', 'Stremio', '/addon'],
     ['Connections', 'Stremio', '/addon/settings'],
     ['Connections', 'Stremio', '/addon/history'],
-    ['Connections', 'Catalog sharing', '/sharing'],
+    ['Connections', 'Shared catalogs', '/sharing'],
     ['Connections', 'Torznab', '/torznab'],
     ['Connections', 'Public access', '/public-access'],
-    ['Connections', 'Catalog sharing', '/sharing/remotes'],
-    ['Connections', 'Catalog sharing', '/remotes'],
+    ['Sources', 'Remote catalogs', '/sharing/remotes'],
+    ['Sources', 'Remote catalogs', '/remotes'],
     ['Administration', 'Storage', '/health'],
     ['Administration', 'Security', '/security'],
     ['Administration', 'Security', '/secrets'],
@@ -77,6 +77,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
   ])
   await expect(navigation.getByRole('link')).toHaveText([
     'Sources',
+    'Remote catalogs',
     'Torrent search',
     'Metadata',
     'Identification',
@@ -84,7 +85,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Search',
     'Stremio',
     'Torznab',
-    'Catalog sharing',
+    'Shared catalogs',
     'Public access',
     'Security',
     'Storage',
@@ -99,7 +100,6 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Backups',
     'Notifications',
     'External notifications',
-    'Remote catalogs',
   ])
     await expect(navigation.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /notification/i })).toHaveCount(0)

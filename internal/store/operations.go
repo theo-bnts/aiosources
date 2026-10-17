@@ -98,7 +98,7 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 	_, err = tx.Exec(ctx, `UPDATE ingest.operation_runs SET phase=$2,processed=$3,errors=$4,results=$5,status=$6,error=$7,updated_at=now(),finished_at=CASE WHEN $6='running' THEN NULL ELSE now() END WHERE id=$1`, run.ID, run.Phase, run.Processed, run.Errors, results, run.Status, run.Error)
 	if err == nil && (previous != run.Phase || run.Status != "running") {
 		phase := run.Phase
-		if run.Status != "running" {
+		if run.Status != "running" && !(run.Kind == "download" && run.Status == "succeeded" && run.Phase == "waiting") {
 			phase = run.Status
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO ingest.operation_events(run_id,phase,processed,errors) VALUES($1,$2,$3,$4)`, run.ID, phase, run.Processed, run.Errors)

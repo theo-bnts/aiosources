@@ -9,16 +9,26 @@ import (
 )
 
 func (s *server) aioReviewDetail(w http.ResponseWriter, r *http.Request) {
-	detail, err := s.options.Store.AIOReviewDetail(r.Context(), r.PathValue("id"))
+	detail, err := s.options.Store.AIOReviewDetail(r.Context(), r.PathValue("id"), catalogLanguage(r))
 	if err != nil {
 		respondError(w, err)
 		return
 	}
-	detail.SuggestedQuery = aiosource.ParseRelease(detail.Record.Title).Title
+	parsed := aiosource.ParseRelease(detail.Record.Title)
+	detail.SuggestedQuery, detail.SuggestedYear = parsed.Title, parsed.Year
 	writeJSON(w, 200, detail)
 }
 func (s *server) aioReviewCandidates(w http.ResponseWriter, r *http.Request) {
-	items, err := s.options.AIOSource.ReviewCandidates(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("type"))
+	filters := model.CatalogSearchFilters{Language: catalogLanguage(r)}
+	if raw := r.URL.Query().Get("year"); raw != "" {
+		year, err := strconv.Atoi(raw)
+		if err != nil || len(raw) != 4 || year < 1000 || year > 9999 {
+			respondError(w, model.ErrInvalid)
+			return
+		}
+		filters.Year = year
+	}
+	items, err := s.options.AIOSource.ReviewCandidates(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("type"), filters)
 	if err != nil {
 		respondError(w, err)
 		return

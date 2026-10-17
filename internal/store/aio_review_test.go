@@ -147,3 +147,39 @@ func TestReviewedMetadataDeletionAndRestorationRemainSafe(t *testing.T) {
 		t.Fatal("unbounded short search accepted")
 	}
 }
+
+func TestReviewCandidatesUseCatalogLocaleYearAndNormalizedWordRules(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	for _, work := range []model.AIOWork{
+		{Type: "movie", TMDB: "501", Years: []int{2021, 2024}, DisplayTitle: "Example Feature", LocalizedTitles: map[string]string{"fr": "Long Métrage Exemple", "en": "Example Feature"}, Titles: []string{"Example Feature", "Long Métrage Exemple"}},
+		{Type: "tv", TMDB: "502", Years: []int{2010}, SeasonYears: map[int]int{2: 2020}, DisplayTitle: "Example Series", LocalizedTitles: map[string]string{"en": "Example Series"}, Titles: []string{"Example Series"}},
+	} {
+		if err := db.SaveAIOWork(ctx, work, func() []string {
+			titles := []string{}
+			for _, title := range work.Titles {
+				titles = append(titles, strings.ToLower(title))
+			}
+			return titles
+		}()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		query, normalized, kind, locale string
+		year                            int
+		want                            string
+	}{
+		{"Example.Feature", "example feature", "movie", "fr", 2024, "Long Métrage Exemple"},
+		{"Example Feature", "example feature", "movie", "de", 2021, "Example Feature"},
+		{"Example Series", "example series", "tv", "fr", 2015, "Example Series"},
+	} {
+		works, err := db.AIOReviewCandidates(ctx, tc.query, tc.normalized, tc.kind, model.CatalogSearchFilters{Year: tc.year, Language: tc.locale})
+		if err != nil || len(works) != 1 || works[0].DisplayTitle != tc.want {
+			t.Fatalf("inconsistent review candidate: %+v %v", works, err)
+		}
+	}
+	works, err := db.AIOReviewCandidates(ctx, "Example Feature", "example feature", "movie", model.CatalogSearchFilters{Year: 2022})
+	if err != nil || len(works) != 0 {
+		t.Fatal("movie years became a continuous span", works, err)
+	}
+}

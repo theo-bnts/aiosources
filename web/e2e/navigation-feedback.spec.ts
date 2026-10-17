@@ -368,10 +368,11 @@ test.describe('return navigation', () => {
       await db.end()
     }
     await page.goto('/sharing/remotes?q=Remote&state=disabled')
+    await expect(page).toHaveURL(/\/remotes\?q=Remote&state=disabled$/)
     const origin = page.url()
     await page.getByRole('link', { name: /View run/ }).click()
     await page.reload()
-    await page.getByRole('link', { name: 'Remote catalogs', exact: true }).click()
+    await page.getByRole('main').getByRole('link', { name: 'Remote catalogs', exact: true }).click()
     await expect(page).toHaveURL(origin)
     expect(server.sourceRequests()).toBe(0)
   })

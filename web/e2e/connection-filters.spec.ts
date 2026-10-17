@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 import type { SharePassword } from '../src/lib/catalog-types'
 
 test('Torznab uses the shared access editor, keeps keys transient and generates multiple URL filters', async ({
@@ -18,16 +18,31 @@ test('Torznab uses the shared access editor, keeps keys transient and generates 
     'password',
   )
   await expect(dialog.getByLabel('Torznab API key', { exact: true })).not.toHaveValue('')
+  await dialog.getByRole('button', { name: 'Reveal API key', exact: true }).click()
+  const keyBox = await dialog.getByLabel('Torznab API key', { exact: true }).boundingBox()
+  const eyeBox = await dialog
+    .getByRole('button', { name: 'Hide API key', exact: true })
+    .boundingBox()
+  expect(
+    keyBox &&
+      eyeBox &&
+      eyeBox.x >= keyBox.x + keyBox.width - 44 &&
+      eyeBox.x + eyeBox.width <= keyBox.x + keyBox.width + 1,
+  ).toBe(true)
+  await expect(dialog.getByLabel('Torznab API key', { exact: true })).toHaveAttribute(
+    'type',
+    'text',
+  )
   await dialog.getByRole('button', { name: 'I have saved the API key', exact: true }).click()
   const card = page.getByRole('region', { name: 'Access External application' })
   await expect(card.getByText('Disabled', { exact: true })).toBeVisible()
   await card.getByText('Client setup & filters', { exact: true }).click()
   await card.locator('summary', { hasText: /^Filters$/ }).click()
-  await card.getByLabel('Media type', { exact: true }).selectOption('movie')
+  await selectMultiple(card, 'Media types', ['movie', 'tv'])
   await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveValue(
-    '&media=movie',
+    '&media=movie%2Ctv',
   )
-  await card.getByLabel('Media type', { exact: true }).selectOption('tv')
+  await selectMultiple(card, 'Media types', ['tv'])
   await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveValue(
     '&media=tv',
   )
@@ -50,9 +65,9 @@ test('saved Stremio access updates the same manifest and can be independently re
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Access name', { exact: true }).fill('Living room')
-  await expect(dialog.getByLabel('Media type', { exact: true })).toBeHidden()
+  await expect(dialog.getByLabel('Media types', { exact: true })).toBeHidden()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
-  await dialog.getByLabel('Media type', { exact: true }).selectOption('movie')
+  await selectMultiple(dialog, 'Media types', ['movie'])
   await dialog.getByLabel('Preferred language', { exact: true }).selectOption('fr')
   await dialog.getByLabel('Cached results only', { exact: true }).check()
   await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
@@ -68,7 +83,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   await dialog.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   const card = page.getByRole('region', { name: 'Access Living room', exact: true })
   await expect(card.getByText('Disabled', { exact: true })).toBeVisible()
-  await card.getByRole('button', { name: 'Enable', exact: true }).click()
+  await card.getByRole('switch', { name: 'Enable Living room', exact: true }).click()
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Enable access', exact: true })
@@ -80,7 +95,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   expect(firstManifest.types).toEqual(['movie', 'series', 'anime'])
   await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
-  await dialog.getByLabel('Media type', { exact: true }).selectOption('series')
+  await selectMultiple(dialog, 'Media types', ['series'])
   await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const changed = await (await page.request.get(manifest)).json()
@@ -179,10 +194,18 @@ test('saved service selections remain editable without widening access after a k
     .click()
   const dialog = page.getByRole('dialog')
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
-  await expect(dialog.getByLabel('AllDebrid (not configured)', { exact: true })).toBeChecked()
-  await dialog.getByLabel('TorBox', { exact: true }).check()
-  await expect(dialog.getByLabel('Direct torrents', { exact: true })).not.toBeChecked()
-  await dialog.getByLabel('AllDebrid (not configured)', { exact: true }).uncheck()
+  await dialog.getByRole('button', { name: 'Services', exact: true }).click()
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'AllDebrid (not configured)', exact: true }),
+  ).toBeChecked()
+  await page.getByRole('menuitemcheckbox', { name: 'TorBox', exact: true }).check()
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'Direct torrents', exact: true }),
+  ).not.toBeChecked()
+  await page
+    .getByRole('menuitemcheckbox', { name: 'AllDebrid (not configured)', exact: true })
+    .uncheck()
+  await page.keyboard.press('Escape')
   await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const data = await (await page.request.get('/api/stremio/connections')).json()
@@ -303,3 +326,23 @@ for (const format of ['stremio', 'torznab'] as const) {
     })
   })
 }
+
+test('new Stremio access uses the same browser language defaults and saves a resolved locale', async ({
+  page,
+}) => {
+  await page.goto('/addon/settings')
+  await page.getByRole('button', { name: 'Create access', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Access name', { exact: true }).fill('Browser language access')
+  await dialog.locator('summary', { hasText: /^Filters$/ }).click()
+  await expect(dialog.getByLabel('Preferred language', { exact: true })).toHaveValue('')
+  await expect(dialog.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
+  await expect(dialog.getByLabel('Include', { exact: true })).toHaveValue('unknown')
+  await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await dialog.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
+  const data = await (await page.request.get('/api/stremio/connections')).json()
+  expect(data.items[0].stream_preferences).toMatchObject({ language: 'en', mode: 'unknown' })
+  await expect(
+    page.getByRole('region', { name: 'Access Browser language access', exact: true }),
+  ).toContainText('English + MULTI + unknown')
+})

@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -102,16 +101,7 @@ func (s *server) catalogDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item, err := s.options.AIOSource.CatalogDownload(r.Context(), id, input)
-	if errors.Is(err, aiosource.ErrPending) {
-		w.Header().Set("Retry-After", "15")
-		writeJSON(w, http.StatusAccepted, item)
-		return
-	}
-	if err != nil {
-		respondError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, item)
+	s.writeCatalogDownload(w, r, item, err)
 }
 
 func catalogLanguage(r *http.Request) string {

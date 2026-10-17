@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input'
 
 // Clear personal inputs without resetting the controlled, non-secret filters.
 export function clearPublicCredentials(form: HTMLFormElement) {
-  for (const input of form.querySelectorAll<HTMLInputElement>('input[type="password"][name]')) {
+  for (const input of form.querySelectorAll<HTMLInputElement>('input[data-sensitive][name]')) {
     input.value = ''
   }
 }

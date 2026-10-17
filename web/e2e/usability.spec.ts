@@ -394,17 +394,14 @@ test('source schedule conflicts merge untouched controls while preserving local 
   })
 })
 
-test('remote catalogs belong to Catalog sharing and use simple intervals with safe concurrent edits', async ({
+test('remote catalogs belong to Sources and use simple intervals with safe concurrent edits', async ({
   page,
   server,
 }) => {
-  await page.goto('/remotes?q=synthetic&state=disabled')
-  await expect(page).toHaveURL(/\/sharing\/remotes\?q=synthetic&state=disabled$/)
-  await expect(page.getByRole('heading', { name: 'Catalog sharing', level: 1 })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Remote catalogs', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
+  await page.goto('/sharing/remotes?q=synthetic&state=disabled')
+  await expect(page).toHaveURL(/\/remotes\?q=synthetic&state=disabled$/)
+  await expect(page.getByRole('heading', { name: 'Remote catalogs', level: 1 })).toBeVisible()
+  await expect(page.getByRole('tab')).toHaveCount(0)
   await page.getByRole('button', { name: 'Add remote catalog', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
   for (const label of ['Timing', 'Timezone', 'Cron expression', 'Page budget per tick']) {
@@ -439,19 +436,13 @@ test('remote catalogs belong to Catalog sharing and use simple intervals with sa
   expect(JSON.parse(created.json).schedule).toBeUndefined()
   await expect(page.getByText('Automatic sync every 45 minutes', { exact: true })).toBeVisible()
   expect((await (await page.request.get('/api/schedules')).json()).items).toEqual([])
-  await page.getByRole('tab', { name: 'Shared catalogs', exact: true }).click()
-  await expect(page).toHaveURL(/\/sharing\?q=synthetic&state=disabled$/)
-  await expect(page.getByRole('tab', { name: 'Shared catalogs', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
+  await page.getByRole('link', { name: 'Shared catalogs', exact: true }).click()
+  await expect(page).toHaveURL(/\/sharing$/)
+  await expect(page.getByRole('tab')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Shared catalogs', level: 2 })).toHaveCount(0)
-  await page.getByRole('tab', { name: 'Remote catalogs', exact: true }).click()
+  await page.getByRole('link', { name: 'Remote catalogs', exact: true }).click()
   await page.reload()
-  await expect(page.getByRole('tab', { name: 'Remote catalogs', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
+  await expect(page.getByRole('tab')).toHaveCount(0)
   await page.getByRole('button', { name: 'Edit remote', exact: true }).click()
   await dialog.getByLabel('Display name', { exact: true }).fill('Synthetic renamed remote')
   const session = await (await page.request.get('/api/session')).json()

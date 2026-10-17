@@ -67,10 +67,10 @@ test('Identification is a separate sidebar page and shared cache statistics matc
   }
   await page.goto('/debrid')
   const card = page
-    .getByRole('region', { name: 'Shared availability cache' })
+    .getByRole('region', { name: 'Availability checks' })
     .locator('section')
     .filter({ has: page.getByRole('heading', { name: 'TorBox', exact: true }) })
-  await expect(card).toContainText('2 valid observations')
+  await expect(card).toContainText('2 shared observations')
   await expect(card.locator('dd')).toHaveText(['1 (50%)', '1 (50%)'])
   const response = await page.request.get('/api/debrid/statistics')
   expect(response.status()).toBe(200)

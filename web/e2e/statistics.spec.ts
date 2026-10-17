@@ -47,7 +47,7 @@ test('statistics are the first view, settings contain configuration and statuses
   for (const [path, heading, statistic] of [
     ['/providers', 'Sources', 'Imported torrents'],
     ['/metadata', 'Metadata', 'Film & series entries'],
-    ['/debrid', 'Debrid', 'Shared availability cache'],
+    ['/debrid', 'Debrid', 'Availability checks'],
   ]) {
     await page.goto(path)
     const views = page.getByRole('tablist', { name: `${heading} views`, exact: true })
@@ -80,10 +80,9 @@ test('statistics are the first view, settings contain configuration and statuses
     'success',
   )
   await page.goto('/security/verification')
-  await expect(page.getByText('Not enabled', { exact: true })).toHaveAttribute(
-    'data-variant',
-    'warning',
-  )
+  await expect(
+    page.getByRole('switch', { name: 'Two-step verification', exact: true }),
+  ).not.toBeChecked()
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/providers')
   await expect(

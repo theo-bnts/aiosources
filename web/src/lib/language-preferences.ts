@@ -5,6 +5,9 @@ export type LanguagePreferences = {
   mode: 'all' | 'preferred' | 'multi' | 'unknown'
 }
 const key = 'aiosources.language-preferences'
+export function defaultLanguagePreferences(): LanguagePreferences {
+  return { language: '', mode: 'unknown' }
+}
 export function browserLanguage() {
   return (navigator.languages?.[0] || navigator.language || 'en').split(/[-_]/)[0].toLowerCase()
 }
@@ -25,7 +28,7 @@ export function useLanguagePreferences() {
     } catch {
       /* Preferences are optional; blocked storage does not prevent use. */
     }
-    return { language: '', mode: 'unknown' }
+    return defaultLanguagePreferences()
   })
   function update(next: LanguagePreferences) {
     setValue(next)

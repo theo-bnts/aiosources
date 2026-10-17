@@ -15,11 +15,22 @@ const catalogReleaseSource = ` FROM ingest.aio_matches m JOIN ingest.torrents t 
 
 // Localized labels do not change correspondence. A matching local alias is the
 // query-language fallback, followed by the English primary title.
-func catalogTitleColumns(locale, alias string) string {
-	label := `COALESCE(NULLIF(w.localized_titles->>` + locale + `,''),` + alias + `,NULLIF(w.localized_titles->>'en',''),NULLIF(w.display_title,''),
+func catalogTitleLabel(locale, alias string) string {
+	return `COALESCE(NULLIF(w.localized_titles->>` + locale + `,''),` + alias + `,NULLIF(w.localized_titles->>'en',''),NULLIF(w.display_title,''),
  (SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1),'Untitled')`
-	return `w.id,w.media_type,` + label + `,w.years,w.tmdb_id,w.imdb_id,
+}
+
+func catalogTitleColumns(locale, alias string) string {
+	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,w.years,w.tmdb_id,w.imdb_id,
  (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id)`
+}
+
+func catalogYearFilter(year string) string {
+	// Film years are alternatives. A series spans all locally known work,
+	// season and episode years, including gaps between seasons.
+	return `(` + year + `=ANY(w.years) OR (w.media_type='tv' AND EXISTS(
+ SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM ingest.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM ingest.aio_episodes WHERE work_id=w.id) known_years
+ HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
 }
 
 func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
@@ -54,11 +65,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	if filters.Year != 0 {
 		args = append(args, filters.Year)
 		year := fmt.Sprintf("$%d::int", len(args))
-		// Film release dates are alternatives, not a continuous range. Series
-		// span their locally known work/season/episode years, including gaps.
-		filter += ` AND (` + year + `=ANY(w.years) OR (w.media_type='tv' AND EXISTS(
- SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM ingest.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM ingest.aio_episodes WHERE work_id=w.id) known_years
- HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
+		filter += ` AND ` + catalogYearFilter(year)
 	}
 	alias := `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + matching + ` ORDER BY public.similarity($3,normalized) DESC,length(normalized),title LIMIT 1)`
 	columns := catalogTitleColumns(fmt.Sprintf("$%d", len(args)+1), alias)

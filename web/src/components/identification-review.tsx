@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, params, queryClient, refreshData } from '@/lib/api'
+import { browserLanguage } from '@/lib/language-preferences'
 import { useSourceNames } from '@/lib/source-names'
 import type { MatchDiagnostic, ReviewDetail, ReviewWork } from '@/lib/aiosource-types'
 import type { Items } from '@/lib/types'
@@ -28,7 +29,7 @@ function WorkSummary({ work }: { work: ReviewWork }) {
     <div className="min-w-0 space-y-1">
       <p className="break-words font-medium">{title}</p>
       <p className="help">
-        {work.type === 'movie' ? 'Film' : 'Series'} · {work.years.join(', ') || 'Year unknown'}
+        {work.type === 'movie' ? 'Movie' : 'Series'} · {work.years.join(', ') || 'Year unknown'}
       </p>
       <p className="mono break-words text-xs">
         {work.imdb && `${work.imdb} · `}TMDB {work.tmdb}
@@ -48,11 +49,15 @@ export function IdentificationReview({
   item: MatchDiagnostic
   onClose: () => void
 }) {
+  const language = browserLanguage()
   const [reviewVersion, setReviewVersion] = useState(0)
   const detail = useQuery({
-    queryKey: ['identification-review', item.occurrence_id],
+    queryKey: ['identification-review', item.occurrence_id, language],
     queryFn: ({ signal }) =>
-      api<ReviewDetail>(`/aiosource/matches/${encodeURIComponent(item.occurrence_id)}`, { signal }),
+      api<ReviewDetail>(
+        `/aiosource/matches/${encodeURIComponent(item.occurrence_id)}?${params({ language })}`,
+        { signal },
+      ),
     refetchInterval: false,
     refetchOnWindowFocus: false,
     staleTime: 0,
@@ -113,6 +118,8 @@ function ReviewForm({
   const [selected, setSelected] = useState<ReviewWork | null>(null)
   const [q, setQuery] = useState(detail.suggested_query)
   const [kind, setKind] = useState('')
+  const [year, setYear] = useState(String(detail.suggested_year ?? ''))
+  const language = browserLanguage()
   const [override, setOverride] = useState(
     (detail.review?.active && detail.review.override_episode) || false,
   )
@@ -122,10 +129,12 @@ function ReviewForm({
   )
   const canSearch = q.trim().length >= 3 || /^\d+$/.test(q)
   const candidates = useQuery({
-    queryKey: ['review-candidates', q, kind],
+    queryKey: ['review-candidates', q, kind, year, language],
     queryFn: ({ signal }) =>
-      api<Items<ReviewWork>>(`/aiosource/candidates?${params({ q, type: kind })}`, { signal }),
-    enabled: canSearch,
+      api<Items<ReviewWork>>(`/aiosource/candidates?${params({ q, type: kind, year, language })}`, {
+        signal,
+      }),
+    enabled: canSearch && (!year || /^\d{4}$/.test(year)),
     refetchInterval: false,
     staleTime: 30_000,
   })
@@ -220,18 +229,32 @@ function ReviewForm({
             placeholder="At least 3 characters, or an identifier"
           />
         </div>
-        <div className="field">
+        <div className="field basis-full sm:basis-auto">
           <Label htmlFor="review-kind">Media type</Label>
           <select
             id="review-kind"
-            className="native-select"
+            className="native-select w-full"
             value={kind}
             onChange={(event) => setKind(event.target.value)}
           >
-            <option value="">Films & series</option>
-            <option value="movie">Films</option>
+            <option value="">Movies & series</option>
+            <option value="movie">Movies</option>
             <option value="tv">Series</option>
           </select>
+        </div>
+        <div className="field w-28">
+          <Label htmlFor="review-year">Year</Label>
+          <Input
+            id="review-year"
+            name="year"
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            pattern="[0-9]{4}"
+            placeholder="Any year"
+            value={year}
+            onChange={(event) => setYear(event.target.value)}
+          />
         </div>
         <Button type="submit" variant="outline" className="self-end">
           Search
@@ -256,7 +279,7 @@ function ReviewForm({
               checked={selected?.id === work.id}
               onChange={() => setSelected(work)}
               disabled={save.isPending}
-              aria-label={`Choose ${work.titles[0] || work.tmdb}`}
+              aria-label={`Choose ${work.display_title || work.titles[0] || work.tmdb}`}
             />
             <WorkSummary work={work} />
           </label>

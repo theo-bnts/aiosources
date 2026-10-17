@@ -138,7 +138,7 @@ test('torrent search combines title and ID fragments, filters and saved views th
   await page.getByRole('menuitemcheckbox', { name: 'fixture', exact: true }).click()
   await expect(page.getByRole('menuitemcheckbox', { name: 'fixture', exact: true })).toBeChecked()
   await page.keyboard.press('Escape')
-  await expect(sourceFilter).toHaveText('2 sources')
+  await expect(sourceFilter).toHaveText('remote-example, fixture')
   await searchButton.click()
   await expect(results).toHaveCount(4)
   expect(new URL(page.url()).searchParams.getAll('provider')).toEqual(['remote-example', 'fixture'])

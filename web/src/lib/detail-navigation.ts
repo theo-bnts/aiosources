@@ -8,6 +8,7 @@ const viewLabels: Record<string, string> = {
   '/runs': 'Sources history',
   '/torrents': 'Torrent search',
   '/search': 'Search',
+  '/remotes': 'Remote catalogs',
   '/sharing/remotes': 'Remote catalogs',
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',

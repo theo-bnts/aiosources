@@ -43,6 +43,8 @@ type Options struct {
 }
 
 type server struct {
+	files      chan struct{}
+	fileClient *http.Client
 	options    Options
 	auth       *authentication
 	streams    chan struct{}
@@ -62,7 +64,7 @@ func New(options Options) (http.Handler, error) {
 	if _, err := fs.Stat(options.Frontend, "index.html"); err != nil {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
-	s := &server{options: options, auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64), public: &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 8)}}
+	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64), public: &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 8)}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)

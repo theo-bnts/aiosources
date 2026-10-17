@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -21,7 +22,7 @@ func readAIOReview(ctx context.Context, tx pgx.Tx, record model.AIORecord) (*mod
 	return &review, databaseError("read identification review", err)
 }
 
-func (s *Store) AIOReviewDetail(ctx context.Context, occurrence string) (model.AIOReviewDetail, error) {
+func (s *Store) AIOReviewDetail(ctx context.Context, occurrence string, locales ...string) (model.AIOReviewDetail, error) {
 	var detail model.AIOReviewDetail
 	if !ValidOccurrenceID(occurrence) {
 		return detail, model.ErrNotFound
@@ -41,7 +42,12 @@ func (s *Store) AIOReviewDetail(ctx context.Context, occurrence string) (model.A
 	if detail.Review, err = readAIOReview(ctx, tx, detail.Record); err != nil {
 		return detail, err
 	}
-	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+aioWorkColumns+` FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.provider_id=$1 AND m.source_id=$2 AND NOT w.adult AND m.status='matched' AND m.fingerprint=$3 AND m.revision=w.revision AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=m.provider_id AND q.source_id=m.source_id)`, detail.Record.Provider, detail.Record.SourceID, detail.Record.Fingerprint))
+	locale := "en"
+	if len(locales) > 0 && locales[0] != "" {
+		locale = locales[0]
+	}
+	columns := strings.Replace(aioWorkColumns, "w.display_title", catalogTitleLabel("$4", "NULL"), 1)
+	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+columns+` FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.provider_id=$1 AND m.source_id=$2 AND NOT w.adult AND m.status='matched' AND m.fingerprint=$3 AND m.revision=w.revision AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=m.provider_id AND q.source_id=m.source_id)`, detail.Record.Provider, detail.Record.SourceID, detail.Record.Fingerprint, locale))
 	if err == nil {
 		detail.Work = &w
 		compactReviewWork(detail.Work)
@@ -61,7 +67,7 @@ func compactReviewWork(w *model.AIOWork) {
 var reviewIMDb = regexp.MustCompile(`^tt[0-9]{1,15}$`)
 var reviewNumeric = regexp.MustCompile(`^[0-9]{1,15}$`)
 
-func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind string) ([]model.AIOWork, error) {
+func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind string, filters ...model.CatalogSearchFilters) ([]model.AIOWork, error) {
 	out := []model.AIOWork{}
 	query = strings.TrimSpace(query)
 	if len(query) > 200 || (kind != "" && kind != "movie" && kind != "tv") {
@@ -70,13 +76,32 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	if len([]rune(normalized)) < 3 && !reviewIMDb.MatchString(query) && !reviewNumeric.MatchString(query) {
 		return out, model.ErrInvalid
 	}
-	pattern := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(normalized) + "%"
+	filter := model.CatalogSearchFilters{Language: "en"}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
+	if filter.Year != 0 && (filter.Year < 1000 || filter.Year > 9999) {
+		return out, model.ErrInvalid
+	}
+	args := []any{query, normalized, kind, filter.Year, filter.Language}
+	terms := []string{}
+	for _, word := range strings.Fields(normalized) {
+		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
+		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
+	}
+	matching := "FALSE"
+	if len(terms) > 0 {
+		matching = strings.Join(terms, " AND ")
+	}
+	alias := `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + matching + ` ORDER BY public.similarity($2,normalized) DESC,length(normalized),title LIMIT 1)`
+	columns := strings.Replace(aioWorkColumns, "w.display_title", catalogTitleLabel("$5", alias), 1)
 	rows, err := s.pool.Query(ctx, `WITH candidates AS (
- SELECT id FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR tvdb_id=$1
- UNION SELECT work_id FROM ingest.aio_titles WHERE $2<>'' AND normalized LIKE $3 ESCAPE '\'
-) SELECT `+aioWorkColumns+` FROM candidates c JOIN ingest.aio_works w ON w.id=c.id
- WHERE NOT w.adult AND ($4='' OR w.media_type=$4)
- ORDER BY CASE WHEN w.imdb_id=$1 OR w.tmdb_id=$1 OR w.tvdb_id=$1 THEN 0 ELSE 1 END,w.id LIMIT 40`, query, normalized, pattern, kind)
+ SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR tvdb_id=$1
+ UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM ingest.aio_titles WHERE `+matching+`
+), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
+ SELECT `+columns+` FROM ranked c JOIN ingest.aio_works w ON w.id=c.id
+ WHERE NOT w.adult AND ($3='' OR w.media_type=$3) AND ($4::int=0 OR `+catalogYearFilter("$4::int")+`)
+ ORDER BY c.precision DESC,c.relevance DESC,w.id LIMIT 40`, args...)
 	if err != nil {
 		return out, databaseError("search review candidates", err)
 	}

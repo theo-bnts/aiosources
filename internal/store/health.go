@@ -33,7 +33,7 @@ WHEN n.nspname='ingest' AND c.relname IN ('aio_works','aio_titles','aio_seasons'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_cleanup','aio_incidents') THEN 'debrid'
 WHEN n.nspname='ingest' AND c.relname IN ('stremio_requests','aio_public_access') THEN 'stremio'
 WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','remote_checkpoints','shares') OR c.relname LIKE 'share_%') THEN 'sharing'
-WHEN n.nspname='ingest' AND c.relname IN ('activity_logs','operation_runs','operation_events') THEN 'logs'
+WHEN n.nspname='ingest' AND c.relname IN ('activity_logs','operation_runs','operation_events','operation_downloads') THEN 'logs'
 WHEN n.nspname='ingest' AND (c.relname IN ('secrets','security_settings','security_attempts','security_recovery_codes') OR c.relname LIKE 'admin_%') THEN 'access'
 ELSE 'other' END AS category,
 CASE
@@ -48,7 +48,7 @@ CASE
  WHEN c.relname IN ('catalog_journal','catalog_baselines') THEN 'shared-snapshots'
  WHEN c.relname='stremio_requests' THEN 'stream-history'
  WHEN c.relname='activity_logs' THEN 'activity-history'
- WHEN c.relname IN ('operation_runs','operation_events') THEN 'operation-history'
+ WHEN c.relname IN ('operation_runs','operation_events','operation_downloads') THEN 'operation-history'
  ELSE 'state' END AS purpose,
 COALESCE(SUM(pg_total_relation_size(c.oid)),0)::bigint,COALESCE(SUM(pg_table_size(c.oid)),0)::bigint,COALESCE(SUM(pg_indexes_size(c.oid)),0)::bigint
 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace

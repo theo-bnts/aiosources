@@ -101,11 +101,18 @@ type AIOAvailability struct {
 	Files      []AIOFile `json:"files,omitempty"`
 }
 
+type AvailabilityCheckStats struct {
+	Cached      int64      `json:"cached"`
+	Uncached    int64      `json:"uncached"`
+	LastChecked *time.Time `json:"last_checked"`
+}
+
 type SharedCacheStats struct {
-	Service     string    `json:"service"`
-	Cached      int64     `json:"cached"`
-	Uncached    int64     `json:"uncached"`
-	LastChecked time.Time `json:"last_checked"`
+	Checks      *AvailabilityCheckStats `json:"checks,omitempty"`
+	Service     string                  `json:"service"`
+	Cached      int64                   `json:"cached"`
+	Uncached    int64                   `json:"uncached"`
+	LastChecked time.Time               `json:"last_checked"`
 }
 type AIOResource struct {
 	Generation  int64
