@@ -110,4 +110,33 @@ func TestInstallationFiltersNeverContactAnUnselectedProvider(t *testing.T) {
 	if err != nil || len(streams) != 0 || calls.Load() != 0 {
 		t.Fatal("unselected provider was queried", len(streams), calls.Load(), err)
 	}
+	// Both configured keys deliberately lack a valid credential. Direct torrent
+	// access must not read them or create availability jobs.
+	c, _ = s.DB.AIOConfig(ctx)
+	if err := s.Vault.Put(ctx, "tb-key", "synthetic-tb-key"); err != nil {
+		t.Fatal(err)
+	}
+	c.TorBoxSecret = "tb-key"
+	if err := s.DB.SetAIOConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for name, key := range map[string]string{"ad-key": "synthetic-ad-key", "tb-key": "synthetic-tb-key"} {
+			if err := s.Vault.Put(ctx, name, key); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	if _, err := conn.Exec(ctx, `UPDATE ingest.secrets SET ciphertext='invalid'::bytea WHERE name IN ('ad-key','tb-key')`); err != nil {
+		t.Fatal(err)
+	}
+	setTestInstallationPreferences(t, ctx, s, token, model.StreamPreferences{Mode: "all", Services: []string{"direct"}})
+	streams, err = s.Streams(ctx, "https://addon.example", token, "movie", "tt1234567")
+	if err != nil || len(streams) != 1 || streams[0].URL != "" || calls.Load() != 0 {
+		t.Fatal("direct-only request checked a debrid service", len(streams), calls.Load(), err)
+	}
+	var jobs int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_runs WHERE kind='cache'`).Scan(&jobs); err != nil || jobs != 0 {
+		t.Fatal("direct-only request scheduled a cache check", jobs, err)
+	}
 }

@@ -1,8 +1,7 @@
-import { SourceFilter } from '@/components/source-filter'
-import { MediaTypeFilter, torznabMediaTypes } from '@/components/connection-filter-fields'
+import { torznabMediaTypes, debridServices } from '@/components/connection-filter-fields'
 import { Switch } from '@/components/ui/switch'
 import { Disclosure } from '@/components/ui/disclosure'
-import { TorznabSetup } from '@/components/torznab-setup'
+import { TorznabFilters } from '@/components/torznab-filters'
 import {
   StremioConnectionFilters,
   defaultStremioPreferences,
@@ -21,6 +20,7 @@ import type {
   CatalogShares,
   SharePassword,
   ConnectionFormat,
+  TorznabPreferences,
 } from '@/lib/catalog-types'
 import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,7 @@ function shareBody(share: CatalogShare) {
     format: share.format,
     media_types: share.media_types,
     stream_preferences: share.stream_preferences,
+    torznab_preferences: share.torznab_preferences,
     name: share.name,
     enabled: share.enabled,
     scope: share.scope,
@@ -135,24 +136,48 @@ export default function SharingPage({
               className="section-card"
               aria-label={`${connection ? 'Access' : 'Share'} ${share.name}`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
                   <h2 className="section-title break-words">{share.name}</h2>
                   <p className="mono mt-1 break-all text-muted-foreground">{share.id}</p>
                 </div>
-                <Badge
-                  variant={
-                    shareExpired(share) ? 'warning' : share.enabled ? 'success' : 'secondary'
-                  }
-                >
-                  {shareExpired(share)
-                    ? 'Expired'
-                    : share.enabled
-                      ? stremio
-                        ? 'Enabled'
-                        : 'Enabled · read-only'
-                      : 'Disabled'}
-                </Badge>
+                <div className="flex shrink-0 items-center gap-3">
+                  {shareExpired(share) && <Badge variant="warning">Expired</Badge>}
+                  <ConfirmAction
+                    title={`${share.enabled ? 'Disable' : 'Enable'} “${share.name}”?`}
+                    description={
+                      share.enabled
+                        ? 'New requests will be denied immediately. Existing downloaded copies cannot be recalled. You can enable this access again later.'
+                        : stremio
+                          ? 'This installation grants Stremio access to the selected sources and playback services. Its saved filters apply immediately to every new request.'
+                          : torznab
+                            ? `This API key grants read-only access to published titles, verified identifiers and tracker-free magnets from ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}.`
+                            : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
+                    }
+                    label={share.enabled ? 'Disable access' : 'Enable access'}
+                    variant={share.enabled ? 'warning' : 'default'}
+                    trigger={
+                      <Switch
+                        checked={share.enabled}
+                        aria-label={`${share.enabled ? 'Disable' : 'Enable'} ${share.name}`}
+                        disabled={
+                          !share.enabled &&
+                          (!httpsReady || shareExpired(share) || share.fields.length === 0)
+                        }
+                      />
+                    }
+                    action={async () => {
+                      await api<CatalogShare>(`${endpoint}/${encodeURIComponent(share.id)}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ ...shareBody(share), enabled: !share.enabled }),
+                      })
+                      notify(
+                        `Access ${share.enabled ? 'disabled' : 'enabled'} for “${share.name}”.`,
+                      )
+                      await refreshData()
+                    }}
+                  />
+                </div>
               </div>
               <dl className="grid gap-4 text-sm md:grid-cols-2">
                 <div>
@@ -170,7 +195,7 @@ export default function SharingPage({
                 </div>
                 <div>
                   <dt className="text-muted-foreground">
-                    {stremio ? 'Filters' : torznab ? 'Media permissions' : 'Authorized fields'}
+                    {connection ? 'Filters' : 'Authorized fields'}
                   </dt>
                   <dd className="mt-1 break-words">
                     {stremio
@@ -186,6 +211,18 @@ export default function SharingPage({
                               .join(', ')
                           : 'All media'
                         : share.fields.join(', ')}
+                    {torznab && share.torznab_preferences?.services?.length ? (
+                      <>
+                        {' '}
+                        ·{' '}
+                        {share.torznab_preferences.services
+                          .map(
+                            (id) => debridServices.find((service) => service.id === id)?.name || id,
+                          )
+                          .join(', ')}
+                      </>
+                    ) : null}
+                    {torznab && share.torznab_preferences?.cached_only ? ' · Cached only' : null}
                   </dd>
                 </div>
                 {!connection && (
@@ -269,43 +306,10 @@ export default function SharingPage({
                   />
                 </div>
               )}
-              {torznab && <TorznabSetup share={share} sources={shares.data?.sources ?? []} />}
               <div className="toolbar">
                 <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
                   Edit permissions & limits
                 </Button>
-                <ConfirmAction
-                  title={`${share.enabled ? 'Disable' : 'Enable'} “${share.name}”?`}
-                  description={
-                    share.enabled
-                      ? 'New requests will be denied immediately. Existing downloaded copies cannot be recalled. You can enable this share again later.'
-                      : stremio
-                        ? 'This installation grants Stremio access to the selected sources and playback services. Its saved filters apply immediately to every new request.'
-                        : torznab
-                          ? `This API key grants read-only access to published titles, verified identifiers and tracker-free magnets from ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}.`
-                          : `This password will grant read-only access to ${share.scope === 'all' ? 'all current and future sources' : 'the selected sources'}, limited to: ${share.fields.join(', ')}.`
-                  }
-                  label={share.enabled ? 'Disable access' : 'Enable access'}
-                  variant={share.enabled ? 'warning' : 'default'}
-                  trigger={
-                    <Switch
-                      checked={share.enabled}
-                      aria-label={`${share.enabled ? 'Disable' : 'Enable'} ${share.name}`}
-                      disabled={
-                        !share.enabled &&
-                        (!httpsReady || shareExpired(share) || share.fields.length === 0)
-                      }
-                    />
-                  }
-                  action={async () => {
-                    await api<CatalogShare>(`${endpoint}/${encodeURIComponent(share.id)}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ ...shareBody(share), enabled: !share.enabled }),
-                    })
-                    notify(`Access ${share.enabled ? 'disabled' : 'enabled'} for “${share.name}”.`)
-                    await refreshData()
-                  }}
-                />
                 <ConfirmAction
                   title={`Replace ${connection ? 'access key' : 'password'} for “${share.name}”?`}
                   description={
@@ -467,6 +471,9 @@ function ShareForm({
   const [streamPreferences, setStreamPreferences] = useState(
     share?.stream_preferences ?? defaultStremioPreferences(),
   )
+  const [torznabPreferences, setTorznabPreferences] = useState<TorznabPreferences>(
+    share?.torznab_preferences ?? {},
+  )
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
   const defaultScope = connection ? 'all' : 'selected'
@@ -507,6 +514,7 @@ function ShareForm({
       const body = {
         format,
         media_types: torznab ? mediaTypes : [],
+        ...(torznab ? { torznab_preferences: torznabPreferences } : {}),
         ...(stremio
           ? {
               stream_preferences: {
@@ -562,6 +570,8 @@ function ShareForm({
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const busy = save.isPending || reload.isPending
   const dirty =
+    (torznab &&
+      JSON.stringify(torznabPreferences) !== JSON.stringify(original?.torznab_preferences ?? {})) ||
     (stremio &&
       JSON.stringify(streamPreferences) !==
         JSON.stringify(original?.stream_preferences ?? defaultStremioPreferences())) ||
@@ -588,14 +598,6 @@ function ShareForm({
     setSourceIDs(ids)
     setScope(ids.length ? 'selected' : 'all')
   }
-  const sourceFilter = (
-    <SourceFilter
-      id="share-sources"
-      value={sourceIDs}
-      sources={sourceOptions}
-      onChange={selectSources}
-    />
-  )
   const accessPolicy = (
     <fieldset className={connection ? 'space-y-4' : 'space-y-4 border-t border-border pt-4'}>
       {!connection && <legend className="px-1 text-sm font-medium">Access policy</legend>}
@@ -764,13 +766,19 @@ function ShareForm({
           />
         ) : torznab ? (
           <Disclosure title="Filters">
-            <MediaTypeFilter
-              id="torznab-media"
-              value={mediaTypes}
-              options={torznabMediaTypes}
-              onChange={setMediaTypes}
+            <TorznabFilters
+              value={{ ...torznabPreferences, media: mediaTypes, sources: sourceIDs }}
+              onChange={({ media, sources, ...options }) => {
+                setMediaTypes(media ?? [])
+                selectSources(sources ?? [])
+                setTorznabPreferences(options)
+              }}
+              sources={sourceOptions}
+              showSources
             />
-            {sourceFilter}
+            <p className="help">
+              Services select the local availability cache. Configure downloads in your client.
+            </p>
           </Disclosure>
         ) : (
           <>

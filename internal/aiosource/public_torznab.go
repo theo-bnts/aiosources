@@ -28,16 +28,12 @@ type PublicTorznabInstallation struct {
 }
 
 func ValidPublicTorznabOptions(o model.PublicTorznabOptions) bool {
-	if !ValidStreamPreferences(model.StreamPreferences{Sources: o.Sources, Services: o.Services}) || len(o.MediaTypes) > 3 {
+	cache := model.TorznabPreferences{Services: o.Services, CachedOnly: o.CachedOnly}
+	if !ValidStreamPreferences(model.StreamPreferences{Sources: o.Sources}) || !cache.Valid() || len(o.MediaTypes) > 3 {
 		return false
 	}
 	for i, m := range o.MediaTypes {
 		if !slices.Contains([]string{"movie", "tv", "other"}, m) || slices.Contains(o.MediaTypes[:i], m) {
-			return false
-		}
-	}
-	for _, s := range o.Services {
-		if s != "alldebrid" && s != "torbox" {
 			return false
 		}
 	}

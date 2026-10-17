@@ -33,7 +33,9 @@ func validateAnnounce(value string) error {
 }
 
 func (s *Service) trackerAnnounce(ctx context.Context, t model.AIOTracker) (string, error) {
-	if t.AnnounceSecret == "" {
+	// Keep the selected secret for a later reactivation, but do not resolve or
+	// attach an inactive private-source credential to public torrent requests.
+	if !t.Private || t.AnnounceSecret == "" {
 		return "", nil
 	}
 	value, err := s.Vault.Resolve(ctx, t.AnnounceSecret)

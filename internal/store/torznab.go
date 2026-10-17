@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -24,35 +25,53 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 		return result, ErrCatalogAuthentication
 	}
 	policy := TorznabVisibility{}
-	if q.CachedOnly {
-		config, e := d.store.AIOConfig(ctx)
-		if e != nil {
-			return result, e
-		}
-		policy.CacheAfter = time.Now().Add(-time.Duration(config.CacheMinutes) * time.Minute)
-	}
-	tx, err := d.store.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	tx, err := d.store.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return result, databaseError("begin Torznab query", err)
 	}
 	defer rollback(tx)
 	var scope string
 	var sources, media []string
-	err = tx.QueryRow(ctx, `SELECT scope,source_ids,media_types FROM ingest.shares s WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND EXISTS(SELECT 1 FROM ingest.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp()) FOR UPDATE`, d.shareID, d.revision, d.id).Scan(&scope, &sources, &media)
+	var encodedPreferences []byte
+	err = tx.QueryRow(ctx, `SELECT scope,source_ids,media_types,torznab_preferences FROM ingest.shares s WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND EXISTS(SELECT 1 FROM ingest.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id).Scan(&scope, &sources, &media, &encodedPreferences)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrCatalogAuthentication
 	}
 	if err != nil {
 		return result, databaseError("authorize Torznab query", err)
 	}
+	var preferences model.TorznabPreferences
+	if json.Unmarshal(encodedPreferences, &preferences) != nil || !preferences.Valid() {
+		return result, model.ErrInvalid
+	}
+	q = q.WithPreferences(preferences)
+	if q.CachedOnly {
+		config, e := readAIOConfig(ctx, tx)
+		if e != nil {
+			return result, e
+		}
+		policy.CacheAfter = time.Now().Add(-time.Duration(config.CacheMinutes) * time.Minute)
+	}
 	result, err = torznabRows(ctx, tx, q, scope, sources, media, policy, episodeMatch)
 	if err != nil {
 		return result, err
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp() WHERE id=$1`, d.shareID); err != nil {
+	if err = tx.Commit(ctx); err != nil {
+		return result, databaseError("finish Torznab query", err)
+	}
+	// Write access time after releasing the repeatable-read snapshot. Updating
+	// its grant inside that snapshot makes concurrent searches fail with 40001.
+	// Recheck the revision and live admission so a changed policy fails closed.
+	tag, err := d.store.pool.Exec(ctx, `UPDATE ingest.shares s SET last_access_at=clock_timestamp()
+WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp())
+AND EXISTS(SELECT 1 FROM ingest.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id)
+	if err != nil {
 		return result, databaseError("record Torznab access", err)
 	}
-	return result, databaseError("finish Torznab query", tx.Commit(ctx))
+	if tag.RowsAffected() != 1 {
+		return result, ErrCatalogAuthentication
+	}
+	return result, nil
 }
 
 // TorznabVisibility is a request-scoped policy. Unlisted sources are private;

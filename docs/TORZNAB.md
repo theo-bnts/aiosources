@@ -5,11 +5,11 @@ AIOSources can serve its published local catalog to Prowlarr and other Torznab c
 ## Connect a client
 
 1. Set `PUBLIC_URL` to your HTTPS public origin, as for catalog sharing.
-2. Open **Connections → Torznab** and create an access key. New accesses include all current and future sources. Choose source and media permissions in **Filters**; optional expiration and per-access limits belong to **Advanced**. Save the generated key; only its hash is retained and the key cannot be retrieved later.
-3. Enable access. In Prowlarr, add **Generic Torznab**. Copy **URL**, **API path** and the generated **API key** into their respective fields.
-4. Optionally choose sources and a media type in **Client setup & filters**, then copy **Additional parameters** into Prowlarr's field with that name. Do not append another `cat` there: Prowlarr already supplies its selected categories.
+2. Open **Connections → Torznab** and create an access key. New accesses include all current and future sources. Choose media types, sources, cache services and **Cached results only** in **Filters**; optional expiration and per-access limits belong to **Advanced**. Save the generated key; only its hash is retained and the key cannot be retrieved later.
+3. Enable access. In Prowlarr, add **Generic Torznab**. Split the displayed Torznab URL into its origin (**URL**) and path (**API path**), and enter the generated **API key**.
+4. To narrow a single client further, optional URL parameters can be placed in Prowlarr's **Additional parameters** field. Do not append another `cat` there: Prowlarr already supplies its selected categories.
 
-Each key can be used with many different filtered URLs. Connection filters are not saved in the database and do not need named devices or profiles. Source/media permissions on the key remain the administrator's upper bound; URL parameters cannot grant additional access. Keys can be disabled, rotated, expired or revoked independently of administrator sessions and Stremio links.
+Private connections save their filters with each access key, just as Stremio installations do. Changes apply to the same key without reconfiguring the client. Each key can still be used with multiple URLs that narrow its settings: query parameters cannot expand source or media permissions, select an excluded cache service, or disable a saved cached-only policy. Cache services select existing shared observations; Torznab never calls the debrid providers. Keys can be disabled, rotated, expired or revoked independently of administrator sessions and Stremio links.
 
 ## Endpoint and filters
 
@@ -23,7 +23,7 @@ The endpoint is `/torznab/ACCESS_ID/api`. Every call, including capabilities, re
 | `t=tvsearch` | Identified series; accepts `q`, `imdbid`, `tmdbid`, `tvdbid`, `season`, `ep`. |
 | `q` | Optional search text. A supplied verified external ID takes precedence over text, so translated or alternative release titles are not lost. |
 | `cat` | Standard comma-separated category IDs: `2000` Movies, `5000` TV, `8000` Other. Unknown categories return no additional results. |
-| `sources` | AIOSources extension: one or more source IDs separated by commas. Use the UI to select their display names and generate this value. |
+| `sources` | AIOSources extension: one or more source IDs separated by commas. Use source IDs; the access editor displays their names. |
 | `media` | AIOSources extension: `movie`, `tv`, `other`, or a comma-separated combination. Intersects the standard `cat` filter and the key's permissions. |
 | `imdbid`, `tmdbid`, `tvdbid` | Current verified identifiers, never obsolete or conflicting source assertions. IMDb accepts a numeric ID or an ID starting with `tt`. |
 | `season`, `ep` | Nonnegative season/episode numbers. Use `t=tvsearch` with a title or external ID; `ep` also requires `season`. Uses the playback numbering rules, including season packs and current manual corrections. Unnumbered releases are excluded because Torznab cannot verify their downloaded files. |

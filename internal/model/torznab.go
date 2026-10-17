@@ -1,5 +1,47 @@
 package model
 
+import "slices"
+
+// TorznabPreferences select known availability, never a recipient's credentials.
+// Public connections carry these settings in their URL; private access saves them.
+type TorznabPreferences struct {
+	Services   []string `json:"services,omitempty"`
+	CachedOnly bool     `json:"cached_only,omitempty"`
+}
+
+func (p TorznabPreferences) Valid() bool {
+	if len(p.Services) > 2 {
+		return false
+	}
+	for i, service := range p.Services {
+		if (service != "alldebrid" && service != "torbox") || slices.Contains(p.Services[:i], service) {
+			return false
+		}
+	}
+	return true
+}
+
+// Query parameters may narrow access settings, never relax a saved or public
+// connection's cache policy. An empty intersection must stay empty, not become All.
+func (q TorznabQuery) WithPreferences(p TorznabPreferences) TorznabQuery {
+	q.CachedOnly = q.CachedOnly || p.CachedOnly
+	if len(p.Services) == 0 {
+		return q
+	}
+	if q.Services == nil {
+		q.Services = p.Services
+		return q
+	}
+	selected := []string{}
+	for _, service := range q.Services {
+		if slices.Contains(p.Services, service) {
+			selected = append(selected, service)
+		}
+	}
+	q.Services = selected
+	return q
+}
+
 // TorznabQuery contains validated protocol filters, never an API key or URL.
 type TorznabQuery struct {
 	SearchFilters

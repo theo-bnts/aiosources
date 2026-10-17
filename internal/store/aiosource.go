@@ -19,13 +19,24 @@ func DefaultAIOConfig() model.AIOConfig {
 	return model.AIOConfig{Revision: 1, AutoSync: true, AutoMatch: true, SyncMinutes: 15, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
+	return readAIOConfig(ctx, s.pool)
+}
+
+type aioConfigReader interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+// A query already holding a transaction must read configuration through that
+// transaction instead of waiting for another connection from the same pool.
+func readAIOConfig(ctx context.Context, reader aioConfigReader) (model.AIOConfig, error) {
 	c := DefaultAIOConfig()
-	v, err := s.Setting(ctx, "aiosource.config.v2")
-	if errors.Is(err, model.ErrNotFound) {
+	var v string
+	err := reader.QueryRow(ctx, "SELECT value FROM ingest.settings WHERE key=$1", "aiosource.config.v2").Scan(&v)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return c, nil
 	}
 	if err != nil {
-		return c, err
+		return c, databaseError("read application setting", err)
 	}
 	if err = json.Unmarshal([]byte(v), &c); err != nil {
 		return c, errors.New("invalid AIOSources configuration")

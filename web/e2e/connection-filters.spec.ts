@@ -1,7 +1,7 @@
 import { test, expect, selectMultiple } from './fixtures'
 import type { SharePassword } from '../src/lib/catalog-types'
 
-test('Torznab uses the shared access editor, keeps keys transient and generates multiple URL filters', async ({
+test('Torznab saves cache and media filters with its access key and removes duplicate client setup', async ({
   page,
 }) => {
   await page.goto('/torznab')
@@ -35,23 +35,38 @@ test('Torznab uses the shared access editor, keeps keys transient and generates 
   )
   await dialog.getByRole('button', { name: 'I have saved the API key', exact: true }).click()
   const card = page.getByRole('region', { name: 'Access External application' })
-  await expect(card.getByText('Disabled', { exact: true })).toBeVisible()
-  await card.getByText('Client setup & filters', { exact: true }).click()
-  await card.locator('summary', { hasText: /^Filters$/ }).click()
-  await selectMultiple(card, 'Media types', ['movie', 'tv'])
-  await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveValue(
-    '&media=movie%2Ctv',
-  )
-  await selectMultiple(card, 'Media types', ['tv'])
-  await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveValue(
-    '&media=tv',
-  )
+  await expect(card.getByRole('switch')).not.toBeChecked()
+  await expect(card.getByText('Client setup & filters', { exact: true })).toHaveCount(0)
+  await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveCount(0)
+  await expect(card.getByRole('switch')).toBeVisible()
+  expect(
+    await card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+  ).not.toBe('rgba(0, 0, 0, 0)')
+  await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await dialog.locator('summary', { hasText: /^Filters$/ }).click()
+  await selectMultiple(dialog, 'Media types', ['movie', 'tv'])
+  await selectMultiple(dialog, 'Services', ['torbox'])
+  await dialog.getByRole('switch', { name: 'Cached results only', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
   const response = await page.request.get('/api/torznab/endpoints')
   const data = await response.json()
   expect(data.items).toHaveLength(1)
-  expect(data.items[0].media_types).toEqual([])
+  expect(data.items[0].media_types).toEqual(['movie', 'tv'])
+  expect(data.items[0].torznab_preferences).toEqual({ services: ['torbox'], cached_only: true })
   expect(data.items[0]).not.toHaveProperty('password')
   expect((await (await page.request.get('/api/shares')).json()).items).toEqual([])
+  await page.reload()
+  await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await dialog.locator('summary', { hasText: /^Filters$/ }).click()
+  await expect(dialog.getByRole('button', { name: 'Services', exact: true })).toHaveText('TorBox')
+  await expect(dialog.getByRole('button', { name: 'Media types', exact: true })).toHaveText(
+    'Movies, Series',
+  )
+  await expect(
+    dialog.getByRole('switch', { name: 'Cached results only', exact: true }),
+  ).toBeChecked()
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
@@ -82,13 +97,31 @@ test('saved Stremio access updates the same manifest and can be independently re
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(manifest)
   await dialog.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   const card = page.getByRole('region', { name: 'Access Living room', exact: true })
-  await expect(card.getByText('Disabled', { exact: true })).toBeVisible()
+  await expect(card.getByRole('switch')).not.toBeChecked()
+  const switchOffColor = await card
+    .getByRole('switch')
+    .evaluate((element) => getComputedStyle(element).backgroundColor)
+  expect(switchOffColor).not.toBe('rgba(0, 0, 0, 0)')
   await card.getByRole('switch', { name: 'Enable Living room', exact: true }).click()
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Enable access', exact: true })
     .click()
-  await expect(card.getByText('Enabled', { exact: true })).toBeVisible()
+  await expect(card.getByRole('switch')).toBeChecked()
+  await expect
+    .poll(() =>
+      card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .not.toBe(switchOffColor)
+  expect(
+    await card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+  ).not.toBe('rgba(0, 0, 0, 0)')
+  const switchBox = await card.getByRole('switch').boundingBox()
+  const headingBox = await card
+    .getByRole('heading', { name: 'Living room', exact: true })
+    .boundingBox()
+  expect(switchBox && headingBox && Math.abs(switchBox.y - headingBox.y) < 4).toBe(true)
+
   const first = await page.request.get(manifest)
   expect(first.status()).toBe(200)
   const firstManifest = await first.json()

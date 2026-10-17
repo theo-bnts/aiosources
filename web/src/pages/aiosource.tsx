@@ -449,7 +449,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                       prefix={`announce_${p.id}`}
                       addLabel="Add announce URL"
                       valueLabel="Complete announce URL"
-                      disabled={save.isPending}
+                      disabled={save.isPending || !tracker.private}
                     />
                   </div>
                 )

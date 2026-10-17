@@ -557,7 +557,11 @@ test.describe('real local imports', () => {
     for (const [index, action] of ['preview', 'incremental', 'incremental', 'full'].entries()) {
       await page.goto('/providers/settings')
       await page.getByText('Manual actions', { exact: true }).click()
-      await page.getByRole('button', { name: 'Run manual import', exact: true }).click()
+      await page
+        .locator('details')
+        .filter({ has: page.getByText('Manual actions', { exact: true }) })
+        .getByRole('button', { name: 'Run manual import', exact: true })
+        .click()
       const dialog = page.getByRole('dialog')
       await dialog.getByLabel('Source', { exact: true }).selectOption('action-source')
       await dialog.getByLabel('Action', { exact: true }).selectOption(action)

@@ -68,7 +68,7 @@ test('statistics are the first view, settings contain configuration and statuses
     await expect(page.locator('[role="tabpanel"] header p')).toHaveCount(0)
   }
   await page.goto('/providers/settings')
-  const source = page.getByRole('row').filter({ hasText: 'Statistics fixture' })
+  const source = page.getByRole('region', { name: 'Source Statistics fixture', exact: true })
   await expect(
     source.getByRole('switch', { name: 'Enable Statistics fixture', exact: true }),
   ).toBeVisible()

@@ -1,10 +1,13 @@
 import type { Run, CatalogSync, ScheduleSummary } from './types'
 import type { InstallationOptions, LanguagePreferences } from './language-preferences'
 
+export type TorznabPreferences = { services?: string[]; cached_only?: boolean }
+
 export type ConnectionFormat = 'catalog' | 'torznab' | 'stremio'
 export type StremioPreferences = InstallationOptions & LanguagePreferences
 
 export interface CatalogShare {
+  torznab_preferences?: TorznabPreferences
   format?: ConnectionFormat
   media_types?: string[]
   stream_preferences?: StremioPreferences

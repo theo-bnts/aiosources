@@ -119,7 +119,7 @@ func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input mod
 		if input.Format == "stremio" {
 			message = "Provide a name, source permissions, valid playback filters and limits within their allowed ranges (zero means no limit)"
 		} else if input.Format == "torznab" {
-			message = "Provide a name, source permissions, valid media types and limits within their allowed ranges (zero means no limit)"
+			message = "Provide a name, source permissions, valid media and cache filters, and limits within their allowed ranges (zero means no limit)"
 		}
 		writeError(w, http.StatusUnprocessableEntity, message)
 		return false

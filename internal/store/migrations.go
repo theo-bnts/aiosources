@@ -220,6 +220,7 @@ var migrations = []struct {
 	{57, stremioConnectionsSchema},
 	{58, connectionDefaultsSchema},
 	{59, operationDownloadsSchema},
+	{60, torznabPreferencesSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

@@ -11,6 +11,7 @@ export function TorznabFilters({
   onChange,
   sources,
   mediaTypes,
+  showSources = false,
   id = 'torznab',
 }: {
   value: TorznabOptions
@@ -18,6 +19,7 @@ export function TorznabFilters({
   sources: { id: string; name: string }[]
   id?: string
   mediaTypes?: string[]
+  showSources?: boolean
 }) {
   return (
     <ConnectionFilterFields
@@ -35,6 +37,7 @@ export function TorznabFilters({
       onServicesChange={(services) => onChange({ ...value, services })}
       cachedOnly={value.cached_only ?? false}
       onCachedChange={(cached_only) => onChange({ ...value, cached_only })}
+      showSources={showSources}
     />
   )
 }

@@ -10,7 +10,8 @@ type PublicAccess struct {
 	Generation        int64 `json:"-"`
 }
 
-// PublicTorznabOptions travel inside an encrypted client key, never a profile.
+// PublicTorznabOptions travel in the client URL, never a saved visitor profile.
+// Personal credentials are encrypted separately from these optional filters.
 type PublicTorznabOptions struct {
 	Sources    []string `json:"sources,omitempty"`
 	MediaTypes []string `json:"media,omitempty"`

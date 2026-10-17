@@ -115,6 +115,46 @@ func TestAnnounceSecretRotationIsValidatedBeforeUse(t *testing.T) {
 	}
 }
 
+func TestPublicClassificationIgnoresTheRetainedPrivateAnnounce(t *testing.T) {
+	ctx, s, conn := testService(t)
+	const reference = "private-announce"
+	const announce = "https://tracker.example/synthetic-key/announce"
+	if err := s.Vault.Put(ctx, reference, announce); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := s.DB.AIOConfig(ctx)
+	c.Trackers["source"] = model.AIOTracker{Private: true, AnnounceSecret: reference}
+	if err := s.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	c, _ = s.DB.AIOConfig(ctx)
+	c.Trackers["source"] = model.AIOTracker{Private: false, AnnounceSecret: reference}
+	if err := s.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	c, _ = s.DB.AIOConfig(ctx)
+	if c.Trackers["source"].AnnounceSecret != reference {
+		t.Fatal("disabling the field discarded the saved selection")
+	}
+	if _, err := conn.Exec(ctx, `UPDATE ingest.secrets SET ciphertext='invalid'::bytea WHERE name=$1`, reference); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Vault.Put(ctx, reference, announce); err != nil {
+			t.Error(err)
+		}
+	})
+	magnet, sources, err := s.magnet(ctx, model.AIORecord{Provider: "source", Hash: strings.Repeat("a", 40), Title: "Example release"}, c)
+	if err != nil || strings.Contains(magnet, "tr=") || len(sources) != 0 {
+		t.Fatal("disabled announce was resolved or included in a public torrent", err)
+	}
+	// Reactivation still validates the selected secret instead of silently
+	// accepting a corrupted or independently rotated credential.
+	if _, err := s.trackerAnnounce(ctx, model.AIOTracker{Private: true, AnnounceSecret: reference}); err == nil {
+		t.Fatal("reactivation skipped credential validation")
+	}
+}
+
 func TestLegacyAnnounceMigrationIsAtomicAndRunsAtStartup(t *testing.T) {
 	ctx, s, _ := testService(t)
 	if err := s.Vault.Put(ctx, "old_passkey", "synthetic/key"); err != nil {

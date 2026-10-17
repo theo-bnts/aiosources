@@ -138,129 +138,18 @@ export function ProvidersPage() {
       {providers.isPending ? (
         <Loading />
       ) : visible.length ? (
-        <div className="table-frame">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Source</TableHead>
-                <TableHead>Adapter</TableHead>
-                <TableHead>Configuration</TableHead>
-                <TableHead>Last run</TableHead>
-                <TableHead>Schedule</TableHead>
-                <TableHead>Enabled</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visible.map((source) => (
-                <TableRow key={source.id}>
-                  <TableCell className="whitespace-normal">
-                    <Link
-                      className="data-link font-medium"
-                      to={`/providers/${encodeURIComponent(source.id)}`}
-                      state={listState}
-                    >
-                      {source.name || source.id}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
-                      {source.adapter || 'Not defined'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {source.valid ? (
-                      <Badge variant="success">Valid</Badge>
-                    ) : (
-                      <Link
-                        className="text-xs text-destructive underline underline-offset-4"
-                        to={`/providers/${encodeURIComponent(source.id)}`}
-                        state={listState}
-                      >
-                        Needs fixing
-                      </Link>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {source.last_run ? (
-                      <Link
-                        to={`/runs/${encodeURIComponent(source.last_run.id)}`}
-                        state={listState}
-                      >
-                        <RunStatusBadge run={source.last_run} />
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No runs</span>
-                    )}
-                  </TableCell>
-                  <SourceScheduleCell
-                    source={source}
-                    schedule={bySource.get(source.id)}
-                    listState={listState}
-                    unavailable={schedules.isError}
-                  />
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        aria-label={`${source.enabled ? 'Disable' : 'Enable'} ${source.name || source.id}`}
-                        checked={source.enabled}
-                        disabled={!source.valid || toggle.isPending}
-                        onCheckedChange={() => toggle.mutate(source)}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <CollectDialog
-                        providerId={source.id}
-                        trigger={
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label={`Run manual import for ${source.name || source.id}`}
-                            disabled={!source.valid || !source.enabled}
-                          >
-                            <PlayIcon />
-                          </Button>
-                        }
-                      />
-                      <Button size="icon-sm" variant="ghost" asChild>
-                        <Link
-                          to={`/providers/${encodeURIComponent(source.id)}`}
-                          state={listState}
-                          aria-label={`Edit ${source.name || source.id}`}
-                        >
-                          <PencilSimpleIcon />
-                        </Link>
-                      </Button>
-                      <ConfirmAction
-                        title={`Delete source “${source.name || source.id}”?`}
-                        description="Only the configuration will be deleted. Raw archives and run history are preserved."
-                        label="Delete source"
-                        variant="destructive"
-                        trigger={
-                          <Button
-                            size="icon-sm"
-                            variant="destructive"
-                            aria-label={`Delete ${source.name || source.id}`}
-                          >
-                            <TrashIcon />
-                          </Button>
-                        }
-                        action={async () => {
-                          await api<void>(`/providers/${encodeURIComponent(source.id)}`, {
-                            method: 'DELETE',
-                            body: JSON.stringify({ revision: source.revision }),
-                          })
-                          await refreshData()
-                        }}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="space-y-4">
+          {visible.map((source) => (
+            <SourceCard
+              key={source.id}
+              source={source}
+              schedule={bySource.get(source.id)}
+              listState={listState}
+              scheduleUnavailable={schedules.isError}
+              toggling={toggle.isPending}
+              onToggle={() => toggle.mutate(source)}
+            />
+          ))}
         </div>
       ) : (
         !providers.isError && (
@@ -282,57 +171,151 @@ export function ProvidersPage() {
   )
 }
 
-function SourceScheduleCell({
+function SourceCard({
   source,
   schedule,
   listState,
-  unavailable,
+  scheduleUnavailable,
+  toggling,
+  onToggle,
 }: {
   source: ProviderSummary
   schedule?: ScheduleSummary
   listState: ReturnType<typeof useListViewState>
-  unavailable: boolean
+  scheduleUnavailable: boolean
+  toggling: boolean
+  onToggle: () => void
 }) {
   const date = useDate()
-  const states: Record<ScheduleSummary['state'], string> = {
-    manual: 'Manual only',
-    disabled: 'Disabled',
-    running: 'Import in progress',
-    paused: 'Budget reached · continues on the next tick',
-    blocked: 'Existing run needs review in History',
-    invalid: 'Source needs review',
-    waiting: schedule?.next_run_at
-      ? `Next: ${date(schedule.next_run_at)}`
-      : 'Waiting for next import',
-  }
+  const name = source.name || source.id
+  const run = schedule?.last_run ?? source.last_run
+  const active =
+    schedule?.state === 'running' || run?.status === 'running' || run?.status === 'queued'
+  const next =
+    !active &&
+    source.enabled &&
+    source.valid &&
+    schedule?.enabled &&
+    (schedule.state === 'waiting' || schedule.state === 'paused') &&
+    schedule.next_run_at
+  // A skipped scheduler tick is normal while a collection owns this source.
+  // Older clocks can retain that message after the active run has finished.
+  const scheduleError =
+    !active &&
+    schedule?.last_error &&
+    schedule.last_error !==
+      'An active collection prevented this scheduled attempt; the next scheduled tick will retry'
+      ? messageText(schedule.last_error)
+      : ''
+  const scheduleState =
+    schedule?.state === 'paused'
+      ? 'Budget reached · continues on the next tick'
+      : schedule?.state === 'blocked'
+        ? 'Existing run needs review in History'
+        : schedule?.state === 'invalid'
+          ? 'Source needs review'
+          : ''
   return (
-    <TableCell>
-      <Link
-        className="data-link"
-        to={`/providers/${encodeURIComponent(source.id)}#schedules`}
-        state={listState}
-      >
-        {schedule
-          ? frequencyLabel(schedule.schedule.every, schedule.schedule.cron)
-          : unavailable
-            ? 'Schedule unavailable'
-            : 'Loading schedule…'}
-      </Link>
-      {schedule && (
-        <>
-          <p
-            className={`mt-1 text-xs ${schedule.state === 'blocked' || schedule.state === 'invalid' || schedule.state === 'paused' ? 'text-amber-800 dark:text-amber-300' : schedule.state === 'running' ? 'text-sky-800 dark:text-sky-300' : 'text-muted-foreground'}`}
+    <section className="section-card" aria-label={`Source ${name}`}>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="section-title min-w-0 flex-1 break-words">
+          <Link
+            className="data-link"
+            to={`/providers/${encodeURIComponent(source.id)}`}
+            state={listState}
           >
-            {states[schedule.state]}
-          </p>
-          {schedule.last_error && (
-            <p className="mt-1 max-w-xs whitespace-normal text-xs text-destructive">
-              {messageText(schedule.last_error)}
-            </p>
+            {name}
+          </Link>
+        </h2>
+        <div className="flex shrink-0 items-center gap-3">
+          {!source.valid && <Badge variant="warning">Needs fixing</Badge>}
+          <Switch
+            aria-label={`${source.enabled ? 'Disable' : 'Enable'} ${name}`}
+            checked={source.enabled}
+            disabled={!source.valid || toggling}
+            onCheckedChange={onToggle}
+          />
+        </div>
+      </div>
+      <dl className="grid gap-4 text-sm md:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">Schedule</dt>
+          <dd className="mt-1">
+            <Link
+              className="data-link"
+              to={`/providers/${encodeURIComponent(source.id)}#schedules`}
+              state={listState}
+            >
+              {schedule
+                ? frequencyLabel(schedule.schedule.every, schedule.schedule.cron)
+                : scheduleUnavailable
+                  ? 'Schedule unavailable'
+                  : 'Loading schedule…'}
+            </Link>
+            {schedule &&
+              !schedule.enabled &&
+              (schedule.schedule.every || schedule.schedule.cron) && (
+                <span className="ml-2 text-muted-foreground">Automatic imports disabled</span>
+              )}
+          </dd>
+          {scheduleState && (
+            <p className="help mt-1 text-amber-800 dark:text-amber-300">{scheduleState}</p>
           )}
-        </>
-      )}
-    </TableCell>
+          {scheduleError && scheduleError !== scheduleState && (
+            <p className="help mt-1 break-words text-destructive">{scheduleError}</p>
+          )}
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Last run</dt>
+          <dd className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {run ? (
+              <Link to={`/runs/${encodeURIComponent(run.id)}`} state={listState}>
+                <RunStatusBadge run={run} />
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">No runs</span>
+            )}
+            {next && <span className="text-muted-foreground">Next: {date(next)}</span>}
+          </dd>
+        </div>
+      </dl>
+      <div className="toolbar">
+        <CollectDialog
+          providerId={source.id}
+          trigger={
+            <Button size="sm" disabled={!source.valid || !source.enabled || active}>
+              <PlayIcon />
+              Run manual import
+            </Button>
+          }
+        />
+        <Button size="sm" variant="outline" asChild>
+          <Link to={`/providers/${encodeURIComponent(source.id)}`} state={listState}>
+            <PencilSimpleIcon />
+            Edit
+          </Link>
+        </Button>
+        <ConfirmAction
+          title={`Delete source “${name}”?`}
+          description="Only the configuration will be deleted. Raw archives and run history are preserved."
+          label="Delete source"
+          variant="destructive"
+          trigger={
+            <Button size="sm" variant="destructive">
+              <TrashIcon />
+              Delete
+            </Button>
+          }
+          action={async () => {
+            await api<void>(`/providers/${encodeURIComponent(source.id)}`, {
+              method: 'DELETE',
+              body: JSON.stringify({ revision: source.revision }),
+            })
+            await refreshData()
+          }}
+        />
+      </div>
+    </section>
   )
 }
 

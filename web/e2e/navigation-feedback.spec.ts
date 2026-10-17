@@ -236,7 +236,10 @@ test.describe('return navigation', () => {
     }
     await page.goto('/providers/settings?q=Return&state=disabled')
     const origin = page.url()
-    await page.getByRole('cell').getByRole('link', { name: 'Completed', exact: true }).click()
+    await page
+      .getByRole('region', { name: 'Source Return source', exact: true })
+      .getByRole('link', { name: 'Completed', exact: true })
+      .click()
     await expect(page).toHaveURL(/\/runs\/return-run$/)
     await page.getByRole('tab', { name: 'Processed records', exact: true }).click()
     await page.reload()

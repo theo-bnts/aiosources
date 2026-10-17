@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
@@ -109,20 +108,7 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	// Services only select known shared availability; credentials are configured
 	// in the recipient's download client. No provider calls or visitor rows here.
-	if len(visitor.Options.Services) > 0 {
-		if q.Services == nil {
-			q.Services = visitor.Options.Services
-		} else {
-			selected := []string{}
-			for _, id := range q.Services {
-				if slices.Contains(visitor.Options.Services, id) {
-					selected = append(selected, id)
-				}
-			}
-			q.Services = selected
-		}
-	}
-	q.CachedOnly = q.CachedOnly || visitor.Options.CachedOnly
+	q = q.WithPreferences(model.TorznabPreferences{Services: visitor.Options.Services, CachedOnly: visitor.Options.CachedOnly})
 	var response any
 	if q.Mode == "caps" {
 		response = torznabCaps(model.Share{MediaTypes: visitor.Options.MediaTypes}, s.auth.origin)

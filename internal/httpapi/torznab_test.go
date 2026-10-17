@@ -90,6 +90,44 @@ func TestTorznabAuthenticationCapabilitiesAndClientRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTorznabSavedCacheFiltersSurviveManagementAndCannotBeOverridden(t *testing.T) {
+	f := sharingAPI(t, "https://owner.example.test")
+	conn, err := pgx.Connect(f.ctx, f.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(f.ctx)
+	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+ ('example','cached','{"title":"Example cached release","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
+ ('example','uncached','{"title":"Example uncached release","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}');
+ INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]')`); err != nil {
+		t.Fatal(err)
+	}
+	w := f.request("POST", "/api/torznab/endpoints", `{"name":"Cache filtered","scope":"all","enabled":true,"torznab_preferences":{"services":["torbox"],"cached_only":true}}`, true, "")
+	var grant model.ShareCredential
+	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &grant) != nil || grant.Share.TorznabPreferences == nil || !grant.Share.TorznabPreferences.CachedOnly {
+		t.Fatal("cache policy did not round-trip through the API", w.Code)
+	}
+	for _, query := range []string{"", "&cached_only=false", "&services=torbox", "&services=alldebrid,torbox"} {
+		w = f.request("GET", "/torznab/"+grant.Share.ID+"/api?t=search&apikey="+grant.Password+query, "", false, "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `total="1"`) || strings.Contains(w.Body.String(), "Example uncached release") {
+			t.Fatal("query relaxed saved cache-only access", w.Code)
+		}
+	}
+	w = f.request("GET", "/torznab/"+grant.Share.ID+"/api?t=search&apikey="+grant.Password+"&services=alldebrid", "", false, "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `total="0"`) {
+		t.Fatal("query expanded an excluded cache service", w.Code)
+	}
+	for _, body := range []string{
+		`{"name":"Bad","scope":"all","torznab_preferences":{"services":["direct"]}}`,
+		`{"name":"Bad","scope":"all","torznab_preferences":{"services":["torbox","torbox"]}}`,
+	} {
+		if w = f.request("POST", "/api/torznab/endpoints", body, true, ""); w.Code != 422 {
+			t.Fatal("invalid cache filter accepted", w.Code)
+		}
+	}
+}
+
 func TestTorznabXMLProjectionEscapesTextAndOmitsNativeURLs(t *testing.T) {
 	v := torznabResults(model.List[model.TorznabRecord]{Total: 1, Items: []model.TorznabRecord{{AIORecord: model.AIORecord{Provider: "alpha", Title: `Example & <Film> "Test"`, Hash: strings.Repeat("a", 40), IMDb: "tt1234567", Size: 100}, OccurrenceID: "stable", Category: 2000}}}, map[string]string{"alpha": "Alpha & source"}, "https://owner.example.test")
 	data, err := xml.Marshal(v)

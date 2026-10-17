@@ -89,9 +89,9 @@ func TestConnectionDefaultsUpgradePreservesNamedAccessAndExplicitPolicies(t *tes
 		t.Fatal(err)
 	}
 	requests, concurrent := 17, 3
-	grant, err := db.CreateShare(ctx, model.ShareInput{Format: "stremio", Name: "Existing connection", Enabled: true, Scope: "all", Fields: CatalogFields(), RequestsPerMinute: &requests, MaxConcurrentDownloads: &concurrent, StreamPreferences: &model.StreamPreferences{Mode: "all", CachedOnly: true}})
-	if err != nil {
-		t.Fatal(err)
+	grant := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing connection", Enabled: true, Scope: "all", Fields: CatalogFields()})
+	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET format='stremio',requests_per_minute=$2,max_concurrent_downloads=$3,stream_preferences='{"mode":"all","cached_only":true}' WHERE id=$1`, grant.Share.ID, requests, concurrent); err != nil {
+		t.Fatal("prepare historical named access", err)
 	}
 	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.secrets(name,ciphertext) VALUES('aiosource_installation','obsolete credential'::bytea)`); err != nil {
 		t.Fatal(err)

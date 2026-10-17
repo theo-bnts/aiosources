@@ -11,7 +11,7 @@ AIOSources is a self-hosted application that organizes torrent metadata from you
 - **Identify films and series:** use TMDB information to verify IMDb, TMDB and TVDB identifiers, then review or correct uncertain results.
 - **Check availability:** connect AllDebrid or TorBox to see cached availability and prepare playback when you select a stream.
 - **Connect Stremio and AIOStreams:** create independent private installations with saved filters and browse the results from your catalog.
-- **Connect Torznab applications:** expose a revocable, read-only endpoint for Prowlarr and other clients, with optional source and media filters in each URL.
+- **Connect Torznab applications:** expose a revocable, read-only endpoint for Prowlarr and other clients, with saved filters and optional URL parameters for each client.
 - **Offer optional public access:** let visitors install the addon with their own debrid keys and reuse shared cache observations, while keeping administration private.
 - **Share selected metadata:** create revocable, read-only catalog shares and import catalogs shared with you.
 - **Follow activity:** see source statistics, processing history, returned Stremio results, logs and storage usage.
@@ -120,7 +120,7 @@ The former global installation token and its Legacy panel have been removed. Rep
 
 ### Torznab
 
-Open **Connections → Torznab**, create an access key and enable it when ready. Access defaults to all sources without per-access limits. Select one or more sources and media types in **Filters** and optional expiration or limits in **Advanced**. Use **Client setup & filters** for the exact URL, API path and optional parameters to paste into Prowlarr's **Generic Torznab** configuration. A single key can be used with multiple filtered URLs; you do not need a key or saved profile for each configuration.
+Open **Connections → Torznab**, create an access key and enable it when ready. Access defaults to all sources without per-access limits. Select media types, sources, cache services and **Cached results only** in **Filters**, and optional expiration or limits in **Advanced**. Saved settings apply immediately to the same key. Enter the Torznab URL and generated API key in your client; Prowlarr uses **Generic Torznab**. A key can still be used with multiple URL filters that narrow its saved settings.
 
 Requests search your published local data without contacting your sources or TMDB. Standard categories select movies, series or other releases. Torznab can include records that are not identified; Stremio uses identified video types, including anime. Optional `sources` and `media` URL parameters can narrow each connection further. Private-source magnets contain no administrator announce URL: the recipient needs their own source access to download them. No debrid account is shared through Torznab. See the [Torznab setup and parameter reference](docs/TORZNAB.md).
 
@@ -130,7 +130,7 @@ Treat the manifest URL like a password: it grants access to your catalog and per
 
 Streams use Stremio's standard `description`, `infoHash`, `url` and `behaviorHints` fields. AIOStreams also reads the structured source name, service, cache state, publication date, duration and file/folder sizes when available; the original release and selected filename retain the quality, codec and language information. Missing optional data is omitted. Arbitrary raw fields and administrator secrets are excluded. A configured announce URL can be included when direct torrent playback needs it, so protect installation links. **Cached results only** excludes direct torrent playback and strips announces from debrid preparation; an unavailable cached file never falls back to the administrator’s announce. Private Torznab magnets never contain an announce.
 
-A source marked **Private source** without an announce URL is offered only when cached availability is verified. Unknown or uncached results are hidden, including episodes that cannot be confirmed in a season pack. Without a configured debrid service, these private sources are excluded from direct torrent results.
+A source marked **Private source** without an announce URL is offered only when cached availability is verified. Unknown or uncached results are hidden, including episodes that cannot be confirmed in a season pack. Without a configured debrid service, these private sources are excluded from direct torrent results. Turning off **Private source** disables announce editing and use while keeping the selected secret for a later reactivation.
 
 Two-step verification, encrypted secrets and session management are available in **Security**. Keep the database and application data volumes together when making backups: the data volume contains the key needed to decrypt your secrets. Completed diagnostic history is automatically retained for seven days; published torrents and recovery data for unfinished imports are preserved.
 

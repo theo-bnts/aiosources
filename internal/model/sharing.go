@@ -8,39 +8,41 @@ import (
 
 // Share contains only owner-visible configuration, never credential material.
 type Share struct {
-	StreamPreferences      *StreamPreferences `json:"stream_preferences,omitempty"`
-	Format                 string             `json:"format"`
-	MediaTypes             []string           `json:"media_types"`
-	ID                     string             `json:"id"`
-	Name                   string             `json:"name"`
-	Enabled                bool               `json:"enabled"`
-	Scope                  string             `json:"scope"`
-	SourceIDs              []string           `json:"source_ids"`
-	Fields                 []string           `json:"fields"`
-	Revision               int64              `json:"revision"`
-	CreatedAt              time.Time          `json:"created_at"`
-	UpdatedAt              time.Time          `json:"updated_at"`
-	LastAccessAt           *time.Time         `json:"last_access_at,omitempty"`
-	LastSyncAt             *time.Time         `json:"last_sync_at,omitempty"`
-	ExpiresAt              *time.Time         `json:"expires_at"`
-	RequestsPerMinute      int                `json:"requests_per_minute"`
-	MaxConcurrentDownloads int                `json:"max_concurrent_downloads"`
-	URL                    string             `json:"url"`
+	TorznabPreferences     *TorznabPreferences `json:"torznab_preferences,omitempty"`
+	StreamPreferences      *StreamPreferences  `json:"stream_preferences,omitempty"`
+	Format                 string              `json:"format"`
+	MediaTypes             []string            `json:"media_types"`
+	ID                     string              `json:"id"`
+	Name                   string              `json:"name"`
+	Enabled                bool                `json:"enabled"`
+	Scope                  string              `json:"scope"`
+	SourceIDs              []string            `json:"source_ids"`
+	Fields                 []string            `json:"fields"`
+	Revision               int64               `json:"revision"`
+	CreatedAt              time.Time           `json:"created_at"`
+	UpdatedAt              time.Time           `json:"updated_at"`
+	LastAccessAt           *time.Time          `json:"last_access_at,omitempty"`
+	LastSyncAt             *time.Time          `json:"last_sync_at,omitempty"`
+	ExpiresAt              *time.Time          `json:"expires_at"`
+	RequestsPerMinute      int                 `json:"requests_per_minute"`
+	MaxConcurrentDownloads int                 `json:"max_concurrent_downloads"`
+	URL                    string              `json:"url"`
 }
 
 type ShareInput struct {
-	StreamPreferences      *StreamPreferences `json:"stream_preferences,omitempty"`
-	Format                 string             `json:"format,omitempty"`
-	MediaTypes             []string           `json:"media_types,omitempty"`
-	Name                   string             `json:"name"`
-	Enabled                bool               `json:"enabled"`
-	Scope                  string             `json:"scope"`
-	SourceIDs              []string           `json:"source_ids"`
-	Fields                 []string           `json:"fields"`
-	Revision               int64              `json:"revision"`
-	ExpiresAt              *time.Time         `json:"expires_at"`
-	RequestsPerMinute      *int               `json:"requests_per_minute,omitempty"`
-	MaxConcurrentDownloads *int               `json:"max_concurrent_downloads,omitempty"`
+	TorznabPreferences     *TorznabPreferences `json:"torznab_preferences,omitempty"`
+	StreamPreferences      *StreamPreferences  `json:"stream_preferences,omitempty"`
+	Format                 string              `json:"format,omitempty"`
+	MediaTypes             []string            `json:"media_types,omitempty"`
+	Name                   string              `json:"name"`
+	Enabled                bool                `json:"enabled"`
+	Scope                  string              `json:"scope"`
+	SourceIDs              []string            `json:"source_ids"`
+	Fields                 []string            `json:"fields"`
+	Revision               int64               `json:"revision"`
+	ExpiresAt              *time.Time          `json:"expires_at"`
+	RequestsPerMinute      *int                `json:"requests_per_minute,omitempty"`
+	MaxConcurrentDownloads *int                `json:"max_concurrent_downloads,omitempty"`
 }
 
 // Null is meaningful only for expiration. Limit pointers distinguish an omitted

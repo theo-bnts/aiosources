@@ -90,7 +90,9 @@ test('source display names stay consistent while routes and historical identity 
   }
   await page.reload()
   await expect(page.getByRole('link', { name: source.name, exact: true })).toBeVisible()
-  await expect(page.getByRole('table')).not.toContainText(source.id)
+  await expect(
+    page.getByRole('region', { name: `Source ${source.name}`, exact: true }),
+  ).not.toContainText(source.id)
 
   for (const name of [source.name, 'Renamed Library é']) {
     if (name !== source.name) {

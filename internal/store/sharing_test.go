@@ -17,7 +17,7 @@ import (
 // columns needed by the current reader. These columns do not alter the catalog
 // identity/publication migration being exercised, and those fixtures are never
 // passed through the complete migration sequence.
-const testShareFormatColumns = `ALTER TABLE ingest.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN stream_preferences JSONB NOT NULL DEFAULT '{}';`
+const testShareFormatColumns = `ALTER TABLE ingest.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN stream_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN torznab_preferences JSONB NOT NULL DEFAULT '{}';`
 
 // Historical upgrade fixtures must be written in their original schema, rather
 // than by a current writer which depends on columns added in later migrations.

@@ -85,6 +85,10 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		}
 		result, e := download.Torznab(ctx, q, match)
 		if e != nil {
+			if errors.Is(e, store.ErrCatalogAuthentication) {
+				torznabError(w, 401, 100, "Incorrect API key")
+				return
+			}
 			_ = s.options.Store.RecordActivity(ctx, "warn", "torznab.failed", "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(started).Milliseconds()})
 			torznabError(w, 503, 910, "Search unavailable; try again later")
 			return
