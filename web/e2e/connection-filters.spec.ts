@@ -317,6 +317,16 @@ for (const format of ['stremio', 'torznab'] as const) {
     await expect(card.getByText('Request limits', { exact: true })).toHaveCount(0)
     await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    if (format === 'torznab') {
+      await editor.getByRole('switch', { name: 'Cached results only', exact: true }).check()
+      await editor.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
+      await selectMultiple(editor, 'Services', ['torbox'])
+      await selectMultiple(editor, 'Services', [])
+      await expect(
+        editor.getByRole('button', { name: 'Save permissions', exact: true }),
+      ).toBeDisabled()
+      await expect(editor.getByText('No unsaved changes', { exact: true })).toBeVisible()
+    }
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitemcheckbox', { name: 'Alpha library', exact: true }).click()
     await page.keyboard.press('Escape')

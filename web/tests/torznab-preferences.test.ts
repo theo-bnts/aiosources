@@ -1,6 +1,30 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { torznabPreferenceKey, torznabPreferenceError } from '../src/lib/torznab-preferences.ts'
+import {
+  torznabPreferenceKey,
+  torznabPreferenceError,
+  torznabCachePreferences,
+} from '../src/lib/torznab-preferences.ts'
+
+test('reverting saved cache filters restores the same defaults as URL options', () => {
+  assert.deepEqual(
+    torznabCachePreferences({ services: [], cached_only: false }),
+    torznabCachePreferences({}),
+  )
+  assert.deepEqual(
+    torznabCachePreferences({
+      sources: ['alpha'],
+      media: ['tv'],
+      services: ['torbox'],
+      cached_only: true,
+    }),
+    { services: ['torbox'], cached_only: true },
+  )
+  assert.equal(
+    torznabPreferenceKey('encrypted-secret', { services: [], cached_only: false }),
+    'encrypted-secret',
+  )
+})
 
 test('Torznab URL filters are replaceable without resubmitting personal credentials', () => {
   const first = torznabPreferenceKey('encrypted-secret', {

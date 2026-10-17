@@ -8,6 +8,7 @@ import {
   stremioPreferenceSummary,
 } from '@/components/stremio-connection-filters'
 import { resolvedLanguage } from '@/lib/language-preferences'
+import { torznabCachePreferences } from '@/lib/torznab-preferences'
 import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -472,7 +473,7 @@ function ShareForm({
     share?.stream_preferences ?? defaultStremioPreferences(),
   )
   const [torznabPreferences, setTorznabPreferences] = useState<TorznabPreferences>(
-    share?.torznab_preferences ?? {},
+    torznabCachePreferences(share?.torznab_preferences ?? {}),
   )
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
@@ -571,7 +572,8 @@ function ShareForm({
   const busy = save.isPending || reload.isPending
   const dirty =
     (torznab &&
-      JSON.stringify(torznabPreferences) !== JSON.stringify(original?.torznab_preferences ?? {})) ||
+      JSON.stringify(torznabPreferences) !==
+        JSON.stringify(torznabCachePreferences(original?.torznab_preferences ?? {}))) ||
     (stremio &&
       JSON.stringify(streamPreferences) !==
         JSON.stringify(original?.stream_preferences ?? defaultStremioPreferences())) ||
@@ -771,7 +773,7 @@ function ShareForm({
               onChange={({ media, sources, ...options }) => {
                 setMediaTypes(media ?? [])
                 selectSources(sources ?? [])
-                setTorznabPreferences(options)
+                setTorznabPreferences(torznabCachePreferences(options))
               }}
               sources={sourceOptions}
               showSources
