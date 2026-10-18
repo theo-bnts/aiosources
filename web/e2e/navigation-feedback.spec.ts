@@ -371,7 +371,8 @@ test.describe('return navigation', () => {
       await db.end()
     }
     await page.goto('/sharing/remotes?q=Remote&state=disabled')
-    await expect(page).toHaveURL(/\/remotes\?q=Remote&state=disabled$/)
+    // The suffix also matches the legacy address before its redirect commits.
+    await expect(page).toHaveURL(server.origin + '/remotes?q=Remote&state=disabled')
     const origin = page.url()
     await page.getByRole('link', { name: /View run/ }).click()
     await page.reload()
