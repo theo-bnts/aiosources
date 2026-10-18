@@ -42,7 +42,7 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   expect(
     await card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
   ).not.toBe('rgba(0, 0, 0, 0)')
-  await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await card.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
   await selectMultiple(dialog, 'Media types', ['movie', 'tv'])
   await selectMultiple(dialog, 'Services', ['torbox'])
@@ -57,7 +57,7 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   expect(data.items[0]).not.toHaveProperty('password')
   expect((await (await page.request.get('/api/shares')).json()).items).toEqual([])
   await page.reload()
-  await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await card.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
   await expect(dialog.getByRole('button', { name: 'Services', exact: true })).toHaveText('TorBox')
   await expect(dialog.getByRole('button', { name: 'Media types', exact: true })).toHaveText(
@@ -126,7 +126,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   expect(first.status()).toBe(200)
   const firstManifest = await first.json()
   expect(firstManifest.types).toEqual(['movie', 'series', 'anime'])
-  await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await card.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
   await selectMultiple(dialog, 'Media types', ['series'])
   await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
@@ -173,10 +173,10 @@ test('saved Stremio access updates the same manifest and can be independently re
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('stremio-access-mobile.png'), fullPage: true })
-  await card.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await card.getByRole('button', { name: 'Delete', exact: true }).click()
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: 'Revoke access', exact: true })
+    .getByRole('button', { name: 'Delete access', exact: true })
     .click()
   await expect(card).toHaveCount(0)
   expect((await page.request.get(manifest)).status()).toBe(401)
@@ -223,7 +223,7 @@ test('saved service selections remain editable without widening access after a k
   await page.goto('/addon/settings')
   await page
     .getByRole('region', { name: 'Access Changed service', exact: true })
-    .getByRole('button', { name: 'Edit permissions & limits', exact: true })
+    .getByRole('button', { name: 'Edit', exact: true })
     .click()
   const dialog = page.getByRole('dialog')
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
@@ -333,7 +333,7 @@ for (const format of ['stremio', 'torznab'] as const) {
     })
     const card = page.getByRole('region', { name: 'Access Default access', exact: true })
     await expect(card.getByText('Request limits', { exact: true })).toHaveCount(0)
-    await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+    await card.getByRole('button', { name: 'Edit', exact: true }).click()
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
     if (format === 'torznab') {
       await editor.getByRole('switch', { name: 'Cached results only', exact: true }).check()
@@ -364,7 +364,7 @@ for (const format of ['stremio', 'torznab'] as const) {
       max_concurrent_downloads: 1,
     })
     expect(access.expires_at).not.toBeNull()
-    await card.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+    await card.getByRole('button', { name: 'Edit', exact: true }).click()
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
     await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
       'Alpha library',

@@ -31,6 +31,7 @@ func scanRun(row scanner) (model.Run, error) {
 	if err := decoder.Decode(&run.Config); err != nil {
 		return run, errors.New("stored provider snapshot is invalid")
 	}
+	run.RemoteCatalog = run.Config.IsRemoteCatalog()
 	if len(policy) != 0 {
 		if err := json.Unmarshal(policy, &run.Policy); err != nil || run.Policy == nil || !run.Policy.Valid() {
 			return run, errors.New("stored collection policy is invalid")
@@ -150,12 +151,20 @@ func (s *Store) LatestRuns(ctx context.Context, providerIDs []string) (map[strin
 func (s *Store) ListRuns(ctx context.Context, opts model.ListOptions) (model.List[model.Run], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.Run]{Items: []model.Run{}, Limit: opts.Limit, Offset: opts.Offset}
+	if opts.SourceKind != "" && opts.SourceKind != "source" && opts.SourceKind != "remote" {
+		return result, model.ErrInvalid
+	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return result, databaseError("begin collection listing", err)
 	}
 	defer rollback(tx)
-	const filter = ` FROM ingest.runs WHERE ($1='' OR provider_id=$1) AND ($2='' OR status=$2) AND ($3='' OR id=$3)`
+	filter := ` FROM ingest.runs WHERE ($1='' OR provider_id=$1) AND ($2='' OR status=$2) AND ($3='' OR id=$3)`
+	if opts.SourceKind == "remote" {
+		filter += " AND remote_catalog"
+	} else if opts.SourceKind == "source" {
+		filter += " AND NOT remote_catalog"
+	}
 	if err := tx.QueryRow(ctx, "SELECT count(*)"+filter, opts.ProviderID, opts.Status, opts.RunID).Scan(&result.Total); err != nil {
 		return result, databaseError("count collections", err)
 	}

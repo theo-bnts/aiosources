@@ -1,3 +1,4 @@
+import { toggleProvider } from '@/lib/provider-state'
 import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -7,6 +8,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
 import {
   PlusIcon,
+  MagnifyingGlassIcon,
   PencilSimpleIcon,
   TrashIcon,
   CheckCircleIcon,
@@ -80,21 +82,7 @@ export function ProvidersPage() {
   )
   const filtered = Boolean(filters.query || filters.state)
   const toggle = useMutation({
-    mutationFn: async (source: ProviderSummary) => {
-      const document = await api<ProviderDocument>(`/providers/${encodeURIComponent(source.id)}`)
-      if (document.revision !== source.revision)
-        throw new ApiError(
-          409,
-          'This source was changed elsewhere. Refresh before changing its state.',
-        )
-      const json = parseProviderJSON(document.json)
-      if (json.errors.length) throw new Error('Fix the JSON before changing its enabled state.')
-      json.set('enabled', !source.enabled)
-      return api<ProviderDocument>(`/providers/${encodeURIComponent(source.id)}`, {
-        method: 'PUT',
-        body: JSON.stringify({ json: json.toString(), revision: source.revision }),
-      })
-    },
+    mutationFn: toggleProvider,
     onSuccess: refreshData,
   })
   return (
@@ -293,6 +281,12 @@ function SourceCard({
           <Link to={`/providers/${encodeURIComponent(source.id)}`} state={listState}>
             <PencilSimpleIcon />
             Edit
+          </Link>
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link to={`/torrents?provider=${encodeURIComponent(source.id)}`} state={listState}>
+            <MagnifyingGlassIcon />
+            View imported data
           </Link>
         </Button>
         <ConfirmAction

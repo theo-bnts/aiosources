@@ -17,7 +17,7 @@ export function remoteDraft(document?: ProviderDocument): RemoteDraft {
     id: provider?.id ?? '',
     name: provider?.name ?? '',
     url: provider?.url ?? '',
-    enabled: provider?.enabled ?? true,
+    enabled: provider?.enabled ?? false,
     secretRef: provider?.auth.secret_ref ?? '',
     autoSync: provider?.catalog_sync?.enabled ?? !document,
     intervalMinutes: String(provider?.catalog_sync?.interval_minutes ?? 60),
@@ -84,7 +84,7 @@ export function remoteJSON(
     "fields": {}
   },
   "output": {
-    "fields": ["title", "size", "info_hash", "leechers", "published_at", "category", "categories"]
+    "fields": ["title", "size", "info_hash", "published_at", "category", "categories"]
   }
 }
 `,

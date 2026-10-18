@@ -18,7 +18,7 @@ func withoutSwarmCounts(value any) (any, bool) {
 		var cleaned map[string]any
 		for key, field := range value {
 			var next any
-			changed := key == "seeders" || key == "peers"
+			changed := swarmCount(key)
 			if !changed {
 				next, changed = withoutSwarmCounts(field)
 			}
@@ -28,7 +28,7 @@ func withoutSwarmCounts(value any) (any, bool) {
 			if cleaned == nil {
 				cleaned = maps.Clone(value)
 			}
-			if key == "seeders" || key == "peers" {
+			if swarmCount(key) {
 				delete(cleaned, key)
 			} else {
 				cleaned[key] = next
@@ -38,14 +38,9 @@ func withoutSwarmCounts(value any) (any, bool) {
 			return cleaned, true
 		}
 	case map[string][]string:
-		_, seeders := value["seeders"]
-		_, peers := value["peers"]
-		if seeders || peers {
-			cleaned := maps.Clone(value)
-			delete(cleaned, "seeders")
-			delete(cleaned, "peers")
-			return cleaned, true
-		}
+		return withoutCountKeys(value)
+	case map[string]string:
+		return withoutCountKeys(value)
 	case []any:
 		var cleaned []any
 		for index, field := range value {
@@ -61,6 +56,27 @@ func withoutSwarmCounts(value any) (any, bool) {
 		if cleaned != nil {
 			return cleaned, true
 		}
+	}
+	return value, false
+}
+
+func swarmCount(key string) bool {
+	return key == "seeders" || key == "peers" || key == "leechers"
+}
+
+func withoutCountKeys[M ~map[string]V, V any](value M) (any, bool) {
+	var cleaned M
+	for key := range value {
+		if !swarmCount(key) {
+			continue
+		}
+		if cleaned == nil {
+			cleaned = maps.Clone(value)
+		}
+		delete(cleaned, key)
+	}
+	if cleaned != nil {
+		return cleaned, true
 	}
 	return value, false
 }

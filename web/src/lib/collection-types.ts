@@ -19,6 +19,8 @@ export interface CollectionSettings {
 }
 
 export interface CollectionOverview {
+  source_running: number
+  source_queued: number
   settings: CollectionSettings
   running: number
   queued: number

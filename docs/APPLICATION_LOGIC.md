@@ -65,6 +65,8 @@ Migration 41 removes seeders from interpreted torrent data and snapshots, preser
 
 Migrations 46–48 retire the backup product and peers, preserve compact recovery evidence independently of seven-day diagnostic history, and store the existing matching fingerprint at field writes. History cleanup is bounded and transactional. Sharing retains recent changes and a compact reference state; expired checkpoints require a fresh Full. Published records, metadata, matches and administrator credentials remain intact.
 
+Migration 61 removes leechers from interpreted records and publication snapshots, preserving current/stale match fingerprints, manual reviews, queues and raw archive integrity. Counter-only shares become disabled without widening their permissions. Migration 62 indexes each run's source/remote origin from its immutable configuration snapshot, keeping separate history counts independent of the size of saved source definitions. The unfiltered runs API remains compatible; `source_kind=source` or `source_kind=remote` selects one history.
+
 Mutable console data refreshes automatically while visible, with more frequent polling for active operations. Live events still invalidate related queries promptly. Successful immutable response archives stay cached instead of downloading their bytes again on each tick; failed reads can recover automatically. Drafts retain their base revision and changed fields; periodic reads cannot replay writes or silently rebase concurrent edits. The search form uses the existing combined filter contract with a multiple-source dropdown and complete/partial hashes in its text field.
 
 Manual API clients must use the following versioned commands:

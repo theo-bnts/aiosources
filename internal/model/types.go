@@ -72,10 +72,10 @@ func (p Provider) MetadataFields() []string {
 		return nil
 	}
 	fields := p.Traversal.EnrichFields
-	if !slices.Contains(fields, "seeders") && !slices.Contains(fields, "peers") {
+	if !slices.ContainsFunc(fields, swarmCount) {
 		return fields
 	}
-	return slices.DeleteFunc(slices.Clone(fields), func(field string) bool { return field == "seeders" || field == "peers" })
+	return slices.DeleteFunc(slices.Clone(fields), swarmCount)
 }
 
 // SecretReferences gives admission, execution and deletion the same dependency set.
@@ -248,6 +248,7 @@ const (
 )
 
 type Run struct {
+	RemoteCatalog         bool              `json:"remote_catalog,omitempty"`
 	ID                    string            `json:"id"`
 	ProviderID            string            `json:"provider_id"`
 	ProviderName          string            `json:"provider_name"`
@@ -361,6 +362,7 @@ type Torrent struct {
 }
 
 type ListOptions struct {
+	SourceKind      string
 	ProviderID      string
 	RunID           string
 	Status          string

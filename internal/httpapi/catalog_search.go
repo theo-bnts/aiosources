@@ -84,7 +84,16 @@ func (s *server) catalogReleases(w http.ResponseWriter, r *http.Request) {
 		respondError(w, model.ErrInvalid)
 		return
 	}
-	items, err := s.options.AIOSource.CatalogReleases(r.Context(), id, selection, opts, preferences)
+	filters := model.CatalogReleaseFilters{StreamPreferences: preferences}
+	if raw := r.URL.Query().Get("cached_only"); raw != "" {
+		cached, err := strconv.ParseBool(raw)
+		if err != nil {
+			respondError(w, model.ErrInvalid)
+			return
+		}
+		filters.CachedOnly = cached
+	}
+	items, err := s.options.AIOSource.CatalogReleases(r.Context(), id, selection, opts, filters)
 	if err != nil {
 		respondError(w, err)
 		return

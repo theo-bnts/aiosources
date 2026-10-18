@@ -63,6 +63,12 @@ const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default:
 const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
+const RemoteStatisticsPage = lazy(() =>
+  import('@/pages/remotes').then((m) => ({ default: m.RemoteStatisticsPage })),
+)
+const SharedCatalogStatisticsPage = lazy(() =>
+  import('@/pages/sharing').then((m) => ({ default: m.SharedCatalogStatisticsPage })),
+)
 const PublicAccessPage = lazy(() => import('@/pages/public-access'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
@@ -100,7 +106,11 @@ function LegacyActivity() {
 function LegacyRemotes() {
   const location = useLocation()
   return (
-    <Navigate to={`/remotes${location.search}${location.hash}`} state={location.state} replace />
+    <Navigate
+      to={`/remotes/settings${location.search}${location.hash}`}
+      state={location.state}
+      replace
+    />
   )
 }
 
@@ -298,8 +308,37 @@ const router = createBrowserRouter(
           <Route path="addon/history" element={<StremioHistoryPage />} />
           <Route path="addon/history/:id" element={<StremioRequestPage />} />
         </Route>
-        <Route path="remotes" element={<RemotesPage />} />
-        <Route path="sharing" element={<SharingPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Remote catalogs"
+              tabs={[
+                { path: '/remotes', label: 'Statistics', icon: ChartBarIcon },
+                { path: '/remotes/settings', label: 'Settings', icon: GearSixIcon },
+                { path: '/remotes/history', label: 'History', icon: ClockCounterClockwiseIcon },
+              ]}
+            />
+          }
+        >
+          <Route path="remotes" element={<RemoteStatisticsPage />} />
+          <Route path="remotes/settings" element={<RemotesPage />} />
+          <Route path="remotes/history" element={<RunsPage remote />} />
+          <Route path="remotes/history/:id" element={<RunDetailPage remote />} />
+        </Route>
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Shared catalogs"
+              tabs={[
+                { path: '/sharing', label: 'Statistics', icon: ChartBarIcon },
+                { path: '/sharing/settings', label: 'Settings', icon: GearSixIcon },
+              ]}
+            />
+          }
+        >
+          <Route path="sharing" element={<SharedCatalogStatisticsPage />} />
+          <Route path="sharing/settings" element={<SharingPage />} />
+        </Route>
         <Route path="torznab" element={<TorznabPage />} />
         <Route path="public-access" element={<PublicAccessPage />} />
         <Route path="sharing/remotes" element={<LegacyRemotes />} />

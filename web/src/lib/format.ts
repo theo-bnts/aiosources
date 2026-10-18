@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { RunMode, RunStatus } from './types'
+import type { Run, RunMode, RunStatus } from './types'
 
 const integers = new Intl.NumberFormat('en-GB')
 const decimals = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 })
@@ -23,6 +23,11 @@ export const modeLabels: Record<RunMode, string> = {
   incremental: 'Update',
   full: 'Rebuild source catalog',
   metadata: 'Fetch source details',
+}
+export function runModeLabel(run: Pick<Run, 'mode' | 'remote_catalog'>) {
+  if (run.remote_catalog && run.mode === 'full') return 'Full sync'
+  if (run.remote_catalog && run.mode === 'incremental') return 'Sync changes'
+  return modeLabels[run.mode]
 }
 export const statusLabels: Record<RunStatus, string> = {
   queued: 'Queued',

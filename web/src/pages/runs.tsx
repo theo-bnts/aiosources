@@ -1,12 +1,12 @@
 import { ResultCount } from '@/components/common'
 import { useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { ArrowRightIcon, PauseIcon, PlayIcon, StopIcon } from '@phosphor-icons/react'
 import { api, params, queryClient, refreshData } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
-import { messageText, useDate, modeLabels, number, statusLabels } from '@/lib/format'
+import { messageText, useDate, runModeLabel, number, statusLabels } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
@@ -40,7 +40,7 @@ import { RunChangesList, RunPublicationCounts } from '@/components/torrent-histo
 import { RunFailureDiagnostic } from '@/components/run-diagnostics'
 import { Statistic } from '@/components/statistic'
 
-export function RunsTable({ runs }: { runs: Run[] }) {
+export function RunsTable({ runs, remote = false }: { runs: Run[]; remote?: boolean }) {
   const sourceName = useSourceNames()
   const date = useDate()
   const listState = useListViewState()
@@ -49,7 +49,7 @@ export function RunsTable({ runs }: { runs: Run[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Source / run</TableHead>
+            <TableHead>{remote ? 'Catalog / run' : 'Source / run'}</TableHead>
             <TableHead>Mode / trigger</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Pages</TableHead>
@@ -66,7 +66,7 @@ export function RunsTable({ runs }: { runs: Run[] }) {
               <TableCell>
                 <Link
                   className="data-link font-medium"
-                  to={`/runs/${encodeURIComponent(run.id)}`}
+                  to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`}
                   state={listState}
                 >
                   {sourceName(run.provider_id, run.provider_name)}
@@ -74,7 +74,7 @@ export function RunsTable({ runs }: { runs: Run[] }) {
                 <p className="mono mt-1 text-muted-foreground">{run.id.slice(0, 8)}</p>
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
-                {modeLabels[run.mode]}
+                {runModeLabel(run)}
                 <p className="mt-1">{run.trigger === 'scheduled' ? 'Scheduled' : 'Manual'}</p>
               </TableCell>
               <TableCell>
@@ -95,7 +95,7 @@ export function RunsTable({ runs }: { runs: Run[] }) {
               <TableCell>
                 <Button variant="ghost" size="icon-sm" asChild>
                   <Link
-                    to={`/runs/${encodeURIComponent(run.id)}`}
+                    to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`}
                     state={listState}
                     aria-label={`Open run ${run.id}`}
                   >
@@ -111,21 +111,25 @@ export function RunsTable({ runs }: { runs: Run[] }) {
   )
 }
 
-export function RunsPage() {
+export function RunsPage({ remote = false }: { remote?: boolean }) {
   const [search, setSearch] = useViewSearchParams()
   const provider = search.get('provider') ?? ''
   const status = search.get('status') ?? ''
   const pagination = useURLPagination()
   const { limit, offset } = pagination
   const runs = useQuery({
-    queryKey: ['runs', provider, status, offset, limit],
+    queryKey: ['runs', remote, provider, status, offset, limit],
     queryFn: ({ signal }) =>
-      api<Page<Run>>(`/runs?${params({ provider, status, offset, limit })}`, { signal }),
+      api<Page<Run>>(
+        `/runs?${params({ source_kind: remote ? 'remote' : 'source', provider, status, offset, limit })}`,
+        { signal },
+      ),
   })
   const providers = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
+  const sources = providers.data?.items?.filter((item) => Boolean(item.remote_catalog) === remote)
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
     value ? next.set(key, value) : next.delete(key)
@@ -146,11 +150,11 @@ export function RunsPage() {
             value={provider}
             onChange={(event) => filter('provider', event.target.value)}
           >
-            <option value="">All sources</option>
-            {provider && !providers.data?.items?.some((item) => item.id === provider) && (
+            <option value="">{remote ? 'All remote catalogs' : 'All sources'}</option>
+            {provider && !sources?.some((item) => item.id === provider) && (
               <option value={provider}>{provider}</option>
             )}
-            {providers.data?.items?.map((item) => (
+            {sources?.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name || item.id}
               </option>
@@ -189,11 +193,15 @@ export function RunsPage() {
           <>
             <ResultCount total={runs.data.total} label="runs" />
             {runs.data.items?.length ? (
-              <RunsTable runs={runs.data.items} />
+              <RunsTable runs={runs.data.items} remote={remote} />
             ) : (
               <ListEmpty
                 title="No runs in this view"
-                description="Start a preview from an enabled source to inspect data before importing it."
+                description={
+                  remote
+                    ? 'Start an import from Remote catalogs → Settings.'
+                    : 'Start a preview from an enabled source to inspect data before importing it.'
+                }
                 filtered={Boolean(provider || status)}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}
@@ -423,7 +431,9 @@ function EventsView({ runId }: { runId: string }) {
   )
 }
 
-export function RunDetailPage() {
+export function RunDetailPage({ remote = false }: { remote?: boolean }) {
+  const location = useLocation()
+  const historyPath = remote ? '/remotes/history' : '/runs'
   const sourceName = useSourceNames()
   const date = useDate()
   const changesPage = useURLPagination({ limitKey: 'changes_limit', offsetKey: 'changes_offset' })
@@ -499,16 +509,24 @@ export function RunDetailPage() {
   if (!run)
     return (
       <div className="page">
-        <PageHeader title="Run details" back={{ to: '/runs', label: 'History' }} />
+        <PageHeader title="Run details" back={{ to: historyPath, label: 'History' }} />
         <ErrorNotice error={runQuery.error} retry={() => void runQuery.refetch()} />
       </div>
+    )
+  if (Boolean(run.remote_catalog) !== remote)
+    return (
+      <Navigate
+        to={`${run.remote_catalog ? '/remotes/history' : '/runs'}/${encodeURIComponent(id)}${location.search}${location.hash}`}
+        state={location.state}
+        replace
+      />
     )
   return (
     <div className="page">
       <PageHeader
         title={sourceName(run.provider_id, run.provider_name)}
         description={`Run ${run.id}`}
-        back={{ to: '/runs', label: 'History' }}
+        back={{ to: historyPath, label: 'History' }}
         actions={
           <>
             <RunStatusBadge run={run} />
@@ -641,7 +659,7 @@ export function RunDetailPage() {
           <>
             <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <span>Run details</span>
-              <span className="font-normal text-muted-foreground">{modeLabels[run.mode]}</span>
+              <span className="font-normal text-muted-foreground">{runModeLabel(run)}</span>
               <span className="font-normal text-muted-foreground">
                 {run.trigger === 'scheduled' ? 'Scheduled trigger' : 'Manual trigger'}
               </span>

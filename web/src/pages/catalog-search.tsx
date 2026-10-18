@@ -18,6 +18,7 @@ import { Empty, ErrorNotice, Loading, PageHeader, Pager, ResultCount } from '@/c
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { DownloadAction } from '@/components/catalog-download'
 import {
   Table,
@@ -209,6 +210,7 @@ export function CatalogTitlePage() {
         }
       : {}
   const sort = search.get('sort') || 'size_desc'
+  const cachedOnly = search.get('cached_only') !== 'false'
   const provider = search.get('provider') || ''
   const query = params({
     ...selection,
@@ -216,6 +218,7 @@ export function CatalogTitlePage() {
     language_mode: preferences.mode,
     sort,
     provider,
+    cached_only: String(cachedOnly),
     limit: pagination.limit,
     offset: pagination.offset,
   })
@@ -233,7 +236,7 @@ export function CatalogTitlePage() {
     const next = new URLSearchParams(search)
     value ? next.set(key, value) : next.delete(key)
     next.delete('offset')
-    setSearch(next)
+    setSearch(next, { flushSync: true, preventScrollReset: true })
   }
   return (
     <div className="page">
@@ -252,6 +255,14 @@ export function CatalogTitlePage() {
               aria-label="Source release filters"
               className="space-y-4 rounded-md border border-border p-4"
             >
+              <div className="flex max-w-sm items-center justify-between gap-3">
+                <Label htmlFor="catalog-cached">Cached results only</Label>
+                <Switch
+                  id="catalog-cached"
+                  checked={cachedOnly}
+                  onCheckedChange={(checked) => filter('cached_only', checked ? '' : 'false')}
+                />
+              </div>
               <LanguageFilter
                 value={preferences}
                 onChange={(next) => {
@@ -422,11 +433,13 @@ export function CatalogTitlePage() {
                     </div>
                   ) : (
                     <Empty
-                      title="No source releases"
+                      title={cachedOnly ? 'No cached releases' : 'No source releases'}
                       description={
-                        title.data.type === 'tv'
-                          ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
-                          : 'No releases match the selected source and language filters. Adjust them to see other versions.'
+                        cachedOnly
+                          ? 'No cached versions match these filters. Turn off Cached results only to see other versions.'
+                          : title.data.type === 'tv'
+                            ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
+                            : 'No releases match the selected source and language filters. Adjust them to see other versions.'
                       }
                     />
                   )}

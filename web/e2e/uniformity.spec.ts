@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './fixtures'
+import { test, expect, addRemotePassword } from './fixtures'
 
 async function headers(page: Page, origin: string) {
   const session = await (await page.request.get('/api/session')).json()
@@ -36,7 +36,7 @@ async function addSource(
 }
 
 async function addRemote(page: Page) {
-  await page.goto('/remotes')
+  await page.goto('/remotes/settings')
   await page.getByRole('button', { name: 'Add remote catalog', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Local source identifier', { exact: true }).fill('remote')
@@ -44,7 +44,7 @@ async function addRemote(page: Page) {
   await dialog
     .getByLabel('HTTPS catalog URL', { exact: true })
     .fill('https://catalog.example/api/catalogs/example')
-  await dialog.getByLabel('Sharing password', { exact: true }).fill('synthetic-not-used-password')
+  await addRemotePassword(page, 'synthetic-not-used-password')
   await dialog.getByRole('switch', { name: 'Connection enabled', exact: true }).uncheck()
   await dialog.getByRole('button', { name: 'Create remote catalog', exact: true }).click()
   await expect(dialog).toBeHidden()
@@ -81,7 +81,7 @@ test('source directories share filters and a stale activation is reloaded withou
   await addRemote(page)
   const views = [
     ['/providers', 'beta', 'disabled', 'Showing 1 of 2 sources'],
-    ['/remotes', 'remote', 'disabled', 'Showing 1 of 1 source'],
+    ['/remotes/settings', 'remote', 'disabled', 'Showing 1 of 1 source'],
   ]
   for (const [route, query, state, count] of views) {
     await page.goto(`${route}?q=${query}&state=${state}`)
@@ -172,7 +172,7 @@ test('source, schedule and remote editors disable no-op saves and clear reverted
   )
   await addRemote(page)
   const remote = await (await page.request.get('/api/providers/remote')).json()
-  await page.getByRole('button', { name: 'Edit remote', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const dialog = page.getByRole('dialog')
   const remoteSave = dialog.getByRole('button', { name: 'Save remote', exact: true })
   await expect(remoteSave).toBeDisabled()

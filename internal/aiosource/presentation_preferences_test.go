@@ -87,7 +87,7 @@ func TestCatalogAndStremioShareLanguageFilterAndLargestFirstOffline(t *testing.T
 	token, _ := testPrivateInstallation(t, ctx, s)
 	for _, mode := range []string{"preferred", "multi", "unknown", "all"} {
 		prefs := model.StreamPreferences{Language: "fr", Mode: mode}
-		releases, err := s.CatalogReleases(ctx, page.Items[0].ID, model.CatalogSelection{}, model.ListOptions{}, prefs)
+		releases, err := s.CatalogReleases(ctx, page.Items[0].ID, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{StreamPreferences: prefs})
 		if err != nil {
 			t.Fatal(err)
 		}

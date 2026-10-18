@@ -9,6 +9,9 @@ const viewLabels: Record<string, string> = {
   '/torrents': 'Torrent search',
   '/search': 'Search',
   '/remotes': 'Remote catalogs',
+  '/remotes/settings': 'Remote catalogs',
+  '/remotes/history': 'Remote catalog history',
+  '/sharing/settings': 'Shared catalog settings',
   '/sharing/remotes': 'Remote catalogs',
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',
@@ -19,7 +22,8 @@ type ListView = { pathname: string; search: string }
 
 function viewLabel(pathname: string) {
   if (Object.hasOwn(viewLabels, pathname)) return viewLabels[pathname]
-  if (/^\/runs\/[A-Za-z0-9_-]{1,128}$/.test(pathname)) return 'Processed records'
+  if (/^\/(?:runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(pathname))
+    return 'Processed records'
   if (/^\/providers\/[A-Za-z0-9_-]{1,128}$/.test(pathname)) return 'Source settings'
   return undefined
 }

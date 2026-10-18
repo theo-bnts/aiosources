@@ -423,6 +423,11 @@ func (s *server) listRuns(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	options.SourceKind = r.URL.Query().Get("source_kind")
+	if options.SourceKind != "" && options.SourceKind != "source" && options.SourceKind != "remote" {
+		respondError(w, model.ErrInvalid)
+		return
+	}
 	result, err := s.options.Store.ListRuns(r.Context(), options)
 	if err != nil {
 		respondError(w, err)

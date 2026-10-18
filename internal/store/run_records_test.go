@@ -194,7 +194,7 @@ func TestNativeDetailAttributesSurviveLaterListUpdates(t *testing.T) {
 			mirrorFinish(t, ctx, db, run, model.StatusSucceeded)
 			rows := mirrorRows(t, ctx, db, provider.ID)
 			record, sibling := rows["249627"], rows["249961"]
-			wantAttributes := map[string]any{"imdbid": []any{"tt123"}, "quality": []any{"20"}, "leechers": []any{"3"}}
+			wantAttributes := map[string]any{"imdbid": []any{"tt123"}, "quality": []any{"20"}}
 			if len(rows) != 2 || sibling.SourceID != "249961" || sibling.Fields["attributes"] != nil || record.Fields["title"] != update.Fields["title"] ||
 				!reflect.DeepEqual(record.Fields["attributes"], wantAttributes) ||
 				!reflect.DeepEqual(record.Fields["external_ids"], []any{map[string]any{"kind": "imdb", "value": "tt123"}}) {

@@ -265,8 +265,8 @@ test('sharing forms use common draft feedback and do not write reverted edits', 
       writes++
   })
   const dialog = page.getByRole('dialog')
-  await page.goto('/sharing')
-  await page.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+  await page.goto('/sharing/settings')
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const shareSave = dialog.getByRole('button', { name: 'Save permissions', exact: true })
   await expect(shareSave).toBeDisabled()
   await dialog.getByLabel('Recipient / share name', { exact: true }).fill('Changed share')

@@ -1,24 +1,22 @@
+import { toggleProvider } from '@/lib/provider-state'
+import { SecretPicker } from '@/components/secret-picker'
+import { Statistic } from '@/components/statistic'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  ArrowClockwiseIcon,
+  PlayIcon,
   PlusIcon,
   CloudArrowDownIcon,
   MagnifyingGlassIcon,
+  PencilSimpleIcon,
+  TrashIcon,
 } from '@phosphor-icons/react'
-import {
-  api,
-  ApiError,
-  ConnectionError,
-  queryClient,
-  refreshData,
-  AUTO_REFRESH_INTERVAL,
-} from '@/lib/api'
+import { api, ApiError, ConnectionError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type { RemoteCatalog } from '@/lib/catalog-types'
-import type { Items, ProviderDocument, Run, SecretInfo, Validation } from '@/lib/types'
+import type { Items, ProviderDocument, Run, Validation } from '@/lib/types'
 import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/lib/remote-config'
 import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
@@ -62,6 +60,93 @@ function safeConfigurationError(error: unknown) {
   )
 }
 
+function useRemotes() {
+  return useQuery({
+    queryKey: ['remotes'],
+    queryFn: ({ signal }) => api<Items<RemoteCatalog>>('/remotes', { signal }),
+    refetchInterval: AUTO_REFRESH_INTERVAL,
+  })
+}
+
+export function RemoteStatisticsPage() {
+  const remotes = useRemotes()
+  const date = useDate()
+  const items = remotes.data?.items ?? []
+  const counts = useSourceTorrentStats(items.length > 0)
+  const totals = items.reduce(
+    (total, remote) => {
+      const count = counts.bySource.get(remote.id)
+      total.imported += count?.imported ?? 0
+      total.awaiting_import += count?.pending_import?.torrents ?? 0
+      return total
+    },
+    { imported: 0, awaiting_import: 0 },
+  )
+  return (
+    <div className="page">
+      <ErrorNotice error={remotes.error} retry={() => void remotes.refetch()} />
+      <ErrorNotice error={counts.error} retry={() => void counts.refetch()} />
+      {remotes.isPending ? (
+        <Loading />
+      ) : (
+        remotes.data && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <Statistic
+                label="Imported torrents"
+                value={counts.data || !items.length ? totals.imported : 'Not available'}
+              />
+              <Statistic
+                label="Awaiting import completion"
+                value={counts.data || !items.length ? totals.awaiting_import : 'Not available'}
+                to="/remotes/history"
+              />
+              <Statistic
+                label="Enabled catalogs"
+                value={items.filter((item) => item.enabled).length}
+              />
+              <Statistic
+                label="Synced catalogs"
+                value={items.filter((item) => item.has_checkpoint).length}
+              />
+            </dl>
+            {items.length ? (
+              <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {items.map((remote) => (
+                  <section
+                    key={remote.id}
+                    className="section-card"
+                    aria-label={`Remote catalog ${remote.name || remote.id}`}
+                  >
+                    <h2 className="section-title">{remote.name || remote.id}</h2>
+                    <SourceTorrentStats
+                      source={remote.name || remote.id}
+                      counts={counts.bySource.get(remote.id)}
+                      unavailable={counts.isError}
+                      totals={counts.totals}
+                    />
+                    <p className="help">
+                      Last successful sync:{' '}
+                      {remote.last_synced_at ? date(remote.last_synced_at) : 'Never completed'}
+                    </p>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              !remotes.isError && (
+                <Empty
+                  title="No remote catalogs"
+                  description="Add a catalog in Settings to import a shared library."
+                />
+              )
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
 export default function RemotesPage() {
   const listState = useListViewState()
   const filters = useSourceFilters()
@@ -71,13 +156,8 @@ export default function RemotesPage() {
   const [editing, setEditing] = useState<RemoteCatalog | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
   const notify = useNotification()
-  const remotes = useQuery({
-    queryKey: ['remotes'],
-    queryFn: ({ signal }) => api<Items<RemoteCatalog>>('/remotes', { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-  })
+  const remotes = useRemotes()
   const items = remotes.data?.items ?? []
-  const counts = useSourceTorrentStats(items.length > 0)
   const visible = items.filter(
     (remote) =>
       sourceMatches(filters.query, remote.name, remote.id) &&
@@ -98,8 +178,9 @@ export default function RemotesPage() {
       body: JSON.stringify({ provider_id: remote.id, mode }),
     })
     await refreshData()
-    navigate(`/runs/${encodeURIComponent(run.id)}`, { state: listState })
+    navigate(`/remotes/history/${encodeURIComponent(run.id)}`, { state: listState })
   }
+  const toggle = useMutation({ mutationFn: toggleProvider, onSuccess: refreshData })
   return (
     <div className="page">
       <div className="flex justify-end">
@@ -120,8 +201,13 @@ export default function RemotesPage() {
           total={items.length}
         />
       )}
+      <ErrorNotice
+        error={toggle.error}
+        retry={() => {
+          void remotes.refetch().then(() => toggle.reset())
+        }}
+      />
       <ErrorNotice error={remotes.error} retry={() => void remotes.refetch()} />
-      <ErrorNotice error={counts.error} retry={() => void counts.refetch()} />
       {remotes.isPending ? (
         <Loading />
       ) : visible.length ? (
@@ -137,73 +223,59 @@ export default function RemotesPage() {
                 className="section-card"
                 aria-label={`Remote catalog ${remote.name || remote.id}`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <h2 className="section-title break-words">{remote.name || remote.id}</h2>
                     <p className="mono mt-1 break-all text-muted-foreground">{remote.url}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Badge variant={remote.enabled ? 'success' : 'secondary'}>
-                      {remote.enabled ? 'Enabled' : 'Connection disabled'}
-                    </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Switch
+                      checked={remote.enabled}
+                      aria-label={`${remote.enabled ? 'Disable' : 'Enable'} ${remote.name || remote.id}`}
+                      disabled={toggle.isPending || (!remote.enabled && !remote.valid)}
+                      onCheckedChange={() => toggle.mutate(remote)}
+                    />
                     {!remote.valid && <Badge variant="destructive">Invalid configuration</Badge>}
                   </div>
                 </div>
                 <dl className="grid gap-4 text-sm md:grid-cols-2">
                   <div>
-                    <dt className="text-muted-foreground">Last successful sync</dt>
+                    <dt className="text-muted-foreground">Schedule</dt>
                     <dd className="mt-1">
-                      {remote.last_synced_at ? date(remote.last_synced_at) : 'Never completed'}
+                      {remote.sync.enabled
+                        ? `Every ${remote.sync.interval_minutes} minutes`
+                        : 'Manual imports only'}
                     </dd>
-                    <p className="help mt-1">
-                      {remote.has_checkpoint
-                        ? 'Durable checkpoint saved. Next sync requests changes.'
-                        : 'No checkpoint for this URL. Next sync starts a full snapshot.'}
-                    </p>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Latest run</dt>
-                    <dd className="mt-1">
-                      {remote.last_run ? (
-                        <Link
-                          to={`/runs/${encodeURIComponent(remote.last_run.id)}`}
-                          state={listState}
-                          className="inline-flex items-center gap-2"
-                        >
-                          <RunStatusBadge run={remote.last_run} />
-                          <span className="data-link">View run</span>
-                        </Link>
-                      ) : (
-                        'No runs yet'
-                      )}
-                    </dd>
-                    {remote.last_run && (
-                      <p className="help mt-1">{date(remote.last_run.created_at)}</p>
+                    {remote.sync_error && (
+                      <p className="help mt-1 text-destructive">{messageText(remote.sync_error)}</p>
                     )}
                   </div>
+                  <div>
+                    <dt className="text-muted-foreground">Last run</dt>
+                    <dd className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+                      {remote.last_run ? (
+                        <Link
+                          to={`/remotes/history/${encodeURIComponent(remote.last_run.id)}`}
+                          state={listState}
+                        >
+                          <RunStatusBadge run={remote.last_run} />
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">No runs</span>
+                      )}
+                      {remote.enabled &&
+                        remote.valid &&
+                        remote.sync.enabled &&
+                        remote.next_sync_at &&
+                        ['waiting', 'paused'].includes(remote.sync_state) &&
+                        !['queued', 'running'].includes(remote.last_run?.status ?? '') && (
+                          <span className="text-muted-foreground">
+                            Next: {date(remote.next_sync_at)}
+                          </span>
+                        )}
+                    </dd>
+                  </div>
                 </dl>
-                <div className="notice space-y-1">
-                  <p className="text-sm font-medium">
-                    {remote.sync.enabled
-                      ? `Automatic sync every ${remote.sync.interval_minutes} minutes`
-                      : 'Automatic sync off · manual imports only'}
-                  </p>
-                  {remote.next_sync_at && (
-                    <p className="help">Next sync: {date(remote.next_sync_at)}</p>
-                  )}
-                  {!remote.enabled && (
-                    <p className="help">Enable this connection to allow imports.</p>
-                  )}
-                  {remote.sync_error && (
-                    <p className="help text-destructive">{messageText(remote.sync_error)}</p>
-                  )}
-                </div>
-                <SourceTorrentStats
-                  source={remote.name || remote.id}
-                  counts={counts.bySource.get(remote.id)}
-                  unavailable={counts.isError}
-                  totals={counts.totals}
-                />
                 {remote.last_run?.error && (
                   <p role="status" className="notice notice-error break-words">
                     Latest run error: {messageText(remote.last_run.error)}
@@ -211,27 +283,28 @@ export default function RemotesPage() {
                 )}
                 {remote.last_run?.status === 'paused' && (
                   <p className="help">
-                    {remote.sync_state === 'paused'
+                    {remote.enabled && remote.sync.enabled && remote.sync_state === 'paused'
                       ? 'This import will resume at the next automatic sync, keeping its saved progress. You can also resume it now from run details.'
                       : 'A paused run has unpublished progress. Resume or cancel it from run details before starting another sync.'}
                   </p>
                 )}
                 <div className="toolbar">
-                  <Button size="sm" variant="outline" onClick={() => openEditor(remote)}>
-                    Edit remote
-                  </Button>
                   <ConfirmAction
                     title={`Sync “${remote.name || remote.id}” now?`}
                     description="Connect to this HTTPS catalog using its vault credential. The first sync imports a full snapshot; later syncs request only changes. The current published copy remains unchanged until the run completes."
                     label="Start sync"
                     trigger={
                       <Button size="sm" disabled={!remote.valid || !remote.enabled || active}>
-                        <ArrowClockwiseIcon />
-                        Sync now
+                        <PlayIcon />
+                        Run manual import
                       </Button>
                     }
                     action={() => sync(remote, 'incremental')}
                   />
+                  <Button size="sm" variant="outline" onClick={() => openEditor(remote)}>
+                    <PencilSimpleIcon />
+                    Edit
+                  </Button>
                   <ConfirmAction
                     title={`Fully resync “${remote.name || remote.id}”?`}
                     description="Download a fresh authoritative snapshot instead of using the checkpoint. Only this remote’s local copy is replaced, atomically after success. Local sources are not modified."
@@ -248,17 +321,39 @@ export default function RemotesPage() {
                     }
                     action={() => sync(remote, 'full')}
                   />
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to={`/runs?provider=${encodeURIComponent(remote.id)}`}>History</Link>
-                  </Button>
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to={`/logs?provider=${encodeURIComponent(remote.id)}`}>Logs</Link>
-                  </Button>
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link to={`/torrents?provider=${encodeURIComponent(remote.id)}`}>
+
+                  <Button size="sm" variant="outline" asChild>
+                    <Link
+                      to={`/torrents?provider=${encodeURIComponent(remote.id)}`}
+                      state={listState}
+                    >
+                      <MagnifyingGlassIcon />
                       View imported data
                     </Link>
                   </Button>
+                  <ConfirmAction
+                    title={`Delete remote catalog “${remote.name || remote.id}”?`}
+                    description="The connection, imported torrents, synchronization history, saved progress and local identifications will be permanently deleted. Secrets, shared metadata and debrid caches are kept. This cannot be undone."
+                    label="Delete remote catalog"
+                    variant="destructive"
+                    trigger={
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={['queued', 'running'].includes(remote.last_run?.status ?? '')}
+                      >
+                        <TrashIcon />
+                        Delete
+                      </Button>
+                    }
+                    action={async () => {
+                      await api<void>(`/providers/${encodeURIComponent(remote.id)}`, {
+                        method: 'DELETE',
+                        body: JSON.stringify({ revision: remote.revision }),
+                      })
+                      await refreshData()
+                    }}
+                  />
                 </div>
               </section>
             )
@@ -272,7 +367,7 @@ export default function RemotesPage() {
             description={
               filtered
                 ? 'Clear the filters to see your other sources.'
-                : 'Enter a shared HTTPS catalog URL and its password or an existing vault reference, then choose an automatic synchronization interval.'
+                : 'Add a shared HTTPS catalog URL and select or store its password in Secrets.'
             }
           />
         )
@@ -296,8 +391,8 @@ export default function RemotesPage() {
               {editing === 'new' ? 'Add remote catalog' : 'Edit remote catalog'}
             </DialogTitle>
             <DialogDescription>
-              Configure the connection and automatic synchronization interval. Unrelated settings
-              and exact JSON values are preserved.
+              Connect to a shared catalog. Published torrent fields are imported; film and series
+              identification is performed locally.
             </DialogDescription>
           </DialogHeader>
           {editing && (
@@ -307,9 +402,7 @@ export default function RemotesPage() {
               onSaving={setSaving}
               onSaved={() => {
                 setEditing(null)
-                notify(
-                  'Remote connection and automatic sync settings saved. Use Sync now to import immediately.',
-                )
+                notify('Remote catalog settings saved.')
               }}
             />
           )}
@@ -354,27 +447,15 @@ function RemoteForm({
 }) {
   const [original, setOriginal] = useState(document)
   const [draft, setDraft] = useState(() => remoteDraft(document))
-  const [credentialMode, setCredentialMode] = useState<'password' | 'reference'>(
-    document ? 'reference' : 'password',
-  )
-  const [password, setPassword] = useState('')
   const [reloaded, setReloaded] = useState(false)
-  const [storedReference, setStoredReference] = useState('')
   const [localError, setLocalError] = useState<Error | null>(null)
-  const secrets = useQuery({
-    queryKey: ['secrets'],
-    queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
-  })
   function change<K extends keyof RemoteDraft>(key: K, value: RemoteDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
   const save = useMutation({
     gcTime: 0,
     mutationFn: async () => {
-      let reference = draft.secretRef.trim()
-      if (credentialMode === 'password') {
-        reference = `remote-${Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('')}`
-      }
+      const reference = draft.secretRef.trim()
       const json = remoteJSON(original, draft, reference)
       let validation: Validation
       try {
@@ -391,23 +472,6 @@ function RemoteForm({
           'The remote definition is invalid. Review the settings before saving.',
           validation.issues ?? [],
         )
-      if (credentialMode === 'password') {
-        try {
-          await api<void>(`/secrets/${encodeURIComponent(reference)}`, {
-            method: 'PUT',
-            body: JSON.stringify({ value: password, revision: 0 }),
-          })
-        } catch {
-          throw new Error(
-            'The password could not be saved in the vault. Its value has not been included in this error. Try again or select an existing reference.',
-          )
-        }
-        setPassword('')
-        setStoredReference(reference)
-        setCredentialMode('reference')
-        change('secretRef', reference)
-        void queryClient.invalidateQueries({ queryKey: ['secrets'] })
-      }
       let result: ProviderDocument
       try {
         result = await api<ProviderDocument>(
@@ -418,7 +482,6 @@ function RemoteForm({
         throw safeConfigurationError(error)
       }
       setOriginal(result)
-      setStoredReference('')
       await refreshData()
       onSaved()
     },
@@ -439,12 +502,8 @@ function RemoteForm({
   })
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const busy = save.isPending || reload.isPending
-  const dirty =
-    JSON.stringify(draft) !== JSON.stringify(remoteDraft(original)) ||
-    password !== '' ||
-    credentialMode !== (original ? 'reference' : 'password')
+  const dirty = JSON.stringify(draft) !== JSON.stringify(remoteDraft(original))
   useUnsavedChanges(dirty, 'remote catalog', busy)
-  const knownReferences = secrets.data?.items ?? []
   return (
     <form
       className="space-y-5"
@@ -455,8 +514,7 @@ function RemoteForm({
         setLocalError(null)
         try {
           validateRemoteURL(draft.url.trim())
-          if (credentialMode === 'password' ? !password : !draft.secretRef.trim())
-            throw new Error('Enter a sharing password or select a vault reference.')
+          if (!draft.secretRef.trim()) throw new Error('Select or add a sharing password.')
           save.mutate()
         } catch (error) {
           setLocalError(error instanceof Error ? error : new Error('Review the remote settings.'))
@@ -503,9 +561,7 @@ function RemoteForm({
             aria-describedby="remote-url-help"
           />
           <p id="remote-url-help" className="help">
-            Use the owner’s catalog URL without query parameters, fragments or credentials.
-            Certificates must be trusted; there is no insecure TLS option. Private LAN HTTPS is
-            supported. No remote request is made while editing or validating.
+            Use the owner’s HTTPS catalog URL without credentials or query parameters.
           </p>
           {original && draft.url.trim() !== original.provider.url && (
             <p className="help">
@@ -514,79 +570,17 @@ function RemoteForm({
             </p>
           )}
         </div>
-        <fieldset className="space-y-3">
-          <legend className="mb-2 text-sm font-medium">Sharing credential</legend>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="remote-credential-mode"
-                checked={credentialMode === 'password'}
-                onChange={() => setCredentialMode('password')}
-                className="accent-primary"
-              />
-              New password
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="remote-credential-mode"
-                checked={credentialMode === 'reference'}
-                onChange={() => {
-                  setCredentialMode('reference')
-                  setPassword('')
-                }}
-                className="accent-primary"
-              />
-              Existing vault reference
-            </label>
-          </div>
-          {credentialMode === 'password' ? (
-            <div className="field">
-              <Label htmlFor="remote-password">Sharing password</Label>
-              <Input
-                id="remote-password"
-                type="password"
-                required
-                autoComplete="new-password"
-                spellCheck={false}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-              <p className="help">
-                Stored in a new, uniquely named encrypted vault entry. Existing shared secrets are
-                never overwritten. Only its reference enters the source JSON.
-              </p>
-            </div>
-          ) : (
-            <div className="field">
-              <Label htmlFor="remote-secret">Vault reference</Label>
-              <select
-                id="remote-secret"
-                required
-                className="native-select w-full"
-                value={draft.secretRef}
-                onChange={(event) => change('secretRef', event.target.value)}
-              >
-                <option value="">Choose a reference</option>
-                {draft.secretRef &&
-                  !knownReferences.some((secret) => secret.name === draft.secretRef) && (
-                    <option value={draft.secretRef}>{draft.secretRef}</option>
-                  )}
-                {knownReferences.map((secret) => (
-                  <option key={secret.name} value={secret.name}>
-                    {secret.name}
-                  </option>
-                ))}
-              </select>
-              <p className="help">
-                Uses the existing encrypted value without changing it. The server never returns that
-                value.
-              </p>
-              <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
-            </div>
-          )}
-        </fieldset>
+        <SecretPicker
+          label="Sharing password"
+          value={draft.secretRef}
+          onChange={(reference) => change('secretRef', reference)}
+          prefix="remote_catalog"
+          addLabel="Add sharing password"
+          valueLabel="Sharing password"
+          emptyLabel="Select a secret"
+          required
+          disabled={busy}
+        />
         <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3">
           <div>
             <Label htmlFor="remote-enabled">Connection enabled</Label>
@@ -637,8 +631,8 @@ function RemoteForm({
         </section>
       </fieldset>
       <p className="notice">
-        Saving waits for the next automatic sync. Use Sync now for an immediate import. Failed or
-        incomplete runs leave the published copy and checkpoint unchanged.
+        Saving waits for the next automatic sync. Use Run manual import for an immediate import.
+        Failed or incomplete runs leave the published copy and checkpoint unchanged.
       </p>
       {original && (
         <p className="help">
@@ -649,13 +643,6 @@ function RemoteForm({
       <ErrorNotice error={localError} />
       <ErrorNotice error={save.error} />
       <ErrorNotice error={reload.error} />
-      {storedReference && save.isError && (
-        <p className="notice">
-          The password was stored as <code className="mono break-all">{storedReference}</code>. This
-          draft now uses that reference so retrying will not rotate any secret. If you abandon the
-          draft, remove this entry in Secrets only after confirming it is unused.
-        </p>
-      )}
       {conflict && (
         <div className="notice space-y-3">
           <p>

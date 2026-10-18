@@ -91,7 +91,7 @@ func catalogResource(title model.CatalogTitle, selection model.CatalogSelection)
 	return r, id, nil
 }
 
-func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, preferences ...model.StreamPreferences) (model.List[model.CatalogRelease], error) {
+func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
 	limit := opts.Limit
 	if limit < 1 || limit > 200 {
 		limit = 50
@@ -114,10 +114,11 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 		return result, err
 	}
 	rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !MatchesEpisode(rec.AIORecord, ParseRelease(rec.Title), r) })
-	prefs := model.StreamPreferences{}
-	if len(preferences) > 0 {
-		prefs = preferences[0]
+	filters := model.CatalogReleaseFilters{}
+	if len(options) > 0 {
+		filters = options[0]
 	}
+	prefs := filters.StreamPreferences
 	if !ValidStreamPreferences(prefs) {
 		return result, model.ErrInvalid
 	}
@@ -151,6 +152,11 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 	result.Total = int64(len(rows))
 	start := min(offset, len(rows))
 	page := rows[start : start+min(limit, len(rows)-start)]
+	if filters.CachedOnly {
+		// Evaluate availability before pagination: an uncached first page must
+		// not hide cached releases further down the result set or inflate totals.
+		page = rows
+	}
 	if len(page) == 0 {
 		return result, nil
 	}
@@ -206,7 +212,14 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 			}
 			item.Services = append(item.Services, state)
 		}
-		result.Items = append(result.Items, item)
+		if !filters.CachedOnly || slices.ContainsFunc(item.Services, func(service model.CatalogAvailability) bool { return service.State == "cached" }) {
+			result.Items = append(result.Items, item)
+		}
+	}
+	if filters.CachedOnly {
+		result.Total = int64(len(result.Items))
+		start = min(offset, len(result.Items))
+		result.Items = result.Items[start : start+min(limit, len(result.Items)-start)]
 	}
 	return result, nil
 }

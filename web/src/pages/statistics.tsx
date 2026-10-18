@@ -67,10 +67,14 @@ export function SourceStatisticsPage() {
           />
           <Statistic
             label="Running imports"
-            value={overview.data.running}
+            value={overview.data.source_running}
             to="/runs?status=running"
           />
-          <Statistic label="Queued imports" value={overview.data.queued} to="/runs?status=queued" />
+          <Statistic
+            label="Queued imports"
+            value={overview.data.source_queued}
+            to="/runs?status=queued"
+          />
           <Statistic
             label="Import capacity on this instance"
             value={overview.data.capacity}

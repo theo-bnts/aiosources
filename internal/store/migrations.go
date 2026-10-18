@@ -221,6 +221,8 @@ var migrations = []struct {
 	{58, connectionDefaultsSchema},
 	{59, operationDownloadsSchema},
 	{60, torznabPreferencesSchema},
+	{61, leecherRetirementSchema},
+	{62, catalogHistorySchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

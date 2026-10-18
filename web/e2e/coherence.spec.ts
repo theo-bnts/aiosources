@@ -311,14 +311,13 @@ test.describe('browser local dates', () => {
       },
     })
     expect(created.status()).toBe(201)
-    await page.goto('/sharing')
-    await page.getByRole('button', { name: 'Edit permissions & limits', exact: true }).click()
+    await page.goto('/sharing/settings')
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
     const editor = page.getByRole('dialog')
     await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
       '2026-10-25T02:30:10',
     )
     await editor.getByLabel('Recipient / share name', { exact: true }).fill('Expiration renamed')
-    await editor.getByLabel('I authorize access to all current and future sources.').check()
     await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
     await expect(editor).toHaveCount(0)
     const shares = await (await page.request.get('/api/shares')).json()

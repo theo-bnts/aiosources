@@ -19,11 +19,11 @@ test('confirmation wording and its action stay on the same revision until the di
   const created = await page.request.post('/api/shares', { headers, data: input })
   expect(created.status()).toBe(201)
   const { share } = await created.json()
-  await page.goto('/sharing')
-  await page.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await page.goto('/sharing/settings')
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   const confirmation = page.getByRole('alertdialog')
   await expect(confirmation.getByRole('heading')).toHaveText(
-    'Revoke “Original recipient” permanently?',
+    'Delete “Original recipient” permanently?',
   )
   const refresh = page.waitForResponse(async (response) => {
     if (new URL(response.url()).pathname !== '/api/shares' || response.request().method() !== 'GET')
@@ -39,22 +39,22 @@ test('confirmation wording and its action stay on the same revision until the di
   expect(changed.status()).toBe(200)
   await refresh
   await expect(confirmation.getByRole('heading')).toHaveText(
-    'Revoke “Original recipient” permanently?',
+    'Delete “Original recipient” permanently?',
   )
   const rejected = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/api/shares/${share.id}`) &&
       response.request().method() === 'DELETE',
   )
-  await confirmation.getByRole('button', { name: 'Revoke share', exact: true }).click()
+  await confirmation.getByRole('button', { name: 'Delete share', exact: true }).click()
   expect((await rejected).status()).toBe(409)
   await expect(confirmation.getByRole('alert')).toBeVisible()
   await confirmation.getByRole('button', { name: 'Back', exact: true }).click()
-  await page.getByRole('button', { name: 'Revoke', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(confirmation.getByRole('heading')).toHaveText(
-    'Revoke “Renamed recipient” permanently?',
+    'Delete “Renamed recipient” permanently?',
   )
-  await confirmation.getByRole('button', { name: 'Revoke share', exact: true }).click()
+  await confirmation.getByRole('button', { name: 'Delete share', exact: true }).click()
   await expect(confirmation).toHaveCount(0)
   expect((await (await page.request.get('/api/shares')).json()).items).toEqual([])
 })
@@ -372,9 +372,9 @@ test.describe('return navigation', () => {
     }
     await page.goto('/sharing/remotes?q=Remote&state=disabled')
     // The suffix also matches the legacy address before its redirect commits.
-    await expect(page).toHaveURL(server.origin + '/remotes?q=Remote&state=disabled')
+    await expect(page).toHaveURL(server.origin + '/remotes/settings?q=Remote&state=disabled')
     const origin = page.url()
-    await page.getByRole('link', { name: /View run/ }).click()
+    await page.getByRole('link', { name: 'Completed', exact: true }).click()
     await page.reload()
     await page.getByRole('main').getByRole('link', { name: 'Remote catalogs', exact: true }).click()
     await expect(page).toHaveURL(origin)

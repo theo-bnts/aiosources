@@ -199,8 +199,9 @@ A missing configured next/total/current response path is an error. A next URL ca
 | `external_ids` | Full array retained, including unknown kinds. Known external-ID kinds additionally populate compatible `attributes` arrays. |
 | `metadata` | Subtree retained, with the binary-NFO representation described below. |
 
-The application discards `seeders`, including nested attribute keys, before storing interpreted records. Existing mappings are accepted for compatibility but do not collect this field. Enrichment candidates ignore it. The standalone Torznab SDK retains its independent protocol support.
 | Other names | Source JSON value retained without these special coercions; mapping is not a transformation language. |
+
+The application discards `seeders`, `peers` and `leechers`, including nested attribute keys, before storing interpreted records. Existing mappings are accepted for compatibility but do not collect these fields. Enrichment candidates ignore them. The standalone Torznab SDK retains its independent protocol support.
 
 Identifiers are read without floating-point conversion for JSON numbers, preserving large integer IDs. Arrays/objects are not IDs. `(provider_id, source_id)` is the identity: different source IDs never merge because hashes match.
 

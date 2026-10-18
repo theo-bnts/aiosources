@@ -32,12 +32,12 @@ func shareFormat(format string) string {
 
 // CatalogFields returns a fresh allowlist so callers cannot widen export policy.
 func CatalogFields() []string {
-	return []string{"title", "size", "info_hash", "leechers", "published_at", "category", "categories"}
+	return []string{"title", "size", "info_hash", "published_at", "category", "categories"}
 }
 
 func catalogField(name string) bool {
 	switch name {
-	case "title", "size", "info_hash", "leechers", "published_at", "category", "categories":
+	case "title", "size", "info_hash", "published_at", "category", "categories":
 		return true
 	default:
 		return false

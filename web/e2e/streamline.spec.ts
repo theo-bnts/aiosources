@@ -57,8 +57,8 @@ test('lists update without refresh controls and empty pages keep a single create
 }) => {
   for (const [path, label] of [
     ['/providers/settings', 'Add source'],
-    ['/sharing', 'Create share'],
-    ['/remotes', 'Add remote catalog'],
+    ['/sharing/settings', 'Create share'],
+    ['/remotes/settings', 'Add remote catalog'],
     ['/security/secrets', 'Create secret'],
   ]) {
     await page.goto(path)

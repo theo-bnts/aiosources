@@ -22,7 +22,16 @@ async function retainDocumentHeight(page: Page) {
 test('horizontal tab bars have no vertical scroll range on desktop or mobile', async ({ page }) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1100 })
-    for (const path of ['/providers', '/metadata', '/debrid', '/addon', '/security', '/health']) {
+    for (const path of [
+      '/providers',
+      '/metadata',
+      '/debrid',
+      '/addon',
+      '/security',
+      '/health',
+      '/remotes',
+      '/sharing',
+    ]) {
       await page.goto(path)
       const tabs = page.getByRole('tablist').first()
       await expect(tabs).toBeVisible()
@@ -62,6 +71,8 @@ test('opening a secondary view directly reveals its active tab without scrolling
     '/metadata/history',
     '/security/settings',
     '/health/settings',
+    '/remotes/settings',
+    '/sharing/settings',
     '/runs/missing',
   ]) {
     await page.goto(path)
@@ -180,18 +191,28 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
   expect(persisted.provider.name).toBe('Tab guard source')
 })
 
-test('shared and remote catalogs are standalone pages without horizontal tabs', async ({
+test('catalog pages use the same statistics and settings navigation as other sections', async ({
   page,
 }) => {
-  for (const path of ['/sharing', '/remotes', '/sharing/remotes']) {
+  for (const [path, title, labels] of [
+    ['/sharing', 'Shared catalogs', ['Statistics', 'Settings']],
+    ['/remotes', 'Remote catalogs', ['Statistics', 'Settings', 'History']],
+  ] as const) {
     await page.goto(path)
-    await expect(
-      page.getByRole('heading', {
-        name: path === '/sharing' ? 'Shared catalogs' : 'Remote catalogs',
-        exact: true,
-        level: 1,
-      }),
-    ).toBeVisible()
-    await expect(page.getByRole('tablist')).toHaveCount(0)
+    const tabs = page.getByRole('tablist', { name: `${title} views`, exact: true })
+    await expect(tabs.getByRole('tab')).toHaveText([...labels])
+    await expect(tabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    await tabs.getByRole('tab', { name: 'Settings', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(path + '/settings$'))
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(0)
   }
+  await page.goto('/sharing/remotes')
+  await expect(page).toHaveURL(/\/remotes\/settings$/)
+  await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
 })

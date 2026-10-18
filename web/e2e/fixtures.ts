@@ -103,3 +103,11 @@ export async function selectMultiple(scope: Page | Locator, label: string, value
     await page.getByRole('menuitemcheckbox', { name: names[value] ?? value, exact: true }).check()
   await page.keyboard.press('Escape')
 }
+
+export async function addRemotePassword(page: Page, value: string) {
+  await page.getByRole('button', { name: 'Add sharing password', exact: true }).click()
+  const secret = page.getByRole('dialog', { name: 'Add sharing password', exact: true })
+  await secret.getByLabel('Sharing password', { exact: true }).fill(value)
+  await secret.getByRole('button', { name: 'Store and select', exact: true }).click()
+  await expect(secret).toBeHidden()
+}

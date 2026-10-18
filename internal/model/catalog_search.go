@@ -10,6 +10,11 @@ type CatalogSearchFilters struct {
 	Language string
 }
 
+type CatalogReleaseFilters struct {
+	StreamPreferences StreamPreferences
+	CachedOnly        bool
+}
+
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {

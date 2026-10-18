@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { test, expect } from './fixtures'
+import { test, expect, addRemotePassword } from './fixtures'
 
 async function configuration(page: Page) {
   const response = await page.request.get('/api/aiosource')
@@ -399,9 +399,12 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   server,
 }) => {
   await page.goto('/sharing/remotes?q=synthetic&state=disabled')
-  await expect(page).toHaveURL(/\/remotes\?q=synthetic&state=disabled$/)
+  await expect(page).toHaveURL(/\/remotes\/settings\?q=synthetic&state=disabled$/)
   await expect(page.getByRole('heading', { name: 'Remote catalogs', level: 1 })).toBeVisible()
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await page.getByRole('button', { name: 'Add remote catalog', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
   for (const label of ['Timing', 'Timezone', 'Cron expression', 'Page budget per tick']) {
@@ -426,7 +429,7 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   await dialog
     .getByLabel('HTTPS catalog URL', { exact: true })
     .fill('https://catalog.example/api/catalogs/synthetic')
-  await dialog.getByLabel('Sharing password', { exact: true }).fill('synthetic-sharing-password')
+  await addRemotePassword(page, 'synthetic-sharing-password')
   await dialog.getByRole('switch', { name: 'Connection enabled', exact: true }).uncheck()
   await dialog.getByLabel('Synchronization interval (minutes)', { exact: true }).fill('45')
   await dialog.getByRole('button', { name: 'Create remote catalog', exact: true }).click()
@@ -434,16 +437,23 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   const created = await source(page, 'interval-remote')
   expect(created.provider.catalog_sync).toEqual({ enabled: true, interval_minutes: 45 })
   expect(JSON.parse(created.json).schedule).toBeUndefined()
-  await expect(page.getByText('Automatic sync every 45 minutes', { exact: true })).toBeVisible()
+  await expect(page.getByText('Every 45 minutes', { exact: true })).toBeVisible()
   expect((await (await page.request.get('/api/schedules')).json()).items).toEqual([])
   await page.getByRole('link', { name: 'Shared catalogs', exact: true }).click()
   await expect(page).toHaveURL(/\/sharing$/)
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await expect(page.getByRole('heading', { name: 'Shared catalogs', level: 2 })).toHaveCount(0)
   await page.getByRole('link', { name: 'Remote catalogs', exact: true }).click()
   await page.reload()
-  await expect(page.getByRole('tab')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Edit remote', exact: true }).click()
+  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.getByLabel('Display name', { exact: true }).fill('Synthetic renamed remote')
   const session = await (await page.request.get('/api/session')).json()
   const concurrent = JSON.parse(created.json)
@@ -502,7 +512,7 @@ test('legacy remote schedules convert to intervals without changing credentials 
   await dialog
     .getByLabel('HTTPS catalog URL', { exact: true })
     .fill('https://catalog.example/api/catalogs/legacy')
-  await dialog.getByLabel('Sharing password', { exact: true }).fill('synthetic-legacy-password')
+  await addRemotePassword(page, 'synthetic-legacy-password')
   await dialog.getByRole('switch', { name: 'Connection enabled', exact: true }).uncheck()
   await dialog.getByRole('button', { name: 'Create remote catalog', exact: true }).click()
   await expect(dialog).toBeHidden()
@@ -523,7 +533,7 @@ test('legacy remote schedules convert to intervals without changing credentials 
   })
   expect(update.status()).toBe(200)
   await page.reload()
-  await page.getByRole('button', { name: 'Edit remote', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await expect(
     dialog.getByRole('switch', { name: 'Automatic synchronization', exact: true }),
   ).not.toBeChecked()

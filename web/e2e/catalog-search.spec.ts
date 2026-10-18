@@ -129,6 +129,15 @@ test('catalog search groups clean titles, sorts source versions and retains the 
     (url) =>
       url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
   )
+  await expect(page.getByRole('switch', { name: 'Cached results only', exact: true })).toBeChecked()
+  await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
+  await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toHaveCount(0)
+  await page.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
+  await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
+  await page.reload()
+  await expect(
+    page.getByRole('switch', { name: 'Cached results only', exact: true }),
+  ).not.toBeChecked()
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
   const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
   await expect(filters.getByLabel('Sort versions', { exact: true })).toHaveValue('size_desc')
@@ -151,7 +160,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue(
     'example new day',
   )
-  await page.goto(`/search/${ids.tv}`)
+  await page.goto(`/search/${ids.tv}?cached_only=false`)
   await expect(page.getByLabel('Season', { exact: true })).toHaveValue('2')
   await expect(page.getByLabel('Episode', { exact: true })).toHaveValue('3')
   await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
@@ -214,7 +223,7 @@ for (const [code, status] of [
         })
       },
     )
-    await page.goto(`/search/${ids.movie}`)
+    await page.goto(`/search/${ids.movie}?cached_only=false`)
     await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
     await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
     await page.clock.runFor(15_001)
@@ -285,7 +294,7 @@ test('mobile download controls handle pending and ready responses without keepin
       })
     },
   )
-  await page.goto(`/search/${ids.tv}`)
+  await page.goto(`/search/${ids.tv}?cached_only=false`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.getByText('Not ready', { exact: true })).toBeVisible()
   await expect.poll(() => page.context().pages().length).toBe(1)
@@ -367,7 +376,7 @@ test('an uncached download starts automatically when the provider becomes ready'
       })
     },
   )
-  await page.goto(`/search/${ids.movie}`)
+  await page.goto(`/search/${ids.movie}?cached_only=false`)
   const started = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
   await expect(page.getByText('Preparing', { exact: true })).toBeVisible()
@@ -405,7 +414,7 @@ test('failed preparations remain in the application and can be retried', async (
       })
     },
   )
-  await page.goto(`/search/${ids.movie}`)
+  await page.goto(`/search/${ids.movie}?cached_only=false`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   await expect(page.locator('[data-request-notice]')).toContainText('Temporary provider failure')
   await expect.poll(() => page.context().pages().length).toBe(1)
@@ -449,7 +458,7 @@ test('leaving a title cancels its unfinished request without opening a tab', asy
       })
     },
   )
-  await page.goto(`/search/${ids.movie}`)
+  await page.goto(`/search/${ids.movie}?cached_only=false`)
   await page.getByRole('button', { name: 'Download', exact: true }).click()
   try {
     await requested
@@ -512,7 +521,7 @@ test('an added file can be followed and downloaded from its original history ope
         body: 'Synthetic followed download',
       }),
     )
-    await page.goto(`/search/${ids.movie}`)
+    await page.goto(`/search/${ids.movie}?cached_only=false`)
     await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
     await page.getByRole('link', { name: 'View operation', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/debrid/history/${operation}$`))
@@ -592,7 +601,7 @@ test.describe('browser language preferences', () => {
     }
     await page.goto('/search?q=example')
     await expect(page.getByRole('link', { name: 'Film Exemple', exact: true })).toBeVisible()
-    await page.goto(`/search/${ids.movie}`)
+    await page.goto(`/search/${ids.movie}?cached_only=false`)
     await expect(page.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
     await expect(page.locator('[data-result-count]')).toHaveText('4 source releases')
     await expect(page.locator('main tbody tr').first()).toContainText('FRENCH')

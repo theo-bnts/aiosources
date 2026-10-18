@@ -179,6 +179,7 @@ export interface CollectionPolicy {
 }
 export type PauseReason = '' | 'manual' | 'budget' | 'quota' | 'no_progress' | 'interrupted'
 export interface Run {
+  remote_catalog?: boolean
   storage_mode: 'compact' | 'full'
   id: string
   provider_id: string

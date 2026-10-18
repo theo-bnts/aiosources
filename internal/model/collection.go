@@ -80,8 +80,10 @@ func (r Run) RequiresManualResume() bool {
 
 // CollectionOverview includes the local database connection budget and queue state.
 type CollectionOverview struct {
-	Settings CollectionSettings `json:"settings"`
-	Running  int                `json:"running"`
-	Queued   int                `json:"queued"`
-	Capacity int                `json:"capacity"`
+	SourceRunning int                `json:"source_running"`
+	SourceQueued  int                `json:"source_queued"`
+	Settings      CollectionSettings `json:"settings"`
+	Running       int                `json:"running"`
+	Queued        int                `json:"queued"`
+	Capacity      int                `json:"capacity"`
 }

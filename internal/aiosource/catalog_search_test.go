@@ -181,6 +181,33 @@ func TestCatalogEpisodeSelectionUsesVerifiedFilesAndSeasonPacks(t *testing.T) {
 	if err != nil || pageEnd.Total != 2 || len(pageEnd.Items) != 0 {
 		t.Fatalf("out-of-range page lost its total or overflowed: %+v %v", pageEnd, err)
 	}
+	// The first version in the existing order is now uncached. Filtering must
+	// still reach the cached version beyond a one-row page and count it once.
+	first, err := s.DB.CatalogRecords(ctx, page.Items[0].ID)
+	if err != nil || len(first) != 3 {
+		t.Fatal("release fixtures missing", err)
+	}
+	var uncachedHash string
+	for _, row := range first {
+		if row.OccurrenceID == releases.Items[0].OccurrenceID {
+			uncachedHash = row.Hash
+		}
+	}
+	if uncachedHash == "" {
+		t.Fatal("first release identity missing")
+	}
+	if err = s.DB.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{Generation: generation, Hash: uncachedHash, CheckedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	for _, offset := range []int{0, 1} {
+		filtered, err := s.CatalogReleases(ctx, page.Items[0].ID, selection, model.ListOptions{Sort: "size_desc", Limit: 1, Offset: offset}, model.CatalogReleaseFilters{CachedOnly: true})
+		if err != nil || filtered.Total != 1 || len(filtered.Items) != 1-offset {
+			t.Fatalf("cached filtering or pagination lost a release: %+v %v", filtered, err)
+		}
+		if offset == 0 && (filtered.Items[0].OccurrenceID == releases.Items[0].OccurrenceID || filtered.Items[0].Services[0].State != "cached") {
+			t.Fatalf("uncached release passed the filter: %+v", filtered)
+		}
+	}
 }
 
 func TestCatalogUncachedPreparationAndReadinessPreserveOwnedDownloads(t *testing.T) {

@@ -59,7 +59,10 @@ func (s *Store) CollectionOverview(ctx context.Context) (model.CollectionOvervie
 		return result, err
 	}
 	err = s.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE status='running'),
-count(*) FILTER (WHERE status='queued') FROM ingest.runs WHERE status IN ('running','queued')`).Scan(&result.Running, &result.Queued)
+count(*) FILTER (WHERE status='queued'),
+count(*) FILTER (WHERE status='running' AND NOT remote_catalog),
+count(*) FILTER (WHERE status='queued' AND NOT remote_catalog)
+FROM ingest.runs WHERE status IN ('running','queued')`).Scan(&result.Running, &result.Queued, &result.SourceRunning, &result.SourceQueued)
 	result.Capacity = min(cap(s.claimSlots), model.MaxCollectionWorkers)
 	return result, databaseError("read collection capacity", err)
 }

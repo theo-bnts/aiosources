@@ -1,3 +1,13 @@
+import { SourceFilter } from '@/components/source-filter'
+import { Statistic } from '@/components/statistic'
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from '@/components/ui/table'
 import { torznabMediaTypes, debridServices } from '@/components/connection-filter-fields'
 import { Switch } from '@/components/ui/switch'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -14,7 +24,7 @@ import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { PlusIcon, ShareNetworkIcon } from '@phosphor-icons/react'
+import { PlusIcon, ShareNetworkIcon, PencilSimpleIcon, TrashIcon } from '@phosphor-icons/react'
 import { api, ApiError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type {
   CatalogShare,
@@ -70,6 +80,109 @@ function connectionEndpoint(format: ConnectionFormat) {
       : '/shares'
 }
 
+function useShares(format: ConnectionFormat) {
+  const endpoint = connectionEndpoint(format)
+  return useQuery({
+    queryKey: ['shares', format],
+    queryFn: ({ signal }) => api<CatalogShares>(endpoint, { signal }),
+    refetchInterval: AUTO_REFRESH_INTERVAL,
+    structuralSharing: false,
+  })
+}
+
+export function SharedCatalogStatisticsPage() {
+  const query = useShares('catalog')
+  const date = useDate()
+  const items = [...(query.data?.items ?? [])].sort(
+    (a, b) =>
+      (b.last_access_at ?? '').localeCompare(a.last_access_at ?? '') ||
+      a.name.localeCompare(b.name),
+  )
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading />
+      ) : (
+        query.data && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <Statistic label="Shares" value={items.length} />
+              <Statistic
+                label="Active shares"
+                value={items.filter((share) => share.enabled && !shareExpired(share)).length}
+              />
+              <Statistic
+                label="Shares downloaded"
+                value={items.filter((share) => share.last_sync_at).length}
+              />
+              <Statistic label="Expired shares" value={items.filter(shareExpired).length} />
+            </dl>
+            <ResultCount total={items.length} label="shares" />
+            {items.length ? (
+              <div className="table-frame">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Recipient</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last access</TableHead>
+                      <TableHead>Last completed download</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((share) => (
+                      <TableRow key={share.id}>
+                        <TableCell className="font-medium whitespace-normal">
+                          {share.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              shareExpired(share)
+                                ? 'warning'
+                                : share.enabled
+                                  ? 'success'
+                                  : 'secondary'
+                            }
+                          >
+                            {shareExpired(share)
+                              ? 'Expired'
+                              : share.enabled
+                                ? 'Enabled'
+                                : 'Disabled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {share.last_access_at ? date(share.last_access_at) : 'Never accessed'}
+                        </TableCell>
+                        <TableCell>
+                          {share.last_sync_at ? date(share.last_sync_at) : 'Never completed'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <Empty
+                title="No shared catalogs"
+                description="Create a share in Settings to grant access to your published torrents."
+              />
+            )}
+            {items.length > 0 && (
+              <p className="help">
+                A completed download means the final page was delivered; the recipient confirms its
+                own import separately.
+              </p>
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
 export default function SharingPage({
   format = 'catalog',
   services = [],
@@ -87,12 +200,7 @@ export default function SharingPage({
   const [saving, setSaving] = useState(false)
   const [credential, setCredential] = useState<SharePassword | null>(null)
   const notify = useNotification()
-  const shares = useQuery({
-    queryKey: ['shares', format],
-    queryFn: ({ signal }) => api<CatalogShares>(endpoint, { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-    structuralSharing: false,
-  })
+  const shares = useShares(format)
   const httpsReady = stremio || Boolean(shares.data?.public_url.startsWith('https://'))
   function rememberFocus() {
     returnFocus.current =
@@ -211,7 +319,7 @@ export default function SharingPage({
                               )
                               .join(', ')
                           : 'All media'
-                        : share.fields.join(', ')}
+                        : share.fields.join(', ') || 'No fields selected'}
                     {torznab && share.torznab_preferences?.services?.length ? (
                       <>
                         {' '}
@@ -226,26 +334,17 @@ export default function SharingPage({
                     {torznab && share.torznab_preferences?.cached_only ? ' · Cached only' : null}
                   </dd>
                 </div>
-                {!connection && (
+                {connection && (
                   <div>
-                    <dt className="text-muted-foreground">Last completed download</dt>
+                    <dt className="text-muted-foreground">
+                      {torznab ? 'Last search' : 'Last access'}
+                    </dt>
                     <dd className="mt-1">
-                      {share.last_sync_at ? date(share.last_sync_at) : 'No completed download'}
+                      {share.last_access_at ? date(share.last_access_at) : 'No access recorded'}
                     </dd>
-                    <p className="help mt-1">
-                      Final page delivered, not confirmation the recipient saved it.
-                    </p>
                   </div>
                 )}
-                <div>
-                  <dt className="text-muted-foreground">
-                    {torznab ? 'Last search' : 'Last access'}
-                  </dt>
-                  <dd className="mt-1">
-                    {share.last_access_at ? date(share.last_access_at) : 'No access recorded'}
-                  </dd>
-                </div>
-                {(!connection || share.expires_at) && (
+                {share.expires_at && (
                   <div>
                     <dt className="text-muted-foreground">Expiration</dt>
                     <dd className="mt-1">
@@ -281,12 +380,6 @@ export default function SharingPage({
                   </div>
                 )}
               </dl>
-              {!connection && share.scope === 'all' && (
-                <p className="help">
-                  Future sources are automatically included. Use selected sources if new sources
-                  should require your approval.
-                </p>
-              )}
               {!stremio && (
                 <div className="field">
                   <Label htmlFor={`share-url-${share.id}`}>
@@ -309,7 +402,8 @@ export default function SharingPage({
               )}
               <div className="toolbar">
                 <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
-                  Edit permissions & limits
+                  <PencilSimpleIcon />
+                  Edit
                 </Button>
                 <ConfirmAction
                   title={`Replace ${connection ? 'access key' : 'password'} for “${share.name}”?`}
@@ -346,17 +440,18 @@ export default function SharingPage({
                   }}
                 />
                 <ConfirmAction
-                  title={`Revoke “${share.name}” permanently?`}
+                  title={`Delete “${share.name}” permanently?`}
                   description={
                     stremio
                       ? 'This installation and all its playback URLs will stop working. Other installations are unaffected. Create a new access to install it again.'
                       : 'This share and its password will stop working. The recipient’s existing downloaded data is not deleted. Create a new share if you want to grant access again.'
                   }
-                  label={connection ? 'Revoke access' : 'Revoke share'}
+                  label={connection ? 'Delete access' : 'Delete share'}
                   variant="destructive"
                   trigger={
                     <Button variant="destructive" size="sm">
-                      Revoke
+                      <TrashIcon />
+                      Delete
                     </Button>
                   }
                   action={async () => {
@@ -364,7 +459,7 @@ export default function SharingPage({
                       method: 'DELETE',
                       body: JSON.stringify({ revision: share.revision }),
                     })
-                    notify(`${connection ? 'Access' : 'Share'} “${share.name}” revoked.`)
+                    notify(`${connection ? 'Access' : 'Share'} “${share.name}” deleted.`)
                     await refreshData()
                   }}
                 />
@@ -416,7 +511,7 @@ export default function SharingPage({
                 ? 'Create independent installations. Saved settings apply to the same link, and each access can be disabled, replaced or revoked separately.'
                 : torznab
                   ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
-                  : 'Only the selected published fields are exposed. Passwords never grant access to administrative APIs.'}
+                  : 'Choose the sources and fields shared with this recipient.'}
             </DialogDescription>
           </DialogHeader>
           {editing && shares.data && (
@@ -477,7 +572,7 @@ function ShareForm({
   )
   const [original, setOriginal] = useState(share)
   const [name, setName] = useState(share?.name ?? '')
-  const defaultScope = connection ? 'all' : 'selected'
+  const defaultScope = 'all'
   const requestsDefault = connection ? 0 : 120
   const concurrentDefault = connection ? 0 : 2
   const limitValue = (value: number | undefined, fallback: number) =>
@@ -492,7 +587,6 @@ function ShareForm({
   const [maxConcurrentDownloads, setMaxConcurrentDownloads] = useState(
     limitValue(share?.max_concurrent_downloads, concurrentDefault),
   )
-  const [acknowledged, setAcknowledged] = useState(share?.scope === 'all')
   const [reloaded, setReloaded] = useState(false)
   const save = useMutation({
     gcTime: 0,
@@ -584,8 +678,7 @@ function ShareForm({
     JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
     expiresAt !== localDateTime(original?.expires_at, 'seconds') ||
     requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
-    maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault) ||
-    (!connection && !original && acknowledged)
+    maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault)
   useUnsavedChanges(
     dirty,
     stremio ? 'Stremio access' : torznab ? 'Torznab access' : 'catalog sharing',
@@ -601,10 +694,7 @@ function ShareForm({
     setScope(ids.length ? 'selected' : 'all')
   }
   const accessPolicy = (
-    <fieldset
-      className={connection ? 'min-w-0 space-y-4' : 'min-w-0 space-y-4 border-t border-border pt-4'}
-    >
-      {!connection && <legend className="px-1 text-sm font-medium">Access policy</legend>}
+    <fieldset className="min-w-0 space-y-4">
       <div className="field">
         <Label htmlFor="share-expires">Expires at (browser local time)</Label>
         <Input
@@ -686,79 +776,6 @@ function ShareForm({
             onChange={(event) => setName(event.target.value)}
           />
         </div>
-        {!connection && (
-          <>
-            <div className="field">
-              <Label htmlFor="share-scope">Source access</Label>
-              <select
-                id="share-scope"
-                className="native-select w-full"
-                value={scope}
-                onChange={(event) => {
-                  setScope(event.target.value as CatalogShare['scope'])
-                  setAcknowledged(false)
-                }}
-              >
-                <option value="selected">Selected sources only</option>
-                <option value="all">All current and future sources</option>
-              </select>
-            </div>
-            {scope === 'selected' ? (
-              <fieldset className="space-y-3">
-                <legend className="mb-2 text-sm font-medium">Allowed sources</legend>
-                {data.sources.length === 0 && (
-                  <p className="help">
-                    No sources are available. Add a source before creating a share for selected
-                    sources.
-                  </p>
-                )}
-                <div className="grid max-h-56 gap-3 overflow-y-auto p-1 sm:grid-cols-2">
-                  {[
-                    ...data.sources,
-                    ...unavailable.map((id) => ({
-                      id,
-                      name: `${id} (unavailable; remove before saving)`,
-                    })),
-                  ].map((source) => (
-                    <label key={source.id} className="flex items-start gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="mt-1 accent-primary"
-                        checked={sourceIDs.includes(source.id)}
-                        onChange={(event) =>
-                          setSourceIDs(
-                            event.target.checked
-                              ? [...sourceIDs, source.id]
-                              : sourceIDs.filter((id) => id !== source.id),
-                          )
-                        }
-                      />
-                      <span className="break-words">{source.name || source.id}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ) : (
-              <div className="notice space-y-3">
-                <p>
-                  Access to all sources automatically includes sources added in the future,
-                  including imported catalogs that are published locally. New sources will not
-                  require another approval.
-                </p>
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={acknowledged}
-                    onChange={(event) => setAcknowledged(event.target.checked)}
-                    className="mt-1 accent-primary"
-                  />
-                  <span>I authorize access to all current and future sources.</span>
-                </label>
-              </div>
-            )}
-          </>
-        )}
         {stremio ? (
           <StremioConnectionFilters
             value={streamPreferences}
@@ -785,8 +802,13 @@ function ShareForm({
             </p>
           </Disclosure>
         ) : (
-          <>
-            {' '}
+          <Disclosure title="Filters">
+            <SourceFilter
+              id="share-sources"
+              value={sourceIDs}
+              sources={sourceOptions}
+              onChange={selectSources}
+            />
             <fieldset className="space-y-3">
               <legend className="mb-2 text-sm font-medium">Safe fields to share</legend>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -813,9 +835,9 @@ function ShareForm({
                 Original provenance accompanies authorized fields.
               </p>
             </fieldset>
-          </>
+          </Disclosure>
         )}
-        {connection ? <Disclosure title="Advanced">{accessPolicy}</Disclosure> : accessPolicy}
+        <Disclosure title="Advanced">{accessPolicy}</Disclosure>
       </fieldset>
       <p className="help">
         {original
@@ -851,7 +873,7 @@ function ShareForm({
             conflict ||
             !name.trim() ||
             fields.length === 0 ||
-            (scope === 'selected' ? sourceIDs.length === 0 : !connection && !acknowledged)
+            (scope === 'selected' && sourceIDs.length === 0)
           }
         >
           {save.isPending
