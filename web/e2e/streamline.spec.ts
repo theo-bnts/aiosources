@@ -85,7 +85,9 @@ test('lists update without refresh controls and empty pages keep a single create
     ).status(),
   ).toBe(204)
   await page.clock.runFor(30_001)
-  await expect(page.locator('main tbody')).toContainText('automatic-test')
+  await expect(
+    page.getByRole('region', { name: 'Secrets', exact: true }).locator('tbody'),
+  ).toContainText('automatic-test')
   for (const route of ['/logs', '/health', '/security', '/metadata']) {
     await page.goto(route)
     await expect(page.getByRole('button', { name: /refresh/i })).toHaveCount(0)

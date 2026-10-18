@@ -129,7 +129,6 @@ export default function SecretsPage() {
               <TableRow>
                 <TableHead>Reference</TableHead>
                 <TableHead>Last updated</TableHead>
-                <TableHead>Value</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -139,9 +138,6 @@ export default function SecretsPage() {
                   <TableCell className="font-mono text-xs">{secret.name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {date(secret.updated_at)}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    Encrypted · not viewable
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">

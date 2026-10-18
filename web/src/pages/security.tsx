@@ -1,12 +1,12 @@
-import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useEffect, useRef, useState } from 'react'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
-import { useQuery } from '@tanstack/react-query'
+import { useIsFetching, useQuery } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import { ShieldCheckIcon, SignOutIcon } from '@phosphor-icons/react'
 import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
-import type { Items } from '@/lib/types'
+import type { Items, SecretInfo } from '@/lib/types'
 import type {
   AdminSession,
   MFAEnrollment,
@@ -14,6 +14,8 @@ import type {
   SecurityStatus,
 } from '@/lib/security-types'
 import { Switch } from '@/components/ui/switch'
+import SecretsPage from '@/pages/secrets'
+import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,7 +37,126 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
+import {
+  ConfirmAction,
+  Empty,
+  ErrorNotice,
+  Loading,
+  PageHeaderVisibility,
+  ResultCount,
+} from '@/components/common'
+
+function useSecurityStatus(enabled = true) {
+  return useQuery({
+    queryKey: ['security', 'status'],
+    queryFn: ({ signal }) => api<SecurityStatus>('/security', { signal }),
+    refetchInterval: AUTO_REFRESH_INTERVAL,
+    enabled,
+  })
+}
+
+function useAdminSessions(enabled = true) {
+  return useQuery({
+    queryKey: ['security', 'sessions'],
+    queryFn: ({ signal }) => api<Items<AdminSession>>('/security/sessions', { signal }),
+    refetchInterval: AUTO_REFRESH_INTERVAL,
+    enabled,
+  })
+}
+
+export function SecurityStatisticsPage() {
+  const status = useSecurityStatus()
+  const sessions = useAdminSessions()
+  const secrets = useQuery({
+    queryKey: ['secrets'],
+    queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
+    refetchInterval: AUTO_REFRESH_INTERVAL,
+  })
+  return (
+    <div className="page">
+      <ErrorNotice error={status.error} retry={() => void status.refetch()} />
+      <ErrorNotice error={sessions.error} retry={() => void sessions.refetch()} />
+      <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
+      <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Statistic
+          label="Stored secrets"
+          value={secrets.data?.items?.length ?? 'Not available'}
+          to="/security/settings#secrets"
+        />
+        <Statistic
+          label="Two-step verification"
+          value={status.data ? (status.data.mfa_enabled ? 'Enabled' : 'Disabled') : 'Not available'}
+          valueClassName={
+            status.data?.mfa_enabled
+              ? 'text-emerald-800 dark:text-emerald-300'
+              : 'text-muted-foreground'
+          }
+          to="/security/settings#verification"
+        />
+        <Statistic
+          label="Recovery codes remaining"
+          valueClassName={
+            status.data?.mfa_enabled
+              ? status.data.recovery_codes_remaining === 0
+                ? 'text-amber-800 dark:text-amber-300'
+                : undefined
+              : 'text-muted-foreground'
+          }
+          value={
+            status.data
+              ? status.data.mfa_enabled
+                ? status.data.recovery_codes_remaining
+                : 'Not set up'
+              : 'Not available'
+          }
+          to="/security/settings#verification"
+        />
+        <Statistic
+          label="Active sessions"
+          value={sessions.data?.items?.length ?? 'Not available'}
+          to="/security/settings#sessions"
+        />
+      </dl>
+    </div>
+  )
+}
+
+export function SecuritySettingsPage() {
+  const { hash, key } = useLocation()
+  const fetching = useIsFetching({
+    predicate: (query) => query.queryKey[0] === 'security' || query.queryKey[0] === 'secrets',
+  })
+  const revealed = useRef('')
+  useEffect(() => {
+    const requested = key + hash
+    if (
+      fetching ||
+      revealed.current === requested ||
+      !['#secrets', '#verification', '#sessions'].includes(hash)
+    )
+      return
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+      revealed.current = requested
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hash, key, fetching])
+  return (
+    <div className="page">
+      <PageHeaderVisibility.Provider value={{ title: true, description: false }}>
+        <section id="secrets" aria-label="Secrets" className="min-w-0 scroll-mt-20">
+          <SecretsPage />
+        </section>
+        <div id="verification" className="min-w-0 scroll-mt-20">
+          <SecurityPage view="mfa" />
+        </div>
+        <div id="sessions" className="min-w-0 scroll-mt-20">
+          <SecurityPage view="sessions" />
+        </div>
+      </PageHeaderVisibility.Provider>
+    </div>
+  )
+}
 
 type Operation = 'enroll' | 'confirm' | 'cancel' | 'disable' | 'recovery'
 const titles: Record<Operation, string> = {
@@ -45,18 +166,10 @@ const titles: Record<Operation, string> = {
   disable: 'Disable two-step verification',
   recovery: 'Replace recovery codes',
 }
-export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
+function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
   const date = useDate()
-  const status = useQuery({
-    queryKey: ['security', 'status'],
-    queryFn: ({ signal }) => api<SecurityStatus>('/security', { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-  })
-  const sessions = useQuery({
-    queryKey: ['security', 'sessions'],
-    queryFn: ({ signal }) => api<Items<AdminSession>>('/security/sessions', { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-  })
+  const status = useSecurityStatus(view === 'mfa')
+  const sessions = useAdminSessions(view === 'sessions')
   const sessionItems = sessions.data?.items ?? []
   const [operation, setOperation] = useState<Operation | null>(null)
   const [password, setPassword] = useState('')
@@ -170,7 +283,8 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
             <div className="flex items-start gap-3">
               <ShieldCheckIcon size={24} className="mt-0.5 shrink-0 text-primary" />
               <div>
-                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                <h2 className="section-title">Two-step verification</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
                   Require a time-based authenticator code as well as your password. Recovery codes
                   let you regain access if your authenticator is unavailable.
                 </p>
@@ -261,7 +375,8 @@ export function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
         <section className="space-y-4" aria-label="Active sessions">
           <div className="page-heading">
             <div>
-              <p className="text-sm text-muted-foreground">
+              <h2 className="section-title">Active sessions</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
                 Sessions expire after 12 hours. Device descriptions are deliberately coarse; no IP
                 address or raw user agent is stored.
               </p>

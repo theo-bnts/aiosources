@@ -169,13 +169,28 @@ test('operation errors remain in their history and manual controls without appea
   }
 })
 
-test('Security opens its first view through navigation and existing secret bookmarks', async ({
+test('Security opens Statistics and existing security bookmarks lead to Settings', async ({
   page,
+  server,
 }) => {
-  for (const path of ['/security', '/security/secrets', '/secrets']) {
+  const session = await (await page.request.get('/api/session')).json()
+  expect(
+    (
+      await page.request.put('/api/secrets/columns-fixture', {
+        headers: { 'X-CSRF-Token': session.csrf_token, Origin: server.origin },
+        data: { value: 'synthetic-column-test-value', revision: 0 },
+      })
+    ).status(),
+  ).toBe(204)
+  for (const path of [
+    '/security/secrets',
+    '/secrets',
+    '/security/verification',
+    '/security/sessions',
+  ]) {
     await page.goto(path)
-    await expect(page).toHaveURL(/\/security$/)
-    await expect(page.getByRole('tab', { name: 'Secrets', exact: true })).toHaveAttribute(
+    await expect(page).toHaveURL(/\/security\/settings#(secrets|verification|sessions)$/)
+    await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',
     )
@@ -183,18 +198,44 @@ test('Security opens its first view through navigation and existing secret bookm
       page.getByRole('button', { name: 'Create secret', exact: true }).first(),
     ).toBeVisible()
   }
-  await page.getByRole('tab', { name: 'Two-step verification', exact: true }).click()
-  await expect(page).toHaveURL(/\/security\/verification$/)
+  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  await expect(page).toHaveURL(/\/security$/)
   await page.reload()
-  await expect(
-    page.getByRole('tab', { name: 'Two-step verification', exact: true }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
     .getByRole('link', { name: 'Security', exact: true })
     .click()
-  await expect(page.getByRole('tab', { name: 'Secrets', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   )
+  await expect(
+    page.getByRole('tablist', { name: 'Security views', exact: true }).getByRole('tab'),
+  ).toHaveText(['Statistics', 'Settings'])
+  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toHaveCount(0)
+  await expect(page.getByText('Stored secrets', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await expect(
+    page.getByRole('region', { name: 'Secrets', exact: true }).getByRole('columnheader'),
+  ).toHaveText(['Reference', 'Last updated', 'Actions'])
+  await expect(
+    page.getByRole('region', { name: 'Two-step verification', exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  await page.getByRole('link', { name: 'View active sessions', exact: true }).click()
+  await expect(page).toHaveURL(/\/security\/settings#sessions$/)
+  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toBeInViewport()
+  await page.locator('#main-content').evaluate((main) => {
+    main.style.minHeight = '2400px'
+  })
+  await page.clock.install()
+  await page.evaluate(() => window.scrollTo(0, 25))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
+  await page.clock.runFor(30_001)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
 })

@@ -9,6 +9,7 @@ export function Statistic({
   size = 'default',
   detail,
   className,
+  valueClassName,
 }: {
   label: string
   value: number | string
@@ -16,6 +17,7 @@ export function Statistic({
   size?: 'default' | 'sm'
   detail?: string
   className?: string
+  valueClassName?: string
 }) {
   const text = typeof value === 'number' ? number(value) : value
   return (
@@ -25,10 +27,15 @@ export function Statistic({
         className={cn(
           'mt-2 [overflow-wrap:anywhere]',
           size === 'sm' ? 'text-sm' : 'text-xl font-semibold tabular-nums',
+          valueClassName,
         )}
       >
         {to ? (
-          <Link className="data-link" to={to} aria-label={`View ${label.toLowerCase()}`}>
+          <Link
+            className={cn('data-link', valueClassName)}
+            to={to}
+            aria-label={`View ${label.toLowerCase()}`}
+          >
             {text}
           </Link>
         ) : (

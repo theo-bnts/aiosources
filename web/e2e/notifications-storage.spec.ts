@@ -38,7 +38,7 @@ test('action confirmations use the shared opaque notification, field errors stay
   server,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/security')
+  await page.goto('/security/settings')
   await page.getByRole('button', { name: 'Create secret', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Reference name', { exact: true }).fill('synthetic-reference')

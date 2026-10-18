@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -139,7 +140,7 @@ func TestRunResponsesKeepContinuationPrivateAndResumable(t *testing.T) {
 	}
 }
 
-func TestProviderDeletionRejectsActiveRunsAndAllowsPausedSnapshots(t *testing.T) {
+func TestProviderDeletionRejectsActiveRunsAndPurgesPausedSnapshots(t *testing.T) {
 	fixture := sharingAPI(t, "https://owner.example.test")
 	response := fixture.request(http.MethodGet, "/api/providers/fixture", "", true, "")
 	var document model.ProviderDocument
@@ -172,7 +173,7 @@ func TestProviderDeletionRejectsActiveRunsAndAllowsPausedSnapshots(t *testing.T)
 		t.Fatalf("claim active source: %v", err)
 	}
 	rejectDeletion() // Running.
-	held, err := fixture.db.FinishRun(fixture.ctx, run.ID, model.StatusPaused, "", model.PauseBudget)
+	_, err = fixture.db.FinishRun(fixture.ctx, run.ID, model.StatusPaused, "", model.PauseBudget)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,9 +184,11 @@ func TestProviderDeletionRejectsActiveRunsAndAllowsPausedSnapshots(t *testing.T)
 	if response := fixture.request(http.MethodGet, "/api/providers/fixture", "", true, ""); response.Code != http.StatusNotFound {
 		t.Fatalf("deleted definition remained accessible: status %d", response.Code)
 	}
-	retained, err := fixture.db.GetRun(fixture.ctx, run.ID)
-	if err != nil || retained.Status != model.StatusPaused || !reflect.DeepEqual(retained.Config, held.Config) {
-		t.Fatalf("definition deletion changed its paused immutable snapshot: %v", err)
+	if _, err := fixture.db.GetRun(fixture.ctx, run.ID); !errors.Is(err, model.ErrNotFound) {
+		t.Fatalf("source deletion retained its paused snapshot: %v", err)
+	}
+	if resumed := fixture.request(http.MethodPost, "/api/runs/"+run.ID+"/resume", "", true, ""); resumed.Code != http.StatusNotFound {
+		t.Fatalf("deleted import remained resumable: %d", resumed.Code)
 	}
 }
 

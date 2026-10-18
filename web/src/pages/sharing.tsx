@@ -601,7 +601,9 @@ function ShareForm({
     setScope(ids.length ? 'selected' : 'all')
   }
   const accessPolicy = (
-    <fieldset className={connection ? 'space-y-4' : 'space-y-4 border-t border-border pt-4'}>
+    <fieldset
+      className={connection ? 'min-w-0 space-y-4' : 'min-w-0 space-y-4 border-t border-border pt-4'}
+    >
       {!connection && <legend className="px-1 text-sm font-medium">Access policy</legend>}
       <div className="field">
         <Label htmlFor="share-expires">Expires at (browser local time)</Label>

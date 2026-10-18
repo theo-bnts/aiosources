@@ -321,15 +321,8 @@ func (s *server) deleteProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	err := s.options.Providers.Delete(id, input.Revision, func() error {
-		active, err := s.options.Store.HasActiveRun(r.Context(), id)
-		if err != nil {
-			return err
-		}
-		if active {
-			return model.ErrBusy
-		}
-		return nil
+	err := s.options.Providers.DeleteWithCleanup(id, input.Revision, func(remove func() error) error {
+		return s.options.Store.DeleteSourceData(r.Context(), id, remove)
 	})
 	if err != nil {
 		respondError(w, err)

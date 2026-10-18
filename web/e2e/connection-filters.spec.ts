@@ -250,6 +250,7 @@ for (const format of ['stremio', 'torznab'] as const) {
     page,
     server,
   }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
     const session = await (await page.request.get('/api/session')).json()
     const headers = { 'X-CSRF-Token': session.csrf_token }
     for (const [id, name] of [
@@ -298,6 +299,23 @@ for (const format of ['stremio', 'torznab'] as const) {
     await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
       '',
     )
+    const expiry = editor.getByLabel('Expires at (browser local time)', { exact: true })
+    const bounds = await expiry.evaluate((element) => {
+      const input = element.getBoundingClientRect()
+      const field = element.closest('fieldset')!.getBoundingClientRect()
+      return {
+        left: input.left,
+        right: input.right,
+        fieldLeft: field.left,
+        fieldRight: field.right,
+        viewport: innerWidth,
+      }
+    })
+    expect(bounds.left).toBeGreaterThanOrEqual(bounds.fieldLeft)
+    expect(bounds.right).toBeLessThanOrEqual(bounds.fieldRight + 1)
+    expect(bounds.right).toBeLessThanOrEqual(bounds.viewport)
+    if (process.env.QA_DIRECTORY)
+      await page.screenshot({ path: `${process.env.QA_DIRECTORY}/${format}-expiry-mobile.png` })
     await editor.getByRole('button', { name: 'Create disabled access', exact: true }).click()
     await page
       .getByRole('button', {

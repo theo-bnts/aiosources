@@ -412,7 +412,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               <p className="help">
                 For uncached private torrents, add the complete announce URL, including its passkey,
                 in{' '}
-                <Link className="data-link" to="/security">
+                <Link className="data-link" to="/security/settings#secrets">
                   Secrets
                 </Link>
                 , or directly below, then save the playback settings. The URL is used exactly as

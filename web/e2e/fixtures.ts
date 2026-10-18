@@ -19,11 +19,12 @@ export const test = base.extend<{ server: TestServer; collectionSource: boolean 
   baseURL: async ({ server }, use) => {
     await use(server.origin)
   },
-  page: async ({ page, server, collectionSource }, use) => {
+  page: async ({ page, server, collectionSource, browserName }, use) => {
     let externalRequests = 0
-    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
-      origin: server.origin,
-    })
+    if (browserName === 'chromium')
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
+        origin: server.origin,
+      })
     // This is an egress guard, not an API mock. All application requests reach the
     // embedded Go server and its real isolated PostgreSQL database unchanged.
     await page.context().route('**/*', async (route) => {

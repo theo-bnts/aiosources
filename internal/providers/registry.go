@@ -280,6 +280,20 @@ func (r *Registry) Save(id, raw, expectedRevision string) (model.ProviderDocumen
 // The guard runs only for a readable definition with a matching revision and must
 // not call another Registry method.
 func (r *Registry) Delete(id, expectedRevision string, before func() error) error {
+	return r.DeleteWithCleanup(id, expectedRevision, func(remove func() error) error {
+		if before != nil {
+			if err := before(); err != nil {
+				return err
+			}
+		}
+		return remove()
+	})
+}
+
+// DeleteWithCleanup keeps definition admission locked through data cleanup and
+// removal. Cleanup must call remove before committing; a failed cleanup restores
+// the original definition, including when removal's directory sync failed.
+func (r *Registry) DeleteWithCleanup(id, expectedRevision string, cleanup func(func() error) error) error {
 	if !ValidID(id) {
 		return fmt.Errorf("%w: unsafe provider id", model.ErrInvalid)
 	}
@@ -301,19 +315,36 @@ func (r *Registry) Delete(id, expectedRevision string, before func() error) erro
 		if expectedRevision == "" || expectedRevision != entry.document.Revision {
 			return model.ErrConflict
 		}
-		if before != nil {
-			if err := before(); err != nil {
-				return err
+		removed := false
+		remove := func() error {
+			if removed {
+				return model.ErrConflict
+			}
+			current, err := r.readDefinition(entry.name)
+			if err != nil || revision(current) != expectedRevision {
+				return model.ErrConflict
+			}
+			if err := r.root.Remove(entry.name); err != nil {
+				return fmt.Errorf("cannot remove provider definition")
+			}
+			removed = true
+			return r.syncDirectory()
+		}
+		var err error
+		if cleanup == nil {
+			err = remove()
+		} else {
+			err = cleanup(remove)
+		}
+		if err == nil && !removed {
+			return fmt.Errorf("provider cleanup did not remove the definition")
+		}
+		if err != nil && removed {
+			if restore := r.atomicWrite(entry.name, []byte(entry.document.JSON), ""); restore != nil {
+				return errors.Join(err, fmt.Errorf("cannot restore provider definition after cleanup failure"))
 			}
 		}
-		current, err := r.readDefinition(entry.name)
-		if err != nil || revision(current) != expectedRevision {
-			return model.ErrConflict
-		}
-		if err := r.root.Remove(entry.name); err != nil {
-			return fmt.Errorf("cannot remove provider definition")
-		}
-		return r.syncDirectory()
+		return err
 	}
 	return model.ErrNotFound
 }

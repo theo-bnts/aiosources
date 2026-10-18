@@ -17,9 +17,6 @@ import {
   ChartBarIcon,
   GearSixIcon,
   ClockCounterClockwiseIcon,
-  KeyIcon,
-  ShieldCheckIcon,
-  DevicesIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -42,7 +39,6 @@ const ProvidersPage = lazy(() =>
 const ProviderEditor = lazy(() =>
   import('@/pages/providers').then((m) => ({ default: m.ProviderEditor })),
 )
-const SecretsPage = lazy(() => import('@/pages/secrets'))
 const RunsPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunsPage })))
 const RunDetailPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunDetailPage })))
 const TorrentsPage = lazy(() =>
@@ -70,8 +66,11 @@ const RemotesPage = lazy(() => import('@/pages/remotes'))
 const PublicAccessPage = lazy(() => import('@/pages/public-access'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
-const SecurityPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecurityPage })),
+const SecurityStatisticsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecurityStatisticsPage })),
+)
+const SecuritySettingsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecuritySettingsPage })),
 )
 function LegacyImportSettings() {
   const location = useLocation()
@@ -242,21 +241,26 @@ const router = createBrowserRouter(
             <WorkspaceLayout
               title="Security"
               tabs={[
-                { path: '/security', label: 'Secrets', icon: KeyIcon },
-                {
-                  path: '/security/verification',
-                  label: 'Two-step verification',
-                  icon: ShieldCheckIcon,
-                },
-                { path: '/security/sessions', label: 'Active sessions', icon: DevicesIcon },
+                { path: '/security', label: 'Statistics', icon: ChartBarIcon },
+                { path: '/security/settings', label: 'Settings', icon: GearSixIcon },
               ]}
             />
           }
         >
-          <Route path="security" element={<SecretsPage />} />
-          <Route path="security/secrets" element={<Navigate to="/security" replace />} />
-          <Route path="security/verification" element={<SecurityPage view="mfa" />} />
-          <Route path="security/sessions" element={<SecurityPage view="sessions" />} />
+          <Route path="security" element={<SecurityStatisticsPage />} />
+          <Route path="security/settings" element={<SecuritySettingsPage />} />
+          <Route
+            path="security/secrets"
+            element={<Navigate to="/security/settings#secrets" replace />}
+          />
+          <Route
+            path="security/verification"
+            element={<Navigate to="/security/settings#verification" replace />}
+          />
+          <Route
+            path="security/sessions"
+            element={<Navigate to="/security/settings#sessions" replace />}
+          />
         </Route>
         <Route
           element={
@@ -289,7 +293,7 @@ const router = createBrowserRouter(
         <Route path="torrents" element={<TorrentsPage />} />
         <Route path="search" element={<CatalogSearchPage />} />
         <Route path="search/:id" element={<CatalogTitlePage />} />
-        <Route path="secrets" element={<Navigate to="/security" replace />} />
+        <Route path="secrets" element={<Navigate to="/security/settings#secrets" replace />} />
         <Route path="schedules" element={<Navigate to="/providers/settings" replace />} />
         <Route path="settings" element={<Navigate to="/providers/settings" replace />} />
         <Route path="import-settings" element={<LegacyImportSettings />} />

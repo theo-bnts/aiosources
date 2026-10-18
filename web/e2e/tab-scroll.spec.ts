@@ -58,7 +58,7 @@ test('opening a secondary view directly reveals its active tab without scrolling
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const path of ['/metadata/history', '/security/sessions', '/runs/missing']) {
+  for (const path of ['/metadata/history', '/security/settings', '/runs/missing']) {
     await page.goto(path)
     const tabs = page.getByRole('tablist').first()
     await expect(tabs).toBeVisible()
@@ -80,19 +80,19 @@ test('opening a secondary view directly reveals its active tab without scrolling
 test('switching page tabs keeps scroll position and keyboard focus while menu navigation resets', async ({
   page,
 }) => {
-  await page.goto('/security/verification')
+  await page.goto('/security/settings')
   await retainDocumentHeight(page)
-  const secrets = page.getByRole('tab', { name: 'Secrets', exact: true })
-  await secrets.click()
+  const statistics = page.getByRole('tab', { name: 'Statistics', exact: true })
+  await statistics.click()
   await expect(page).toHaveURL(/\/security$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
-  await expect(secrets).toBeFocused()
+  await expect(statistics).toBeFocused()
   await page.keyboard.press('ArrowRight')
-  await expect(page).toHaveURL(/\/security\/verification$/)
+  await expect(page).toHaveURL(/\/security\/settings$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
-  await expect(page.getByRole('tab', { name: 'Two-step verification', exact: true })).toBeFocused()
+  await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toBeFocused()
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
     .getByRole('link', { name: 'Metadata', exact: true })

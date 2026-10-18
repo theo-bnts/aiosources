@@ -144,6 +144,8 @@ To start again with the new mode, save your selection and pause any running impo
 
 **Connections → Shared catalogs** shares published data. **Sources → Remote catalogs** manages imports from other instances. Sharing keeps only fields its export protocol can use, and does not keep publication snapshots while every share is disabled or expired. Enabling sharing builds a fresh snapshot of the current catalog. Storage measurements include PostgreSQL tables and indexes; ordinary deletion makes space reusable inside PostgreSQL, while a source reset also releases the large source table files.
 
+Deleting a source permanently removes its definition, imported torrents, import history, saved progress, identification decisions and saved download preparations. Stored secrets, shared film/series metadata and account-wide debrid caches are kept. Active imports or download preparations must finish first. Access limited to that source is revoked; access to several selected sources keeps only the remaining selection. Connected catalogs restart with a full synchronization so deleted content does not remain in their local copy. PostgreSQL can reuse the freed space.
+
 ### Optional public access
 
 Enable **Connections → Public access** to offer a visitor homepage. Visitors supply at least one AllDebrid or TorBox key and receive an encrypted installation URL. Keys are processed without saving them; playback uses each visitor's own account. Administration remains protected. Disabling public access revokes existing public links, while private installations keep working.

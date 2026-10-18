@@ -5,7 +5,7 @@ test('connection failures in a secret dialog use one notification without replay
   page,
   server,
 }) => {
-  await page.goto('/security')
+  await page.goto('/security/settings')
   await page.getByRole('button', { name: 'Create secret', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Reference name', { exact: true }).fill('offline-example')

@@ -18,12 +18,13 @@ import (
 )
 
 type sharingAPIFixture struct {
-	dsn     string
-	ctx     context.Context
-	db      *store.Store
-	handler http.Handler
-	cookie  *http.Cookie
-	csrf    string
+	dsn      string
+	ctx      context.Context
+	db       *store.Store
+	handler  http.Handler
+	cookie   *http.Cookie
+	csrf     string
+	registry *providers.Registry
 }
 
 func sharingAPI(t *testing.T, origin string) sharingAPIFixture {
@@ -64,7 +65,7 @@ func sharingAPI(t *testing.T, origin string) sharingAPIFixture {
 	if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &session) != nil || len(w.Result().Cookies()) != 1 {
 		t.Fatalf("fixture login failed: %d %s", w.Code, w.Body.String())
 	}
-	return sharingAPIFixture{dsn: endpoint, ctx: ctx, db: db, handler: handler, cookie: w.Result().Cookies()[0], csrf: session.CSRF}
+	return sharingAPIFixture{dsn: endpoint, ctx: ctx, db: db, handler: handler, cookie: w.Result().Cookies()[0], csrf: session.CSRF, registry: registry}
 }
 
 func (f sharingAPIFixture) request(method, path, body string, admin bool, password string) *httptest.ResponseRecorder {
@@ -228,9 +229,9 @@ func TestSharingAPICanDisableAfterSelectedProviderDisappears(t *testing.T) {
 	if provider.Code != http.StatusOK || json.Unmarshal(provider.Body.Bytes(), &definition) != nil {
 		t.Fatalf("read provider: %d %s", provider.Code, provider.Body.String())
 	}
-	deletion, _ := json.Marshal(map[string]string{"revision": definition.Revision})
-	if removed := fixture.request(http.MethodDelete, "/api/providers/fixture", string(deletion), true, ""); removed.Code != http.StatusNoContent {
-		t.Fatalf("remove provider: %d %s", removed.Code, removed.Body.String())
+	// An out-of-band file removal does not go through the destructive admin API.
+	if err := fixture.registry.Delete("fixture", definition.Revision, nil); err != nil {
+		t.Fatalf("remove provider file: %v", err)
 	}
 	input := model.ShareInput{Name: grant.Share.Name, Enabled: false, Scope: grant.Share.Scope, SourceIDs: grant.Share.SourceIDs, Fields: grant.Share.Fields, Revision: grant.Share.Revision, RequestsPerMinute: &grant.Share.RequestsPerMinute, MaxConcurrentDownloads: &grant.Share.MaxConcurrentDownloads}
 	body, _ := json.Marshal(input)

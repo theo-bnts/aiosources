@@ -154,17 +154,16 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   await expect(page.getByRole('dialog')).toBeHidden()
   const tabs = page.getByRole('tablist', { name: 'Security views', exact: true })
   await expect(tabs).toHaveAttribute('aria-orientation', 'horizontal')
-  await expect(tabs.getByRole('tab', { name: 'Secrets', exact: true })).toHaveAttribute(
+  await expect(tabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   )
   await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toHaveCount(0)
-  await expect(
-    page.getByRole('button', { name: 'Create secret', exact: true }).first(),
-  ).toBeVisible()
-  await tabs.getByRole('tab', { name: 'Active sessions', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toHaveCount(0)
+  await tabs.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toBeVisible()
   await expect(page.getByText('This session', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Active sessions', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Active sessions', exact: true })).toBeVisible()
   await expect(page.getByText('Security audit', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

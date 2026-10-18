@@ -388,6 +388,31 @@ func TestDuplicateIDsRemainIndividuallyRepairable(t *testing.T) {
 	}
 }
 
+func TestCleanupFailureRestoresDeletedDefinition(t *testing.T) {
+	r, err := providers.New(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	saved, err := r.Save("archive", definition("archive"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("synthetic cleanup commit failure")
+	if err = r.DeleteWithCleanup("archive", saved.Revision, func(remove func() error) error {
+		if err := remove(); err != nil {
+			return err
+		}
+		return failure
+	}); !errors.Is(err, failure) {
+		t.Fatalf("cleanup error lost: %v", err)
+	}
+	restored, err := r.Get("archive")
+	if err != nil || restored.Revision != saved.Revision || restored.JSON != saved.JSON {
+		t.Fatalf("definition not restored: %+v %v", restored, err)
+	}
+}
+
 func TestInvalidJSONNeverReplacesSavedDefinition(t *testing.T) {
 	r := openRegistry(t, t.TempDir())
 	raw := definition("archive")

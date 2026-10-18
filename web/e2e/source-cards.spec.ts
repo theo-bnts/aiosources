@@ -89,6 +89,71 @@ test.describe('source cards', () => {
   })
 })
 
+test('deleting an edited source removes its data, retains secrets and returns to the original list', async ({
+  page,
+  server,
+}) => {
+  const session = await (await page.request.get('/api/session')).json()
+  const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
+  expect(
+    (
+      await page.request.put('/api/secrets/deletion-key', {
+        headers,
+        data: { revision: 0, value: 'synthetic-deletion-test-value' },
+      })
+    ).status(),
+  ).toBe(204)
+  const source = {
+    version: 1,
+    id: 'disposable',
+    name: 'Disposable archive',
+    adapter: 'http_json',
+    url: server.sourceURL,
+    enabled: false,
+    auth: { type: 'bearer', secret_ref: 'deletion-key' },
+  }
+  expect(
+    (
+      await page.request.put('/api/providers/disposable', {
+        headers,
+        data: { revision: '', json: JSON.stringify(source) },
+      })
+    ).status(),
+  ).toBe(200)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(
+      `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at) VALUES('disposable-run','disposable','Disposable archive','full','paused','',$1,now())`,
+      [source],
+    )
+    await db.query(
+      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('disposable','one','{"title":"Synthetic release"}')`,
+    )
+  } finally {
+    await db.end()
+  }
+  await page.goto('/providers/settings?q=Disposable')
+  await page
+    .getByRole('region', { name: 'Source Disposable archive', exact: true })
+    .getByRole('link', { name: 'Edit', exact: true })
+    .click()
+  await page.getByLabel('Display name', { exact: true }).fill('Unsaved source name')
+  await page.getByRole('button', { name: 'Delete source', exact: true }).click()
+  const confirm = page.getByRole('alertdialog')
+  await expect(confirm).toContainText('Stored secrets')
+  await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(page).toHaveURL(/\/providers\/settings\?q=Disposable$/)
+  await expect(page.getByRole('heading', { name: 'Unsaved changes', exact: true })).toHaveCount(0)
+  expect((await page.request.get('/api/runs/disposable-run')).status()).toBe(404)
+  expect((await page.request.get('/api/providers/disposable')).status()).toBe(404)
+  const secrets = await (await page.request.get('/api/secrets')).json()
+  expect(secrets.items.some((secret: { name: string }) => secret.name === 'deletion-key')).toBe(
+    true,
+  )
+  expect(server.sourceRequests()).toBe(0)
+})
+
 test('public classification disables announce editing without deleting the saved secret reference', async ({
   page,
   server,

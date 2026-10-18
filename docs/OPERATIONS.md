@@ -14,7 +14,7 @@ The matching upgrade reconsiders previous misses and affected numbering decision
 
 ## Console navigation
 
-Sources groups source setup and Torrent search; Metadata groups information settings and Identification. Debrid and Search are independent entries, with Search immediately above Connections. Connections groups Stremio and Catalog sharing. Administration groups Security, Storage and Logs, in that order.
+Sources groups source setup, Remote catalogs and Torrent search; Metadata groups information settings and Identification. Debrid and Search are independent entries, with Search immediately above Connections. Connections groups Stremio, Torznab, Shared catalogs and Public access. Administration groups Security, Storage and Logs, in that order.
 
 | Page | Views |
 | --- | --- |
@@ -25,20 +25,23 @@ Sources groups source setup and Torrent search; Metadata groups information sett
 | Debrid | Statistics / Settings / History |
 | Search | Clean film and series titles, source versions and downloads |
 | Stremio | Statistics / Settings / History |
-| Catalog sharing | Shared catalogs / Remote catalogs |
+| Torznab | Saved endpoint access and filters |
+| Shared catalogs | Catalog access granted to other instances |
+| Remote catalogs | Catalog imports from other instances |
+| Public access | Public Stremio and Torznab controls |
 | Storage | Direct page |
-| Security | Secrets / Two-step verification / Active sessions |
+| Security | Statistics / Settings (secrets, two-step verification and sessions) |
 | Logs | Service activity and alerts; optional Debug |
 
 **Sources → History** follows active and past source imports, previews and source-detail updates. Open a specific run, then **Processed records**, to inspect its accepted, ignored and rejected records. There is no global observation browser. **Metadata → History** follows information updates and torrent identification; **Debrid → History** follows cache verification and temporary magnet cleanup. **Logs** contains activity and alerts from all services.
 
-**Sources** groups source setup, imported torrents and import monitoring. **Catalog sharing → Remote catalogs** manages imported catalogues and their simple synchronization intervals. Native source schedules are the sixth settings section in each source editor, after Source fields and Imports. The source list also shows their frequency, next run and continuation state. **Torrent search** searches the local published records, with record details, provenance and history; it does not contact trackers. **Metadata** contains film/series information and local identification, including IMDb matching. Run-scoped processing details belong to Sources; film and series decisions have their own **Metadata → Identification** page.
+**Sources** groups source setup, imported torrents and import monitoring. **Sources → Remote catalogs** manages imported catalogues and their simple synchronization intervals. Native source schedules are the sixth settings section in each source editor, after Source fields and Imports. Source cards show their schedule, latest run and next eligible attempt; active imports omit the next attempt. **Torrent search** searches the local published records, with record details, provenance and history; it does not contact trackers. **Metadata** contains film/series information and local identification, including IMDb matching. Run-scoped processing details belong to Sources; film and series decisions have their own **Metadata → Identification** page.
 
 **Sources → Statistics** and **Remote catalogs** show each source's **Imported torrents**, **Identified**, **Not identified**, **Needs review** and **Awaiting identification** counts. Imported torrents counts distinct currently published source IDs, including separate IDs with the same info hash. The four identification counts sum to that total and use the same freshness rules as Metadata: queued, changed or obsolete matches are pending. Click a number to open Torrent search or **Metadata → Identification** filtered to that source and result. Counts refresh every 15 seconds while the page is open; unavailable counts are reported instead of displaying a false zero.
 
 **Awaiting import completion** links to the current Full import or remote sync, or its latest incomplete attempt. A resumed older import takes priority while queued or running. Its retained non-deleted records may include updates to existing torrents, so this count is kept separate from the imported total. Paused and failed progress remains visible; Preview and older completed/cancelled or superseded attempts do not inflate the current counts.
 
-**Connections** groups Stremio installation, catalog access granted to others and remote catalog synchronization. **Debrid** contains availability and playback-provider configuration with its operation history. **Storage** displays database and local filesystem measurements directly.
+**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage** displays database and local filesystem measurements directly.
 
 Groups with several menu entries can be expanded independently. Pages with only one entry are direct links. Breadcrumbs use the same definitions as the menu, including **Sources / Sources**, and display the page's title and short description once. Histories and Security views use horizontal tabs. Root tab panels omit repeated titles and introductory descriptions; source and operation details retain their specific names.
 

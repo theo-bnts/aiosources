@@ -146,11 +146,12 @@ test('source display names stay consistent while routes and historical identity 
     ).status(),
   ).toBe(204)
   await page.reload()
-  // A retained response keeps its original readable name after source removal.
+  // Explicit source deletion also removes the associated history and results.
   await expect(
     page.getByRole('link', { name: `${source.name} · release-1`, exact: true }),
-  ).toBeVisible()
-  await page.goto('/runs/display-run')
-  await expect(page.locator('.page').first()).toContainText(source.name)
+  ).toHaveCount(0)
+  expect((await page.request.get('/api/runs/display-run')).status()).toBe(404)
+  await page.goto(`/runs?provider=${source.id}`)
+  await expect(page.getByRole('link', { name: 'Renamed Library é', exact: true })).toHaveCount(0)
   expect(server.sourceRequests()).toBe(0)
 })

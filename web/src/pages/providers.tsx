@@ -46,7 +46,7 @@ import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/sou
 import { FormStatus } from '@/components/form-status'
 import { AdvancedImportSettings } from '@/components/advanced-import-settings'
 import { Disclosure } from '@/components/ui/disclosure'
-import { useListViewState } from '@/lib/detail-navigation'
+import { useDetailBackLink, useListViewState } from '@/lib/detail-navigation'
 import {
   ConfirmAction,
   Empty,
@@ -297,7 +297,7 @@ function SourceCard({
         </Button>
         <ConfirmAction
           title={`Delete source “${name}”?`}
-          description="Only the configuration will be deleted. Raw archives and run history are preserved."
+          description="The source, imported torrents, import history and identifications will be permanently deleted. Stored secrets and shared metadata and debrid caches are kept. Access configured only for this source is revoked. This cannot be undone."
           label="Delete source"
           variant="destructive"
           trigger={
@@ -456,6 +456,14 @@ function ProviderForm({
 }) {
   const navigate = useNavigate()
   const { state: navigationState, hash } = useLocation()
+  const returnView = useDetailBackLink({ to: '/providers/settings', label: 'All sources' })!
+  // A source deletion removes its run details too. Return only to surviving
+  // list views, keeping their filters, rather than to an erased detail page.
+  const deletionTarget = /^\/(?:providers(?:\/settings)?|runs|torrents|remotes)(?:\?|$)/.test(
+    returnView.to,
+  )
+    ? returnView.to
+    : '/providers/settings'
   const [json, setJSON] = useState(document?.json ?? initialJSON ?? template?.template ?? '')
   const [savedJSON, setSavedJSON] = useState(document?.json ?? '')
   const [revision, setRevision] = useState(document?.revision ?? '')
@@ -845,7 +853,7 @@ function ProviderForm({
               />
               <ConfirmAction
                 title="Delete this source?"
-                description="The definition will be deleted. Archives and history will remain available."
+                description="The source, imported torrents, import history and identifications will be permanently deleted. Stored secrets and shared metadata and debrid caches are kept. Access configured only for this source is revoked. This cannot be undone."
                 label="Delete"
                 variant="destructive"
                 trigger={
@@ -859,8 +867,9 @@ function ProviderForm({
                     method: 'DELETE',
                     body: JSON.stringify({ revision }),
                   })
+                  markSaved()
+                  navigate(deletionTarget, { replace: true, flushSync: true })
                   await refreshData()
-                  navigate('/providers/settings')
                 }}
               />
             </div>
