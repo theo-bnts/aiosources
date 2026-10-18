@@ -66,6 +66,9 @@ const RemotesPage = lazy(() => import('@/pages/remotes'))
 const PublicAccessPage = lazy(() => import('@/pages/public-access'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
+const StorageSettingsPage = lazy(() =>
+  import('@/pages/health').then((m) => ({ default: m.StorageSettingsPage })),
+)
 const SecurityStatisticsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecurityStatisticsPage })),
 )
@@ -235,7 +238,20 @@ const router = createBrowserRouter(
           />
           <Route path="debrid/history/:id" element={<OperationDetailPage section="debrid" />} />
         </Route>
-        <Route path="health" element={<HealthPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Storage"
+              tabs={[
+                { path: '/health', label: 'Statistics', icon: ChartBarIcon },
+                { path: '/health/settings', label: 'Settings', icon: GearSixIcon },
+              ]}
+            />
+          }
+        >
+          <Route path="health" element={<HealthPage />} />
+          <Route path="health/settings" element={<StorageSettingsPage />} />
+        </Route>
         <Route
           element={
             <WorkspaceLayout

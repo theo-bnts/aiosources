@@ -22,7 +22,7 @@ async function retainDocumentHeight(page: Page) {
 test('horizontal tab bars have no vertical scroll range on desktop or mobile', async ({ page }) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1100 })
-    for (const path of ['/providers', '/metadata', '/debrid', '/addon', '/security']) {
+    for (const path of ['/providers', '/metadata', '/debrid', '/addon', '/security', '/health']) {
       await page.goto(path)
       const tabs = page.getByRole('tablist').first()
       await expect(tabs).toBeVisible()
@@ -58,7 +58,12 @@ test('opening a secondary view directly reveals its active tab without scrolling
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  for (const path of ['/metadata/history', '/security/settings', '/runs/missing']) {
+  for (const path of [
+    '/metadata/history',
+    '/security/settings',
+    '/health/settings',
+    '/runs/missing',
+  ]) {
     await page.goto(path)
     const tabs = page.getByRole('tablist').first()
     await expect(tabs).toBeVisible()

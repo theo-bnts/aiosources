@@ -201,7 +201,7 @@ const navigationGroups = [
       {
         to: '/health',
         label: 'Storage',
-        description: 'PostgreSQL storage and local available space.',
+        description: 'PostgreSQL storage, local available space and data retention.',
         icon: DatabaseIcon,
       },
       {

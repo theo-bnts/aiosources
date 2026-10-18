@@ -7,13 +7,22 @@ async function proof(page: Page, origin: string) {
   return { 'X-CSRF-Token': session.csrf_token, Origin: origin }
 }
 
-test('Storage is direct, sorted by size and has no backup API or duplicate availability badge', async ({
+test('Storage separates measurements from settings and has no backup API or duplicate availability badge', async ({
   page,
 }) => {
   await page.goto('/health')
   for (const name of ['PostgreSQL database', 'Local available space', 'Where storage is used'])
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  const tabs = page.getByRole('tablist', { name: 'Storage views', exact: true })
+  await expect(tabs).toHaveAttribute('aria-orientation', 'horizontal')
+  await expect(tabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(page.getByRole('heading', { name: 'Data retention', exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Reset all source data', exact: true }),
+  ).toHaveCount(0)
   await expect(page.getByText('Available', { exact: true })).toHaveCount(1)
   const data = await (await page.request.get('/api/system-health')).json()
   expect(data.database.available).toBe(true)

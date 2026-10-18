@@ -5,7 +5,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/health')
+  await page.goto('/health/settings')
   const retention = page
     .locator('section')
     .filter({ has: page.getByRole('heading', { name: 'Data retention', exact: true }) })
@@ -15,8 +15,11 @@ test('Storage saving is the default, edits are explicit and data reset requires 
     retention.getByText('Applies to imports started after saving.', { exact: false }),
   ).toBeVisible()
   const save = retention.getByRole('button', { name: 'Save', exact: true })
-  const reset = retention.getByRole('button', { name: 'Reset all source data', exact: true })
-  const resetStatus = retention.locator('#source-data-reset-status')
+  const maintenance = page.locator('details#maintenance')
+  const reset = maintenance.getByRole('button', { name: 'Reset all source data', exact: true })
+  const resetStatus = maintenance.locator('#source-data-reset-status')
+  await expect(reset).toBeHidden()
+  await maintenance.getByText('Maintenance', { exact: true }).click()
   await expect(save).toBeDisabled()
   await expect(reset).toBeEnabled()
   await mode.selectOption('full')
@@ -28,13 +31,21 @@ test('Storage saving is the default, edits are explicit and data reset requires 
     'aria-describedby',
     'source-data-reset-help source-data-reset-status',
   )
+  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  const unsaved = page.getByRole('alertdialog')
+  await expect(unsaved).toContainText('storage settings')
+  await unsaved.getByRole('button', { name: 'Keep editing', exact: true }).click()
+  await expect(mode).toHaveValue('full')
+  await expect(reset).toBeDisabled()
   await save.click()
   await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
   await expect(reset).toBeEnabled()
   await expect(resetStatus).toHaveText('')
   await page.reload()
   await expect(mode).toHaveValue('full')
-  await retention.getByRole('button', { name: 'Reset all source data', exact: true }).click()
+  await expect(reset).toBeHidden()
+  await maintenance.getByText('Maintenance', { exact: true }).click()
+  await reset.click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText(
     'Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained.',
@@ -45,20 +56,29 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await mode.selectOption('compact')
   await save.click()
   await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
-  await retention.getByRole('button', { name: 'Reset all source data', exact: true }).click()
+  await reset.click()
   await dialog.getByRole('button', { name: 'Reset source data', exact: true }).click()
   await expect(dialog).toBeHidden()
   await expect(mode).toHaveValue('compact')
+  await expect(reset).toBeEnabled()
+  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  await expect(page).toHaveURL(/\/health$/)
   await expect(
-    retention.getByRole('button', { name: 'Reset all source data', exact: true }),
-  ).toBeEnabled()
+    page.getByRole('heading', { name: 'PostgreSQL database', exact: true }),
+  ).toBeVisible()
+  await expect(mode).toHaveCount(0)
+  await expect(reset).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await expect(mode).toHaveValue('compact')
+  await expect(reset).toBeHidden()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
 test('Storage settings report stale edits without silently overwriting another administrator', async ({
   page,
   server,
 }) => {
-  await page.goto('/health')
+  await page.goto('/health/settings#maintenance')
   const mode = page.getByLabel('Stored torrent information', { exact: true })
   await expect(mode).toHaveValue('compact')
   await mode.selectOption('full')
@@ -110,7 +130,7 @@ test.describe('resetting source data with imports in progress', () => {
         (id,provider_id,provider_name,mode,status,trigger,revision,config,started_at)
         VALUES('storage-active','example','Example source','full','running','manual','',
           '{"version":1,"id":"example","adapter":"http_json","enabled":false}',now())`)
-      await page.goto('/health')
+      await page.goto('/health/settings#maintenance')
       const reset = page.getByRole('button', { name: 'Reset all source data', exact: true })
       const status = page.locator('#source-data-reset-status')
       await expect(reset).toBeDisabled()

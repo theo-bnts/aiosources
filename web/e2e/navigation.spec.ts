@@ -146,8 +146,18 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   )
   await navigation.getByRole('link', { name: 'Storage', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  const storageTabs = page.getByRole('tablist', { name: 'Storage views', exact: true })
+  await expect(storageTabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
+  await storageTabs.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Data retention', exact: true })).toBeVisible()
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
+  await expect(
+    page.getByRole('button', { name: 'Reset all source data', exact: true }),
+  ).toBeHidden()
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await navigation.getByRole('link', { name: 'Security', exact: true }).click()

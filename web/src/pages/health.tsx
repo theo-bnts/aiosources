@@ -24,7 +24,6 @@ export function HealthPage() {
   const disk = report && storageStatus(report.disk.available, report.disk.measured_at, stale)
   return (
     <div className="page">
-      <StorageSettingsPanel />
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       {query.isPending ? (
         <Loading label="Loading storage measurements" />
@@ -86,6 +85,14 @@ export function HealthPage() {
           </>
         )
       )}
+    </div>
+  )
+}
+
+export function StorageSettingsPage() {
+  return (
+    <div className="page">
+      <StorageSettingsPanel />
     </div>
   )
 }

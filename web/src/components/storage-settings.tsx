@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -6,11 +7,14 @@ import { ConfirmAction, ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Disclosure } from '@/components/ui/disclosure'
 
 type StorageSettings = { mode: 'compact' | 'full'; revision: number }
 type StorageOverview = { settings: StorageSettings; running: number }
 
 export function StorageSettingsPanel() {
+  const location = useLocation()
+  const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const client = useQueryClient()
   const query = useQuery({
     queryKey: ['storage-settings'],
@@ -67,14 +71,14 @@ export function StorageSettingsPanel() {
   }
 
   return (
-    <section className="section-card">
-      <h2 className="section-title">Data retention</h2>
-      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
-      {query.isPending ? (
-        <Loading label="Loading storage settings" />
-      ) : (
-        settings && (
-          <>
+    <>
+      <section className="section-card">
+        <h2 className="section-title">Data retention</h2>
+        <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+        {query.isPending ? (
+          <Loading label="Loading storage settings" />
+        ) : (
+          settings && (
             <form
               className="space-y-5"
               onSubmit={(event) => {
@@ -134,39 +138,44 @@ export function StorageSettingsPanel() {
                 <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
               </div>
             </form>
-            <div className="border-t border-border pt-5">
-              <ConfirmAction
-                variant="destructive"
-                title="Reset all source data?"
-                label="Reset source data"
-                description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
-                action={reset}
-                trigger={
-                  <Button
-                    variant="destructive"
-                    disabled={Boolean(resetUnavailableReason)}
-                    aria-describedby="source-data-reset-help source-data-reset-status"
-                  >
-                    Reset all source data
-                  </Button>
-                }
-              />
-              <p className="help mt-2" id="source-data-reset-help">
-                Optional: start over to reclaim space used by previously stored source data. Queued
-                and paused imports are removed with their data.
-              </p>
-              <p
-                className={resetUnavailableReason ? 'help mt-2 text-amber-300' : 'sr-only'}
-                id="source-data-reset-status"
-                role="status"
-                aria-live="polite"
-              >
-                {resetUnavailableReason}
-              </p>
-            </div>
-          </>
-        )
-      )}
-    </section>
+          )
+        )}
+      </section>
+      <Disclosure
+        id="maintenance"
+        title="Maintenance"
+        open={maintenanceOpen}
+        onOpenChange={setMaintenanceOpen}
+      >
+        <ConfirmAction
+          variant="destructive"
+          title="Reset all source data?"
+          label="Reset source data"
+          description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
+          action={reset}
+          trigger={
+            <Button
+              variant="destructive"
+              disabled={Boolean(resetUnavailableReason)}
+              aria-describedby="source-data-reset-help source-data-reset-status"
+            >
+              Reset all source data
+            </Button>
+          }
+        />
+        <p className="help" id="source-data-reset-help">
+          Optional: start over to reclaim space used by previously stored source data. Queued and
+          paused imports are removed with their data.
+        </p>
+        <p
+          className={resetUnavailableReason ? 'help text-amber-800 dark:text-amber-300' : 'sr-only'}
+          id="source-data-reset-status"
+          role="status"
+          aria-live="polite"
+        >
+          {resetUnavailableReason}
+        </p>
+      </Disclosure>
+    </>
   )
 }
