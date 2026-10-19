@@ -153,7 +153,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
       .getByRole('form', { name: 'Advanced settings', exact: true })
       .getByRole('button', { name: 'Save', exact: true }),
   ).toBeDisabled()
-  await page.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await retries.fill(String(persisted.settings.max_quota_retries))
   expect((await (await page.request.get('/api/settings/collections')).json()).settings).toEqual(
     persisted.settings,
   )
