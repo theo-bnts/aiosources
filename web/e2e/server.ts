@@ -19,6 +19,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import pg from 'pg'
+import { launchBackend } from './backend-readiness'
 
 const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const databasePrefix = 'ingest_e2e_'
@@ -133,41 +134,6 @@ async function stopProcess(child: ChildProcess) {
     if (!stopped)
       throw new Error('Could not stop the owned browser-test backend; refusing storage cleanup.')
   }
-}
-
-async function ready(child: ChildProcess, origin: string) {
-  await new Promise<void>((resolveReady, reject) => {
-    let output = ''
-    const finish = (error?: Error) => {
-      clearTimeout(timer)
-      child.stdout?.off('data', onData)
-      child.off('exit', onExit)
-      child.off('error', onError)
-      if (error) reject(error)
-      else resolveReady()
-    }
-    const onData = (data: Buffer) => {
-      output = (output + data.toString()).slice(-8192)
-      if (output.includes(`AIOSources ready at ${origin} (version `)) finish()
-    }
-    const onExit = () =>
-      finish(
-        new Error(
-          'The isolated backend exited before readiness. Build the embedded production binary and check the disposable PostgreSQL service.',
-        ),
-      )
-    const onError = () => finish(new Error('Could not launch E2E_BINARY.'))
-    const timer = setTimeout(
-      () => finish(new Error('The isolated backend did not become ready within 45 seconds.')),
-      45_000,
-    )
-    child.stdout?.on('data', onData)
-    child.once('exit', onExit)
-    child.once('error', onError)
-  })
-  // Do not probe any address until this exact owned process confirms its bind.
-  const response = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(5000) })
-  if (!response.ok) throw new Error('The isolated backend failed its readiness check.')
 }
 
 export async function startServer({
@@ -312,46 +278,47 @@ export async function startServer({
     const database = new URL(maintenance)
     database.pathname = `/${name}`
     const sourcePort = await listen(tripwire)
-    const port = await listen(reservation)
-    await closeListener(reservation)
-    const origin = `http://127.0.0.1:${port}`
-    // Deliberately do not inherit deployment credentials, PG*, proxies, HOME or
-    // provider credentials. Neither the binary's cwd nor its state is the repo.
-    child = spawn(
-      binary,
-      [
-        'serve',
-        '--data-dir',
-        state,
-        '--providers',
-        providers,
-        '--bind',
-        `127.0.0.1:${port}`,
-        '--public-url',
-        origin,
-        '--workers',
-        '1',
-      ],
-      {
-        cwd: root,
-        env: {
-          PATH: process.env.PATH || '/usr/bin:/bin',
-          HOME: home,
-          TMPDIR: temporary,
-          TMP: temporary,
-          TEMP: temporary,
-          LANG: 'C.UTF-8',
-          TZ: 'UTC',
-          DATABASE_URL: database.toString(),
-          ADMIN_PASSWORD: password,
+    const { origin } = await launchBackend(async () => {
+      const port = await listen(reservation)
+      await closeListener(reservation)
+      const origin = `http://127.0.0.1:${port}`
+      // Deliberately do not inherit deployment credentials, PG*, proxies, HOME or
+      // provider credentials. Neither the binary's cwd nor its state is the repo.
+      child = spawn(
+        binary,
+        [
+          'serve',
+          '--data-dir',
+          state,
+          '--providers',
+          providers,
+          '--bind',
+          `127.0.0.1:${port}`,
+          '--public-url',
+          origin,
+          '--workers',
+          '1',
+        ],
+        {
+          cwd: root,
+          env: {
+            PATH: process.env.PATH || '/usr/bin:/bin',
+            HOME: home,
+            TMPDIR: temporary,
+            TMP: temporary,
+            TEMP: temporary,
+            LANG: 'C.UTF-8',
+            TZ: 'UTC',
+            DATABASE_URL: database.toString(),
+            ADMIN_PASSWORD: password,
+          },
+          // Startup output is used only for readiness. Never persist or publish logs,
+          // environment, database URLs, cookies or temporary administrator passwords.
+          stdio: ['ignore', 'pipe', 'pipe'],
         },
-        // Startup output is used only for readiness. Never persist or publish logs,
-        // environment, database URLs, cookies or temporary administrator passwords.
-        stdio: ['ignore', 'pipe', 'ignore'],
-      },
-    )
-    await ready(child, origin)
-    child.stdout?.resume()
+      )
+      return { child, origin }
+    })
     return {
       origin,
       databaseURL: database.toString(),
