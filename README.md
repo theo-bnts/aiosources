@@ -82,7 +82,7 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. 
 
 Open **Sources → Settings → Add source**. Use the visual editor or import your own source JSON. Select any required credential through **Secrets**, check the configuration and save.
 
-Enable the source, then use **Run manual import → Preview** to check a sample before publishing records. When it looks right, start an import and choose an automatic update in its **Schedules** section. Saving a definition does not contact the source. Supported connections are Torznab and HTTP/JSON; HTML pages and ordinary RSS feeds need a compatible bridge. See [source setup](docs/CONFIGURATION.md) and [supported connectors](docs/CONNECTORS.md).
+Enable the source, then use **Run manual import → Preview** to check a sample before publishing records. When it looks right, start an import and choose an automatic update in its **Schedules** section. Saving a definition does not contact the source. Connect a Torznab or JSON API, or read a website directly with the **HTML** source template. See [source setup](docs/CONFIGURATION.md), [HTML source setup](docs/HTML_SOURCES.md) and [supported connectors](docs/CONNECTORS.md).
 
 ### 3. Set up identification and playback
 

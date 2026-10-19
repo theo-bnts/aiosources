@@ -64,6 +64,21 @@ export interface Provider {
     items_path: string
     catalog?: boolean
   }
+  html?: {
+    page_selector: string
+    rows_selector: string
+    empty_selector?: string
+    next_selector?: string
+    id: HTMLField
+    fields: Record<string, HTMLField>
+    total?: HTMLField
+    current?: HTMLField
+    details?: {
+      url: HTMLField
+      page_selector: string
+      fields: Record<string, HTMLField>
+    }
+  }
   pagination: {
     type: string
     in?: string
@@ -118,6 +133,17 @@ export interface Provider {
   output: { fields?: string[] }
   schedule: Schedule
   options?: Record<string, unknown>
+}
+
+export interface HTMLField {
+  selector?: string
+  attribute?: string
+  pattern?: string
+  format?: 'text' | 'integer' | 'size' | 'date' | 'url' | 'info_hash' | 'torrent' | ''
+  all?: boolean
+  required?: boolean
+  date_layout?: string
+  timezone?: string
 }
 export interface ProviderDocument {
   provider: Provider

@@ -32,6 +32,7 @@ type Provider struct {
 	PageSize        int            `json:"page_size"`
 	Search          Search         `json:"search"`
 	HTTP            HTTPConfig     `json:"http"`
+	HTML            *HTMLConfig    `json:"html,omitempty"`
 	Pagination      Pagination     `json:"pagination"`
 	Mapping         Mapping        `json:"mapping"`
 	Traversal       *JSONTraversal `json:"traversal,omitempty"`

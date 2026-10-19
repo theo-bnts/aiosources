@@ -22,7 +22,7 @@ This is the field-by-field reference. The [configuration guide](CONFIGURATION.md
 
 | Surface | Reader | Purpose |
 | --- | --- | --- |
-| Application source JSON | `ingest validate`, the source editor, and the source registry | Native Torznab, native HTTP/JSON, or remote Ingest catalogue collection. This is the main schema below. |
+| Application source JSON | `ingest validate`, the source editor, and the source registry | Native Torznab, HTTP/JSON, HTML, or remote Ingest catalogue collection. This is the main schema below. |
 | Standalone Torznab SDK JSON | `torznab.LoadProvider`; `torznab/examples/crawl -provider` | A separate, smaller schema with environment-variable credential references. It is **not** application source JSON. |
 | `compose.yaml` | Docker Compose | Services, volumes, ports, and environment substitution. Compose settings do not become source options. |
 
@@ -70,7 +70,7 @@ All paths in the next sections are relative to one application source document.
 | `version` | integer | Required; no default | Exactly `1`. |
 | `id` | string | Required; no default | Unique safe identifier; becomes `provider_id`. Changing it creates a different source namespace, not a rename or hash merge. Use `name` to change the label shown in the console and Stremio. |
 | `name` | string | Required; no default | Nonblank, at most 200 UTF-8 bytes, no control characters. Display name, not identity. |
-| `adapter` | string | Required; no default | `torznab` or `http_json`. UNIT3D is a template for `http_json`, not another adapter. |
+| `adapter` | string | Required; no default | `torznab`, `http_json` or `html`. UNIT3D is a template for `http_json`, not another adapter. |
 | `url` | string | Required; no default | Absolute HTTP(S) URL with a hostname; no userinfo, fragment, controls, spaces, backslashes, or credential query parameters. Explicit port must be 1–65535. Remote catalogues have stricter rules below. |
 | `enabled` | boolean | Required explicitly | `true` permits collection; `false` retains the definition disabled. A schedule does not override a disabled source. |
 | `auth` | mapping | Optional; `{"type":"none"}` | Authentication configuration; see the complete matrix below. |
@@ -81,7 +81,8 @@ All paths in the next sections are relative to one application source document.
 | `page_size` | integer | Optional; `100` | 1–10000; remote catalogue maximum is 1000. Torznab additionally respects the advertised maximum. Preferred remote page size, not a whole-run limit. |
 | `search` | mapping | Optional; empty query/categories | Torznab search configuration. Native JSON and remote catalogue adapters do not translate it into API filters. |
 | `http` | mapping | Optional; method `GET` | Transport headers and adapter-specific request configuration. |
-| `pagination` | mapping | Optional; adapter-specific defaults | HTTP/JSON pagination. Torznab requires the zero/empty configuration because it negotiates its own offset pagination. |
+| `pagination` | mapping | Optional; adapter-specific defaults | HTTP/JSON or HTML pagination. Torznab requires the zero/empty configuration because it negotiates its own offset pagination. |
+| `html` | mapping | Required for HTML; omitted otherwise | CSS selectors, extraction formats, page checks and optional detail mappings. See [HTML fields](#html-source-definitions). |
 | `mapping` | mapping | Optional; HTTP/JSON ID `/id`, no fields | JSON source identity and retained canonical fields. Torznab owns its RSS mapping. Remote catalogue mappings are fixed. |
 | `traversal` | mapping | Optional; absent disables bounded traversal | Native HTTP/JSON only. An empty object is not a valid traversal: window, totals, and scopes must be supplied. |
 | `output` | mapping | Optional; all normalized fields | Catalogue response projection, not a storage or retention policy. |
@@ -146,8 +147,8 @@ Unused credential references are errors, not alternative fallbacks. Auth and sta
 | `http.secret_headers.<name>` | string | Required value for each entry | Safe secret-reference name. `Cookie` and `Set-Cookie` cannot be placed here; use cookie auth. |
 | `http.query` | string-to-query-value map | Optional/null; empty | Open map of static non-secret query parameters. Applied to Torznab and native JSON; remote catalogue forbids overrides. |
 | `http.query.<name>` | query value | Required value for each entry | Names must be nonempty and control-free. Traversal has stricter names/reservations. Arrays repeat the exact key, including a literal `categories[]` key. |
-| `http.incremental_query` | string-to-query-value map | Optional/null; empty | Ordinary native JSON only, without bounded traversal or remote catalogue mode. Merged over `http.query` for Incremental; Full and Preview keep the base query. Configure API-supported newest-first ordering when using known-page stopping. |
-| `http.incremental_query.<name>` | query value | Required value for each entry | Same value, name, credential and auth-query collision rules as `http.query`. Overrides the same base key; other filters remain inherited. A nonempty map forces the merged query and query page size onto next URLs, including after Resume. |
+| `http.incremental_query` | string-to-query-value map | Optional/null; empty | Ordinary native JSON or HTML, without bounded traversal or remote catalogue mode. Merged over `http.query` for Incremental; Full and Preview keep the base query. Configure source-supported newest-first ordering when using known-page stopping. HTML next links remain authoritative; see [HTML requests](#html-requests-and-pagination). |
+| `http.incremental_query.<name>` | query value | Required value for each entry | Same value, name, credential and auth-query collision rules as `http.query`. Overrides the same base key; other filters remain inherited. In ordinary JSON, a nonempty map forces the merged query and query page size onto next URLs, including after Resume. HTML next links remain authoritative. |
 | `http.body` | JSON-compatible value | Optional/null; no body | Native JSON `POST` only. Query-pagination POST can send an object, array, or scalar; body pagination requires an object or omitted/null body. Maximum encoded request body **1 MiB**, nesting at most 128 levels. Credentials in body data are forbidden. |
 | `http.items_path` | JSON Pointer string | Optional; `""` for native JSON, `/items` for remote catalogue | Native JSON pointer to an array in the response. Empty selects a root array. Torznab requires empty. |
 | `http.catalog` | boolean | Optional; `false` | `true` activates the fixed remote Ingest catalogue protocol on `adapter` = `"http_json"`, not ordinary user-mapped JSON. |
@@ -329,8 +330,8 @@ The manual Start a run form has separate request controls: empty Known pages inh
 
 | Option path | Type | Default | Applies to / dependencies |
 | --- | --- | --- | --- |
-| `options.published_at_unit` | string | Absent: textual dates only | Native Torznab and native JSON, including bounded traversal. Exactly `seconds` or `milliseconds`; empty string is invalid. Numeric publication values and integer strings use that unit, never digit-count inference. Text dates remain accepted. Remote catalogue forbids it. |
-| `options.local_categories` | nonempty sequence of integer-compatible values | Absent: no local filter | Torznab and ordinary native JSON only. Nonnegative signed 64-bit IDs. Use JSON integer number lexemes such as `2000`, or decimal integer strings such as `"2000"`. The loader preserves numbers as `json.Number`, and `Int64` rejects decimal-point/exponent spellings such as `2000.0` or `2e3` even when mathematically integral. Duplicate IDs are harmless. Native HTTP/JSON requires a nonempty `mapping.fields.categories` pointer. Exact normalized-category match; no remote filter or parent expansion. Empty sequence/null is invalid; remove the key to disable. |
+| `options.published_at_unit` | string | Absent: textual dates only | Native Torznab, JSON (including bounded traversal) and HTML. Exactly `seconds` or `milliseconds`; empty string is invalid. Numeric publication values and integer strings use that unit, never digit-count inference. Text dates remain accepted. Remote catalogue forbids it. |
+| `options.local_categories` | nonempty sequence of integer-compatible values | Absent: no local filter | Torznab, ordinary native JSON and HTML. Nonnegative signed 64-bit IDs. Use JSON integer number lexemes such as `2000`, or decimal integer strings such as `"2000"`. The loader preserves numbers as `json.Number`, and `Int64` rejects decimal-point/exponent spellings such as `2000.0` or `2e3` even when mathematically integral. Duplicate IDs are harmless. JSON and HTML require a categories mapping. Exact normalized-category match; no remote filter or parent expansion. Empty sequence/null is invalid; remove the key to disable. |
 | `options.category_scope` | string | `combined` | Torznab only: `combined`, `each`, `advertised`. `combined` uses one search over configured categories. `each` requires categories and searches each distinct configured ID. `advertised` requires no configured categories and visits every advertised parent/child ID; no advertised categories is a runtime error. Positive known_pages stops Incremental separately in each category; with multiple search queries, separately in each query/category pair, including combined categories. Counters and the negotiated category list survive Resume. |
 | `options.search_mode` | string | `search` | Torznab only: `search`, `tvsearch`, `movie`, `music`, or `book`. Requested mode must also be available in the source's capabilities at runtime. |
 | `options.search_queries` | nonempty JSON array of strings | Absent: use `search.query` | Torznab only. Ordered query plan; `""` explicitly requests the unfiltered listing. Rejects null, an empty array, nonstrings and a nonempty `search.query`. Visits all category scopes for each query before advancing to the next. One resumable run uses the ordinary client, pacing and quotas. Overlap is allowed; query unions do not certify global coverage. |
@@ -341,7 +342,7 @@ The manual Start a run form has separate request controls: empty Known pages inh
 | `options.preserve_query_on_next` | boolean | `false` | Ordinary native JSON only when true. Reapplies static query and query-mode page-size parameter to next URLs, with configured values taking precedence. Configured bracket arrays replace numeric indexed aliases. A nonempty `http.incremental_query` implicitly enables this preservation during Incremental, even when this option is false. Omit both for opaque/signed continuations that must remain authoritative. |
 | `options.allow_total_growth` | boolean | `false` | Ordinary native JSON only when true. Requires nonempty total_path. Positive known_pages additionally requires explicit `http.incremental_query` for newest-first Incremental; without it, known_pages must be zero. Full and Preview accept monotonic growth and reject decreases. Incremental accepts increases and decreases, including stale cached counts; all modes checkpoint the latest accepted total. Integer/position/bounds/completion checks and known-page stopping remain enforced; contradictory or premature endings still fail. When false, any total change fails. Keep Full oldest-first for append-at-end feeds. Offset pagination is not a transactional snapshot: removals/reordering can shift page boundaries and new records prepended during Incremental may wait until the next run. |
 
-There are **eleven distinct recognized option names** across the two native adapters: eight Torznab names and five HTTP/JSON names, with `published_at_unit` and `local_categories` shared. Remote catalogues accept no option entries. Bounded traversal permits `published_at_unit`; the three ordinary JSON boolean keys are accepted when explicitly false but cannot enable their behavior, and local_categories cannot be configured.
+There are **eleven distinct recognized option names** across native adapters: eight Torznab names and five HTTP/JSON names, with `published_at_unit` and `local_categories` shared. HTML accepts only those two shared options. Remote catalogues accept no option entries. Bounded traversal permits `published_at_unit`; the three ordinary JSON boolean keys are accepted when explicitly false but cannot enable their behavior, and local_categories cannot be configured.
 
 Publication-date normalization accepts textual RFC 3339/RFC 5322 dates by default. With published_at_unit, integer numeric values and integer strings are also accepted, including zero and negatives. Fractional epochs, overflow, and UTC years outside 1–9999 fail instead of being truncated or inferred. Both input formats normalize to UTC RFC 3339 with available subsecond precision; remote catalogue imports instead preserve the publisher's exact values.
 
@@ -801,6 +802,53 @@ The example API must implement both `year` and `quality` filters, the option end
 ### UNIT3D profile values are not universal defaults
 
 The **UNIT3D** picker expands a normal HTTP/JSON document using `/api/torrents/filter`, `/data`, page start 1, `perPage`, `/meta/current_page`, `/links/next`, `preserve_query_on_next` = `true`, and oldest-first `created_at` ordering. Its initial interval is `3s`, page size 25, and known_pages zero; it is disabled and has no timing expression. These are template values, not loader defaults or guaranteed tracker quotas. Categories are that site's native IDs in `http.query."categories[]"`, not Torznab IDs. Its explicit mapping/output excludes signed download and magnet links. See the [UNIT3D configuration guide](CONFIGURATION.md#unit3d-source-profile).
+
+## HTML source definitions
+
+Use `adapter: "html"`. The [HTML setup guide](HTML_SOURCES.md) explains the visual controls and Preview workflow. The same strict definition, secrets, schedules, retention and publication rules apply.
+
+| Path | Type | Required / default | Meaning |
+| --- | --- | --- | --- |
+| `html.page_selector` | CSS string | Required | Exactly one valid listing container in the document. |
+| `html.rows_selector` | CSS string | Required | Select records relative to that container; at most 10000 per page. |
+| `html.empty_selector` | CSS string | Optional | Document-relative marker proving that zero records are intentional. Without a matching marker, zero rows fail. A marker alongside records also fails. |
+| `html.next_selector` | CSS string | Required for `next`; otherwise optional | Document-relative enabled next links. Their `href` values must resolve to one credential-free, same-origin URL. Identical top/bottom links are allowed. |
+| `html.id` | field object | Required | Stable native identity, at most 2048 bytes. Single text, integer or URL; missing/duplicate page identities fail. |
+| `html.fields` | field-name → field-object map | Required, 1–64 fields | Listing mappings. A title must be available here or in details. Canonical field normalization and retired-counter removal are unchanged. |
+| `html.total` | field object | Optional | Document-relative total count. A configured total must be present, nonnegative and stable. Full also requires unique identities across its pages. |
+| `html.current` | field object | Optional | Document-relative current page or offset; must match the requested position. |
+| `html.details.url` | field object | Required when details configured | Row-relative detail link. Its requests stay on the source origin and reuse its client. |
+| `html.details.page_selector` | CSS string | Required when details configured | Exactly one valid detail container. |
+| `html.details.fields` | field-name → field-object map | Required when details configured, 1–64 fields | Select fields relative to that detail container; fill missing listing values without overwriting present ones. |
+
+### HTML field objects
+
+| Key | Type / default | Meaning |
+| --- | --- | --- |
+| `selector` | CSS string, empty | Relative selector; empty reads the current container itself. |
+| `attribute` | string, empty | Attribute such as `href`, `datetime` or `data-id`; empty reads text. Script, style and template text is excluded. |
+| `pattern` | regexp string, empty | Optional Go regular expression with at most one capture. Use that capture, or the complete match without captures. No match means no value. |
+| `format` | string, `text` | `text`, `integer`, `size`, `date`, `url`, `info_hash` or `torrent`. See conversions below. |
+| `all` | boolean, `false` | Collect all selected values as an array, up to 1000. IDs, titles, sizes, dates, hashes, detail links and pagination checks remain single-valued. |
+| `required` | boolean, `false` | Missing values fail the page. Native ID, final title, configured links and checks are independently required. |
+| `date_layout` | string, empty | For `date` only. Go reference-time layout, at most 256 bytes; otherwise standard publication-date parsing. |
+| `timezone` | string, `UTC` | For `date` only. IANA timezone used by custom layouts without an explicit zone. |
+
+Selectors and patterns are limited to 2048 bytes each. Extracted strings are limited to 64 KiB, and their cumulative mapped text to 16 MiB per listing. A response and its charset-decoded HTML are limited to 16 MiB; the parsed document is limited to 100000 nodes. Unsupported selectors, patterns and formats are rejected before any source request.
+
+`integer` accepts nonnegative integers and conventional grouped thousands. `size` accepts bytes or decimal amounts with B/K/M/G/T/P/E units, including decimal commas. `GB` is decimal, `GiB` is binary; abbreviated units such as `G` are binary. Sizes round once without floating-point precision loss and must fit a signed 64-bit integer. `date` normalizes standard text or explicitly configured Unix units; a custom layout uses its supplied timezone. `url` resolves HTTP(S) links and rejects credential query parameters. `info_hash` normalizes a direct hash or extracts a BitTorrent v1 hash from a magnet, discarding its other parameters. `torrent` is permitted only on `info_hash`: it fetches same-origin torrent metadata, validates bounded bencode, and hashes the exact info bytes. BitTorrent v1/hybrid uses SHA-1; v2-only metainfo uses SHA-256. Announce addresses, passkeys, metainfo bodies and filenames do not become fields.
+
+### HTML requests and pagination
+
+`http.method` supports GET and form POST. POST `http.body` must be an object of scalar/array form values and is encoded as `application/x-www-form-urlencoded`; it is not sent as JSON. Credentials still belong in secret references. `http.query`, `http.incremental_query`, ordinary/secret headers, proxy routing, pacing and quota policies reuse the common client. Detail and torrent-file requests count toward those limits.
+
+`pagination.type` supports `next` (HTML default), `page`, `offset` and `none`. Position parameters default to `page` / `offset`; `in` defaults to `query`, with `body` allowed for numbered form POST. The size parameter has no default, so a fixed website page size is not accidentally overridden. `start` defaults to zero for numbered requests; the template starts pages at one. Next-link mode has a logical first page of one.
+
+In `next`, no next link on a valid nonempty listing proves the configured traversal ended. Numbered pagination without a next selector continues until a confirmed empty page or verified total, never merely a short page. When configured, next links are authoritative GET URLs, including after POST: static query/body filters are not reapplied. Relative links resolve against the final redirected document and its same-origin `<base>` element. Disabled or `aria-disabled="true"` next links are ignored. Managed query authentication is removed from next links and reapplied by the source client; it never enters the checkpoint. Cross-origin links, other credential parameters, conflicting continuations, repeated pages and contradictory totals fail without advancing the cursor.
+
+Details are fetched only when a detail-mapped field is absent from the listing. Intermediate responses receive compact ordinary history entries; only the complete interpreted listing commits primary records and its cursor. A crash, pause or detail error may repeat the current listing/details but cannot skip it or publish a partial Full. No pending HTML, credentials or record payloads are copied into the continuation. Preview budgets count completed data listings, not their auxiliary requests.
+
+HTML rejects JSON mappings, JSON response pointers, `traversal`, Torznab `search` settings and unsupported options. It accepts only `published_at_unit` and `local_categories` options; local categories require a categories mapping. Scripts and embedded resources are never executed or fetched. Automatic interactive login, challenge solving, ordinary RSS and Cardigann definitions are not part of this adapter.
 
 ## Standalone Torznab SDK JSON
 

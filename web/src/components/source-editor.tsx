@@ -19,6 +19,11 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { CodeEditor } from '@/components/code-editor'
 import {
+  HTMLMappingSettings,
+  HTMLPaginationSettings,
+  SourceHTMLCompatibility,
+} from '@/components/source-html-fields'
+import {
   AdvancedSection,
   ArrayField,
   BooleanField,
@@ -63,7 +68,7 @@ const stages = [
     id: 'collection',
     label: 'Imports',
     icon: TimerIcon,
-    description: 'Control request pacing and bounded traversal.',
+    description: 'Control request pacing and collection limits.',
   },
   {
     id: 'schedules',
@@ -93,8 +98,8 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
         <SelectField
           path={['adapter']}
           label="Source type"
-          choices={['http_json', 'torznab']}
-          labels={{ http_json: 'JSON API', torznab: 'Torznab' }}
+          choices={['http_json', 'torznab', 'html']}
+          labels={{ http_json: 'JSON API', torznab: 'Torznab', html: 'HTML website' }}
         />
         <BooleanField
           path={['enabled']}
@@ -103,6 +108,7 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
           help="Allows manual and scheduled runs. Saving does not start collection."
         />
       </FieldGrid>
+      <SourceHTMLCompatibility />
       <AdvancedSection title="Definition format">
         <JSONField
           path={['version']}
@@ -243,6 +249,7 @@ function AuthenticationSettings() {
 function ConnectionSettings() {
   const { document } = useSourceEditor()
   const torznab = document.get('adapter') === 'torznab'
+  const html = document.get('adapter') === 'html'
   return (
     <>
       <FieldSection
@@ -252,7 +259,9 @@ function ConnectionSettings() {
         <TextField
           path={['url']}
           label="Source URL"
-          placeholder="https://archive.example/api/items"
+          placeholder={
+            html ? 'https://archive.example/catalog' : 'https://archive.example/api/items'
+          }
         />
         {!torznab && (
           <SelectField
@@ -284,8 +293,12 @@ function ConnectionSettings() {
           {document.getIn(['http', 'method']) === 'POST' ? (
             <JSONField
               path={['http', 'body']}
-              label="Request body · JSON"
-              help="Optional POST body. Leave empty to omit. Arbitrary JSON and numeric precision are preserved."
+              label={html ? 'Form values · JSON object' : 'Request body · JSON'}
+              help={
+                html
+                  ? 'Form field names and values, for example {"search": "", "sort": "newest"}. Sent as an HTML form, not JSON.'
+                  : 'Optional POST body. Leave empty to omit. Arbitrary JSON and numeric precision are preserved.'
+              }
               multiline
             />
           ) : (
@@ -301,18 +314,18 @@ function ConnectionSettings() {
         </FieldSection>
       )}
       <AdvancedSection
-        title="Headers & search"
+        title={html ? 'Headers' : 'Headers & search'}
         configuredPaths={[
           ['http', 'headers'],
           ['http', 'secret_headers'],
-          ...(!torznab ? [['search']] : []),
+          ...(!torznab && !html ? [['search']] : []),
         ]}
         description="Ordinary headers contain non-secret values. Secret headers map a header name to a vault reference."
       >
         <MapField path={['http', 'headers']} label="HTTP headers" strings />
         <MapField path={['http', 'secret_headers']} label="Secret header references" strings />
-        {!torznab && <TextField path={['search', 'query']} label="Search query" />}
-        {!torznab && (
+        {!torznab && !html && <TextField path={['search', 'query']} label="Search query" />}
+        {!torznab && !html && (
           <ArrayField path={['search', 'categories']} label="Categories" initial={0}>
             {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
           </ArrayField>
@@ -362,32 +375,35 @@ function ConnectionSettings() {
           </ArrayField>
         </FieldSection>
       )}
-      <AdvancedSection title="Adapter compatibility">
-        {torznab && (
-          <SelectField
-            path={['http', 'method']}
-            label="HTTP method"
-            choices={['GET', 'POST']}
-            fallback="Default · GET"
+      {!html && (
+        <AdvancedSection title="Adapter compatibility">
+          {torznab && (
+            <SelectField
+              path={['http', 'method']}
+              label="HTTP method"
+              choices={['GET', 'POST']}
+              fallback="Default · GET"
+            />
+          )}
+          <BooleanField
+            path={['http', 'catalog']}
+            label="Normalized catalog"
+            help="Enable only for a compatible catalog endpoint."
           />
-        )}
-        <BooleanField
-          path={['http', 'catalog']}
-          label="Normalized catalog"
-          help="Enable only for a compatible catalog endpoint."
-        />
-        {torznab && <MapField path={['http', 'query']} label="Base query · Full and all modes" />}
-        {torznab && (
-          <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
-        )}
-        {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
-      </AdvancedSection>
+          {torznab && <MapField path={['http', 'query']} label="Base query · Full and all modes" />}
+          {torznab && (
+            <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
+          )}
+          {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
+        </AdvancedSection>
+      )}
     </>
   )
 }
 
 function PaginationSettings() {
   const { document } = useSourceEditor()
+  if (document.get('adapter') === 'html') return <HTMLPaginationSettings />
   const torznab = document.get('adapter') === 'torznab'
   const strategy = document.getIn(['pagination', 'type']) || 'none'
   const parameters = [
@@ -540,79 +556,86 @@ function PaginationSettings() {
 function MappingSettings() {
   const { document } = useSourceEditor()
   const torznab = document.get('adapter') === 'torznab'
+  const html = document.get('adapter') === 'html'
   const Selection = torznab ? AdvancedSection : FieldSection
   return (
     <>
-      {torznab && (
-        <AdvancedSection
-          title="Native identity"
-          configuredPaths={[
-            ['options', 'id_source'],
-            ['options', 'id_pattern'],
-          ]}
-        >
-          <FieldGrid>
-            <SelectField
-              path={['options', 'id_source']}
-              label="Native ID from"
-              choices={['guid', 'link']}
-              fallback="RSS identifier (default)"
-              labels={{ guid: 'RSS identifier', link: 'Item link' }}
-              help="Choose the field containing the source’s stable item identifier."
+      {html ? (
+        <HTMLMappingSettings />
+      ) : (
+        <>
+          {torznab && (
+            <AdvancedSection
+              title="Native identity"
+              configuredPaths={[
+                ['options', 'id_source'],
+                ['options', 'id_pattern'],
+              ]}
+            >
+              <FieldGrid>
+                <SelectField
+                  path={['options', 'id_source']}
+                  label="Native ID from"
+                  choices={['guid', 'link']}
+                  fallback="RSS identifier (default)"
+                  labels={{ guid: 'RSS identifier', link: 'Item link' }}
+                  help="Choose the field containing the source’s stable item identifier."
+                />
+                <TextField
+                  path={['options', 'id_pattern']}
+                  label="Native ID pattern"
+                  placeholder="/items/([0-9]+)"
+                  help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
+                />
+              </FieldGrid>
+            </AdvancedSection>
+          )}
+          {torznab && (
+            <p className="notice">
+              Torznab reads torrent fields from its native RSS format. Custom JSON field settings
+              remain accessible below. These fields do not configure IMDb identification.
+            </p>
+          )}
+          <Selection
+            title="Record selection"
+            description="HTTP JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
+          >
+            <FieldGrid>
+              <TextField
+                path={['http', 'items_path']}
+                label="Items pointer"
+                placeholder="/data"
+                help="Array of records in the response. Empty selects the response root."
+              />
+              <TextField
+                path={['mapping', 'id']}
+                label="Native source ID pointer"
+                placeholder="/id"
+                help="Stable identity within this source, independent from the torrent hash."
+              />
+            </FieldGrid>
+            <MapField
+              path={['mapping', 'fields']}
+              label="Field mappings"
+              strings
+              suggestions={[
+                'title',
+                'info_hash',
+                'size',
+                'published_at',
+                'imdb_id',
+                'tmdb_id',
+                'tvdb_id',
+                'season',
+                'episode',
+                'audiolangs',
+                'categories',
+              ]}
+              help="Map catalog field names to pointers relative to each item, such as title → /name."
             />
-            <TextField
-              path={['options', 'id_pattern']}
-              label="Native ID pattern"
-              placeholder="/items/([0-9]+)"
-              help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
-            />
-          </FieldGrid>
-        </AdvancedSection>
+          </Selection>
+        </>
       )}
-      {torznab && (
-        <p className="notice">
-          Torznab reads torrent fields from its native RSS format. Custom JSON field settings remain
-          accessible below. These fields do not configure IMDb identification.
-        </p>
-      )}
-      <Selection
-        title="Record selection"
-        description="HTTP JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
-      >
-        <FieldGrid>
-          <TextField
-            path={['http', 'items_path']}
-            label="Items pointer"
-            placeholder="/data"
-            help="Array of records in the response. Empty selects the response root."
-          />
-          <TextField
-            path={['mapping', 'id']}
-            label="Native source ID pointer"
-            placeholder="/id"
-            help="Stable identity within this source, independent from the torrent hash."
-          />
-        </FieldGrid>
-        <MapField
-          path={['mapping', 'fields']}
-          label="Field mappings"
-          strings
-          suggestions={[
-            'title',
-            'info_hash',
-            'size',
-            'published_at',
-            'imdb_id',
-            'tmdb_id',
-            'tvdb_id',
-            'season',
-            'episode',
-            'audiolangs',
-            'categories',
-          ]}
-          help="Map catalog field names to pointers relative to each item, such as title → /name."
-        />
-      </Selection>
       <AdvancedSection
         title="Output selection"
         configuredPaths={[['output', 'fields']]}
@@ -991,7 +1014,7 @@ function CollectionSettings() {
           excludeKeys={torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []}
         />
       </AdvancedSection>
-      <TraversalSettings />
+      {document.get('adapter') !== 'html' && <TraversalSettings />}
     </>
   )
 }
@@ -1204,8 +1227,12 @@ export function SourceEditor({
   const summaries = [
     `${text(['adapter'], 'Choose adapter')} · ${document.get('enabled') === true ? 'enabled' : 'disabled'}`,
     `${text(['http', 'method'], 'GET')} · ${endpoint}`,
-    `${text(['pagination', 'type'], 'none')} · ${document.rawIn(['page_size']) || 'default'} records`,
-    `${document.keysIn(['mapping', 'fields']).length} fields · ${text(['http', 'items_path'], 'root items')}`,
+    document.get('adapter') === 'html' && !document.getIn(['pagination', 'size_param'])
+      ? text(['pagination', 'type'], 'next')
+      : `${text(['pagination', 'type'], document.get('adapter') === 'html' ? 'next' : 'none')} · ${document.rawIn(['page_size']) || 'default'} records`,
+    document.get('adapter') === 'html'
+      ? `${document.keysIn(['html', 'fields']).length} listing fields · CSS selectors`
+      : `${document.keysIn(['mapping', 'fields']).length} fields · ${text(['http', 'items_path'], 'root items')}`,
     `${text(['request_interval'], '1s')} between requests`,
     text(['schedule', 'every'], text(['schedule', 'cron'], 'Manual only')),
   ]

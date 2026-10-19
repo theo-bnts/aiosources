@@ -359,7 +359,7 @@ func validateProvider(p model.Provider) []string {
 			}
 		}
 	}
-	add(p.Pagination.Type != "" && p.Pagination.Type != "none" && p.Pagination.Type != "offset" && p.Pagination.Type != "page" && p.Pagination.Type != "cursor", "pagination.type must be none, offset, page or cursor")
+	add(p.Pagination.Type != "" && p.Pagination.Type != "none" && p.Pagination.Type != "offset" && p.Pagination.Type != "page" && p.Pagination.Type != "cursor" && p.Pagination.Type != "next", "pagination.type must be none, offset, page, cursor or next")
 	add(p.Pagination.In != "" && p.Pagination.In != "query" && p.Pagination.In != "body", "pagination.in must be query or body")
 	add(p.Pagination.In == "body" && p.HTTP.Method != "POST", "body pagination requires http.method POST")
 	add(p.Pagination.Start < 0, "pagination.start must be nonnegative")
@@ -493,17 +493,7 @@ func normalizeName(name string) string {
 }
 
 func credentialName(name string) bool {
-	name = normalizeName(name)
-	switch name {
-	case "key", "auth", "authorization", "proxyauthorization", "cookie", "setcookie", "credentials", "credential", "username", "password", "passwd", "pass", "passkey", "secret", "token", "session", "sessionid", "sid", "apikey", "accesskey", "privatekey", "clientsecret", "signature", "sig":
-		return true
-	}
-	for _, suffix := range []string{"token", "password", "passwd", "passkey", "secret", "apikey", "authkey", "auth", "authorization", "authentication", "credential", "credentials", "cookie", "sessionid", "accesskey", "privatekey"} {
-		if strings.HasSuffix(name, suffix) {
-			return true
-		}
-	}
-	return false
+	return model.CredentialParameter(name)
 }
 
 func hasControl(value string) bool {

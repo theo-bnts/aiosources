@@ -35,6 +35,22 @@ func FailureReasonMessage(reason string) string {
 		return "Source pagination position exceeds the supported integer range"
 	case "publication_order_invalid":
 		return "Source publication dates are not in descending order"
+	case "html_listing_missing":
+		return "Source listing was not found. Check the HTML page selector, authentication and Preview"
+	case "html_empty_unconfirmed":
+		return "Source listing has no confirmed results. Check the HTML row and empty-result selectors"
+	case "html_field_invalid":
+		return "Source HTML field is missing or invalid. Check its selector, attribute and format in Preview"
+	case "html_identity_invalid":
+		return "Source HTML record has a missing, duplicate or unsafe native identity"
+	case "html_detail_missing":
+		return "Source HTML detail page or link was not found. Check its selectors and authentication"
+	case "html_torrent_invalid":
+		return "Source did not return valid torrent metadata. Check the torrent-file selector and authentication"
+	case "html_page_limit":
+		return "Source HTML listing exceeds the supported 10000 records per page"
+	case "html_fields_limit":
+		return "Source HTML fields exceed the page text limit. Reduce the page size or field selection"
 	default:
 		return ""
 	}
@@ -47,6 +63,9 @@ var diagnosticCountKeys = [...]string{"expected_total", "actual_total", "expecte
 func SanitizeFailureDiagnostics(data map[string]any) {
 	if reason, ok := data["failure_reason"].(string); !ok || FailureReasonMessage(reason) == "" {
 		delete(data, "failure_reason")
+	}
+	if _, ok := diagnosticField(data); !ok {
+		delete(data, "field_name")
 	}
 	for _, key := range diagnosticCountKeys {
 		if value, ok := diagnosticInteger(data[key]); !ok || key == "http_status" && (value < 100 || value > 599) {
@@ -62,6 +81,9 @@ func CopyFailureDiagnostics(dst, src map[string]any) {
 	if reason, ok := src["failure_reason"].(string); ok && FailureReasonMessage(reason) != "" {
 		dst["failure_reason"] = reason
 	}
+	if name, ok := diagnosticField(src); ok {
+		dst["field_name"] = name
+	}
 	for _, key := range diagnosticCountKeys {
 		if value, ok := diagnosticInteger(src[key]); ok {
 			if key != "http_status" || value >= 100 && value <= 599 {
@@ -69,6 +91,12 @@ func CopyFailureDiagnostics(dst, src map[string]any) {
 			}
 		}
 	}
+}
+
+func diagnosticField(data map[string]any) (string, bool) {
+	reason, _ := data["failure_reason"].(string)
+	name, ok := data["field_name"].(string)
+	return name, ok && safeField.MatchString(name) && (reason == "html_field_invalid" || reason == "html_torrent_invalid" || reason == "html_fields_limit")
 }
 
 func diagnosticInteger(value any) (int64, bool) {

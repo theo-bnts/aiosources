@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Complete JSON reference](JSON_REFERENCE.md) · [Connector compatibility](CONNECTORS.md) · [Deployment settings](SETTINGS.md) · [Remote catalogs](SHARING.md)
 
-Add a source once, check a sample, then let automatic imports keep its catalog up to date. This guide covers the visual editor and your own Torznab or HTTP/JSON definitions. If you are unsure which connection to choose, start with [Source compatibility](CONNECTORS.md).
+Add a source once, check a sample, then let automatic imports keep its catalog up to date. This guide covers the visual editor and your own Torznab, HTTP/JSON or HTML definitions. For websites, see the [HTML setup guide](HTML_SOURCES.md). If you are unsure which connection to choose, start with [Source compatibility](CONNECTORS.md).
 
 ## Configure your sources
 
@@ -20,8 +20,8 @@ The visual editor follows six sections:
 
 1. **Identity:** source name, stable ID, adapter, version and enabled state.
 2. **Connection:** endpoint, authentication references, HTTP method, headers, query parameters, request body and adapter-specific connection settings.
-3. **Pagination:** page strategy, size, position parameters and response pointers.
-4. **Source fields:** native record ID, canonical field mappings and output selectors; separate from film/series identification.
+3. **Pagination:** page strategy, size, position parameters and response checks. HTML sources can follow next-page links.
+4. **Source fields:** native record ID, canonical field mappings and output selectors; separate from film/series identification. HTML sources use CSS selectors and optional detail pages in the same editor.
 5. **Imports:** pacing, timeout, rate-limit policy and options, with advanced bounded traversal and numeric-ID recovery controls.
 6. **Schedules:** automatic timing, timezone and mode, with advanced page budgets and periodic rebuilds.
 

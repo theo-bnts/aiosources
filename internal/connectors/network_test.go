@@ -19,13 +19,17 @@ func TestSourceConnectorsUseTheirAssignedConnection(t *testing.T) {
 		_, _ = w.Write([]byte(`{"items":[]}`))
 	}))
 	defer origin.Close()
-	for _, adapter := range []string{"http_json", "torznab"} {
+	for _, adapter := range []string{"http_json", "torznab", "html"} {
 		t.Run(adapter, func(t *testing.T) {
 			settings := model.NetworkSettings{Revision: 1, Default: model.NetworkDirect, Proxies: []model.NetworkProxy{{ID: "blocked", Name: "Disabled proxy", URL: "socks5://127.0.0.1:1", Enabled: false}}, Overrides: map[string]string{"source:sample": "blocked"}}
 			router := &outbound.Router{Settings: func(context.Context) (model.NetworkSettings, error) { return settings, nil }}
 			provider := model.Provider{Version: 1, ID: "sample", Name: "Sample", Adapter: adapter, URL: origin.URL, Enabled: true, RequestInterval: "1ms", HTTP: model.HTTPConfig{ItemsPath: "/items"}, Mapping: model.Mapping{ID: "/id", Fields: map[string]string{"title": "/title"}}}
 			if adapter == "torznab" {
 				provider.HTTP, provider.Mapping = model.HTTPConfig{}, model.Mapping{}
+			}
+			if adapter == "html" {
+				provider.HTTP, provider.Mapping = model.HTTPConfig{}, model.Mapping{}
+				provider.HTML = htmlProvider(origin.URL).HTML
 			}
 			source, err := New(context.Background(), provider, model.ModePreview, Environment{Network: router})
 			if err != nil {

@@ -22,6 +22,7 @@ func TestJSONReadRecoversHTMLAfterRateLimitWithinExistingAttemptLimit(t *testing
 		{name: "JSON mislabeled as HTML", quota: true, body: `{"items":[]}`, requests: 2},
 		{name: "POST", quota: true, method: http.MethodPost, requests: 2},
 		{name: "XML adapter", quota: true, adapter: "torznab", requests: 2},
+		{name: "HTML adapter", quota: true, adapter: "html", requests: 2},
 		{name: "invalid JSON", quota: true, contentType: "application/json", body: `{invalid`, requests: 2},
 	} {
 		t.Run(test.name, func(t *testing.T) {

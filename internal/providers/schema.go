@@ -69,7 +69,7 @@ func buildJSONSchema() json.RawMessage {
 	set("http.method", "default", "GET")
 	set("http.secret_headers", "additionalProperties", map[string]any{"type": "string", "pattern": identifier.String()})
 	set("http.incremental_query", "description", "Query overrides applied only to Incremental collection. Credential values belong in secret references.")
-	set("pagination.type", "enum", []string{"", "none", "offset", "page", "cursor"})
+	set("pagination.type", "enum", []string{"", "none", "offset", "page", "cursor", "next"})
 	set("pagination.in", "enum", []string{"", "query", "body"})
 	set("pagination.start", "minimum", 0)
 	for _, path := range []string{"http.items_path", "mapping.id", "pagination.next_path", "pagination.total_path", "pagination.current_path"} {
@@ -95,6 +95,26 @@ func buildJSONSchema() json.RawMessage {
 	set("traversal.incremental_order", "enum", []string{"", "id", "published_at"})
 	set("traversal.metadata_after_incremental", "default", false)
 	set("traversal.metadata_after_incremental", "description", "After a successful Incremental, queue Metadata only for newly added native IDs with missing enrich_fields. Requires Metadata support; disabled by default. Existing run snapshots are unchanged.")
+	set("html", "description", "HTML adapter only. CSS selectors read server-rendered pages; no scripts, styles, images or embedded resources are executed or fetched. Empty pages require an explicit empty_selector match.")
+	set("html", "required", []string{"page_selector", "rows_selector", "id", "fields"})
+	for _, path := range []string{"html.page_selector", "html.rows_selector", "html.empty_selector", "html.next_selector"} {
+		set(path, "maxLength", 2048)
+	}
+	set("html.id.format", "enum", []string{"", "text", "integer", "url"})
+	set("html.details.url.format", "enum", []string{"", "text", "url"})
+	for _, path := range []string{"html.total", "html.current"} {
+		set(path+".format", "enum", []string{"", "text", "integer"})
+	}
+	for _, path := range []string{"html.id", "html.total", "html.current", "html.details.url"} {
+		set(path+".all", "const", false)
+	}
+	for _, path := range []string{"html.fields", "html.details.fields"} {
+		set(path, "minProperties", 1)
+		set(path, "maxProperties", model.MaxHTMLFields)
+		properties := field(path)["additionalProperties"].(map[string]any)["properties"].(map[string]any)
+		properties["format"].(map[string]any)["enum"] = []string{"", "text", "integer", "size", "date", "url", "info_hash", "torrent"}
+	}
+	set("html.details", "required", []string{"url", "page_selector", "fields"})
 	data, err := json.Marshal(schema)
 	if err != nil {
 		panic("cannot generate source JSON schema")

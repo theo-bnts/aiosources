@@ -6,8 +6,9 @@
 | --- | --- |
 | A Torznab API | Add a **Torznab** source. |
 | A JSON API listing releases | Add an **HTTP/JSON** source and map its fields. |
+| Server-rendered HTML listing pages | Add an **HTML** source and configure its selectors. See [HTML setup](HTML_SOURCES.md). |
 | A catalog shared by another AIOSources instance | Use **Sources → Remote catalogs**. |
-| HTML pages or an ordinary RSS feed | Configure a compatible Torznab bridge, such as your own Prowlarr instance. Direct HTML/RSS import is not available. |
+| An ordinary RSS feed or a site requiring an unsupported login flow | Use a compatible Torznab bridge, such as your own Prowlarr instance. |
 | Usenet / NZB releases | Not currently supported. |
 
 You supply your own source configuration and credentials. Start with **Preview** and check the returned records before enabling automatic imports. Some APIs expose only recent releases: importing them cannot recover history they do not provide.
@@ -16,9 +17,17 @@ You supply your own source configuration and credentials. Start with **Preview**
 
 AIOSources imports a local catalog before searching, identifying or returning releases. A source must expose stable record identities and a traversal that can finish. A successful keyword search alone does not establish that the whole catalog is accessible.
 
-## HTML sources through a Torznab bridge
+## Direct HTML sources
 
-The existing **Torznab** connector can consume a torrent indexer's Torznab endpoint from a separately configured Prowlarr instance. Prowlarr performs its own HTML parsing and login; AIOSources imports the returned records using its usual scheduling, checkpoints, history and publication rules. This does not add a native HTML or Cardigann engine to AIOSources.
+The **HTML** template reads listings with CSS selectors, follows next links or numbered pages, and can fill missing fields from detail pages. It recognizes human-readable sizes, dates, magnets and torrent-file hashes. The imported records use the same identification, Search, Stremio, Torznab, sharing and retention rules as other sources.
+
+Configure it in the usual source editor, then use **Preview**. Page markers and an explicit empty-result marker prevent an unrecognized sign-in, challenge or changed page from replacing the published catalog. Requests use the configured source authentication, proxy, pacing and quotas. See [HTML setup and supported fields](HTML_SOURCES.md).
+
+The connector reads server-rendered HTML. It does not execute JavaScript or implement Cardigann definitions, automatic form login or challenge solving. A site exposing only its newest pages still exposes only those pages; pagination does not invent older history.
+
+## Sources through a Torznab bridge
+
+The **Torznab** connector can also consume an endpoint from a separately configured Prowlarr instance. The bridge performs its parsing and login; AIOSources imports the returned records using its usual scheduling, checkpoints, history and publication rules. This remains useful for a site whose login or page behavior is unsupported by the direct HTML connector.
 
 1. Configure and test your source in Prowlarr. Copy that individual source's Torznab endpoint, without its API key, into a new **Torznab** source in AIOSources.
 2. Store the bridge API key in **Security → Secrets**. Select **Query parameter**, parameter `apikey`, and that secret in the source editor. Never paste keys into a source URL or exported JSON.
@@ -26,7 +35,7 @@ The existing **Torznab** connector can consume a torrent indexer's Torznab endpo
 4. Keep strict total checking unless the endpoint's behavior requires another explicitly understood strategy. Check that successive offsets return new records, that a finite end is reachable, and that the reported total represents the full intended catalog. Test each category independently when necessary.
 5. Schedule imports only after verifying these properties. A source limited to recent results remains limited through a bridge. A capped advertised total can hide older records; AIOSources cannot infer missing records that the source never exposes. Advisory totals are not evidence of complete coverage.
 
-Use a separate AIOSources source for each bridge endpoint so names, private-source rules, credentials, schedules and import checkpoints remain independent. HTML-only sources without usable info hashes or complete enumeration cannot currently provide the same functionality as a native catalog API.
+Use a separate AIOSources source for each bridge endpoint so names, private-source rules, credentials, schedules and import checkpoints remain independent. Sources without usable info hashes cannot provide debrid cache checks. A bridge does not guarantee complete enumeration.
 
 ## Why CDN definitions are not an automatic source catalog
 

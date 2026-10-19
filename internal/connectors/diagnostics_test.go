@@ -65,6 +65,7 @@ func TestFailureDiagnosticsRejectNonFiniteAndPrivateContext(t *testing.T) {
 		"actual_position": math.NaN(), "offset": 1.5, "page": math.Inf(1), "http_status": 999,
 		"requested_page": "credential-secret", "record_index": json.Number("9007199254740993"),
 		"Authorization": "credential-secret",
+		"field_name":    "credential-secret",
 	}
 	public := make(map[string]any)
 	CopyFailureDiagnostics(public, unsafe)
@@ -79,5 +80,20 @@ func TestFailureDiagnosticsRejectNonFiniteAndPrivateContext(t *testing.T) {
 	want := map[string]any{"failure_reason": "total_changed", "expected_total": int64(9007199254740991), "actual_total": int64(0), "offset": int64(3), "http_status": int64(200)}
 	if !reflect.DeepEqual(public, want) {
 		t.Fatalf("safe boundary diagnostics changed: %+v", public)
+	}
+}
+
+func TestHTMLFieldDiagnosticsExposeOnlyAValidatedFieldName(t *testing.T) {
+	data := map[string]any{"failure_reason": "html_field_invalid", "field_name": "info_hash", "record_index": 3, "field_value": "private-credential"}
+	public := make(map[string]any)
+	CopyFailureDiagnostics(public, data)
+	want := map[string]any{"failure_reason": "html_field_invalid", "field_name": "info_hash", "record_index": int64(3)}
+	if !reflect.DeepEqual(public, want) {
+		t.Fatalf("HTML field diagnostics lost context or retained a value: %+v", public)
+	}
+	data["field_name"] = "https://private.invalid/?token=private-credential"
+	SanitizeFailureDiagnostics(data)
+	if data["field_name"] != nil {
+		t.Fatal("HTML diagnostic field name retained untrusted text")
 	}
 }

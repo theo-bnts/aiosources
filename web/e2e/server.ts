@@ -192,7 +192,24 @@ export async function startServer({
   let closing: Promise<void> | undefined
   const tripwire = createHTTPServer((_request, response) => {
     requests++
-    if (collectionSource) {
+    if (collectionSource && _request.url?.startsWith('/source/html')) {
+      const url = new URL(_request.url, 'http://fixture.invalid')
+      if (url.pathname.startsWith('/source/html/detail/')) {
+        const hash = url.pathname.endsWith('/two') ? 'b'.repeat(40) : 'a'.repeat(40)
+        response
+          .writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+          .end(`<main id="item-details"><span class="hash">${hash}</span></main>`)
+        return
+      }
+      const second = url.searchParams.get('page') === '2'
+      const id = second ? 'two' : 'one'
+      response
+        .writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+        .end(
+          `<main id="catalog"><article data-id="${id}"><span class="title">Example HTML ${id} 2026</span><span class="size">1 KiB</span><time datetime="2026-01-01T00:00:00Z"></time><a class="details" href="/source/html/detail/${id}">Details</a></article></main>` +
+            (second ? '' : '<a rel="next" href="?page=2">Next</a>'),
+        )
+    } else if (collectionSource) {
       response.writeHead(200, { 'Content-Type': 'application/json' }).end(
         JSON.stringify({
           items: [

@@ -38,6 +38,20 @@ func providerDefaults(p model.Provider) model.Provider {
 	if p.HTTP.Method == "" {
 		p.HTTP.Method = http.MethodGet
 	}
+	if p.Adapter == "html" {
+		if p.Pagination.Type == "" {
+			p.Pagination.Type = "next"
+		}
+		if p.Pagination.In == "" {
+			p.Pagination.In = "query"
+		}
+		if p.Pagination.PageParam == "" {
+			p.Pagination.PageParam = "page"
+		}
+		if p.Pagination.OffsetParam == "" {
+			p.Pagination.OffsetParam = "offset"
+		}
+	}
 	if p.Adapter == "http_json" {
 		if p.HTTP.Catalog {
 			if p.HTTP.ItemsPath == "" {
@@ -94,6 +108,8 @@ func New(ctx context.Context, p model.Provider, mode model.RunMode, env Environm
 		return newHTTPJSON(ctx, p, mode, env)
 	case "torznab":
 		return newTorznab(ctx, p, mode, env)
+	case "html":
+		return newHTML(ctx, p, mode, env)
 	default:
 		return nil, fmt.Errorf("%w: unknown adapter", model.ErrInvalid)
 	}
@@ -116,6 +132,8 @@ func Validate(p model.Provider) error {
 		err = validateHTTPJSON(p)
 	case "torznab":
 		err = validateTorznab(p)
+	case "html":
+		err = validateHTML(p)
 	default:
 		err = errors.New("unknown adapter")
 	}
@@ -126,11 +144,14 @@ func Validate(p model.Provider) error {
 }
 
 func validateCommon(p model.Provider) error {
+	if p.HTML != nil && p.Adapter != "html" {
+		return errors.New("html settings require the HTML adapter")
+	}
 	if p.HTTP.Catalog && p.Adapter != "http_json" {
 		return errors.New("catalogue mode requires the http_json adapter")
 	}
-	if len(p.HTTP.IncrementalQuery) > 0 && (p.Adapter != "http_json" || p.HTTP.Catalog || p.Traversal != nil) {
-		return errors.New("http.incremental_query requires ordinary native HTTP JSON pagination")
+	if len(p.HTTP.IncrementalQuery) > 0 && ((p.Adapter != "http_json" && p.Adapter != "html") || p.HTTP.Catalog || p.Traversal != nil) {
+		return errors.New("http.incremental_query requires ordinary native JSON or HTML pagination")
 	}
 	if p.Version != 1 {
 		return errors.New("provider version must be 1")
@@ -341,6 +362,7 @@ func Adapters() []model.AdapterInfo {
 	return []model.AdapterInfo{
 		{Type: "http_json", Name: "HTTP JSON", Description: "Configurable JSON Pointer mappings and explicit pagination.", Template: httpJSONTemplate()},
 		{Type: "torznab", Name: "Torznab", Description: "Discovered capabilities, raw RSS and category-scoped collection.", Template: torznabTemplate()},
+		{Type: "html", Name: "HTML", Description: "Read website listings and optional detail pages with CSS selectors and resumable pagination.", Template: htmlTemplate()},
 		{Type: "http_json", Profile: "unit3d", Name: "UNIT3D", Description: "UNIT3D torrent API with native IDs, site-specific filters and resumable pagination.", Template: unit3dTemplate()},
 	}
 }

@@ -72,6 +72,9 @@ type Response struct {
 	Body       []byte
 	StatusCode int
 	Header     http.Header
+	// Final request address for resolving relative HTML links after redirects.
+	// Internal only: like Header, this must never be copied into diagnostics.
+	URL string
 	// Set only for an invalid HTML response to a JSON GET after HTTP 429.
 	UnexpectedHTML bool
 }

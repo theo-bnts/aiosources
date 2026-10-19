@@ -374,6 +374,9 @@ func (c *Client) do(ctx context.Context, input Request, target *url.URL, client 
 		body, readErr = io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 	}
 	result := Response{Body: body, StatusCode: response.StatusCode, Header: response.Header.Clone()}
+	if response.Request != nil && response.Request.URL != nil {
+		result.URL = response.Request.URL.String()
+	}
 	if len(body) > maxResponseBytes {
 		result.Body = body[:maxResponseBytes]
 		return result, errors.New("response exceeds the size limit")
@@ -594,7 +597,7 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 				retryAt = time.Time{}
 			}
 		}
-		retained := Response{Body: data, StatusCode: response.StatusCode, Header: response.Header.Clone(), UnexpectedHTML: unexpectedHTML}
+		retained := Response{Body: data, StatusCode: response.StatusCode, Header: response.Header.Clone(), URL: request.URL.String(), UnexpectedHTML: unexpectedHTML}
 		if t.publicOrigin == nil {
 			c.last = retained
 		}

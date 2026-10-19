@@ -3,6 +3,7 @@ module github.com/theo-bnts/aiosources
 go 1.26.9
 
 require (
+	github.com/andybalholm/cascadia v1.3.4
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/moodiness/ingest/torznab v0.0.0
