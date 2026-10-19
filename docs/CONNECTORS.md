@@ -1,5 +1,19 @@
 # Source compatibility
 
+## Choose a connection
+
+| What your source provides | What to use |
+| --- | --- |
+| A Torznab API | Add a **Torznab** source. |
+| A JSON API listing releases | Add an **HTTP/JSON** source and map its fields. |
+| A catalog shared by another AIOSources instance | Use **Sources → Remote catalogs**. |
+| HTML pages or an ordinary RSS feed | Configure a compatible Torznab bridge, such as your own Prowlarr instance. Direct HTML/RSS import is not available. |
+| Usenet / NZB releases | Not currently supported. |
+
+You supply your own source configuration and credentials. Start with **Preview** and check the returned records before enabling automatic imports. Some APIs expose only recent releases: importing them cannot recover history they do not provide.
+
+## What an import can collect
+
 AIOSources imports a local catalog before searching, identifying or returning releases. A source must expose stable record identities and a traversal that can finish. A successful keyword search alone does not establish that the whole catalog is accessible.
 
 ## HTML sources through a Torznab bridge

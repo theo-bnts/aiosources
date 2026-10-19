@@ -831,6 +831,7 @@ function ProviderForm({
             <div className="flex flex-wrap justify-end gap-2">
               <CollectDialog
                 providerId={sourceID}
+                remote={document?.provider.http.catalog === true}
                 trigger={
                   <Button
                     disabled={

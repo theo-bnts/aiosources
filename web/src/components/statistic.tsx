@@ -10,6 +10,7 @@ export function Statistic({
   detail,
   className,
   valueClassName,
+  loadingLabel,
 }: {
   label: string
   value: number | string
@@ -18,19 +19,25 @@ export function Statistic({
   detail?: string
   className?: string
   valueClassName?: string
+  loadingLabel?: string
 }) {
   const text = typeof value === 'number' ? number(value) : value
   return (
     <div className={cn('statistic-card', className)}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd
+        aria-busy={Boolean(loadingLabel)}
         className={cn(
           'mt-2 [overflow-wrap:anywhere]',
           size === 'sm' ? 'text-sm' : 'text-xl font-semibold tabular-nums',
           valueClassName,
         )}
       >
-        {to ? (
+        {loadingLabel ? (
+          <span role="status" className="text-sm font-normal text-muted-foreground">
+            {loadingLabel}
+          </span>
+        ) : to ? (
           <Link
             className={cn('data-link', valueClassName)}
             to={to}

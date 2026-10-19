@@ -2,20 +2,21 @@
 
 [Back to README](../README.md) · [Complete JSON reference](JSON_REFERENCE.md) · [Connector compatibility](CONNECTORS.md) · [Deployment settings](SETTINGS.md) · [Remote catalogs](SHARING.md)
 
-Source behavior belongs in strict JSON, not application code. This narrative guide covers native Torznab and HTTP/JSON sources. For every accepted field, its exact default, validation constraints, standalone SDK differences and Compose controls, see the [complete JSON reference](JSON_REFERENCE.md). Existing source YAML requires [offline migration](#migrating-existing-sources); Compose and CI configuration remain YAML.
+Add a source once, check a sample, then let automatic imports keep its catalog up to date. This guide covers the visual editor and your own Torznab or HTTP/JSON definitions. If you are unsure which connection to choose, start with [Source compatibility](CONNECTORS.md).
 
 ## Configure your sources
 
 1. Open **Sources → Settings → Add source**, choose a source template or **Import JSON**, then configure the **Visual stages** or advanced **JSON** editor.
 2. If the API requires a credential, add it directly in **Connection** or select an existing entry from **Secrets**. Only the encrypted reference enters the source definition.
-3. Check the configuration and save the definition. Set `"enabled": true` when ready.
-4. Start a **Preview** to inspect a parsed sample without publishing torrents. New raw response and record bodies are not stored.
+3. Select **Check configuration**, save, then enable the source when ready.
+4. Choose **Run manual import → Preview** to inspect a sample without publishing torrents.
+5. Once the sample looks right, choose **Update** or **Rebuild source catalog** in the same dialog. Use **Schedules** in the source editor for automatic imports.
 
-The panel writes real `.json` files in its configured provider directory. Existing filenames and untouched JSON formatting/numeric lexemes survive normal edits; JSON does not support comments. Saves use revisions to reject conflicting edits. You can also manage the files yourself and run `ingest validate`.
+**Check configuration** verifies the settings, not the source's live response. **Preview** contacts the source and shows what AIOSources can read. Use it to check titles, IDs, sizes and hashes before importing.
 
-An existing source ID cannot be renamed. **Add source** rejects an ID that already exists and cannot adopt that source's revision to overwrite it; choose another ID or open the existing editor.
+### Where each setting belongs
 
-The connected vertical **Visual stages** are a fixed configuration sequence, not a free-form execution graph or an n8n runtime:
+The visual editor follows six sections:
 
 1. **Identity:** source name, stable ID, adapter, version and enabled state.
 2. **Connection:** endpoint, authentication references, HTTP method, headers, query parameters, request body and adapter-specific connection settings.
@@ -25,6 +26,14 @@ The connected vertical **Visual stages** are a fixed configuration sequence, not
 6. **Schedules:** automatic timing, timezone and mode, with advanced page budgets and periodic rebuilds.
 
 The display name labels the source throughout the console and in Stremio results. Rename it without changing the stable ID: routes, playback, filters and collection checkpoints keep that ID. Historical runs and Stremio results retain a saved display name for use after a source definition is removed.
+
+### Advanced editing and configuration reference
+
+Expand advanced sections only when your source needs them. **JSON** edits the same definition as the visual editor; it is useful for importing a configuration or adjusting settings not needed for a typical connection. For all accepted fields, defaults and validation rules, see the [complete JSON reference](JSON_REFERENCE.md). Existing YAML sources require [offline migration](#migrating-existing-sources).
+
+The panel writes real `.json` files in its configured provider directory. Existing filenames and untouched JSON formatting/numeric lexemes survive normal edits; JSON does not support comments. Saves use revisions to reject conflicting edits. You can also manage the files yourself and run `ingest validate`.
+
+An existing source ID cannot be renamed. **Add source** rejects an ID that already exists and cannot adopt that source's revision to overwrite it; choose another ID or open the existing editor.
 
 Use structured map/array controls for query parameters, headers, scopes, partitions, variants and mappings. Expand advanced traversal/ID recovery sections only when supported by the source. **JSON** exposes the complete definition for advanced editing and repairing invalid definitions; both modes edit the same document. Invalid local field drafts block saving and stage/mode switching until corrected or reset. Malformed JSON must be repaired in JSON mode before returning to visual editing.
 
@@ -434,7 +443,7 @@ Setting `schedule.enabled` to `false` retains a schedule without running it. Wit
 
 A scheduled run that reaches its page or duration budget resumes at the next slot, using its original snapshot. A changed configuration or incompatible mode blocks automatic continuation of that paused run; a matching-revision Full from an Incremental `full_every` routine is compatible. Resume or cancel incompatible work explicitly before starting a new traversal. Active runs are never overlapped. Manual, quota and no-progress holds are not automatically released. Cancelled or failed runs are not automatically resumed. Cancelling an individual run does not disable its schedule.
 
-`"known_pages": 0` disables early stopping. A positive boundary applies to Incremental only when the source is reliably ordered newest-first. Torznab `each`/`advertised` and ordered bounded JSON apply this boundary separately to each scope, using only native identities that predate the run; reaching it advances to the next scope. In **Start a run**, an empty **Known pages (X)** inherits this source setting. An explicit integer from 0 to 10000 overrides only the new Incremental run snapshot, not the source JSON. Full and Metadata never use this override.
+`"known_pages": 0` disables early stopping. A positive boundary applies to Incremental only when the source is reliably ordered newest-first. Torznab `each`/`advertised` and ordered bounded JSON apply this boundary separately to each scope, using only native identities that predate the run; reaching it advances to the next scope. In **Run manual import**, an empty **Known pages (X)** inherits this source setting. An explicit integer from 0 to 10000 overrides only the new Incremental run snapshot, not the source JSON. Full and Metadata never use this override.
 
 The consecutive-known-page streak persists across Pause/Resume and page/duration-budget continuations; an unknown page resets it. The boundary remains based on native identities that predate the original run, not the latest attempt. Setting `schedule.max_pages` to `0` means unlimited scheduled pages, not inheritance from the separate manual-run default.
 
@@ -451,18 +460,18 @@ Migration is an explicit **offline** operation, not a startup feature, editor im
    ./bin/ingest validate --providers /private/ingest/providers
    ```
 
-   For the repository's Compose deployment, after separately stopping any other writers/replicas and taking the backup, use the current `ingest` service. If upgrading the former `scraper` deployment, first apply the [deployment naming migration](SETTINGS.md#migrating-the-former-scraper-deployment), keeping the application stopped:
+   For the repository's Compose deployment, after separately stopping any other writers/replicas and taking the backup, use the `aiosources` service. These commands migrate legacy YAML source definitions only; AIOSources V1 instead requires the [fresh deployment described here](SETTINGS.md#first-aiosources-deployment).
 
    ```sh
-   docker compose stop ingest
-   docker compose pull ingest
-   docker compose run --rm --no-deps ingest migrate-sources --providers /data/providers
-   docker compose run --rm --no-deps ingest validate --providers /data/providers
+   docker compose stop aiosources
+   docker compose pull aiosources
+   docker compose run --rm --no-deps aiosources migrate-sources --providers /data/providers
+   docker compose run --rm --no-deps aiosources validate --providers /data/providers
    ```
 
    Do not proceed to restart after a failed command. The migrator itself needs no database, network access or secret resolution. `--providers` otherwise defaults to `PROVIDERS_DIR`, then `providers`.
 4. Review the converted definitions privately, including enabled flags, schedules, mappings and credential references. Keep the generated `<providers-dir>/.source-migration/` directory and its `.manifest.json` journal intact. It stores exact original YAML bytes, including comments/formatting, in a private `0700` directory; journal, originals and new JSON files are written with `0600` permissions. Back up this recovery material separately; external deployment backups must include this recovery material explicitly.
-5. Only after successful migration and validation, restart the new service (for Compose, `docker compose up -d --no-deps ingest`) and review **Sources**. Existing enabled schedules can become eligible after restart; do not enable automation unintentionally.
+5. Only after successful migration and validation, restart the new service (for Compose, `docker compose up -d --no-deps aiosources`) and review **Sources**. Existing enabled schedules can become eligible after restart; do not enable automation unintentionally.
 
 Before any source writes, migration preflights the entire legacy batch and existing active JSON for valid app definitions, duplicate source IDs, unsafe files and case-insensitive target-name collisions. `.example.yml`/`.example.yaml` are skipped, just as `.example.json` is excluded from runtime loading. An unrelated existing `.json` target is never overwritten, even if its contents look equivalent. Fix invalid definitions or collisions offline; do not rename YAML to `.json` without conversion. The batch safety limit is 10,000 legacy sources, and generated documents must meet the app's strict validation and 128 KiB limit.
 

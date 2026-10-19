@@ -1,6 +1,110 @@
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
+test('remote manual imports share the source action dialog and open remote history', async ({
+  page,
+  server,
+}) => {
+  const session = await (await page.request.get('/api/session')).json()
+  const headers = { Origin: server.origin, 'X-CSRF-Token': session.csrf_token }
+  expect(
+    (
+      await page.request.put('/api/secrets/remote-password', {
+        headers,
+        data: { value: 'synthetic-sharing-password', revision: 0 },
+      })
+    ).status(),
+  ).toBe(204)
+  for (const source of [
+    {
+      version: 1,
+      id: 'remote-copy',
+      name: 'Remote copy',
+      adapter: 'http_json',
+      enabled: true,
+      url: 'https://catalog.example/api/catalogs/shared',
+      auth: { type: 'bearer', secret_ref: 'remote-password' },
+      http: { catalog: true, method: 'GET', items_path: '/items' },
+      pagination: {
+        type: 'cursor',
+        in: 'query',
+        cursor_param: 'cursor',
+        size_param: 'limit',
+        next_path: '/next_cursor',
+        start: 0,
+      },
+      mapping: { id: '/id', fields: {} },
+      catalog_sync: { enabled: false, interval_minutes: 60 },
+    },
+    {
+      version: 1,
+      id: 'native',
+      name: 'Native source',
+      adapter: 'http_json',
+      enabled: true,
+      url: server.sourceURL,
+    },
+  ])
+    expect(
+      (
+        await page.request.put(`/api/providers/${source.id}`, {
+          headers,
+          data: { json: JSON.stringify(source), revision: '' },
+        })
+      ).status(),
+    ).toBe(200)
+
+  const requests: unknown[] = []
+  // Inspect only the submitted action; do not contact a remote catalog or enqueue work.
+  await page.route('**/api/runs', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    requests.push(route.request().postDataJSON())
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'remote-action', remote_catalog: true }),
+    })
+  })
+  for (const mode of ['incremental', 'full']) {
+    if (mode === 'full') await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/remotes/settings')
+    const card = page.getByRole('region', { name: 'Remote catalog Remote copy', exact: true })
+    await expect(card.getByRole('button', { name: 'Full resync', exact: true })).toHaveCount(0)
+    await card.getByRole('button', { name: 'Run manual import', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Run manual import', exact: true })
+    const catalog = dialog.getByLabel('Remote catalog', { exact: true })
+    await expect(catalog).toHaveValue('remote-copy')
+    await expect(catalog.getByRole('option')).toHaveText(['Select a remote catalog', 'Remote copy'])
+    const action = dialog.getByLabel('Action', { exact: true })
+    await expect(action).toHaveValue('incremental')
+    await expect(action.getByRole('option')).toHaveText(['Preview', 'Sync changes', 'Full resync'])
+    await action.selectOption(mode)
+    await dialog.getByText('Advanced import settings', { exact: true }).click()
+    await expect(dialog.getByLabel('Known pages (X)', { exact: true })).toHaveCount(0)
+    await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('0')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
+    await expect(page).toHaveURL(/\/remotes\/history\/remote-action$/)
+    expect(requests.at(-1)).toEqual({ provider_id: 'remote-copy', mode, max_pages: 0 })
+  }
+  await page.goto('/providers/settings')
+  await page
+    .getByRole('region', { name: 'Source Native source', exact: true })
+    .getByRole('button', { name: 'Run manual import', exact: true })
+    .click()
+  const dialog = page.getByRole('dialog', { name: 'Run manual import', exact: true })
+  await expect(dialog.getByLabel('Source', { exact: true }).getByRole('option')).toHaveText([
+    'Select a source',
+    'Native source',
+  ])
+  await expect(dialog.getByLabel('Action', { exact: true }).getByRole('option')).toHaveText([
+    'Preview',
+    'Update',
+    'Rebuild source catalog',
+    'Fetch source details',
+  ])
+})
+
 // Exercise saved records through the real administration API and isolated database.
 test.describe('remote catalog history and ownership', () => {
   test.use({ collectionSource: true })

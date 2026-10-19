@@ -1,10 +1,24 @@
-# Operations
+# Using and maintaining your instance
 
 [Back to README](../README.md) · [Source configuration](CONFIGURATION.md) · [Restarts and temporary failures](RESTART_SAFETY.md)
 
-Understand what gets published, inspect changes and monitor the installation without discarding its history.
+Use this guide to review results, follow imports and understand storage. Advanced recovery and publication details follow the everyday controls.
 
-### Identification review and Stremio requests
+## Find the right page
+
+| I want to… | Open |
+| --- | --- |
+| Find a film or series and compare versions | **Search** |
+| Find a particular imported torrent or hash | **Sources → Torrent search** |
+| Correct an uncertain film or series match | **Metadata → Identification** |
+| Follow a source import | **Sources → History**, then open its run |
+| Follow a shared catalog import | **Sources → Remote catalogs → History** |
+| See what Stremio received | **Connections → Stremio → History** |
+| Follow download preparation | **Debrid → History** |
+| Explain a failed operation | **Administration → Logs** |
+| Find what uses disk space | **Administration → Storage → Statistics** |
+
+## Identification review and Stremio requests
 
 **Metadata → Identification** lists imported torrents and their current decisions. Its main search accepts the same title fragments, source IDs, info hashes and punctuation variants as **Torrent search**. Open **Review** to search the downloaded film and series information by partial title or IMDb/TMDB/TVDB identifier, choose an entry, then confirm. Optional episode correction is folded separately. Reviews apply to one source occurrence and leave imported fields untouched. Source identity evidence (title, hash, identifiers and numbering) is fenced separately from ancillary fields; changed evidence requires another review, while ordinary metadata updates and ancillary changes retain the choice. Concurrent source, work or review changes reject the write. **Use automatic matching** removes the manual choice and queues normal identification. Resetting matches or metadata retains reviews; an unavailable reviewed work cannot be published until its information becomes available again. Reviews are included in database backups.
 
@@ -26,10 +40,10 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 | Search | Clean film and series titles, source versions and downloads |
 | Stremio | Statistics / Settings / History |
 | Torznab | Saved endpoint access and filters |
-| Shared catalogs | Catalog access granted to other instances |
-| Remote catalogs | Catalog imports from other instances |
+| Shared catalogs | Statistics / Settings for access granted to other instances |
+| Remote catalogs | Statistics / Settings / History for imported catalogs |
 | Public access | Public Stremio and Torznab controls |
-| Storage | Direct page |
+| Storage | Statistics / Settings (data retention and maintenance) |
 | Security | Statistics / Settings (secrets, two-step verification and sessions) |
 | Logs | Service activity and alerts; optional Debug |
 
@@ -41,7 +55,7 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 
 **Awaiting import completion** links to the current Full import or remote sync, or its latest incomplete attempt. A resumed older import takes priority while queued or running. Its retained non-deleted records may include updates to existing torrents, so this count is kept separate from the imported total. Paused and failed progress remains visible; Preview and older completed/cancelled or superseded attempts do not inflate the current counts.
 
-**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage** displays database and local filesystem measurements directly.
+**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage → Statistics** displays database and local filesystem measurements; **Settings** contains data retention and maintenance.
 
 Groups with several menu entries can be expanded independently. Pages with only one entry are direct links. Breadcrumbs use the same definitions as the menu, including **Sources / Sources**, and display the page's title and short description once. Histories and Security views use horizontal tabs. Root tab panels omit repeated titles and introductory descriptions; source and operation details retain their specific names.
 
@@ -90,7 +104,7 @@ In **Metadata**, click **Identified torrents**, **Needs review**, **Not identifi
 
 Open a specific run in **Sources → History**, then **Processed records**, for advanced diagnostics. Processing errors, ignored records, enrichment and accepted records are counted and searched only within that run. Literal case-insensitive fragments use the search index; only the selected page resolves archive references. `GET /api/raw` requires a `run` parameter and rejects global scans. Old `/raw?run=…` bookmarks redirect to the corresponding run; unscoped bookmarks redirect to History. Retained archives and unavailable payloads remain distinguishable; diagnostic content expires after seven days.
 
-**Sources** stores strict JSON and offers six **Visual stages** plus advanced **JSON** editing. The final stage configures automatic imports; remote catalogs use their separate basic interval in **Catalog sharing**. **Import JSON** changes only the draft, and **Export JSON** downloads that draft; neither publishes a source or starts collection. **Check configuration** and **Save** make no source HTTP request and start no run. Fix invalid local field/JSON drafts before saving or switching stages. Revision conflicts preserve local edits for comparison and explicit reconciliation; see the [configuration workflow](CONFIGURATION.md#configure-your-sources). Existing YAML definitions require [offline migration](CONFIGURATION.md#migrating-existing-sources), which leaves historical run snapshots and checkpoints unchanged.
+**Sources** stores strict JSON and offers six **Visual stages** plus advanced **JSON** editing. The final stage configures automatic imports; remote catalogs use their separate basic interval in **Sources → Remote catalogs → Settings**. **Import JSON** changes only the draft, and **Export JSON** downloads that draft; neither publishes a source or starts collection. **Check configuration** and **Save** make no source HTTP request and start no run. Fix invalid local field/JSON drafts before saving or switching stages. Revision conflicts preserve local edits for comparison and explicit reconciliation; see the [configuration workflow](CONFIGURATION.md#configure-your-sources). Existing YAML definitions require [offline migration](CONFIGURATION.md#migrating-existing-sources), which leaves historical run snapshots and checkpoints unchanged.
 
 - **Preview:** uses a fixed default of three complete nonempty pages, adjustable for an individual launch; stores a parsed sample without publishing torrents or retaining raw response/record bodies.
 - **Incremental:** discovers newest native identities and merges valid records into the published dataset as pages commit. For ordered bounded JSON sources, each selected scope stops after X consecutive pages entirely known from collections completed before run creation. Remote catalogues keep their existing atomic synchronization and checkpoint semantics.

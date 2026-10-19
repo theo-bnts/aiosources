@@ -1,5 +1,22 @@
 # Public instances
 
+Use an existing public instance to connect your apps, or enable a visitor page on your own instance. Public access is optional; private connections and administration remain separate.
+
+## Use a public instance
+
+1. Open the instance address supplied by its administrator. No administrator account is needed.
+2. Choose **Connections → Stremio**, enter your personal AllDebrid or TorBox key (at least one is required), then create your installation link.
+3. Adjust optional **Filters** and install the generated link in Stremio or AIOStreams. When AIOSources handles playback, leave **Service Wrap** and **Reconfigure Service** disabled for this addon in AIOStreams.
+4. Keep the link private. It contains your encrypted configuration and grants access using your account.
+
+If the administrator offers **Torznab**, choose that page instead to create a connection for a compatible client. Torznab does not accept debrid keys or return ready video links; your download client handles downloading.
+
+When permitted by the administrator, **Advanced** accepts your personal announce URLs for private sources. Leave them empty for cached-only private-source access. Never use someone else's account credentials.
+
+AIOSources does not save your submitted keys or announces. It does retain media-request history and safe diagnostics for seven days. You must trust the host processing your keys, and an encrypted installation link is still a credential. The sections below explain these boundaries.
+
+## Enable public access on your instance
+
 Public access is optional and disabled by default. An administrator can enable it in **Connections → Public access** after setting `PUBLIC_URL` to the instance's external HTTPS origin. Literal loopback HTTP addresses are accepted for local testing.
 
 When enabled, the homepage provides **Connections → Stremio** and **Torznab**. Stremio visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Public Torznab has a separate administrator opt-in and uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.

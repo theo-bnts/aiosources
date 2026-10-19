@@ -1,8 +1,10 @@
-# Sharing and remote catalogs
+# Share or import a catalog
 
 [Back to README](../README.md) · [Source configuration](CONFIGURATION.md) · [Security policy](../SECURITY.md)
 
-## Publish a read-only catalogue
+Share selected records with another AIOSources instance, or keep a local copy of a catalog shared with you. Each connection has its own access and can be stopped independently.
+
+## Share your catalog
 
 1. Configure a trusted HTTPS reverse proxy and set `PUBLIC_URL` to its exact HTTPS origin. Keep the backend port private or loopback-only. This setting declares the deployment origin; it does **not** terminate TLS. Forwarded headers cannot enable sharing, and an absent/non-HTTPS public origin prevents activation.
 2. Open **Connections → Shared catalogs → Settings → Create share**. Give each recipient their own share. **Filters → Sources** includes all current and future sources by default. Use its multiselect dropdown to restrict a recipient to specific sources, including imported catalogs.
@@ -17,17 +19,24 @@ Download/magnet URL fields and arbitrary nested objects are not exportable. Nati
 
 **Revocation is not remote deletion or DRM.** It stops future access, not copies already downloaded. A recipient can retain or re-share those copies outside this application's controls. “Last completed download” means the server delivered the final page, not that the recipient committed its import.
 
-## Import and synchronize a remote catalogue
+## Import a shared catalog
 
-Open **Sources → Remote catalogs → Settings → Add remote catalog**. Enter the supplied HTTPS URL and use the same **Sharing password** selector as other source credentials: choose an existing encrypted secret or use **Add sharing password** to store a new one. Only the reference is saved in the definition. New connections start **disabled**; enable them with the switch when ready. Existing connections keep their activation choice.
+1. Open **Sources → Remote catalogs → Settings → Add remote catalog**.
+2. Enter the HTTPS URL supplied by the other instance's administrator.
+3. Under **Sharing password**, choose an existing secret or use **Add sharing password** to store the supplied password securely.
+4. Choose the automatic update interval, save, then enable the connection with its switch. New connections start disabled.
+
+For an immediate import, choose **Run manual import**. **Sync changes** is selected by default: the first sync downloads the catalog and later syncs fetch changes. Choose **Full resync** in the same menu when you need a fresh copy. Both keep your current published copy available until the import succeeds.
 
 Use **Statistics** for imported, pending and locally identified records. **History** contains only remote imports, with the same run details, filters and pagination as source history. Native Sources history does not include remote imports. **View imported data** opens Torrent search filtered to the connection; native source cards offer the same action. **Delete** removes the connection, its local torrent copy, saved progress, history and local identifications. Active imports must finish or pause first. Secrets, shared metadata and debrid caches are retained.
 
 Only authorized published torrent fields and their provenance are imported. TMDB information, remote matching decisions, manual reviews, debrid caches, secrets, announce URLs, source definitions and remote history are not transferred. Identification runs against your own local metadata and can be reviewed independently.
 
+## Advanced synchronization behavior
+
 The editor writes ordinary strict source JSON with `"adapter": "http_json"` and `"catalog": true` inside `http`; it does not introduce another adapter or configuration store. The fixed versioned envelope, provenance identity, field policy and cursor mapping are validated rather than user-remapped. An endpoint cannot contain credentials, query parameters or a fragment. The private definition remains compatible with JSON import/export and existing source-editor bookmarks; importing a definition is not importing catalogue records. Remote connections have their own page under Sources rather than appearing in the native source list. Source revisions protect concurrent edits, and existing runs keep their immutable source snapshot. See the [configuration guide](CONFIGURATION.md) and [JSON reference](JSON_REFERENCE.md); legacy YAML definitions require [offline migration](CONFIGURATION.md#migrating-existing-sources).
 
-New remote connections default to **automatic synchronization every 60 minutes**, ready to start after the connection is enabled. The connection editor contains only **Automatic synchronization** and a whole-minute interval from 1 to 525600. Connection activation and synchronization activation are separate controls. Remote connections do not appear in native source scheduling and do not use Cron, known-page boundaries or periodic Full reconciliation. Validating or saving makes no remote HTTP request and does not start a manual sync; an enabled interval waits until its next due time. **Run manual import** and **Full resync** use the same durable import engine as native sources. Outcomes appear in Logs and the dedicated remote catalog history.
+New remote connections default to **automatic synchronization every 60 minutes**, ready to start after the connection is enabled. The connection editor contains only **Automatic synchronization** and a whole-minute interval from 1 to 525600. Connection activation and synchronization activation are separate controls. Remote connections do not appear in native source scheduling and do not use Cron, known-page boundaries or periodic Full reconciliation. Validating or saving makes no remote HTTP request and does not start a manual sync; an enabled interval waits until its next due time. **Run manual import** opens the same action dialog as native sources, with **Sync changes** selected by default and **Full resync** available for downloading a fresh snapshot. Both use the durable import engine and preserve the current published copy until completion. Outcomes appear in Logs and the dedicated remote catalog history.
 
 Existing remote definitions retain their activation choice: manual connections stay manual, disabled synchronization stays disabled, and elapsed intervals convert to whole minutes rounded up. Legacy Cron converts to a fixed interval between its first two occurrences after a fixed reference date; daily and weekly frequencies are preserved, while irregular calendar rules become a representative interval. Review the displayed interval before saving. Saving the remote form writes `catalog_sync` and removes the legacy `schedule` block. The database upgrades remote timing clocks once; native deadlines, published copies, checkpoints and immutable run snapshots remain unchanged. An existing budget-paused scheduled Full can finish with its saved cursor and budget under the converted interval. Explicit holds and changed source revisions still require manual action.
 

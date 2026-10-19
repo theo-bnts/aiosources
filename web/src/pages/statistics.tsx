@@ -28,7 +28,7 @@ export function SourceStatisticsPage() {
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const items = (providers.data?.items ?? []).filter((source) => !source.remote_catalog)
-  const counts = useSourceTorrentStats(items.length > 0)
+  const counts = useSourceTorrentStats(Boolean(providers.data))
   const visible = items.filter(
     (source) =>
       sourceMatches(filters.query, source.name, source.id, source.adapter) &&
@@ -58,11 +58,13 @@ export function SourceStatisticsPage() {
           <Statistic
             label="Imported torrents"
             value={counts.totals ? counts.totals.imported : 'Not available'}
+            loadingLabel={counts.isPending && !providers.isError ? 'Loading counts…' : undefined}
             to="/torrents"
           />
           <Statistic
             label="Awaiting import completion"
             value={counts.totals ? counts.totals.awaiting_import : 'Not available'}
+            loadingLabel={counts.isPending && !providers.isError ? 'Loading counts…' : undefined}
             to="/runs"
           />
           <Statistic

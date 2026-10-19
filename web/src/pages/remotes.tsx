@@ -5,7 +5,7 @@ import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   PlayIcon,
   PlusIcon,
@@ -16,13 +16,14 @@ import {
 } from '@phosphor-icons/react'
 import { api, ApiError, ConnectionError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type { RemoteCatalog } from '@/lib/catalog-types'
-import type { Items, ProviderDocument, Run, Validation } from '@/lib/types'
+import type { Items, ProviderDocument, Validation } from '@/lib/types'
 import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/lib/remote-config'
 import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { FormStatus } from '@/components/form-status'
+import { CollectDialog } from '@/components/collect-dialog'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,10 +96,12 @@ export function RemoteStatisticsPage() {
               <Statistic
                 label="Imported torrents"
                 value={counts.data || !items.length ? totals.imported : 'Not available'}
+                loadingLabel={items.length > 0 && counts.isPending ? 'Loading counts…' : undefined}
               />
               <Statistic
                 label="Awaiting import completion"
                 value={counts.data || !items.length ? totals.awaiting_import : 'Not available'}
+                loadingLabel={items.length > 0 && counts.isPending ? 'Loading counts…' : undefined}
                 to="/remotes/history"
               />
               <Statistic
@@ -151,7 +154,6 @@ export default function RemotesPage() {
   const listState = useListViewState()
   const filters = useSourceFilters()
   const date = useDate()
-  const navigate = useNavigate()
   const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<RemoteCatalog | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
@@ -171,14 +173,6 @@ export default function RemotesPage() {
     returnFocus.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     setEditing(remote)
-  }
-  async function sync(remote: RemoteCatalog, mode: 'incremental' | 'full') {
-    const run = await api<Run>('/runs', {
-      method: 'POST',
-      body: JSON.stringify({ provider_id: remote.id, mode }),
-    })
-    await refreshData()
-    navigate(`/remotes/history/${encodeURIComponent(run.id)}`, { state: listState })
   }
   const toggle = useMutation({ mutationFn: toggleProvider, onSuccess: refreshData })
   return (
@@ -289,39 +283,20 @@ export default function RemotesPage() {
                   </p>
                 )}
                 <div className="toolbar">
-                  <ConfirmAction
-                    title={`Sync “${remote.name || remote.id}” now?`}
-                    description="Connect to this HTTPS catalog using its vault credential. The first sync imports a full snapshot; later syncs request only changes. The current published copy remains unchanged until the run completes."
-                    label="Start sync"
+                  <CollectDialog
+                    providerId={remote.id}
+                    remote
                     trigger={
                       <Button size="sm" disabled={!remote.valid || !remote.enabled || active}>
                         <PlayIcon />
                         Run manual import
                       </Button>
                     }
-                    action={() => sync(remote, 'incremental')}
                   />
                   <Button size="sm" variant="outline" onClick={() => openEditor(remote)}>
                     <PencilSimpleIcon />
                     Edit
                   </Button>
-                  <ConfirmAction
-                    title={`Fully resync “${remote.name || remote.id}”?`}
-                    description="Download a fresh authoritative snapshot instead of using the checkpoint. Only this remote’s local copy is replaced, atomically after success. Local sources are not modified."
-                    label="Start full resync"
-                    variant="warning"
-                    trigger={
-                      <Button
-                        size="sm"
-                        variant="warning"
-                        disabled={!remote.valid || !remote.enabled || active}
-                      >
-                        Full resync
-                      </Button>
-                    }
-                    action={() => sync(remote, 'full')}
-                  />
-
                   <Button size="sm" variant="outline" asChild>
                     <Link
                       to={`/torrents?provider=${encodeURIComponent(remote.id)}`}

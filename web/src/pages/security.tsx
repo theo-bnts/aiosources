@@ -81,11 +81,13 @@ export function SecurityStatisticsPage() {
         <Statistic
           label="Stored secrets"
           value={secrets.data?.items?.length ?? 'Not available'}
+          loadingLabel={secrets.isPending ? 'Loading secrets…' : undefined}
           to="/security/settings#secrets"
         />
         <Statistic
           label="Two-step verification"
           value={status.data ? (status.data.mfa_enabled ? 'Enabled' : 'Disabled') : 'Not available'}
+          loadingLabel={status.isPending ? 'Loading verification…' : undefined}
           valueClassName={
             status.data?.mfa_enabled
               ? 'text-emerald-800 dark:text-emerald-300'
@@ -95,6 +97,7 @@ export function SecurityStatisticsPage() {
         />
         <Statistic
           label="Recovery codes remaining"
+          loadingLabel={status.isPending ? 'Loading recovery codes…' : undefined}
           valueClassName={
             status.data?.mfa_enabled
               ? status.data.recovery_codes_remaining === 0
@@ -114,6 +117,7 @@ export function SecurityStatisticsPage() {
         <Statistic
           label="Active sessions"
           value={sessions.data?.items?.length ?? 'Not available'}
+          loadingLabel={sessions.isPending ? 'Loading sessions…' : undefined}
           to="/security/settings#sessions"
         />
       </dl>

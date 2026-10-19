@@ -25,13 +25,15 @@ import { ErrorNotice, Loading } from './common'
 export function CollectDialog({
   providerId,
   trigger,
+  remote = false,
 }: {
   providerId?: string
   trigger?: ReactNode
+  remote?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [provider, setProvider] = useState(providerId ?? '')
-  const [mode, setMode] = useState<RunMode>('preview')
+  const [mode, setMode] = useState<RunMode>(remote ? 'incremental' : 'preview')
   const [maxPages, setMaxPages] = useState('')
   const [maxDuration, setMaxDuration] = useState('')
   const [knownPages, setKnownPages] = useState('')
@@ -48,7 +50,7 @@ export function CollectDialog({
       api<ProviderDocument>(`/providers/${encodeURIComponent(provider)}`, { signal }),
     enabled: open && Boolean(provider),
   })
-  const metadataSupported = supportsMetadata(definition.data?.provider)
+  const metadataSupported = !remote && supportsMetadata(definition.data?.provider)
   const metadataReady = metadataSupported && !definition.isPending && !definition.isError
   const metadataFollowup =
     metadataReady && definition.data?.provider.traversal?.metadata_after_incremental === true
@@ -64,6 +66,7 @@ export function CollectDialog({
     maxPages !== '' &&
     (!/^\d+$/.test(maxPages) || !Number.isSafeInteger(Number(maxPages)) || Number(maxPages) > 10000)
   const invalidKnownPages =
+    !remote &&
     mode === 'incremental' &&
     knownPages !== '' &&
     (!/^\d+$/.test(knownPages) ||
@@ -80,14 +83,28 @@ export function CollectDialog({
     onSuccess: async (run) => {
       setOpen(false)
       await refreshData()
-      navigate(`/runs/${encodeURIComponent(run.id)}`, { state: returnView })
+      navigate(
+        `${run.remote_catalog ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`,
+        {
+          state: returnView,
+        },
+      )
     },
   })
-  const selected = sources.data?.items?.find((item) => item.id === provider)
+  const items = sources.data?.items?.filter((item) => Boolean(item.remote_catalog) === remote)
+  const selected = items?.find((item) => item.id === provider)
+  const actions = remote
+    ? { preview: 'Preview', incremental: 'Sync changes', full: 'Full resync' }
+    : modeLabels
   const eligible = Boolean(
     selected?.valid &&
     selected.enabled &&
-    !(selected.last_run && ['queued', 'running'].includes(selected.last_run.status)),
+    !(
+      selected.last_run &&
+      (remote ? ['queued', 'running', 'paused'] : ['queued', 'running']).includes(
+        selected.last_run.status,
+      )
+    ),
   )
   return (
     <Dialog
@@ -111,8 +128,8 @@ export function CollectDialog({
         <DialogHeader>
           <DialogTitle>Run manual import</DialogTitle>
           <DialogDescription>
-            Choose what to do with this source. Follow progress and resume interrupted imports in
-            History.
+            Choose what to do with this {remote ? 'remote catalog' : 'source'}. Follow progress and
+            resume interrupted imports in History.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -133,17 +150,19 @@ export function CollectDialog({
                 mode,
                 ...(maxPages === '' ? {} : { max_pages: Number(maxPages) }),
                 ...(maxDuration === '' ? {} : { max_duration_seconds: Number(maxDuration) }),
-                ...(mode === 'incremental' && knownPages !== ''
+                ...(!remote && mode === 'incremental' && knownPages !== ''
                   ? { known_pages: Number(knownPages) }
                   : {}),
               })
           }}
         >
-          {sources.isPending && <Loading label="Loading sources" />}
+          {sources.isPending && (
+            <Loading label={remote ? 'Loading remote catalogs' : 'Loading sources'} />
+          )}
           <ErrorNotice error={sources.error} retry={() => void sources.refetch()} />
           <ErrorNotice error={definition.error} retry={() => void definition.refetch()} />
           <div className="field">
-            <Label htmlFor="collect-provider">Source</Label>
+            <Label htmlFor="collect-provider">{remote ? 'Remote catalog' : 'Source'}</Label>
             <select
               id="collect-provider"
               className="native-select w-full"
@@ -152,8 +171,8 @@ export function CollectDialog({
               onChange={(event) => setProvider(event.target.value)}
               disabled={mutation.isPending}
             >
-              <option value="">Select a source</option>
-              {sources.data?.items?.map((item) => (
+              <option value="">Select a {remote ? 'remote catalog' : 'source'}</option>
+              {items?.map((item) => (
                 <option key={item.id} value={item.id} disabled={!item.valid || !item.enabled}>
                   {item.name || item.id}
                   {!item.valid ? ' · invalid' : !item.enabled ? ' · disabled' : ''}
@@ -161,7 +180,13 @@ export function CollectDialog({
               ))}
             </select>
             {selected && !eligible && (
-              <p className="help">The source must be valid, enabled and have no run in progress.</p>
+              <p className="help">
+                The {remote ? 'remote catalog' : 'source'} must be valid, enabled and have no run in
+                progress.
+                {remote && selected.last_run?.status === 'paused'
+                  ? ' Resume or cancel the paused import in History first.'
+                  : ''}
+              </p>
             )}
           </div>
           <div className="field">
@@ -177,7 +202,7 @@ export function CollectDialog({
                 setMaxPages('')
               }}
             >
-              {Object.entries(modeLabels).map(([value, text]) => (
+              {Object.entries(actions).map(([value, text]) => (
                 <option key={value} value={value} disabled={value === 'metadata' && !metadataReady}>
                   {text}
                 </option>
@@ -187,10 +212,14 @@ export function CollectDialog({
               {mode === 'preview'
                 ? 'Inspect a sample without adding torrents to the catalog.'
                 : mode === 'full'
-                  ? 'Read the whole source and replace its published catalog only after completion. Other sources are preserved.'
+                  ? remote
+                    ? 'Download a fresh snapshot and replace this remote catalog’s local copy only after completion. Other sources are preserved.'
+                    : 'Read the whole source and replace its published catalog only after completion. Other sources are preserved.'
                   : mode === 'metadata'
                     ? 'Fetch missing fields from this source for existing torrents. This does not download TMDB information or identify films and series.'
-                    : 'Import new torrents. The first update automatically starts with a complete import (Full); later updates use Incremental.'}
+                    : remote
+                      ? 'Import changes since the last successful sync. The first sync downloads the complete catalog. Your current copy remains available until completion.'
+                      : 'Import new torrents. The first update automatically starts with a complete import (Full); later updates use Incremental.'}
             </p>
             {mode === 'incremental' && metadataFollowup && (
               <p className="help">
@@ -205,8 +234,10 @@ export function CollectDialog({
                 Checking available actions…
               </p>
             ) : !provider ? (
-              <p className="help">Select a source to see its available actions.</p>
-            ) : !definition.isError && !metadataSupported ? (
+              <p className="help">
+                Select a {remote ? 'remote catalog' : 'source'} to see its available actions.
+              </p>
+            ) : !remote && !definition.isError && !metadataSupported ? (
               <p className="help">
                 Fetching source details is unavailable for this source. It requires native
                 HTTP/JSON, ID recovery and configured missing-metadata fields; remote catalogs are
@@ -223,7 +254,7 @@ export function CollectDialog({
             Imports pause when a limit is reached and can resume from the saved point.
           </p>
           <Disclosure title="Advanced import settings">
-            {mode === 'incremental' && (
+            {!remote && mode === 'incremental' && (
               <div className="field">
                 <Label htmlFor="collect-known-pages">Known pages (X)</Label>
                 <Input
@@ -272,12 +303,12 @@ export function CollectDialog({
                 onChange={(event) => setMaxPages(event.target.value)}
               />
               <p id="collect-budget-help" className="help">
-                Empty = source limit
+                Empty = {remote ? 'remote catalog' : 'source'} limit
                 {defaultPages === undefined
                   ? ''
                   : ` (${defaultPages === 0 ? 'unlimited' : `${defaultPages} pages`})`}
-                . 0 explicitly selects unlimited. Full, Incremental and Metadata pause when their
-                budget is reached, never as a false success.
+                . 0 explicitly selects unlimited. Imports pause when their budget is reached, never
+                as a false success.
               </p>
               {invalidPages && (
                 <p id="collect-budget-error" role="alert" className="text-sm text-destructive">
