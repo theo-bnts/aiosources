@@ -175,10 +175,14 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		return stopReason(ctx, err)
 	}
 	environment := connectors.Environment{Network: m.network, Secrets: resolved, MaxQuotaRetries: &policy.MaxQuotaRetries}
-	environment.KnownIDs = func(ctx context.Context, ids []string) (map[string]bool, error) {
-		return m.db.Known(ctx, run.ProviderID, ids, run.CreatedAt)
-	}
 	var responseErr, boundaryErr error
+	environment.KnownIDs = func(ctx context.Context, ids []string) (map[string]bool, error) {
+		known, err := m.db.Known(ctx, run.ProviderID, ids, run.CreatedAt)
+		if err != nil {
+			boundaryErr = errPersistence
+		}
+		return known, err
+	}
 	var pendingResponse connectors.Response
 	var responseRetryAt time.Time
 	environment.ResponseObserved = func(response connectors.Response, retryAt time.Time) {
@@ -345,7 +349,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 			return m.db.NextRefreshID(ctx, run.ID, after, through)
 		}
 	}
-	if run.Config.Adapter == "http_json" && run.Config.HTTP.Catalog {
+	if run.Config.IsRemoteCatalog() {
 		environment.LocalInstanceID, err = m.db.CatalogInstanceID(ctx)
 		if err != nil {
 			return stopReason(ctx, errPersistence)

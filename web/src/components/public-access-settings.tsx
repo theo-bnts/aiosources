@@ -161,20 +161,6 @@ export function PublicAccessSettings() {
               <Button type="submit" disabled={!dirty || conflict || busy}>
                 {save.isPending ? 'Saving…' : 'Save'}
               </Button>
-              {dirty && (
-                <Button
-                  type="button"
-                  variant="warning"
-                  disabled={busy}
-                  onClick={() => {
-                    setDraft(undefined)
-                    save.reset()
-                    review.reset()
-                  }}
-                >
-                  Discard changes
-                </Button>
-              )}
               {query.data?.enabled && (
                 <Button variant="outline" asChild>
                   <Link to="/public">Open public homepage</Link>

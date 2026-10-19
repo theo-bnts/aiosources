@@ -547,17 +547,19 @@ export function NetworkRoutingPage() {
             <div className="toolbar justify-between">
               <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={save.isPending || !draft}
-                  onClick={() => {
-                    setDraft(null)
-                    save.reset()
-                  }}
-                >
-                  Discard changes
-                </Button>
+                {conflict && (
+                  <Button
+                    type="button"
+                    variant="warning"
+                    disabled={save.isPending}
+                    onClick={() => {
+                      setDraft(null)
+                      save.reset()
+                    }}
+                  >
+                    Discard changes and reload
+                  </Button>
+                )}
                 <Button type="submit" disabled={save.isPending || !dirty || conflict}>
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>

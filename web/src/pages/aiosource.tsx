@@ -254,23 +254,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             Load latest settings
           </Button>
         )}
-        {drafts[form] && (
-          <Button
-            type="button"
-            variant="warning"
-            disabled={save.isPending}
-            onClick={() => {
-              setDrafts((current) => {
-                const next = { ...current }
-                delete next[form]
-                return next
-              })
-              clearFeedback(form)
-            }}
-          >
-            Discard changes
-          </Button>
-        )}
         <FormStatus
           dirty={Boolean(drafts[form])}
           saving={save.isPending && save.variables?.scope === form}

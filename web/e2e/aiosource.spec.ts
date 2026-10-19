@@ -230,7 +230,7 @@ test('private playback saves independently and fields have space below their lab
   await page.getByLabel('Cache validity (minutes)').fill('0')
   await expect(selector).toHaveValue('invalid_announce_url')
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
-  await playback.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await selector.selectOption('')
   await expect(playback.getByRole('alert')).toHaveCount(0)
   await expect(selector).toHaveValue('')
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
@@ -252,7 +252,7 @@ test('private playback saves independently and fields have space below their lab
   const independent = await (await page.request.get('/api/aiosource')).json()
   expect(independent.config.cache_minutes).toBe(1500)
   expect(independent.config.trackers['private-playback'].private).toBe(true)
-  await playback.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await source.getByRole('switch', { name: 'Private source' }).check()
   await expect(source.getByRole('switch', { name: 'Private source' })).toBeChecked()
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
   // The playback draft can save again against the refreshed revision.

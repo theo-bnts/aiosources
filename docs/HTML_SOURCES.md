@@ -51,7 +51,11 @@ For next-link pagination, no matching enabled next link means the valid listing 
 
 For numbered pages, configure the parameter and starting page/offset. Leave the next-link selector empty to continue until a confirmed empty page. A short page alone is not the end. The page-size parameter is optional: many websites have a fixed size and ignore it. Explicit next links are authoritative GET URLs; static query or form values are not reapplied to them.
 
+If a site returns an empty response when no user agent is supplied, configure an identifying `User-Agent` in **Connection → Headers**, then check Preview again.
+
 The empty-result selector must match an actual empty-state marker when no rows exist. Missing rows without that marker are an error. This prevents a changed layout, sign-in page or temporary challenge from being treated as an empty catalog. Optional **Response checks** can also verify the current position and total; configured totals must stay consistent during the run.
+
+For several sections with the same layout, add their paths in **Connection → Additional listings**. The source URL is imported first, followed by the additional paths. Each section has its own pagination and Incremental stopping boundary; they share request pacing, secrets, proxy and source identity. A rebuild publishes only after every section completes.
 
 Complete listing pages are committed with their continuation. Details are part of that same atomic page: an interruption retries the current listing and its details, while earlier committed pages remain saved. **Preview**, **Update**, **Rebuild source catalog**, page budgets, quotas and known-page stopping use the ordinary import behavior. A failed or paused rebuild leaves the previous published catalog available.
 

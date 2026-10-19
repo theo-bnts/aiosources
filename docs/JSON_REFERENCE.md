@@ -70,7 +70,7 @@ All paths in the next sections are relative to one application source document.
 | `version` | integer | Required; no default | Exactly `1`. |
 | `id` | string | Required; no default | Unique safe identifier; becomes `provider_id`. Changing it creates a different source namespace, not a rename or hash merge. Use `name` to change the label shown in the console and Stremio. |
 | `name` | string | Required; no default | Nonblank, at most 200 UTF-8 bytes, no control characters. Display name, not identity. |
-| `adapter` | string | Required; no default | `torznab`, `http_json` or `html`. UNIT3D is a template for `http_json`, not another adapter. |
+| `adapter` | string | Required; no default | `torznab`, `json` or `html`. UNIT3D is a template for `json`, not another adapter. |
 | `url` | string | Required; no default | Absolute HTTP(S) URL with a hostname; no userinfo, fragment, controls, spaces, backslashes, or credential query parameters. Explicit port must be 1–65535. Remote catalogues have stricter rules below. |
 | `enabled` | boolean | Required explicitly | `true` permits collection; `false` retains the definition disabled. A schedule does not override a disabled source. |
 | `auth` | mapping | Optional; `{"type":"none"}` | Authentication configuration; see the complete matrix below. |
@@ -150,8 +150,9 @@ Unused credential references are errors, not alternative fallbacks. Auth and sta
 | `http.incremental_query` | string-to-query-value map | Optional/null; empty | Ordinary native JSON or HTML, without bounded traversal or remote catalogue mode. Merged over `http.query` for Incremental; Full and Preview keep the base query. Configure source-supported newest-first ordering when using known-page stopping. HTML next links remain authoritative; see [HTML requests](#html-requests-and-pagination). |
 | `http.incremental_query.<name>` | query value | Required value for each entry | Same value, name, credential and auth-query collision rules as `http.query`. Overrides the same base key; other filters remain inherited. In ordinary JSON, a nonempty map forces the merged query and query page size onto next URLs, including after Resume. HTML next links remain authoritative. |
 | `http.body` | JSON-compatible value | Optional/null; no body | Native JSON `POST` only. Query-pagination POST can send an object, array, or scalar; body pagination requires an object or omitted/null body. Maximum encoded request body **1 MiB**, nesting at most 128 levels. Credentials in body data are forbidden. |
+| `http.listing_paths` | string array | Optional; omitted | Up to 1000 distinct absolute paths on the source origin, read after `url`. Ordinary JSON or HTML only, without bounded traversal or catalog mode. Each listing uses the same fields and has its own pagination and Incremental known-page boundary. No credentials or fragments. |
 | `http.items_path` | JSON Pointer string | Optional; `""` for native JSON, `/items` for remote catalogue | Native JSON pointer to an array in the response. Empty selects a root array. Torznab requires empty. |
-| `http.catalog` | boolean | Optional; `false` | `true` activates the fixed remote Ingest catalogue protocol on `adapter` = `"http_json"`, not ordinary user-mapped JSON. |
+| `http.catalog` | boolean | Optional; `false` | `true` activates the fixed remote Ingest catalogue protocol on `adapter` = `"json"`, not ordinary user-mapped JSON. |
 
 Header names are unique across both maps ignoring case. `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Trailer`, `Upgrade`, and `Proxy-Connection` are transport-managed and forbidden. Literal credential-bearing headers such as `Authorization`, `Cookie`, and API-token headers are forbidden even if their value looks like a reference. Put the reference in `auth` or `http.secret_headers` instead.
 
@@ -222,7 +223,7 @@ This controls catalogue search and related-occurrence responses, not stored meta
 
 ## Bounded native JSON traversal
 
-`traversal` requires native `adapter` = `"http_json"`, `http.method` = `"GET"`, no body/catalog mode, `pagination.type` = `"page"`, `pagination.in` = `"query"`, and no `next_path`. Page/size parameters receive the normal JSON defaults. The API must expose genuine per-scope totals, not a total clamped to its visible search window.
+`traversal` requires native `adapter` = `"json"`, `http.method` = `"GET"`, no body/catalog mode, `pagination.type` = `"page"`, `pagination.in` = `"query"`, and no `next_path`. Page/size parameters receive the normal JSON defaults. The API must expose genuine per-scope totals, not a total clamped to its visible search window.
 
 | Path | Type | Required / default | Meaning |
 | --- | --- | --- | --- |
@@ -366,7 +367,7 @@ For mapped `metadata.nfoContent`, ordinary text stays a string. Only a string co
 
 ## Remote catalogue specialization
 
-Use the application schema with `adapter` = `"http_json"` and `http.catalog` = `true`:
+Use the application schema with `adapter` = `"json"` and `http.catalog` = `true`:
 
 - URL must be HTTPS, at most 8192 bytes, with no query (including a bare `?`), userinfo, fragment, whitespace, or unsafe host syntax. Redirects and environment HTTP proxies are disabled. Normal certificate/hostname verification is required; private LAN/loopback HTTPS is supported, while prohibited destination addresses are rejected.
 - Auth must be bearer with a vault `secret_ref`. `page_size` is 1–1000, default 100.
@@ -468,7 +469,7 @@ The upstream GUID contract in this example is `release:` followed by a numeric n
   "version": 1,
   "id": "example_json",
   "name": "Example JSON feed",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://indexer.example/api/releases",
   "enabled": false,
   "auth": {
@@ -550,7 +551,7 @@ The upstream GUID contract in this example is `release:` followed by a numeric n
   "version": 1,
   "id": "example_post",
   "name": "Example POST feed",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://indexer.example/api/search",
   "enabled": false,
   "auth": {
@@ -611,7 +612,7 @@ Here `nextCursor` must be an opaque non-URL cursor or a terminator. A one-page A
   "version": 1,
   "id": "example_bounded",
   "name": "Example bounded catalogue",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://indexer.example/api/releases",
   "enabled": false,
   "auth": {
@@ -762,7 +763,7 @@ The example API must implement both `year` and `quality` filters, the option end
   "version": 1,
   "id": "example_remote",
   "name": "Example remote catalogue",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://ingest.example/api/catalogs/11111111-2222-4333-8444-555555555555",
   "enabled": false,
   "auth": {
@@ -985,7 +986,7 @@ The explicit [`compose.build.yaml`](../compose.build.yaml) development override 
 | Root `api_key`, `password`, `cookie`, literal auth values | Rejected unknown/unsafe fields; credentials belong in the vault. | Rejected unknown fields; use auth environment references. |
 | Inline URL apikey | Rejected credential query. | Legacy parsing accepts it; unsafe for stored configuration, use api_key_env instead. |
 | `options.api_path`, `options.advisory_totals`, `options.disable_retries` | Rejected unknown option names. Use options.total_mode for application Torznab advisory totals. | No options mapping; Go-only Config fields are not JSON. |
-| `pagination.type` = `"search"`, `adapter` = `"unit3d"`, `adapter` = `"catalog"` | Rejected; select supported pagination and http_json specialization. | No adapter/pagination schema. |
+| `pagination.type` = `"search"`, `adapter` = `"unit3d"`, `adapter` = `"catalog"` | Rejected; select supported pagination and JSON specialization. | No adapter/pagination schema. |
 | `output.fields` = `[]` | Accepted: all fields. | Rejected: empty explicit projection. |
 | `output.fields` = `null` or omission | Accepted: all fields. | Accepted: complete normalized item. |
 | `schedule.mode` = `"preview"` | Rejected; Preview is manual. | No schedule schema. |

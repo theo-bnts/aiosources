@@ -1,9 +1,7 @@
 import pg from 'pg'
 import { test, expect, createStremioAccess } from './fixtures'
 
-test('save feedback distinguishes reverted values, committed changes and discarded drafts', async ({
-  page,
-}) => {
+test('save feedback distinguishes reverted controls from committed changes', async ({ page }) => {
   const writes: string[] = []
   page.on('request', (request) => {
     if (request.method() === 'PUT') writes.push(new URL(request.url()).pathname)
@@ -35,7 +33,10 @@ test('save feedback distinguishes reverted values, committed changes and discard
   const workers = advanced.getByLabel('Simultaneous imports', { exact: true })
   const originalWorkers = await workers.inputValue()
   await workers.fill(originalWorkers === '7' ? '6' : '7')
-  await advanced.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await expect(advanced.getByRole('button', { name: 'Discard changes', exact: true })).toHaveCount(
+    0,
+  )
+  await workers.fill(originalWorkers)
   await expect(workers).toHaveValue(originalWorkers)
   await expect(advanced.getByRole('status')).toHaveText('No unsaved changes')
 })

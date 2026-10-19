@@ -1,8 +1,10 @@
 import type { Provider } from './types'
+import { isJSONAdapter } from './source-adapters'
 
 export function supportsMetadata(provider: Provider | undefined): boolean {
   return Boolean(
-    provider?.adapter === 'http_json' &&
+    provider &&
+    isJSONAdapter(provider.adapter) &&
     !provider.http.catalog &&
     provider.traversal?.id_recovery &&
     provider.traversal.enrich_fields?.length,

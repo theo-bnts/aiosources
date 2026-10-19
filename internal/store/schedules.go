@@ -142,7 +142,7 @@ ORDER BY provider_id,created_at,id`, providerIDs)
 // harmless. Preparation failures consume the slot with a durable error instead
 // of a hot retry loop. Persistence failures roll back the entire slot.
 // Preparation must finish before this transaction begins. A continuation can
-// only use the same immutable revision as the already-prepared source.
+// uses its immutable snapshot, including after an adapter-only file rename.
 func (s *Store) AttemptSchedule(ctx context.Context, source scheduling.Source, now time.Time, preparationErr error) (ScheduleClock, *model.Run, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

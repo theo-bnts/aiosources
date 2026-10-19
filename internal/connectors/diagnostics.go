@@ -56,7 +56,7 @@ func FailureReasonMessage(reason string) string {
 	}
 }
 
-var diagnosticCountKeys = [...]string{"expected_total", "actual_total", "expected_position", "actual_position", "offset", "page", "requested_page", "record_index", "http_status"}
+var diagnosticCountKeys = [...]string{"expected_total", "actual_total", "expected_position", "actual_position", "offset", "page", "requested_page", "record_index", "listing_index", "listing_count", "http_status"}
 
 // SanitizeFailureDiagnostics removes unsafe values in the diagnostic namespace
 // without changing unrelated page metadata or historical event contracts.

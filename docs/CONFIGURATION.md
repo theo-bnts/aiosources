@@ -27,6 +27,12 @@ The visual editor follows six sections:
 
 The display name labels the source throughout the console and in Stremio results. Rename it without changing the stable ID: routes, playback, filters and collection checkpoints keep that ID. Historical runs and Stremio results retain a saved display name for use after a source definition is removed.
 
+### Several listings on one source
+
+For an ordinary JSON or HTML source split into several listings, add their paths in **Connection → Additional listings** (`http.listing_paths`). The main **Source URL** is read first, followed by these paths on the same origin. They share field mappings, credentials, request pacing and the source ID. Each listing has its own pagination and known-page stopping boundary, so an up-to-date first listing cannot hide new records in a later one. Pause and Resume retain the current listing and its checkpoint.
+
+Use this only for listings with the same response structure. Include every relevant entry point when you want full coverage. A finite recent feed can collect future entries while automatic Incremental imports keep previous ones; it cannot recover history no longer exposed upstream. Set an interval short enough for successive feeds to overlap, allowing for source outages and update delays.
+
 ### Advanced editing and configuration reference
 
 Expand advanced sections only when your source needs them. **JSON** edits the same definition as the visual editor; it is useful for importing a configuration or adjusting settings not needed for a typical connection. For all accepted fields, defaults and validation rules, see the [complete JSON reference](JSON_REFERENCE.md). Existing YAML sources require [offline migration](#migrating-existing-sources).
@@ -53,6 +59,8 @@ On a **Revision conflict**, the local draft is preserved. Select **Compare serve
 
 Source definitions are private local configuration, not a versioned provider catalogue. The default `providers/` directory is ignored by Git and excluded from container builds. Normal loading accepts only `.json` (case-insensitive), skips `.example.json` and never loads legacy `.yml`/`.yaml`. No real source is enabled automatically.
 
+JSON definitions use `"adapter": "json"`. On startup, the application automatically updates this name in valid older `"adapter": "http_json"` source files, preserving their filenames, IDs and other values. Imported data and collection baselines remain in place: the rename does not trigger another Full import. Saved run snapshots and checkpoints are unchanged and keep working. If a file cannot be updated, its older adapter name remains supported.
+
 Each app definition is a single strict UTF-8 JSON object, at most 128 KiB, with an explicit boolean `enabled`. Comments, trailing commas, duplicate keys, unknown fixed-schema fields, wrong types, scalar nulls and decoded NUL in keys/values are rejected. Arbitrary JSON is allowed only in declared open maps/body; numeric lexemes there remain exact rather than rounding through floating point. The authenticated `GET /api/provider-schema` exposes JSON Schema for editor tooling, but server connector/credential-reference validation remains authoritative. The standalone Torznab SDK has a separate smaller JSON schema and 64 KiB limit, not an interchangeable app definition.
 
 The HTTP/JSON and Torznab examples below are complete source documents. Other JSON blocks illustrate object fragments to merge into an existing definition, not standalone sources.
@@ -64,7 +72,7 @@ The HTTP/JSON and Torznab examples below are complete source documents. Other JS
   "version": 1,
   "id": "my_index",
   "name": "My index",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://indexer.example/api/releases",
   "enabled": true,
   "auth": {
@@ -140,7 +148,7 @@ These options do not apply to remote catalogues or bounded traversal. HTTP/JSON 
 
 #### UNIT3D source profile
 
-The **UNIT3D** template expands to an ordinary `"adapter": "http_json"` definition, not a separate transport. Set the tracker URL, a unique source ID and a bearer-token vault reference. Choose the tracker's own `categories[]` IDs, not Torznab category IDs; an empty list leaves categories unrestricted.
+The **UNIT3D** template expands to an ordinary `"adapter": "json"` definition, not a separate transport. Set the tracker URL, a unique source ID and a bearer-token vault reference. Choose the tracker's own `categories[]` IDs, not Torznab category IDs; an empty list leaves categories unrestricted.
 
 The profile follows `/links/next` through `/api/torrents/filter`, preserves filters and `perPage`, and maps native `/id` values from `/data`. It requests `created_at` ascending, oldest first, and disables the newest-first known-page shortcut. Its 25-row page size and three-second interval are starting values: check the site's actual quota. Saving leaves the source disabled and unscheduled until explicitly configured.
 
@@ -259,7 +267,7 @@ Use a verified newest-first listing query for known-page stopping. Invalid numer
 
 #### Standalone Metadata collection
 
-Set `traversal.enrich_fields` to `["external_ids", "metadata"]` to identify fields whose absence or null value makes a published native record eligible for **Metadata** mode. This mode requires `"adapter": "http_json"`, no `http.catalog`, and `traversal.id_recovery` with a detail URL, detail mapping and mapped `info_hash` in both list/detail records. Every configured field must exist in the detail mapping; for an API returning `externalIds`, for example, map `"external_ids": "/externalIds"` and the relevant `metadata` subtree.
+Set `traversal.enrich_fields` to `["external_ids", "metadata"]` to identify fields whose absence or null value makes a published native record eligible for **Metadata** mode. This mode requires `"adapter": "json"`, no `http.catalog`, and `traversal.id_recovery` with a detail URL, detail mapping and mapped `info_hash` in both list/detail records. Every configured field must exist in the detail mapping; for an API returning `externalIds`, for example, map `"external_ids": "/externalIds"` and the relevant `metadata` subtree.
 
 Start a separate Metadata run manually or set `schedule.mode` to `"metadata"`. It walks **all published native records that existed before run creation**, not just recently encountered listing pages, selecting those missing any configured field. Candidates are queried in bounded batches ordered by native source ID; only the last committed ID and terminal state persist in the resume cursor. No listing, option-discovery or HEAD resolver requests are made. Empty arrays count as complete, unlike absent or null fields, so a known empty external-ID list is not repeatedly fetched.
 

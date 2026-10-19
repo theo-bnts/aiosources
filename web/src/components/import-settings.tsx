@@ -286,16 +286,6 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                 >
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
-                {draft && !conflict && (
-                  <Button
-                    type="button"
-                    variant="warning"
-                    onClick={useSavedValues}
-                    disabled={save.isPending}
-                  >
-                    Discard changes
-                  </Button>
-                )}
                 <FormStatus
                   dirty={dirty}
                   saving={save.isPending}

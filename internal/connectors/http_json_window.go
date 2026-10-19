@@ -113,7 +113,7 @@ func validateWindowJSON(p model.Provider) error {
 	if t == nil {
 		return errors.New("bounded JSON traversal configuration is required")
 	}
-	if p.Adapter != "http_json" || p.HTTP.Catalog || p.HTTP.Method != http.MethodGet || p.HTTP.Body != nil || p.Pagination.Type != "page" || p.Pagination.In != "query" || p.Pagination.NextPath != "" {
+	if !p.IsJSON() || p.HTTP.Catalog || p.HTTP.Method != http.MethodGet || p.HTTP.Body != nil || p.Pagination.Type != "page" || p.Pagination.In != "query" || p.Pagination.NextPath != "" {
 		return errors.New("bounded traversal requires native GET JSON with query page pagination and no next_path")
 	}
 	if t.WindowPages < 1 || p.Pagination.Start < 0 || t.WindowPages > int(^uint(0)>>1)-p.Pagination.Start || p.PageSize < 1 || p.Pagination.PageParam == "" || p.Pagination.SizeParam == "" {

@@ -75,7 +75,7 @@ func validateHTTPJSON(p model.Provider) error {
 	}
 	for name := range p.Options {
 		if name != "published_at_unit" && name != "local_categories" && name != "null_items_as_empty" && name != "preserve_query_on_next" && name != "allow_total_growth" {
-			return errors.New("unknown HTTP JSON adapter option")
+			return errors.New("unknown JSON adapter option")
 		}
 	}
 	if _, err := publishedAtUnit(p); err != nil {
@@ -105,10 +105,10 @@ func validateHTTPJSON(p model.Provider) error {
 		return errors.New("allow_total_growth with known pages requires http.incremental_query for newest-first ordering")
 	}
 	if p.Traversal != nil && (len(categories) > 0 || nullItems || preserveQuery || allowGrowth) {
-		return errors.New("local category, null-item, next-query, and total-growth options require ordinary HTTP JSON pagination")
+		return errors.New("local category, null-item, next-query, and total-growth options require ordinary JSON pagination")
 	}
 	if p.HTTP.Method != http.MethodGet && p.HTTP.Method != http.MethodPost {
-		return errors.New("http_json supports GET or POST")
+		return errors.New("JSON supports GET or POST")
 	}
 	if p.HTTP.Method == http.MethodGet && p.HTTP.Body != nil {
 		return errors.New("GET requests cannot include a JSON body")
@@ -231,11 +231,11 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 	}
 	if len(checkpoint) > 0 {
 		if err := decodeJSON(checkpoint, &state); err != nil || state.Version != 1 || state.Page < 0 || state.Offset < 0 || (state.Total != nil && *state.Total < 0) {
-			return model.Page{}, errors.New("invalid HTTP JSON continuation state")
+			return model.Page{}, errors.New("invalid JSON continuation state")
 		}
 		if state.URL != "" {
 			if _, err := c.client.target(state.URL); err != nil {
-				return model.Page{}, errors.New("invalid HTTP JSON continuation URL")
+				return model.Page{}, errors.New("invalid JSON continuation URL")
 			}
 		}
 	}
@@ -459,6 +459,9 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 func (c *httpJSONConnector) request(state jsonCursor) (Request, error) {
 	p := c.provider
 	request := Request{Method: p.HTTP.Method, URL: state.URL, Query: make(url.Values), Headers: http.Header{"Accept": {"application/json"}}}
+	if state.URL == "" {
+		request.URL = p.URL
+	}
 	preserveQuery := c.preserveQuery
 	if state.URL == "" || preserveQuery {
 		var nextURL *url.URL
@@ -563,7 +566,7 @@ func httpJSONTemplate() string {
   "version": 1,
   "id": "example_json",
   "name": "Example JSON provider",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://indexer.example/api/releases",
   "enabled": false,
   "auth": {

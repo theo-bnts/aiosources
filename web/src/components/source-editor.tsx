@@ -16,6 +16,7 @@ import { SecretPicker } from '@/components/secret-picker'
 import { DurationSelect, ScheduleTimingFields } from '@/components/schedule-fields'
 import { timingMode, type TimingMode } from '@/lib/schedule-input'
 import { Switch } from '@/components/ui/switch'
+import { isJSONAdapter } from '@/lib/source-adapters'
 import { Label } from '@/components/ui/label'
 import { CodeEditor } from '@/components/code-editor'
 import {
@@ -81,6 +82,8 @@ const stages = [
 const remoteStages = stages.filter((stage) => stage.id !== 'schedules')
 
 function IdentitySettings({ sourceID }: { sourceID?: string }) {
+  const { document } = useSourceEditor()
+  const jsonAdapter = document.get('adapter') === 'http_json' ? 'http_json' : 'json'
   return (
     <FieldSection title="Source identity">
       <FieldGrid>
@@ -98,8 +101,8 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
         <SelectField
           path={['adapter']}
           label="Source type"
-          choices={['http_json', 'torznab', 'html']}
-          labels={{ http_json: 'JSON API', torznab: 'Torznab', html: 'HTML website' }}
+          choices={['torznab', 'html', jsonAdapter]}
+          labels={{ json: 'JSON', http_json: 'JSON', torznab: 'Torznab', html: 'HTML website' }}
         />
         <BooleanField
           path={['enabled']}
@@ -270,6 +273,18 @@ function ConnectionSettings() {
             choices={['GET', 'POST']}
             fallback="Default · GET"
           />
+        )}
+        {!torznab && (
+          <AdvancedSection
+            title="Additional listings"
+            configuredPaths={[['http', 'listing_paths']]}
+          >
+            <StringArrayField
+              path={['http', 'listing_paths']}
+              label="Additional listing paths"
+              help="Paths on the same source, such as /catalog/audio. Imported after Source URL with the same fields and request settings. Each listing keeps its own pagination and update boundary."
+            />
+          </AdvancedSection>
         )}
       </FieldSection>
       <AuthenticationSettings />
@@ -598,7 +613,7 @@ function MappingSettings() {
           )}
           <Selection
             title="Record selection"
-            description="HTTP JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
+            description="JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
           >
             <FieldGrid>
               <TextField
@@ -656,7 +671,7 @@ function TraversalSettings() {
   const configured =
     document.kindIn(['traversal']) !== undefined && document.kindIn(['traversal']) !== 'null'
   const metadataSupported =
-    document.get('adapter') === 'http_json' &&
+    isJSONAdapter(document.get('adapter')) &&
     !document.getIn(['http', 'catalog']) &&
     document.kindIn(['traversal', 'id_recovery']) === 'object' &&
     document.lengthIn(['traversal', 'enrich_fields']) > 0
@@ -664,7 +679,7 @@ function TraversalSettings() {
     <AdvancedSection
       title="Bounded traversal"
       configuredPaths={[['traversal']]}
-      description="Advanced HTTP JSON collection across overlapping search windows. Configure only when a source has a bounded listing and advertised coverage totals."
+      description="Advanced JSON collection across overlapping search windows. Configure only when a source has a bounded listing and advertised coverage totals."
     >
       {configured ? (
         <>
@@ -1036,7 +1051,7 @@ function SourceScheduleSettings() {
   const enabled = typeof storedEnabled === 'boolean' ? storedEnabled : configured
   const mode = text('mode') || 'incremental'
   const metadataSupported =
-    document.get('adapter') === 'http_json' &&
+    isJSONAdapter(document.get('adapter')) &&
     document.getIn(['http', 'catalog']) !== true &&
     document.getIn(['traversal', 'id_recovery']) != null &&
     document.lengthIn(['traversal', 'enrich_fields']) > 0

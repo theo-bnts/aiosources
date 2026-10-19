@@ -47,6 +47,11 @@ test('HTML uses the source stages, validates selectors without requests and keep
   server,
 }) => {
   await newHTMLSource(page, server.sourceURL)
+  await page.getByRole('tab', { name: 'Connection', exact: true }).click()
+  await page.locator('summary').filter({ hasText: 'Additional listings' }).click()
+  await page.getByRole('button', { name: 'Add additional listing paths', exact: true }).click()
+  await page.getByLabel('Additional listing paths 1', { exact: true }).fill('/catalog/audio')
+  await page.getByRole('tab', { name: 'Source fields', exact: true }).click()
   await page.getByLabel('Title selector', { exact: true }).fill('[')
   const invalid = await checkConfiguration(page)
   expect(invalid.valid).toBe(false)
@@ -63,6 +68,7 @@ test('HTML uses the source stages, validates selectors without requests and keep
   await saveHTMLSource(page)
   const saved = await (await page.request.get('/api/providers/html_example')).json()
   expect(JSON.parse(saved.json).html.details.fields.info_hash.required).toBe(true)
+  expect(JSON.parse(saved.json).http.listing_paths).toEqual(['/catalog/audio'])
   await page.reload()
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
@@ -95,7 +101,7 @@ test('HTML uses the source stages, validates selectors without requests and keep
     })
   }
   await page.getByRole('tab', { name: 'Identity', exact: true }).click()
-  await page.getByLabel('Source type', { exact: true }).selectOption('http_json')
+  await page.getByLabel('Source type', { exact: true }).selectOption('json')
   await page
     .getByRole('button', { name: 'Clear incompatible source settings', exact: true })
     .click()

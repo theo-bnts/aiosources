@@ -60,11 +60,21 @@ func (s *server) shareRequestAllowed(w http.ResponseWriter, r *http.Request) boo
 }
 
 func (s *server) sharingPublicURL() string {
-	origin, err := url.Parse(s.options.PublicURL)
-	if err != nil || origin.Scheme != "https" || origin.Host == "" || origin.Hostname() == "" || origin.User != nil || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
+	origin := s.connectionOrigin()
+	if !strings.HasPrefix(origin, "https://") {
 		return ""
 	}
-	return "https://" + origin.Host
+	return origin
+}
+
+// Private app connections follow the explicitly configured origin, including
+// HTTP on a trusted internal network. Never infer it from forwarded headers.
+func (s *server) connectionOrigin() string {
+	origin, err := url.Parse(s.options.PublicURL)
+	if err != nil || (origin.Scheme != "https" && origin.Scheme != "http") || origin.Host == "" || origin.Hostname() == "" || origin.User != nil || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" || (origin.Path != "" && origin.Path != "/") {
+		return ""
+	}
+	return origin.Scheme + "://" + origin.Host
 }
 
 func (s *server) shareURL(share *model.Share) {
@@ -72,12 +82,14 @@ func (s *server) shareURL(share *model.Share) {
 		share.URL = strings.TrimSuffix(s.options.PublicURL, "/") + "/stremio/s1." + url.PathEscape(share.ID)
 		return
 	}
-	if origin := s.sharingPublicURL(); origin != "" {
-		if share.Format == "torznab" {
+	if share.Format == "torznab" {
+		if origin := s.connectionOrigin(); origin != "" {
 			share.URL = origin + "/torznab/" + url.PathEscape(share.ID) + "/api"
-		} else {
-			share.URL = origin + "/api/catalogs/" + url.PathEscape(share.ID)
 		}
+		return
+	}
+	if origin := s.sharingPublicURL(); origin != "" {
+		share.URL = origin + "/api/catalogs/" + url.PathEscape(share.ID)
 	}
 }
 
@@ -109,6 +121,8 @@ func (s *server) listShares(w http.ResponseWriter, r *http.Request) {
 	publicURL := s.sharingPublicURL()
 	if shareRequestFormat(r) == "stremio" {
 		publicURL = s.options.PublicURL
+	} else if shareRequestFormat(r) == "torznab" {
+		publicURL = s.connectionOrigin()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "fields": store.CatalogFields(), "sources": sources, "public_url": publicURL})
 }
@@ -124,8 +138,12 @@ func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input mod
 		writeError(w, http.StatusUnprocessableEntity, message)
 		return false
 	}
-	if input.Format != "stremio" && input.Enabled && s.sharingPublicURL() == "" {
+	if input.Format == "catalog" && input.Enabled && s.sharingPublicURL() == "" {
 		writeError(w, http.StatusUnprocessableEntity, "Configure PUBLIC_URL with an HTTPS public origin before enabling sharing")
+		return false
+	}
+	if input.Format == "torznab" && input.Enabled && s.connectionOrigin() == "" {
+		writeError(w, http.StatusUnprocessableEntity, "Configure PUBLIC_URL with the HTTP or HTTPS origin used by your clients")
 		return false
 	}
 	if input.Scope == "all" {

@@ -21,8 +21,9 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 405, 202, "Read-only endpoint")
 		return
 	}
-	if s.sharingPublicURL() == "" {
-		torznabError(w, 503, 910, "HTTPS Torznab access is not configured")
+	origin := s.connectionOrigin()
+	if origin == "" {
+		torznabError(w, 503, 910, "Torznab origin is not configured")
 		return
 	}
 	// Authenticate before reporting capabilities or parameter errors. A session,
@@ -78,7 +79,7 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	var response any
 	if q.Mode == "caps" {
-		response = torznabCaps(share, s.sharingPublicURL())
+		response = torznabCaps(share, origin)
 	} else {
 		match := func(rec model.AIORecord) bool {
 			return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode)
@@ -100,7 +101,7 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		for _, p := range providers {
 			names[p.ID] = p.Name
 		}
-		response = torznabResults(result, names, s.sharingPublicURL())
+		response = torznabResults(result, names, origin)
 		// Only counts enter ordinary seven-day logs. Never store the key, search
 		// text, recipient URL, IP address, titles, hashes or returned magnets.
 		if err = s.options.Store.RecordActivity(ctx, "debug", "torznab.searched", "", "", "", map[string]any{"records": len(result.Items), "duration_ms": time.Since(started).Milliseconds()}); err != nil {

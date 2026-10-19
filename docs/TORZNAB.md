@@ -4,7 +4,7 @@ AIOSources can serve its published local catalog to Prowlarr and other Torznab c
 
 ## Connect a client
 
-1. Set `PUBLIC_URL` to your HTTPS public origin, as for catalog sharing.
+1. Set `PUBLIC_URL` to the exact origin used by your clients. Private Torznab and Stremio connections support HTTP on an internal network; use HTTPS when traffic crosses an untrusted network. Catalog sharing and public visitor connections retain their HTTPS requirements.
 2. Open **Connections → Torznab** and create an access key. New accesses include all current and future sources. Choose media types, sources, cache services and **Cached results only** in **Filters**; optional expiration and per-access limits belong to **Advanced**. Save the generated key; only its hash is retained and the key cannot be retrieved later.
 3. Enable access. In Prowlarr, add **Generic Torznab**. Split the displayed Torznab URL into its origin (**URL**) and path (**API path**), and enter the generated **API key**.
 4. To narrow a single client further, optional URL parameters can be placed in Prowlarr's **Additional parameters** field. Do not append another `cat` there: Prowlarr already supplies its selected categories.

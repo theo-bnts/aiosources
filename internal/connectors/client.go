@@ -89,7 +89,7 @@ func NewClient(ctx context.Context, p model.Provider, env Environment) (*Client,
 	closeContext, cancel := context.WithCancel(context.Background())
 	c := &Client{origin: origin, jar: jar, headers: make(http.Header), secretHeaders: make(http.Header), interval: interval, gate: make(chan struct{}, 1), quotas: make(map[string]clientQuota), closeContext: closeContext, cancel: cancel}
 	c.timeout = timeout
-	c.expectJSON = p.Adapter == "http_json"
+	c.expectJSON = p.IsJSON()
 	c.relativeQuotaReset = p.RateLimitReset == "relative"
 	c.rateLimited = env.RateLimited
 	c.transientFailure = env.TransientFailure

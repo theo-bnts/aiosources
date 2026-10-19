@@ -20,6 +20,9 @@ var safeIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 var safeField = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]{0,127}$`)
 
 func providerDefaults(p model.Provider) model.Provider {
+	if p.IsJSON() {
+		p.Adapter = "json"
+	}
 	if p.PageSize == 0 {
 		p.PageSize = 100
 	}
@@ -52,7 +55,7 @@ func providerDefaults(p model.Provider) model.Provider {
 			p.Pagination.OffsetParam = "offset"
 		}
 	}
-	if p.Adapter == "http_json" {
+	if p.IsJSON() {
 		if p.HTTP.Catalog {
 			if p.HTTP.ItemsPath == "" {
 				p.HTTP.ItemsPath = "/items"
@@ -98,21 +101,30 @@ func New(ctx context.Context, p model.Provider, mode model.RunMode, env Environm
 		return nil, fmt.Errorf("%w: invalid collection mode", model.ErrInvalid)
 	}
 	if mode == model.ModeMetadata && !p.SupportsMetadata() {
-		return nil, fmt.Errorf("%w: metadata collection requires a native HTTP JSON detail mapping and enrich_fields", model.ErrInvalid)
+		return nil, fmt.Errorf("%w: metadata collection requires a native JSON detail mapping and enrich_fields", model.ErrInvalid)
 	}
+	var connector Connector
+	var err error
 	switch p.Adapter {
-	case "http_json":
+	case "json":
 		if p.Traversal != nil {
 			return newWindowJSON(ctx, p, mode, env)
 		}
-		return newHTTPJSON(ctx, p, mode, env)
+		connector, err = newHTTPJSON(ctx, p, mode, env)
 	case "torznab":
 		return newTorznab(ctx, p, mode, env)
 	case "html":
-		return newHTML(ctx, p, mode, env)
+		connector, err = newHTML(ctx, p, mode, env)
 	default:
 		return nil, fmt.Errorf("%w: unknown adapter", model.ErrInvalid)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if len(p.HTTP.ListingPaths) > 0 {
+		return newListings(connector, p, mode, env), nil
+	}
+	return connector, nil
 }
 
 func Validate(p model.Provider) error {
@@ -120,15 +132,15 @@ func Validate(p model.Provider) error {
 	if err := validateCommon(p); err != nil {
 		return fmt.Errorf("%w: %w", model.ErrInvalid, err)
 	}
-	if p.Traversal != nil && (p.Adapter != "http_json" || p.HTTP.Catalog) {
-		return fmt.Errorf("%w: traversal requires a native HTTP JSON source", model.ErrInvalid)
+	if p.Traversal != nil && (!p.IsJSON() || p.HTTP.Catalog) {
+		return fmt.Errorf("%w: traversal requires a native JSON source", model.ErrInvalid)
 	}
 	if p.Traversal != nil && p.Traversal.MetadataAfterIncremental && !p.SupportsMetadata() {
 		return fmt.Errorf("%w: automatic metadata requires configured ID recovery and enrich_fields", model.ErrInvalid)
 	}
 	var err error
 	switch p.Adapter {
-	case "http_json":
+	case "json":
 		err = validateHTTPJSON(p)
 	case "torznab":
 		err = validateTorznab(p)
@@ -144,13 +156,16 @@ func Validate(p model.Provider) error {
 }
 
 func validateCommon(p model.Provider) error {
+	if err := validateListings(p); err != nil {
+		return err
+	}
 	if p.HTML != nil && p.Adapter != "html" {
 		return errors.New("html settings require the HTML adapter")
 	}
-	if p.HTTP.Catalog && p.Adapter != "http_json" {
-		return errors.New("catalogue mode requires the http_json adapter")
+	if p.HTTP.Catalog && !p.IsJSON() {
+		return errors.New("catalogue mode requires the json adapter")
 	}
-	if len(p.HTTP.IncrementalQuery) > 0 && ((p.Adapter != "http_json" && p.Adapter != "html") || p.HTTP.Catalog || p.Traversal != nil) {
+	if len(p.HTTP.IncrementalQuery) > 0 && ((!p.IsJSON() && p.Adapter != "html") || p.HTTP.Catalog || p.Traversal != nil) {
 		return errors.New("http.incremental_query requires ordinary native JSON or HTML pagination")
 	}
 	if p.Version != 1 {
@@ -360,9 +375,9 @@ func validateStaticBody(value any, depth int) error {
 
 func Adapters() []model.AdapterInfo {
 	return []model.AdapterInfo{
-		{Type: "http_json", Name: "HTTP JSON", Description: "Configurable JSON Pointer mappings and explicit pagination.", Template: httpJSONTemplate()},
 		{Type: "torznab", Name: "Torznab", Description: "Discovered capabilities, raw RSS and category-scoped collection.", Template: torznabTemplate()},
 		{Type: "html", Name: "HTML", Description: "Read website listings and optional detail pages with CSS selectors and resumable pagination.", Template: htmlTemplate()},
-		{Type: "http_json", Profile: "unit3d", Name: "UNIT3D", Description: "UNIT3D torrent API with native IDs, site-specific filters and resumable pagination.", Template: unit3dTemplate()},
+		{Type: "json", Name: "JSON", Description: "Configurable JSON Pointer mappings and explicit pagination.", Template: httpJSONTemplate()},
+		{Type: "json", Profile: "unit3d", Name: "UNIT3D", Description: "UNIT3D torrent API with native IDs, site-specific filters and resumable pagination.", Template: unit3dTemplate()},
 	}
 }

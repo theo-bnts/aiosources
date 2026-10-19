@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/scheduling"
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
@@ -44,6 +45,54 @@ func TestScheduledBudgetContinuationPreservesCheckpointAndExplainsItsCause(t *te
 	events, err := db.Events(ctx, saved.ID, model.ListOptions{Limit: 1})
 	if err != nil || len(events.Items) != 1 || events.Items[0].Message != "Scheduled collection queued for continuation" {
 		t.Fatalf("budget continuation was presented as an unexpected interruption: %+v %v", events, err)
+	}
+}
+
+func TestScheduledAdapterRenameContinuesTheOriginalCheckpoint(t *testing.T) {
+	ctx, _, db := scheduleDatabase(t)
+	registry, err := providers.New(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer registry.Close()
+	document, err := registry.Save("scheduled-source", `{"version":1,"id":"scheduled-source","name":"Example archive","adapter":"http_json","url":"https://archive.example/items","enabled":true,"http":{"headers":{},"query":{"id":9007199254740993,"ratio":1.2300e+2}},"schedule":{"every":"1m","mode":"full","max_pages":1}}`, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := scheduling.Sources(map[string]model.ProviderDocument{document.Provider.ID: document})[0]
+	start := time.Now().UTC()
+	if _, err := db.ReconcileSchedules(ctx, []scheduling.Source{source}, start); err != nil {
+		t.Fatal(err)
+	}
+	_, queued, err := db.AttemptSchedule(ctx, source, start.Add(time.Minute), nil)
+	if err != nil || queued == nil {
+		t.Fatal("initial scheduled work was not queued", err)
+	}
+	claimed, err := db.ClaimNext(ctx)
+	if err != nil || claimed == nil {
+		t.Fatal(err)
+	}
+	saved, err := db.SavePage(ctx, *claimed, model.Page{Next: json.RawMessage(`{"page":23}`)}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.FinishRun(ctx, saved.ID, model.StatusPaused, "Page budget reached", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := registry.UpgradeDefinitions(); err != nil || count != 1 {
+		t.Fatal("source file was not upgraded", count, err)
+	}
+	document, err = registry.Get(source.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source = scheduling.Sources(map[string]model.ProviderDocument{document.Provider.ID: document})[0]
+	if _, err := db.ReconcileSchedules(ctx, []scheduling.Source{source}, start.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	_, resumed, err := db.AttemptSchedule(ctx, source, start.Add(2*time.Minute), nil)
+	if err != nil || resumed == nil || resumed.ID != saved.ID || string(resumed.Cursor) != string(saved.Cursor) || resumed.Pages != saved.Pages || resumed.Revision != saved.Revision || resumed.Config.Adapter != "http_json" {
+		t.Fatal("adapter rename restarted or blocked the saved traversal", err)
 	}
 }
 

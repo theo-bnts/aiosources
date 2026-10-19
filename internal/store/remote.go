@@ -12,7 +12,7 @@ import (
 )
 
 func remoteCatalog(p model.Provider) bool {
-	return p.Adapter == "http_json" && p.HTTP.Catalog
+	return p.IsRemoteCatalog()
 }
 
 // RemoteCheckpoint is endpoint-bound: changing a source URL must begin a new

@@ -142,7 +142,9 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   ).toHaveValue('')
   await page.keyboard.press('Escape')
   expect((await (await page.request.get('/api/secrets')).json()).items).toHaveLength(3)
-  await metadata.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await page
+    .getByLabel('TMDB read access token', { exact: true })
+    .selectOption((await configuration(page)).tmdb_secret)
   await expect(page.getByRole('button', { name: 'Add TMDB token', exact: true })).toBeDisabled()
 })
 
@@ -240,7 +242,7 @@ test('adaptive authentication, pagination and adapter controls retain hidden val
   await page.getByRole('tab', { name: /^Source fields/ }).click()
   await expect(page.getByText('Torznab reads torrent fields', { exact: false })).toBeVisible()
   await page.getByRole('tab', { name: /^Identity/ }).click()
-  await page.getByLabel('Source type', { exact: true }).selectOption('http_json')
+  await page.getByLabel('Source type', { exact: true }).selectOption('json')
   await page.getByRole('tab', { name: /^Connection/ }).click()
   await page.getByLabel('Authentication type', { exact: true }).selectOption('basic')
   await page.getByRole('tab', { name: /^Pagination/ }).click()
@@ -254,7 +256,9 @@ test('adaptive authentication, pagination and adapter controls retain hidden val
   const chunks = []
   for await (const chunk of stream!) chunks.push(Buffer.from(chunk))
   await exported.delete()
-  expect(Buffer.concat(chunks).toString('utf8')).toBe(original.json)
+  expect(Buffer.concat(chunks).toString('utf8')).toBe(
+    original.json.replace(/("adapter"\s*:\s*)"http_json"/, '$1"json"'),
+  )
   await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('tab', { name: /^Imports/ }).click()
   for (const label of ['Timing', 'Daily time', 'Schedule enabled', 'Scheduled collection mode']) {

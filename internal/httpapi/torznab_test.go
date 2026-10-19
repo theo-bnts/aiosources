@@ -157,7 +157,7 @@ func TestTorznabXMLProjectionEscapesTextAndOmitsNativeURLs(t *testing.T) {
 	}
 }
 
-func TestTorznabHTTPSDisabledExpiryAndRollingLimits(t *testing.T) {
+func TestTorznabOriginDisabledExpiryAndRollingLimits(t *testing.T) {
 	f := sharingAPI(t, "https://owner.example.test")
 	create := func(body string) model.ShareCredential {
 		t.Helper()
@@ -187,7 +187,7 @@ func TestTorznabHTTPSDisabledExpiryAndRollingLimits(t *testing.T) {
 	}
 	local := sharingAPI(t, "")
 	if w = local.request("POST", "/api/torznab/endpoints", `{"name":"Unsafe","scope":"all","enabled":true}`, true, ""); w.Code != 422 {
-		t.Fatal("enabled without HTTPS public origin", w.Code)
+		t.Fatal("enabled without a configured origin", w.Code)
 	}
 	if w = local.request("GET", "/torznab/anything/api?t=caps&apikey=anything", "", false, ""); w.Code != 503 {
 		t.Fatal("feed ignored deployment boundary", w.Code)

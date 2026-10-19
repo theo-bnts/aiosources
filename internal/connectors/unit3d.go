@@ -1,13 +1,13 @@
 package connectors
 
 // UNIT3D is a source profile, not another transport. Its expanded definition
-// stays editable and uses the same HTTP JSON collector and coverage guarantees.
+// stays editable and uses the same JSON collector and coverage guarantees.
 func unit3dTemplate() string {
 	return `{
   "version": 1,
   "id": "example_unit3d",
   "name": "UNIT3D tracker",
-  "adapter": "http_json",
+  "adapter": "json",
   "url": "https://tracker.example/api/torrents/filter",
   "enabled": false,
   "auth": {

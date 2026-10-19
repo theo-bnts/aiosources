@@ -1,5 +1,6 @@
 import type { ProviderDocument } from './types'
 import { parseProviderJSON } from './provider-json'
+import { isJSONAdapter } from './source-adapters'
 
 export interface RemoteDraft {
   id: string
@@ -62,7 +63,7 @@ export function remoteJSON(
     document?.json ??
       `{
   "version": 1,
-  "adapter": "http_json",
+  "adapter": "json",
   "request_interval": "1s",
   "rate_limit_reset": "epoch",
   "page_size": 100,
@@ -91,7 +92,7 @@ export function remoteJSON(
   )
   if (json.errors.length)
     throw new Error('Fix the source JSON before changing its remote settings.')
-  if (document && (document.provider.adapter !== 'http_json' || !document.provider.http.catalog)) {
+  if (document && (!isJSONAdapter(document.provider.adapter) || !document.provider.http.catalog)) {
     throw new Error(
       'This source is no longer a remote catalog. Reload its configuration in Sources.',
     )

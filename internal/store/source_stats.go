@@ -26,7 +26,7 @@ func (s *Store) SourceTorrentStats(ctx context.Context, providers []string) (mod
 ), latest_import AS (
  SELECT DISTINCT ON (provider_id) provider_id,id,status FROM ingest.runs
  WHERE mode<>'preview'
- AND (mode='full' OR (config->>'adapter'='http_json' AND config->'http'->>'catalog'='true'))
+ AND (mode='full' OR (config->>'adapter' IN ('json','http_json') AND config->'http'->>'catalog'='true'))
  ORDER BY provider_id,(status IN ('queued','running')) DESC,created_at DESC,id DESC
 ), progress AS (
  SELECT r.provider_id,r.id,count(*) AS torrents,

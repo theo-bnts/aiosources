@@ -151,7 +151,7 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   ).toBeVisible()
   await expect(page.getByLabel('Outgoing connections', { exact: true })).toHaveValue('direct')
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  await page.getByRole('button', { name: 'Discard changes', exact: true }).click()
+  await page.getByRole('button', { name: 'Discard changes and reload', exact: true }).click()
   await expect(page.getByLabel('Outgoing connections', { exact: true })).toHaveValue('system')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

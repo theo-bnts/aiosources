@@ -147,7 +147,7 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 		initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
 		modeMatches := run.Mode == s.Plan.Mode || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) || initialFull || metadataFollowup ||
 			(s.Provider.IsRemoteCatalog() && run.Mode == model.ModeFull)
-		if run.Revision != s.Revision || !modeMatches {
+		if !s.matchesSnapshot(run) || !modeMatches {
 			return "blocked", nil, "A paused scheduled collection uses an older configuration or different mode; resume or cancel it manually in run history"
 		}
 		if resume == nil {
@@ -159,6 +159,30 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 		return "paused", resume, ""
 	}
 	return "waiting", nil, ""
+}
+
+func (s Source) matchesSnapshot(run model.Run) bool {
+	if run.Revision == s.Revision {
+		return true
+	}
+	if s.Provider.Adapter != "json" || run.Config.Adapter != "http_json" {
+		return false
+	}
+	// An automatic adapter rename changes file revisions, but must not strand
+	// a budgeted traversal. All functional settings still have to match; the
+	// original snapshot, revision and checkpoint continue to own that run.
+	normalize := func(p model.Provider) (model.Provider, error) {
+		p.Adapter = "json"
+		var err error
+		p.Schedule, err = Settings(p)
+		if p.RequestTimeout == "" {
+			p.RequestTimeout = model.DefaultRequestTimeout
+		}
+		return p, err
+	}
+	current, currentErr := normalize(s.Provider)
+	snapshot, snapshotErr := normalize(run.Config)
+	return currentErr == nil && snapshotErr == nil && equalSnapshotJSON(current, snapshot)
 }
 
 // Sources orders a complete registry snapshot for deterministic locking and

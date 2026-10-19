@@ -50,7 +50,7 @@ type CatalogSync struct {
 	IntervalMinutes int  `json:"interval_minutes"`
 }
 
-func (p Provider) IsRemoteCatalog() bool { return p.Adapter == "http_json" && p.HTTP.Catalog }
+func (p Provider) IsRemoteCatalog() bool { return p.IsJSON() && p.HTTP.Catalog }
 
 // RequestLimits bound primary-origin request attempts in rolling time windows.
 // Zero disables that window; admission history is shared by all runs of a source.
@@ -62,7 +62,7 @@ type RequestLimits struct {
 
 // SupportsMetadata identifies native sources with a configured detail mapping.
 func (p Provider) SupportsMetadata() bool {
-	return p.Adapter == "http_json" && !p.HTTP.Catalog && p.Traversal != nil &&
+	return p.IsJSON() && !p.HTTP.Catalog && p.Traversal != nil &&
 		p.Traversal.IDRecovery != nil && len(p.Traversal.EnrichFields) > 0
 }
 
@@ -117,6 +117,7 @@ type HTTPConfig struct {
 	SecretHeaders    map[string]string `json:"secret_headers,omitempty"`
 	Query            map[string]any    `json:"query,omitempty"`
 	IncrementalQuery map[string]any    `json:"incremental_query,omitempty"`
+	ListingPaths     []string          `json:"listing_paths,omitempty"`
 	Body             any               `json:"body,omitempty"`
 	ItemsPath        string            `json:"items_path"`
 	Catalog          bool              `json:"catalog,omitempty"`
