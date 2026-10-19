@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/publicsuffix"
 )
@@ -34,6 +35,7 @@ var errResponseLimit = errors.New("response exceeds the size limit")
 type Client struct {
 	origin                                            *url.URL
 	transport                                         *http.Transport
+	routing                                           *outbound.Transport
 	httpClient                                        *http.Client
 	jar                                               http.CookieJar
 	headers                                           http.Header
@@ -106,6 +108,13 @@ func NewClient(ctx context.Context, p model.Provider, env Environment) (*Client,
 		c.maxQuotaRetries = *env.MaxQuotaRetries
 	}
 	c.transport = &http.Transport{Proxy: http.ProxyFromEnvironment, DialContext: (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext, ForceAttemptHTTP2: true, MaxIdleConns: 8, MaxIdleConnsPerHost: 4, IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: timeout, ExpectContinueTimeout: time.Second, MaxResponseHeaderBytes: 1 << 20}
+	direct := c.transport.DialContext
+	c.transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return outbound.Dial(ctx, network, address, direct)
+	}
+	if env.Network != nil {
+		c.routing = env.Network.Transport("source:"+p.ID, c.transport)
+	}
 	resolved := make(map[string]string)
 	resolve := func(ref string) (string, error) {
 		if value, exists := resolved[ref]; exists {
@@ -195,6 +204,9 @@ func (c *Client) Close() error {
 	c.closed = true
 	c.mu.Unlock()
 	c.cancel()
+	if c.routing != nil {
+		c.routing.CloseIdleConnections()
+	}
 	c.transport.CloseIdleConnections()
 	return nil
 }
@@ -521,7 +533,13 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		}
 		networkContext, networkCancel := context.WithTimeout(ctx, timeout)
 		request = request.WithContext(networkContext)
-		response, err := c.transport.RoundTrip(request)
+		var response *http.Response
+		var err error
+		if c.routing != nil {
+			response, err = c.routing.RoundTrip(request)
+		} else {
+			response, err = c.transport.RoundTrip(request)
+		}
 		if err != nil {
 			safeErr := safeHTTPError(networkContext, err)
 			networkCancel()

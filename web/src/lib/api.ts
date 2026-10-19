@@ -195,6 +195,7 @@ async function invalidateData(cancelRefetch: boolean) {
       'stremio-requests',
       'security',
       'collection-settings',
+      'network-settings',
     ].map((key) => queryClient.invalidateQueries({ queryKey: [key] }, { cancelRefetch })),
   )
 }

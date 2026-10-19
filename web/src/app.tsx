@@ -33,6 +33,7 @@ import {
   GearSixIcon,
   ListChecksIcon,
   BroadcastIcon,
+  GlobeIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -192,6 +193,12 @@ const navigationGroups = [
     icon: GearSixIcon,
     defaultOpen: true,
     items: [
+      {
+        to: '/network',
+        label: 'Network',
+        description: 'Outgoing proxies and connection routing.',
+        icon: GlobeIcon,
+      },
       {
         to: '/security',
         label: 'Security',

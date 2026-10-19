@@ -23,6 +23,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/health"
 	"github.com/theo-bnts/aiosources/internal/jobs"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/scheduling"
 	"github.com/theo-bnts/aiosources/internal/store"
@@ -65,6 +66,8 @@ func New(options Options) (http.Handler, error) {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
 	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64), public: &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 8)}}
+	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
+	s.fileClient.Transport = network.Transport("downloads", s.fileClient.Transport.(*http.Transport))
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -118,6 +121,7 @@ func New(options Options) (http.Handler, error) {
 	s.registerSystemHealthRoutes(mux)
 	s.registerStorageRoutes(mux)
 	s.registerCollectionSettingsRoutes(mux)
+	s.registerNetworkRoutes(mux)
 	mux.HandleFunc("/api/", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "API route not found")
 	}))

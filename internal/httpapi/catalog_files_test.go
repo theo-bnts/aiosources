@@ -9,15 +9,35 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 type catalogFileRoundTrip func(*http.Request) (*http.Response, error)
 
 func (f catalogFileRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestCatalogFileDestinationGuardPrecedesProxyConnection(t *testing.T) {
+	var requests atomic.Int64
+	relay := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer relay.Close()
+	settings := model.NetworkSettings{Revision: 1, Default: "relay", Proxies: []model.NetworkProxy{{ID: "relay", Name: "Relay", URL: relay.URL, Enabled: true}}}
+	router := &outbound.Router{Settings: func(context.Context) (model.NetworkSettings, error) { return settings, nil }}
+	client := newCatalogFileClient()
+	client.Transport = router.Transport("downloads", client.Transport.(*http.Transport))
+	client.Timeout = time.Second
+	defer client.CloseIdleConnections()
+	if _, err := client.Get("https://127.0.0.1/file"); err == nil || requests.Load() != 0 {
+		t.Fatal("Download address protection was bypassed by proxy routing")
+	}
+}
 
 func TestCatalogFileAttachmentsAreSessionBoundAndStreamWithoutProviderCredentials(t *testing.T) {
 	f, addon, _ := addonAPI(t)

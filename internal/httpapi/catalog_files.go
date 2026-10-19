@@ -18,11 +18,13 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 const catalogFilePurpose = "catalog-browser-download-v1"
 
 type catalogFileTicket struct {
+	Service string `json:"service,omitempty"`
 	URL     string `json:"url"`
 	Session string `json:"session"`
 	Expires int64  `json:"expires"`
@@ -45,7 +47,7 @@ func (s *server) writeCatalogDownload(w http.ResponseWriter, r *http.Request, it
 			respondError(w, aiosource.ErrInvalidResponse)
 			return
 		}
-		data, e := json.Marshal(catalogFileTicket{URL: item.URL, Session: r.Context().Value(sessionContextKey{}).(session).id, Expires: time.Now().Add(10 * time.Minute).Unix()})
+		data, e := json.Marshal(catalogFileTicket{Service: item.Service, URL: item.URL, Session: r.Context().Value(sessionContextKey{}).(session).id, Expires: time.Now().Add(10 * time.Minute).Unix()})
 		if e != nil {
 			respondError(w, e)
 			return
@@ -102,7 +104,7 @@ func newCatalogFileClient() *http.Client {
 		}
 		d := net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 		for _, ip := range ips {
-			conn, err := d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+			conn, err := outbound.Dial(ctx, network, net.JoinHostPort(ip.String(), port), d.DialContext)
 			if err == nil {
 				return conn, nil
 			}
@@ -140,7 +142,7 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket catalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+600 || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && ticket.Service != "alldebrid" && ticket.Service != "torbox") || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+600 || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
@@ -153,6 +155,9 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 24*time.Hour)
 	defer cancel()
+	if ticket.Service != "" {
+		ctx = outbound.WithTarget(ctx, "download:"+ticket.Service)
+	}
 	request, err := http.NewRequestWithContext(ctx, r.Method, ticket.URL, nil)
 	if err != nil {
 		respondError(w, aiosource.ErrInvalidResponse)

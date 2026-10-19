@@ -17,6 +17,8 @@ import {
   ChartBarIcon,
   GearSixIcon,
   ClockCounterClockwiseIcon,
+  GlobeIcon,
+  PathIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -61,6 +63,10 @@ const RawDetailPage = lazy(() =>
 )
 const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default: m.RawPageView })))
 const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
+const NetworkPage = lazy(() => import('@/pages/network').then((m) => ({ default: m.NetworkPage })))
+const NetworkRoutingPage = lazy(() =>
+  import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
+)
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
 const RemoteStatisticsPage = lazy(() =>
@@ -343,6 +349,20 @@ const router = createBrowserRouter(
         <Route path="public-access" element={<PublicAccessPage />} />
         <Route path="sharing/remotes" element={<LegacyRemotes />} />
         <Route path="logs" element={<LogsPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Network"
+              tabs={[
+                { path: '/network', label: 'Proxies', icon: GlobeIcon },
+                { path: '/network/routing', label: 'Routing', icon: PathIcon },
+              ]}
+            />
+          }
+        >
+          <Route path="network" element={<NetworkPage />} />
+          <Route path="network/routing" element={<NetworkRoutingPage />} />
+        </Route>
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
         <Route path="torrents" element={<TorrentsPage />} />

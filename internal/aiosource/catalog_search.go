@@ -292,6 +292,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 		return result, err
 	}
 	result.OperationID = h.run.ID
+	result.Service = input.Service
 	defer func() {
 		if errors.Is(downloadErr, ErrPending) {
 			h.run.Processed = 1

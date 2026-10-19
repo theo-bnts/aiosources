@@ -174,7 +174,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		}
 		return stopReason(ctx, err)
 	}
-	environment := connectors.Environment{Secrets: resolved, MaxQuotaRetries: &policy.MaxQuotaRetries}
+	environment := connectors.Environment{Network: m.network, Secrets: resolved, MaxQuotaRetries: &policy.MaxQuotaRetries}
 	environment.KnownIDs = func(ctx context.Context, ids []string) (map[string]bool, error) {
 		return m.db.Known(ctx, run.ProviderID, ids, run.CreatedAt)
 	}

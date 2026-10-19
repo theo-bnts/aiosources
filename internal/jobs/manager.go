@@ -12,6 +12,7 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/connectors"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/store"
 )
@@ -43,6 +44,7 @@ type Manager struct {
 	db             *store.Store
 	registry       *providers.Registry
 	resolver       model.SecretResolver
+	network        *outbound.Router
 	initialWorkers int
 
 	lifecycle   sync.Mutex
@@ -66,8 +68,13 @@ func New(db *store.Store, registry *providers.Registry, resolver model.SecretRes
 	if initialWorkers < 1 {
 		initialWorkers = 1
 	}
+	var network *outbound.Router
+	if db != nil {
+		network = &outbound.Router{Settings: db.NetworkSettings, Secrets: resolver}
+	}
 	return &Manager{
-		db: db, registry: registry, resolver: resolver, initialWorkers: initialWorkers,
+		network: network,
+		db:      db, registry: registry, resolver: resolver, initialWorkers: initialWorkers,
 		done: make(chan struct{}), work: make(chan struct{}), schedule: make(chan struct{}, 1),
 		recovery: make(chan struct{}, 1),
 		active:   make(map[string]*activeAttempt), subscribers: make(map[chan Notice]struct{}),

@@ -49,6 +49,8 @@ Successful logout and detected session expiry remove the authenticated interface
 
 See [deployment settings](docs/SETTINGS.md) and [sharing boundaries](docs/SHARING.md) for operational details.
 
+Outgoing proxy profiles and routing require an administrator session and CSRF protection. Authentication refers to encrypted Secrets; credentials are not accepted inside proxy URLs. Managed proxies preserve destination certificate verification and the existing address checks for remote catalogs and browser downloads. An unavailable selected proxy blocks requests without direct fallback. Connection testing accepts only a saved profile ID and uses a fixed public HTTPS destination; its logs contain neither credentials nor connection addresses. Public visitors inherit routing without access to its configuration. See [proxy setup](docs/NETWORK.md).
+
 ## Interpreting dependency reports
 
 Run source-aware checks as well as package/version scans. A reported module is not necessarily an imported package or a reachable vulnerable call, and a clean scan is not a security certification.

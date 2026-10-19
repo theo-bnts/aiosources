@@ -90,6 +90,8 @@ In **Metadata → Settings**, add your own [TMDB API read access token](https://
 
 For debrid playback, add your AllDebrid or TorBox key in **Debrid → Settings**. Availability checks show which versions are already cached. AllDebrid checks can create temporary account entries; AIOSources only cleans up entries it has confirmed it created.
 
+If a service needs a different outgoing connection, open **Administration → Network**. Add an existing WARP, VPN or other proxy, test it, then select it for that service in **Routing**. You can also route all outgoing connections or individual sources through it. See [proxy setup](docs/NETWORK.md).
+
 ### 4. Search and connect an app
 
 Open **Search**, find a title and compare its releases, or [connect Stremio, AIOStreams or a Torznab client](#connect-your-apps).
@@ -198,7 +200,7 @@ For an older deployment using prefixed variables, remove `INGEST_` from those na
 - [Discord support — French only](https://discord.gg/h3sja5XN8b)
 - [Report a bug or suggest an improvement](https://github.com/theo-bnts/aiosources/issues)
 - [Source setup](docs/CONFIGURATION.md) · [Connector compatibility](docs/CONNECTORS.md) · [Sharing](docs/SHARING.md) · [Public instances](docs/PUBLIC_INSTANCES.md)
-- [Deployment](docs/SETTINGS.md) · [Operations and troubleshooting](docs/OPERATIONS.md)
+- [Deployment](docs/SETTINGS.md) · [Proxy setup](docs/NETWORK.md) · [Operations and troubleshooting](docs/OPERATIONS.md)
 - [Contributing](CONTRIBUTING.md) · [Development](docs/DEVELOPMENT.md) · [JSON reference](docs/JSON_REFERENCE.md)
 - [Report a security issue privately](SECURITY.md) · [Content rights and service terms](LEGAL.md)
 - [Support AIOSources on GitHub Sponsors](https://github.com/sponsors/theo-bnts)

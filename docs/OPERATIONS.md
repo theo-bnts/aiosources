@@ -43,6 +43,7 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 | Shared catalogs | Statistics / Settings for access granted to other instances |
 | Remote catalogs | Statistics / Settings / History for imported catalogs |
 | Public access | Public Stremio and Torznab controls |
+| Network | Proxies / Routing for outgoing connections |
 | Storage | Statistics / Settings (data retention and maintenance) |
 | Security | Statistics / Settings (secrets, two-step verification and sessions) |
 | Logs | Service activity and alerts; optional Debug |
@@ -55,7 +56,7 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 
 **Awaiting import completion** links to the current Full import or remote sync, or its latest incomplete attempt. A resumed older import takes priority while queued or running. Its retained non-deleted records may include updates to existing torrents, so this count is kept separate from the imported total. Paused and failed progress remains visible; Preview and older completed/cancelled or superseded attempts do not inflate the current counts.
 
-**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage → Statistics** displays database and local filesystem measurements; **Settings** contains data retention and maintenance.
+**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Administration → Network** selects outgoing proxies globally or per service/source; see [proxy setup](NETWORK.md). **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage → Statistics** displays database and local filesystem measurements; **Settings** contains data retention and maintenance.
 
 Groups with several menu entries can be expanded independently. Pages with only one entry are direct links. Breadcrumbs use the same definitions as the menu, including **Sources / Sources**, and display the page's title and short description once. Histories and Security views use horizontal tabs. Root tab panels omit repeated titles and introductory descriptions; source and operation details retain their specific names.
 

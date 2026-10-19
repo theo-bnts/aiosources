@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 // Connector returns complete pages and explicit opaque continuation state.
@@ -19,6 +20,7 @@ type Connector interface {
 }
 
 type Environment struct {
+	Network         *outbound.Router
 	Secrets         model.SecretResolver
 	LocalInstanceID string
 	// Nil preserves the standalone limit of three automatic 429 retries.

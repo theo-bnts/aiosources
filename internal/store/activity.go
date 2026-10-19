@@ -25,7 +25,7 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	if err := validateActivityPage(options.ListOptions); err != nil {
 		return result, err
 	}
-	if options.Service != "" && options.Service != "tmdb" && options.Service != "alldebrid" && options.Service != "torbox" {
+	if options.Service != "" && options.Service != "tmdb" && options.Service != "alldebrid" && options.Service != "torbox" && options.Service != "network" {
 		return result, model.ErrInvalid
 	}
 	for _, level := range options.Levels {
@@ -102,6 +102,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		return model.ErrInvalid
 	}
 	switch kind {
+	case "network.settings_changed", "network.test_completed", "network.test_failed":
 	case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 		"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset":
 	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked", "torznab.searched", "torznab.failed", "torznab.public_searched", "torznab.public_failed":
@@ -131,7 +132,13 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 			}
 		}
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6))`, "activity-"+id, level, kind, providerID, runID, encoded)
+	// Keep ordinary activity compatible with the earlier catalog migrations.
+	// Network events are only emitted after the network schema is installed.
+	query := `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6))`
+	if strings.HasPrefix(kind, "network.") {
+		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'network')`
+	}
+	_, err = tx.Exec(ctx, query, "activity-"+id, level, kind, providerID, runID, encoded)
 	if err != nil {
 		return databaseError("record service activity", err)
 	}

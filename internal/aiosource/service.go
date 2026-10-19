@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/store"
 	"github.com/theo-bnts/aiosources/internal/vault"
@@ -21,6 +22,7 @@ type Service struct {
 	Providers                 *ProviderHTTP
 	TMDBBase, ExportBase      string
 	MetadataHTTP              *http.Client
+	Network                   *outbound.Router
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
 	cancel                    context.CancelFunc
@@ -53,6 +55,9 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	}
 	life, cancel := context.WithCancel(ctx)
 	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}, slots: make(chan struct{}, 4), cleanupSlots: make(chan struct{}, 4)}
+	s.Network = &outbound.Router{Settings: db.NetworkSettings, Secrets: v.Resolve}
+	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
+	s.Providers.Client.Transport = s.Network.Transport("", outbound.HTTPTransport())
 	release, locked, err := db.AIOLock(ctx, "installation")
 	if err != nil {
 		cancel()
@@ -93,6 +98,12 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	return err
 }
 func (s *Service) Close(ctx context.Context) error {
+	if s.MetadataHTTP != nil {
+		defer s.MetadataHTTP.CloseIdleConnections()
+	}
+	if s.Providers != nil && s.Providers.Client != nil {
+		defer s.Providers.Client.CloseIdleConnections()
+	}
 	s.mu.Lock()
 	s.closed = true
 	s.cancel()

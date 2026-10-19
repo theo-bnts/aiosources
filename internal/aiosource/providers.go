@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 var ErrPending = errors.New("torrent is not ready")
@@ -89,6 +90,7 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	if err != nil {
 		return nil, ErrInvalidResponse
 	}
+	req = req.WithContext(outbound.WithTarget(req.Context(), "debrid:"+service))
 	req.Header.Set("Authorization", "Bearer "+key)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)

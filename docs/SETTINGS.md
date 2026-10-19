@@ -64,6 +64,10 @@ Crash tests pass `CRASH_TEST_DATABASE_URL` and `CRASH_TEST_PROVIDERS` to their c
 
 The unauthenticated liveness endpoint is `GET /healthz`. Database and storage measurements require an authenticated session.
 
+## Outgoing connections
+
+Configure existing WARP, VPN or other HTTP(S)/SOCKS5 proxies in **Administration → Network**. Profiles, the default connection and per-source/service choices are saved in the database; authentication uses encrypted Secrets. No new environment variable or application restart is required. See [proxy setup](NETWORK.md) for Docker addresses, routing rules and connection testing.
+
 ## Collection concurrency
 
 Open **Sources → Settings → Advanced settings** to change **Simultaneous imports** from **1 to 32**. The setting persists in PostgreSQL and applies immediately to all collection processes sharing that database, without restarting.

@@ -113,6 +113,7 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 		queries = append(queries, `DELETE FROM ingest.`+table+` WHERE run_id IN (SELECT id FROM ingest.runs WHERE provider_id=$1)`)
 	}
 	queries = append(queries,
+		`UPDATE ingest.network_settings SET overrides=overrides-('source:'||$1),revision=revision+1 WHERE singleton AND overrides ? ('source:'||$1)`,
 		`DELETE FROM ingest.runs WHERE provider_id=$1`,
 		`DELETE FROM ingest.schedule_clocks WHERE provider_id=$1`,
 		`DELETE FROM ingest.provider_requests WHERE provider_id=$1`,

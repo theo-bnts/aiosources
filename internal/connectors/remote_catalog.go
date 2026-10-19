@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 func validateRemoteCatalog(p model.Provider) error {
@@ -40,8 +41,8 @@ func validateRemoteCatalog(p model.Provider) error {
 }
 
 // Private LAN and loopback HTTPS are intentional. DNS is checked again for every
-// connection and only the validated IP is dialed, without a proxy or second DNS
-// lookup. Certificate verification still uses the original URL hostname.
+// connection and only the validated IP is dialed, including through a selected
+// proxy. Certificate verification still uses the original URL hostname.
 func catalogAddressAllowed(ip net.IP) bool {
 	return ip != nil && !ip.IsUnspecified() && !ip.IsMulticast() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() && !ip.Equal(net.IPv4bcast) && !ip.Equal(net.IP{100, 100, 100, 200})
 }
@@ -62,7 +63,7 @@ func catalogDial(ctx context.Context, network, address string) (net.Conn, error)
 	}
 	dialer := net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
 	for _, address := range addresses {
-		connection, err := dialer.DialContext(ctx, network, net.JoinHostPort(address.IP.String(), port))
+		connection, err := outbound.Dial(ctx, network, net.JoinHostPort(address.IP.String(), port), dialer.DialContext)
 		if err == nil {
 			return connection, nil
 		}

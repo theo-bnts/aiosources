@@ -64,6 +64,7 @@ type CatalogDownloadInput struct {
 }
 
 type CatalogDownload struct {
+	Service       string `json:"-"`
 	Status        string `json:"status"`
 	URL           string `json:"url,omitempty"`
 	OperationID   string `json:"operation_id"`
