@@ -194,16 +194,16 @@ const navigationGroups = [
     defaultOpen: true,
     items: [
       {
-        to: '/network',
-        label: 'Network',
-        description: 'Outgoing proxies and connection routing.',
-        icon: GlobeIcon,
-      },
-      {
         to: '/security',
         label: 'Security',
         description: 'Encrypted secrets, sign-in protection and active sessions.',
         icon: ShieldCheckIcon,
+      },
+      {
+        to: '/network',
+        label: 'Network',
+        description: 'Outgoing proxies and connection routing.',
+        icon: GlobeIcon,
       },
       {
         to: '/health',

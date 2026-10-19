@@ -20,7 +20,7 @@ The test verifies that an HTTPS connection works through the proxy. A particular
 
 **Default connection** applies to sources, remote catalogs, metadata, debrid services and browser downloads. New sources inherit it automatically.
 
-Use the separate service or source selectors for exceptions:
+Use **Sources**, **Metadata** and **Debrid** for exceptions, in the same order as the main menu:
 
 - **Use default connection** follows the saved default.
 - **System connection** preserves the application's existing connection behavior, including environment proxy settings where previously supported.

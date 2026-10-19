@@ -462,36 +462,6 @@ export function NetworkRoutingPage() {
               </p>
             </section>
             <section className="section-card">
-              <h2 className="section-title">Services</h2>
-              <div className="grid gap-5 md:grid-cols-2">
-                {[
-                  ['metadata:tmdb', 'TMDB information and exports'],
-                  ['debrid:alldebrid', 'AllDebrid'],
-                  ['debrid:torbox', 'TorBox'],
-                  ['downloads', 'Browser downloads'],
-                ].map(([target, label]) => (
-                  <ConnectionSelect
-                    key={target}
-                    id={`network-${target}`}
-                    label={label}
-                    value={settings.overrides[target] ?? ''}
-                    settings={settings}
-                    inherit={
-                      target === 'downloads'
-                        ? 'Use debrid connection or default'
-                        : 'Use default connection'
-                    }
-                    disabled={save.isPending}
-                    onChange={(value) => route(target, value)}
-                  />
-                ))}
-              </div>
-              <p className="help">
-                Browser downloads inherit their debrid service’s connection unless overridden.
-                Stremio playback links are opened by your player.
-              </p>
-            </section>
-            <section className="section-card">
               <h2 className="section-title">Sources</h2>
               {providers.isPending ? (
                 <Loading label="Loading sources" />
@@ -517,6 +487,49 @@ export function NetworkRoutingPage() {
                   </p>
                 )
               )}
+            </section>
+            <section className="section-card">
+              <h2 className="section-title">Metadata</h2>
+              <div className="grid gap-5 md:grid-cols-2">
+                <ConnectionSelect
+                  id="network-metadata:tmdb"
+                  label="TMDB"
+                  value={settings.overrides['metadata:tmdb'] ?? ''}
+                  settings={settings}
+                  inherit="Use default connection"
+                  disabled={save.isPending}
+                  onChange={(value) => route('metadata:tmdb', value)}
+                />
+              </div>
+            </section>
+            <section className="section-card">
+              <h2 className="section-title">Debrid</h2>
+              <div className="grid gap-5 md:grid-cols-2">
+                {[
+                  ['debrid:alldebrid', 'AllDebrid'],
+                  ['debrid:torbox', 'TorBox'],
+                  ['downloads', 'Browser downloads'],
+                ].map(([target, label]) => (
+                  <ConnectionSelect
+                    key={target}
+                    id={`network-${target}`}
+                    label={label}
+                    value={settings.overrides[target] ?? ''}
+                    settings={settings}
+                    inherit={
+                      target === 'downloads'
+                        ? 'Use debrid connection or default'
+                        : 'Use default connection'
+                    }
+                    disabled={save.isPending}
+                    onChange={(value) => route(target, value)}
+                  />
+                ))}
+              </div>
+              <p className="help">
+                Browser downloads inherit their debrid service’s connection unless overridden.
+                Stremio playback links are opened by your player.
+              </p>
             </section>
             {settings.proxies.some((proxy) => !proxy.enabled && proxyInUse(settings, proxy.id)) && (
               <p role="status" className="notice notice-warning">

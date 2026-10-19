@@ -43,9 +43,9 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 | Shared catalogs | Statistics / Settings for access granted to other instances |
 | Remote catalogs | Statistics / Settings / History for imported catalogs |
 | Public access | Public Stremio and Torznab controls |
+| Security | Statistics / Settings (secrets, two-step verification and sessions) |
 | Network | Proxies / Routing for outgoing connections |
 | Storage | Statistics / Settings (data retention and maintenance) |
-| Security | Statistics / Settings (secrets, two-step verification and sessions) |
 | Logs | Service activity and alerts; optional Debug |
 
 **Sources → History** follows active and past source imports, previews and source-detail updates. Open a specific run, then **Processed records**, to inspect its accepted, ignored and rejected records. There is no global observation browser. **Metadata → History** follows information updates and torrent identification; **Debrid → History** follows cache verification and temporary magnet cleanup. **Logs** contains activity and alerts from all services.

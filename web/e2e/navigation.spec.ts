@@ -93,8 +93,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Torznab',
     'Shared catalogs',
     'Public access',
-    'Network',
     'Security',
+    'Network',
     'Storage',
     'Logs',
   ])

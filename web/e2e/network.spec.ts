@@ -79,6 +79,12 @@ test('proxy profiles use Secrets and route services independently without activa
     ).status(),
   ).toBe(200)
   await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+  await expect(page.locator('main .section-title')).toHaveText([
+    'Default connection',
+    'Sources',
+    'Metadata',
+    'Debrid',
+  ])
   await page.getByLabel('AllDebrid', { exact: true }).selectOption(initial.proxies[0].id)
   await page.getByLabel('Sample connection', { exact: true }).selectOption('direct')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
