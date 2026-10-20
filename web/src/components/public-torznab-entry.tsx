@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import {
+  usePublicCredential,
+  savePublicCredential,
+  forgetPublicCredential,
+  isCurrentPublicCredential,
+  type PublicCredential,
+} from '@/lib/public-credentials'
 import { torznabPreferenceKey, torznabPreferenceError } from '@/lib/torznab-preferences'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,16 +22,23 @@ import {
 } from '@/components/public-connection-fields'
 
 export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
+  const saved = usePublicCredential()
   const [options, setOptions] = useState<TorznabOptions>({})
   const [connection, setConnection] = useState<{ url: string; api_key: string }>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>()
   const request = useRef<AbortController | null>(null)
+  const connectionCredential = useRef('')
+  const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => {
+    if ((saved?.credential ?? '') !== connectionCredential.current) setConnection(undefined)
+  }, [saved])
   useEffect(() => {
     if (!info.torznab_enabled) {
       setConnection(undefined)
       request.current?.abort()
+      setPending(false)
     }
   }, [info.torznab_enabled])
   useEffect(() => {
@@ -49,15 +63,33 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     setError(undefined)
     setConnection(undefined)
     try {
-      const result = await api<{ url: string; api_key: string }>('/public/torznab/install', {
-        method: 'POST',
-        cache: 'no-store',
-        body: JSON.stringify({ options, announces }),
-        signal: controller.signal,
-      })
-      if (!controller.signal.aborted) setConnection(result)
+      const result = await api<PublicCredential & { url: string; api_key: string }>(
+        '/public/torznab/install',
+        {
+          method: 'POST',
+          cache: 'no-store',
+          body: JSON.stringify({
+            options,
+            announces,
+            ...(saved ? { credential: saved.credential } : {}),
+            ...(values.getAll('remove_announce').length
+              ? { remove_announces: values.getAll('remove_announce') }
+              : {}),
+          }),
+          signal: controller.signal,
+        },
+      )
+      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
+        connectionCredential.current = result.credential
+        if (result.credential) savePublicCredential(result)
+        else forgetPublicCredential()
+        setConnection(result)
+      }
     } catch (e) {
-      if (!controller.signal.aborted) setError(e)
+      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
+        if (e instanceof ApiError && e.status === 401) forgetPublicCredential(saved?.credential)
+        setError(e)
+      }
     } finally {
       for (const key of Object.keys(announces)) delete announces[key]
       for (const key of [...values.keys()]) values.delete(key)
@@ -84,6 +116,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
       <section className="section-card">
         <h2 className="section-title">Create a Torznab connection</h2>
         <form
+          ref={formRef}
           className="space-y-5"
           onSubmit={(e) => {
             e.preventDefault()
@@ -112,9 +145,25 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
               {preferenceError}
             </p>
           )}
-          <Button type="submit" disabled={pending || Boolean(preferenceError)}>
-            {pending ? 'Creating connection…' : 'Create connection link'}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={pending || Boolean(preferenceError)}>
+              {pending ? 'Creating connection…' : 'Create connection link'}
+            </Button>
+            {saved && (
+              <Button
+                type="button"
+                variant="warning"
+                disabled={pending}
+                onClick={() => {
+                  if (formRef.current) clearPublicCredentials(formRef.current)
+                  forgetPublicCredential()
+                  setError(undefined)
+                }}
+              >
+                Forget saved credentials
+              </Button>
+            )}
+          </div>
         </form>
       </section>
       {connection && !preferenceError && (

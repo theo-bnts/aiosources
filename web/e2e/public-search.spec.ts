@@ -188,7 +188,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     const second = await context.newPage()
     await second.goto('/public/search')
     await expect(second.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toBeVisible()
-    await visitor.getByRole('button', { name: 'Forget saved keys', exact: true }).click()
+    await visitor.getByRole('button', { name: 'Forget saved credentials', exact: true }).click()
     await expect(second.getByRole('button', { name: 'Start searching', exact: true })).toBeVisible()
     await second.close()
     await visitor.setViewportSize({ width: 390, height: 844 })

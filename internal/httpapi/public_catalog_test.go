@@ -79,7 +79,7 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	}
 	saved, err := addon.OpenPublicInstallation(f.ctx, "https://addon.example", installed.Credential)
 	if err != nil || saved.Services["torbox"] != key || len(saved.Announces) != 0 {
-		t.Fatal("Browser credential is not keys-only", err)
+		t.Fatal("Browser credential lost its key or acquired an announce", err)
 	}
 	response = send("POST", "/api/public/install", `{"credential":"`+installed.Credential+`","services":{}}`, "")
 	if response.Code != 200 || strings.Contains(response.Body.String(), key) {

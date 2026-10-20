@@ -36,7 +36,7 @@ type PublicInstallation struct {
 }
 
 // This is a consented list of source names, never a source definition or secret
-// reference. Only sources explicitly marked private can accept visitor announces.
+// reference. Unclassified sources are private, as in playback and the settings UI.
 type PublicPrivateSource struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -52,7 +52,7 @@ func (s *Service) publicPrivateSources(c model.AIOConfig) ([]PublicPrivateSource
 		return nil, err
 	}
 	for _, source := range sources {
-		if tracker, configured := c.Trackers[source.ID]; source.Valid && configured && tracker.Private {
+		if tracker, configured := c.Trackers[source.ID]; source.Valid && (!configured || tracker.Private) {
 			name := strings.TrimSpace(source.Name)
 			if name == "" {
 				name = source.ID
@@ -254,28 +254,11 @@ func (s *Service) sealPublicInstallation(installation PublicInstallation) (strin
 	return configuration, nil
 }
 
-// A browser can remember this sealed credential without retaining plaintext keys
-// or personal announces. It authorizes no administration and remains revocable.
-func (s *Service) PublicBrowserCredential(ctx context.Context, audience, configuration string) (string, []string, error) {
-	installation, err := s.OpenPublicInstallation(ctx, audience, configuration)
-	if err != nil {
-		return "", nil, err
-	}
-	defer clear(installation.Services)
-	defer clear(installation.Announces)
-	keysOnly := *installation
-	keysOnly.Announces = nil
-	credential, err := s.sealPublicInstallation(keysOnly)
-	services := []string{}
-	for _, provider := range PublicProviders {
-		if installation.Services[provider.ID] != "" {
-			services = append(services, provider.ID)
-		}
-	}
-	return credential, services, err
+func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
+	return s.openPublicCredential(ctx, audience, value, true)
 }
 
-func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
+func (s *Service) openPublicCredential(ctx context.Context, audience, value string, requireServices bool) (*PublicInstallation, error) {
 	if len(value) < 32 || len(value) > MaxPublicInstallationSize {
 		return nil, ErrAuth
 	}
@@ -300,7 +283,9 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 	}
 	defer clear(data)
 	var out PublicInstallation
-	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
+	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || (requireServices || len(out.Services) > 0) && !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
+		clear(out.Services)
+		clear(out.Announces)
 		return nil, ErrAuth
 	}
 	if !access.ExposeSources {

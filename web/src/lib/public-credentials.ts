@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { api, ApiError, queryClient } from './api'
 
-export type PublicCredential = { credential: string; services: string[] }
+export type PublicCredential = { credential: string; services: string[]; announces?: string[] }
 export type PublicInstallation = PublicCredential & { manifest_url: string }
 const storageKey = 'aiosources.public.credentials'
 const listeners = new Set<() => void>()
@@ -15,12 +15,22 @@ function parse(value: unknown): PublicCredential | null {
     typeof item.credential !== 'string' ||
     !/^[A-Za-z0-9_-]{32,8192}$/.test(item.credential) ||
     !Array.isArray(item.services) ||
-    !item.services.length ||
     item.services.length > 2 ||
-    !item.services.every((service) => service === 'alldebrid' || service === 'torbox')
+    !item.services.every((service) => service === 'alldebrid' || service === 'torbox') ||
+    (item.announces !== undefined &&
+      (!Array.isArray(item.announces) ||
+        item.announces.length > 128 ||
+        !item.announces.every(
+          (id) => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id),
+        ))) ||
+    (!item.services.length && !(item.announces as string[] | undefined)?.length)
   )
     return null
-  return { credential: item.credential, services: [...new Set(item.services as string[])] }
+  return {
+    credential: item.credential,
+    services: [...new Set(item.services as string[])],
+    announces: [...new Set((item.announces ?? []) as string[])],
+  }
 }
 
 function read() {
@@ -60,13 +70,17 @@ export function usePublicCredential() {
   return useSyncExternalStore(subscribe, read, () => null)
 }
 
+export function isCurrentPublicCredential(expected?: string) {
+  return read()?.credential === expected
+}
+
 export function savePublicCredential(value: PublicCredential) {
   const next = parse(value)
   if (!next) throw new Error('The server returned an invalid service configuration.')
   current = next
   loaded = true
-  // Only the server-sealed, keys-only configuration is persisted. Personal
-  // keys and announce URLs never enter localStorage or query-cache entries.
+  // Only server-sealed credentials and field identifiers are persisted. Personal
+  // keys and announce URLs never enter localStorage or query-cache entries in plaintext.
   try {
     localStorage.setItem(storageKey, JSON.stringify(next))
   } catch {

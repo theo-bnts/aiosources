@@ -29,17 +29,27 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 		}
 		defer release()
 		var input struct {
-			Options   model.PublicTorznabOptions `json:"options"`
-			Announces map[string]string          `json:"announces"`
+			// Torznab only preserves previously validated service keys inside the
+			// browser credential. Its connection key never contains those keys.
+			Options         model.PublicTorznabOptions `json:"options"`
+			Credential      string                     `json:"credential"`
+			Announces       map[string]string          `json:"announces"`
+			RemoveAnnounces []string                   `json:"remove_announces"`
 		}
 		defer func() { clear(input.Announces) }()
-		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
+		r.Body = http.MaxBytesReader(w, r.Body, 2*aiosource.MaxPublicInstallationSize)
 		if !decodeJSON(w, r, &input) {
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
-		key, err := s.options.AIOSource.CreatePublicTorznab(ctx, s.auth.origin, input.Options, input.Announces)
+		saved, err := s.options.AIOSource.ResolvePublicCredential(ctx, s.auth.origin, aiosource.PublicCredentialChanges{Credential: input.Credential, Announces: input.Announces, RemoveAnnounces: input.RemoveAnnounces})
+		if err != nil {
+			publicCredentialError(w, err)
+			return
+		}
+		defer func() { clear(saved.Services); clear(saved.Announces) }()
+		key, err := s.options.AIOSource.CreatePublicTorznab(ctx, s.auth.origin, input.Options, saved.Announces)
 		if err != nil {
 			if errors.Is(err, model.ErrNotFound) {
 				writeError(w, 404, "Public Torznab is disabled")
@@ -48,7 +58,16 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 			writeError(w, 400, "Check public Torznab access, filters and your complete announce URLs. Shorten optional URLs if the configuration is too large.")
 			return
 		}
-		writeJSON(w, 200, map[string]string{"url": s.auth.origin + "/public/torznab/api", "api_key": key})
+		credential, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, saved)
+		if err != nil {
+			publicCredentialError(w, err)
+			return
+		}
+		writeJSON(w, 200, struct {
+			aiosource.PublicBrowserCredential
+			URL    string `json:"url"`
+			APIKey string `json:"api_key"`
+		}{credential, s.auth.origin + "/public/torznab/api", key})
 	})
 	mux.HandleFunc("/public/torznab/api", s.publicTorznabFeed)
 }

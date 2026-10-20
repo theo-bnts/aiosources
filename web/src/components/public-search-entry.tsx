@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { usePublicCredential } from '@/lib/public-credentials'
 import { PublicSearchContext } from '@/lib/public-search'
@@ -18,9 +18,7 @@ const CatalogTitlePage = lazy(() =>
 export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const saved = usePublicCredential()
   const location = useLocation()
-  const [session, setSession] = useState<{ base: string; configuration: string } | null>(null)
-  const configuration =
-    saved && (session?.base === saved.credential ? session.configuration : saved.credential)
+  const configuration = saved?.services.length ? saved.credential : ''
   const scope = useMemo(() => crypto.randomUUID(), [configuration])
   const id = /^\/public\/search\/([0-9]+)$/.exec(location.pathname)?.[1]
   if (!info.search_enabled)
@@ -38,16 +36,9 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const form = (
     <PublicCredentialsForm
       info={info}
-      submitLabel={saved ? 'Update services' : 'Start searching'}
-      onConfigured={(value, hasAnnounces) => {
-        const token = new URL(value.manifest_url).pathname.split('/').at(-2) || ''
-        setSession({
-          base: value.credential,
-          configuration: hasAnnounces ? token : value.credential,
-        })
-      }}
+      submitLabel={configuration ? 'Update services' : 'Start searching'}
     >
-      <PublicAnnounceFields sources={info.private_sources ?? []} pending={false} search />
+      <PublicAnnounceFields sources={info.private_sources ?? []} pending={false} />
     </PublicCredentialsForm>
   )
   if (!saved || !configuration)

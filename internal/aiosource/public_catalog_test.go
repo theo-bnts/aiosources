@@ -59,15 +59,21 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	if err != nil || rows.Total != 1 || rows.Items[0].ProviderName != "Example Library" || !rows.Items[0].Services[0].CanAdd {
 		t.Fatal("Own announce did not authorize an uncached version", err)
 	}
-	browser, services, err := s.PublicBrowserCredential(ctx, "https://addon.example", configuration)
-	if err != nil || len(services) != 1 {
+	browser, err := s.PublicBrowserCredential(ctx, "https://addon.example", visitor)
+	if err != nil || len(browser.Services) != 1 || len(browser.Announces) != 1 {
 		t.Fatal(err)
 	}
-	keysOnly, err := s.OpenPublicInstallation(ctx, "https://addon.example", browser)
-	if err != nil || len(keysOnly.Announces) != 0 || len(keysOnly.Preferences.Sources) != 0 {
-		t.Fatal("Browser credential retained feature-specific fields", err)
+	remembered, err := s.OpenPublicInstallation(ctx, "https://addon.example", browser.Credential)
+	if err != nil || remembered.Announces["private-one"] != announce || len(remembered.Preferences.Sources) != 0 {
+		t.Fatal("Browser credential lost its personal announce or retained filters", err)
 	}
-	rows, err = s.PublicCatalogReleases(ctx, keysOnly, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
+	rows, err = s.PublicCatalogReleases(ctx, remembered, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
+	if err != nil || rows.Total != 1 {
+		t.Fatal("Remembered personal announce was not reused", err)
+	}
+	keysOnly := *remembered
+	keysOnly.Announces = nil
+	rows, err = s.PublicCatalogReleases(ctx, &keysOnly, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
 	if err != nil || rows.Total != 0 {
 		t.Fatal("Keys-only configuration inherited an announce", err)
 	}
@@ -105,7 +111,7 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	if _, err = s.PublicCatalogDownload(ctx, visitor, work, input); !errors.Is(err, model.ErrNotFound) {
 		t.Fatal("Installation capability crossed purposes", err)
 	}
-	if _, err = s.OpenPublicInstallation(ctx, "https://another.example", browser); err == nil {
+	if _, err = s.OpenPublicInstallation(ctx, "https://another.example", browser.Credential); err == nil {
 		t.Fatal("Saved keys crossed origins")
 	}
 	access, _ = s.DB.PublicAccess(ctx)

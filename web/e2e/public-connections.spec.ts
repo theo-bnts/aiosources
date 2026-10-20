@@ -121,6 +121,38 @@ test('public connections share the shell and encrypted Torznab filters without v
     const stored = await visitor.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
     expect(stored.includes('visitor-private-passkey')).toBe(false)
     expect(stored.includes(credential)).toBe(false)
+    // Announce-only Torznab setup is remembered too, without inventing a debrid
+    // key or requiring the visitor to re-enter the URL on another public page.
+    await visitor.reload()
+    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await expect(announceField).toHaveAttribute('placeholder', /Saved on this browser/)
+    await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
+    await expect(key).not.toHaveValue('')
+    credential = await key.inputValue()
+    expect(await (await feed(credential)).text()).toContain('tr=' + encodeURIComponent(own))
+    await navigation.getByRole('link', { name: 'Stremio', exact: true }).click()
+    await expect(
+      visitor.getByRole('button', { name: 'Create installation link', exact: true }),
+    ).toBeVisible()
+    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await expect(announceField).toHaveAttribute('placeholder', /Saved on this browser/)
+    await expect(visitor.getByLabel('TorBox API key')).toHaveValue('')
+    await navigation.getByRole('link', { name: 'Torznab', exact: true }).click()
+    await expect(
+      visitor.getByRole('button', { name: 'Create connection link', exact: true }),
+    ).toBeVisible()
+    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.getByRole('button', { name: 'Remove announce', exact: true }).click()
+    await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
+    await expect(key).not.toHaveValue('')
+    const withoutAnnounce = await key.inputValue()
+    expect(await (await feed(withoutAnnounce)).text()).not.toContain('tr=')
+    await expect(announceField).toHaveAttribute('placeholder', 'Complete announce URL')
+    // Replacing the saved value keeps the rest of the ordinary connection flow.
+    await announceField.fill(own)
+    await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
+    await expect(key).not.toHaveValue('')
+    credential = await key.inputValue()
     const counts = await db.query(
       'SELECT (SELECT count(*) FROM ingest.shares)::int AS grants,(SELECT count(*) FROM ingest.share_requests)::int AS requests',
     )

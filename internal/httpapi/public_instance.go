@@ -101,14 +101,13 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		defer release()
 		var input struct {
-			Preferences    model.StreamPreferences `json:"preferences"`
-			Services       map[string]string       `json:"services"`
-			Announces      map[string]string       `json:"announces"`
-			Credential     string                  `json:"credential"`
-			RemoveServices []string                `json:"remove_services"`
+			aiosource.PublicCredentialChanges
+			Preferences model.StreamPreferences `json:"preferences"`
 		}
 		defer func() { clear(input.Services); clear(input.Announces) }()
-		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
+		// A remembered encrypted configuration and replacement values can be
+		// larger than either final URL. The sealed result keeps its own hard cap.
+		r.Body = http.MaxBytesReader(w, r.Body, 2*aiosource.MaxPublicInstallationSize)
 		if !decodeJSON(w, r, &input) {
 			return
 		}
@@ -118,44 +117,14 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, model.ErrInvalid)
 			return
 		}
-		keys := map[string]string{}
-		defer clear(keys)
-		if input.Credential != "" {
-			saved, err := s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, input.Credential)
-			if err != nil {
-				if errors.Is(err, aiosource.ErrAuth) {
-					writeError(w, 401, "Your saved service configuration is no longer available. Enter your keys again.")
-				} else {
-					respondError(w, err)
-				}
-				return
-			}
-			for service, key := range saved.Services {
-				keys[service] = key
-			}
-			clear(saved.Services)
-			clear(saved.Announces)
-		}
-		if len(input.RemoveServices) > len(aiosource.PublicProviders) {
-			respondError(w, model.ErrInvalid)
+		saved, err := s.options.AIOSource.ResolvePublicCredential(ctx, s.auth.origin, input.PublicCredentialChanges)
+		if err != nil {
+			publicCredentialError(w, err)
 			return
 		}
-		for _, service := range input.RemoveServices {
-			known := false
-			for _, provider := range aiosource.PublicProviders {
-				known = known || provider.ID == service
-			}
-			if !known {
-				respondError(w, model.ErrInvalid)
-				return
-			}
-			delete(keys, service)
-		}
-		for service, key := range input.Services {
-			keys[service] = key
-		}
-		hasAnnounces := len(input.Announces) > 0
-		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, keys, input.Announces)
+		defer func() { clear(saved.Services); clear(saved.Announces) }()
+		hasAnnounces := len(saved.Announces) > 0
+		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, saved.Services, saved.Announces)
 		if err == nil {
 			configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
 		}
@@ -173,12 +142,15 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			}
 			return
 		}
-		credential, services, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, configuration)
+		credential, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, saved)
 		if err != nil {
 			respondError(w, err)
 			return
 		}
-		writeJSON(w, 200, map[string]any{"manifest_url": s.auth.origin + "/public/stremio/" + configuration + "/manifest.json", "credential": credential, "services": services})
+		writeJSON(w, 200, struct {
+			aiosource.PublicBrowserCredential
+			ManifestURL string `json:"manifest_url"`
+		}{credential, s.auth.origin + "/public/stremio/" + configuration + "/manifest.json"})
 	})
 	protect := func(budget time.Duration, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -249,4 +221,12 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		w.WriteHeader(204)
 	})
 	mux.HandleFunc("/public/stremio/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "Addon route not found") })
+}
+
+func publicCredentialError(w http.ResponseWriter, err error) {
+	if errors.Is(err, aiosource.ErrAuth) {
+		writeError(w, 401, "Your saved credentials are no longer available. Enter them again.")
+	} else {
+		respondError(w, err)
+	}
 }

@@ -137,7 +137,7 @@ Only permitted torrent information is transferred. Accounts, source credentials,
 
 An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Search and Torznab. Administration stays protected.
 
-For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys are remembered automatically on the visitor’s browser in an encrypted configuration shared with Search; **Forget saved keys** clears it. Fresh cached-availability observations can be reused across users, independently for each debrid service.
+For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys and optional personal announce URLs are remembered automatically on the visitor’s browser in an encrypted configuration shared by Search, Stremio and Torznab; **Forget saved credentials** clears it. Fresh cached-availability observations can be reused across users, independently for each debrid service.
 
 The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
 

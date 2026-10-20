@@ -72,7 +72,7 @@ func TestInvalidSourceDefinitionCannotAuthorizeVisitorDownloads(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(directory, "private-one.json"), []byte(invalid), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if sources, err := s.PublicPrivateSources(ctx); err != nil || len(sources) != 1 || sources[0].ID != "private-two" {
+	if sources, err := s.PublicPrivateSources(ctx); err != nil || len(sources) != 2 || sources[0].ID != "private-two" || sources[1].ID != "unspecified" {
 		t.Fatal("invalid definition still offered a visitor announce field", err)
 	}
 	var validations atomic.Int64
@@ -156,14 +156,14 @@ func TestVisitorAnnouncesAreOptInScopedEncryptedAndNeverStored(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, err := s.PublicPrivateSources(ctx)
-	if err != nil || len(list) != 2 || list[0].Name != "Another Library" || list[1].Name != "Example Library" {
+	if err != nil || len(list) != 3 || list[0].Name != "Another Library" || list[1].Name != "Example Library" || list[2].ID != "unspecified" {
 		t.Fatal("source consent list lost names, ordering or privacy classification", list, err)
 	}
 	encoded, _ := json.Marshal(list)
 	if strings.Contains(string(encoded), "admin") || strings.Contains(string(encoded), "https") || strings.Contains(string(encoded), "secret") {
 		t.Fatal("public source list contains definition or credential data")
 	}
-	for _, input := range []map[string]string{{"unknown": announce}, {"public-one": announce}, {"unspecified": announce}, {"private-one": ""}, {"private-one": "https://user:secret@example.invalid/announce"}, {"private-one": "https://example.invalid/announce#private"}, {"private-one": "file:///private"}, {"private-one": "https://example.invalid/bad\nvalue"}} {
+	for _, input := range []map[string]string{{"unknown": announce}, {"public-one": announce}, {"private-one": ""}, {"private-one": "https://user:secret@example.invalid/announce"}, {"private-one": "https://example.invalid/announce#private"}, {"private-one": "file:///private"}, {"private-one": "https://example.invalid/bad\nvalue"}} {
 		if _, err := s.CreatePublicInstallation(ctx, "https://public.example", keys, input); !errors.Is(err, model.ErrInvalid) || calls.Load() != 0 || strings.Contains(err.Error(), "private-passkey") {
 			t.Fatal("invalid or unauthorized announcement accepted or contacted a provider", err)
 		}

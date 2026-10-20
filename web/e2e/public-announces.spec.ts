@@ -25,15 +25,8 @@ test('visitor announce fields are opt-in, use source names and clear personal in
       })
     ).status(),
   ).toBe(200)
-  const { config } = await (await page.request.get('/api/aiosource')).json()
-  expect(
-    (
-      await page.request.put('/api/aiosource/config', {
-        headers,
-        data: { ...config, trackers: { 'private-example': { private: true } } },
-      })
-    ).status(),
-  ).toBe(204)
+  // No playback-settings save: new sources already default to private in the
+  // administrator interface and must offer the same optional visitor field.
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public access', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
@@ -57,6 +50,7 @@ test('visitor announce fields are opt-in, use source names and clear personal in
         json: {
           credential: 'synthetic-browser-credential-without-personal-data-012345',
           services: ['torbox'],
+          announces: ['private-example'],
           manifest_url: `${server.origin}/public/stremio/encrypted-own-configuration/manifest.json`,
         },
       })

@@ -85,7 +85,8 @@ func TestPublicAnnounceSetupAcceptsUsableLinksWithinTheBoundedRequestBudget(t *t
 	}
 	response := install(input)
 	var created struct {
-		URL string `json:"manifest_url"`
+		URL        string `json:"manifest_url"`
+		Credential string `json:"credential"`
 	}
 	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &created) != nil {
 		t.Fatal("valid encrypted installation rejected by the setup body limit", response.Code)
@@ -98,10 +99,28 @@ func TestPublicAnnounceSetupAcceptsUsableLinksWithinTheBoundedRequestBudget(t *t
 	if response := f.request("GET", strings.TrimPrefix(created.URL, "https://addon.example"), "", false, ""); response.Code != http.StatusOK {
 		t.Fatal("generated manifest exceeds the usable route budget", response.Code)
 	}
+	// Updating a remembered configuration carries ciphertext and replacements
+	// together. Bound the request without rejecting a valid final encrypted URL.
+	updated, _ := json.Marshal(map[string]any{"credential": created.Credential, "announces": map[string]string{"example-source": announce}})
+	if len(updated) <= aiosource.MaxPublicInstallationSize {
+		t.Fatal("fixture must cover ciphertext and replacement request overhead")
+	}
+	response = install(updated)
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &created) != nil {
+		t.Fatal("remembered announce replacement exceeds the usable body budget", response.Code)
+	}
+	response = install([]byte(`{"credential":"` + created.Credential + `","remove_announces":["example-source"]}`))
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &created) != nil {
+		t.Fatal("saved announce could not be removed", response.Code)
+	}
+	visitor, err = addon.OpenPublicInstallation(f.ctx, "https://addon.example", created.Credential)
+	if err != nil || visitor.Services["torbox"] != key || len(visitor.Announces) != 0 {
+		t.Fatal("removing an announce lost the key or retained the URL", err)
+	}
 	// The larger form still has a hard body limit before any provider request.
 	oversized := []byte(`{"services":{"torbox":"` + strings.Repeat("x", 9000) + `"}}`)
 	response = install(oversized)
-	if response.Code != http.StatusBadRequest || providerCalls.Load() != 1 || strings.Contains(response.Body.String(), strings.Repeat("x", 64)) {
+	if response.Code != http.StatusBadRequest || providerCalls.Load() != 3 || strings.Contains(response.Body.String(), strings.Repeat("x", 64)) {
 		t.Fatal("oversized setup was processed or echoed instead of rejected safely", response.Code)
 	}
 	if _, err := addon.OpenPublicInstallation(f.ctx, "https://addon.example", strings.Repeat("x", 9000)); err != aiosource.ErrAuth {

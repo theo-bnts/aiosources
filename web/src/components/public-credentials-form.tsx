@@ -4,6 +4,7 @@ import {
   usePublicCredential,
   savePublicCredential,
   forgetPublicCredential,
+  isCurrentPublicCredential,
   type PublicInstallation,
 } from '@/lib/public-credentials'
 import { clearPublicCredentials, type PublicInfo } from './public-connection-fields'
@@ -27,7 +28,7 @@ export function PublicCredentialsForm({
   submitLabel: string
   disabled?: boolean
   onStart?: () => void
-  onConfigured: (value: PublicInstallation, hasAnnounces: boolean) => void
+  onConfigured?: (value: PublicInstallation) => void
   children?: ReactNode
 }) {
   const saved = usePublicCredential()
@@ -71,16 +72,19 @@ export function PublicCredentialsForm({
           services,
           ...(saved ? { credential: saved.credential } : {}),
           ...(removed.length ? { remove_services: removed } : {}),
+          ...(values.getAll('remove_announce').length
+            ? { remove_announces: values.getAll('remove_announce') }
+            : {}),
           ...(preferences ? { preferences } : {}),
           ...(Object.keys(announces).length ? { announces } : {}),
         }),
       })
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
         savePublicCredential(result)
-        onConfigured(result, Object.keys(announces).length > 0)
+        onConfigured?.(result)
       }
     } catch (caught) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
         if (caught instanceof ApiError && caught.status === 401)
           forgetPublicCredential(saved?.credential)
         setError(caught)
@@ -109,7 +113,7 @@ export function PublicCredentialsForm({
           return (
             <div className="field" key={provider.id}>
               <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-              <div className="flex min-w-0 gap-2">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                 <Input
                   id={`public-${provider.id}`}
                   name={provider.id}
@@ -127,6 +131,7 @@ export function PublicCredentialsForm({
                     type="button"
                     variant="warning"
                     size="sm"
+                    className="self-start sm:self-auto"
                     onClick={() => setRemoved((ids) => [...ids, provider.id])}
                   >
                     Remove key
@@ -137,10 +142,10 @@ export function PublicCredentialsForm({
           )
         })}
         <p className="help">
-          Enter at least one key. Your keys are remembered automatically on this browser in an
-          encrypted configuration, shared between Search and Stremio. The server does not save them.
-          Request history retains media, results and errors for up to 7 days without identifying
-          you.
+          Enter at least one key. Your keys and optional announce URLs are remembered automatically
+          on this browser in an encrypted configuration, shared between Search, Stremio and Torznab.
+          The server does not save them. Request history retains media, results and errors for up to
+          7 days without identifying you.
         </p>
         {children}
       </fieldset>
@@ -161,7 +166,7 @@ export function PublicCredentialsForm({
               setError(null)
             }}
           >
-            Forget saved keys
+            Forget saved credentials
           </Button>
         )}
       </div>
