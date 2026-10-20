@@ -17,7 +17,7 @@ test('proxy profiles use Secrets and route services independently without activa
   page,
   server,
 }) => {
-  await page.goto('/network')
+  await page.goto('/network/proxies')
   await expect(page.getByRole('heading', { name: 'Network', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('button', { name: 'Add proxy', exact: true }).click()
   const editor = page.getByRole('dialog', { name: 'Add proxy', exact: true })
@@ -118,7 +118,7 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/network')
+  await page.goto('/network/proxies')
   await page.getByRole('button', { name: 'Add proxy', exact: true }).click()
   const editor = page.getByRole('dialog', { name: 'Add proxy', exact: true })
   await editor.getByLabel('Name', { exact: true }).fill('WARP gateway')
@@ -160,7 +160,11 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   page,
 }) => {
   await page.goto('/network/incoming')
-  await expect(page.getByRole('tab', { name: 'Incoming', exact: true })).toHaveAttribute(
+  await expect(page).toHaveURL(/\/network$/)
+  await expect(
+    page.getByRole('tablist', { name: 'Network views', exact: true }).getByRole('tab'),
+  ).toHaveText(['Incoming proxy', 'Request limits', 'Outgoing proxies', 'Outgoing routing'])
+  await expect(page.getByRole('tab', { name: 'Incoming proxy', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   )
@@ -186,7 +190,10 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     connection_ip: '127.0.0.1',
     visitor_ip: '203.0.113.7',
   })
-  const form = page.getByRole('form', { name: 'Incoming network settings', exact: true })
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
+  await expect(page.getByLabel('IP address header', { exact: true })).toHaveCount(0)
+  const form = page.getByRole('form', { name: 'Request limits', exact: true })
   for (const [label, value] of [
     ['Link creations per minute', '12'],
     ['Addon requests per minute', '120'],
@@ -202,6 +209,12 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     setup_per_minute: 12,
     requests_per_minute: 2,
     concurrent: 7,
+  })
+  expect(saved.incoming).toEqual({
+    enabled: true,
+    ip_header: 'CF-Connecting-IP',
+    format: 'single',
+    trusted_proxies: ['127.0.0.1', '::1'],
   })
   const visitor = { 'CF-Connecting-IP': '203.0.113.8' }
   expect(
@@ -239,12 +252,12 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/network/incoming')
+  await page.goto('/network')
   await page.getByLabel('IP address header', { exact: true }).fill('X-Real-IP')
   await page
     .getByLabel('Trusted proxy addresses', { exact: true })
     .fill('2001:db8:1234:5678:90ab:cdef:1234:5678\n10.0.0.0/24')
-  await page.getByRole('tab', { name: 'Outgoing routing', exact: true }).click()
+  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
@@ -252,11 +265,22 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.getByLabel('Addon requests per minute', { exact: true }).fill('80')
+  await page.getByRole('tab', { name: 'Incoming proxy', exact: true }).click()
+  await expect(guard).toBeVisible()
+  await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('80')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await page.getByRole('tab', { name: 'Incoming proxy', exact: true }).click()
+  await expect(page.getByLabel('IP address header', { exact: true })).toHaveValue('X-Real-IP')
+  expect((await settings(page)).public_limits.requests_per_minute).toBe(80)
 })
 
-test('public access saves preserve network quotas and concurrent incoming edits require explicit review', async ({
+test('public access saves preserve network quotas and concurrent request limit edits require explicit review', async ({
   page,
 }) => {
   await page.goto('/public-access')
@@ -274,7 +298,7 @@ test('public access saves preserve network quotas and concurrent incoming edits 
   expect(access.enabled).toBe(true)
   expect(access).not.toHaveProperty('limits')
   expect((await settings(page)).public_limits.requests_per_minute).toBe(333)
-  await page.goto('/network/incoming')
+  await page.goto('/network/limits')
   await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('333')
   await page.getByLabel('Addon requests per minute', { exact: true }).fill('444')
   const latest = await settings(page)

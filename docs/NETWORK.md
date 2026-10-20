@@ -43,7 +43,7 @@ The gateway's own request, traffic and account limits still apply. Proxy routing
 
 ## Recognize visitors behind a proxy
 
-Open **Administration → Network → Incoming** when requests arrive through Cloudflare, a tunnel or another reverse proxy. This is independent of outgoing WARP/VPN routing.
+Open **Administration → Network → Incoming proxy** when requests arrive through Cloudflare, a tunnel or another reverse proxy. This is independent of outgoing WARP/VPN routing.
 
 1. Select **IP address header**. Cloudflare's orange-cloud proxy and Tunnel normally send `CF-Connecting-IP`; use **Single IP address**. `X-Real-IP` works the same way. For `X-Forwarded-For`, use **Comma-separated IP chain**. Custom header names are supported with either format.
 2. Enter **Trusted proxy addresses**, one IP or CIDR network per line. The page shows the direct connection address currently seen by AIOSources. With Tunnel, trust the `cloudflared` connector address or its dedicated network. With Cloudflare's standard proxy, use [Cloudflare's published IPv4 and IPv6 ranges](https://www.cloudflare.com/ips/). An intermediate local reverse proxy must be included too when using an address chain.
@@ -53,4 +53,4 @@ Trust only peers allowed to assert visitor addresses. Restrict direct access to 
 
 A chain is read right to left from the connected proxy, stopping at the first untrusted hop. A visitor cannot gain a new quota merely by prepending an invented address. Untrusted connections and missing, malformed, duplicate single-address or oversized headers use the direct connection address. Header trust is disabled after an upgrade until explicitly configured. It never changes authentication, HTTPS detection, the configured public origin or outgoing proxy settings.
 
-The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Network → Incoming → Public request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.
+The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Network → Request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.

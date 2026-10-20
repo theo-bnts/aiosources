@@ -141,7 +141,7 @@ For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Thei
 
 The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
 
-Set visitor request limits in **Administration → Network → Incoming** (defaults: 12 link creations and 120 addon requests per minute per visitor IP, with 50 simultaneous public requests per process). Behind Cloudflare or another reverse proxy, configure **Network → Incoming** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
+Set visitor request limits in **Administration → Network → Request limits** (defaults: 12 link creations and 120 addon requests per minute per visitor IP, with 50 simultaneous public requests per process). Behind Cloudflare or another reverse proxy, configure **Network → Incoming proxy** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
 
 Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for seven days. Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
 

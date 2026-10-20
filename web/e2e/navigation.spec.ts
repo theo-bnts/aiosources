@@ -42,6 +42,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Remote catalogs', '/remotes/history/missing'],
     ['Connections', 'Shared catalogs', '/sharing/settings'],
     ['Administration', 'Network', '/network'],
+    ['Administration', 'Network', '/network/limits'],
+    ['Administration', 'Network', '/network/proxies'],
     ['Administration', 'Network', '/network/routing'],
     ['Administration', 'Network', '/network/incoming'],
     ['Administration', 'Storage', '/health'],

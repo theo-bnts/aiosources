@@ -20,6 +20,7 @@ import {
   GlobeIcon,
   PathIcon,
   ShieldCheckIcon,
+  GaugeIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -69,6 +70,9 @@ const NetworkRoutingPage = lazy(() =>
   import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
 )
 const IncomingNetworkPage = lazy(() => import('@/pages/incoming-network'))
+const NetworkRequestLimitsPage = lazy(() =>
+  import('@/pages/incoming-network').then((m) => ({ default: m.NetworkRequestLimitsPage })),
+)
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
 const RemoteStatisticsPage = lazy(() =>
@@ -356,16 +360,19 @@ const router = createBrowserRouter(
             <WorkspaceLayout
               title="Network"
               tabs={[
-                { path: '/network', label: 'Outgoing proxies', icon: GlobeIcon },
+                { path: '/network', label: 'Incoming proxy', icon: ShieldCheckIcon },
+                { path: '/network/limits', label: 'Request limits', icon: GaugeIcon },
+                { path: '/network/proxies', label: 'Outgoing proxies', icon: GlobeIcon },
                 { path: '/network/routing', label: 'Outgoing routing', icon: PathIcon },
-                { path: '/network/incoming', label: 'Incoming', icon: ShieldCheckIcon },
               ]}
             />
           }
         >
-          <Route path="network" element={<NetworkPage />} />
+          <Route path="network" element={<IncomingNetworkPage />} />
+          <Route path="network/limits" element={<NetworkRequestLimitsPage />} />
+          <Route path="network/proxies" element={<NetworkPage />} />
           <Route path="network/routing" element={<NetworkRoutingPage />} />
-          <Route path="network/incoming" element={<IncomingNetworkPage />} />
+          <Route path="network/incoming" element={<Navigate to="/network" replace />} />
         </Route>
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
