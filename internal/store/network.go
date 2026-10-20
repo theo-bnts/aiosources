@@ -42,6 +42,9 @@ func (s *Store) NetworkSettings(ctx context.Context) (model.NetworkSettings, err
 	if json.Unmarshal(proxies, &result.Proxies) != nil || json.Unmarshal(overrides, &result.Overrides) != nil || json.Unmarshal(incoming, &result.Incoming) != nil || result.Validate() != nil {
 		return model.NetworkSettings{}, errors.New("Stored network settings are invalid")
 	}
+	if result.Incoming != nil && result.Incoming.TrustedProxies == nil {
+		result.Incoming.TrustedProxies = []string{}
+	}
 	return result, nil
 }
 
@@ -65,7 +68,11 @@ func (s *Store) UpdateNetworkSettings(ctx context.Context, input model.NetworkSe
 	}
 	var incoming []byte
 	if input.Incoming != nil {
-		incoming, err = json.Marshal(input.Incoming)
+		value := *input.Incoming
+		if value.TrustedProxies == nil {
+			value.TrustedProxies = []string{}
+		}
+		incoming, err = json.Marshal(value)
 		if err != nil {
 			return model.ErrInvalid
 		}

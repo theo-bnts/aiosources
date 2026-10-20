@@ -75,6 +75,15 @@ CREATE TRIGGER reject_limits_audit BEFORE INSERT ON ingest.activity_logs FOR EAC
 	if !reflect.DeepEqual(previousIncoming, savedNetwork.Incoming) {
 		t.Fatal("an old outgoing editor removed incoming trust")
 	}
+	savedNetwork.Incoming.Enabled = false
+	savedNetwork.Incoming.TrustedProxies = nil
+	if err := db.UpdateNetworkSettings(ctx, savedNetwork); err != nil {
+		t.Fatal(err)
+	}
+	savedNetwork, _ = db.NetworkSettings(ctx)
+	if savedNetwork.Incoming.TrustedProxies == nil {
+		t.Fatal("a disabled API configuration returned null instead of the address list expected by the editor")
+	}
 	var logs int
 	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='security.public_limits_changed' AND message='Public request limits changed' AND data='{}'::jsonb`).Scan(&logs); err != nil || logs != 1 {
 		t.Fatal("quota audit event missing, duplicated or contains private data", err)
