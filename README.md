@@ -135,13 +135,15 @@ Only permitted torrent information is transferred. Accounts, source credentials,
 
 ## Offer public access
 
-An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Torznab. Administration stays protected.
+An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Search and Torznab. Administration stays protected.
 
-For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Fresh cached-availability observations can be reused across users, independently for each debrid service.
+For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys are remembered automatically on the visitor’s browser in an encrypted configuration shared with Search; **Forget saved keys** clears it. Fresh cached-availability observations can be reused across users, independently for each debrid service.
 
 The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
 
-Set visitor request limits in **Administration → Network → Request limits** (defaults: 12 link creations and 120 addon requests per minute per visitor IP, with 50 simultaneous public requests per process). Behind Cloudflare or another reverse proxy, configure **Network → Incoming proxy** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
+**Allow public Search** lets visitors find films and series in the local identified catalog and download through their own debrid accounts. It uses the same language, year, version and cache controls as administrator Search, while keeping administrator pages protected. Downloads pass through the instance without being saved to disk.
+
+Set visitor request limits in **Administration → Network → Request limits** (defaults: 12 link creations and 120 public requests per minute per visitor IP, with 50 simultaneous public requests per process). Each limit can be switched off independently, including the global concurrency limit. Behind Cloudflare or another reverse proxy, configure **Network → Incoming proxy** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
 
 Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for seven days. Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
 

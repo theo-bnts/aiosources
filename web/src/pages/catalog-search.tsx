@@ -9,6 +9,8 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
 import { bytes, number, useDate } from '@/lib/format'
+import { usePublicSearch } from '@/lib/public-search'
+import { publicAPI } from '@/lib/public-credentials'
 import { useSourceNames } from '@/lib/source-names'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
@@ -40,6 +42,8 @@ function TitleDetails({ title }: { title: CatalogTitle }) {
 }
 
 export function CatalogSearchPage() {
+  const visitor = usePublicSearch()
+  const searchPath = visitor ? '/public/search' : '/search'
   const language = browserLanguage()
   const [search, setSearch] = useViewSearchParams()
   const listState = useListViewState()
@@ -48,16 +52,29 @@ export function CatalogSearchPage() {
   const kind = search.get('type') || ''
   const year = search.get('year') || ''
   const query = useQuery({
-    queryKey: ['catalog-search', q, kind, year, language, pagination.limit, pagination.offset],
-    queryFn: ({ signal }) =>
-      api<Page<CatalogTitle>>(
-        `/catalog/search?${params({ q, type: kind, year, language, limit: pagination.limit, offset: pagination.offset })}`,
-        { signal },
-      ),
+    queryKey: visitor
+      ? [
+          'public-catalog',
+          visitor.scope,
+          'search',
+          q,
+          kind,
+          year,
+          language,
+          pagination.limit,
+          pagination.offset,
+        ]
+      : ['catalog-search', q, kind, year, language, pagination.limit, pagination.offset],
+    queryFn: ({ signal }) => {
+      const path = `/catalog/search?${params({ q, type: kind, year, language, limit: pagination.limit, offset: pagination.offset })}`
+      return visitor
+        ? publicAPI<Page<CatalogTitle>>(path, visitor.configuration, { signal }, visitor.credential)
+        : api<Page<CatalogTitle>>(path, { signal })
+    },
     enabled: q.trim().length >= 2,
   })
   return (
-    <div className="page">
+    <div className={visitor ? 'space-y-6' : 'page'}>
       <form
         key={`${q}:${kind}:${year}`}
         className="flex flex-wrap items-end gap-3 rounded-md border border-border p-4"
@@ -140,7 +157,7 @@ export function CatalogSearchPage() {
                       <TableRow key={title.id}>
                         <TableCell className="whitespace-normal">
                           <Link
-                            to={`/search/${title.id}?${params({ q })}`}
+                            to={`${searchPath}/${title.id}?${params({ q })}`}
                             state={listState}
                             className="font-medium break-words"
                           >
@@ -152,7 +169,7 @@ export function CatalogSearchPage() {
                         <TableCell>
                           <Button asChild size="icon-sm" variant="ghost">
                             <Link
-                              to={`/search/${title.id}?${params({ q })}`}
+                              to={`${searchPath}/${title.id}?${params({ q })}`}
                               state={listState}
                               aria-label={`Show releases for ${title.title}`}
                             >
@@ -168,7 +185,11 @@ export function CatalogSearchPage() {
             ) : (
               <Empty
                 title="No matching titles"
-                description="Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing."
+                description={
+                  visitor
+                    ? 'No identified titles match this search.'
+                    : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing.'
+                }
               />
             )}
             <Pager
@@ -185,22 +206,32 @@ export function CatalogSearchPage() {
   )
 }
 
-export function CatalogTitlePage() {
+export function CatalogTitlePage({ publicID }: { publicID?: string }) {
+  const visitor = usePublicSearch()
+  const searchPath = visitor ? '/public/search' : '/search'
   const [preferences, setPreferences] = useLanguagePreferences()
   const language = resolvedLanguage(preferences)
   const titleLanguage = browserLanguage()
-  const { id = '' } = useParams()
+  const { id: routeID = '' } = useParams()
+  const id = publicID ?? routeID
   const [search, setSearch] = useViewSearchParams()
   const pagination = useURLPagination()
-  const sourceName = useSourceNames()
+  const privateSourceName = useSourceNames(!visitor)
+  const sourceName = (id?: string, savedName?: string) =>
+    visitor
+      ? visitor.info.sources?.find((source) => source.id === id)?.name || savedName || id || ''
+      : privateSourceName(id, savedName)
   const date = useDate()
   const title = useQuery({
-    queryKey: ['catalog-title', id, titleLanguage, search.get('q')],
-    queryFn: ({ signal }) =>
-      api<CatalogTitle>(
-        `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`,
-        { signal },
-      ),
+    queryKey: visitor
+      ? ['public-catalog', visitor.scope, 'title', id, titleLanguage, search.get('q')]
+      : ['catalog-title', id, titleLanguage, search.get('q')],
+    queryFn: ({ signal }) => {
+      const path = `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`
+      return visitor
+        ? publicAPI<CatalogTitle>(path, visitor.configuration, { signal }, visitor.credential)
+        : api<CatalogTitle>(path, { signal })
+    },
   })
   const selection: CatalogSelection =
     title.data?.type === 'tv'
@@ -209,9 +240,13 @@ export function CatalogTitlePage() {
           episode: Number(search.get('episode') ?? title.data.selection.episode ?? 1),
         }
       : {}
-  const sort = search.get('sort') || 'size_desc'
+  const discloseSources = !visitor || Boolean(visitor.info.sources)
+  const sort =
+    !discloseSources && search.get('sort') === 'source'
+      ? 'size_desc'
+      : search.get('sort') || 'size_desc'
   const cachedOnly = search.get('cached_only') !== 'false'
-  const provider = search.get('provider') || ''
+  const provider = discloseSources ? search.get('provider') || '' : ''
   const query = params({
     ...selection,
     language,
@@ -223,9 +258,18 @@ export function CatalogTitlePage() {
     offset: pagination.offset,
   })
   const releases = useQuery({
-    queryKey: ['catalog-releases', id, query],
+    queryKey: visitor
+      ? ['public-catalog', visitor.scope, 'releases', id, query]
+      : ['catalog-releases', id, query],
     queryFn: ({ signal }) =>
-      api<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, { signal }),
+      visitor
+        ? publicAPI<Page<CatalogRelease>>(
+            `/catalog/${id}/releases?${query}`,
+            visitor.configuration,
+            { signal },
+            visitor.credential,
+          )
+        : api<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, { signal }),
     enabled: Boolean(title.data),
   })
   const sourceOptions = [...(title.data?.providers ?? [])].sort((a, b) =>
@@ -239,10 +283,10 @@ export function CatalogTitlePage() {
     setSearch(next, { flushSync: true, preventScrollReset: true })
   }
   return (
-    <div className="page">
+    <div className={visitor ? 'space-y-6' : 'page'}>
       <PageHeader
         title={title.data?.title || 'Source releases'}
-        back={{ to: '/search', label: 'Search' }}
+        back={{ to: searchPath, label: 'Search' }}
       />
       <ErrorNotice error={title.error} retry={() => void title.refetch()} />
       {title.isPending ? (
@@ -342,25 +386,27 @@ export function CatalogTitlePage() {
                   >
                     <option value="recent">Newest first</option>
                     <option value="size_desc">Largest first</option>
-                    <option value="source">Source name</option>
+                    {discloseSources && <option value="source">Source name</option>}
                   </select>
                 </div>
-                <div className="field">
-                  <Label htmlFor="release-source">Source</Label>
-                  <select
-                    id="release-source"
-                    className="native-select"
-                    value={provider}
-                    onChange={(event) => filter('provider', event.target.value)}
-                  >
-                    <option value="">All sources</option>
-                    {sourceOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {sourceName(value)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {discloseSources && (
+                  <div className="field">
+                    <Label htmlFor="release-source">Source</Label>
+                    <select
+                      id="release-source"
+                      className="native-select"
+                      value={provider}
+                      onChange={(event) => filter('provider', event.target.value)}
+                    >
+                      <option value="">All sources</option>
+                      {sourceOptions.map((value) => (
+                        <option key={value} value={value}>
+                          {sourceName(value)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </section>
             <ErrorNotice error={releases.error} retry={() => void releases.refetch()} />
@@ -370,24 +416,27 @@ export function CatalogTitlePage() {
               releases.data && (
                 <>
                   <ResultCount total={releases.data.total} label="source releases" />
-                  {releases.data.items?.some((release) =>
-                    release.services.some(
-                      (service) =>
-                        !service.can_add && ['unknown', 'uncached'].includes(service.state),
-                    ),
-                  ) && (
-                    <p className="help">
-                      Private sources without an announce URL allow cached downloads only. Add your
-                      announce URL in <Link to="/debrid/settings">Debrid settings</Link> to enable
-                      uncached downloads.
-                    </p>
-                  )}
+                  {!visitor &&
+                    releases.data.items?.some((release) =>
+                      release.services.some(
+                        (service) =>
+                          !service.can_add && ['unknown', 'uncached'].includes(service.state),
+                      ),
+                    ) && (
+                      <p className="help">
+                        Private sources without an announce URL allow cached downloads only. Add
+                        your announce URL in <Link to="/debrid/settings">Debrid settings</Link> to
+                        enable uncached downloads.
+                      </p>
+                    )}
                   {releases.data.items?.length ? (
                     <div className="table-frame">
                       <Table className="max-md:block max-md:[&_thead]:sr-only max-md:[&_tbody]:block max-md:[&_tr]:grid max-md:[&_tr]:grid-cols-1 max-md:[&_td]:block">
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Version / source</TableHead>
+                            <TableHead>
+                              {discloseSources ? 'Version / source' : 'Version'}
+                            </TableHead>
                             <TableHead>Download</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -397,7 +446,8 @@ export function CatalogTitlePage() {
                               <TableCell className="max-w-xl align-top whitespace-normal">
                                 <p className="break-words font-medium">{release.title}</p>
                                 <p className="help mt-1">
-                                  {sourceName(release.provider)} ·{' '}
+                                  {release.provider &&
+                                    `${sourceName(release.provider, release.provider_name)} · `}
                                   {release.size > 0 ? bytes(release.size) : 'Size unknown'}
                                   {release.languages.length > 0 &&
                                     ` · ${release.languages.join(', ')}`}
@@ -411,7 +461,7 @@ export function CatalogTitlePage() {
                                   <div className="flex flex-wrap gap-5">
                                     {release.services.map((service) => (
                                       <DownloadAction
-                                        key={`${id}:${selection.season}:${selection.episode}:${release.occurrence_id}:${release.fingerprint}:${service.service}`}
+                                        key={`${visitor?.scope ?? 'admin'}:${id}:${selection.season}:${selection.episode}:${release.occurrence_id}:${release.fingerprint}:${service.service}`}
                                         workID={id}
                                         release={release}
                                         service={service}
@@ -421,8 +471,16 @@ export function CatalogTitlePage() {
                                   </div>
                                 ) : (
                                   <p className="help">
-                                    <Link to="/debrid/settings">Configure a debrid service</Link> to
-                                    download this version.
+                                    {visitor ? (
+                                      'No service is available for this version.'
+                                    ) : (
+                                      <>
+                                        <Link to="/debrid/settings">
+                                          Configure a debrid service
+                                        </Link>{' '}
+                                        to download this version.
+                                      </>
+                                    )}
                                   </p>
                                 )}
                               </TableCell>
@@ -436,10 +494,12 @@ export function CatalogTitlePage() {
                       title={cachedOnly ? 'No cached releases' : 'No source releases'}
                       description={
                         cachedOnly
-                          ? 'No cached versions match these filters. Turn off Cached results only to see other versions.'
-                          : title.data.type === 'tv'
-                            ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
-                            : 'No releases match the selected source and language filters. Adjust them to see other versions.'
+                          ? 'No cached versions match these filters. Turn off Cached results only to see other permitted versions.'
+                          : visitor
+                            ? 'No available versions match these filters. Private sources require verified cached files or your own permitted announce URL.'
+                            : title.data.type === 'tv'
+                              ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
+                              : 'No releases match the selected source and language filters. Adjust them to see other versions.'
                       }
                     />
                   )}

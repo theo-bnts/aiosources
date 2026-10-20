@@ -13,7 +13,7 @@ export type OperationRun = {
   id: string
   kind: OperationKind
   service: 'tmdb' | 'local' | 'alldebrid' | 'torbox'
-  trigger: 'manual' | 'automatic' | 'playback'
+  trigger: 'manual' | 'automatic' | 'playback' | 'public'
   resource?: string
   status: OperationStatus
   phase: string

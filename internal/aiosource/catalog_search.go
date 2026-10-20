@@ -92,12 +92,27 @@ func catalogResource(title model.CatalogTitle, selection model.CatalogSelection)
 }
 
 func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+	return s.catalogReleases(ctx, workID, selection, opts, nil, options...)
+}
+
+func (s *Service) catalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, visitor *PublicInstallation, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
 	limit := opts.Limit
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
 	offset := max(0, opts.Offset)
 	result := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}
+	var access model.PublicAccess
+	if visitor != nil {
+		var err error
+		access, err = s.PublicSearchAccess(ctx, visitor)
+		if err != nil {
+			return result, err
+		}
+		if !access.ExposeSources && (opts.ProviderID != "" || opts.Sort == "source") {
+			return result, model.ErrInvalid
+		}
+	}
 	if opts.Sort != "" && opts.Sort != "recent" && opts.Sort != "size_desc" && opts.Sort != "source" {
 		return result, model.ErrInvalid
 	}
@@ -114,6 +129,14 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 		return result, err
 	}
 	rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !MatchesEpisode(rec.AIORecord, ParseRelease(rec.Title), r) })
+	if visitor != nil {
+		if !AllowsInstallation(visitor.Preferences, "", "", r.Type) {
+			return result, nil
+		}
+		rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool {
+			return !hashRE.MatchString(rec.Hash) || !AllowsInstallation(visitor.Preferences, rec.Provider, "", r.Type)
+		})
+	}
 	filters := model.CatalogReleaseFilters{}
 	if len(options) > 0 {
 		filters = options[0]
@@ -152,7 +175,7 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 	result.Total = int64(len(rows))
 	start := min(offset, len(rows))
 	page := rows[start : start+min(limit, len(rows)-start)]
-	if filters.CachedOnly {
+	if filters.CachedOnly || visitor != nil {
 		// Evaluate availability before pagination: an uncached first page must
 		// not hide cached releases further down the result set or inflate totals.
 		page = rows
@@ -173,9 +196,31 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 		records = append(records, row.AIORecord)
 	}
 	slices.Sort(hashes)
-	availability, err := s.availability(ctx, c, "catalog:"+streamResourceKey(r, records)+":"+fingerprint(strings.Join(hashes, ",")), hashes, "manual")
+	resource := "catalog:" + streamResourceKey(r, records) + ":" + fingerprint(strings.Join(hashes, ","))
+	var availability map[string]map[string]model.AIOAvailability
+	var announces map[string]string
+	if visitor == nil {
+		availability, err = s.availability(ctx, c, resource, hashes, "manual")
+	} else {
+		filtered := *visitor
+		filtered.Services = map[string]string{}
+		for service, key := range visitor.Services {
+			if AllowsInstallation(visitor.Preferences, "", service, r.Type) {
+				filtered.Services[service] = key
+			}
+		}
+		availability, err = s.publicAvailability(ctx, c, resource, hashes, &filtered)
+		clear(filtered.Services)
+		if err == nil {
+			announces, err = s.visitorAnnounces(ctx, c, visitor)
+		}
+	}
 	if err != nil {
 		return result, err
+	}
+	names := map[string]string{}
+	if visitor != nil && access.ExposeSources {
+		names = s.sourceNames()
 	}
 	for _, row := range page {
 		languages := []string{}
@@ -185,6 +230,9 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 		item := model.CatalogRelease{Fingerprint: row.Fingerprint, OccurrenceID: row.OccurrenceID, Provider: row.Provider, Title: row.Title, Size: max(0, row.Size), PublishedAt: row.PublishedAt, Languages: languages, Services: []model.CatalogAvailability{}}
 		tracker, configured := c.Trackers[row.Provider]
 		canAdd := configured && (!tracker.Private || tracker.AnnounceSecret != "")
+		if visitor != nil {
+			canAdd = (configured && !tracker.Private) || announces[row.Provider] != ""
+		}
 		for _, service := range []string{"alldebrid", "torbox"} {
 			states, enabled := availability[service]
 			if !enabled {
@@ -205,18 +253,37 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 					} else if len(observed.Files) > 0 {
 						state.State = "unavailable"
 						state.CanAdd = false
-					} else if r.Episode != nil {
+					} else if r.Episode != nil || (visitor != nil && (!configured || tracker.Private)) {
 						state.State = "unknown"
 					}
 				}
 			}
+			if visitor != nil && (state.State == "invalid" || state.State == "unavailable" || (state.State != "cached" && (!canAdd || visitor.Preferences.CachedOnly))) {
+				continue
+			}
 			item.Services = append(item.Services, state)
+		}
+		if visitor != nil {
+			if len(item.Services) == 0 {
+				continue
+			}
+			item.DownloadToken, err = s.sealPublicCatalogSource(workID, row)
+			if err != nil {
+				return result, err
+			}
+			item.Fingerprint = ""
+			if access.ExposeSources {
+				item.ProviderName = names[row.Provider]
+			}
+			if !access.ExposeSources {
+				item.Provider = ""
+			}
 		}
 		if !filters.CachedOnly || slices.ContainsFunc(item.Services, func(service model.CatalogAvailability) bool { return service.State == "cached" }) {
 			result.Items = append(result.Items, item)
 		}
 	}
-	if filters.CachedOnly {
+	if filters.CachedOnly || visitor != nil {
 		result.Total = int64(len(result.Items))
 		start = min(offset, len(result.Items))
 		result.Items = result.Items[start : start+min(limit, len(result.Items)-start)]
@@ -227,10 +294,13 @@ func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection m
 // A download is an explicit administrator action. Readiness checks use the
 // providers' cached-only safeguards and never start a new uncached download.
 func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput) (model.CatalogDownload, error) {
-	return s.catalogDownload(ctx, workID, input, "", "")
+	if input.DownloadToken != "" {
+		return model.CatalogDownload{}, model.ErrInvalid
+	}
+	return s.catalogDownload(ctx, workID, input, "", "", nil)
 }
 
-func (s *Service) catalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput, operationID, expectedAccount string) (result model.CatalogDownload, downloadErr error) {
+func (s *Service) catalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput, operationID, expectedAccount string, visitor *PublicInstallation) (result model.CatalogDownload, downloadErr error) {
 	if (input.Service != "alldebrid" && input.Service != "torbox") || !store.ValidOccurrenceID(input.OccurrenceID) || input.Fingerprint == "" || len(input.Fingerprint) > 128 {
 		return result, model.ErrInvalid
 	}
@@ -272,6 +342,17 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 		return result, model.ErrConflict
 	}
 	lock := "catalog-download:" + input.Service + ":" + selected.OccurrenceID
+	trigger := "manual"
+	if visitor != nil {
+		if _, err = s.PublicSearchAccess(ctx, visitor); err != nil {
+			return result, err
+		}
+		if visitor.Services[input.Service] == "" || !AllowsInstallation(visitor.Preferences, selected.Provider, input.Service, r.Type) {
+			return result, ErrAuth
+		}
+		lock = "public-" + lock + ":" + fingerprint(visitor.Services[input.Service])
+		trigger = "public"
+	}
 	release, locked, err := s.DB.AIOLock(ctx, lock)
 	if err != nil {
 		return result, err
@@ -286,7 +367,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 		err = e
 		h = &operationHistory{service: s, run: run}
 	} else {
-		h, err = s.beginOperation(ctx, "download", input.Service, "manual", r.Type+":"+id, lock)
+		h, err = s.beginOperation(ctx, "download", input.Service, trigger, r.Type+":"+id, lock)
 	}
 	if err != nil {
 		return result, err
@@ -306,24 +387,35 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	if err != nil {
 		return result, err
 	}
-	secret := config.TorBoxSecret
-	if input.Service == "alldebrid" {
-		secret = config.AllDebridSecret
-	}
-	key, err := s.key(ctx, secret)
-	if err != nil {
-		return result, err
+	var key string
+	if visitor != nil {
+		key = visitor.Services[input.Service]
+	} else {
+		secret := config.TorBoxSecret
+		if input.Service == "alldebrid" {
+			secret = config.AllDebridSecret
+		}
+		key, err = s.key(ctx, secret)
+		if err != nil {
+			return result, err
+		}
 	}
 	if expectedAccount != "" && fingerprint(key) != expectedAccount {
 		return result, model.ErrConflict
 	}
 	continuation := model.OperationDownload{WorkID: workID, Input: input, Account: fingerprint(key)}
-	if err = s.DB.SaveOperationDownload(ctx, result.OperationID, continuation); err != nil {
-		return result, err
+	if visitor == nil {
+		if err = s.DB.SaveOperationDownload(ctx, result.OperationID, continuation); err != nil {
+			return result, err
+		}
 	}
 	h.checkpoint(ctx, "download")
-	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, nil, playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID})
-	if result.PreparationID != "" {
+	policy := playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID}
+	if visitor != nil {
+		policy.Preferences = &visitor.Preferences
+	}
+	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, visitor, policy)
+	if visitor == nil && result.PreparationID != "" {
 		continuation.Input.PreparationID = result.PreparationID
 		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		err = s.DB.SaveOperationDownload(saveCtx, result.OperationID, continuation)
@@ -375,5 +467,5 @@ func (s *Service) CheckOperationDownload(ctx context.Context, id string) (result
 		return model.CatalogDownload{}, model.ErrConflict
 	}
 	saved.Input.AllowUncached = false
-	return s.catalogDownload(ctx, saved.WorkID, saved.Input, id, saved.Account)
+	return s.catalogDownload(ctx, saved.WorkID, saved.Input, id, saved.Account, nil)
 }

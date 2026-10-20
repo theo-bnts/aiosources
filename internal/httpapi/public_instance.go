@@ -26,6 +26,7 @@ func (s *server) publicOriginAllowed() bool {
 }
 func (s *server) registerPublicInstance(mux *http.ServeMux) {
 	s.registerPublicTorznab(mux)
+	s.registerPublicCatalog(mux)
 	mux.HandleFunc("GET /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		value, err := s.options.Store.PublicAccess(r.Context())
 		if err != nil {
@@ -66,7 +67,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "torznab_enabled": enabled && value.TorznabEnabled}
+		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled}
 		if enabled && value.ExposeSources {
 			allSources, e := s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
@@ -100,9 +101,11 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		defer release()
 		var input struct {
-			Preferences model.StreamPreferences `json:"preferences"`
-			Services    map[string]string       `json:"services"`
-			Announces   map[string]string       `json:"announces"`
+			Preferences    model.StreamPreferences `json:"preferences"`
+			Services       map[string]string       `json:"services"`
+			Announces      map[string]string       `json:"announces"`
+			Credential     string                  `json:"credential"`
+			RemoveServices []string                `json:"remove_services"`
 		}
 		defer func() { clear(input.Services); clear(input.Announces) }()
 		r.Body = http.MaxBytesReader(w, r.Body, aiosource.MaxPublicInstallationSize)
@@ -115,8 +118,44 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, model.ErrInvalid)
 			return
 		}
+		keys := map[string]string{}
+		defer clear(keys)
+		if input.Credential != "" {
+			saved, err := s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, input.Credential)
+			if err != nil {
+				if errors.Is(err, aiosource.ErrAuth) {
+					writeError(w, 401, "Your saved service configuration is no longer available. Enter your keys again.")
+				} else {
+					respondError(w, err)
+				}
+				return
+			}
+			for service, key := range saved.Services {
+				keys[service] = key
+			}
+			clear(saved.Services)
+			clear(saved.Announces)
+		}
+		if len(input.RemoveServices) > len(aiosource.PublicProviders) {
+			respondError(w, model.ErrInvalid)
+			return
+		}
+		for _, service := range input.RemoveServices {
+			known := false
+			for _, provider := range aiosource.PublicProviders {
+				known = known || provider.ID == service
+			}
+			if !known {
+				respondError(w, model.ErrInvalid)
+				return
+			}
+			delete(keys, service)
+		}
+		for service, key := range input.Services {
+			keys[service] = key
+		}
 		hasAnnounces := len(input.Announces) > 0
-		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, input.Services, input.Announces)
+		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, keys, input.Announces)
 		if err == nil {
 			configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
 		}
@@ -134,7 +173,12 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			}
 			return
 		}
-		writeJSON(w, 200, map[string]string{"manifest_url": s.auth.origin + "/public/stremio/" + configuration + "/manifest.json"})
+		credential, services, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, configuration)
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"manifest_url": s.auth.origin + "/public/stremio/" + configuration + "/manifest.json", "credential": credential, "services": services})
 	})
 	protect := func(budget time.Duration, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {

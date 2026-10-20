@@ -84,11 +84,12 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
       if (error instanceof Error && error.name === 'AbortError') throw error
       /* A proxy may return a non-JSON error. */
     }
-    if (response.status === 401 && path !== '/login') {
+    if (response.status === 401 && path !== '/login' && !path.startsWith('/public/')) {
       setCSRF()
       window.dispatchEvent(new Event('session-expired'))
     }
-    if (response.status === 403) void queryClient.invalidateQueries({ queryKey: ['session'] })
+    if (response.status === 403 && !path.startsWith('/public/'))
+      void queryClient.invalidateQueries({ queryKey: ['session'] })
     const fallback =
       response.status === 403
         ? 'The security session must be refreshed. Try again after refreshing.'

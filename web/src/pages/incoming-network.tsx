@@ -12,6 +12,32 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useNetworkSettings, useSaveNetwork } from '@/lib/network-settings'
 
+const publicLimitFields = [
+  ['setup_per_minute', 'Link creations per minute', 100000, 12],
+  ['requests_per_minute', 'Public requests per minute', 100000, 120],
+  ['concurrent', 'Simultaneous public requests', 1000, 50],
+] as const
+
+type LimitDrafts = Record<keyof PublicLimits, { enabled: boolean; value: string }>
+
+function draftLimits(limits: PublicLimits): LimitDrafts {
+  return Object.fromEntries(
+    publicLimitFields.map(([field, , , fallback]) => [
+      field,
+      { enabled: limits[field] > 0, value: String(limits[field] || fallback) },
+    ]),
+  ) as LimitDrafts
+}
+
+function limitValues(limits: LimitDrafts): PublicLimits {
+  return Object.fromEntries(
+    publicLimitFields.map(([field]) => [
+      field,
+      limits[field].enabled ? Number(limits[field].value) : 0,
+    ]),
+  ) as PublicLimits
+}
+
 export default function IncomingNetworkPage() {
   return <IncomingSettings section="proxy" />
 }
@@ -34,10 +60,10 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
     base: NetworkSettings
     value: IncomingNetwork
     trusted: string
-    limits: PublicLimits
+    limits: LimitDrafts
   } | null>(null)
   const save = useSaveNetwork(() => setDraft(null))
-  const limits = draft?.limits ?? query.data?.public_limits
+  const limits = draft?.limits ?? (query.data && draftLimits(query.data.public_limits))
   const current = draft?.value ?? query.data?.incoming
   const trusted = draft?.trusted ?? current?.trusted_proxies.join('\n') ?? ''
   const value = current && {
@@ -51,7 +77,14 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
     draft &&
     (proxy
       ? JSON.stringify(value) !== JSON.stringify(query.data?.incoming)
-      : JSON.stringify(limits) !== JSON.stringify(query.data?.public_limits)),
+      : publicLimitFields.some(([field]) => {
+          const limit = draft.limits[field]
+          const saved = query.data?.public_limits[field]
+          return (
+            limit.enabled !== (saved !== undefined && saved > 0) ||
+            (limit.enabled && limit.value !== String(saved))
+          )
+        })),
   )
   const conflict =
     Boolean(draft && draft.base.revision !== query.data?.revision) ||
@@ -89,7 +122,7 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
               if (dirty && draft && !conflict && !save.isPending)
                 save.mutate({
                   ...draft.base,
-                  ...(proxy ? { incoming: value } : { public_limits: limits }),
+                  ...(proxy ? { incoming: value } : { public_limits: limitValues(limits) }),
                 })
             }}
           >
@@ -201,15 +234,22 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
               <section className="section-card" aria-label="Public request limits">
                 <h2 className="section-title">Public request limits</h2>
                 <div className="grid gap-5 md:grid-cols-3">
-                  {(
-                    [
-                      ['setup_per_minute', 'Link creations per minute', 100000],
-                      ['requests_per_minute', 'Addon requests per minute', 100000],
-                      ['concurrent', 'Simultaneous public requests', 1000],
-                    ] as const
-                  ).map(([field, label, max]) => (
+                  {publicLimitFields.map(([field, label, max]) => (
                     <div className="field min-w-0" key={field}>
-                      <Label htmlFor={`public-limit-${field}`}>{label}</Label>
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor={`public-limit-${field}`}>{label}</Label>
+                        <Switch
+                          aria-label={`${label} limit`}
+                          checked={limits[field].enabled}
+                          disabled={save.isPending}
+                          onCheckedChange={(enabled) =>
+                            change({}, undefined, {
+                              ...limits,
+                              [field]: { ...limits[field], enabled },
+                            })
+                          }
+                        />
+                      </div>
                       <Input
                         id={`public-limit-${field}`}
                         type="number"
@@ -217,10 +257,14 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                         max={max}
                         step={1}
                         required
-                        disabled={save.isPending}
-                        value={limits[field] || ''}
+                        disabled={save.isPending || !limits[field].enabled}
+                        value={limits[field].enabled ? limits[field].value : ''}
+                        placeholder={limits[field].enabled ? undefined : 'Unlimited'}
                         onChange={(event) =>
-                          change({}, undefined, { ...limits, [field]: Number(event.target.value) })
+                          change({}, undefined, {
+                            ...limits,
+                            [field]: { ...limits[field], value: event.target.value },
+                          })
                         }
                       />
                     </div>
@@ -228,9 +272,10 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                 </div>
                 <div className="space-y-2">
                   <p className="help">
-                    Per-minute limits apply to each visitor IP and are shared by Stremio and
-                    Torznab. Simultaneous requests are limited across this application process. Use
-                    the visitor IP settings in Incoming proxy when behind a reverse proxy.
+                    Switch off any limit to remove that restriction. Per-minute limits apply to each
+                    visitor IP and are shared by Stremio and Torznab. Simultaneous requests are
+                    limited across this application process. Use the visitor IP settings in Incoming
+                    proxy when behind a reverse proxy.
                   </p>
                   <p className="help">
                     Changes apply without restarting or replacing installation links. Lowering

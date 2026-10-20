@@ -54,7 +54,12 @@ const services = {
   alldebrid: 'AllDebrid',
   torbox: 'TorBox',
 }
-const triggers = { manual: 'Manual', automatic: 'Automatic', playback: 'Playback request' }
+const triggers = {
+  manual: 'Manual',
+  automatic: 'Automatic',
+  playback: 'Playback request',
+  public: 'Public Search',
+}
 const phases: Record<string, string> = {
   ...providerSteps,
 

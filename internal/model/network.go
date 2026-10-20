@@ -1,6 +1,8 @@
 package model
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"regexp"
@@ -35,7 +37,7 @@ type NetworkSettings struct {
 
 func (s NetworkSettings) Validate() error {
 	if s.PublicLimits != nil && !s.PublicLimits.Valid() {
-		return errors.New("Public request limits must be between 1 and 100000 per minute, with 1 to 1000 simultaneous requests")
+		return errors.New("Public request limits must be 0 (unlimited), 1 to 100000 per minute, or 1 to 1000 simultaneous requests")
 	}
 	if s.Incoming != nil {
 		if err := s.Incoming.Validate(); err != nil {
@@ -102,10 +104,30 @@ type PublicLimits struct {
 	Concurrent        int `json:"concurrent"`
 }
 
+// Zero explicitly disables a limit. An omitted or null value must not turn a
+// partially filled settings object into unrestricted public access.
+func (l *PublicLimits) UnmarshalJSON(data []byte) error {
+	var value struct {
+		SetupPerMinute    *int `json:"setup_per_minute"`
+		RequestsPerMinute *int `json:"requests_per_minute"`
+		Concurrent        *int `json:"concurrent"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&value); err != nil {
+		return err
+	}
+	if value.SetupPerMinute == nil || value.RequestsPerMinute == nil || value.Concurrent == nil {
+		return errors.New("Set all three public request limits explicitly")
+	}
+	*l = PublicLimits{SetupPerMinute: *value.SetupPerMinute, RequestsPerMinute: *value.RequestsPerMinute, Concurrent: *value.Concurrent}
+	return nil
+}
+
 func DefaultPublicLimits() PublicLimits {
 	return PublicLimits{SetupPerMinute: 12, RequestsPerMinute: 120, Concurrent: 50}
 }
 
 func (l PublicLimits) Valid() bool {
-	return l.SetupPerMinute >= 1 && l.SetupPerMinute <= 100000 && l.RequestsPerMinute >= 1 && l.RequestsPerMinute <= 100000 && l.Concurrent >= 1 && l.Concurrent <= 1000
+	return l.SetupPerMinute >= 0 && l.SetupPerMinute <= 100000 && l.RequestsPerMinute >= 0 && l.RequestsPerMinute <= 100000 && l.Concurrent >= 0 && l.Concurrent <= 1000
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/inbound"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -116,5 +117,72 @@ func TestPublicAdmissionFailsClosedWhenSettingsCannotBeRead(t *testing.T) {
 	}
 	if a.inflight != 0 || len(a.windows) != 0 {
 		t.Fatal("failed admission consumed a slot")
+	}
+}
+
+func TestPublicMinuteLimitsCanBeDisabledIndependently(t *testing.T) {
+	for _, unlimited := range []publicRequest{publicSetup, publicAddon} {
+		limits := model.PublicLimits{SetupPerMinute: 1, RequestsPerMinute: 1, Concurrent: 1}
+		if unlimited == publicSetup {
+			limits.SetupPerMinute = 0
+		} else {
+			limits.RequestsPerMinute = 0
+		}
+		a := &publicAdmission{policy: func(context.Context) (requestPolicy, error) { return requestPolicy{limits: limits}, nil }}
+		r := httptest.NewRequest("GET", "/", nil)
+		for range 150 {
+			release, _, err := a.reserve(r, unlimited)
+			if err != nil || release == nil {
+				t.Fatal("disabled minute limit still rejected a request", unlimited, err)
+			}
+			release()
+		}
+		if len(a.windows) != 0 {
+			t.Fatal("an unlimited request allocated visitor counters")
+		}
+		limited := publicSetup
+		if unlimited == publicSetup {
+			limited = publicAddon
+		}
+		release, _, err := a.reserve(r, limited)
+		if err != nil || release == nil {
+			t.Fatal("independent limited request was rejected", err)
+		}
+		release()
+		if release, _, _ = a.reserve(r, limited); release != nil {
+			t.Fatal("disabling one family removed the other family's limit")
+		}
+	}
+}
+
+func TestUnlimitedPublicRequestsIgnoreBoundedVisitorCounterCapacity(t *testing.T) {
+	limits := model.PublicLimits{SetupPerMinute: 1}
+	a := &publicAdmission{policy: func(context.Context) (requestPolicy, error) { return requestPolicy{limits: limits}, nil }, windows: map[string]loginWindow{}}
+	for i := range 8192 {
+		a.windows[fmt.Sprint(i)] = loginWindow{attempts: 1, until: time.Now().Add(time.Minute)}
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	var releases []func()
+	for range 75 {
+		release, _, err := a.reserve(r, publicAddon)
+		if err != nil || release == nil {
+			t.Fatal("an unlimited request was rejected by a disabled limit or unrelated counters", err)
+		}
+		releases = append(releases, release)
+	}
+	limits.Concurrent = 1
+	if release, _, _ := a.reserve(r, publicAddon); release != nil {
+		t.Fatal("enabling concurrency lost requests admitted while it was disabled")
+	}
+	for _, release := range releases {
+		release()
+	}
+	release, _, err := a.reserve(r, publicAddon)
+	if err != nil || release == nil {
+		t.Fatal("concurrency did not recover after active requests finished", err)
+	}
+	release()
+	if a.inflight != 0 || len(a.windows) != 8192 {
+		t.Fatal("unlimited traffic leaked slots or allocated visitor counters")
 	}
 }

@@ -1,6 +1,22 @@
 package model
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestPublicLimitsRequireExplicitValuesBeforeRemovingRestrictions(t *testing.T) {
+	for _, raw := range []string{`{}`, `null`, `{"setup_per_minute":0,"requests_per_minute":0}`, `{"setup_per_minute":0,"requests_per_minute":0,"concurrent":null}`, `{"setup_per_minute":0,"requests_per_minute":0,"concurrent":0,"unknown":1}`} {
+		var limits PublicLimits
+		if json.Unmarshal([]byte(raw), &limits) == nil {
+			t.Fatal("ambiguous limits silently removed a restriction")
+		}
+	}
+	var limits PublicLimits
+	if err := json.Unmarshal([]byte(`{"setup_per_minute":0,"requests_per_minute":0,"concurrent":0}`), &limits); err != nil || !limits.Valid() {
+		t.Fatal("explicit unlimited values were rejected", err)
+	}
+}
 
 func TestNetworkSettingsRejectCredentialsAndInvalidRoutes(t *testing.T) {
 	base := NetworkSettings{Revision: 1, Default: NetworkSystem, Proxies: []NetworkProxy{{ID: "warp", Name: "WARP", URL: "socks5://127.0.0.1:40000", Enabled: true}}, Overrides: map[string]string{}}

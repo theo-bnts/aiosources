@@ -10,6 +10,7 @@ export function clearPublicCredentials(form: HTMLFormElement) {
 }
 export type PublicInfo = {
   torznab_enabled?: boolean
+  search_enabled?: boolean
   sources?: { id: string; name: string }[]
   enabled: boolean
   providers: { id: string; name: string }[]
@@ -19,21 +20,25 @@ export function PublicAnnounceFields({
   sources,
   pending,
   torznab = false,
+  search = false,
 }: {
   sources: { id: string; name: string }[]
   pending: boolean
   torznab?: boolean
+  search?: boolean
 }) {
   if (!sources.length) return null
   return (
     <Disclosure title="Advanced">
       <p className="help">
         Optional: supply your own complete announce URL to allow uncached{' '}
-        {torznab ? 'downloads' : 'playback'} from a private source.{' '}
+        {torznab || search ? 'downloads' : 'playback'} from a private source.{' '}
         {torznab
           ? 'Your client receives your announce in its magnets.'
           : 'These URLs are sent only to your debrid account when needed.'}{' '}
-        They stay in your encrypted connection link.
+        {search
+          ? 'They stay in this Search session and are not remembered on this browser.'
+          : 'They stay in your encrypted connection link.'}
       </p>
       {sources.map((source) => (
         <div className="field" key={source.id}>

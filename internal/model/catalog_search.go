@@ -31,14 +31,16 @@ type CatalogTitle struct {
 }
 
 type CatalogRelease struct {
-	Fingerprint  string                `json:"fingerprint"`
-	OccurrenceID string                `json:"occurrence_id"`
-	Provider     string                `json:"provider"`
-	Title        string                `json:"title"`
-	Size         int64                 `json:"size"`
-	PublishedAt  *time.Time            `json:"published_at,omitempty"`
-	Languages    []string              `json:"languages"`
-	Services     []CatalogAvailability `json:"services"`
+	DownloadToken string                `json:"download_token,omitempty"`
+	ProviderName  string                `json:"provider_name,omitempty"`
+	Fingerprint   string                `json:"fingerprint"`
+	OccurrenceID  string                `json:"occurrence_id"`
+	Provider      string                `json:"provider"`
+	Title         string                `json:"title"`
+	Size          int64                 `json:"size"`
+	PublishedAt   *time.Time            `json:"published_at,omitempty"`
+	Languages     []string              `json:"languages"`
+	Services      []CatalogAvailability `json:"services"`
 }
 
 type CatalogAvailability struct {
@@ -55,6 +57,7 @@ type CatalogSelection struct {
 }
 
 type CatalogDownloadInput struct {
+	DownloadToken string `json:"download_token,omitempty"`
 	CatalogSelection
 	Fingerprint   string `json:"fingerprint"`
 	OccurrenceID  string `json:"occurrence_id"`

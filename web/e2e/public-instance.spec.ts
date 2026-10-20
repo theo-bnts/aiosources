@@ -48,6 +48,8 @@ test('public access preserves the access proxy cookie without an administrator s
       })
       return route.fulfill({
         json: {
+          credential: 'synthetic-browser-credential-without-personal-data-012345',
+          services: ['torbox'],
           manifest_url: `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,
         },
       })
@@ -80,7 +82,7 @@ test('public access preserves the access proxy cookie without an administrator s
   }
 })
 
-test('public access is opt-in and visitors get a private link without administrator menus or saved keys', async ({
+test('public access is opt-in and visitors get a private link without administrator menus or plaintext key storage', async ({
   page,
   server,
   browser,
@@ -108,6 +110,8 @@ test('public access is opt-in and visitors get a private link without administra
       expect(body.services.torbox === 'synthetic-visitor-key').toBe(true)
       return route.fulfill({
         json: {
+          credential: 'synthetic-browser-credential-without-personal-data-012345',
+          services: ['torbox'],
           manifest_url: `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,
         },
       })

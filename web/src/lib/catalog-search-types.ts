@@ -19,6 +19,8 @@ export type CatalogAvailability = {
   size?: number
 }
 export type CatalogRelease = {
+  download_token?: string
+  provider_name?: string
   fingerprint: string
   occurrence_id: string
   provider: string

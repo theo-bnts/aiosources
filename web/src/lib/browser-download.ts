@@ -14,7 +14,9 @@ export function prepareBrowserDownload() {
           destination.origin !== window.location.origin ||
           destination.username ||
           destination.password ||
-          !destination.pathname.startsWith('/api/catalog-downloads/') ||
+          !['/api/catalog-downloads/', '/api/public/catalog-downloads/'].some((prefix) =>
+            destination.pathname.startsWith(prefix),
+          ) ||
           destination.search ||
           destination.hash
         )

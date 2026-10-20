@@ -1,6 +1,6 @@
 import { test, expect, selectMultiple } from './fixtures'
 
-test('visitor announce fields are opt-in, use source names and never retain credentials', async ({
+test('visitor announce fields are opt-in, use source names and clear personal inputs without retaining plaintext credentials', async ({
   page,
   server,
   browser,
@@ -55,6 +55,8 @@ test('visitor announce fields are opt-in, use source names and never retain cred
       })
       return route.fulfill({
         json: {
+          credential: 'synthetic-browser-credential-without-personal-data-012345',
+          services: ['torbox'],
           manifest_url: `${server.origin}/public/stremio/encrypted-own-configuration/manifest.json`,
         },
       })
@@ -71,7 +73,7 @@ test('visitor announce fields are opt-in, use source names and never retain cred
     const permission = access.getByLabel('Expose source names and filters', { exact: true })
     await expect(permission).not.toBeChecked()
     await permission.check()
-    await expect(access).toContainText('Applies to Stremio and Torznab')
+    await expect(access).toContainText('Applies to Search, Stremio and Torznab')
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await expect(visitor.locator('summary', { hasText: 'Advanced' })).toBeVisible()

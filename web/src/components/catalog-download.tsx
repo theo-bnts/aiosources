@@ -3,6 +3,8 @@ import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { DownloadSimpleIcon, PlusIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import { api, ApiError, queryClient } from '@/lib/api'
+import { usePublicSearch } from '@/lib/public-search'
+import { publicAPI } from '@/lib/public-credentials'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import { prepareBrowserDownload } from '@/lib/browser-download'
@@ -40,6 +42,8 @@ export function DownloadAction({
   operationID?: string
   preparing?: boolean
 }) {
+  const visitor = usePublicSearch()
+  const preparation = useRef('')
   const [ready, setReady] = useState<CatalogDownload | null>(null)
   const [waiting, setWaiting] = useState(preparing)
   const [notReady, setNotReady] = useState(false)
@@ -60,6 +64,27 @@ export function DownloadAction({
     gcTime: 0,
     mutationFn: (allowUncached: boolean) => {
       controller.current = new AbortController()
+      if (visitor) {
+        return publicAPI<CatalogDownload>(
+          `/catalog/${workID}/download`,
+          visitor.configuration,
+          {
+            method: 'POST',
+            signal: controller.current.signal,
+            body: JSON.stringify(
+              preparation.current && !allowUncached
+                ? { preparation_id: preparation.current }
+                : {
+                    ...selection,
+                    download_token: release.download_token,
+                    service: service.service,
+                    allow_uncached: allowUncached,
+                  },
+            ),
+          },
+          visitor.credential,
+        )
+      }
       const continuation = operationID || (!allowUncached ? operation : '')
       return api<CatalogDownload>(
         continuation
@@ -83,6 +108,7 @@ export function DownloadAction({
       )
     },
     onSuccess: (result, allowUncached) => {
+      preparation.current = result.preparation_id || ''
       setOperation(result.operation_id)
       const pending = result.status === 'pending'
       setWaiting(pending && (allowUncached || waiting))
@@ -106,7 +132,8 @@ export function DownloadAction({
       // A fast pending response can batch both mutation transitions into one
       // render. Schedule the next check even when its visible state is unchanged.
       setCheckVersion((version) => version + 1)
-      void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
+      if (!visitor)
+        void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
       if (operationID) {
         void queryClient.invalidateQueries({ queryKey: ['operation', operationID] })
         void queryClient.invalidateQueries({ queryKey: ['operation-events', operationID] })
@@ -122,8 +149,10 @@ export function DownloadAction({
         setWaiting(false)
         setNotReady(true)
         setReady(null)
+        preparation.current = ''
       }
-      void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
+      if (!visitor)
+        void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
       if (operationID) {
         void queryClient.invalidateQueries({ queryKey: ['operation', operationID] })
         void queryClient.invalidateQueries({ queryKey: ['operation-events', operationID] })
@@ -202,7 +231,7 @@ export function DownloadAction({
                     : 'Check cached file'}
           </Button>
         )}
-        {operation && !operationID && (
+        {!visitor && operation && !operationID && (
           <Button asChild size="sm" variant="ghost">
             <Link to={`/debrid/history/${encodeURIComponent(operation)}`}>
               View operation

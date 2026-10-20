@@ -38,7 +38,7 @@ func TestIncomingTrustAndPublicLimitsPreserveExistingConnectionsAndGenerations(t
 	if *saved.PublicLimits != *network.PublicLimits {
 		t.Fatal("public access save overwrote network quotas")
 	}
-	for _, limits := range []model.PublicLimits{{SetupPerMinute: -1, RequestsPerMinute: 10, Concurrent: 2}, {SetupPerMinute: 1, RequestsPerMinute: 1}, {SetupPerMinute: 1, RequestsPerMinute: 1, Concurrent: 1001}} {
+	for _, limits := range []model.PublicLimits{{SetupPerMinute: -1, RequestsPerMinute: 10, Concurrent: 2}, {SetupPerMinute: 1, RequestsPerMinute: 1, Concurrent: -1}, {SetupPerMinute: 1, RequestsPerMinute: 1, Concurrent: 1001}} {
 		invalid := saved
 		invalid.PublicLimits = &limits
 		if err := db.UpdateNetworkSettings(ctx, invalid); !errors.Is(err, model.ErrInvalid) {
@@ -145,5 +145,32 @@ func TestIncomingNetworkMigrationPreservesEnabledVisitorLinksAndOutgoingRoutes(t
 	network, _ = db.NetworkSettings(ctx)
 	if network.Revision != revision {
 		t.Fatal("repeated startup rewrote settings")
+	}
+}
+
+func TestPublicLimitsCanBeDisabledIndividuallyWithoutChangingOtherNetworkSettings(t *testing.T) {
+	ctx, _, db := activityDatabase(t)
+	for _, limits := range []model.PublicLimits{
+		{RequestsPerMinute: 120, Concurrent: 50},
+		{SetupPerMinute: 12, Concurrent: 50},
+		{SetupPerMinute: 12, RequestsPerMinute: 120},
+		{},
+	} {
+		before, err := db.NetworkSettings(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		updated := before
+		updated.PublicLimits = &limits
+		if err = db.UpdateNetworkSettings(ctx, updated); err != nil {
+			t.Fatal("disabled request limit could not be saved", err)
+		}
+		after, err := db.NetworkSettings(ctx)
+		if err != nil || *after.PublicLimits != limits || !reflect.DeepEqual(after.Incoming, before.Incoming) || after.Default != before.Default {
+			t.Fatal("disabled limits were changed or affected unrelated network settings", err)
+		}
+	}
+	if _, err := db.pool.Exec(ctx, `UPDATE ingest.network_settings SET public_limits=jsonb_set(public_limits,'{requests_per_minute}','-1') WHERE singleton`); err == nil {
+		t.Fatal("database constraint accepted a negative request limit")
 	}
 }

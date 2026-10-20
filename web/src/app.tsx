@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/dialog'
 import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/components/common'
 import { Login } from '@/components/login'
+import type { PublicInfo } from '@/components/public-connection-fields'
 import { PublicEntry } from '@/components/public-entry'
 
 export class RootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -220,6 +221,20 @@ const navigationGroups = [
     ],
   },
 ]
+const publicSearchNavigation = {
+  id: 'public-search',
+  label: 'Search',
+  icon: MagnifyingGlassIcon,
+  defaultOpen: true,
+  items: [
+    {
+      to: '/public/search',
+      label: 'Search',
+      description: 'Find films and series and download through your own debrid accounts.',
+      icon: MagnifyingGlassIcon,
+    },
+  ],
+}
 const publicNavigationGroups = [
   {
     id: 'integrations',
@@ -442,16 +457,30 @@ export function AppShell({
   authenticated?: boolean
   children?: ReactNode
 }) {
-  const groups = publicMode ? publicNavigationGroups : navigationGroups
+  const publicInfo = useQuery({
+    queryKey: ['public-config'],
+    queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
+    enabled: publicMode,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+    retry: false,
+  })
+  const groups = publicMode
+    ? [
+        ...(publicInfo.data?.search_enabled ? [publicSearchNavigation] : []),
+        ...publicNavigationGroups,
+      ]
+    : navigationGroups
   const items = groups.flatMap((group) => group.items)
   const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
   const live = useLiveUpdates(!publicMode)
   const location = useLocation()
   const navigationPath = publicMode
-    ? location.pathname === '/public/torznab'
-      ? '/public/torznab'
-      : '/public'
+    ? location.pathname.startsWith('/public/search')
+      ? '/public/search'
+      : location.pathname === '/public/torznab'
+        ? '/public/torznab'
+        : '/public'
     : ['/runs', '/raw', '/pages'].some(
           (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
         ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)

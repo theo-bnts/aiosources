@@ -234,7 +234,11 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	if err = s.validatePublicAnnounces(ctx, latest, announces); err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces})
+	return s.sealPublicInstallation(PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces})
+}
+
+func (s *Service) sealPublicInstallation(installation PublicInstallation) (string, error) {
+	data, err := json.Marshal(installation)
 	if err != nil {
 		return "", model.ErrInvalid
 	}
@@ -249,6 +253,28 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	}
 	return configuration, nil
 }
+
+// A browser can remember this sealed credential without retaining plaintext keys
+// or personal announces. It authorizes no administration and remains revocable.
+func (s *Service) PublicBrowserCredential(ctx context.Context, audience, configuration string) (string, []string, error) {
+	installation, err := s.OpenPublicInstallation(ctx, audience, configuration)
+	if err != nil {
+		return "", nil, err
+	}
+	defer clear(installation.Services)
+	defer clear(installation.Announces)
+	keysOnly := *installation
+	keysOnly.Announces = nil
+	credential, err := s.sealPublicInstallation(keysOnly)
+	services := []string{}
+	for _, provider := range PublicProviders {
+		if installation.Services[provider.ID] != "" {
+			services = append(services, provider.ID)
+		}
+	}
+	return credential, services, err
+}
+
 func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
 	if len(value) < 32 || len(value) > MaxPublicInstallationSize {
 		return nil, ErrAuth

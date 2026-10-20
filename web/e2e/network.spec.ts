@@ -190,17 +190,17 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     connection_ip: '127.0.0.1',
     visitor_ip: '203.0.113.7',
   })
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveCount(0)
   await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   await expect(page.getByLabel('IP address header', { exact: true })).toHaveCount(0)
   const form = page.getByRole('form', { name: 'Request limits', exact: true })
   for (const [label, value] of [
     ['Link creations per minute', '12'],
-    ['Addon requests per minute', '120'],
+    ['Public requests per minute', '120'],
     ['Simultaneous public requests', '50'],
   ])
     await expect(form.getByLabel(label, { exact: true })).toHaveValue(value)
-  await form.getByLabel('Addon requests per minute', { exact: true }).fill('2')
+  await form.getByLabel('Public requests per minute', { exact: true }).fill('2')
   await form.getByLabel('Simultaneous public requests', { exact: true }).fill('7')
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -240,12 +240,12 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     ).status(),
   ).toBe(401)
   await page.reload()
-  await expect(form.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('2')
+  await expect(form.getByLabel('Public requests per minute', { exact: true })).toHaveValue('2')
   await page.goto('/public-access')
   await expect(
     page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
   ).toHaveText(['Administration/', 'Public access'])
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveCount(0)
 })
 
 test('incoming settings preserve unsaved edits and stay within a mobile viewport', async ({
@@ -268,11 +268,11 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await page.getByLabel('Addon requests per minute', { exact: true }).fill('80')
+  await page.getByLabel('Public requests per minute', { exact: true }).fill('80')
   await page.getByRole('tab', { name: 'Incoming proxy', exact: true }).click()
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('80')
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveValue('80')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.getByRole('tab', { name: 'Incoming proxy', exact: true }).click()
@@ -299,8 +299,8 @@ test('public access saves preserve network quotas and concurrent request limit e
   expect(access).not.toHaveProperty('limits')
   expect((await settings(page)).public_limits.requests_per_minute).toBe(333)
   await page.goto('/network/limits')
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('333')
-  await page.getByLabel('Addon requests per minute', { exact: true }).fill('444')
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveValue('333')
+  await page.getByLabel('Public requests per minute', { exact: true }).fill('444')
   const latest = await settings(page)
   expect(
     (
@@ -317,9 +317,59 @@ test('public access saves preserve network quotas and concurrent request limit e
       { exact: true },
     ),
   ).toBeVisible()
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('444')
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveValue('444')
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Discard changes and reload', exact: true }).click()
-  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('333')
+  await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveValue('333')
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('70')
+})
+
+test('each public request limit can be switched off while active limits and incomplete drafts stay protected', async ({
+  page,
+}) => {
+  await page.goto('/network/limits')
+  const limit = page.getByRole('switch', { name: 'Public requests per minute limit', exact: true })
+  const requests = page.getByLabel('Public requests per minute', { exact: true })
+  await requests.fill('1')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await limit.click()
+  await expect(requests).toBeDisabled()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect((await settings(page)).public_limits).toEqual({
+    setup_per_minute: 12,
+    requests_per_minute: 0,
+    concurrent: 50,
+  })
+  for (let i = 0; i < 3; i++)
+    expect((await page.request.get('/public/stremio/invalid/manifest.json')).status()).toBe(401)
+  await page.reload()
+  await expect(limit).not.toBeChecked()
+  await expect(requests).toBeDisabled()
+  await expect(requests).toHaveAttribute('placeholder', 'Unlimited')
+  await limit.click()
+  await requests.fill('')
+  await expect(limit).toBeChecked()
+  await expect(requests).toBeEditable()
+  await page.getByRole('tab', { name: 'Incoming proxy', exact: true }).click()
+  const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
+  await expect(guard).toBeVisible()
+  await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
+  await requests.fill('1')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect((await page.request.get('/public/stremio/invalid/manifest.json')).status()).toBe(401)
+  expect((await page.request.get('/public/stremio/invalid/manifest.json')).status()).toBe(429)
+  await page.getByRole('switch', { name: 'Link creations per minute limit', exact: true }).click()
+  await page
+    .getByRole('switch', { name: 'Simultaneous public requests limit', exact: true })
+    .click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect((await settings(page)).public_limits).toEqual({
+    setup_per_minute: 0,
+    requests_per_minute: 1,
+    concurrent: 0,
+  })
 })

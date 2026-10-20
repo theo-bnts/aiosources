@@ -9,9 +9,10 @@ export function sourceName(names: ReadonlyMap<string, string>, id?: string, save
   return (id && names.get(id)?.trim()) || savedName?.trim() || id || 'Unknown source'
 }
 
-export function useSourceNames() {
+export function useSourceNames(enabled = true) {
   const sources = useQuery({
     queryKey: ['providers'],
+    enabled,
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
   return useMemo(() => {

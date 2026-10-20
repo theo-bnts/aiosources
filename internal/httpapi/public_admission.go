@@ -46,10 +46,14 @@ func (a *publicAdmission) reserve(r *http.Request, kind publicRequest) (func(), 
 	address := policy.clients.ClientIP(r)
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.inflight >= policy.limits.Concurrent {
+	if policy.limits.Concurrent > 0 && a.inflight >= policy.limits.Concurrent {
 		return nil, 1, nil
 	}
-	if kind != publicConfig {
+	limit := policy.limits.RequestsPerMinute
+	if kind == publicSetup {
+		limit = policy.limits.SetupPerMinute
+	}
+	if kind != publicConfig && limit > 0 {
 		now := time.Now()
 		if a.windows == nil {
 			a.windows = make(map[string]loginWindow)
@@ -62,11 +66,9 @@ func (a *publicAdmission) reserve(r *http.Request, kind publicRequest) (func(), 
 			}
 			a.nextPrune = now.Add(time.Second)
 		}
-		limit := policy.limits.RequestsPerMinute
 		key := address
 		if kind == publicSetup {
 			key += "/setup"
-			limit = policy.limits.SetupPerMinute
 		}
 		value := a.windows[key]
 		if !now.Before(value.until) {

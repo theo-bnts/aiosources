@@ -12,6 +12,7 @@ import { Disclosure } from '@/components/ui/disclosure'
 type Access = {
   revision: number
   enabled: boolean
+  search_enabled: boolean
   expose_sources: boolean
   torznab_enabled: boolean
 }
@@ -27,6 +28,7 @@ export function PublicAccessSettings() {
   const dirty = Boolean(
     draft &&
     (draft.value.enabled !== query.data?.enabled ||
+      draft.value.search_enabled !== query.data?.search_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
       draft.value.expose_sources !== query.data?.expose_sources),
   )
@@ -60,6 +62,10 @@ export function PublicAccessSettings() {
                 ...latest,
                 enabled:
                   draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
+                search_enabled:
+                  draft.value.search_enabled !== draft.base.search_enabled
+                    ? draft.value.search_enabled
+                    : latest.search_enabled,
                 torznab_enabled:
                   draft.value.torznab_enabled !== draft.base.torznab_enabled
                     ? draft.value.torznab_enabled
@@ -114,6 +120,20 @@ export function PublicAccessSettings() {
             </p>
             <div className="flex items-center gap-3">
               <Switch
+                id="public-search-enabled"
+                checked={current.search_enabled}
+                disabled={busy || !current.enabled}
+                onCheckedChange={(search_enabled) => change({ search_enabled })}
+              />
+              <Label htmlFor="public-search-enabled">Allow public Search</Label>
+            </div>
+            <p className="help">
+              Visitors can search the identified catalog and download using their own debrid
+              services. Source visibility and private download permissions follow the same rules as
+              Stremio. Browser downloads pass through this instance and use its bandwidth.
+            </p>
+            <div className="flex items-center gap-3">
+              <Switch
                 id="public-torznab-enabled"
                 checked={current.torznab_enabled}
                 disabled={busy || !current.enabled}
@@ -136,10 +156,10 @@ export function PublicAccessSettings() {
                 <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
               </div>
               <p className="help">
-                Applies to Stremio and Torznab. Visitors can select sources and supply their own
-                announce URLs for private sources. Your source definitions and announce URLs stay
-                private. When off, source names and source filters are hidden and private sources
-                require known cached availability.
+                Applies to Search, Stremio and Torznab. Visitors can select sources and supply their
+                own announce URLs for private sources. Your source definitions and announce URLs
+                stay private. When off, source names and source filters are hidden and private
+                sources require known cached availability.
               </p>
             </Disclosure>
             {conflict && (

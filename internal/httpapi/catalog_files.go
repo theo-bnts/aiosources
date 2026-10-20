@@ -146,6 +146,10 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
+	s.deliverCatalogFile(w, r, ticket, nil)
+}
+
+func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, ticket catalogFileTicket, authorize func(context.Context) error) {
 	select {
 	case s.files <- struct{}{}:
 		defer func() { <-s.files }()
@@ -189,6 +193,12 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 		}
 		respondError(w, aiosource.ErrInvalidResponse)
 		return
+	}
+	if authorize != nil {
+		if err := authorize(ctx); err != nil {
+			respondError(w, err)
+			return
+		}
 	}
 	if err = http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		respondError(w, err)

@@ -27,6 +27,7 @@ test('detail return links retain the complete public list view and direct links 
   for (const [pathname, search, label] of [
     ['/torrents', '?q=example&provider=source&sort=oldest', 'Torrent search'],
     ['/search', '?q=example&type=tv&offset=50', 'Search'],
+    ['/public/search', '?q=example&type=tv&year=2026&offset=50', 'Search'],
     ['/sharing/remotes', '?q=example&state=disabled', 'Remote catalogs'],
     ['/remotes/settings', '?q=example&state=disabled', 'Remote catalogs'],
     ['/remotes/history', '?status=failed&offset=50', 'Remote catalog history'],

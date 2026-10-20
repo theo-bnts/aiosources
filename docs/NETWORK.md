@@ -54,3 +54,9 @@ Trust only peers allowed to assert visitor addresses. Restrict direct access to 
 A chain is read right to left from the connected proxy, stopping at the first untrusted hop. A visitor cannot gain a new quota merely by prepending an invented address. Untrusted connections and missing, malformed, duplicate single-address or oversized headers use the direct connection address. Header trust is disabled after an upgrade until explicitly configured. It never changes authentication, HTTPS detection, the configured public origin or outgoing proxy settings.
 
 The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Network → Request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.
+
+## Adjust public request limits
+
+**Request limits** has a separate switch for each restriction. Keep the per-visitor link-creation and request quotas while switching off **Simultaneous public requests** if you do not want a shared admission ceiling. Switching off one limit leaves the others active. Defaults remain 12 link creations and 120 addon/Search requests per minute per visitor IP, with 50 simultaneous public requests. Administrator sign-in protection is separate.
+
+A disabled limit is saved as `0` (unlimited). Existing positive settings are preserved on upgrade. Request timeouts, input-size checks and the bounded capacity of individual operations still apply, even when an admission limit is off. Already active requests finish normally and remain counted if a limit is enabled again.
