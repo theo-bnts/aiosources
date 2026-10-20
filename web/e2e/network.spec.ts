@@ -186,11 +186,7 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     connection_ip: '127.0.0.1',
     visitor_ip: '203.0.113.7',
   })
-  await page.goto('/public-access')
-  await expect(
-    page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
-  ).toHaveText(['Administration/', 'Public access'])
-  const form = page.getByRole('form', { name: 'Public access', exact: true })
+  const form = page.getByRole('form', { name: 'Incoming network settings', exact: true })
   for (const [label, value] of [
     ['Link creations per minute', '12'],
     ['Addon requests per minute', '120'],
@@ -201,8 +197,12 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   await form.getByLabel('Simultaneous public requests', { exact: true }).fill('7')
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  const saved = await (await page.request.get('/api/public-access')).json()
-  expect(saved.limits).toEqual({ setup_per_minute: 12, requests_per_minute: 2, concurrent: 7 })
+  const saved = await settings(page)
+  expect(saved.public_limits).toEqual({
+    setup_per_minute: 12,
+    requests_per_minute: 2,
+    concurrent: 7,
+  })
   const visitor = { 'CF-Connecting-IP': '203.0.113.8' }
   expect(
     (
@@ -228,6 +228,11 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   ).toBe(401)
   await page.reload()
   await expect(form.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('2')
+  await page.goto('/public-access')
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
+  ).toHaveText(['Administration/', 'Public access'])
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveCount(0)
 })
 
 test('incoming settings preserve unsaved edits and stay within a mobile viewport', async ({
@@ -247,7 +252,50 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await page.goto('/public-access')
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('public access saves preserve network quotas and concurrent incoming edits require explicit review', async ({
+  page,
+}) => {
+  await page.goto('/public-access')
+  const exposure = page.getByRole('form', { name: 'Public access', exact: true })
+  await exposure.getByRole('switch', { name: 'Enable public access', exact: true }).click()
+  const network = await settings(page)
+  const response = await page.request.put('/api/settings/network', {
+    headers: await mutationHeaders(page),
+    data: { ...network, public_limits: { ...network.public_limits, requests_per_minute: 333 } },
+  })
+  expect(response.status()).toBe(200)
+  await exposure.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(exposure.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const access = await (await page.request.get('/api/public-access')).json()
+  expect(access.enabled).toBe(true)
+  expect(access).not.toHaveProperty('limits')
+  expect((await settings(page)).public_limits.requests_per_minute).toBe(333)
+  await page.goto('/network/incoming')
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('333')
+  await page.getByLabel('Addon requests per minute', { exact: true }).fill('444')
+  const latest = await settings(page)
+  expect(
+    (
+      await page.request.put('/api/settings/network', {
+        headers: await mutationHeaders(page),
+        data: { ...latest, public_limits: { ...latest.public_limits, concurrent: 70 } },
+      })
+    ).status(),
+  ).toBe(200)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(
+    page.getByText(
+      'Network settings changed. Your draft is preserved; discard it to load the saved settings.',
+      { exact: true },
+    ),
+  ).toBeVisible()
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('444')
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Discard changes and reload', exact: true }).click()
+  await expect(page.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('333')
+  await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('70')
 })

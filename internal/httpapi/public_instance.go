@@ -47,7 +47,6 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, err)
 			return
 		}
-		s.policies.invalidate()
 		w.WriteHeader(204)
 	}))
 	mux.HandleFunc("GET /api/public/config", func(w http.ResponseWriter, r *http.Request) {

@@ -259,8 +259,6 @@ func validAccessActivity(action, targetID string) bool {
 		return false
 	}
 	switch action {
-	case "security.public_limits_changed":
-		return true
 	case "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
 		return true
 	default:

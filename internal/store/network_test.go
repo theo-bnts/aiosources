@@ -10,9 +10,10 @@ import (
 func TestNetworkSettingsRevisionsSecretsDeletionAndAtomicLogs(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
 	settings, err := db.NetworkSettings(ctx)
-	if err != nil || settings.Revision != 1 || settings.Default != model.NetworkSystem || len(settings.Proxies) != 0 {
+	if err != nil || settings.Revision < 1 || settings.Default != model.NetworkSystem || len(settings.Proxies) != 0 {
 		t.Fatal("Existing installations must keep their system connection by default")
 	}
+	initialRevision := settings.Revision
 	settings.Proxies = []model.NetworkProxy{{ID: "warp", Name: "WARP", URL: "socks5://127.0.0.1:40000", Enabled: false, UsernameRef: "proxy-user", PasswordRef: "proxy-password"}}
 	if err := db.UpdateNetworkSettings(ctx, settings); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("Network settings referenced missing credentials")
@@ -33,7 +34,7 @@ func TestNetworkSettingsRevisionsSecretsDeletionAndAtomicLogs(t *testing.T) {
 		t.Fatal("A configured proxy lost its authentication secret")
 	}
 	saved, err := db.NetworkSettings(ctx)
-	if err != nil || saved.Revision != 2 || saved.Proxies[0].Enabled || saved.Overrides["source:sample"] != "warp" {
+	if err != nil || saved.Revision != initialRevision+1 || saved.Proxies[0].Enabled || saved.Overrides["source:sample"] != "warp" {
 		t.Fatal("Saving changed activation or scoped routing")
 	}
 	var logs int
@@ -44,7 +45,7 @@ func TestNetworkSettingsRevisionsSecretsDeletionAndAtomicLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, err = db.NetworkSettings(ctx)
-	if err != nil || len(saved.Overrides) != 0 || saved.Revision != 3 || len(saved.Proxies) != 1 {
+	if err != nil || len(saved.Overrides) != 0 || saved.Revision != initialRevision+2 || len(saved.Proxies) != 1 {
 		t.Fatal("Deleting a source retained its route or removed a shared proxy")
 	}
 	saved.Proxies = nil

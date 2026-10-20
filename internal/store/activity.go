@@ -102,7 +102,6 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		return model.ErrInvalid
 	}
 	switch kind {
-	case "security.public_limits_changed":
 	case "network.settings_changed", "network.test_completed", "network.test_failed":
 	case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 		"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset":

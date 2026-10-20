@@ -13,15 +13,10 @@ func TestSavedIncomingTrustAndQuotasApplyImmediatelyAcrossPublicProtocols(t *tes
 	f, _, _ := addonAPI(t)
 	settings, _ := f.db.NetworkSettings(f.ctx)
 	settings.Incoming = &model.IncomingNetwork{Enabled: true, IPHeader: "CF-Connecting-IP", Format: "single", TrustedProxies: []string{"10.0.0.2"}}
+	settings.PublicLimits = &model.PublicLimits{SetupPerMinute: 2, RequestsPerMinute: 2, Concurrent: 50}
 	encoded, _ := json.Marshal(settings)
 	if w := f.request("PUT", "/api/settings/network", string(encoded), true, ""); w.Code != 200 {
 		t.Fatal("incoming settings could not be saved", w.Code)
-	}
-	access, _ := f.db.PublicAccess(f.ctx)
-	access.Limits = model.PublicLimits{SetupPerMinute: 2, RequestsPerMinute: 2, Concurrent: 50}
-	encoded, _ = json.Marshal(access)
-	if w := f.request("PUT", "/api/public-access", string(encoded), true, ""); w.Code != 204 {
-		t.Fatal("quota settings could not be saved", w.Code)
 	}
 	call := func(path, peer, visitor string, admin bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest("GET", path, nil).WithContext(f.ctx)
@@ -56,10 +51,10 @@ func TestSavedIncomingTrustAndQuotasApplyImmediatelyAcrossPublicProtocols(t *tes
 	if call(stremio, "10.0.0.2:1234", "203.0.113.2", false).Code != 401 {
 		t.Fatal("visitors behind the same proxy share a quota")
 	}
-	access, _ = f.db.PublicAccess(f.ctx)
-	access.Limits.RequestsPerMinute = 3
-	encoded, _ = json.Marshal(access)
-	if f.request("PUT", "/api/public-access", string(encoded), true, "").Code != 204 {
+	settings, _ = f.db.NetworkSettings(f.ctx)
+	settings.PublicLimits.RequestsPerMinute = 3
+	encoded, _ = json.Marshal(settings)
+	if f.request("PUT", "/api/settings/network", string(encoded), true, "").Code != 200 {
 		t.Fatal("could not raise live request limit")
 	}
 	if call(stremio, "10.0.0.2:1234", "203.0.113.1", false).Code != 401 || call(stremio, "10.0.0.2:1234", "203.0.113.1", false).Code != 429 {

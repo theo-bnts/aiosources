@@ -25,14 +25,18 @@ type NetworkProxy struct {
 }
 
 type NetworkSettings struct {
-	Revision  int64             `json:"revision"`
-	Default   string            `json:"default"`
-	Proxies   []NetworkProxy    `json:"proxies"`
-	Overrides map[string]string `json:"overrides"`
-	Incoming  *IncomingNetwork  `json:"incoming,omitempty"`
+	Revision     int64             `json:"revision"`
+	Default      string            `json:"default"`
+	Proxies      []NetworkProxy    `json:"proxies"`
+	Overrides    map[string]string `json:"overrides"`
+	Incoming     *IncomingNetwork  `json:"incoming,omitempty"`
+	PublicLimits *PublicLimits     `json:"public_limits,omitempty"`
 }
 
 func (s NetworkSettings) Validate() error {
+	if s.PublicLimits != nil && !s.PublicLimits.Valid() {
+		return errors.New("Public request limits must be between 1 and 100000 per minute, with 1 to 1000 simultaneous requests")
+	}
 	if s.Incoming != nil {
 		if err := s.Incoming.Validate(); err != nil {
 			return err
@@ -90,4 +94,18 @@ func (s NetworkSettings) Route(target string) string {
 		}
 	}
 	return s.Default
+}
+
+type PublicLimits struct {
+	SetupPerMinute    int `json:"setup_per_minute"`
+	RequestsPerMinute int `json:"requests_per_minute"`
+	Concurrent        int `json:"concurrent"`
+}
+
+func DefaultPublicLimits() PublicLimits {
+	return PublicLimits{SetupPerMinute: 12, RequestsPerMinute: 120, Concurrent: 50}
+}
+
+func (l PublicLimits) Valid() bool {
+	return l.SetupPerMinute >= 1 && l.SetupPerMinute <= 100000 && l.RequestsPerMinute >= 1 && l.RequestsPerMinute <= 100000 && l.Concurrent >= 1 && l.Concurrent <= 1000
 }

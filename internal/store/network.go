@@ -34,12 +34,12 @@ $$;
 
 func (s *Store) NetworkSettings(ctx context.Context) (model.NetworkSettings, error) {
 	var result model.NetworkSettings
-	var proxies, overrides, incoming []byte
-	err := s.pool.QueryRow(ctx, `SELECT revision,default_route,proxies,overrides,incoming FROM ingest.network_settings WHERE singleton`).Scan(&result.Revision, &result.Default, &proxies, &overrides, &incoming)
+	var proxies, overrides, incoming, limits []byte
+	err := s.pool.QueryRow(ctx, `SELECT revision,default_route,proxies,overrides,incoming,public_limits FROM ingest.network_settings WHERE singleton`).Scan(&result.Revision, &result.Default, &proxies, &overrides, &incoming, &limits)
 	if err != nil {
 		return result, databaseError("read network settings", err)
 	}
-	if json.Unmarshal(proxies, &result.Proxies) != nil || json.Unmarshal(overrides, &result.Overrides) != nil || json.Unmarshal(incoming, &result.Incoming) != nil || result.Validate() != nil {
+	if json.Unmarshal(proxies, &result.Proxies) != nil || json.Unmarshal(overrides, &result.Overrides) != nil || json.Unmarshal(incoming, &result.Incoming) != nil || json.Unmarshal(limits, &result.PublicLimits) != nil || result.Validate() != nil {
 		return model.NetworkSettings{}, errors.New("Stored network settings are invalid")
 	}
 	if result.Incoming != nil && result.Incoming.TrustedProxies == nil {
@@ -77,6 +77,13 @@ func (s *Store) UpdateNetworkSettings(ctx context.Context, input model.NetworkSe
 			return model.ErrInvalid
 		}
 	}
+	var limits []byte
+	if input.PublicLimits != nil {
+		limits, err = json.Marshal(input.PublicLimits)
+		if err != nil {
+			return model.ErrInvalid
+		}
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return databaseError("begin network settings update", err)
@@ -105,7 +112,7 @@ func (s *Store) UpdateNetworkSettings(ctx context.Context, input model.NetworkSe
 			return databaseError("lock proxy credential", err)
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE ingest.network_settings SET revision=revision+1,default_route=$1,proxies=$2,overrides=$3,incoming=COALESCE($4,incoming) WHERE singleton`, input.Default, proxies, overrides, incoming); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE ingest.network_settings SET revision=revision+1,default_route=$1,proxies=$2,overrides=$3,incoming=COALESCE($4,incoming),public_limits=COALESCE($5,public_limits) WHERE singleton`, input.Default, proxies, overrides, incoming, limits); err != nil {
 		return databaseError("update network settings", err)
 	}
 	if err := recordActivityTx(ctx, tx, "info", "network.settings_changed", "", "", "", nil); err != nil {

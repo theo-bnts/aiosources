@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Deployment settings](SETTINGS.md)
 
-Use **Administration → Network** when a source or service needs a different internet connection. For example, you can send AllDebrid requests through an existing Cloudflare WARP proxy while keeping other connections unchanged.
+Use **Administration → Network** to manage incoming visitor requests and outgoing service connections. For example, you can recognize visitor IPs behind a reverse proxy, set public request limits, or send AllDebrid requests through an existing Cloudflare WARP proxy.
 
 AIOSources connects to an existing proxy; it does not install or start a VPN. Supported addresses use `http://`, `https://`, `socks5://` or `socks5h://`. HTTP and HTTPS proxies must support CONNECT tunnels. A VPN can be used when its gateway provides one of these proxy interfaces.
 
@@ -41,7 +41,6 @@ The address must work **from inside the AIOSources container**. `127.0.0.1` ther
 
 The gateway's own request, traffic and account limits still apply. Proxy routing preserves HTTPS certificate checks and the existing destination protections for remote catalogs and browser downloads. Public visitors inherit the administrator's routing and cannot view or change proxy profiles or credentials.
 
-
 ## Recognize visitors behind a proxy
 
 Open **Administration → Network → Incoming** when requests arrive through Cloudflare, a tunnel or another reverse proxy. This is independent of outgoing WARP/VPN routing.
@@ -54,4 +53,4 @@ Trust only peers allowed to assert visitor addresses. Restrict direct access to 
 
 A chain is read right to left from the connected proxy, stopping at the first untrusted hop. A visitor cannot gain a new quota merely by prepending an invented address. Untrusted connections and missing, malformed, duplicate single-address or oversized headers use the direct connection address. Header trust is disabled after an upgrade until explicitly configured. It never changes authentication, HTTPS detection, the configured public origin or outgoing proxy settings.
 
-The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Public access → Request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.
+The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Network → Incoming → Public request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.

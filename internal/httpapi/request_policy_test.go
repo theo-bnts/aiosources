@@ -46,3 +46,28 @@ func TestRequestPolicyCachesConcurrentReadsAndInvalidatesSavedPolicies(t *testin
 		t.Fatal("policy did not recover after invalidation")
 	}
 }
+
+func TestCancelledVisitorCannotPoisonSharedRequestPolicy(t *testing.T) {
+	started, finish := make(chan struct{}), make(chan struct{})
+	loads := 0
+	c := &requestPolicyCache{load: func(ctx context.Context) (requestPolicy, error) {
+		loads++
+		close(started)
+		<-finish
+		if err := ctx.Err(); err != nil {
+			return requestPolicy{}, err
+		}
+		return requestPolicy{limits: model.DefaultPublicLimits()}, nil
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { _, _ = c.get(ctx); close(done) }()
+	<-started
+	cancel()
+	close(finish)
+	<-done
+	policy, err := c.get(context.Background())
+	if err != nil || policy.limits != model.DefaultPublicLimits() || loads != 1 {
+		t.Fatal("one visitor cancellation made healthy requests unavailable", err, loads)
+	}
+}

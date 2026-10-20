@@ -196,7 +196,7 @@ const navigationGroups = [
       {
         to: '/network',
         label: 'Network',
-        description: 'Incoming proxy trust and outgoing connection routing.',
+        description: 'Visitor request limits, incoming proxy trust and outgoing connections.',
         icon: GlobeIcon,
       },
       {

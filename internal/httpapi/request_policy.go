@@ -27,19 +27,30 @@ type requestPolicyCache struct {
 }
 
 func (c *requestPolicyCache) get(ctx context.Context) (requestPolicy, error) {
+	if err := ctx.Err(); err != nil {
+		return requestPolicy{}, err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return requestPolicy{}, err
+	}
 	if time.Now().Before(c.until) {
 		return c.value, c.err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	// This snapshot is shared by other callers. A disconnected visitor must
+	// not cancel its refresh and cache that cancellation for everyone else.
+	loadContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
-	c.value, c.err = c.load(ctx)
+	c.value, c.err = c.load(loadContext)
 	ttl := time.Second
 	if c.err != nil {
 		ttl = 250 * time.Millisecond
 	}
 	c.until = time.Now().Add(ttl)
+	if err := ctx.Err(); err != nil {
+		return requestPolicy{}, err
+	}
 	return c.value, c.err
 }
 
@@ -62,8 +73,7 @@ func (s *server) initRequestPolicy() {
 		if err != nil {
 			return requestPolicy{}, err
 		}
-		access, err := s.options.Store.PublicAccess(ctx)
-		return requestPolicy{clients: resolver, limits: access.Limits}, err
+		return requestPolicy{clients: resolver, limits: *network.PublicLimits}, nil
 	}}
 	s.policies = c
 	s.public = &publicAdmission{policy: c.get}
