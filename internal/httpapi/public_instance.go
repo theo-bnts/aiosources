@@ -7,76 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-// Admission data is bounded, volatile and never appears in history or exports.
-type publicAdmission struct {
-	mu      sync.Mutex
-	windows map[string]loginWindow
-	slots   chan struct{}
-}
-
-func (a *publicAdmission) tryAcquire() bool {
-	select {
-	case a.slots <- struct{}{}:
-		return true
-	default:
-		return false
-	}
-}
-func (a *publicAdmission) acquire(w http.ResponseWriter) bool {
-	if a.tryAcquire() {
-		return true
-	}
-	w.Header().Set("Retry-After", "1")
-	writeError(w, 429, "Too many public requests. Try again shortly.")
-	return false
-}
-func (a *publicAdmission) tryAdmit(r *http.Request, setup bool) bool {
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if host == "" {
-		host = "unknown"
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	now := time.Now()
-	for key, value := range a.windows {
-		if !now.Before(value.until) {
-			delete(a.windows, key)
-		}
-	}
-	key := host
-	if setup {
-		key += "/setup"
-	}
-	value := a.windows[key]
-	limit := 60
-	if setup {
-		limit = 6
-	}
-	if len(a.windows) >= 1024 && value.until.IsZero() || value.attempts >= limit {
-		return false
-	}
-	if value.until.IsZero() {
-		value.until = now.Add(time.Minute)
-	}
-	value.attempts++
-	a.windows[key] = value
-	return true
-}
-func (a *publicAdmission) admit(w http.ResponseWriter, r *http.Request, setup bool) bool {
-	if a.tryAdmit(r, setup) {
-		return true
-	}
-	w.Header().Set("Retry-After", "60")
-	writeError(w, 429, "Too many public requests. Try again shortly.")
-	return false
-}
 func (s *server) publicOriginAllowed() bool {
 	u, err := url.Parse(s.auth.origin)
 	if err != nil {
@@ -111,16 +47,18 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, err)
 			return
 		}
+		s.policies.invalidate()
 		w.WriteHeader(204)
 	}))
 	mux.HandleFunc("GET /api/public/config", func(w http.ResponseWriter, r *http.Request) {
 		// Listing consented source names reads definitions too. Bound this work
 		// like other anonymous requests, without charging homepage refreshes
 		// against the visitor's setup or addon request quota.
-		if !s.public.acquire(w) {
+		release, ok := s.public.enter(w, r, publicConfig)
+		if !ok {
 			return
 		}
-		defer func() { <-s.public.slots }()
+		defer release()
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		value, err := s.options.Store.PublicAccess(ctx)
@@ -157,13 +95,11 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
-		if !s.public.admit(w, r, true) {
+		release, ok := s.public.enter(w, r, publicSetup)
+		if !ok {
 			return
 		}
-		if !s.public.acquire(w) {
-			return
-		}
-		defer func() { <-s.public.slots }()
+		defer release()
 		var input struct {
 			Preferences model.StreamPreferences `json:"preferences"`
 			Services    map[string]string       `json:"services"`
@@ -213,13 +149,11 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				writeError(w, 401, "Invalid public installation")
 				return
 			}
-			if !s.public.admit(w, r, false) {
+			release, ok := s.public.enter(w, r, publicAddon)
+			if !ok {
 				return
 			}
-			if !s.public.acquire(w) {
-				return
-			}
-			defer func() { <-s.public.slots }()
+			defer release()
 			visitor, err := s.options.AIOSource.OpenPublicInstallation(r.Context(), s.auth.origin, r.PathValue("configuration"))
 			if err != nil {
 				writeError(w, 401, "Invalid public installation")

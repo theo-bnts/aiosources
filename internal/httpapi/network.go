@@ -8,14 +8,31 @@ import (
 	"strings"
 	"time"
 
+	"github.com/theo-bnts/aiosources/internal/inbound"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 func (s *server) registerNetworkRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings/network", s.auth.protect(s.networkSettings))
+	mux.HandleFunc("GET /api/settings/network/incoming", s.auth.protect(s.incomingNetworkStatus))
 	mux.HandleFunc("PUT /api/settings/network", s.auth.protect(s.updateNetworkSettings))
 	mux.HandleFunc("POST /api/settings/network/test", s.auth.protect(s.testNetworkProxy))
+}
+
+// These are the administrator's current request addresses, never stored or logged.
+func (s *server) incomingNetworkStatus(w http.ResponseWriter, r *http.Request) {
+	settings, err := s.options.Store.NetworkSettings(r.Context())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	resolver, err := inbound.New(settings.Incoming)
+	if err != nil {
+		respondError(w, model.ErrInvalid)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"connection_ip": inbound.Direct(r), "visitor_ip": resolver.ClientIP(r)})
 }
 
 func (s *server) networkSettings(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +57,7 @@ func (s *server) updateNetworkSettings(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
+	s.policies.invalidate()
 	s.networkSettings(w, r)
 }
 

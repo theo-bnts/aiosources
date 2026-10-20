@@ -7,8 +7,16 @@ export type NetworkProxy = {
   password_ref?: string
 }
 
+export type IncomingNetwork = {
+  enabled: boolean
+  ip_header: string
+  format: 'single' | 'chain'
+  trusted_proxies: string[]
+}
+
 export type NetworkSettings = {
   revision: number
+  incoming: IncomingNetwork
   default: string
   proxies: NetworkProxy[]
   overrides: Record<string, string>

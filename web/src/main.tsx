@@ -19,6 +19,7 @@ import {
   ClockCounterClockwiseIcon,
   GlobeIcon,
   PathIcon,
+  ShieldCheckIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -67,6 +68,7 @@ const NetworkPage = lazy(() => import('@/pages/network').then((m) => ({ default:
 const NetworkRoutingPage = lazy(() =>
   import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
 )
+const IncomingNetworkPage = lazy(() => import('@/pages/incoming-network'))
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
 const RemoteStatisticsPage = lazy(() =>
@@ -354,14 +356,16 @@ const router = createBrowserRouter(
             <WorkspaceLayout
               title="Network"
               tabs={[
-                { path: '/network', label: 'Proxies', icon: GlobeIcon },
-                { path: '/network/routing', label: 'Routing', icon: PathIcon },
+                { path: '/network', label: 'Outgoing proxies', icon: GlobeIcon },
+                { path: '/network/routing', label: 'Outgoing routing', icon: PathIcon },
+                { path: '/network/incoming', label: 'Incoming', icon: ShieldCheckIcon },
               ]}
             />
           }
         >
           <Route path="network" element={<NetworkPage />} />
           <Route path="network/routing" element={<NetworkRoutingPage />} />
+          <Route path="network/incoming" element={<IncomingNetworkPage />} />
         </Route>
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />

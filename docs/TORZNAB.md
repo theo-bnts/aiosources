@@ -49,6 +49,6 @@ Protocol references: [Torznab specification](https://torznab.github.io/spec-1.3-
 
 ## Optional public connections
 
-Administrators can separately enable public Torznab in **Connections → Public access**. Its visitor setup uses encrypted, stateless configurations instead of the administrator's named grants. Source disclosure is shared with public Stremio and remains opt-in. Public catalog eligibility, optional personal announces, cache behavior and revocation are described in [Public instances](PUBLIC_INSTANCES.md#public-navigation-and-torznab).
+Administrators can separately enable public Torznab in **Administration → Public access**. Its visitor setup uses encrypted, stateless configurations instead of the administrator's named grants. Source disclosure is shared with public Stremio and remains opt-in. Public catalog eligibility, optional personal announces, cache behavior and revocation are described in [Public instances](PUBLIC_INSTANCES.md#public-navigation-and-torznab).
 
 If Cloudflare Access or another sign-in gateway protects the instance, external clients must also be allowed through that gateway. A browser's login cookie is not sent by Prowlarr. Public Torznab uses `/public/torznab/api` and its encrypted configuration key; private Torznab uses `/torznab/ACCESS_ID/api` and its separate access key. Keep administration routes protected when configuring gateway access.

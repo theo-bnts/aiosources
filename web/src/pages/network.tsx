@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
-import { api, ApiError, ConnectionError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import { api, ApiError, ConnectionError } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import type { NetworkProxy, NetworkSettings } from '@/lib/network-types'
+import { useNetworkSettings, useSaveNetwork } from '@/lib/network-settings'
 import type { Items, ProviderSummary } from '@/lib/types'
 import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
@@ -23,34 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-function useNetworkSettings() {
-  return useQuery({
-    queryKey: ['network-settings'],
-    queryFn: ({ signal }) => api<NetworkSettings>('/settings/network', { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-  })
-}
-
-function useSaveNetwork(onSaved?: () => void) {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (settings: NetworkSettings) =>
-      api<NetworkSettings>('/settings/network', {
-        method: 'PUT',
-        body: JSON.stringify(settings),
-      }),
-    onSuccess: async (settings) => {
-      await client.cancelQueries({ queryKey: ['network-settings'] })
-      client.setQueryData<NetworkSettings>(['network-settings'], (current) =>
-        current && current.revision > settings.revision ? current : settings,
-      )
-      onSaved?.()
-      void refreshData()
-    },
-    onError: () => void client.invalidateQueries({ queryKey: ['network-settings'] }),
-  })
-}
 
 function proxyInUse(settings: NetworkSettings, id: string) {
   return settings.default === id || Object.values(settings.overrides).includes(id)
@@ -183,7 +156,8 @@ export function NetworkPage() {
                   </div>
                   {used && (
                     <p className="help">
-                      Assigned in Routing. Change those assignments before deleting this proxy.
+                      Assigned in Outgoing routing. Change those assignments before deleting this
+                      proxy.
                     </p>
                   )}
                 </section>
@@ -193,7 +167,7 @@ export function NetworkPage() {
         ) : (
           <Empty
             title="No proxies configured"
-            description="Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Routing."
+            description="Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Outgoing routing."
           />
         ))
       )}
@@ -533,8 +507,8 @@ export function NetworkRoutingPage() {
             </section>
             {settings.proxies.some((proxy) => !proxy.enabled && proxyInUse(settings, proxy.id)) && (
               <p role="status" className="notice notice-warning">
-                Some connections use a disabled proxy. Enable it in Proxies or choose another
-                connection.
+                Some connections use a disabled proxy. Enable it in Outgoing proxies or choose
+                another connection.
               </p>
             )}
             {conflict && (

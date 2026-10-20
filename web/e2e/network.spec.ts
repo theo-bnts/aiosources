@@ -78,7 +78,7 @@ test('proxy profiles use Secrets and route services independently without activa
       })
     ).status(),
   ).toBe(200)
-  await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+  await page.getByRole('tab', { name: 'Outgoing routing', exact: true }).click()
   await expect(page.locator('main .section-title')).toHaveText([
     'Default connection',
     'Sources',
@@ -94,13 +94,13 @@ test('proxy profiles use Secrets and route services independently without activa
   await expect(page.getByLabel('TorBox', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Browser downloads', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Sample connection', { exact: true })).toHaveValue('direct')
-  await page.getByRole('tab', { name: 'Proxies', exact: true }).click()
+  await page.getByRole('tab', { name: 'Outgoing proxies', exact: true }).click()
   await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
-  await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+  await page.getByRole('tab', { name: 'Outgoing routing', exact: true }).click()
   await page.getByLabel('AllDebrid', { exact: true }).selectOption('')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  await page.getByRole('tab', { name: 'Proxies', exact: true }).click()
+  await page.getByRole('tab', { name: 'Outgoing proxies', exact: true }).click()
   await card.getByRole('button', { name: 'Delete', exact: true }).click()
   await page
     .getByRole('alertdialog')
@@ -131,7 +131,7 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   await expect(editor.getByLabel('Name', { exact: true })).toHaveValue('WARP gateway')
   await editor.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(editor).toBeHidden()
-  await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+  await page.getByRole('tab', { name: 'Outgoing routing', exact: true }).click()
   await page.getByLabel('Outgoing connections', { exact: true }).selectOption('direct')
   const current = await settings(page)
   expect(
@@ -153,5 +153,101 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Discard changes and reload', exact: true }).click()
   await expect(page.getByLabel('Outgoing connections', { exact: true })).toHaveValue('system')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('incoming proxy trust and public quotas use coherent forms and apply to both public protocols', async ({
+  page,
+}) => {
+  await page.goto('/network/incoming')
+  await expect(page.getByRole('tab', { name: 'Incoming', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(
+    page.getByRole('switch', { name: 'Trust an incoming proxy header', exact: true }),
+  ).not.toBeChecked()
+  await page.getByLabel('IP address header', { exact: true }).fill('CF-Connecting-IP')
+  await expect(page.getByLabel('Header format', { exact: true })).toHaveValue('single')
+  await page.getByLabel('Trusted proxy addresses', { exact: true }).fill('127.0.0.1\n::1')
+  await page.getByRole('switch', { name: 'Trust an incoming proxy header', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect((await settings(page)).incoming).toEqual({
+    enabled: true,
+    ip_header: 'CF-Connecting-IP',
+    format: 'single',
+    trusted_proxies: ['127.0.0.1', '::1'],
+  })
+  const diagnostics = await page.request.get('/api/settings/network/incoming', {
+    headers: { 'CF-Connecting-IP': '203.0.113.7' },
+  })
+  expect(await diagnostics.json()).toEqual({
+    connection_ip: '127.0.0.1',
+    visitor_ip: '203.0.113.7',
+  })
+  await page.goto('/public-access')
+  await expect(
+    page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
+  ).toHaveText(['Administration/', 'Public access'])
+  const form = page.getByRole('form', { name: 'Public access', exact: true })
+  for (const [label, value] of [
+    ['Link creations per minute', '12'],
+    ['Addon requests per minute', '120'],
+    ['Simultaneous public requests', '50'],
+  ])
+    await expect(form.getByLabel(label, { exact: true })).toHaveValue(value)
+  await form.getByLabel('Addon requests per minute', { exact: true }).fill('2')
+  await form.getByLabel('Simultaneous public requests', { exact: true }).fill('7')
+  await form.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const saved = await (await page.request.get('/api/public-access')).json()
+  expect(saved.limits).toEqual({ setup_per_minute: 12, requests_per_minute: 2, concurrent: 7 })
+  const visitor = { 'CF-Connecting-IP': '203.0.113.8' }
+  expect(
+    (
+      await page.request.get('/public/stremio/invalid/manifest.json', { headers: visitor })
+    ).status(),
+  ).toBe(401)
+  expect(
+    (
+      await page.request.get('/public/torznab/api?apikey=invalid&t=caps', { headers: visitor })
+    ).status(),
+  ).toBe(401)
+  const limited = await page.request.get('/public/stremio/invalid/manifest.json', {
+    headers: visitor,
+  })
+  expect(limited.status()).toBe(429)
+  expect(Number(limited.headers()['retry-after'])).toBeGreaterThan(0)
+  expect(
+    (
+      await page.request.get('/public/stremio/invalid/manifest.json', {
+        headers: { 'CF-Connecting-IP': '203.0.113.9' },
+      })
+    ).status(),
+  ).toBe(401)
+  await page.reload()
+  await expect(form.getByLabel('Addon requests per minute', { exact: true })).toHaveValue('2')
+})
+
+test('incoming settings preserve unsaved edits and stay within a mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/network/incoming')
+  await page.getByLabel('IP address header', { exact: true }).fill('X-Real-IP')
+  await page
+    .getByLabel('Trusted proxy addresses', { exact: true })
+    .fill('2001:db8:1234:5678:90ab:cdef:1234:5678\n10.0.0.0/24')
+  await page.getByRole('tab', { name: 'Outgoing routing', exact: true }).click()
+  const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
+  await expect(guard).toBeVisible()
+  await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
+  await expect(page.getByLabel('IP address header', { exact: true })).toHaveValue('X-Real-IP')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.goto('/public-access')
+  await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

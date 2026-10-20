@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
@@ -22,10 +23,11 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
-		if !s.public.admit(w, r, true) || !s.public.acquire(w) {
+		release, ok := s.public.enter(w, r, publicSetup)
+		if !ok {
 			return
 		}
-		defer func() { <-s.public.slots }()
+		defer release()
 		var input struct {
 			Options   model.PublicTorznabOptions `json:"options"`
 			Announces map[string]string          `json:"announces"`
@@ -64,17 +66,17 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 401, 100, "Invalid public configuration")
 		return
 	}
-	if !s.public.tryAdmit(r, false) {
-		w.Header().Set("Retry-After", "60")
+	release, retry, admissionErr := s.public.reserve(r, publicAddon)
+	if admissionErr != nil {
+		torznabError(w, 503, 910, "Public access settings are unavailable")
+		return
+	}
+	if release == nil {
+		w.Header().Set("Retry-After", strconv.Itoa(retry))
 		torznabError(w, 429, 500, "Request limit reached")
 		return
 	}
-	if !s.public.tryAcquire() {
-		w.Header().Set("Retry-After", "1")
-		torznabError(w, 429, 500, "Request limit reached")
-		return
-	}
-	defer func() { <-s.public.slots }()
+	defer release()
 	ctx, cancel := context.WithTimeout(r.Context(), store.CatalogDownloadTimeout)
 	defer cancel()
 	controller := http.NewResponseController(w)

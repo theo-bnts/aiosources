@@ -16,7 +16,7 @@ import (
 func TestPublicConfigurationSharesTheBoundedAdmissionWithoutUsingRequestQuota(t *testing.T) {
 	fixture := newSecurityFixture(t)
 	s := &server{options: Options{Store: fixture.db}, auth: fixture.auth,
-		public: &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 1)}}
+		public: &publicAdmission{inflight: 50}}
 	mux := http.NewServeMux()
 	s.registerPublicInstance(mux)
 	request := func() *httptest.ResponseRecorder {
@@ -25,13 +25,13 @@ func TestPublicConfigurationSharesTheBoundedAdmissionWithoutUsingRequestQuota(t 
 		mux.ServeHTTP(w, r)
 		return w
 	}
-	s.public.slots <- struct{}{}
+
 	response := request()
-	<-s.public.slots
+	s.public.inflight = 0
 	if response.Code != http.StatusTooManyRequests {
 		t.Fatal("public bootstrap bypassed the bounded admission", response.Code)
 	}
-	if response := request(); response.Code != http.StatusOK || len(s.public.slots) != 0 || len(s.public.windows) != 0 {
+	if response := request(); response.Code != http.StatusOK || s.public.inflight != 0 || len(s.public.windows) != 0 {
 		t.Fatal("ordinary homepage refresh consumes addon quota or leaked its admission", response.Code)
 	}
 }

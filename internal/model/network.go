@@ -29,9 +29,15 @@ type NetworkSettings struct {
 	Default   string            `json:"default"`
 	Proxies   []NetworkProxy    `json:"proxies"`
 	Overrides map[string]string `json:"overrides"`
+	Incoming  *IncomingNetwork  `json:"incoming,omitempty"`
 }
 
 func (s NetworkSettings) Validate() error {
+	if s.Incoming != nil {
+		if err := s.Incoming.Validate(); err != nil {
+			return err
+		}
+	}
 	if s.Revision < 1 || len(s.Proxies) > 32 || len(s.Overrides) > 4096 {
 		return errors.New("Network settings exceed their limits or have an invalid revision")
 	}

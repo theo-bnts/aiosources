@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -17,6 +16,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/theo-bnts/aiosources/internal/inbound"
 	"github.com/theo-bnts/aiosources/internal/store"
 	"github.com/theo-bnts/aiosources/internal/vault"
 )
@@ -48,6 +48,7 @@ type authentication struct {
 	attempts         map[string]loginWindow
 	passwordChecks   chan struct{}
 	passwordRequests chan struct{}
+	clientAddress    func(*http.Request) string
 }
 
 func newAuthentication(password, publicURL string, db *store.Store, secretVault *vault.Vault) (*authentication, error) {
@@ -146,9 +147,9 @@ func (a *authentication) sessionHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (a *authentication) allowAttempt(r *http.Request) bool {
-	address, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		address = r.RemoteAddr
+	address := inbound.Direct(r)
+	if a.clientAddress != nil {
+		address = a.clientAddress(r)
 	}
 	key := sha256.Sum256([]byte("scraper/login-client/v1\x00" + address))
 	client := hex.EncodeToString(key[:])

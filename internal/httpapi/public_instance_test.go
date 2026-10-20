@@ -204,14 +204,20 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 }
 
 func TestPublicAdmissionIsBoundedAndUntrustedHeadersCannotBypassIt(t *testing.T) {
-	admission := &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 8)}
-	for i := 0; i < 7; i++ {
+	admission := &publicAdmission{}
+	for i := 0; i < 13; i++ {
 		r := httptest.NewRequest("POST", "/api/public/install", nil)
 		r.RemoteAddr = "192.0.2.1:1234"
 		r.Header.Set("X-Forwarded-For", fmt.Sprintf("192.0.2.%d", i+10))
 		w := httptest.NewRecorder()
-		accepted := admission.admit(w, r, true)
-		if accepted != (i < 6) {
+		accepted := func() bool {
+			release, ok := admission.enter(w, r, publicSetup)
+			if ok {
+				release()
+			}
+			return ok
+		}()
+		if accepted != (i < 12) {
 			t.Fatal("setup limit bypassed")
 		}
 	}

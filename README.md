@@ -135,11 +135,13 @@ Only permitted torrent information is transferred. Accounts, source credentials,
 
 ## Offer public access
 
-An administrator can enable a visitor homepage in **Connections → Public access**. Visitors choose Stremio or, when allowed, Torznab. Administration stays protected.
+An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Torznab. Administration stays protected.
 
 For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Fresh cached-availability observations can be reused across users, independently for each debrid service.
 
 The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
+
+Set visitor request limits in **Administration → Public access** (defaults: 12 link creations and 120 addon requests per minute per visitor IP, with 50 simultaneous public requests per process). Behind Cloudflare or another reverse proxy, configure **Network → Incoming** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
 
 Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for seven days. Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
 

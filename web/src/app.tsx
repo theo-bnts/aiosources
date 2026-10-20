@@ -179,12 +179,6 @@ const navigationGroups = [
         description: 'Share published catalogs with other instances.',
         icon: ShareNetworkIcon,
       },
-      {
-        to: '/public-access',
-        label: 'Public access',
-        description: 'Visitor access, source visibility and public connections.',
-        icon: ShieldCheckIcon,
-      },
     ],
   },
   {
@@ -202,8 +196,14 @@ const navigationGroups = [
       {
         to: '/network',
         label: 'Network',
-        description: 'Outgoing proxies and connection routing.',
+        description: 'Incoming proxy trust and outgoing connection routing.',
         icon: GlobeIcon,
+      },
+      {
+        to: '/public-access',
+        label: 'Public access',
+        description: 'Visitor access, source visibility and public connections.',
+        icon: ShieldCheckIcon,
       },
       {
         to: '/health',

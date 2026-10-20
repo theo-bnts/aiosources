@@ -31,24 +31,32 @@ ALTER TABLE ingest.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT 
 
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
-	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration)
+	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,setup_per_minute,requests_per_minute,concurrent FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.Limits.SetupPerMinute, &out.Limits.RequestsPerMinute, &out.Limits.Concurrent)
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
+	if value.Limits != (model.PublicLimits{}) && !value.Limits.Valid() {
+		return model.ErrInvalid
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return databaseError("begin public access change", err)
 	}
 	defer rollback(tx)
 	var previous, previousDownloads, previousTorznab bool
-	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab)
+	var limits model.PublicLimits
+	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled,setup_per_minute,requests_per_minute,concurrent FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab, &limits.SetupPerMinute, &limits.RequestsPerMinute, &limits.Concurrent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
 	if err != nil {
 		return databaseError("lock public access", err)
 	}
-	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled)
+	// Older callers omit limits. Preserve saved policies instead of resetting them.
+	if value.Limits == (model.PublicLimits{}) {
+		value.Limits = limits
+	}
+	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END,setup_per_minute=$5,requests_per_minute=$6,concurrent=$7 WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled, value.Limits.SetupPerMinute, value.Limits.RequestsPerMinute, value.Limits.Concurrent)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
@@ -79,6 +87,11 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 			kind = "security.public_torznab_enabled"
 		}
 		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
+			return err
+		}
+	}
+	if limits != value.Limits {
+		if err = recordAccessActivityTx(ctx, tx, "security.public_limits_changed", "public"); err != nil {
 			return err
 		}
 	}

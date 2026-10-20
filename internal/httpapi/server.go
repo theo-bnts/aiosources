@@ -51,6 +51,7 @@ type server struct {
 	streams    chan struct{}
 	streamAuth chan struct{}
 	public     *publicAdmission
+	policies   *requestPolicyCache
 	torznab    chan struct{}
 }
 
@@ -65,7 +66,8 @@ func New(options Options) (http.Handler, error) {
 	if _, err := fs.Stat(options.Frontend, "index.html"); err != nil {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
-	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64), public: &publicAdmission{windows: map[string]loginWindow{}, slots: make(chan struct{}, 8)}}
+	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
+	s.initRequestPolicy()
 	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
 	s.fileClient.Transport = network.Transport("downloads", s.fileClient.Transport.(*http.Transport))
 	mux := http.NewServeMux()

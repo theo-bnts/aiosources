@@ -6,6 +6,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -14,6 +15,7 @@ type Access = {
   enabled: boolean
   expose_sources: boolean
   torznab_enabled: boolean
+  limits: { setup_per_minute: number; requests_per_minute: number; concurrent: number }
 }
 type Draft = { base: Access; value: Access }
 export function PublicAccessSettings() {
@@ -28,9 +30,10 @@ export function PublicAccessSettings() {
     draft &&
     (draft.value.enabled !== query.data?.enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
-      draft.value.expose_sources !== query.data?.expose_sources),
+      draft.value.expose_sources !== query.data?.expose_sources ||
+      JSON.stringify(draft.value.limits) !== JSON.stringify(query.data?.limits)),
   )
-  function change(value: Partial<Pick<Access, 'enabled' | 'expose_sources' | 'torznab_enabled'>>) {
+  function change(value: Partial<Omit<Access, 'revision'>>) {
     setDraft((draft) => ({
       base: draft?.base || query.data!,
       value: { ...(draft?.value || query.data!), ...value },
@@ -64,6 +67,17 @@ export function PublicAccessSettings() {
                   draft.value.torznab_enabled !== draft.base.torznab_enabled
                     ? draft.value.torznab_enabled
                     : latest.torznab_enabled,
+                limits: Object.fromEntries(
+                  Object.entries(latest.limits).map(([key, value]) => {
+                    const field = key as keyof Access['limits']
+                    return [
+                      key,
+                      draft.value.limits[field] !== draft.base.limits[field]
+                        ? draft.value.limits[field]
+                        : value,
+                    ]
+                  }),
+                ) as Access['limits'],
                 expose_sources:
                   draft.value.expose_sources !== draft.base.expose_sources
                     ? draft.value.expose_sources
@@ -142,6 +156,46 @@ export function PublicAccessSettings() {
                 require known cached availability.
               </p>
             </Disclosure>
+            <section className="space-y-4 border-t pt-5" aria-label="Public request limits">
+              <h3 className="section-title">Request limits</h3>
+              <div className="grid gap-5 md:grid-cols-3">
+                {(
+                  [
+                    ['setup_per_minute', 'Link creations per minute', 100000],
+                    ['requests_per_minute', 'Addon requests per minute', 100000],
+                    ['concurrent', 'Simultaneous public requests', 1000],
+                  ] as const
+                ).map(([field, label, max]) => (
+                  <div className="field min-w-0" key={field}>
+                    <Label htmlFor={`public-limit-${field}`}>{label}</Label>
+                    <Input
+                      id={`public-limit-${field}`}
+                      type="number"
+                      min={1}
+                      max={max}
+                      step={1}
+                      required
+                      disabled={busy}
+                      value={current.limits[field] || ''}
+                      onChange={(event) =>
+                        change({
+                          limits: { ...current.limits, [field]: Number(event.target.value) },
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="help">
+                Per-minute limits apply to each visitor IP and are shared by Stremio and Torznab.
+                Simultaneous requests are limited across this application process. Configure trusted
+                incoming proxies in Network when using a reverse proxy.
+              </p>
+              <p className="help">
+                Changes apply without restarting or replacing installation links. Lowering
+                concurrency lets active requests finish before admitting new ones.
+              </p>
+            </section>
             {conflict && (
               <div className="notice notice-warning space-y-3" role="status">
                 <p>
