@@ -27,12 +27,13 @@ type PublicProvider struct {
 var PublicProviders = []PublicProvider{{"alldebrid", "AllDebrid"}, {"torbox", "TorBox"}}
 
 type PublicInstallation struct {
-	Preferences model.StreamPreferences `json:"-"`
-	Version     int                     `json:"version"`
-	Generation  int64                   `json:"generation"`
-	Audience    string                  `json:"audience"`
-	Services    map[string]string       `json:"services"`
-	Announces   map[string]string       `json:"announces,omitempty"`
+	Preferences       model.StreamPreferences `json:"-"`
+	Version           int                     `json:"version"`
+	Generation        int64                   `json:"generation"`
+	StremioGeneration int64                   `json:"stremio_generation,omitempty"`
+	Audience          string                  `json:"audience"`
+	Services          map[string]string       `json:"services"`
+	Announces         map[string]string       `json:"announces,omitempty"`
 }
 
 // This is a consented list of source names, never a source definition or secret
@@ -202,11 +203,21 @@ func validPublicKeys(keys map[string]string) bool {
 	return true
 }
 func (s *Service) CreatePublicInstallation(ctx context.Context, audience string, keys, announces map[string]string) (string, error) {
+	return s.createPublicInstallation(ctx, audience, keys, announces, true)
+}
+
+// Search uses the same visitor-owned credentials without granting an addon
+// connection when Stremio has been disabled independently.
+func (s *Service) CreatePublicSearchCredential(ctx context.Context, audience string, keys, announces map[string]string) (string, error) {
+	return s.createPublicInstallation(ctx, audience, keys, announces, false)
+}
+
+func (s *Service) createPublicInstallation(ctx context.Context, audience string, keys, announces map[string]string, stremio bool) (string, error) {
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return "", err
 	}
-	if !access.Enabled {
+	if !access.Enabled || stremio && !access.StremioEnabled || !stremio && !access.SearchEnabled {
 		return "", model.ErrNotFound
 	}
 	if !validPublicKeys(keys) || audience == "" {
@@ -231,10 +242,31 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	if !latest.Enabled || latest.Generation != access.Generation {
 		return "", model.ErrNotFound
 	}
+	if stremio && (!latest.StremioEnabled || latest.StremioGeneration != access.StremioGeneration) || !stremio && !latest.SearchEnabled {
+		return "", model.ErrNotFound
+	}
 	if err = s.validatePublicAnnounces(ctx, latest, announces); err != nil {
 		return "", err
 	}
-	return s.sealPublicInstallation(PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces})
+	installation := PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces}
+	if stremio {
+		installation.StremioGeneration = access.StremioGeneration
+	}
+	return s.sealPublicInstallation(installation)
+}
+
+// Old installation links had no protocol counter. They remain valid only until
+// the first Stremio policy change. Browser credentials deliberately ignore it.
+func (s *Service) CheckPublicStremio(ctx context.Context, visitor *PublicInstallation) error {
+	access, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return err
+	}
+	if visitor == nil || !access.Enabled || !access.StremioEnabled || visitor.Generation != access.Generation ||
+		visitor.StremioGeneration != access.StremioGeneration && !(visitor.StremioGeneration == 0 && access.StremioGeneration == 1) {
+		return ErrAuth
+	}
+	return nil
 }
 
 func (s *Service) sealPublicInstallation(installation PublicInstallation) (string, error) {

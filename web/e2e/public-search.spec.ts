@@ -30,7 +30,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
       url.pathname !== '/api/about'
     )
       privateRequests.push(url.pathname)
-    if (url.pathname === '/api/public/install') {
+    if (['/api/public/install', '/api/public/credentials'].includes(url.pathname)) {
       const body = request.postDataJSON()
       if (submissions++ === 0)
         expect(body.services).toEqual({ torbox: 'synthetic-own-browser-key' })
@@ -147,7 +147,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     ).toBeVisible()
     await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-own-browser-key')
     const connection = visitor.waitForResponse(
-      (response) => new URL(response.url()).pathname === '/api/public/install',
+      (response) => new URL(response.url()).pathname === '/api/public/credentials',
       { timeout: 8000 },
     )
     await visitor.getByRole('button', { name: 'Start searching', exact: true }).click()
@@ -265,7 +265,7 @@ test('Stremio keys are reused by public Search on mobile and failed requests pre
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url())
     if (url.origin !== server.origin) return route.abort('blockedbyclient')
-    if (url.pathname === '/api/public/install')
+    if (['/api/public/install', '/api/public/credentials'].includes(url.pathname))
       return route.fulfill({
         json: {
           credential,

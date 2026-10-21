@@ -318,22 +318,14 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 			if err != nil || !sameOrigin(c.client.origin, target) {
 				return fail("invalid_continuation")
 			}
-			response, err := operation.request(ctx, Request{URL: target.String(), Headers: http.Header{"Accept": {"text/html, application/xhtml+xml"}}}, "detail", index)
+			detail, detailBase, err := operation.detailDocument(ctx, target, index)
 			if err != nil {
+				if FailureCode(err) == "parse" {
+					page.Metadata["failure_reason"] = "html_detail_missing"
+				}
 				return page, err
 			}
-			detailRoot, detailBase, err := c.document(ctx, response, target.String())
-			if err != nil {
-				if ctx.Err() != nil {
-					return page, ctx.Err()
-				}
-				return fail("html_detail_missing")
-			}
-			details := cascadia.QueryAll(detailRoot, c.detailPage)
-			if len(details) != 1 {
-				return fail("html_detail_missing")
-			}
-			if err := operation.fields(ctx, details[0], detailBase, c.detailFields, fields, index); err != nil {
+			if err := operation.fields(ctx, detail, detailBase, c.detailFields, fields, index); err != nil {
 				return failHTMLFields(page, err)
 			}
 		}
@@ -348,6 +340,37 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 	delete(page.Metadata, "record_index")
 	page.Next, err = json.Marshal(next)
 	return page, err
+}
+
+func (operation *htmlFetch) detailDocument(ctx context.Context, target *url.URL, index int) (*html.Node, *url.URL, error) {
+	c := operation.connector
+	for attempt := 1; ; attempt++ {
+		response, err := operation.request(ctx, Request{URL: target.String(), Headers: http.Header{"Accept": {"text/html, application/xhtml+xml"}}}, "detail", index)
+		if err != nil {
+			return nil, nil, err
+		}
+		root, base, parseErr := c.document(ctx, response, target.String())
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		if parseErr == nil {
+			details := cascadia.QueryAll(root, c.detailPage)
+			if len(details) == 1 {
+				return details[0], base, nil
+			}
+			if len(details) > 1 {
+				return nil, nil, &FailureError{code: "parse"}
+			}
+		}
+		if err := c.client.retryHTMLDocument(ctx, response, attempt); err != nil {
+			return nil, nil, err
+		}
+		if c.client.transientFailure != nil {
+			// The callback already retained this rejected response. Do not archive
+			// it a second time as an auxiliary success on the next request.
+			operation.response = Response{}
+		}
+	}
 }
 
 // The error category remains finite, even when a field or upstream body contains

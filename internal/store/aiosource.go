@@ -475,7 +475,7 @@ func (s *Store) QueueAIOInventory(ctx context.Context, typ string, ids []string,
 		return err
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_inventory(media_type,tmdb_id,export_date) SELECT $1,id,$3 FROM(SELECT DISTINCT unnest($2::text[]) id) i ON CONFLICT(media_type,tmdb_id) DO UPDATE SET export_date=EXCLUDED.export_date`, typ, ids, date); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_inventory(media_type,tmdb_id,export_date) SELECT $1,id,$3 FROM(SELECT DISTINCT unnest($2::text[]) id) i ON CONFLICT(media_type,tmdb_id) DO UPDATE SET export_date=EXCLUDED.export_date WHERE ingest.aio_inventory.export_date IS DISTINCT FROM EXCLUDED.export_date`, typ, ids, date); err != nil {
 		return databaseError("store inventory", err)
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_metadata_jobs(media_type,tmdb_id) SELECT $1,id FROM(SELECT DISTINCT unnest($2::text[]) id) i WHERE NOT EXISTS(SELECT 1 FROM ingest.aio_works w WHERE w.media_type=$1 AND w.tmdb_id=i.id) ON CONFLICT DO NOTHING`, typ, ids); err != nil {

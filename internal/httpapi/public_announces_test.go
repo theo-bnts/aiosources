@@ -182,17 +182,17 @@ func TestPublicAnnounceRoutesRequireSeparateConsentAndExposeOnlySourceNames(t *t
 		}
 	}
 	config(false)
-	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true,"expose_sources":true}`, false, ""); response.Code != 401 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true,"stremio_enabled":true,"expose_sources":true}`, false, ""); response.Code != 401 {
 		t.Fatal("anonymous visitor changed source exposure")
 	}
-	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true}`, true, ""); response.Code != 204 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true,"stremio_enabled":true}`, true, ""); response.Code != 204 {
 		t.Fatal("public access could not be enabled", response.Code)
 	}
 	config(false)
 	if response := install(input); response.Code != 400 || providerCalls.Load() != 0 || strings.Contains(response.Body.String(), "visitor-passkey") {
 		t.Fatal("unconsented announce contacted a provider or was reflected", response.Code)
 	}
-	if response := f.request("PUT", "/api/public-access", `{"revision":2,"enabled":true,"expose_sources":true}`, true, ""); response.Code != 204 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":2,"enabled":true,"stremio_enabled":true,"expose_sources":true}`, true, ""); response.Code != 204 {
 		t.Fatal("administrator could not enable optional source exposure", response.Code)
 	}
 	config(true)
@@ -207,7 +207,7 @@ func TestPublicAnnounceRoutesRequireSeparateConsentAndExposeOnlySourceNames(t *t
 	if response := f.request("GET", manifestPath, "", false, ""); response.Code != 200 {
 		t.Fatal("new public manifest is unusable", response.Code)
 	}
-	if response := f.request("PUT", "/api/public-access", `{"revision":3,"enabled":true,"expose_sources":false}`, true, ""); response.Code != 204 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":3,"enabled":true,"stremio_enabled":true,"expose_sources":false}`, true, ""); response.Code != 204 {
 		t.Fatal("optional permission cannot be withdrawn", response.Code)
 	}
 	config(false)

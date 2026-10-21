@@ -36,9 +36,25 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		writeJSON(w, 200, value)
 	}))
 	mux.HandleFunc("PUT /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
-		var value model.PublicAccess
-		if !decodeJSON(w, r, &value) {
+		var input struct {
+			model.PublicAccess
+			StremioEnabled *bool `json:"stremio_enabled"`
+		}
+		if !decodeJSON(w, r, &input) {
 			return
+		}
+		value := input.PublicAccess
+		if input.StremioEnabled != nil {
+			value.StremioEnabled = *input.StremioEnabled
+		} else {
+			// A settings form opened before the upgrade must not revoke Stremio
+			// merely because it does not yet contain the new control.
+			current, err := s.options.Store.PublicAccess(r.Context())
+			if err != nil {
+				respondError(w, err)
+				return
+			}
+			value.StremioEnabled = current.StremioEnabled
 		}
 		if value.Enabled && !s.publicOriginAllowed() {
 			writeError(w, 400, "Set PUBLIC_URL to the external HTTPS origin before enabling public access.")
@@ -67,7 +83,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled}
+		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled}
 		if enabled && value.ExposeSources {
 			allSources, e := s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
@@ -86,72 +102,84 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, info)
 	})
-	mux.HandleFunc("POST /api/public/install", func(w http.ResponseWriter, r *http.Request) {
-		if !s.publicOriginAllowed() {
-			writeError(w, 404, "Public access is disabled")
-			return
-		}
-		if r.Header.Get("Origin") != s.auth.origin {
-			writeError(w, 403, "Request origin is not allowed")
-			return
-		}
-		release, ok := s.public.enter(w, r, publicSetup)
-		if !ok {
-			return
-		}
-		defer release()
-		var input struct {
-			aiosource.PublicCredentialChanges
-			Preferences model.StreamPreferences `json:"preferences"`
-		}
-		defer func() { clear(input.Services); clear(input.Announces) }()
-		// A remembered encrypted configuration and replacement values can be
-		// larger than either final URL. The sealed result keeps its own hard cap.
-		r.Body = http.MaxBytesReader(w, r.Body, 2*aiosource.MaxPublicInstallationSize)
-		if !decodeJSON(w, r, &input) {
-			return
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-		defer cancel()
-		if !aiosource.ValidStreamPreferences(input.Preferences) {
-			respondError(w, model.ErrInvalid)
-			return
-		}
-		saved, err := s.options.AIOSource.ResolvePublicCredential(ctx, s.auth.origin, input.PublicCredentialChanges)
-		if err != nil {
-			publicCredentialError(w, err)
-			return
-		}
-		defer func() { clear(saved.Services); clear(saved.Announces) }()
-		hasAnnounces := len(saved.Announces) > 0
-		configuration, err := s.options.AIOSource.CreatePublicInstallation(ctx, s.auth.origin, saved.Services, saved.Announces)
-		if err == nil {
-			configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
-		}
-		if err == nil && len(configuration) > aiosource.MaxPublicInstallationSize {
-			writeError(w, 400, "The installation link is too large. Shorten optional announce URLs.")
-			return
-		}
-		if err != nil {
-			if errors.Is(err, model.ErrNotFound) {
+	install := func(stremio bool) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if !s.publicOriginAllowed() {
 				writeError(w, 404, "Public access is disabled")
-			} else if hasAnnounces && errors.Is(err, model.ErrInvalid) {
-				writeError(w, 400, "Check the service keys and complete announce URLs. Visitor announce URLs must be enabled for the selected private sources.")
-			} else {
-				writeError(w, 400, "Could not validate the service keys. Check the keys, subscription and provider connection.")
+				return
 			}
-			return
+			if r.Header.Get("Origin") != s.auth.origin {
+				writeError(w, 403, "Request origin is not allowed")
+				return
+			}
+			release, ok := s.public.enter(w, r, publicSetup)
+			if !ok {
+				return
+			}
+			defer release()
+			var input struct {
+				aiosource.PublicCredentialChanges
+				Preferences model.StreamPreferences `json:"preferences"`
+			}
+			defer func() { clear(input.Services); clear(input.Announces) }()
+			// A remembered encrypted configuration and replacement values can be
+			// larger than either final URL. The sealed result keeps its own hard cap.
+			r.Body = http.MaxBytesReader(w, r.Body, 2*aiosource.MaxPublicInstallationSize)
+			if !decodeJSON(w, r, &input) {
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+			defer cancel()
+			if !aiosource.ValidStreamPreferences(input.Preferences) {
+				respondError(w, model.ErrInvalid)
+				return
+			}
+			saved, err := s.options.AIOSource.ResolvePublicCredential(ctx, s.auth.origin, input.PublicCredentialChanges)
+			if err != nil {
+				publicCredentialError(w, err)
+				return
+			}
+			defer func() { clear(saved.Services); clear(saved.Announces) }()
+			hasAnnounces := len(saved.Announces) > 0
+			create := s.options.AIOSource.CreatePublicInstallation
+			if !stremio {
+				create = s.options.AIOSource.CreatePublicSearchCredential
+			}
+			configuration, err := create(ctx, s.auth.origin, saved.Services, saved.Announces)
+			if err == nil {
+				configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
+			}
+			if err == nil && len(configuration) > aiosource.MaxPublicInstallationSize {
+				writeError(w, 400, "The installation link is too large. Shorten optional announce URLs.")
+				return
+			}
+			if err != nil {
+				if errors.Is(err, model.ErrNotFound) {
+					writeError(w, 404, "Public access is disabled")
+				} else if hasAnnounces && errors.Is(err, model.ErrInvalid) {
+					writeError(w, 400, "Check the service keys and complete announce URLs. Visitor announce URLs must be enabled for the selected private sources.")
+				} else {
+					writeError(w, 400, "Could not validate the service keys. Check the keys, subscription and provider connection.")
+				}
+				return
+			}
+			credential, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, saved)
+			if err != nil {
+				respondError(w, err)
+				return
+			}
+			manifest := ""
+			if stremio {
+				manifest = s.auth.origin + "/public/stremio/" + configuration + "/manifest.json"
+			}
+			writeJSON(w, 200, struct {
+				aiosource.PublicBrowserCredential
+				ManifestURL string `json:"manifest_url"`
+			}{credential, manifest})
 		}
-		credential, err := s.options.AIOSource.PublicBrowserCredential(ctx, s.auth.origin, saved)
-		if err != nil {
-			respondError(w, err)
-			return
-		}
-		writeJSON(w, 200, struct {
-			aiosource.PublicBrowserCredential
-			ManifestURL string `json:"manifest_url"`
-		}{credential, s.auth.origin + "/public/stremio/" + configuration + "/manifest.json"})
-	})
+	}
+	mux.HandleFunc("POST /api/public/install", install(true))
+	mux.HandleFunc("POST /api/public/credentials", install(false))
 	protect := func(budget time.Duration, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx, cancel := context.WithTimeout(r.Context(), budget)
@@ -175,6 +203,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				return
 			}
 			defer func() { clear(visitor.Services); clear(visitor.Announces) }()
+			if err := s.options.AIOSource.CheckPublicStremio(ctx, visitor); err != nil {
+				writeError(w, 401, "Invalid public installation")
+				return
+			}
 			next(w, r, visitor)
 		}
 	}
@@ -197,6 +229,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			respondError(w, err)
 			return
 		}
+		if err := s.options.AIOSource.CheckPublicStremio(r.Context(), visitor); err != nil {
+			writeError(w, 401, "Invalid public installation")
+			return
+		}
 		writeJSON(w, 200, map[string]any{"streams": streams})
 	}))
 	mux.HandleFunc("GET /public/stremio/{configuration}/play/{service}/{source}/{type}/{id}", protect(65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
@@ -210,6 +246,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		if err != nil {
 			respondError(w, err)
+			return
+		}
+		if err := s.options.AIOSource.CheckPublicStremio(r.Context(), visitor); err != nil {
+			writeError(w, 401, "Invalid public installation")
 			return
 		}
 		http.Redirect(w, r, link, http.StatusTemporaryRedirect)

@@ -1,9 +1,8 @@
 import { lazy, Suspense, useMemo } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { usePublicCredential } from '@/lib/public-credentials'
 import { PublicSearchContext } from '@/lib/public-search'
-import { Empty, Loading } from './common'
-import { Button } from './ui/button'
+import { Loading } from './common'
 import { Disclosure } from './ui/disclosure'
 import { PublicCredentialsForm } from './public-credentials-form'
 import { PublicAnnounceFields, type PublicInfo } from './public-connection-fields'
@@ -21,21 +20,10 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const configuration = saved?.services.length ? saved.credential : ''
   const scope = useMemo(() => crypto.randomUUID(), [configuration])
   const id = /^\/public\/search\/([0-9]+)$/.exec(location.pathname)?.[1]
-  if (!info.search_enabled)
-    return (
-      <div className="page">
-        <Empty
-          title="Public Search is disabled"
-          description="You can still use the connections enabled on this instance."
-        />
-        <Button asChild variant="outline">
-          <Link to="/public">Stremio</Link>
-        </Button>
-      </div>
-    )
   const form = (
     <PublicCredentialsForm
       info={info}
+      connection="search"
       submitLabel={configuration ? 'Update services' : 'Start searching'}
     >
       <PublicAnnounceFields sources={info.private_sources ?? []} pending={false} />

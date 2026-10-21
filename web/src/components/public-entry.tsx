@@ -7,7 +7,7 @@ import {
 } from '@/lib/language-preferences'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useLocation } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,10 +48,28 @@ export function PublicEntry({
       </main>
     )
   if (!info.data?.enabled) return <Login />
-  if (location.pathname === '/public/search' || location.pathname.startsWith('/public/search/'))
-    return layout(<PublicSearchEntry info={info.data} />)
-  if (location.pathname === '/public/torznab')
-    return layout(<PublicTorznabEntry info={info.data} />)
+  const section = location.pathname.startsWith('/public/search')
+    ? 'search'
+    : location.pathname === '/public/torznab'
+      ? 'torznab'
+      : 'stremio'
+  const available = {
+    search: info.data.search_enabled,
+    stremio: info.data.stremio_enabled,
+    torznab: info.data.torznab_enabled,
+  }
+  if (!available[section]) {
+    const target = available.stremio
+      ? '/public'
+      : available.search
+        ? '/public/search'
+        : available.torznab
+          ? '/public/torznab'
+          : ''
+    return target ? <Navigate to={target} replace /> : <Login />
+  }
+  if (section === 'search') return layout(<PublicSearchEntry info={info.data} />)
+  if (section === 'torznab') return layout(<PublicTorznabEntry info={info.data} />)
   return layout(<PublicStremioEntry info={info.data} />)
 }
 

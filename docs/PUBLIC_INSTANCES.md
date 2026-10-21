@@ -19,9 +19,11 @@ AIOSources does not save your submitted keys or announces on the server. Validat
 
 Public access is optional and disabled by default. An administrator can enable it in **Administration → Public access** after setting `PUBLIC_URL` to the instance's external HTTPS origin. Literal loopback HTTP addresses are accepted for local testing.
 
-When enabled, the homepage provides **Connections → Stremio** and **Torznab**. Stremio visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Public Torznab has a separate administrator opt-in and uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
+Under **Connections**, choose separately whether to offer **Search**, **Stremio** and **Torznab**. Only enabled pages appear in public navigation; a direct link to a disabled page opens an available connection, or the administrator login if none remain. Existing instances keep Stremio enabled after upgrading. Stremio visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Search and Torznab are opt-in; Torznab uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
 
 When disabled, the homepage keeps its ordinary login. Disabling public access revokes existing public installation links; enabling it again does not restore those links. Private installations and administrator sessions retain their behavior.
+
+Turning off **Stremio** revokes its installation and playback links without affecting Search, Torznab or the encrypted credentials remembered by visitors. Turning it back on requires creating a new Stremio link. **Sources and privacy** controls source visibility and personal announce URLs consistently across all enabled connections.
 
 ## Credentials and installation links
 
@@ -95,7 +97,7 @@ Provider references: [AllDebrid API](https://docs.alldebrid.com/), [TorBox API](
 
 ## Public navigation and Torznab
 
-Public visitors use the same sidebar and breadcrumb layout as administrators, with **Connections → Stremio** and **Torznab**, plus **Search** when enabled. Administration, storage, logs, definitions and secrets remain protected. When public access is off, the homepage returns to the ordinary login.
+Public visitors use the same sidebar and breadcrumb layout as administrators, with only the enabled **Stremio**, **Torznab** and **Search** pages. Administration, storage, logs, definitions and secrets remain protected. When public access is off, the homepage returns to the ordinary login.
 
 **Administration → Public access → Allow public Torznab connections** is disabled by default, including after an upgrade. Visitors can create a configuration without an account. In Generic Torznab clients, use the displayed URL, API path and encrypted API key. Other clients can use the complete generated endpoint URL. Only personal announces are encrypted; URL preferences can be changed without re-entering them or creating a database record. Each configuration can choose sources (only when disclosed), media types, a cache service and cached-only results. It creates no share, request lease or visitor profile in the database.
 

@@ -5,6 +5,8 @@ type PublicAccess struct {
 	Revision          int64 `json:"revision"`
 	Enabled           bool  `json:"enabled"`
 	SearchEnabled     bool  `json:"search_enabled"`
+	StremioEnabled    bool  `json:"stremio_enabled"`
+	StremioGeneration int64 `json:"-"`
 	ExposeSources     bool  `json:"expose_sources"`
 	TorznabEnabled    bool  `json:"torznab_enabled"`
 	TorznabGeneration int64 `json:"-"`

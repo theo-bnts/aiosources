@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CopyButton } from '@/components/copy-button'
 import { Disclosure } from '@/components/ui/disclosure'
-import { Empty, ErrorNotice } from '@/components/common'
+import { ErrorNotice } from '@/components/common'
 import { TorznabFilters, type TorznabOptions } from '@/components/torznab-filters'
 import {
   PublicAnnounceFields,
@@ -98,15 +98,6 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
       if (!controller.signal.aborted) setPending(false)
     }
   }
-  if (!info.torznab_enabled)
-    return (
-      <div className="page">
-        <Empty
-          title="Public Torznab is unavailable"
-          description="The administrator has not enabled this connection."
-        />
-      </div>
-    )
   const credential = connection ? torznabPreferenceKey(connection.api_key, options) : ''
   const preferenceError = torznabPreferenceError(connection?.api_key ?? '', options)
   const endpoint = connection ? new URL(connection.url) : null

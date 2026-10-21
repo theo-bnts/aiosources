@@ -77,14 +77,17 @@ type Response struct {
 	URL string
 	// Set only for an invalid HTML response to a JSON GET after HTTP 429.
 	UnexpectedHTML bool
+	// A successful HTML detail response omitted its configured page container.
+	// This is eligible for bounded read retries, never for accepting an empty page.
+	InvalidDocument bool
 }
 
 func (r Response) TransientError(attempt int) error {
 	code := "http"
-	if r.UnexpectedHTML {
+	if r.UnexpectedHTML || r.InvalidDocument {
 		code = "parse"
 	}
-	return &transientHTTPFailure{failure: FailureError{code: code}, status: r.StatusCode, attempt: attempt, unexpectedHTML: r.UnexpectedHTML}
+	return &transientHTTPFailure{failure: FailureError{code: code}, status: r.StatusCode, attempt: attempt, unexpectedHTML: r.UnexpectedHTML, invalidDocument: r.InvalidDocument}
 }
 
 // Request is deliberately data-only, never a script or executable template.

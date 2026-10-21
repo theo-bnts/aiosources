@@ -663,17 +663,46 @@ func transientRetryDelay(header http.Header, now time.Time, attempt int) time.Du
 }
 
 type transientHTTPFailure struct {
-	failure        FailureError
-	status         int
-	attempt        int
-	unexpectedHTML bool
+	failure         FailureError
+	status          int
+	attempt         int
+	unexpectedHTML  bool
+	invalidDocument bool
 }
 
 func (e *transientHTTPFailure) Error() string {
+	if e.invalidDocument {
+		return fmt.Sprintf("Source HTML detail page was unavailable after %d attempts", e.attempt)
+	}
 	if e.unexpectedHTML {
 		return fmt.Sprintf("source returned HTML instead of JSON after a rate limit (%d attempts)", e.attempt)
 	}
 	return fmt.Sprintf("source returned HTTP %d after %d attempts", e.status, e.attempt)
+}
+
+// Parsed HTML has one additional transient failure: an HTTP 200 intermediary
+// page can omit the detail container. Use the same pacing, response ledger,
+// backoff and attempt controls as HTTP retries. Never skip a missing record.
+func (c *Client) retryHTMLDocument(ctx context.Context, response Response, attempt int) error {
+	response.InvalidDocument = true
+	c.mu.Lock()
+	retryAt := time.Now().Add(transientRetryDelay(response.Header, time.Now(), attempt))
+	if retryAt.After(c.next) {
+		c.next = retryAt
+	}
+	retryAt = c.next
+	c.mu.Unlock()
+	retry := attempt <= maxHTTPRetries
+	if c.transientFailure != nil {
+		if err := c.transientFailure(ctx, response, retryAt, attempt, retry); err != nil {
+			return err
+		}
+	}
+	if !retry {
+		return response.TransientError(attempt)
+	}
+	// The next Do performs the actual wait and still honors persisted quotas.
+	return ctx.Err()
 }
 
 func (e *transientHTTPFailure) Unwrap() error { return &e.failure }

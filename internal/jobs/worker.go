@@ -301,6 +301,9 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if response.UnexpectedHTML {
 			message, failureCode = "Source returned HTML instead of JSON after a rate limit", "parse"
 		}
+		if response.InvalidDocument {
+			message, failureCode = fmt.Sprintf("Source HTML detail page was unavailable on attempt %d", attempt), "parse"
+		}
 		page := model.Page{
 			Body: response.Body, ContentType: response.Header.Get("Content-Type"),
 			Error: message,
@@ -308,6 +311,10 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 				"failure_code": failureCode, "http_status": response.StatusCode,
 				"retry_attempt": attempt, "retry": retry,
 			},
+		}
+		if response.InvalidDocument {
+			page.Metadata["failure_reason"] = "html_detail_missing"
+			page.Metadata["html_phase"], page.Metadata["detail_response"] = "detail", true
 		}
 		if !retryAt.IsZero() {
 			page.Metadata["retry_at"] = retryAt.UTC().Format(time.RFC3339Nano)
@@ -527,6 +534,9 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 				return model.StatusSucceeded, "", ""
 			}
 			if run.Trigger == model.TriggerScheduled {
+				if run.MetadataParentRunID != "" {
+					return model.StatusPaused, "Metadata page budget reached; new torrents will be collected before enrichment continues", model.PauseBudget
+				}
 				return model.StatusPaused, "Page budget reached; the next scheduled tick will continue this traversal", model.PauseBudget
 			}
 			return model.StatusPaused, "Page budget reached; resume to continue the traversal", model.PauseBudget

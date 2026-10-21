@@ -54,7 +54,7 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	}))
 	defer upstream.Close()
 	addon.Providers.TBBase, addon.Providers.Client = upstream.URL, upstream.Client()
-	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true}); err != nil {
+	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true, StremioEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	send := func(method, path, body, credential string) *httptest.ResponseRecorder {

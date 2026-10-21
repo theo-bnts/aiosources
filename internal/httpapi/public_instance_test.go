@@ -54,7 +54,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	}))
 	defer upstream.Close()
 	addon.Providers.TBBase = upstream.URL
-	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true}); err != nil {
+	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true, StremioEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	configuration, err := addon.CreatePublicInstallation(f.ctx, "https://addon.example", map[string]string{"torbox": "visitor-key-never-save"}, nil)
@@ -108,7 +108,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 	if response := f.request("GET", "/api/public-access", "", false, ""); response.Code != 401 {
 		t.Fatal("public settings are not protected")
 	}
-	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true}`, true, ""); response.Code != 204 {
+	if response := f.request("PUT", "/api/public-access", `{"revision":1,"enabled":true,"stremio_enabled":true}`, true, ""); response.Code != 204 {
 		t.Fatal("cannot enable public access", response.Code)
 	}
 	install := func(body string, origin string) *httptest.ResponseRecorder {
@@ -191,7 +191,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 	if value := f.request("GET", path, "", false, ""); value.Code != 401 {
 		t.Fatal("disabled public manifest still accessible")
 	}
-	if value := f.request("PUT", "/api/public-access", `{"revision":3,"enabled":true}`, true, ""); value.Code != 204 {
+	if value := f.request("PUT", "/api/public-access", `{"revision":3,"enabled":true,"stremio_enabled":true}`, true, ""); value.Code != 204 {
 		t.Fatal("cannot reenable public access")
 	}
 	if value := f.request("GET", path, "", false, ""); value.Code != 401 {
@@ -225,7 +225,7 @@ func TestPublicAdmissionIsBoundedAndUntrustedHeadersCannotBypassIt(t *testing.T)
 
 func TestEnabledPublicInstallationCannotReadOrChangeAdministration(t *testing.T) {
 	f, addon, _ := addonAPI(t)
-	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true}); err != nil {
+	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true, StremioEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

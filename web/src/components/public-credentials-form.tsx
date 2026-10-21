@@ -16,6 +16,7 @@ import type { LanguagePreferences, InstallationOptions } from '@/lib/language-pr
 
 export function PublicCredentialsForm({
   info,
+  connection = 'stremio',
   preferences,
   submitLabel,
   disabled,
@@ -24,6 +25,7 @@ export function PublicCredentialsForm({
   children,
 }: {
   info: PublicInfo
+  connection?: 'stremio' | 'search'
   preferences?: LanguagePreferences & InstallationOptions
   submitLabel: string
   disabled?: boolean
@@ -64,21 +66,24 @@ export function PublicCredentialsForm({
     setError(null)
     onStart?.()
     try {
-      const result = await api<PublicInstallation>('/public/install', {
-        method: 'POST',
-        cache: 'no-store',
-        signal: controller.signal,
-        body: JSON.stringify({
-          services,
-          ...(saved ? { credential: saved.credential } : {}),
-          ...(removed.length ? { remove_services: removed } : {}),
-          ...(values.getAll('remove_announce').length
-            ? { remove_announces: values.getAll('remove_announce') }
-            : {}),
-          ...(preferences ? { preferences } : {}),
-          ...(Object.keys(announces).length ? { announces } : {}),
-        }),
-      })
+      const result = await api<PublicInstallation>(
+        connection === 'search' ? '/public/credentials' : '/public/install',
+        {
+          method: 'POST',
+          cache: 'no-store',
+          signal: controller.signal,
+          body: JSON.stringify({
+            services,
+            ...(saved ? { credential: saved.credential } : {}),
+            ...(removed.length ? { remove_services: removed } : {}),
+            ...(values.getAll('remove_announce').length
+              ? { remove_announces: values.getAll('remove_announce') }
+              : {}),
+            ...(preferences ? { preferences } : {}),
+            ...(Object.keys(announces).length ? { announces } : {}),
+          }),
+        },
+      )
       if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
         savePublicCredential(result)
         onConfigured?.(result)

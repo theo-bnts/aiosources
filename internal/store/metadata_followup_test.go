@@ -382,10 +382,35 @@ func TestScheduledMetadataFollowupContinuesBudgetWithoutChangingSnapshot(t *test
 		t.Fatal(err)
 	}
 	t.Cleanup(reopened.Close)
-	// Even a due Full routine must continue the existing linked Metadata first.
-	clock, continued, err := reopened.AttemptSchedule(ctx, source, due.Add(time.Minute), nil)
+	// Discovery gets a turn between metadata budgets, including a due Full.
+	clock, discovery, err := reopened.AttemptSchedule(ctx, source, due.Add(time.Minute), nil)
+	if err != nil || discovery == nil || discovery.Mode != model.ModeFull || discovery.ID == child.ID {
+		t.Fatalf("metadata monopolized discovery: %+v %v", discovery, err)
+	}
+	claimedDiscovery, err := reopened.ClaimNext(ctx)
+	if err != nil || claimedDiscovery == nil || claimedDiscovery.ID != discovery.ID {
+		t.Fatalf("claim interleaved discovery: %+v %v", claimedDiscovery, err)
+	}
+	if _, err := reopened.FinishRun(ctx, discovery.ID, model.StatusPaused, "budget", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	_, discovery, err = reopened.AttemptSchedule(ctx, source, due.Add(2*time.Minute), nil)
+	if err != nil || discovery == nil || discovery.ID != claimedDiscovery.ID {
+		t.Fatalf("older metadata stranded budgeted discovery: %+v %v", discovery, err)
+	}
+	claimedDiscovery, err = reopened.ClaimNext(ctx)
+	if err != nil || claimedDiscovery == nil || claimedDiscovery.ID != discovery.ID {
+		t.Fatal("claim continued discovery", err)
+	}
+	collected, err := reopened.SavePage(ctx, *claimedDiscovery, model.Page{Items: []model.Record{coverageRecord("10"), coverageRecord("20")}, Done: true}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirrorFinish(t, ctx, reopened, collected, model.StatusSucceeded)
+	// Enrichment now resumes its original immutable snapshot and cursor.
+	clock, continued, err := reopened.AttemptSchedule(ctx, source, due.Add(3*time.Minute), nil)
 	if err != nil || continued == nil || continued.ID != child.ID || continued.Mode != model.ModeMetadata || continued.MetadataParentRunID != parent.ID ||
-		!reflect.DeepEqual(continued.Config, saved.Config) || !reflect.DeepEqual(continued.Policy, saved.Policy) || clock.FullDueAt == nil || !clock.FullDueAt.Equal(due.Add(time.Minute)) {
+		!reflect.DeepEqual(continued.Config, saved.Config) || !reflect.DeepEqual(continued.Policy, saved.Policy) || clock.FullDueAt == nil || !clock.FullDueAt.Equal(due.Add(3*time.Minute)) {
 		t.Fatalf("scheduled budget continuation replaced the follow-up: %+v %+v %v", clock, continued, err)
 	}
 	var state struct {
@@ -406,10 +431,10 @@ func TestScheduledMetadataFollowupContinuesBudgetWithoutChangingSnapshot(t *test
 		t.Fatal(err)
 	}
 	source.Revision = "changed"
-	if _, err := reopened.ReconcileSchedules(ctx, []scheduling.Source{source}, due.Add(time.Minute)); err != nil {
+	if _, err := reopened.ReconcileSchedules(ctx, []scheduling.Source{source}, due.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	clock, continued, err = reopened.AttemptSchedule(ctx, source, due.Add(2*time.Minute), nil)
+	clock, continued, err = reopened.AttemptSchedule(ctx, source, due.Add(4*time.Minute), nil)
 	if err != nil || continued != nil || clock.LastError == "" {
 		t.Fatalf("changed revision automatically resumed or replaced Metadata: %+v %+v %v", clock, continued, err)
 	}

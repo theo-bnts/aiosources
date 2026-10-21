@@ -82,7 +82,6 @@ test('public connections share the shell and encrypted Torznab filters without v
     let result = await feed(credential)
     expect(result.status()).toBe(200)
     expect(await result.text()).toContain('total="0"')
-    await access.locator('summary', { hasText: 'Advanced' }).click()
     await access.getByLabel('Expose source names and filters', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(visitor.getByLabel('Sources', { exact: true })).toBeVisible()

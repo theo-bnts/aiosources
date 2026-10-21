@@ -319,11 +319,14 @@ function AppNavigation({
         group.items.length === 1 ? (
           navigationLink(group.items[0])
         ) : (
-          <section key={group.id} className={`space-y-1 ${openGroups[group.id] ? 'pb-2' : ''}`}>
+          <section
+            key={group.id}
+            className={`space-y-1 ${(openGroups[group.id] ?? group.defaultOpen) ? 'pb-2' : ''}`}
+          >
             <h2>
               <button
                 type="button"
-                aria-expanded={openGroups[group.id]}
+                aria-expanded={openGroups[group.id] ?? group.defaultOpen}
                 aria-controls={`${id}-${group.id}`}
                 onClick={() => onToggle(group.id)}
                 className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground lg:min-h-9"
@@ -332,13 +335,13 @@ function AppNavigation({
                 <span className="min-w-0 flex-1">{group.label}</span>
                 <CaretDownIcon
                   aria-hidden="true"
-                  className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${openGroups[group.id] ? '' : '-rotate-90'}`}
+                  className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${(openGroups[group.id] ?? group.defaultOpen) ? '' : '-rotate-90'}`}
                 />
               </button>
             </h2>
             <ul
               id={`${id}-${group.id}`}
-              hidden={!openGroups[group.id]}
+              hidden={!(openGroups[group.id] ?? group.defaultOpen)}
               className="ml-5 space-y-0.5 border-l border-border pl-2"
             >
               {group.items.map((item) => (
@@ -467,7 +470,16 @@ export function AppShell({
   const groups = publicMode
     ? [
         ...(publicInfo.data?.search_enabled ? [publicSearchNavigation] : []),
-        ...publicNavigationGroups,
+        ...publicNavigationGroups
+          .map((group) => ({
+            ...group,
+            items: group.items.filter((item) =>
+              item.to === '/public'
+                ? publicInfo.data?.stremio_enabled
+                : publicInfo.data?.torznab_enabled,
+            ),
+          }))
+          .filter((group) => group.items.length > 0),
       ]
     : navigationGroups
   const items = groups.flatMap((group) => group.items)
@@ -499,6 +511,7 @@ export function AppShell({
         navigationPath === item.to || (item.to !== '/' && navigationPath.startsWith(`${item.to}/`)),
     )
   const activeGroup = groups.find((group) => group.items.some((item) => item === activeItem))
+  const activeGroupId = activeGroup?.id
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     let stored: unknown
     try {
@@ -526,9 +539,9 @@ export function AppShell({
   const focusMainOnClose = useRef(false)
   useEffect(() => {
     setMobileOpen(false)
-    if (activeGroup) {
+    if (activeGroupId) {
       setOpenGroups((current) =>
-        current[activeGroup.id] ? current : { ...current, [activeGroup.id]: true },
+        current[activeGroupId] ? current : { ...current, [activeGroupId]: true },
       )
     }
     if (previousPath.current !== location.pathname) {
@@ -539,7 +552,7 @@ export function AppShell({
       }
       previousPath.current = location.pathname
     }
-  }, [location.pathname, location.state, activeGroup])
+  }, [location.pathname, location.state, activeGroupId])
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(openGroups))
@@ -568,10 +581,17 @@ export function AppShell({
   const navigationProps = {
     groups,
     activeItem,
-    activeGroupId: activeGroup?.id,
+    activeGroupId,
     openGroups,
     onToggle: (groupId: string) =>
-      setOpenGroups((current) => ({ ...current, [groupId]: !current[groupId] })),
+      setOpenGroups((current) => ({
+        ...current,
+        [groupId]: !(
+          current[groupId] ??
+          groups.find((group) => group.id === groupId)?.defaultOpen ??
+          false
+        ),
+      })),
   }
   const branding = (
     <>

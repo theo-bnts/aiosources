@@ -114,6 +114,34 @@ func BenchmarkMetadataSeasonLookup(b *testing.B) {
 	}
 }
 
+// A restart may reread the same dated export. Measure that idempotent replay,
+// not a first inventory download or metadata retrieval from the provider.
+func BenchmarkMetadataInventoryReplay(b *testing.B) {
+	ctx, s, conn := testService(b)
+	date := time.Now().UTC().Add(-24 * time.Hour).Format("2006-01-02")
+	ids := make([]string, 50000)
+	for i := range ids {
+		ids[i] = strconv.Itoa(i + 1)
+	}
+	replay := func() {
+		for start := 0; start < len(ids); start += 1000 {
+			if err := s.DB.QueueAIOInventory(ctx, "movie", ids[start:start+1000], date); err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+	replay()
+	b.ResetTimer()
+	for range b.N {
+		replay()
+	}
+	b.StopTimer()
+	var inventory, jobs int
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_inventory),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&inventory, &jobs); err != nil || inventory != len(ids) || jobs != len(ids) {
+		b.Fatal("inventory replay lost or duplicated durable jobs", inventory, jobs, err)
+	}
+}
+
 // Unlike the repeated-title fixture, each pick has a different title and ID.
 // This measures the no-reuse path, including episodic and season-pack requests.
 func BenchmarkMatchingVariedCatalog(b *testing.B) {

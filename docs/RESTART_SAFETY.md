@@ -81,4 +81,4 @@ source metadata checkpoints, orphaned leases, seven-day history cleanup and
 persisted matching/cache queues. Additional end-to-end scenarios
 kill a real worker process during Full and Incremental collection, reopen state
 between three consecutive tracker failures, and verify metadata and AD/TB
-recovery without erasing earlier published results.
+recovery without erasing earlier published results. Separate crash tests also kill a real process during TMDB detail retrieval and local matching: committed details are not fetched again, completed matches are not rewritten, and the remaining durable jobs finish after restart. An unfinished inventory file or in-flight, uncommitted batch can be read again; that does not erase saved progress.

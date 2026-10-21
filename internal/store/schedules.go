@@ -189,6 +189,20 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 		runs[index] = recovered
 	}
 	state, resume, message := source.RunState(runs)
+	if state == "paused" && resume != nil && resume.MetadataParentRunID != "" && source.Plan.Mode == model.ModeIncremental && resume.FinishedAt != nil {
+		// Alternate a bounded automatic enrichment attempt with discovery. Its
+		// original snapshot/cursor stays paused; no second source worker runs.
+		var discovered *time.Time
+		if err := tx.QueryRow(ctx, `SELECT max(finished_at) FROM ingest.runs WHERE provider_id=$1 AND status='succeeded' AND mode IN ('full','incremental')`, source.ID).Scan(&discovered); err != nil {
+			return clock, nil, databaseError("read last successful discovery", err)
+		}
+		if discovered != nil && !discovered.After(*resume.FinishedAt) {
+			if err := lifecycleEvent(ctx, tx, resume.ID, "discovery_due", "New torrents will be collected before this metadata enrichment continues"); err != nil {
+				return clock, nil, err
+			}
+			state, resume = "waiting", nil
+		}
+	}
 	if state == "running" {
 		message = "An active collection prevented this scheduled attempt; the next scheduled tick will retry"
 	}

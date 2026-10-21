@@ -12,6 +12,7 @@ export function clearPublicCredentials(form: HTMLFormElement) {
   }
 }
 export type PublicInfo = {
+  stremio_enabled?: boolean
   torznab_enabled?: boolean
   search_enabled?: boolean
   sources?: { id: string; name: string }[]

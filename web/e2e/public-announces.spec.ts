@@ -63,7 +63,6 @@ test('visitor announce fields are opt-in, use source names and clear personal in
       visitor.getByRole('heading', { name: 'Connect your debrid services' }),
     ).toBeVisible()
     await expect(visitor.locator('summary', { hasText: 'Advanced' })).toHaveCount(0)
-    await access.locator('summary', { hasText: 'Advanced' }).click()
     const permission = access.getByLabel('Expose source names and filters', { exact: true })
     await expect(permission).not.toBeChecked()
     await permission.check()
@@ -133,7 +132,6 @@ test('reviewing concurrent public settings preserves only fields edited locally'
   // administrator's optional field instead of silently reverting it to false.
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await access.getByRole('button', { name: 'Load latest settings', exact: true }).click()
-  await access.locator('summary', { hasText: 'Advanced' }).click()
   await expect(access.getByLabel('Expose source names and filters', { exact: true })).toBeChecked()
   await expect(access.getByLabel('Enable public access', { exact: true })).toBeChecked()
   await access.getByRole('button', { name: 'Save', exact: true }).click()

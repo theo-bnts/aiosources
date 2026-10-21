@@ -15,6 +15,7 @@ test('personal announces follow encrypted services across public Search, Stremio
         data: {
           ...access,
           enabled: true,
+          stremio_enabled: true,
           search_enabled: true,
           torznab_enabled: true,
           expose_sources: true,
@@ -36,6 +37,7 @@ test('personal announces follow encrypted services across public Search, Stremio
       return route.fulfill({
         json: {
           enabled: true,
+          stremio_enabled: true,
           search_enabled: true,
           torznab_enabled: true,
           providers: [{ id: 'torbox', name: 'TorBox' }],
@@ -43,7 +45,7 @@ test('personal announces follow encrypted services across public Search, Stremio
           private_sources: [{ id: 'private-example', name: 'Example Library' }],
         },
       })
-    if (url.pathname === '/api/public/install') {
+    if (['/api/public/install', '/api/public/credentials'].includes(url.pathname)) {
       const body = request.postDataJSON()
       if (installs++ === 0) {
         expect(body.services).toEqual({ torbox: key })

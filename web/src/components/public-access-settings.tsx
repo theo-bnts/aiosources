@@ -8,11 +8,11 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
-import { Disclosure } from '@/components/ui/disclosure'
 type Access = {
   revision: number
   enabled: boolean
   search_enabled: boolean
+  stremio_enabled: boolean
   expose_sources: boolean
   torznab_enabled: boolean
 }
@@ -29,6 +29,7 @@ export function PublicAccessSettings() {
     draft &&
     (draft.value.enabled !== query.data?.enabled ||
       draft.value.search_enabled !== query.data?.search_enabled ||
+      draft.value.stremio_enabled !== query.data?.stremio_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
       draft.value.expose_sources !== query.data?.expose_sources),
   )
@@ -66,6 +67,10 @@ export function PublicAccessSettings() {
                   draft.value.search_enabled !== draft.base.search_enabled
                     ? draft.value.search_enabled
                     : latest.search_enabled,
+                stremio_enabled:
+                  draft.value.stremio_enabled !== draft.base.stremio_enabled
+                    ? draft.value.stremio_enabled
+                    : latest.stremio_enabled,
                 torznab_enabled:
                   draft.value.torznab_enabled !== draft.base.torznab_enabled
                     ? draft.value.torznab_enabled
@@ -97,71 +102,97 @@ export function PublicAccessSettings() {
         if (dirty && current && !conflict && !busy) save.mutate(current)
       }}
     >
-      <h2 className="section-title">Visitor connections</h2>
       <ErrorNotice error={query.error || save.error || review.error} />
       {query.isPending ? (
         <Loading />
       ) : (
         current && (
           <>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="public-access-enabled"
-                checked={current.enabled}
-                disabled={busy}
-                onCheckedChange={(enabled) => change({ enabled })}
-              />
-              <Label htmlFor="public-access-enabled">Enable public access</Label>
-            </div>
-            <p className="help">
-              Visitors receive an encrypted installation link. Keys are not saved, and
-              administration stays protected. Turning this off revokes their links. AllDebrid uses
-              your configured account to check missing cache availability.
-            </p>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="public-search-enabled"
-                checked={current.search_enabled}
-                disabled={busy || !current.enabled}
-                onCheckedChange={(search_enabled) => change({ search_enabled })}
-              />
-              <Label htmlFor="public-search-enabled">Allow public Search</Label>
-            </div>
-            <p className="help">
-              Visitors can search the identified catalog and download using their own debrid
-              services. Source visibility and private download permissions follow the same rules as
-              Stremio. Browser downloads pass through this instance and use its bandwidth.
-            </p>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="public-torznab-enabled"
-                checked={current.torznab_enabled}
-                disabled={busy || !current.enabled}
-                onCheckedChange={(torznab_enabled) => change({ torznab_enabled })}
-              />
-              <Label htmlFor="public-torznab-enabled">Allow public Torznab connections</Label>
-            </div>
-            <p className="help">
-              Visitors can create encrypted Torznab configurations without an account. Disabling
-              this option revokes those links.
-            </p>
-            <Disclosure title="Advanced">
+            <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <Switch
-                  id="public-private-downloads"
-                  checked={current.expose_sources}
-                  disabled={busy || !current.enabled}
-                  onCheckedChange={(expose_sources) => change({ expose_sources })}
+                  id="public-access-enabled"
+                  checked={current.enabled}
+                  disabled={busy}
+                  onCheckedChange={(enabled) => change({ enabled })}
                 />
-                <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
+                <Label htmlFor="public-access-enabled">Enable public access</Label>
               </div>
               <p className="help">
-                Applies to Search, Stremio and Torznab. Visitors can select sources and supply their
-                own announce URLs for private sources. Your source definitions and announce URLs
-                stay private. When off, source names and source filters are hidden and private
-                sources require known cached availability.
+                Visitors use the connections enabled below with their own keys. The server does not
+                save these keys, and administration stays protected. Turning this off revokes public
+                links. AllDebrid uses your configured account to check missing cache availability.
               </p>
-            </Disclosure>
+            </div>
+            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
+              <legend className="pr-3 text-sm font-medium">Connections</legend>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-search-enabled"
+                    checked={current.search_enabled}
+                    disabled={busy || !current.enabled}
+                    onCheckedChange={(search_enabled) => change({ search_enabled })}
+                  />
+                  <Label htmlFor="public-search-enabled">Allow public Search</Label>
+                </div>
+                <p className="help">
+                  Visitors can search the identified catalog and download using their own debrid
+                  services. Source visibility and private download permissions follow the same rules
+                  as Stremio. Browser downloads pass through this instance and use its bandwidth.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-stremio-enabled"
+                    checked={current.stremio_enabled}
+                    disabled={busy || !current.enabled}
+                    onCheckedChange={(stremio_enabled) => change({ stremio_enabled })}
+                  />
+                  <Label htmlFor="public-stremio-enabled">Allow public Stremio connections</Label>
+                </div>
+                <p className="help">
+                  Visitors can create installation links for Stremio and AIOStreams. Disabling this
+                  option revokes those links without affecting Search or Torznab.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-torznab-enabled"
+                    checked={current.torznab_enabled}
+                    disabled={busy || !current.enabled}
+                    onCheckedChange={(torznab_enabled) => change({ torznab_enabled })}
+                  />
+                  <Label htmlFor="public-torznab-enabled">Allow public Torznab connections</Label>
+                </div>
+                <p className="help">
+                  Visitors can create encrypted Torznab configurations without an account. Disabling
+                  this option revokes those links.
+                </p>
+              </div>
+            </fieldset>
+            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
+              <legend className="pr-3 text-sm font-medium">Sources and privacy</legend>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-private-downloads"
+                    checked={current.expose_sources}
+                    disabled={busy || !current.enabled}
+                    onCheckedChange={(expose_sources) => change({ expose_sources })}
+                  />
+                  <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
+                </div>
+                <p className="help">
+                  Applies to Search, Stremio and Torznab. Visitors can select sources and supply
+                  their own announce URLs for private sources. Your source definitions and announce
+                  URLs stay private. When off, source names and source filters are hidden and
+                  private sources require known cached availability.
+                </p>
+              </div>
+            </fieldset>
             {conflict && (
               <div className="notice notice-warning space-y-3" role="status">
                 <p>

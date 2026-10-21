@@ -12,6 +12,10 @@ type AIOCandidateSearch func(model.AIOCandidateFilter) ([]model.AIOWork, bool, e
 
 const aioCandidateLimit = 100
 
+// A bounded transaction shares candidate lookups between release variants.
+// Keep batches small so metadata publication can acquire its exclusive fence.
+const AIOMatchBatchSize = 25
+
 func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
 	rows, err := tx.Query(ctx, aioCandidatesQuery, filter.Title, filter.TMDB, filter.IMDb, filter.TVDB, filter.Type, filter.Year, filter.Seasons, filter.Episode, filter.ExactOnly)
 	if err != nil {
@@ -36,7 +40,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	if len(picks) == 0 {
 		return nil, nil
 	}
-	if len(picks) > 10 || decide == nil {
+	if len(picks) > AIOMatchBatchSize || decide == nil {
 		return nil, model.ErrInvalid
 	}
 	tx, err := s.pool.Begin(ctx)

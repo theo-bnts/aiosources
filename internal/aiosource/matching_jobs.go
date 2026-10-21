@@ -14,15 +14,19 @@ func (s *Service) drainMatching(ctx context.Context, history *operationHistory) 
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		rows, err := s.DB.AIOMatchBatch(ctx, 100)
+		rows, err := s.DB.AIOMatchBatch(ctx, 250)
 		if err != nil || len(rows) == 0 {
 			return err
 		}
 		group, work := errgroup.WithContext(ctx)
-		group.SetLimit(s.DB.AIOMatchWorkers())
-		outcomes := make([][]model.AIOMatchResult, (len(rows)+9)/10)
-		for start := 0; start < len(rows); start += 10 {
-			chunk, index := rows[start:min(start+10, len(rows))], start/10
+		workers := s.DB.AIOMatchWorkers()
+		group.SetLimit(workers)
+		// Retain parallelism for a short queue, and amortize candidate discovery
+		// across more variants when enough work exists to fill every worker.
+		batchSize := max(10, min(store.AIOMatchBatchSize, (len(rows)+workers-1)/workers))
+		outcomes := make([][]model.AIOMatchResult, (len(rows)+batchSize-1)/batchSize)
+		for start := 0; start < len(rows); start += batchSize {
+			chunk, index := rows[start:min(start+batchSize, len(rows))], start/batchSize
 			group.Go(func() error {
 				results, err := s.DB.MatchAIOBatch(work, chunk, decideAIORecord)
 				outcomes[index] = results

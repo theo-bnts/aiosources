@@ -150,7 +150,9 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 		if !s.matchesSnapshot(run) || !modeMatches {
 			return "blocked", nil, "A paused scheduled collection uses an older configuration or different mode; resume or cancel it manually in run history"
 		}
-		if resume == nil {
+		// Finish a budgeted discovery before optional enrichment. Otherwise an
+		// older metadata child can strand a newer Incremental at every tick.
+		if resume == nil || resume.MetadataParentRunID != "" && run.MetadataParentRunID == "" {
 			copy := run
 			resume = &copy
 		}
