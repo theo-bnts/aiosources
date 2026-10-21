@@ -86,7 +86,7 @@ func TestEpisodeMarkersDoNotConsumeDigitsInsideTitles(t *testing.T) {
 			t.Fatal("lost concatenated episodes")
 		}
 	}
-	for _, title := range []string{"Example.S01.Episode03", "Example.Season01.Episode03", "Example.S01.Episode 03", "Example.S01.Ep03", "Example.S01Episode03", "Example.S01Ep03", "Example.S01.Episode02-Episode03"} {
+	for _, title := range []string{"Example.S01.Episode03", "Example.Season01.Episode03", "Example.S01.Episode 03", "Example.S01.Ep03", "Example.S01Episode03", "Example.S01Ep03", "Example.S01.Episode02-Episode03", "Example.S01E02-Episode03", "Example.S01E02-Ep03"} {
 		p := ParseRelease(title)
 		if !contains(p.Seasons, 1) || !contains(p.Episodes, 3) || p.Pack {
 			t.Fatalf("lost explicit word-based numbering for %s: %+v", title, p)
@@ -155,7 +155,7 @@ func TestSeasonFolderQualifiesNumericEpisodeFiles(t *testing.T) {
 func TestMalformedRangesNeverBecomeUnscopedPacks(t *testing.T) {
 	r := Resource{Type: "series", Season: matchingNumber(1), Episode: matchingNumber(3)}
 	c := Candidate{WorkID: "1", EntryID: "1", Type: "tv", Titles: []string{"Example Serial"}, Years: []int{2021}}
-	for _, title := range []string{"Example.Serial.S03-S01.2021", "Example.Serial.S01-S200.2021", "Example.Serial.S01E05-E03.2021", "Example.Serial.S01E001-E500.2021", "Example Serial - 05-03", "Example Serial - 001-500"} {
+	for _, title := range []string{"Example.Serial.S03-S01.2021", "Example.Serial.S01-S200.2021", "Example.Serial.S01E05-E03.2021", "Example.Serial.S01E001-E500.2021", "Example.Serial.S01E05-Episode03.2021", "Example.Serial.S01E001-Ep500.2021", "Example Serial - 05-03", "Example Serial - 001-500"} {
 		p := ParseRelease(title)
 		if d := ChooseMatch(p, []Candidate{c}, SourceIDs{}, false, SourceEpisode{}); d.Status == "matched" {
 			t.Fatal("invalid range was identified", title)
