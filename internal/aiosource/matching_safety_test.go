@@ -117,6 +117,21 @@ func TestMultiSeasonPacksRetainCoveredSeasonsAndVetoContradictions(t *testing.T)
 	}
 }
 
+func TestSpacedSeasonPacksKeepTheirExplicitPackMarker(t *testing.T) {
+	for _, title := range []string{"Example Serial Season 1 - 3 COMPLETE", "Example Serial S01 - 03 Pack", "Example Serial Saison 1 - 3 Intégrale"} {
+		p := ParseRelease(title)
+		if !p.Pack || p.InvalidNumbering || len(p.Seasons) != 3 || len(p.Episodes) != 0 {
+			t.Fatalf("spaced season range became an episode: %s: %+v", title, p)
+		}
+		for _, season := range []int{1, 2, 3, 4} {
+			r := Resource{Type: "series", Season: matchingNumber(season), Episode: matchingNumber(4)}
+			if got := MatchesEpisode(model.AIORecord{Title: title}, p, r); got != (season <= 3) {
+				t.Fatalf("wrong season %d in explicit pack %s", season, title)
+			}
+		}
+	}
+}
+
 func TestSeasonFolderQualifiesNumericEpisodeFiles(t *testing.T) {
 	r := Resource{Type: "series", Season: matchingNumber(2), Episode: matchingNumber(3)}
 	for _, name := range []string{"Example Serial/Season 02/03.mkv", "Example.Serial.S02/03 - Example title.mp4", `Example Serial\Season 02\03.mkv`} {

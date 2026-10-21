@@ -105,6 +105,7 @@ var absoluteRE = regexp.MustCompile(`(?i)(?:\s-\s|\b(?:ep|episode)\s*)(\d{1,4})(
 var ordinalSeasonRE = regexp.MustCompile(`(?i)\b(\d{1,3})(?:st|nd|rd|th)\s+season\b`)
 var separatedSeasonEpisodeRE = regexp.MustCompile(`(?i)\b(?:S|season\s*|saison\s*)(\d{1,3})\s+[-–]\s+(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\b`)
 var localEpisodeRE = regexp.MustCompile(`(?i)\bS\d{1,3}\s*E\d{1,4}(?:(?:\s*[-–]\s*E?|\s*E)\d{1,4})*`)
+var packMarkerRE = regexp.MustCompile(`(?i)\b(?:complete|integrale|intégrale|pack)\b`)
 var yearRE = regexp.MustCompile(`\b(?:18|19|20|21)\d{2}\b`)
 var technicalRE = regexp.MustCompile(`(?i)\b(?:2160p|1080[pi]|720p|576p|480p|4k|web[ ._-]?(?:dl|rip)?|bluray|blu[ ._-]?ray|bdrip|brrip|dvdrip|hdtv|remux|x26[45]|h[ .]?26[45]|hevc|avc|av1|dts(?:[ ._-]?hd)?|aac|e?ac3|ddp|flac|xvid|divx|french|vff|vfq|vostfr|multi|truefrench|english|complete|integrale|intégrale)\b`)
 var leadingGroupRE = regexp.MustCompile(`^\s*\[[^\]]+\]\s*`)
@@ -198,13 +199,16 @@ func ParseRelease(raw string) Release {
 	s := strings.ReplaceAll(raw, ".", " ")
 	s = strings.ReplaceAll(s, "_", " ")
 	s = ordinalSeasonRE.ReplaceAllString(s, "Season $1")
-	// The spaced separator in "Season 3 - 09" denotes an episode. Explicit
-	// season ranges (S01-S03, Season 1-3) retain their original pack semantics.
+	// Without an explicit pack marker, "Season 3 - 09" denotes an episode.
+	// Explicit season ranges retain their original pack semantics.
 	s = separatedSeasonEpisodeRE.ReplaceAllStringFunc(s, func(text string) string {
 		m := separatedSeasonEpisodeRE.FindStringSubmatch(text)
 		n, _ := strconv.Atoi(m[2])
 		if n >= 1800 && n <= 2199 {
 			return "S" + m[1] + " " + m[2]
+		}
+		if m[3] == "" && packMarkerRE.MatchString(s) {
+			return "S" + m[1] + "-S" + m[2]
 		}
 		value := "S" + m[1] + "E" + m[2]
 		if m[3] != "" {
