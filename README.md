@@ -104,7 +104,7 @@ Results are largest first, and **Cached results only** is enabled by default. Tu
 
 Choose **Download** to start a ready file in your browser. Choose **Add to debrid** to prepare an uncached version, then **View operation** to follow progress in **Debrid → History**. Downloads from the web interface use your instance's bandwidth without saving the file on its disk. Stremio uses direct provider playback links.
 
-**Torrent search** lists individual imported records, including unidentified releases. Use title fragments, source IDs or complete or partial info hashes. **Identification** uses the same search syntax when reviewing matches. These pages help explain why a release appears, is missing or needs a correction.
+**Torrents** lists individual imported records, including unidentified releases. Use title fragments, source IDs or complete or partial info hashes. **Identification** uses the same search syntax when reviewing matches. These pages help explain why a release appears, is missing or needs a correction.
 
 ## Connect your apps
 
@@ -143,7 +143,7 @@ The administrator chooses whether to disclose source names and allow visitors to
 
 **Allow public Search** lets visitors find films and series in the local identified catalog and download through their own debrid accounts. It uses the same language, year, version and cache controls as administrator Search, while keeping administrator pages protected. Downloads pass through the instance without being saved to disk.
 
-Set visitor request limits in **Administration → Network → Request limits** (defaults: 12 link creations and 120 public requests per minute per visitor IP, with 50 simultaneous public requests per process). Each limit can be switched off independently, including the global concurrency limit. Behind Cloudflare or another reverse proxy, configure **Network → Incoming proxy** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
+Set visitor request limits in **Administration → Public access → Request limits** (defaults: 12 link creations and 120 public requests per minute per visitor IP, with 50 simultaneous public requests per process). Each limit can be switched off independently, including the global concurrency limit. Behind Cloudflare or another reverse proxy, configure **Network → Incoming** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
 
 Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for seven days. Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
 

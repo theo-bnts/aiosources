@@ -139,7 +139,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
   return (
     <div className="page">
       <PageHeader title="History" />
-      <div className="toolbar">
+      <div className="toolbar rounded-md border border-border p-4">
         <div className="field">
           <Label htmlFor="run-provider" className="sr-only">
             Filter by source

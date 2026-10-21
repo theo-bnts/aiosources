@@ -68,8 +68,8 @@ test('source creation and import actions appear only in Settings', async ({ page
   await expect(
     page.locator('.page-heading').getByRole('button', { name: 'Run manual import', exact: true }),
   ).toHaveCount(0)
-  await page.getByText('Manual actions', { exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Run manual import', exact: true })).toBeVisible()
+  await expect(page.getByText('Manual actions', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Run manual import', exact: true })).toHaveCount(0)
 })
 
 test('secret forms and open deletion confirmations cannot adopt a competing rotation silently', async ({
@@ -159,55 +159,23 @@ test('secret forms and open deletion confirmations cannot adopt a competing rota
   await expect(row).toBeVisible()
 })
 
-test('saved view conflicts keep the edited name until an explicit review of the latest revision', async ({
+test('retired saved views have no controls or API and search URLs remain usable', async ({
   page,
   server,
 }) => {
+  await page.goto('/torrents?q=example&sort=size_desc')
+  await expect(page.getByLabel('Search text', { exact: true })).toHaveValue('example')
+  await expect(page.getByText('Saved views', { exact: true })).toHaveCount(0)
   const headers = await proof(page, server.origin)
-  const created = await page.request.post('/api/saved-views', {
-    headers,
-    data: { name: 'Original view', filters: {} },
-  })
-  expect(created.status()).toBe(201)
-  const original = await created.json()
-  await page.goto('/torrents')
-  await page.getByText('Saved views', { exact: true }).click()
-  await page.getByLabel('Saved view', { exact: true }).selectOption(original.id)
-  const name = page.getByLabel('View name', { exact: true })
-  await name.fill('Local view draft')
-  // Keep background reads at the version this tab opened, so this case also
-  // exercises the server rejection before an SSE refresh discovers the edit.
-  const visibleViews = await (await page.request.get('/api/saved-views')).json()
-  await page.route('**/api/saved-views', (route) =>
-    route.fulfill({ status: 200, json: visibleViews }),
-  )
-  expect(
-    (
-      await page.request.put(`/api/saved-views/${original.id}`, {
-        headers,
-        data: { name: 'Competing view', filters: original.filters, revision: original.revision },
-      })
-    ).status(),
-  ).toBe(200)
-  const rejected = page.waitForResponse(
-    (response) =>
-      response.url().endsWith(`/api/saved-views/${original.id}`) &&
-      response.request().method() === 'PUT',
-  )
-  await page.getByRole('button', { name: 'Update selected', exact: true }).click()
-  expect((await rejected).status()).toBe(409)
-  await expect(name).toHaveValue('Local view draft')
-  await page.unroute('**/api/saved-views')
-  await page.getByRole('button', { name: 'Load latest view', exact: true }).click()
-  await expect(name).toHaveValue('Local view draft')
-  await page.getByRole('button', { name: 'Update selected', exact: true }).click()
-  await expect(
-    page.locator('[data-notification]').filter({ hasText: 'Saved the currently applied' }),
-  ).toBeVisible()
-  const saved = await (await page.request.get('/api/saved-views')).json()
-  expect(saved.items.find((view: { id: string }) => view.id === original.id).name).toBe(
-    'Local view draft',
-  )
+  for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
+    const response = await page.request.fetch(
+      method === 'GET' || method === 'POST' ? '/api/saved-views' : '/api/saved-views/old',
+      { method, headers },
+    )
+    expect(response.status()).toBe(404)
+  }
+  await page.reload()
+  await expect(page.getByLabel('Sort results', { exact: true })).toHaveValue('size_desc')
 })
 
 test('named secret creation recovers a lost acknowledgement without replacing a different value', async ({

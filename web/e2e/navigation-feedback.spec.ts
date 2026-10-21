@@ -72,7 +72,7 @@ test('invalid search ranges keep the applied results and the editable draft with
     await db.end()
   }
   await page.goto('/torrents?q=original')
-  const form = page.getByRole('form', { name: 'Torrent search', exact: true })
+  const form = page.getByRole('form', { name: 'Torrents', exact: true })
   await expect(form.getByLabel('Search text', { exact: true })).toHaveValue('original')
   await expect(page.getByRole('navigation', { name: 'Pagination', exact: true })).toBeVisible()
   let requests = 0
@@ -276,7 +276,8 @@ test.describe('return navigation', () => {
     await page.goto('/providers/manual-return')
     await page.getByRole('button', { name: 'Run manual import', exact: true }).click()
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByLabel('Source', { exact: true })).toHaveValue('manual-return')
+    await expect(dialog.locator('#collect-provider')).toHaveText('Manual return')
+    await expect(dialog.getByRole('combobox', { name: 'Source', exact: true })).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
     await expect(page).toHaveURL(/\/runs\//)
     await page.reload()
@@ -312,7 +313,7 @@ test.describe('return navigation', () => {
     await page.getByRole('link', { name: 'Open processed record for record', exact: true }).click()
     await expect(page).toHaveURL(/\/raw\/[0-9]+$/)
     await page.reload()
-    await page.locator('main').getByRole('link', { name: 'Torrent search', exact: true }).click()
+    await page.locator('main').getByRole('link', { name: 'Torrents', exact: true }).click()
     await expect(page).toHaveURL(origin)
     await expect(page.getByLabel('Search text', { exact: true })).toHaveValue('example')
   })

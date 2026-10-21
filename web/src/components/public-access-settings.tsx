@@ -125,7 +125,7 @@ export function PublicAccessSettings() {
               </p>
             </div>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-              <legend className="pr-3 text-sm font-medium">Connections</legend>
+              <legend className="pr-3 text-sm font-medium">Search</legend>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Switch
@@ -142,6 +142,9 @@ export function PublicAccessSettings() {
                   as Stremio. Browser downloads pass through this instance and use its bandwidth.
                 </p>
               </div>
+            </fieldset>
+            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
+              <legend className="pr-3 text-sm font-medium">Connections</legend>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Switch

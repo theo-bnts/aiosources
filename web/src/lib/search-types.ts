@@ -12,15 +12,6 @@ export interface TorrentFilters {
   sort?: TorrentSort
 }
 
-export interface SavedView {
-  id: string
-  name: string
-  filters: TorrentFilters
-  revision: number
-  created_at: string
-  updated_at: string
-}
-
 export const torrentSortOptions: { value: TorrentSort; label: string }[] = [
   { value: 'recent', label: 'Most recent' },
   { value: 'oldest', label: 'Oldest first' },

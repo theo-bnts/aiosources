@@ -69,7 +69,7 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
 		t.Fatal(err)
 	}
 	for range 2 {
-		if err = db.Migrate(ctx); err != nil {
+		if err = db.migrateThrough(ctx, 71); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -128,9 +128,14 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
 	if err != nil || string(preserved.Cursor) != `{"page": 12}` || preserved.Pages != 11 || preserved.Records != 4 {
 		t.Fatalf("progress changed: %+v %v", preserved, err)
 	}
-	views, err := db.SavedViews(ctx)
-	if err != nil || len(views) != 1 || views[0].Filters.MinSize != "9007199254740993" || views[0].Filters.Sort != "recent" || views[0].Revision != 2 {
-		t.Fatalf("saved filters changed incorrectly: %+v %v", views, err)
+	var viewFilters model.SearchFilters
+	var viewJSON []byte
+	var viewRevision int64
+	if err := db.pool.QueryRow(ctx, `SELECT filters,revision FROM ingest.saved_views WHERE id='legacy-view'`).Scan(&viewJSON, &viewRevision); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(viewJSON, &viewFilters); err != nil || viewFilters.MinSize != "9007199254740993" || viewFilters.Sort != "recent" || viewRevision != 2 {
+		t.Fatalf("historical saved filters changed incorrectly: %+v %v", viewFilters, err)
 	}
 	remaining, err := db.Share(ctx, mixed.Share.ID)
 	if err != nil || !remaining.Enabled || !reflect.DeepEqual(remaining.Fields, []string{"title"}) {

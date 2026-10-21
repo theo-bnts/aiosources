@@ -6,7 +6,7 @@ const viewLabels: Record<string, string> = {
   '/providers': 'Source statistics',
   '/providers/settings': 'All sources',
   '/runs': 'Sources history',
-  '/torrents': 'Torrent search',
+  '/torrents': 'Torrents',
   '/search': 'Search',
   '/public/search': 'Search',
   '/remotes': 'Remote catalogs',

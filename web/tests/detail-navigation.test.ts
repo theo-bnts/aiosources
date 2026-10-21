@@ -25,7 +25,7 @@ test('detail return links retain the complete public list view and direct links 
     { to: '/runs/run-one?tab=raw&raw_status=error&raw_offset=50', label: 'Processed records' },
   )
   for (const [pathname, search, label] of [
-    ['/torrents', '?q=example&provider=source&sort=oldest', 'Torrent search'],
+    ['/torrents', '?q=example&provider=source&sort=oldest', 'Torrents'],
     ['/search', '?q=example&type=tv&offset=50', 'Search'],
     ['/public/search', '?q=example&type=tv&year=2026&offset=50', 'Search'],
     ['/sharing/remotes', '?q=example&state=disabled', 'Remote catalogs'],

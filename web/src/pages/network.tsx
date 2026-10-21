@@ -156,8 +156,7 @@ export function NetworkPage() {
                   </div>
                   {used && (
                     <p className="help">
-                      Assigned in Outgoing routing. Change those assignments before deleting this
-                      proxy.
+                      Assigned in Routing. Change those assignments before deleting this proxy.
                     </p>
                   )}
                 </section>
@@ -167,7 +166,7 @@ export function NetworkPage() {
         ) : (
           <Empty
             title="No proxies configured"
-            description="Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Outgoing routing."
+            description="Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Routing."
           />
         ))
       )}
@@ -507,8 +506,8 @@ export function NetworkRoutingPage() {
             </section>
             {settings.proxies.some((proxy) => !proxy.enabled && proxyInUse(settings, proxy.id)) && (
               <p role="status" className="notice notice-warning">
-                Some connections use a disabled proxy. Enable it in Outgoing proxies or choose
-                another connection.
+                Some connections use a disabled proxy. Enable it in Proxies or choose another
+                connection.
               </p>
             )}
             {conflict && (

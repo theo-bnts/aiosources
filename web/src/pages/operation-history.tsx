@@ -124,7 +124,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   }
   return (
     <div className="page">
-      <div className="toolbar">
+      <div className="toolbar rounded-md border border-border p-4">
         <div className="field">
           <Label htmlFor="operation-type" className="sr-only">
             {section === 'metadata' ? 'Filter by operation' : 'Filter by service'}

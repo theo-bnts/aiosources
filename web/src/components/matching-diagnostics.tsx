@@ -85,64 +85,68 @@ export function MatchingDiagnostics() {
   }
   return (
     <div className="page" id="matching-results">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="field">
-          <Label htmlFor="matching-status">Identification result</Label>
-          <select
-            id="matching-status"
-            className="native-select"
-            value={status}
-            onChange={(event) => filter({ match_status: event.target.value })}
-          >
-            <option value="all">All results</option>
-            {Object.entries(identificationResults).map(([key, { label }]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <Label htmlFor="matching-source">Source</Label>
-          <select
-            id="matching-source"
-            className="native-select"
-            value={provider}
-            onChange={(event) => filter({ match_provider: event.target.value })}
-          >
-            <option value="">All sources</option>
-            {provider && !providers.data?.items?.some((item) => item.id === provider) && (
-              <option value={provider}>{provider}</option>
-            )}
-            {providers.data?.items?.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name || item.id}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
       <form
-        className="toolbar"
+        key={`${status}:${provider}:${q}`}
+        className="space-y-4 rounded-md border border-border p-4"
+        aria-label="Identification filters"
         onSubmit={(event) => {
           event.preventDefault()
-          filter({ match_q: String(new FormData(event.currentTarget).get('q') ?? '').trim() })
+          const values = new FormData(event.currentTarget)
+          filter({
+            match_q: String(values.get('q') ?? '').trim(),
+            match_status: String(values.get('status') ?? 'all'),
+            match_provider: String(values.get('provider') ?? ''),
+          })
         }}
       >
-        <div className="field min-w-0 basis-full sm:basis-auto sm:flex-1">
+        <div className="field min-w-0">
           <Label htmlFor="matching-search">Title, source ID or info hash</Label>
           <Input
-            key={q}
             id="matching-search"
             name="q"
             defaultValue={q}
             placeholder="Search title fragments, source IDs or info hashes"
           />
         </div>
-        <Button type="submit" variant="outline" className="self-end">
-          Search
-        </Button>
-        <div className="self-end">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="field min-w-0">
+            <Label htmlFor="matching-status">Identification result</Label>
+            <select
+              id="matching-status"
+              name="status"
+              className="native-select w-full"
+              defaultValue={status}
+            >
+              <option value="all">All results</option>
+              {Object.entries(identificationResults).map(([key, { label }]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field min-w-0">
+            <Label htmlFor="matching-source">Source</Label>
+            <select
+              id="matching-source"
+              name="provider"
+              className="native-select w-full"
+              defaultValue={provider}
+            >
+              <option value="">All sources</option>
+              {provider && !providers.data?.items?.some((item) => item.id === provider) && (
+                <option value={provider}>{provider}</option>
+              )}
+              {providers.data?.items?.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name || item.id}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit">Search</Button>
           <ClearFiltersButton
             active={status !== 'all' || Boolean(provider || q)}
             onClear={() => filter({ match_status: 'all', match_provider: '', match_q: '' })}

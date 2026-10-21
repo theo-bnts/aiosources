@@ -47,7 +47,6 @@ import { CollectDialog } from '@/components/collect-dialog'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
 import { FormStatus } from '@/components/form-status'
 import { AdvancedImportSettings } from '@/components/advanced-import-settings'
-import { Disclosure } from '@/components/ui/disclosure'
 import { useDetailBackLink, useListViewState } from '@/lib/detail-navigation'
 import {
   ConfirmAction,
@@ -151,9 +150,6 @@ export function ProvidersPage() {
           />
         )
       )}
-      <Disclosure title="Manual actions">
-        <CollectDialog />
-      </Disclosure>
       <AdvancedImportSettings />
     </div>
   )

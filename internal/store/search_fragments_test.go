@@ -105,18 +105,6 @@ func TestTorrentSearchFragmentsAndQueryOperators(t *testing.T) {
 			}
 		})
 	}
-	// A saved fragment query must share the live query and source-filter
-	// semantics, rather than introducing a separate search mode.
-	view, err := db.SaveView(ctx, "", model.SavedViewInput{Name: "Partial release", Filters: model.SearchFilters{
-		Query: "gain", Providers: []string{"fixture"}, Sort: "relevance",
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	page, err := db.ListTorrents(ctx, view.Filters.ListOptions())
-	if err != nil || page.Total != 1 || page.Items[0].SourceID != "release-8394612" {
-		t.Fatalf("saved fragment query: %+v %v", page, err)
-	}
 	filtered, err := db.ListTorrents(ctx, model.ListOptions{Query: "gain OR 宇宙", Providers: []string{"remote-example"}})
 	if err != nil || filtered.Total != 1 || filtered.Items[0].ProviderID != "remote-example" {
 		t.Fatalf("query alternative bypassed the source filter: %+v %v", filtered, err)

@@ -72,9 +72,10 @@ test('remote manual imports share the source action dialog and open remote histo
     await expect(card.getByRole('button', { name: 'Full resync', exact: true })).toHaveCount(0)
     await card.getByRole('button', { name: 'Run manual import', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Run manual import', exact: true })
-    const catalog = dialog.getByLabel('Remote catalog', { exact: true })
-    await expect(catalog).toHaveValue('remote-copy')
-    await expect(catalog.getByRole('option')).toHaveText(['Select a remote catalog', 'Remote copy'])
+    await expect(dialog.locator('#collect-provider')).toHaveText('Remote copy')
+    await expect(dialog.getByRole('combobox', { name: 'Remote catalog', exact: true })).toHaveCount(
+      0,
+    )
     const action = dialog.getByLabel('Action', { exact: true })
     await expect(action).toHaveValue('incremental')
     await expect(action.getByRole('option')).toHaveText(['Preview', 'Sync changes', 'Full resync'])
@@ -93,10 +94,8 @@ test('remote manual imports share the source action dialog and open remote histo
     .getByRole('button', { name: 'Run manual import', exact: true })
     .click()
   const dialog = page.getByRole('dialog', { name: 'Run manual import', exact: true })
-  await expect(dialog.getByLabel('Source', { exact: true }).getByRole('option')).toHaveText([
-    'Select a source',
-    'Native source',
-  ])
+  await expect(dialog.locator('#collect-provider')).toHaveText('Native source')
+  await expect(dialog.getByRole('combobox', { name: 'Source', exact: true })).toHaveCount(0)
   await expect(dialog.getByLabel('Action', { exact: true }).getByRole('option')).toHaveText([
     'Preview',
     'Update',

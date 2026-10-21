@@ -38,7 +38,7 @@ export function SourceFilters({
   total: number
 }) {
   return (
-    <section className="space-y-3" aria-label="Source filters">
+    <section className="space-y-3 rounded-md border border-border p-4" aria-label="Source filters">
       <div className="flex flex-wrap items-end gap-3">
         <div className="field min-w-48 flex-1 sm:max-w-md">
           <Label htmlFor="source-query">Find a source</Label>

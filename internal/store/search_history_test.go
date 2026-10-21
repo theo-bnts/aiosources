@@ -168,22 +168,7 @@ DELETE FROM ingest.torrents WHERE source_id='deleted';`+searchHistorySchema+"COM
 	}
 }
 
-func TestSavedViewRevisionAndSharedBoundValidation(t *testing.T) {
-	ctx, db := sharingDatabase(t)
-	created, err := db.SaveView(ctx, "", model.SavedViewInput{Name: "Large", Filters: model.SearchFilters{MinSize: "9007199254740993", MaxSize: "9007199254740994"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	updated, err := db.SaveView(ctx, created.ID, model.SavedViewInput{Name: "Renamed", Filters: created.Filters, Revision: created.Revision})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.DeleteSavedView(ctx, created.ID, created.Revision); !errors.Is(err, model.ErrConflict) {
-		t.Fatalf("stale delete removed newer view: %v", err)
-	}
-	if _, err := db.SaveView(ctx, created.ID, model.SavedViewInput{Name: "Stale", Filters: created.Filters, Revision: created.Revision}); !errors.Is(err, model.ErrConflict) {
-		t.Fatalf("stale edit overwrote newer view: %v", err)
-	}
+func TestSearchBoundValidation(t *testing.T) {
 	for _, filters := range []model.SearchFilters{
 		{MinSize: "9007199254740994", MaxSize: "9007199254740993"},
 		{PublishedAfter: "2026-01-01T00:00:00Z", PublishedBefore: "0001-01-01T00:00:00Z"},
@@ -191,12 +176,9 @@ func TestSavedViewRevisionAndSharedBoundValidation(t *testing.T) {
 		{PublishedBefore: "9999-12-31T23:59:59.999999999-23:00"},
 		{Sort: "seeders_desc"}, {Sort: "size;delete"},
 	} {
-		if _, err := db.SaveView(ctx, "", model.SavedViewInput{Name: "Invalid", Filters: filters}); !errors.Is(err, model.ErrInvalid) {
-			t.Fatalf("invalid saved filters accepted: %+v %v", filters, err)
+		if _, err := NormalizeSearchFilters(filters); !errors.Is(err, model.ErrInvalid) {
+			t.Fatalf("invalid search filters accepted: %+v %v", filters, err)
 		}
-	}
-	if err := db.DeleteSavedView(ctx, updated.ID, updated.Revision); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -277,7 +259,7 @@ func TestRemoteMalformedTimestampPublicationPreservesFieldsAndSemanticHistory(t 
 	}
 }
 
-func TestSearchAndSavedViewOffsetBoundsPreserveInstantAndFractions(t *testing.T) {
+func TestSearchOffsetBoundsPreserveInstantAndFractions(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	for _, provider := range []string{"one", "two"} {
 		publishSharingRow(t, ctx, db, provider, "match", `{"published_at":"2026-08-31T01:00:00.600Z"}`, nil)
@@ -297,19 +279,15 @@ func TestSearchAndSavedViewOffsetBoundsPreserveInstantAndFractions(t *testing.T)
 	if live.Items[0].OccurrenceID == live.Items[1].OccurrenceID || live.Items[0].ProviderID == live.Items[1].ProviderID {
 		t.Fatal("date query merged provider occurrences")
 	}
-	view, err := db.SaveView(ctx, "", model.SavedViewInput{Name: "Precise offset window", Filters: filters})
+	normalized, err := NormalizeSearchFilters(filters)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Filters.PublishedAfter != "2026-08-31T01:00:00.500123456Z" || view.Filters.PublishedBefore != "2026-08-31T01:00:00.900987654Z" {
-		t.Fatalf("saved view lost canonical instant or nanoseconds: %+v", view.Filters)
+	if normalized.PublishedAfter != "2026-08-31T01:00:00.500123456Z" || normalized.PublishedBefore != "2026-08-31T01:00:00.900987654Z" {
+		t.Fatalf("search lost canonical instant or nanoseconds: %+v", normalized)
 	}
-	saved, err := db.SavedViews(ctx)
-	if err != nil || len(saved) != 1 {
-		t.Fatalf("saved view read: %+v %v", saved, err)
-	}
-	roundtrip, err := db.ListTorrents(ctx, saved[0].Filters.ListOptions())
+	roundtrip, err := db.ListTorrents(ctx, normalized.ListOptions())
 	if err != nil || !reflect.DeepEqual(roundtrip.Items, live.Items) {
-		t.Fatalf("saved view roundtrip changed search semantics: %+v %v", roundtrip, err)
+		t.Fatalf("normalized search changed semantics: %+v %v", roundtrip, err)
 	}
 }

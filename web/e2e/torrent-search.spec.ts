@@ -1,7 +1,7 @@
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
-test('torrent search combines title and ID fragments, filters and saved views through the real backend', async ({
+test('torrents combines title and ID fragments, filters and URL state through the real backend', async ({
   page,
   server,
 }) => {
@@ -62,7 +62,7 @@ test('torrent search combines title and ID fragments, filters and saved views th
   const search = page.getByLabel('Search text', { exact: true })
   const searchButton = page.getByRole('button', { name: 'Search', exact: true })
   const sourceFilter = page
-    .getByRole('form', { name: 'Torrent search', exact: true })
+    .getByRole('form', { name: 'Torrents', exact: true })
     .getByRole('button', { name: 'Sources', exact: true })
   const results = page.locator('main tbody tr')
   await expect(results).toHaveCount(6)
@@ -97,21 +97,7 @@ test('torrent search combines title and ID fragments, filters and saved views th
   await page.getByLabel('Sort results', { exact: true }).selectOption('relevance')
   await searchButton.click()
   await expect(results).toHaveCount(1)
-  await page.getByText('Saved views', { exact: true }).click()
-  await page.getByLabel('View name', { exact: true }).fill('Partial title')
-  await page.getByRole('button', { name: 'Save as new', exact: true }).click()
-  await expect(
-    page
-      .locator('[data-notification]')
-      .filter({ hasText: 'Saved the currently applied search filters.' }),
-  ).toBeVisible()
-  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
-  await expect(search).toHaveValue('')
-  await expect(results).toHaveCount(6)
-  await page.getByRole('button', { name: 'Apply view', exact: true }).click()
-  await expect(search).toHaveValue('gain -cam')
-  await expect(page.getByLabel('Sort results', { exact: true })).toHaveValue('relevance')
-  await expect(results).toHaveCount(1)
+  await expect(page.getByText('Saved views', { exact: true })).toHaveCount(0)
   await page.reload()
   await expect(search).toHaveValue('gain -cam')
   await expect(results).toHaveCount(1)

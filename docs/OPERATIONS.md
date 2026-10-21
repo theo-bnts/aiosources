@@ -9,7 +9,7 @@ Use this guide to review results, follow imports and understand storage. Advance
 | I want to… | Open |
 | --- | --- |
 | Find a film or series and compare versions | **Search** |
-| Find a particular imported torrent or hash | **Sources → Torrent search** |
+| Find a particular imported torrent or hash | **Sources → Torrents** |
 | Correct an uncertain film or series match | **Metadata → Identification** |
 | Follow a source import | **Sources → History**, then open its run |
 | Follow a shared catalog import | **Sources → Remote catalogs → History** |
@@ -20,7 +20,7 @@ Use this guide to review results, follow imports and understand storage. Advance
 
 ## Identification review and Stremio requests
 
-**Metadata → Identification** lists imported torrents and their current decisions. Its main search accepts the same title fragments, source IDs, info hashes and punctuation variants as **Torrent search**. Open **Review** to search the downloaded film and series information by partial title or IMDb/TMDB/TVDB identifier, choose an entry, then confirm. Optional episode correction is folded separately. Reviews apply to one source occurrence and leave imported fields untouched. Source identity evidence (title, hash, identifiers and numbering) is fenced separately from ancillary fields; changed evidence requires another review, while ordinary metadata updates and ancillary changes retain the choice. Concurrent source, work or review changes reject the write. **Use automatic matching** removes the manual choice and queues normal identification. Resetting matches or metadata retains reviews; an unavailable reviewed work cannot be published until its information becomes available again. Reviews are included in database backups.
+**Metadata → Identification** lists imported torrents and their current decisions. Its main search accepts the same title fragments, source IDs, info hashes and punctuation variants as **Torrents**. Open **Review** to search the downloaded film and series information by partial title or IMDb/TMDB/TVDB identifier, choose an entry, then confirm. Optional episode correction is folded separately. Reviews apply to one source occurrence and leave imported fields untouched. Source identity evidence (title, hash, identifiers and numbering) is fenced separately from ancillary fields; changed evidence requires another review, while ordinary metadata updates and ancillary changes retain the choice. Concurrent source, work or review changes reject the write. **Use automatic matching** removes the manual choice and queues normal identification. Resetting matches or metadata retains reviews; an unavailable reviewed work cannot be published until its information becomes available again. Reviews are included in database backups.
 
 The matching upgrade reconsiders previous misses and affected numbering decisions once. Existing manual reviews remain active. The temporary increase in awaiting-identification counts represents queued review of existing records, without recollecting sources. Series identification uses source numbering and verified season/episode dates, including seasons that span two calendar years. Contradictory evidence remains rejected. Explicit multi-season packs can serve their declared seasons, but playback still requires a unique video matching the requested episode.
 
@@ -28,12 +28,12 @@ The matching upgrade reconsiders previous misses and affected numbering decision
 
 ## Console navigation
 
-Sources groups source setup, Remote catalogs and Torrent search; Metadata groups information settings and Identification. Debrid and Search are independent entries, with Search immediately above Connections. Connections groups Stremio, Torznab, Shared catalogs and Public access. Administration groups Security, Storage and Logs, in that order.
+Sources groups Sources, Remote catalogs and Torrents. Metadata groups Metadata and Identification. Debrid and Search are independent entries, with Search immediately above Connections. Connections groups Stremio, Torznab and Shared catalogs. Administration groups Security, Network, Public access, Storage and Logs. Network expands into Incoming and Outgoing; Outgoing contains Proxies and Routing. Public access contains Settings and Request limits.
 
 | Page | Views |
 | --- | --- |
 | Sources | Statistics / Settings / History |
-| Torrent search | Individual imported records and filters |
+| Torrents | Individual imported records and filters |
 | Metadata | Statistics / Settings / History |
 | Identification | Review individual torrent decisions |
 | Debrid | Statistics / Settings / History |
@@ -42,17 +42,17 @@ Sources groups source setup, Remote catalogs and Torrent search; Metadata groups
 | Torznab | Saved endpoint access and filters |
 | Shared catalogs | Statistics / Settings for access granted to other instances |
 | Remote catalogs | Statistics / Settings / History for imported catalogs |
-| Public access | Public Stremio and Torznab controls |
+| Public access | Settings for Search and connections / Request limits |
 | Security | Statistics / Settings (secrets, two-step verification and sessions) |
-| Network | Proxies / Routing for outgoing connections |
+| Network | Incoming → Trusted proxy; Outgoing → Proxies / Routing |
 | Storage | Statistics / Settings (data retention and maintenance) |
 | Logs | Service activity and alerts; optional Debug |
 
 **Sources → History** follows active and past source imports, previews and source-detail updates. Open a specific run, then **Processed records**, to inspect its accepted, ignored and rejected records. There is no global observation browser. **Metadata → History** follows information updates and torrent identification; **Debrid → History** follows cache verification and temporary magnet cleanup. **Logs** contains activity and alerts from all services.
 
-**Sources** groups source setup, imported torrents and import monitoring. **Sources → Remote catalogs** manages imported catalogues and their simple synchronization intervals. Native source schedules are the sixth settings section in each source editor, after Source fields and Imports. Source cards show their schedule, latest run and next eligible attempt; active imports omit the next attempt. **Torrent search** searches the local published records, with record details, provenance and history; it does not contact trackers. **Metadata** contains film/series information and local identification, including IMDb matching. Run-scoped processing details belong to Sources; film and series decisions have their own **Metadata → Identification** page.
+**Sources** groups source setup, imported torrents and import monitoring. **Sources → Remote catalogs** manages imported catalogues and their simple synchronization intervals. Native source schedules are the sixth settings section in each source editor, after Source fields and Imports. Source cards show their schedule, latest run and next eligible attempt; active imports omit the next attempt. **Torrents** searches the local published records, with record details, provenance and history; it does not contact trackers. **Metadata** contains film/series information and local identification, including IMDb matching. Run-scoped processing details belong to Sources; film and series decisions have their own **Metadata → Identification** page.
 
-**Sources → Statistics** and **Remote catalogs** show each source's **Imported torrents**, **Identified**, **Not identified**, **Needs review** and **Awaiting identification** counts. Imported torrents counts distinct currently published source IDs, including separate IDs with the same info hash. The four identification counts sum to that total and use the same freshness rules as Metadata: queued, changed or obsolete matches are pending. Click a number to open Torrent search or **Metadata → Identification** filtered to that source and result. Counts refresh every 15 seconds while the page is open; unavailable counts are reported instead of displaying a false zero.
+**Sources → Statistics** and **Remote catalogs** show each source's **Imported torrents**, **Identified**, **Not identified**, **Needs review** and **Awaiting identification** counts. Imported torrents counts distinct currently published source IDs, including separate IDs with the same info hash. The four identification counts sum to that total and use the same freshness rules as Metadata: queued, changed or obsolete matches are pending. Click a number to open Torrents or **Metadata → Identification** filtered to that source and result. Counts refresh every 15 seconds while the page is open; unavailable counts are reported instead of displaying a false zero.
 
 **Awaiting import completion** links to the current Full import or remote sync, or its latest incomplete attempt. A resumed older import takes priority while queued or running. Its retained non-deleted records may include updates to existing torrents, so this count is kept separate from the imported total. Paused and failed progress remains visible; Preview and older completed/cancelled or superseded attempts do not inflate the current counts.
 
@@ -187,17 +187,17 @@ Full discovery fails closed when a primary record cannot be interpreted or retai
 
 A Metadata response whose interpreted fields still cannot be represented in the database—for example, a NUL in a field other than `metadata.nfoContent`—fails the run after retaining its error observation once. Binary NFO text is retained using the reversible Base64 representation documented in [Configuration](CONFIGURATION.md#standalone-metadata-collection), so it does not block the run. For other rejected fields, the last successful checkpoint remains unchanged: the failed candidate is neither silently skipped nor automatically requested in a loop, and the rejected page does not partially enrich the catalogue. After the source response is corrected, Resume retries that candidate without replaying earlier committed work. Editing source JSON still does not alter the failed run's immutable snapshot.
 
-### Torrent search, saved views and occurrence history
+### Torrents and occurrence history
 
-**Torrent search** searches PostgreSQL directly. Words match case-insensitive fragments anywhere in titles, provider IDs, source record IDs and info hashes, including the middle of a word or a dotted release title. Separate fragments with spaces to require all of them, in any order; use `OR` for alternatives and `-fragment` to exclude a fragment. Surrounding punctuation such as brackets and colons is ignored for unquoted words. Dots and hyphens also separate unquoted title fragments. Quoted phrases retain whole-word phrase matching, including phrase exclusions such as `-"blue ocean"`. Unquoted `%`, `_` and backslashes are literal characters, not wildcard operators. Relevance puts whole-word matches first, then ranks fragment matches by text similarity; similarity never adds results that do not match the query.
+**Torrents** searches PostgreSQL directly. Words match case-insensitive fragments anywhere in titles, provider IDs, source record IDs and info hashes, including the middle of a word or a dotted release title. Separate fragments with spaces to require all of them, in any order; use `OR` for alternatives and `-fragment` to exclude a fragment. Surrounding punctuation such as brackets and colons is ignored for unquoted words. Dots and hyphens also separate unquoted title fragments. Quoted phrases retain whole-word phrase matching, including phrase exclusions such as `-"blue ocean"`. Unquoted `%`, `_` and backslashes are literal characters, not wildcard operators. Relevance puts whole-word matches first, then ranks fragment matches by text similarity; similarity never adds results that do not match the query.
 
-Text and filters share one always-visible form and one **Search** button. The same text box accepts complete or partial hexadecimal info hashes, as well as complete Base32 hashes. The Sources dropdown supports multiple selections. Combine text with category, exact size bounds and publication dates; sort by recency, age, size or relevance. Numeric bounds remain decimal strings so values larger than JavaScript's safe integer range stay exact. Date inputs use the browser's local time zone; saved bounds retain their exact instant and fractional precision. Both text indexes use the same bounded UTF-8 prefix, up to 128 KiB per occurrence; complete field values remain stored. Unmapped properties and their names are not searched. Short fragments with fewer than three consecutive letters or digits are supported but can require scanning more records; adding another fragment or a source filter narrows the search. The exact `info_hash` API filter remains compatible with existing clients and saved views.
+Text and filters share one always-visible form and one **Search** button. The same text box accepts complete or partial hexadecimal info hashes, as well as complete Base32 hashes. The Sources dropdown supports multiple selections. Combine text with category, exact size bounds and publication dates; sort by recency, age, size or relevance. Numeric bounds remain decimal strings so values larger than JavaScript's safe integer range stay exact. Date inputs use the browser's local time zone; saved bounds retain their exact instant and fractional precision. Both text indexes use the same bounded UTF-8 prefix, up to 128 KiB per occurrence; complete field values remain stored. Unmapped properties and their names are not searched. Short fragments with fewer than three consecutive letters or digits are supported but can require scanning more records; adding another fragment or a source filter narrows the search. The exact `info_hash` API filter remains compatible with existing clients.
 
 Seeders, peers and leechers are no longer collected, stored in interpreted records or returned by catalog APIs. Upgrades remove existing counters and retired search filters without adding publication/history events or invalidating current identifications and manual reviews. Existing raw response archives retain their original bytes and integrity. Cleaning a large history can extend the first upgrade's startup. A share allowing only retired counters becomes disabled with no granted fields; choose durable fields explicitly before enabling it again.
 
 Upgrading builds the fragment index automatically in the schema migration transaction. Existing published fields, identities and occurrence history remain intact. The initial index build can extend startup on a large catalogue. The 30-second database connection budget does not limit migrations; stopping the process still cancels the upgrade, rolls it back and retries it at the next start.
 
-Save named combinations in **Saved views**. They persist in PostgreSQL and use revisions to reject conflicting updates.
+Filters and sorting stay in the page URL. Bookmark or share an administration URL to reuse a search; signing in is still required.
 
 **An info hash is not a record identity.** Every `(provider_id, source_id)` remains independent, including different IDs within one provider. **Related occurrences** offers navigation to matching hashes; it never merges, deletes or hides another tracker's record.
 

@@ -63,6 +63,10 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   expect((await saving).status()).toBe(204)
   await expect(dialog).toBeHidden()
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await page
+    .getByRole('form', { name: 'Identification filters', exact: true })
+    .getByRole('button', { name: 'Search', exact: true })
+    .click()
   await expect(page.locator('#matching-results')).toContainText('tt1234567')
   const { manifestPath } = await createStremioAccess(page)
   const streams = await page.request.get(

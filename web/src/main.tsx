@@ -19,7 +19,6 @@ import {
   ClockCounterClockwiseIcon,
   GlobeIcon,
   PathIcon,
-  ShieldCheckIcon,
   GaugeIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
@@ -70,8 +69,8 @@ const NetworkRoutingPage = lazy(() =>
   import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
 )
 const IncomingNetworkPage = lazy(() => import('@/pages/incoming-network'))
-const NetworkRequestLimitsPage = lazy(() =>
-  import('@/pages/incoming-network').then((m) => ({ default: m.NetworkRequestLimitsPage })),
+const PublicRequestLimitsPage = lazy(() =>
+  import('@/pages/incoming-network').then((m) => ({ default: m.PublicRequestLimitsPage })),
 )
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
@@ -352,28 +351,44 @@ const router = createBrowserRouter(
           <Route path="sharing/settings" element={<SharingPage />} />
         </Route>
         <Route path="torznab" element={<TorznabPage />} />
-        <Route path="public-access" element={<PublicAccessPage />} />
-        <Route path="sharing/remotes" element={<LegacyRemotes />} />
-        <Route path="logs" element={<LogsPage />} />
         <Route
           element={
             <WorkspaceLayout
-              title="Network"
+              title="Public access"
               tabs={[
-                { path: '/network', label: 'Incoming proxy', icon: ShieldCheckIcon },
-                { path: '/network/limits', label: 'Request limits', icon: GaugeIcon },
-                { path: '/network/proxies', label: 'Outgoing proxies', icon: GlobeIcon },
-                { path: '/network/routing', label: 'Outgoing routing', icon: PathIcon },
+                { path: '/public-access', label: 'Settings', icon: GearSixIcon },
+                { path: '/public-access/limits', label: 'Request limits', icon: GaugeIcon },
               ]}
             />
           }
         >
-          <Route path="network" element={<IncomingNetworkPage />} />
-          <Route path="network/limits" element={<NetworkRequestLimitsPage />} />
-          <Route path="network/proxies" element={<NetworkPage />} />
-          <Route path="network/routing" element={<NetworkRoutingPage />} />
-          <Route path="network/incoming" element={<Navigate to="/network" replace />} />
+          <Route path="public-access" element={<PublicAccessPage />} />
+          <Route path="public-access/limits" element={<PublicRequestLimitsPage />} />
         </Route>
+        <Route path="sharing/remotes" element={<LegacyRemotes />} />
+        <Route path="logs" element={<LogsPage />} />
+        <Route path="network/incoming" element={<IncomingNetworkPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Outgoing"
+              tabs={[
+                { path: '/network/outgoing', label: 'Proxies', icon: GlobeIcon },
+                { path: '/network/outgoing/routing', label: 'Routing', icon: PathIcon },
+              ]}
+            />
+          }
+        >
+          <Route path="network/outgoing" element={<NetworkPage />} />
+          <Route path="network/outgoing/routing" element={<NetworkRoutingPage />} />
+        </Route>
+        <Route path="network" element={<Navigate to="/network/incoming" replace />} />
+        <Route path="network/proxies" element={<Navigate to="/network/outgoing" replace />} />
+        <Route
+          path="network/routing"
+          element={<Navigate to="/network/outgoing/routing" replace />}
+        />
+        <Route path="network/limits" element={<Navigate to="/public-access/limits" replace />} />
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
         <Route path="torrents" element={<TorrentsPage />} />

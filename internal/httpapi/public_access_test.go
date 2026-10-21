@@ -9,7 +9,7 @@ import (
 func TestPublicDeploymentNeverExposesPrivateDataWithoutItsOwnCredential(t *testing.T) {
 	fixture, addon, _ := addonAPI(t)
 	for _, path := range []string{
-		"/api/health", "/api/providers", "/api/providers/example", "/api/provider-schema", "/api/adapters", "/api/secrets", "/api/runs", "/api/runs/example", "/api/runs/example/events", "/api/events", "/api/raw", "/api/raw/1", "/api/raw/1/download", "/api/pages/1/download", "/api/torrents", "/api/torrents/1/history", "/api/source-torrent-stats", "/api/schedules", "/api/settings/collections", "/api/system-health", "/api/security", "/api/security/sessions", "/api/logs", "/api/shares", "/api/remotes", "/api/saved-views", "/api/aiosource", "/api/aiosource/matches", "/api/aiosource/candidates", "/api/operations", "/api/stremio/statistics", "/api/stremio/requests",
+		"/api/health", "/api/providers", "/api/providers/example", "/api/provider-schema", "/api/adapters", "/api/secrets", "/api/runs", "/api/runs/example", "/api/runs/example/events", "/api/events", "/api/raw", "/api/raw/1", "/api/raw/1/download", "/api/pages/1/download", "/api/torrents", "/api/torrents/1/history", "/api/source-torrent-stats", "/api/schedules", "/api/settings/collections", "/api/system-health", "/api/security", "/api/security/sessions", "/api/logs", "/api/shares", "/api/remotes", "/api/aiosource", "/api/aiosource/matches", "/api/aiosource/candidates", "/api/operations", "/api/stremio/statistics", "/api/stremio/requests",
 	} {
 		t.Run(path, func(t *testing.T) {
 			response := fixture.request(http.MethodGet, path, "", false, "")

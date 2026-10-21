@@ -570,14 +570,13 @@ test.describe('real local imports', () => {
     })
     for (const [index, action] of ['preview', 'incremental', 'incremental', 'full'].entries()) {
       await page.goto('/providers/settings')
-      await page.getByText('Manual actions', { exact: true }).click()
       await page
-        .locator('details')
-        .filter({ has: page.getByText('Manual actions', { exact: true }) })
+        .getByRole('region', { name: 'Source Synthetic usability source', exact: true })
         .getByRole('button', { name: 'Run manual import', exact: true })
         .click()
       const dialog = page.getByRole('dialog')
-      await dialog.getByLabel('Source', { exact: true }).selectOption('action-source')
+      await expect(dialog.getByRole('combobox', { name: 'Source', exact: true })).toHaveCount(0)
+      await expect(dialog.locator('#collect-provider')).toHaveText('Synthetic usability source')
       await dialog.getByLabel('Action', { exact: true }).selectOption(action)
       await expect(
         dialog.getByRole('option', { name: 'Fetch source details', exact: true }),

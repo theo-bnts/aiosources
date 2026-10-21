@@ -3,10 +3,9 @@ package model
 import (
 	"bytes"
 	"encoding/json"
-	"time"
 )
 
-// SearchFilters is the persisted, server-validated search contract. Numeric
+// SearchFilters is the server-validated torrent search contract. Numeric
 // bounds stay decimal strings; they must never pass through floating point.
 type SearchFilters struct {
 	Query           string   `json:"q,omitempty"`
@@ -47,19 +46,4 @@ func (f SearchFilters) ListOptions() ListOptions {
 	return ListOptions{Query: f.Query, Providers: f.Providers, Category: f.Category,
 		MinSize: f.MinSize, MaxSize: f.MaxSize, PublishedAfter: f.PublishedAfter,
 		PublishedBefore: f.PublishedBefore, InfoHash: f.InfoHash, Sort: f.Sort}
-}
-
-type SavedView struct {
-	ID        string        `json:"id"`
-	Name      string        `json:"name"`
-	Filters   SearchFilters `json:"filters"`
-	Revision  int64         `json:"revision"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
-}
-
-type SavedViewInput struct {
-	Name     string        `json:"name"`
-	Filters  SearchFilters `json:"filters"`
-	Revision int64         `json:"revision"`
 }

@@ -37,7 +37,7 @@ import {
   PageHeader,
   Pager,
 } from '@/components/common'
-import { TorrentSearchForm, SavedTorrentViews } from '@/components/torrent-filters'
+import { TorrentSearchForm } from '@/components/torrent-filters'
 import { OccurrenceDialog, TorrentTable } from '@/components/torrent-history'
 import { readTorrentFilters, torrentFilterParams, type TorrentFilters } from '@/lib/search-types'
 import { decodeSearchJSON, exactField, exactJSON } from '@/lib/search-json'
@@ -65,7 +65,7 @@ function BrowseFilters({
     <div className="space-y-3">
       <form
         ref={form}
-        className="toolbar"
+        className="toolbar rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
           const values = new FormData(event.currentTarget)
@@ -197,7 +197,6 @@ export function TorrentsPage() {
   return (
     <div className="page">
       <TorrentSearchForm key={filterKey} filters={filters} onApply={applyFilters} />
-      <SavedTorrentViews filters={filters} onApply={applyFilters} />
       <ErrorNotice error={torrents.error} retry={() => void torrents.refetch()} />
       {torrents.isPending ? (
         <Loading label="Searching published occurrences" />

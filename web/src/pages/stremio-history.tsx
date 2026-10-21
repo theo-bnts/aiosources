@@ -158,7 +158,7 @@ export function StremioHistoryPage() {
   return (
     <div className="page">
       <form
-        className="toolbar"
+        className="toolbar rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
           filter({ q: String(new FormData(event.currentTarget).get('q') ?? '').trim() })

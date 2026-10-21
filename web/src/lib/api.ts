@@ -182,7 +182,6 @@ async function invalidateData(cancelRefetch: boolean) {
       'logs',
       'shares',
       'remotes',
-      'saved-views',
       'torrent-history',
       'torrent-related',
       'run-changes',

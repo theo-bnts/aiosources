@@ -27,12 +27,12 @@ export function CollectDialog({
   trigger,
   remote = false,
 }: {
-  providerId?: string
+  providerId: string
   trigger?: ReactNode
   remote?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [provider, setProvider] = useState(providerId ?? '')
+  const provider = providerId
   const [mode, setMode] = useState<RunMode>(remote ? 'incremental' : 'preview')
   const [maxPages, setMaxPages] = useState('')
   const [maxDuration, setMaxDuration] = useState('')
@@ -162,23 +162,12 @@ export function CollectDialog({
           <ErrorNotice error={sources.error} retry={() => void sources.refetch()} />
           <ErrorNotice error={definition.error} retry={() => void definition.refetch()} />
           <div className="field">
-            <Label htmlFor="collect-provider">{remote ? 'Remote catalog' : 'Source'}</Label>
-            <select
-              id="collect-provider"
-              className="native-select w-full"
-              required
-              value={provider}
-              onChange={(event) => setProvider(event.target.value)}
-              disabled={mutation.isPending}
-            >
-              <option value="">Select a {remote ? 'remote catalog' : 'source'}</option>
-              {items?.map((item) => (
-                <option key={item.id} value={item.id} disabled={!item.valid || !item.enabled}>
-                  {item.name || item.id}
-                  {!item.valid ? ' · invalid' : !item.enabled ? ' · disabled' : ''}
-                </option>
-              ))}
-            </select>
+            <span className="text-sm text-muted-foreground">
+              {remote ? 'Remote catalog' : 'Source'}
+            </span>
+            <p id="collect-provider" className="break-words text-sm font-medium">
+              {selected?.name || definition.data?.provider.name || provider}
+            </p>
             {selected && !eligible && (
               <p className="help">
                 The {remote ? 'remote catalog' : 'source'} must be valid, enabled and have no run in
@@ -232,10 +221,6 @@ export function CollectDialog({
             {provider && definition.isPending ? (
               <p className="help" role="status">
                 Checking available actions…
-              </p>
-            ) : !provider ? (
-              <p className="help">
-                Select a {remote ? 'remote catalog' : 'source'} to see its available actions.
               </p>
             ) : !remote && !definition.isError && !metadataSupported ? (
               <p className="help">
@@ -296,7 +281,9 @@ export function CollectDialog({
                 max={10000}
                 step={1}
                 value={maxPages}
-                placeholder={defaultPages === undefined ? 'Select a source…' : String(defaultPages)}
+                placeholder={
+                  defaultPages === undefined ? 'Loading source limit…' : String(defaultPages)
+                }
                 aria-invalid={invalidPages}
                 aria-describedby={`collect-budget-help${invalidPages ? ' collect-budget-error' : ''}`}
                 disabled={mutation.isPending}

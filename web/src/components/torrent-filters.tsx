@@ -1,21 +1,13 @@
-import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { api, ApiError, queryClient } from '@/lib/api'
-import { useDiscardChanges, useUnsavedChanges } from '@/lib/unsaved-changes'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import type { Items, ProviderSummary } from '@/lib/types'
-import {
-  torrentFilterKeys,
-  torrentSortOptions,
-  type SavedView,
-  type TorrentFilters,
-} from '@/lib/search-types'
+import { torrentFilterKeys, torrentSortOptions, type TorrentFilters } from '@/lib/search-types'
 import { Button } from '@/components/ui/button'
-import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SourceMultiSelect } from '@/components/source-multi-select'
-import { ClearFiltersButton, ConfirmAction, ErrorNotice, Loading } from '@/components/common'
+import { ClearFiltersButton, ErrorNotice } from '@/components/common'
 
 const rangeFields = [
   ['min_size', 'Minimum size (bytes)', '0'],
@@ -46,7 +38,7 @@ export function TorrentSearchForm({
     <form
       ref={form}
       className="space-y-4 rounded-md border border-border p-4"
-      aria-label="Torrent search"
+      aria-label="Torrents"
       onSubmit={(event) => {
         event.preventDefault()
         setError(null)
@@ -239,206 +231,5 @@ export function TorrentSearchForm({
         </div>
       )}
     </form>
-  )
-}
-
-export function SavedTorrentViews({
-  filters,
-  onApply,
-}: {
-  filters: TorrentFilters
-  onApply: (filters: TorrentFilters) => void
-}) {
-  const views = useQuery({
-    queryKey: ['saved-views'],
-    queryFn: ({ signal }) => api<Items<SavedView>>('/saved-views', { signal }),
-  })
-  const [selectedId, setSelectedId] = useState('')
-  const [original, setOriginal] = useState<SavedView | null>(null)
-  const [name, setName] = useState('')
-  const notify = useNotification()
-  const selected = views.data?.items?.find((view) => view.id === selectedId)
-  const save = useMutation({
-    mutationFn: (update: boolean) => {
-      if (!name.trim()) throw new Error('Enter a name for this saved view.')
-      if (update && (!selected || !original))
-        throw new Error('Select an existing saved view first.')
-      return api<SavedView>(
-        update ? `/saved-views/${encodeURIComponent(selected!.id)}` : '/saved-views',
-        {
-          method: update ? 'PUT' : 'POST',
-          body: JSON.stringify({
-            name: name.trim(),
-            filters,
-            ...(update ? { revision: original!.revision } : {}),
-          }),
-        },
-      )
-    },
-    onMutate: () => queryClient.cancelQueries({ queryKey: ['saved-views'] }),
-    onSuccess: async (saved) => {
-      await queryClient.cancelQueries({ queryKey: ['saved-views'] })
-      queryClient.setQueryData<Items<SavedView>>(['saved-views'], (old) => ({
-        items: [...(old?.items ?? []).filter((item) => item.id !== saved.id), saved],
-      }))
-      setSelectedId(saved.id)
-      setOriginal(saved)
-      setName(saved.name)
-      notify('Saved the currently applied search filters.')
-      void queryClient.invalidateQueries({ queryKey: ['saved-views'] })
-    },
-    onError: (error) => {
-      if (error instanceof ApiError && error.status === 409)
-        void queryClient.invalidateQueries({ queryKey: ['saved-views'] })
-    },
-  })
-  const conflict =
-    Boolean(original && selected && original.revision !== selected.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
-  useUnsavedChanges(name !== (original?.name ?? ''), 'saved view', save.isPending, 'saved-view')
-  const discard = useDiscardChanges('saved-view')
-  return (
-    <Disclosure title="Saved views">
-      <p className="help">
-        Save the applied search, not unsent form changes. Views store filters and sorting, never a
-        fixed list of records.
-      </p>
-      <ErrorNotice error={views.error} retry={() => void views.refetch()} />
-      {views.isPending ? (
-        <Loading label="Loading saved views" />
-      ) : (
-        views.data && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
-              <div className="field">
-                <Label htmlFor="saved-torrent-view">Saved view</Label>
-                <select
-                  id="saved-torrent-view"
-                  className="native-select w-full"
-                  value={selectedId}
-                  disabled={save.isPending}
-                  onChange={(event) => {
-                    const id = event.target.value
-                    discard(() => {
-                      const view = views.data?.items?.find((item) => item.id === id) ?? null
-                      setSelectedId(id)
-                      setOriginal(view)
-                      setName(view?.name ?? '')
-                      save.reset()
-                    })
-                  }}
-                >
-                  <option value="">New saved view</option>
-                  {views.data.items?.map((view) => (
-                    <option key={view.id} value={view.id}>
-                      {view.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Button
-                variant="outline"
-                disabled={!selected || save.isPending}
-                onClick={() => {
-                  if (selected) {
-                    onApply(selected.filters)
-                    notify(`Applied “${selected.name}”.`)
-                  }
-                }}
-              >
-                Apply view
-              </Button>
-              <ConfirmAction
-                title="Delete this saved view?"
-                description={`Delete “${selected?.name ?? ''}”? The records and currently applied filters will not be changed.`}
-                label="Delete view"
-                variant="destructive"
-                trigger={
-                  <Button variant="destructive" disabled={!selected || save.isPending}>
-                    Delete
-                  </Button>
-                }
-                action={async () => {
-                  if (!selected) return
-                  await api<void>(`/saved-views/${encodeURIComponent(selected.id)}`, {
-                    method: 'DELETE',
-                    body: JSON.stringify({ revision: selected.revision }),
-                  })
-                  queryClient.setQueryData<Items<SavedView>>(['saved-views'], (old) => ({
-                    items: old?.items?.filter((item) => item.id !== selected.id) ?? [],
-                  }))
-                  setSelectedId('')
-                  setOriginal(null)
-                  setName('')
-                  notify('Saved view deleted. Published records are unchanged.')
-                  await queryClient.invalidateQueries({ queryKey: ['saved-views'] })
-                }}
-              />
-            </div>
-            {!views.data.items?.length && (
-              <p className="help">
-                No saved views yet. Apply a search, name it below, and save it.
-              </p>
-            )}
-          </>
-        )
-      )}
-      <form
-        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end"
-        onSubmit={(event) => {
-          event.preventDefault()
-          save.mutate(false)
-        }}
-      >
-        <div className="field">
-          <Label htmlFor="saved-view-name">View name</Label>
-          <Input
-            id="saved-view-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={120}
-            required
-            disabled={save.isPending}
-            placeholder="Name this search"
-          />
-        </div>
-        <Button type="submit" variant="outline" disabled={save.isPending || !name.trim()}>
-          {save.isPending ? 'Saving…' : 'Save as new'}
-        </Button>
-        <Button
-          type="button"
-          disabled={!selected || !name.trim() || save.isPending || conflict}
-          onClick={() => {
-            save.mutate(true)
-          }}
-        >
-          Update selected
-        </Button>
-      </form>
-      <ErrorNotice error={save.error} retry={() => void views.refetch()} />
-      {conflict && selected && (
-        <div className="notice space-y-3">
-          <p>
-            This view changed elsewhere. Load the latest version before updating it. Your edited
-            name and applied filters will be kept.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={save.isPending || views.isFetching}
-            onClick={async () => {
-              const latest = await views.refetch()
-              const view = latest.data?.items?.find((item) => item.id === selectedId)
-              if (!view || latest.isError) return
-              if (name === original?.name) setName(view.name)
-              setOriginal(view)
-              save.reset()
-            }}
-          >
-            Load latest view
-          </Button>
-        </div>
-      )}
-    </Disclosure>
   )
 }

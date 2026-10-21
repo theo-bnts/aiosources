@@ -12,6 +12,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
+import type { Icon } from '@phosphor-icons/react'
 import {
   DatabaseIcon,
   PlugsConnectedIcon,
@@ -81,7 +82,30 @@ export class RootBoundary extends Component<{ children: ReactNode }, { error: Er
     return this.props.children
   }
 }
-const navigationGroups = [
+type NavigationItem = {
+  to: string
+  label: string
+  description: string
+  icon: Icon
+  children?: NavigationItem[]
+}
+type NavigationGroup = {
+  id: string
+  label: string
+  icon: Icon
+  defaultOpen: boolean
+  standalone?: boolean
+  items: NavigationItem[]
+}
+function navigationItems(items: NavigationItem[]): NavigationItem[] {
+  return items.flatMap((item) => [item, ...navigationItems(item.children ?? [])])
+}
+function navigationSections(groups: NavigationGroup[]) {
+  return groups
+    .flatMap((group) => navigationItems(group.items))
+    .filter((item) => item.children?.length)
+}
+const navigationGroups: NavigationGroup[] = [
   {
     id: 'collection',
     label: 'Sources',
@@ -102,7 +126,7 @@ const navigationGroups = [
       },
       {
         to: '/torrents',
-        label: 'Torrent search',
+        label: 'Torrents',
         description: 'Search torrents imported from your sources.',
         icon: ListMagnifyingGlassIcon,
       },
@@ -199,8 +223,22 @@ const navigationGroups = [
       {
         to: '/network',
         label: 'Network',
-        description: 'Visitor request limits, incoming proxy trust and outgoing connections.',
+        description: 'Incoming proxy trust and outgoing connections.',
         icon: GlobeIcon,
+        children: [
+          {
+            to: '/network/incoming',
+            label: 'Incoming',
+            description: 'Recognize visitor IP addresses behind trusted proxies.',
+            icon: ShieldCheckIcon,
+          },
+          {
+            to: '/network/outgoing',
+            label: 'Outgoing',
+            description: 'Manage proxies and choose how services connect.',
+            icon: GlobeIcon,
+          },
+        ],
       },
       {
         to: '/public-access',
@@ -223,7 +261,7 @@ const navigationGroups = [
     ],
   },
 ]
-const publicSearchNavigation = {
+const publicSearchNavigation: NavigationGroup = {
   id: 'public-search',
   label: 'Search',
   standalone: true,
@@ -238,7 +276,7 @@ const publicSearchNavigation = {
     },
   ],
 }
-const publicNavigationGroups = [
+const publicNavigationGroups: NavigationGroup[] = [
   {
     id: 'integrations',
     label: 'Connections',
@@ -260,7 +298,6 @@ const publicNavigationGroups = [
     ],
   },
 ]
-const navigation = navigationGroups.flatMap((group) => group.items)
 const navigationStorageKey = 'ingest.navigation.groups'
 const navigationLinkClassName =
   'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary lg:min-h-9'
@@ -273,8 +310,8 @@ function AppNavigation({
   onToggle,
   onNavigate,
 }: {
-  groups?: typeof navigationGroups
-  activeItem: (typeof navigation)[number] | undefined
+  groups?: NavigationGroup[]
+  activeItem: NavigationItem | undefined
   activeGroupId: string | undefined
   openGroups: Record<string, boolean>
   onToggle: (groupId: string) => void
@@ -298,7 +335,7 @@ function AppNavigation({
       onNavigate?.()
     }
   }
-  function navigationLink(item: (typeof navigation)[number]) {
+  function navigationLink(item: NavigationItem) {
     return (
       <Link
         key={item.to}
@@ -310,6 +347,35 @@ function AppNavigation({
         <item.icon size={19} aria-hidden="true" className="shrink-0" />
         {item.label}
       </Link>
+    )
+  }
+  function navigationItem(item: NavigationItem): ReactNode {
+    if (!item.children?.length) return <li key={item.to}>{navigationLink(item)}</li>
+    const expanded = openGroups[item.to] ?? false
+    return (
+      <li key={item.to} className="space-y-1">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={`${id}-${item.to}`}
+          onClick={() => onToggle(item.to)}
+          className={`${navigationLinkClassName} w-full text-left`}
+        >
+          <item.icon size={19} aria-hidden="true" className="shrink-0" />
+          <span className="min-w-0 flex-1">{item.label}</span>
+          <CaretDownIcon
+            aria-hidden="true"
+            className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${expanded ? '' : '-rotate-90'}`}
+          />
+        </button>
+        <ul
+          id={`${id}-${item.to}`}
+          hidden={!expanded}
+          className="ml-5 space-y-0.5 border-l border-border pl-2"
+        >
+          {item.children.map(navigationItem)}
+        </ul>
+      </li>
     )
   }
   return (
@@ -349,9 +415,7 @@ function AppNavigation({
                 hidden={!(openGroups[group.id] ?? group.defaultOpen)}
                 className="ml-5 space-y-0.5 border-l border-border pl-2"
               >
-                {group.items.map((item) => (
-                  <li key={item.to}>{navigationLink(item)}</li>
-                ))}
+                {group.items.map(navigationItem)}
               </ul>
             </section>
           ),
@@ -487,7 +551,7 @@ export function AppShell({
           .filter((group) => group.items.length > 0),
       ]
     : navigationGroups
-  const items = groups.flatMap((group) => group.items)
+  const items = groups.flatMap((group) => navigationItems(group.items))
   const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
   const live = useLiveUpdates(!publicMode)
@@ -515,7 +579,11 @@ export function AppShell({
       (item) =>
         navigationPath === item.to || (item.to !== '/' && navigationPath.startsWith(`${item.to}/`)),
     )
-  const activeGroup = groups.find((group) => group.items.some((item) => item === activeItem))
+  const activeGroup = groups.find((group) => navigationItems(group.items).includes(activeItem!))
+  const activeSections = navigationSections(groups).filter((item) =>
+    navigationItems(item.children ?? []).includes(activeItem!),
+  )
+  const activeSectionKey = activeSections.map((item) => item.to).join('|')
   const activeGroupId = activeGroup?.id
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     let stored: unknown
@@ -524,8 +592,8 @@ export function AppShell({
     } catch {
       // Browser preferences must not prevent access to the console.
     }
-    return Object.fromEntries(
-      groups.map((group) => {
+    return Object.fromEntries([
+      ...groups.map((group) => {
         const preference =
           stored !== null && typeof stored === 'object'
             ? (stored as Record<string, unknown>)[group.id]
@@ -536,7 +604,14 @@ export function AppShell({
             (typeof preference === 'boolean' ? preference : group.defaultOpen),
         ]
       }),
-    )
+      ...navigationSections(groups).map((item) => {
+        const preference =
+          stored !== null && typeof stored === 'object'
+            ? (stored as Record<string, unknown>)[item.to]
+            : undefined
+        return [item.to, activeSections.includes(item) || preference === true]
+      }),
+    ])
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
@@ -544,11 +619,15 @@ export function AppShell({
   const focusMainOnClose = useRef(false)
   useEffect(() => {
     setMobileOpen(false)
-    if (activeGroupId) {
-      setOpenGroups((current) =>
-        current[activeGroupId] ? current : { ...current, [activeGroupId]: true },
-      )
-    }
+    const activeKeys = [activeGroupId, ...activeSectionKey.split('|')].filter(Boolean) as string[]
+    setOpenGroups((current) =>
+      activeKeys.every((key) => current[key])
+        ? current
+        : {
+            ...current,
+            ...Object.fromEntries(activeKeys.map((key) => [key, true])),
+          },
+    )
     if (previousPath.current !== location.pathname) {
       if (!isPageTabNavigation(location.state)) {
         focusMainOnClose.current = true
@@ -557,7 +636,7 @@ export function AppShell({
       }
       previousPath.current = location.pathname
     }
-  }, [location.pathname, location.state, activeGroupId])
+  }, [location.pathname, location.state, activeGroupId, activeSectionKey])
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(openGroups))
@@ -666,7 +745,7 @@ export function AppShell({
                 className="min-w-0 space-y-1 text-xs text-muted-foreground"
               >
                 <ol className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {activeGroup && activeGroup.items.length > 1 && (
+                  {activeGroup && !activeGroup.standalone && (
                     <li className="flex items-center gap-3">
                       {activeGroup.label}
                       <span aria-hidden="true" className="text-border">
@@ -674,6 +753,14 @@ export function AppShell({
                       </span>
                     </li>
                   )}
+                  {activeSections.map((section) => (
+                    <li key={section.to} className="flex items-center gap-3">
+                      {section.label}
+                      <span aria-hidden="true" className="text-border">
+                        /
+                      </span>
+                    </li>
+                  ))}
                   <li aria-current="page" className="text-foreground">
                     <h1
                       className="text-sm font-medium"

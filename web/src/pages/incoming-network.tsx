@@ -42,7 +42,7 @@ export default function IncomingNetworkPage() {
   return <IncomingSettings section="proxy" />
 }
 
-export function NetworkRequestLimitsPage() {
+export function PublicRequestLimitsPage() {
   return <IncomingSettings section="limits" />
 }
 
@@ -127,8 +127,8 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
             }}
           >
             {proxy ? (
-              <section className="section-card" aria-label="Visitor IP addresses">
-                <h2 className="section-title">Visitor IP addresses</h2>
+              <section className="section-card" aria-label="Trusted proxy">
+                <h2 className="section-title">Trusted proxy</h2>
                 <div className="flex items-center gap-3">
                   <Switch
                     id="incoming-enabled"
@@ -273,9 +273,9 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                 <div className="space-y-2">
                   <p className="help">
                     Switch off any limit to remove that restriction. Per-minute limits apply to each
-                    visitor IP and are shared by Stremio and Torznab. Simultaneous requests are
-                    limited across this application process. Use the visitor IP settings in Incoming
-                    proxy when behind a reverse proxy.
+                    visitor IP and are shared by Search, Stremio and Torznab. Simultaneous requests
+                    are limited across this application process. Use the visitor IP settings in
+                    Network → Incoming when behind a reverse proxy.
                   </p>
                   <p className="help">
                     Changes apply without restarting or replacing installation links. Lowering

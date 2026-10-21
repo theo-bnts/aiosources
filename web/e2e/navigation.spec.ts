@@ -17,7 +17,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Sources', '/raw/999999'],
     ['Sources', 'Sources', '/pages/999999'],
     ['Sources', 'Sources', '/runs/missing'],
-    ['Sources', 'Torrent search', '/torrents'],
+    ['Sources', 'Torrents', '/torrents'],
     ['Metadata', 'Metadata', '/metadata'],
     ['Metadata', 'Metadata', '/metadata/settings'],
     ['Metadata', 'Identification', '/metadata/identification'],
@@ -41,11 +41,11 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Remote catalogs', '/remotes/history'],
     ['Sources', 'Remote catalogs', '/remotes/history/missing'],
     ['Connections', 'Shared catalogs', '/sharing/settings'],
-    ['Administration', 'Network', '/network'],
-    ['Administration', 'Network', '/network/limits'],
-    ['Administration', 'Network', '/network/proxies'],
-    ['Administration', 'Network', '/network/routing'],
-    ['Administration', 'Network', '/network/incoming'],
+    ['Administration', 'Incoming', '/network'],
+    ['Administration', 'Public access', '/network/limits'],
+    ['Administration', 'Outgoing', '/network/proxies'],
+    ['Administration', 'Outgoing', '/network/routing'],
+    ['Administration', 'Incoming', '/network/incoming'],
     ['Administration', 'Storage', '/health'],
     ['Administration', 'Security', '/security'],
     ['Administration', 'Security', '/secrets'],
@@ -62,7 +62,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
       page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
     ).toHaveText(
       ['Sources', 'Metadata', 'Connections', 'Administration'].includes(group)
-        ? [`${group}/`, label]
+        ? ['Incoming', 'Outgoing'].includes(label)
+          ? [`${group}/`, 'Network/', label]
+          : [`${group}/`, label]
         : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -78,16 +80,19 @@ test('navigation and page tabs remain coherent on every current and legacy route
   }
   await page.goto('/providers')
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
+  const network = navigation.getByRole('button', { name: 'Network', exact: true })
+  if ((await network.getAttribute('aria-expanded')) === 'true') await network.click()
   await expect(navigation.getByRole('button')).toHaveText([
     'Sources',
     'Metadata',
     'Connections',
     'Administration',
+    'Network',
   ])
   await expect(navigation.getByRole('link')).toHaveText([
     'Sources',
     'Remote catalogs',
-    'Torrent search',
+    'Torrents',
     'Metadata',
     'Identification',
     'Debrid',
@@ -96,7 +101,6 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Torznab',
     'Shared catalogs',
     'Security',
-    'Network',
     'Public access',
     'Storage',
     'Logs',

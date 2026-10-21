@@ -118,7 +118,6 @@ func New(options Options) (http.Handler, error) {
 	s.registerSharingRoutes(mux)
 	s.registerRemoteRoutes(mux)
 	s.registerSecurityRoutes(mux)
-	s.registerSearchRoutes(mux)
 	s.registerHistoryRoutes(mux)
 	s.registerSystemHealthRoutes(mux)
 	s.registerStorageRoutes(mux)

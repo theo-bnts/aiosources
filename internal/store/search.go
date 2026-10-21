@@ -52,7 +52,7 @@ func decimalGreater(a, b string) bool {
 	return len(a) > len(b) || (len(a) == len(b) && a > b)
 }
 
-// NormalizeSearchFilters is shared by live queries and persisted saved views.
+// NormalizeSearchFilters is shared by torrent searches and Torznab queries.
 // Error text is deliberately independent of user-provided field values.
 func NormalizeSearchFilters(input model.SearchFilters) (model.SearchFilters, error) {
 	input.Query = strings.TrimSpace(input.Query)

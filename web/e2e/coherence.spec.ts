@@ -94,6 +94,10 @@ test('reviewing changed metadata clears the old choice and refreshes candidate r
   expect((await saved).status()).toBe(204)
   await expect(editor).toHaveCount(0)
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await page
+    .getByRole('form', { name: 'Identification filters', exact: true })
+    .getByRole('button', { name: 'Search', exact: true })
+    .click()
   await expect(page.getByRole('row').filter({ hasText: 'Review Example 2024' })).toContainText(
     'Identified',
   )

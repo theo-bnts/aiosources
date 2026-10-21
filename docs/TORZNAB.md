@@ -1,6 +1,6 @@
 # Torznab
 
-AIOSources can serve its published local catalog to Prowlarr and other Torznab clients. Searches are offline: they do not contact your sources, TMDB or debrid accounts. Full imports become visible only after publication, just as in Torrent search.
+AIOSources can serve its published local catalog to Prowlarr and other Torznab clients. Searches are offline: they do not contact your sources, TMDB or debrid accounts. Full imports become visible only after publication, just as in Torrents.
 
 ## Connect a client
 
@@ -18,7 +18,7 @@ The endpoint is `/torznab/ACCESS_ID/api`. Every call, including capabilities, re
 | Parameter | Purpose |
 | --- | --- |
 | `t=caps` | Advertised search modes, page limits and authorized categories. |
-| `t=search` | Browse or search release titles, source identifiers and hashes using the same fragment and punctuation handling as Torrent search. |
+| `t=search` | Browse or search release titles, source identifiers and hashes using the same fragment and punctuation handling as Torrents. |
 | `t=movie` | Identified movies; accepts `q`, `imdbid`, `tmdbid`, `year`. |
 | `t=tvsearch` | Identified series; accepts `q`, `imdbid`, `tmdbid`, `tvdbid`, `season`, `ep`. |
 | `q` | Optional search text. A supplied verified external ID takes precedence over text, so translated or alternative release titles are not lost. |
