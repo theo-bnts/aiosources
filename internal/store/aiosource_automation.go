@@ -14,9 +14,19 @@ func (s *Store) AIOAutomationStatus(ctx context.Context) (model.AIOStatus, error
  CASE WHEN EXISTS(SELECT 1 FROM ingest.aio_works) THEN 1 ELSE 0 END,
  CASE WHEN EXISTS(SELECT 1 FROM ingest.aio_match_queue) THEN 1 ELSE 0 END,
  EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),
- last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error FROM ingest.aio_state`).Scan(
-		&v.Works, &v.MatchingPending, &v.MetadataDue, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError)
+ last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match FROM ingest.aio_state`).Scan(
+		&v.Works, &v.MatchingPending, &v.MetadataDue, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch)
 	return v, databaseError("read metadata automation", err)
+}
+
+// Settings and debrid activity do not need catalog-wide identification counts.
+// Keep the existence checks separate from the exact Statistics projection.
+func (s *Store) AIOControlStatus(ctx context.Context) (model.AIOStatus, error) {
+	v, err := s.AIOAutomationStatus(ctx)
+	if err == nil {
+		err = s.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE NOT failed),count(*) FILTER (WHERE failed) FROM ingest.aio_cleanup`).Scan(&v.CleanupPending, &v.CleanupFailed)
+	}
+	return v, databaseError("read metadata controls", err)
 }
 
 // The metadata worker owns its advisory lock before advancing this durable retry

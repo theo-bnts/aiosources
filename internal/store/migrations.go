@@ -230,6 +230,8 @@ var migrations = []struct {
 	{67, optionalNetworkLimitsSchema},
 	{68, publicSearchSchema},
 	{69, publicStremioSchema},
+	{70, matchingScheduleSchema},
+	{71, releaseNumberingRecheckSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

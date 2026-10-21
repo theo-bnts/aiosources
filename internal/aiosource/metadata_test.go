@@ -166,6 +166,11 @@ func TestTMDBInventorySyncAndEpisodeYearPublication(t *testing.T) {
 	c, _ := s.DB.AIOConfig(ctx)
 	c.TMDBSecret = "tmdb"
 	c.AutoMatch = true
+	// Automatic identification honors the saved opt-in, including when a
+	// metadata publication wakes the dispatcher during a manual sync.
+	if err := s.DB.SetAIOConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Sync(ctx, c); err != nil {
 		t.Fatal(err)
 	}

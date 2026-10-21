@@ -24,6 +24,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/catalog/{id}/releases", s.auth.protect(s.catalogReleases))
 	mux.HandleFunc("POST /api/catalog/{id}/download", s.auth.protect(s.catalogDownload))
 	mux.HandleFunc("GET /api/aiosource", s.auth.protect(s.aioStatus))
+	mux.HandleFunc("GET /api/aiosource/controls", s.auth.protect(s.aioStatus))
 	mux.HandleFunc("GET /api/debrid/statistics", s.auth.protect(s.cacheStatistics))
 	mux.HandleFunc("GET /api/operations", s.auth.protect(s.operationHistory))
 	mux.HandleFunc("GET /api/operations/{id}", s.auth.protect(s.operationDetail))
@@ -135,7 +136,13 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	state, err := s.options.Store.AIOStatus(r.Context())
+	controls := r.URL.Path == "/api/aiosource/controls"
+	var state model.AIOStatus
+	if controls {
+		state, err = s.options.Store.AIOControlStatus(r.Context())
+	} else {
+		state, err = s.options.Store.AIOStatus(r.Context())
+	}
 	if err != nil {
 		respondError(w, err)
 		return
@@ -146,10 +153,15 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	rebuild := state.ChangesThrough != nil && time.Since(*state.ChangesThrough) > 14*24*time.Hour
 	automation := aiosource.AutomationPlan(c, state, syncing, matching, time.Now())
-	writeJSON(w, 200, map[string]any{"config": c, "status": state, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
+	var projection any = state
+	if controls {
+		projection = map[string]any{"has_information": state.Works > 0, "cleanup_pending": state.CleanupPending, "cleanup_failed": state.CleanupFailed, "last_sync": state.LastSync, "last_match": state.LastMatch, "sync_error": state.SyncError}
+	}
+	writeJSON(w, 200, map[string]any{"config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
-	c := model.AIOConfig{TMDBRequestsPerSecond: store.DefaultAIOConfig().TMDBRequestsPerSecond}
+	defaults := store.DefaultAIOConfig()
+	c := model.AIOConfig{TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
 	if !decodeJSON(w, r, &c) {
 		return
 	}

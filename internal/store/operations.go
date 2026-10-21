@@ -87,8 +87,8 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 		return databaseError("begin operation checkpoint", err)
 	}
 	defer rollback(tx)
-	var previous string
-	err = tx.QueryRow(ctx, `SELECT phase FROM ingest.operation_runs WHERE id=$1 AND status='running' FOR UPDATE`, run.ID).Scan(&previous)
+	var previous, kind string
+	err = tx.QueryRow(ctx, `SELECT phase,kind FROM ingest.operation_runs WHERE id=$1 AND status='running' FOR UPDATE`, run.ID).Scan(&previous, &kind)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
@@ -105,6 +105,11 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 	}
 	if err != nil {
 		return databaseError("save operation checkpoint", err)
+	}
+	if kind == "matching" && run.Status != "running" && run.Status != "interrupted" {
+		if _, err = tx.Exec(ctx, `UPDATE ingest.aio_state SET last_match=now()`); err != nil {
+			return databaseError("save identification schedule", err)
+		}
 	}
 	return databaseError("commit operation checkpoint", tx.Commit(ctx))
 }

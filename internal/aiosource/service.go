@@ -137,7 +137,7 @@ func (s *Service) State() (bool, bool, string) {
 var secretRefRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
-	if c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
+	if c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid
 	}
 	refs := []string{c.TMDBSecret, c.AllDebridSecret, c.TorBoxSecret}
@@ -308,6 +308,21 @@ func (s *Service) match(ctx context.Context, trigger string) (matchErr error) {
 		return model.ErrBusy
 	}
 	defer release()
+	if trigger == "automatic" {
+		c, err := s.DB.AIOConfig(ctx)
+		if err != nil {
+			return err
+		}
+		status, err := s.DB.AIOAutomationStatus(ctx)
+		if err != nil {
+			return err
+		}
+		// Recheck the durable clock and current opt-in after acquiring the lock.
+		// Metadata notifications and other instances use this same admission.
+		if AutomationPlan(c, status, false, false, time.Now()).Identification != "pending" {
+			return nil
+		}
+	}
 	history, err := s.beginOperation(ctx, "matching", "local", trigger, "", "matcher")
 	if err != nil {
 		return err

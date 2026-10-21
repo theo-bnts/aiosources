@@ -1,6 +1,6 @@
 module github.com/theo-bnts/aiosources
 
-go 1.26.9
+go 1.26.10
 
 require (
 	github.com/andybalholm/cascadia v1.3.4

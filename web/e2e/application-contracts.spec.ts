@@ -300,7 +300,7 @@ test('debrid drafts require review before adopting another writer after a separa
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await privateSource.uncheck()
   let changed = false
-  await page.route('**/api/aiosource', async (route) => {
+  await page.route('**/api/aiosource/controls', async (route) => {
     if (!changed) {
       const current = await (await page.request.get('/api/aiosource')).json()
       const startingRevision = initial.config.revision + 1

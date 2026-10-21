@@ -4,6 +4,12 @@
 
 Add a source once, check a sample, then let automatic imports keep its catalog up to date. This guide covers the visual editor and your own Torznab, HTTP/JSON or HTML definitions. For websites, see the [HTML setup guide](HTML_SOURCES.md). If you are unsure which connection to choose, start with [Source compatibility](CONNECTORS.md).
 
+## Automatic information updates and identification
+
+Open **Metadata → Settings → Schedules** to choose how often information is updated and waiting torrents are identified. Information updates default to every 15 minutes (5 minutes to 24 hours). Identification defaults to 30 seconds after the previous attempt finishes (5 seconds to 24 hours). Disable either switch to run that task manually.
+
+Saved progress and the next eligible time survive a restart. New imports wait in the identification queue; metadata updates do not bypass the saved identification interval. A first identification can start as soon as information is available. **Manual actions** can run immediately. Upstream quotas and failure retries still apply; the intervals do not override them.
+
 ## Configure your sources
 
 1. Open **Sources → Settings → Add source**, choose a source template or **Import JSON**, then configure the **Visual stages** or advanced **JSON** editor.

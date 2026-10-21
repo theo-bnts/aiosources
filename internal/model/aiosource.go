@@ -12,6 +12,7 @@ type AIOConfig struct {
 	AutoSync              bool                  `json:"auto_sync"`
 	AutoMatch             bool                  `json:"auto_match"`
 	SyncMinutes           int                   `json:"sync_minutes"`
+	MatchSeconds          int                   `json:"match_seconds"`
 	TMDBRequestsPerSecond int                   `json:"tmdb_requests_per_second"`
 	CacheMinutes          int                   `json:"cache_minutes"`
 	ResponseSeconds       int                   `json:"response_seconds"`
@@ -142,6 +143,7 @@ type AIOStatus struct {
 	CleanupPending  int64      `json:"cleanup_pending"`
 	CleanupFailed   int64      `json:"cleanup_failed"`
 	LastSync        *time.Time `json:"last_sync"`
+	LastMatch       *time.Time `json:"last_match"`
 	ChangesThrough  *time.Time `json:"changes_through"`
 	InventoryDate   string     `json:"inventory_date"`
 	SyncRetryAt     *time.Time `json:"sync_retry_at"`
@@ -150,9 +152,10 @@ type AIOStatus struct {
 }
 
 type AIOAutomation struct {
-	Updates        string     `json:"updates"`
-	NextUpdate     *time.Time `json:"next_update"`
-	Identification string     `json:"identification"`
+	Updates            string     `json:"updates"`
+	NextUpdate         *time.Time `json:"next_update"`
+	Identification     string     `json:"identification"`
+	NextIdentification *time.Time `json:"next_identification"`
 }
 
 // Diagnostics expose only source identity, title and the current decision.

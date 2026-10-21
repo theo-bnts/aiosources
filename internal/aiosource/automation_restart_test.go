@@ -67,7 +67,7 @@ func TestInterruptedAutomaticUpdateRetainsClockAndResumesAfterRestart(t *testing
 	if requests.Load() != 0 {
 		t.Fatal("restart bypassed the retry delay")
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET sync_retry_at=now()-INTERVAL '1 second'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET sync_retry_at=now()-INTERVAL '1 second',last_match=now()-INTERVAL '31 seconds'`); err != nil {
 		t.Fatal(err)
 	}
 	restarted.wakeAutomation()

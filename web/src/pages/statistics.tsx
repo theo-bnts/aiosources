@@ -4,7 +4,7 @@ import { api, params, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from 
 import { useListViewState } from '@/lib/detail-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
-import type { Status } from '@/lib/aiosource-types'
+import type { Controls, Status } from '@/lib/aiosource-types'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
 import { Empty, ErrorNotice, Loading, PageHeader } from '@/components/common'
 import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
@@ -143,16 +143,19 @@ export function SourceStatisticsPage() {
 }
 
 export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' }) {
+  return section === 'metadata' ? <MetadataStatisticsPage /> : <DebridStatisticsPage />
+}
+
+function MetadataStatisticsPage() {
   const date = useDate()
   const location = useLocation()
   const legacyMatches =
-    section === 'metadata' &&
-    (new URLSearchParams(location.search).has('match_status') ||
-      location.hash === '#matching-results')
+    new URLSearchParams(location.search).has('match_status') ||
+    location.hash === '#matching-results'
   const query = useQuery({
     queryKey: ['aiosource'],
     queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
-    refetchInterval: LIVE_REFRESH_INTERVAL,
+    refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const status = query.data
   const identifiedTotal = status
@@ -173,114 +176,140 @@ export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' 
       ) : (
         status && (
           <>
-            {section === 'metadata' ? (
-              <>
-                <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  <Statistic label="Film & series entries" value={status.status.works} />
-                  <Statistic
-                    label="Imported torrents"
-                    value={identifiedTotal}
-                    to="/metadata/identification"
-                  />
-                  {identificationStatuses.map((decision) => (
-                    <Statistic
-                      key={decision}
-                      label={
-                        decision === 'matched'
-                          ? 'Identified torrents'
-                          : identificationResults[decision].label
-                      }
-                      value={`${number(status.status[decision === 'pending' ? 'matching_pending' : decision])} (${percentage(status.status[decision === 'pending' ? 'matching_pending' : decision], identifiedTotal)})`}
-                      to={`/metadata/identification?${params({ match_status: decision })}`}
-                    />
-                  ))}
-                  <Statistic label="Information pending" value={status.status.pending} />
-                </dl>
-                <dl className="grid gap-3 sm:grid-cols-2">
-                  <Statistic
-                    label="Last successful information update"
-                    value={
-                      status.status.last_sync
-                        ? date(status.status.last_sync)
-                        : 'No completed update'
-                    }
-                    size="sm"
-                    to="/metadata/history?kind=metadata"
-                  />
-                  <Statistic
-                    label="Next automatic information update"
-                    value={
-                      status.automation.next_update
-                        ? date(status.automation.next_update)
-                        : status.automation.updates === 'running'
-                          ? 'Running'
-                          : status.automation.updates === 'disabled'
-                            ? 'Disabled'
-                            : 'Waiting'
-                    }
-                    size="sm"
-                    to="/metadata/settings"
-                  />
-                </dl>
-                <div className="flex flex-wrap gap-2" aria-label="Current activity">
-                  <Link
-                    to="/metadata/history?kind=metadata"
-                    aria-label="View information update history"
-                  >
-                    <Badge
-                      variant={
-                        status.syncing ? 'info' : status.status.sync_error ? 'warning' : 'secondary'
-                      }
-                    >
-                      {status.syncing
-                        ? 'Information update running'
-                        : status.status.sync_error
-                          ? 'Information update needs attention'
-                          : 'Information update idle'}
-                    </Badge>
-                  </Link>
-                  <Link
-                    to="/metadata/history?kind=matching"
-                    aria-label="View identification history"
-                  >
-                    <Badge variant={status.matching ? 'info' : 'secondary'}>
-                      {status.matching ? 'Identification running' : 'Identification idle'}
-                    </Badge>
-                  </Link>
-                </div>
-                {status.rebuild_required && (
-                  <p role="alert" className="notice notice-warning">
-                    The change history gap exceeds 14 days. Reset the metadata catalog in{' '}
-                    <Link className="underline" to="/metadata/settings#maintenance">
-                      Settings
-                    </Link>
-                    .
-                  </p>
-                )}
-              </>
-            ) : (
-              <>
-                <DebridStatistics config={status.config} />
-                <dl className="grid gap-3 sm:grid-cols-2">
-                  <Statistic
-                    label="Temporary AllDebrid magnets pending cleanup"
-                    value={status.status.cleanup_pending}
-                  />
-                  <Statistic
-                    label="Temporary AllDebrid magnets needing attention"
-                    value={status.status.cleanup_failed}
-                  />
-                </dl>
-                {status.status.cleanup_failed > 0 && (
-                  <p role="alert" className="notice notice-warning">
-                    Retry temporary magnet cleanup in{' '}
-                    <Link className="underline" to="/debrid/settings#maintenance">
-                      Settings
-                    </Link>
-                    .
-                  </p>
-                )}
-              </>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Statistic label="Film & series entries" value={status.status.works} />
+              <Statistic
+                label="Imported torrents"
+                value={identifiedTotal}
+                to="/metadata/identification"
+              />
+              {identificationStatuses.map((decision) => (
+                <Statistic
+                  key={decision}
+                  label={
+                    decision === 'matched'
+                      ? 'Identified torrents'
+                      : identificationResults[decision].label
+                  }
+                  value={`${number(status.status[decision === 'pending' ? 'matching_pending' : decision])} (${percentage(status.status[decision === 'pending' ? 'matching_pending' : decision], identifiedTotal)})`}
+                  to={`/metadata/identification?${params({ match_status: decision })}`}
+                />
+              ))}
+              <Statistic label="Information pending" value={status.status.pending} />
+            </dl>
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Statistic
+                label="Last successful information update"
+                value={
+                  status.status.last_sync ? date(status.status.last_sync) : 'No completed update'
+                }
+                size="sm"
+                to="/metadata/history?kind=metadata"
+              />
+              <Statistic
+                label="Next automatic information update"
+                value={
+                  status.automation.next_update
+                    ? date(status.automation.next_update)
+                    : status.automation.updates === 'running'
+                      ? 'Running'
+                      : status.automation.updates === 'disabled'
+                        ? 'Disabled'
+                        : 'Waiting'
+                }
+                size="sm"
+                to="/metadata/settings"
+              />
+              <Statistic
+                label="Next automatic identification"
+                value={
+                  status.automation.next_identification
+                    ? date(status.automation.next_identification)
+                    : status.automation.identification === 'running'
+                      ? 'Running'
+                      : status.automation.identification === 'disabled'
+                        ? 'Disabled'
+                        : status.automation.identification === 'up_to_date'
+                          ? 'Up to date'
+                          : 'Waiting for information'
+                }
+                size="sm"
+                to="/metadata/settings"
+              />
+            </dl>
+            <div className="flex flex-wrap gap-2" aria-label="Current activity">
+              <Link
+                to="/metadata/history?kind=metadata"
+                aria-label="View information update history"
+              >
+                <Badge
+                  variant={
+                    status.syncing ? 'info' : status.status.sync_error ? 'warning' : 'secondary'
+                  }
+                >
+                  {status.syncing
+                    ? 'Information update running'
+                    : status.status.sync_error
+                      ? 'Information update needs attention'
+                      : 'Information update idle'}
+                </Badge>
+              </Link>
+              <Link to="/metadata/history?kind=matching" aria-label="View identification history">
+                <Badge variant={status.matching ? 'info' : 'secondary'}>
+                  {status.matching ? 'Identification running' : 'Identification idle'}
+                </Badge>
+              </Link>
+            </div>
+            {status.rebuild_required && (
+              <p role="alert" className="notice notice-warning">
+                The change history gap exceeds 14 days. Reset the metadata catalog in{' '}
+                <Link className="underline" to="/metadata/settings#maintenance">
+                  Settings
+                </Link>
+                .
+              </p>
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+function DebridStatisticsPage() {
+  const query = useQuery({
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+  })
+  const status = query.data
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading label="Loading statistics" />
+      ) : (
+        status && (
+          <>
+            <DebridStatistics config={status.config} />
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <Statistic
+                label="Temporary AllDebrid magnets pending cleanup"
+                value={status.status.cleanup_pending}
+              />
+              <Statistic
+                label="Temporary AllDebrid magnets needing attention"
+                value={status.status.cleanup_failed}
+              />
+            </dl>
+            {status.status.cleanup_failed > 0 && (
+              <p role="alert" className="notice notice-warning">
+                Retry temporary magnet cleanup in{' '}
+                <Link className="underline" to="/debrid/settings#maintenance">
+                  Settings
+                </Link>
+                .
+              </p>
             )}
           </>
         )

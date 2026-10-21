@@ -60,3 +60,15 @@ The matching dispatcher now groups up to 25 records per transaction, while keepi
 An unfinished inventory may be replayed after a restart. Entries already marked with the same export date no longer receive identical row updates. New dates, missing entries and pending metadata jobs retain their original behavior. This measures local replay, not download time or a first import.
 
 Reproduce the inventory case with `go test ./internal/aiosource -run '^$' -bench '^BenchmarkMetadataInventoryReplay$' -benchtime=1x -count=5`. Use the matching command above with `-benchtime=1x` for the 21 October comparison. Actual gains depend on catalog size, title reuse, database latency and available workers.
+
+## Metadata and debrid controls
+
+The same synthetic read-path fixture (120,000 torrents and 1,000 works) compares the old full-statistics request used by Settings with the new control projection. Five repetitions of 20 calls on the machine above give median times of **122.71 ms before and 0.45 ms after**, or **99.6% less elapsed time** for this refresh.
+
+Settings and Debrid Statistics now ask for indexed existence checks, operation clocks and cleanup counts. They do not need exact metadata or identification totals. Metadata Statistics keeps the exact counting query and refreshes every 15 seconds, consistently with source and debrid statistics. Control activity continues refreshing every 5 seconds. Distinct response types and query keys keep flags separate from exact counts; saving, concurrent edits and manual actions retain their existing behavior.
+
+Reproduce with `go test ./internal/store -run '^$' -bench 'BenchmarkCatalogReadPaths/(metadata-statistics|metadata-controls)$' -benchtime=20x -count=5 -benchmem`. These are different projections serving different screens, not a faster algorithm for computing the same exact totals.
+
+## Release parser checks
+
+`TestReleaseQualityExamples` contains 58 independently labelled synthetic video examples covering title normalization, years, seasons, episode ranges and relative/absolute annotations. The corrected parser passes all 58. The examples deliberately exercise supported formats and edge cases; they do not estimate accuracy on arbitrary release names. Existing v1 correspondence tests, malformed numbering, conflicting identifiers and ambiguous file-selection tests remain separate safety checks.

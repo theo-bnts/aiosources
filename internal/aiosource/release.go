@@ -101,7 +101,10 @@ var episodeRE = regexp.MustCompile(`(?i)` + episodeMarker + `(\d{1,4})(?:\s*[-�
 var episodePrefixRE = regexp.MustCompile(`(?i)\bS\d{1,3}(?:` + episodeMarker + `\d{1,4})*$`)
 var crossRE = regexp.MustCompile(`(?i)\b(\d{1,2})x(\d{1,3})\b`)
 var seasonWordRE = regexp.MustCompile(`(?i)\b(?:season|saison)\s*(\d{1,3})(?:\s*[-–]\s*(?:season|saison)?\s*(\d{1,3}))?`)
-var absoluteRE = regexp.MustCompile(`(?i)(?:\s-\s|\b(?:ep|episode)\s*)(\d{1,4})(?:\b|\s)`)
+var absoluteRE = regexp.MustCompile(`(?i)(?:\s-\s|\b(?:ep|episode)\s*)(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\b`)
+var ordinalSeasonRE = regexp.MustCompile(`(?i)\b(\d{1,3})(?:st|nd|rd|th)\s+season\b`)
+var separatedSeasonEpisodeRE = regexp.MustCompile(`(?i)\b(?:S|season\s*|saison\s*)(\d{1,3})\s+[-–]\s+(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\b`)
+var localEpisodeRE = regexp.MustCompile(`(?i)\bS\d{1,3}\s*E\d{1,4}(?:(?:\s*[-–]\s*E?|\s*E)\d{1,4})*`)
 var yearRE = regexp.MustCompile(`\b(?:18|19|20|21)\d{2}\b`)
 var technicalRE = regexp.MustCompile(`(?i)\b(?:2160p|1080[pi]|720p|576p|480p|4k|web[ ._-]?(?:dl|rip)?|bluray|blu[ ._-]?ray|bdrip|brrip|dvdrip|hdtv|remux|x26[45]|h[ .]?26[45]|hevc|avc|av1|dts(?:[ ._-]?hd)?|aac|e?ac3|ddp|flac|xvid|divx|french|vff|vfq|vostfr|multi|truefrench|english|complete|integrale|intégrale)\b`)
 var leadingGroupRE = regexp.MustCompile(`^\s*\[[^\]]+\]\s*`)
@@ -194,8 +197,29 @@ func ParseRelease(raw string) Release {
 	}
 	s := strings.ReplaceAll(raw, ".", " ")
 	s = strings.ReplaceAll(s, "_", " ")
+	s = ordinalSeasonRE.ReplaceAllString(s, "Season $1")
+	// The spaced separator in "Season 3 - 09" denotes an episode. Explicit
+	// season ranges (S01-S03, Season 1-3) retain their original pack semantics.
+	s = separatedSeasonEpisodeRE.ReplaceAllStringFunc(s, func(text string) string {
+		m := separatedSeasonEpisodeRE.FindStringSubmatch(text)
+		n, _ := strconv.Atoi(m[2])
+		if n >= 1800 && n <= 2199 {
+			return "S" + m[1] + " " + m[2]
+		}
+		value := "S" + m[1] + "E" + m[2]
+		if m[3] != "" {
+			value += "-E" + m[3]
+		}
+		return value
+	})
 	seasons := seasonRE.FindAllStringSubmatch(s, -1)
-	episodes, invalidEpisodes := parsedEpisodes(s)
+	episodeText := s
+	if local := localEpisodeRE.FindAllString(s, -1); len(local) > 0 {
+		// A second absolute annotation (S02E03 EP1158) must not turn a
+		// relative episode into a second, unrelated playback candidate.
+		episodeText = strings.Join(local, " ")
+	}
+	episodes, invalidEpisodes := parsedEpisodes(episodeText)
 	p := Release{Seasons: ints(seasons), Episodes: episodes, InvalidNumbering: invalidRanges(seasons) || invalidEpisodes}
 	if len(p.Seasons) == 0 {
 		wordSeasons := seasonWordRE.FindAllStringSubmatch(s, -1)
@@ -209,7 +233,16 @@ func ParseRelease(raw string) Release {
 		p.Episodes = []int{b}
 	}
 	if len(p.Episodes) == 0 && len(p.Seasons) == 0 {
-		p.Episodes = ints(absoluteRE.FindAllStringSubmatch(s, -1))
+		absolute := [][]string{}
+		for _, m := range absoluteRE.FindAllStringSubmatch(s, -1) {
+			n, _ := strconv.Atoi(m[1])
+			if n >= 1800 && n <= 2199 && strings.HasPrefix(strings.TrimSpace(m[0]), "-") {
+				continue
+			}
+			absolute = append(absolute, m)
+		}
+		p.Episodes = ints(absolute)
+		p.InvalidNumbering = p.InvalidNumbering || invalidRanges(absolute)
 	}
 	if len(p.Seasons) > 0 || len(p.Episodes) > 0 {
 		p.Type = "tv"

@@ -413,6 +413,7 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 		t.Fatal(err)
 	}
 	delete(legacy, "tmdb_requests_per_second")
+	delete(legacy, "match_seconds")
 	body, _ = json.Marshal(legacy)
 	if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 204 {
 		t.Fatalf("previous client could not save its configuration: %d", response.Code)
@@ -420,6 +421,9 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 	c, _ = f.db.AIOConfig(f.ctx)
 	if c.TMDBRequestsPerSecond != 35 {
 		t.Fatal("previous client did not receive the v1 request limit", c.TMDBRequestsPerSecond)
+	}
+	if c.MatchSeconds != 30 {
+		t.Fatal("previous client did not receive the identification interval", c.MatchSeconds)
 	}
 	for _, rate := range []int{0, 4, 41} {
 		c.TMDBRequestsPerSecond = rate
@@ -430,5 +434,50 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 	}
 	if response := f.request("PUT", "/api/aiosource/config", `{}`, true, ""); response.Code != 422 {
 		t.Fatal("defaulting the new field made an empty configuration valid", response.Code)
+	}
+}
+
+func TestIdentificationIntervalValidationAndLightweightControls(t *testing.T) {
+	f, _, conn := addonAPI(t)
+	if response := f.request("GET", "/api/aiosource/controls", "", false, ""); response.Code != 401 {
+		t.Fatal("controls lack authentication", response.Code)
+	}
+	c, _ := f.db.AIOConfig(f.ctx)
+	for _, seconds := range []int{0, 4, 86401} {
+		c.MatchSeconds = seconds
+		body, _ := json.Marshal(c)
+		if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 422 {
+			t.Fatalf("invalid identification interval %d: %d", seconds, response.Code)
+		}
+	}
+	for _, seconds := range []int{5, 86400} {
+		c.MatchSeconds = seconds
+		body, _ := json.Marshal(c)
+		if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 204 {
+			t.Fatalf("valid identification interval %d: %d", seconds, response.Code)
+		}
+		c, _ = f.db.AIOConfig(f.ctx)
+		if c.MatchSeconds != seconds {
+			t.Fatal("interval was not saved", c.MatchSeconds)
+		}
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years) VALUES('movie','1',ARRAY[2021]);
+INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example Film"}');`); err != nil {
+		t.Fatal(err)
+	}
+	full := f.request("GET", "/api/aiosource", "", true, "")
+	light := f.request("GET", "/api/aiosource/controls", "", true, "")
+	var a, b map[string]json.RawMessage
+	if full.Code != 200 || light.Code != 200 || json.Unmarshal(full.Body.Bytes(), &a) != nil || json.Unmarshal(light.Body.Bytes(), &b) != nil {
+		t.Fatalf("status projections %d / %d", full.Code, light.Code)
+	}
+	for _, key := range []string{"config", "automation", "syncing", "matching", "error", "rebuild_required"} {
+		if string(a[key]) != string(b[key]) {
+			t.Fatal("controls diverge from status", key)
+		}
+	}
+	var flags map[string]any
+	if json.Unmarshal(b["status"], &flags) != nil || flags["has_information"] != true || flags["works"] != nil || flags["matching_pending"] != nil {
+		t.Fatal("controls exposed substitute catalog counts", string(b["status"]))
 	}
 }

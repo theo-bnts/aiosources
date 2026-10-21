@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { SecretPicker } from '@/components/secret-picker'
 import { FormStatus } from '@/components/form-status'
-import type { Config, Status, Tracker } from '@/lib/aiosource-types'
+import type { Config, Controls, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
 
 type FormScope = 'metadata' | 'debrid' | 'trackers'
@@ -45,8 +45,8 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   const location = useLocation()
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
-    queryKey: ['aiosource'],
-    queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const secrets = useQuery({
@@ -73,7 +73,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       api('/aiosource/config', { method: 'PUT', body: JSON.stringify(value) }),
     onSuccess: async (_, savedForm) => {
       await queryClient.invalidateQueries({ queryKey: ['aiosource'] })
-      const saved = queryClient.getQueryData<Status>(['aiosource'])?.config
+      const saved = queryClient.getQueryData<Controls>(['aiosource', 'controls'])?.config
       setDrafts((current) => {
         const next = { ...current }
         delete next[savedForm.scope]
@@ -95,10 +95,10 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
     },
   })
   const review = useMutation({
-    mutationFn: (_form: FormScope) => api<Status>('/aiosource'),
+    mutationFn: (_form: FormScope) => api<Controls>('/aiosource/controls'),
     onSuccess: async (latest, form) => {
       await queryClient.cancelQueries({ queryKey: ['aiosource'] })
-      queryClient.setQueryData(['aiosource'], latest)
+      queryClient.setQueryData(['aiosource', 'controls'], latest)
       setDrafts((current) =>
         current[form] ? { ...current, [form]: { ...current[form], base: latest.config } } : current,
       )
@@ -178,7 +178,12 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   )
   const number = (
     label: string,
-    key: 'sync_minutes' | 'tmdb_requests_per_second' | 'cache_minutes' | 'response_seconds',
+    key:
+      | 'sync_minutes'
+      | 'match_seconds'
+      | 'tmdb_requests_per_second'
+      | 'cache_minutes'
+      | 'response_seconds',
     min: number,
     max: number,
   ) => (
@@ -278,10 +283,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             {section === 'metadata' ? (
               <>
                 {secret('TMDB read access token', 'tmdb_secret')}
-                {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
                 {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
-                {toggle('Automatically update film & series information', 'auto_sync')}
-                {toggle('Automatically identify torrents', 'auto_match')}
               </>
             ) : (
               <>
@@ -293,13 +295,23 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             )}
           </div>
           {section === 'metadata' && (
-            <p className="help">
-              Enable both options and save a TMDB token to keep information and torrent
-              identification up to date automatically. Identification checks for new or changed
-              torrents every 30 seconds. Both tasks continue while this page is closed. The request
-              limit applies to the next information update; TMDB rate limits also pause requests
-              automatically.
-            </p>
+            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
+              <legend className="pr-3 text-sm font-medium">Schedules</legend>
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-4">
+                  {toggle('Automatically update film & series information', 'auto_sync')}
+                  {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
+                </div>
+                <div className="space-y-4">
+                  {toggle('Automatically identify torrents', 'auto_match')}
+                  {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
+                </div>
+              </div>
+              <p className="help">
+                Identification waits for this interval after each attempt. Pending work and timing
+                survive restarts. Manual actions run immediately.
+              </p>
+            </fieldset>
           )}
           {footer(scope)}
         </Panel>
@@ -351,7 +363,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             </div>
             <div className="flex flex-wrap gap-3">
               <Button
-                disabled={busy || status.status.works === 0}
+                disabled={busy || !status.status.has_information}
                 onClick={() => action.mutate('match')}
               >
                 Identify torrents

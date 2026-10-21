@@ -15,6 +15,10 @@ async function expectMaintenanceFooter(page: Page) {
 test('metadata configuration persists and missing information explains disabled actions', async ({
   page,
 }) => {
+  const statisticsRequests: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/aiosource') statisticsRequests.push(request.url())
+  })
   await page.goto('/metadata/settings')
   await expect(page.getByRole('heading', { name: 'Metadata', exact: true, level: 1 })).toBeVisible()
   await expectMaintenanceFooter(page)
@@ -26,16 +30,45 @@ test('metadata configuration persists and missing information explains disabled 
   ).toBeDisabled()
   const configuration = page.getByRole('form', { name: 'Metadata configuration', exact: true })
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
+  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
   await page.getByLabel('TMDB requests per second').fill('20')
   await page.getByLabel('Information update interval (minutes)').fill('30')
+  await page.getByLabel('Identification interval (seconds)').fill('90')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
   await expect(page.getByLabel('Information update interval (minutes)')).toHaveValue('30')
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('20')
+  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('90')
+  await page.getByLabel('Identification interval (seconds)').fill('4')
+  await configuration.getByRole('button', { name: 'Save', exact: true }).click()
+  expect(
+    await page
+      .getByLabel('Identification interval (seconds)')
+      .evaluate((field) => (field as HTMLInputElement).validity.rangeUnderflow),
+  ).toBe(true)
+  await page.getByLabel('Identification interval (seconds)').fill('5')
+  await configuration.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect(
+    (await (await page.request.get('/api/aiosource/controls')).json()).config.match_seconds,
+  ).toBe(5)
   await page.getByText('Manual actions', { exact: true }).click()
   await expect(page.getByRole('button', { name: 'Identify torrents' })).toBeDisabled()
   await expect(page.getByRole('alert')).toHaveCount(0)
+  expect(statisticsRequests).toHaveLength(0)
+  if (process.env.QA_DIRECTORY) {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+      await page.screenshot({
+        path: `${process.env.QA_DIRECTORY}/metadata-settings-${width}.png`,
+        fullPage: true,
+      })
+    }
+  }
 })
 
 test('metadata automation persists schedules, retry dates and manual choices without duplicate status cards', async ({
@@ -302,6 +335,7 @@ test('private playback saves independently and fields have space below their lab
   await page.goto('/metadata/settings')
   await assertSpacing('tmdb_secret')
   await assertSpacing('sync_minutes')
+  await assertSpacing('match_seconds')
   await page.goto('/addon/settings')
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   await assertSpacing('share-name')

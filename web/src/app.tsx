@@ -131,6 +131,7 @@ const navigationGroups = [
   {
     id: 'playback',
     label: 'Debrid',
+    standalone: true,
     icon: CloudCheckIcon,
     defaultOpen: true,
     items: [
@@ -145,6 +146,7 @@ const navigationGroups = [
   {
     id: 'search',
     label: 'Search',
+    standalone: true,
     icon: MagnifyingGlassIcon,
     defaultOpen: true,
     items: [
@@ -224,6 +226,7 @@ const navigationGroups = [
 const publicSearchNavigation = {
   id: 'public-search',
   label: 'Search',
+  standalone: true,
   icon: MagnifyingGlassIcon,
   defaultOpen: true,
   items: [
@@ -315,42 +318,44 @@ function AppNavigation({
       aria-label="Main navigation"
       className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]"
     >
-      {groups.map((group) =>
-        group.items.length === 1 ? (
-          navigationLink(group.items[0])
-        ) : (
-          <section
-            key={group.id}
-            className={`space-y-1 ${(openGroups[group.id] ?? group.defaultOpen) ? 'pb-2' : ''}`}
-          >
-            <h2>
-              <button
-                type="button"
-                aria-expanded={openGroups[group.id] ?? group.defaultOpen}
-                aria-controls={`${id}-${group.id}`}
-                onClick={() => onToggle(group.id)}
-                className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground lg:min-h-9"
-              >
-                <group.icon size={19} aria-hidden="true" className="shrink-0" />
-                <span className="min-w-0 flex-1">{group.label}</span>
-                <CaretDownIcon
-                  aria-hidden="true"
-                  className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${(openGroups[group.id] ?? group.defaultOpen) ? '' : '-rotate-90'}`}
-                />
-              </button>
-            </h2>
-            <ul
-              id={`${id}-${group.id}`}
-              hidden={!(openGroups[group.id] ?? group.defaultOpen)}
-              className="ml-5 space-y-0.5 border-l border-border pl-2"
+      {groups
+        .filter((group) => group.items.length > 0)
+        .map((group) =>
+          group.standalone ? (
+            navigationLink(group.items[0])
+          ) : (
+            <section
+              key={group.id}
+              className={`space-y-1 ${(openGroups[group.id] ?? group.defaultOpen) ? 'pb-2' : ''}`}
             >
-              {group.items.map((item) => (
-                <li key={item.to}>{navigationLink(item)}</li>
-              ))}
-            </ul>
-          </section>
-        ),
-      )}
+              <h2>
+                <button
+                  type="button"
+                  aria-expanded={openGroups[group.id] ?? group.defaultOpen}
+                  aria-controls={`${id}-${group.id}`}
+                  onClick={() => onToggle(group.id)}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground lg:min-h-9"
+                >
+                  <group.icon size={19} aria-hidden="true" className="shrink-0" />
+                  <span className="min-w-0 flex-1">{group.label}</span>
+                  <CaretDownIcon
+                    aria-hidden="true"
+                    className={`size-3.5 shrink-0 transition-transform motion-reduce:transition-none ${(openGroups[group.id] ?? group.defaultOpen) ? '' : '-rotate-90'}`}
+                  />
+                </button>
+              </h2>
+              <ul
+                id={`${id}-${group.id}`}
+                hidden={!(openGroups[group.id] ?? group.defaultOpen)}
+                className="ml-5 space-y-0.5 border-l border-border pl-2"
+              >
+                {group.items.map((item) => (
+                  <li key={item.to}>{navigationLink(item)}</li>
+                ))}
+              </ul>
+            </section>
+          ),
+        )}
     </nav>
   )
 }

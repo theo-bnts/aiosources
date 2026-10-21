@@ -140,7 +140,7 @@ func TestSeasonFolderQualifiesNumericEpisodeFiles(t *testing.T) {
 func TestMalformedRangesNeverBecomeUnscopedPacks(t *testing.T) {
 	r := Resource{Type: "series", Season: matchingNumber(1), Episode: matchingNumber(3)}
 	c := Candidate{WorkID: "1", EntryID: "1", Type: "tv", Titles: []string{"Example Serial"}, Years: []int{2021}}
-	for _, title := range []string{"Example.Serial.S03-S01.2021", "Example.Serial.S01-S200.2021", "Example.Serial.S01E05-E03.2021", "Example.Serial.S01E001-E500.2021"} {
+	for _, title := range []string{"Example.Serial.S03-S01.2021", "Example.Serial.S01-S200.2021", "Example.Serial.S01E05-E03.2021", "Example.Serial.S01E001-E500.2021", "Example Serial - 05-03", "Example Serial - 001-500"} {
 		p := ParseRelease(title)
 		if d := ChooseMatch(p, []Candidate{c}, SourceIDs{}, false, SourceEpisode{}); d.Status == "matched" {
 			t.Fatal("invalid range was identified", title)

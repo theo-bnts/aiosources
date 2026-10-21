@@ -82,3 +82,5 @@ persisted matching/cache queues. Additional end-to-end scenarios
 kill a real worker process during Full and Incremental collection, reopen state
 between three consecutive tracker failures, and verify metadata and AD/TB
 recovery without erasing earlier published results. Separate crash tests also kill a real process during TMDB detail retrieval and local matching: committed details are not fetched again, completed matches are not rewritten, and the remaining durable jobs finish after restart. An unfinished inventory file or in-flight, uncommitted batch can be read again; that does not erase saved progress.
+
+The identification interval in **Metadata → Settings → Schedules** uses a durable completion time independent of retained history. Successful, failed and manually stopped attempts respect that interval before automatic identification starts again. An interrupted worker preserves its pending queue without recording a new completion; manual identification remains immediate.

@@ -1,0 +1,645 @@
+[
+  {
+    "title": "Example.Film.2021.1080p",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film (2021) WEB-DL",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example_Film_2021_720p",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "[Group] Example Film 2021 BluRay",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film - 2021",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film 2021 MULTI",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film 2021 2160p",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film 2021 REMUX",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S01E02.1080p",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S01 E02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.1x02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Season 1 Episode 02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Saison 1 Episode 02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S01.Ep02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S01Episode02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S01Ep02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "[Group] Example Serial S01E02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Season 1 - 02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S1 - 02",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S03E09",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      3
+    ],
+    "episodes": [
+      9
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Season 3 - 09",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      3
+    ],
+    "episodes": [
+      9
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S03 - 09",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      3
+    ],
+    "episodes": [
+      9
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Saison 3 - 09",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      3
+    ],
+    "episodes": [
+      9
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial 3rd Season - 09",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      3
+    ],
+    "episodes": [
+      9
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Season2 - 01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial 2nd Season - 01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S02E01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S01E02E03",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2,
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S01E02-E03",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2,
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S01E02-03",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2,
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Season 1 - 02-03",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2,
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.Season01.Episode02-Episode03",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2,
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S01.COMPLETE",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial Season 1",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial Saison 1",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial 1st Season",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example.Serial.S01-S03.COMPLETE",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1,
+      2,
+      3
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial Season 1-3",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1,
+      2,
+      3
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial Saison 1-3",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      1,
+      2,
+      3
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial - 01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "[Group] Example Serial - 01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Episode 01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial Ep01",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial - 01-12",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial - 01 - 12",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [],
+    "episodes": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S02E03.EP1158",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S02E03 (Episode 1158)",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S02E03 - Episode1158",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      2
+    ],
+    "episodes": [
+      3
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example.Serial.S00E01 - Episode14",
+    "normalized": "example serial",
+    "year": null,
+    "seasons": [
+      0
+    ],
+    "episodes": [
+      1
+    ],
+    "pack": false
+  },
+  {
+    "title": "Example Serial S01 2021",
+    "normalized": "example serial",
+    "year": 2021,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example Serial Season 1 - 2021",
+    "normalized": "example serial",
+    "year": 2021,
+    "seasons": [
+      1
+    ],
+    "episodes": [],
+    "pack": true
+  },
+  {
+    "title": "Example.Serial.S01E02.2021.1080p",
+    "normalized": "example serial",
+    "year": 2021,
+    "seasons": [
+      1
+    ],
+    "episodes": [
+      2
+    ],
+    "pack": false
+  },
+  {
+    "title": "Zone51.2021.1080p",
+    "normalized": "zone51",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Village2.2021.1080p",
+    "normalized": "village2",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "TheEdge17.2021.1080p",
+    "normalized": "theedge17",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "1917.2019.1080p",
+    "normalized": "1917",
+    "year": 2019,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example.Film.2021.1080p-ARTIST007",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  },
+  {
+    "title": "Example Film 2021 1080p-GROUPS42",
+    "normalized": "example film",
+    "year": 2021,
+    "seasons": [],
+    "episodes": [],
+    "pack": false
+  }
+]

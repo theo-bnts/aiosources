@@ -59,6 +59,94 @@ func TestAutomationPlanUsesDurableProgressAndSavedChoices(t *testing.T) {
 
 func ptrTime(v time.Time) *time.Time { return &v }
 
+func TestIdentificationPlanUsesSavedInterval(t *testing.T) {
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	last := now.Add(-20 * time.Second)
+	for _, test := range []struct {
+		name             string
+		seconds          int
+		enabled, running bool
+		last             *time.Time
+		decision         string
+		next             *time.Time
+	}{
+		{"initial pending work", 30, true, false, nil, "pending", &now},
+		{"saved completion survives restart", 30, true, false, &last, "scheduled", ptrTime(last.Add(30 * time.Second))},
+		{"shorter interval", 5, true, false, &last, "pending", ptrTime(last.Add(5 * time.Second))},
+		{"exact boundary", 20, true, false, &last, "pending", &now},
+		{"longer interval", 86400, true, false, &last, "scheduled", ptrTime(last.Add(24 * time.Hour))},
+		{"manual only", 30, false, false, &last, "disabled", nil},
+		{"running", 30, true, true, &last, "running", nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := store.DefaultAIOConfig()
+			c.AutoMatch, c.MatchSeconds = test.enabled, test.seconds
+			p := AutomationPlan(c, model.AIOStatus{Works: 1, MatchingPending: 1, LastMatch: test.last}, false, test.running, now)
+			if p.Identification != test.decision || (p.NextIdentification == nil) != (test.next == nil) || p.NextIdentification != nil && !p.NextIdentification.Equal(*test.next) {
+				t.Fatalf("plan %+v, wanted %+v", p, test)
+			}
+		})
+	}
+}
+
+func TestIdentificationAdmissionAndRestartKeepPendingWork(t *testing.T) {
+	ctx, s, conn := testService(t)
+	seedMovie(t, ctx, s, conn, "source", "1", strings.Repeat("a", 40))
+	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','2','{"title":"Example.Movie.2021.720p"}')`); err != nil {
+		t.Fatal(err)
+	}
+	// A metadata notification cannot bypass the saved interval, even when
+	// another poll has already decided to launch an automatic worker.
+	c, _ := s.DB.AIOConfig(ctx)
+	c.AutoMatch, c.MatchSeconds = true, 86400
+	if err := s.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.match(ctx, "automatic"); err != nil {
+		t.Fatal(err)
+	}
+	s.queueAutomaticMatching(ctx)
+	if err := s.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	before, err := s.DB.AIOStatus(ctx)
+	if err != nil || before.Matched != 1 || before.MatchingPending != 1 || before.LastMatch == nil {
+		t.Fatalf("notification skipped cadence or lost work: %+v %v", before, err)
+	}
+	restarted, err := New(ctx, s.DB, s.Vault, s.sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restarted.Close(ctx) })
+	if err := restarted.match(ctx, "automatic"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := s.DB.AIOStatus(ctx)
+	if err != nil || after.Matched != 1 || after.MatchingPending != 1 || !after.LastMatch.Equal(*before.LastMatch) {
+		t.Fatalf("restart reset cadence: %+v %v", after, err)
+	}
+	// Manual actions remain immediately available during the interval.
+	if err := restarted.Match(ctx); err != nil {
+		t.Fatal(err)
+	}
+	after, err = s.DB.AIOStatus(ctx)
+	if err != nil || after.Matched != 2 || after.MatchingPending != 0 || after.LastMatch.Before(*before.LastMatch) {
+		t.Fatalf("manual matching did not finish pending work: %+v %v", after, err)
+	}
+	c, _ = s.DB.AIOConfig(ctx)
+	c.AutoMatch = false
+	if err := restarted.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := restarted.Reset(ctx, "mapping"); err != nil {
+		t.Fatal(err)
+	}
+	after, err = s.DB.AIOStatus(ctx)
+	if err != nil || after.LastMatch != nil {
+		t.Fatal("reset retained identification cadence", err)
+	}
+}
+
 func TestInformationRetryBackoffIsBounded(t *testing.T) {
 	for attempt, minutes := range map[int]int{-1: 1, 0: 1, 1: 1, 2: 2, 3: 4, 4: 8, 5: 15, 30: 15} {
 		if got := syncRetryDelay(attempt); got != time.Duration(minutes)*time.Minute {
@@ -144,6 +232,16 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.runAutomation()
+	waitAutomation(t, func() bool { _, active, _ := s.State(); return !active })
+	status, err := s.DB.AIOStatus(ctx)
+	if err != nil || status.Matched != 1 || status.MatchingPending != 1 || status.LastMatch == nil {
+		t.Fatalf("new import bypassed the identification interval: %+v %v", status, err)
+	}
+	// Move only the durable clock; no wall-clock wait or skipped queue item.
+	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET last_match=now()-INTERVAL '31 seconds'`); err != nil {
+		t.Fatal(err)
+	}
+	s.wakeAutomation()
 	waitAutomation(t, func() bool { status, _ := s.DB.AIOStatus(ctx); return status.Matched == 2 })
 	if requests.Load() != count {
 		t.Fatal("new import unnecessarily downloaded information")
@@ -163,7 +261,7 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 		_ = restarted.Close(cleanup)
 	})
 	restarted.runAutomation()
-	status, err := restarted.DB.AIOStatus(ctx)
+	status, err = restarted.DB.AIOStatus(ctx)
 	c, _ = restarted.DB.AIOConfig(ctx)
 	p := AutomationPlan(c, status, false, false, time.Now())
 	if err != nil || p.Updates != "scheduled" || p.NextUpdate == nil || !p.NextUpdate.Equal(status.LastSync.Add(15*time.Minute)) {

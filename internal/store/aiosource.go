@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, AutoSync: true, AutoMatch: true, SyncMinutes: 15, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)
@@ -122,11 +122,11 @@ COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM gr
 ) SELECT
 (SELECT count(*) FROM ingest.aio_works),
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
-(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error FROM ingest.aio_state CROSS JOIN counts`
+(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match FROM ingest.aio_state CROSS JOIN counts`
 
 func (s *Store) AIOStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
-	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(&v.Works, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError)
+	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(&v.Works, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch)
 	return v, databaseError("read AIOSources status", err)
 }
 func (s *Store) SaveAIOWork(ctx context.Context, w model.AIOWork, normalized []string) error {
@@ -613,11 +613,11 @@ func (s *Store) AIOCompletedSync(ctx context.Context) error {
 	return databaseError("finish metadata synchronization", err)
 }
 func (s *Store) ResetAIOMapping(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;DELETE FROM ingest.aio_matches;DELETE FROM ingest.aio_match_queue;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;DELETE FROM ingest.aio_matches;DELETE FROM ingest.aio_match_queue;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL`)
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;TRUNCATE ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;UPDATE ingest.aio_state SET last_sync=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;TRUNCATE ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
 	return databaseError("reset local metadata", err)
 }
 

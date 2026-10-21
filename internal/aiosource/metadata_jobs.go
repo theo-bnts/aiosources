@@ -140,8 +140,5 @@ func (s *Service) queueAutomaticMatching(ctx context.Context) {
 	if running || ctx.Err() != nil {
 		return
 	}
-	status, err := s.DB.AIOAutomationStatus(ctx)
-	if err == nil && status.Works > 0 && status.MatchingPending > 0 {
-		_ = s.startMatch("automatic")
-	}
+	s.wakeAutomation()
 }

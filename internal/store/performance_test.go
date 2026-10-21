@@ -62,7 +62,7 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	for _, name := range []string{"source-statistics", "metadata-statistics", "identification", "identification-filtered", "search", "stremio", "shared-cache", "storage"} {
+	for _, name := range []string{"source-statistics", "metadata-statistics", "metadata-controls", "identification", "identification-filtered", "search", "stremio", "shared-cache", "storage"} {
 		b.Run(name, func(b *testing.B) {
 			for b.Loop() {
 				switch name {
@@ -70,6 +70,8 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 					_, err = db.SourceTorrentStats(ctx, []string{"synthetic-0", "synthetic-1", "synthetic-2"})
 				case "metadata-statistics":
 					_, err = db.AIOStatus(ctx)
+				case "metadata-controls":
+					_, err = db.AIOControlStatus(ctx)
 				case "identification", "identification-filtered":
 					status := ""
 					if name == "identification-filtered" {

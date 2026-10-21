@@ -7,6 +7,7 @@ export type Config = {
   auto_sync: boolean
   auto_match: boolean
   sync_minutes: number
+  match_seconds: number
   tmdb_requests_per_second: number
   cache_minutes: number
   response_seconds: number
@@ -24,6 +25,7 @@ export type Status = {
     cleanup_pending: number
     cleanup_failed: number
     last_sync: string | null
+    last_match: string | null
     sync_error: string
   }
   syncing: boolean
@@ -31,10 +33,21 @@ export type Status = {
   automation: {
     updates: 'disabled' | 'missing_token' | 'blocked' | 'running' | 'scheduled' | 'retry' | 'due'
     next_update: string | null
-    identification: 'disabled' | 'waiting_information' | 'pending' | 'up_to_date' | 'running'
+    identification:
+      'disabled' | 'waiting_information' | 'pending' | 'up_to_date' | 'running' | 'scheduled'
+    next_identification: string | null
   }
   error: string
   rebuild_required: boolean
+}
+
+export type Controls = Omit<Status, 'status'> & {
+  status: Pick<
+    Status['status'],
+    'cleanup_pending' | 'cleanup_failed' | 'last_sync' | 'last_match' | 'sync_error'
+  > & {
+    has_information: boolean
+  }
 }
 
 export type MatchDiagnostic = {
