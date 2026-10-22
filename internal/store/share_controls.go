@@ -12,15 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// CatalogDownloadTimeout bounds database work and network delivery. A lease
-// outlives that hard deadline, so another replica cannot admit a replacement
-// while a slow response is still allowed to write.
-const CatalogDownloadTimeout = 20 * time.Second
-const catalogLeaseLifetime = CatalogDownloadTimeout + 5*time.Second
-
-// Preserve the existing 60-second playback and 65-second stream budgets.
-const StremioRequestTimeout = 70 * time.Second
-
 // CatalogQuotaError is safe to expose: it contains no credential or share data.
 type CatalogQuotaError struct {
 	RetryAfter int
@@ -59,9 +50,9 @@ func (s *Store) BeginTorznabRequest(ctx context.Context, shareID, password strin
 }
 
 func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format string) (*CatalogDownload, error) {
-	timeout := CatalogDownloadTimeout
-	if format == "stremio" {
-		timeout = StremioRequestTimeout
+	timeout, err := s.ConnectionTimeout(ctx, format)
+	if err != nil {
+		return nil, err
 	}
 	deadline := time.Now().Add(timeout)
 	ctx, cancel := context.WithDeadline(ctx, deadline)

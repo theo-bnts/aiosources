@@ -163,7 +163,7 @@ func TestPublicAllDebridAdministratorProbesRetainActualCleanupCalls(t *testing.T
 		t.Fatal("administrator probe did not fill common availability", err)
 	}
 	deadline := time.Now().Add(5 * time.Second)
-	for len(s.cleanupSlots) > 0 {
+	for s.cleanupDispatch.count() > 0 {
 		if time.Now().After(deadline) {
 			t.Fatal("owned cleanup did not complete")
 		}

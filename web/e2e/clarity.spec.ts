@@ -230,7 +230,7 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'pending';`)
     .getByRole('link', { name: 'Metadata', exact: true })
     .click()
   const formatted = await page.evaluate(() =>
-    new Intl.DateTimeFormat('en-GB', {
+    new Intl.DateTimeFormat(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(new Date('2026-01-02T03:04:00Z')),

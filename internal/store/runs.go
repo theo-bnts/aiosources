@@ -424,6 +424,15 @@ ORDER BY id DESC LIMIT 1),FALSE)`, run.ID).Scan(&unsafeFailure); err != nil {
 		status, reason = model.StatusFailed, ""
 		message = "Source configuration needs attention before this collection can resume"
 	} else if eligible {
+		var resume bool
+		if err := tx.QueryRow(ctx, "SELECT auto_resume_interrupted FROM ingest.collection_settings WHERE singleton").Scan(&resume); err != nil {
+			return run, false, databaseError("read automatic recovery", err)
+		}
+		if !resume {
+			eligible = false
+		}
+	}
+	if !run.RequiresManualResume() && !unsafeFailure && eligible {
 		status, reason = model.StatusQueued, ""
 		var active bool
 		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.runs WHERE provider_id=$1 AND id<>$2 AND status IN ('queued','running'))", run.ProviderID, run.ID).Scan(&active); err != nil {

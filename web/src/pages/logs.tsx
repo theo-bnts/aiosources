@@ -1,3 +1,4 @@
+import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -6,7 +7,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
 import { activityLevels, activityServices, type LogEntry } from '@/lib/activity-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
-import { messageText, dateTimeToISO, localDateTime, useDate } from '@/lib/format'
+import { messageText, dateTimeToISO, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { ActivityLinks, LevelBadge } from '@/components/activity-common'
@@ -32,6 +33,7 @@ import {
 
 export function LogsPage() {
   const date = useDate()
+  const dateZone = useDateTimeZoneLabel()
   const pagination = useURLPagination()
   const { limit, offset } = pagination
   const [search, setSearch] = useViewSearchParams()
@@ -154,17 +156,12 @@ export function LogsPage() {
             <Input id="log-query" name="q" defaultValue={q} placeholder="Search event messages" />
           </div>
           <div className="field">
-            <Label htmlFor="log-from">From (browser local time)</Label>
-            <Input
-              id="log-from"
-              name="from"
-              type="datetime-local"
-              defaultValue={localDateTime(from)}
-            />
+            <Label htmlFor="log-from">From ({dateZone})</Label>
+            <DateTimeInput id="log-from" name="from" defaultValue={from} />
           </div>
           <div className="field">
-            <Label htmlFor="log-to">To (browser local time)</Label>
-            <Input id="log-to" name="to" type="datetime-local" defaultValue={localDateTime(to)} />
+            <Label htmlFor="log-to">To ({dateZone})</Label>
+            <DateTimeInput id="log-to" name="to" defaultValue={to} />
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Button type="submit">
@@ -182,7 +179,7 @@ export function LogsPage() {
             />
           </div>
         </div>
-        <p className="help">Date filters use the browser's timezone.</p>
+        <p className="help">Date filters use {dateZone}.</p>
         <ErrorNotice error={filterError} />
       </form>
       <ErrorNotice error={providers.error} retry={() => void providers.refetch()} />

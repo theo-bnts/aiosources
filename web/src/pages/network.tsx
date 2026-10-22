@@ -1,3 +1,4 @@
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
@@ -170,6 +171,7 @@ export function NetworkPage() {
           />
         ))
       )}
+      <RuntimeSettingsPanel section="outgoing" />
       {editing && (
         <ProxyEditor
           initial={editing.proxy}
@@ -517,26 +519,24 @@ export function NetworkRoutingPage() {
               </p>
             )}
             <ErrorNotice error={save.error} />
-            <div className="toolbar justify-between">
+            <div className="toolbar">
+              <Button type="submit" disabled={save.isPending || !dirty || conflict}>
+                {save.isPending ? 'Saving…' : 'Save'}
+              </Button>
               <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
-              <div className="flex gap-2">
-                {conflict && (
-                  <Button
-                    type="button"
-                    variant="warning"
-                    disabled={save.isPending}
-                    onClick={() => {
-                      setDraft(null)
-                      save.reset()
-                    }}
-                  >
-                    Discard changes and reload
-                  </Button>
-                )}
-                <Button type="submit" disabled={save.isPending || !dirty || conflict}>
-                  {save.isPending ? 'Saving…' : 'Save'}
+              {conflict && (
+                <Button
+                  type="button"
+                  variant="warning"
+                  disabled={save.isPending}
+                  onClick={() => {
+                    setDraft(null)
+                    save.reset()
+                  }}
+                >
+                  Discard changes and reload
                 </Button>
-              </div>
+              )}
             </div>
           </form>
         )

@@ -240,3 +240,43 @@ test('refresh covers mutable source data and diagnostics without invalidating im
     assert.equal(queryClient.getQueryState([key, 'fixture'])?.isInvalidated, true, key)
   assert.equal(queryClient.getQueryState(['raw-page', 'fixture'])?.isInvalidated, false)
 })
+
+test('frequent progress events honor statistics pacing while controls and explicit writes stay immediate', async () => {
+  const originalNow = Date.now
+  let now = originalNow()
+  Date.now = () => now
+  let statistics = 0,
+    controls = 0
+  const observers = [
+    new QueryObserver(queryClient, {
+      queryKey: ['aiosource'],
+      staleTime: Infinity,
+      refetchInterval: false,
+      queryFn: async () => ++statistics,
+    }),
+    new QueryObserver(queryClient, {
+      queryKey: ['aiosource', 'control'],
+      staleTime: Infinity,
+      refetchInterval: false,
+      queryFn: async () => ++controls,
+    }),
+  ]
+  queryClient.setQueryData(['aiosource'], 0)
+  queryClient.setQueryData(['aiosource', 'control'], 0)
+  const unsubscribes = observers.map((observer) => observer.subscribe(() => {}))
+  try {
+    for (let i = 0; i < 12; i++) {
+      now += 5000
+      await refreshLiveData()
+    }
+    assert.equal(statistics, 4)
+    assert.equal(controls, 12)
+    await refreshData()
+    assert.equal(statistics, 5)
+    assert.equal(controls, 13)
+  } finally {
+    unsubscribes.forEach((unsubscribe) => unsubscribe())
+    observers.forEach((observer) => observer.destroy())
+    Date.now = originalNow
+  }
+})

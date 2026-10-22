@@ -55,13 +55,11 @@ func (s *Service) cacheFlightTriggered(service, key, resource string, hashes []s
 				return
 			}
 		}
-		select {
-		case s.slots <- struct{}{}:
-			defer func() { <-s.slots }()
-		case <-ctx.Done():
-			f.err = ctx.Err()
+		if err := s.acquireCapacity(ctx, &s.slots, "cache_jobs", true); err != nil {
+			f.err = err
 			return
 		}
+		defer s.slots.release()
 		f.err = s.checkResourceTriggered(ctx, service, key, resource, hashes, c, trigger)
 	}()
 	return f, nil
@@ -297,6 +295,11 @@ func (s *Service) adCheckOwned(ctx context.Context, key, hash string) (model.AIO
 	return result, err
 }
 func (s *Service) enqueueCleanup(parent context.Context, key, hash string) {
+	limit, policyErr := s.DB.RuntimeValue(s.ctx, "debrid", "cleanup_jobs")
+	if policyErr != nil {
+		return
+	}
+
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
@@ -304,9 +307,7 @@ func (s *Service) enqueueCleanup(parent context.Context, key, hash string) {
 	}
 	// Ownership is already durable. Leave excess jobs for recovery instead of
 	// opening an unbounded number of database locks or provider requests.
-	select {
-	case s.cleanupSlots <- struct{}{}:
-	default:
+	if !s.cleanupDispatch.try(limit) {
 		s.mu.Unlock()
 		return
 	}
@@ -314,7 +315,7 @@ func (s *Service) enqueueCleanup(parent context.Context, key, hash string) {
 	s.mu.Unlock()
 	go func() {
 		defer s.wg.Done()
-		defer func() { <-s.cleanupSlots }()
+		defer s.cleanupDispatch.release()
 		ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
 		defer cancel()
 		// Keep the safe operation reference, without inheriting the caller's
@@ -337,7 +338,14 @@ func (s *Service) cleanupHash(ctx context.Context, key, hash string, retry bool)
 		if j.Failed && !retry {
 			return errors.New("temporary magnet cleanup requires attention")
 		}
+		// All ordinary deletion paths share this permit. Dispatch permits are
+		// separate: a queued job waiting for a hash must not prevent its owner
+		// from finishing a prior cleanup while holding that same hash lock.
+		if err := s.acquireCapacity(ctx, &s.cleanupSlots, "cleanup_jobs", true); err != nil {
+			return err
+		}
 		err = s.Providers.ADDelete(ctx, key, j.ID)
+		s.cleanupSlots.release()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

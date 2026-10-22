@@ -12,6 +12,7 @@ export function supportsMetadata(provider: Provider | undefined): boolean {
 }
 
 export interface CollectionSettings {
+  auto_resume_interrupted?: boolean
   workers: number
   max_quota_retries: number
   max_quota_wait_seconds: number

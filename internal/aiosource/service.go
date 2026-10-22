@@ -34,13 +34,15 @@ type Service struct {
 	lastError                 string
 	flights                   map[string]*flight
 	probes                    map[string]*adProbe
-	slots                     chan struct{}
-	downloadSlots             chan struct{}
-	cleanupSlots              chan struct{}
-	publicProbe               chan struct{}
-	publicADMu                sync.Mutex
-	publicADFlight            *flight
-	automationWake            chan struct{}
+	slots                     capacityGate
+	downloadSlots             capacityGate
+	cleanupSlots              capacityGate
+	cleanupDispatch           capacityGate
+	// Public probes have their own capacity, preserving room for administrator work.
+	publicProbe    capacityGate
+	publicADMu     sync.Mutex
+	publicADFlight *flight
+	automationWake chan struct{}
 }
 type flight struct {
 	warm   bool // Immutable admission state, shared by callers joining this check.
@@ -54,9 +56,11 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 		return nil, errors.New("AIOSources dependencies required")
 	}
 	life, cancel := context.WithCancel(ctx)
-	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}, slots: make(chan struct{}, 4), cleanupSlots: make(chan struct{}, 4)}
+	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}}
 	s.Network = &outbound.Router{Settings: db.NetworkSettings, Secrets: v.Resolve}
 	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
+	s.Providers.Client.Timeout = 0 // Per-request policy supplies the deadline.
+	s.Providers.Timeout = func(ctx context.Context) (time.Duration, error) { return s.outgoingTimeout(ctx, "debrid_seconds") }
 	s.Providers.Client.Transport = s.Network.Transport("", outbound.HTTPTransport())
 	release, locked, err := db.AIOLock(ctx, "installation")
 	if err != nil {
@@ -69,9 +73,6 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	}
 	defer release()
 	s.automationWake = make(chan struct{}, 1)
-	s.downloadSlots = make(chan struct{}, 4)
-	// Public cache checks must leave connection capacity for administration.
-	s.publicProbe = make(chan struct{}, 1)
 	if err = db.RecoverOperations(ctx); err != nil {
 		cancel()
 		return nil, err

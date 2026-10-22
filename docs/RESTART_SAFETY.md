@@ -77,7 +77,7 @@ request does not repair invalid credentials or an invalid definition.
 ## Regression coverage
 
 The automated suite covers transaction rollback, interrupted publication,
-source metadata checkpoints, orphaned leases, seven-day history cleanup and
+source metadata checkpoints, orphaned leases, configurable diagnostic history cleanup and
 persisted matching/cache queues. Additional end-to-end scenarios
 kill a real worker process during Full and Incremental collection, reopen state
 between three consecutive tracker failures, and verify metadata and AD/TB

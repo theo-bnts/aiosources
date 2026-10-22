@@ -41,7 +41,12 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 400, 201, "Incorrect parameter")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), store.CatalogDownloadTimeout)
+	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "torznab")
+	if budgetErr != nil {
+		torznabError(w, http.StatusServiceUnavailable, 910, "Connection settings are unavailable")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()

@@ -145,7 +145,7 @@ The administrator chooses whether to disclose source names and allow visitors to
 
 Set visitor request limits in **Administration → Public access → Request limits** (defaults: 12 link creations and 120 public requests per minute per visitor IP, with 50 simultaneous public requests per process). Each limit can be switched off independently, including the global concurrency limit. Behind Cloudflare or another reverse proxy, configure **Network → Incoming** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
 
-Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for seven days. Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
+Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for the configured history retention period (seven days by default). Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
 
 ## Keep track of your instance
 
@@ -155,7 +155,9 @@ Visitors must trust the host processing their keys and keep their installation U
 - **Storage** shows where space is used. **Storage saving**, enabled by default, keeps the fields used by AIOSources and compatible apps instead of unnecessary source details.
 - **Security** manages encrypted secrets, two-step verification and active sessions.
 
-Diagnostic history is cleaned up after seven days. Published records and saved progress for unfinished imports remain available. A cancelled or paused import may therefore retain preparation data; retained history is not the same as the live catalog. See [storage and operations](docs/OPERATIONS.md).
+Diagnostic history is cleaned up after seven days by default; its duration and cleanup interval can be adjusted in Storage settings. Published records and saved progress for unfinished imports remain available. A cancelled or paused import may therefore retain preparation data; retained history is not the same as the live catalog. See [storage and operations](docs/OPERATIONS.md).
+
+Use **Interface preferences**, beside About, to choose the page size, date format, time zone and a lighter refresh mode on your browser. Less common capacity and timeout controls stay folded on their respective settings pages; see [application settings](docs/CONFIGURATION_REVIEW.md).
 
 Changing the storage mode affects new imports. If you want to import everything again, **Storage → Settings → Maintenance → Reset all source data** removes imported data and history while retaining source definitions, secrets, schedules, TMDB information and debrid caches. Review the confirmation carefully: this cannot be undone.
 

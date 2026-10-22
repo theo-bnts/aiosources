@@ -10,7 +10,6 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 func (s *server) registerPublicTorznab(mux *http.ServeMux) {
@@ -96,7 +95,12 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	ctx, cancel := context.WithTimeout(r.Context(), store.CatalogDownloadTimeout)
+	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "torznab")
+	if budgetErr != nil {
+		torznabError(w, http.StatusServiceUnavailable, 910, "Connection settings are unavailable")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()

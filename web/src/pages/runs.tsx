@@ -414,7 +414,7 @@ function EventsView({ runId }: { runId: string }) {
         !events.isError && (
           <ListEmpty
             title={events.data?.total ? 'No events on this page' : 'No retained events'}
-            description="Events are kept for seven days."
+            description="Events follow the history retention policy in Storage settings."
             offset={offset}
             onFirstPage={() => setOffset(0)}
           />

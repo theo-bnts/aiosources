@@ -9,12 +9,13 @@ const (
 
 // CollectionSettings applies capacity immediately; execution defaults are captured at creation.
 type CollectionSettings struct {
-	Workers             int    `json:"workers"`
-	MaxQuotaRetries     int    `json:"max_quota_retries"`
-	MaxQuotaWaitSeconds int    `json:"max_quota_wait_seconds"`
-	NoProgressRequests  int    `json:"no_progress_requests"`
-	NoProgressAction    string `json:"no_progress_action"`
-	Revision            int64  `json:"revision"`
+	AutoResumeInterrupted bool   `json:"auto_resume_interrupted"`
+	Workers               int    `json:"workers"`
+	MaxQuotaRetries       int    `json:"max_quota_retries"`
+	MaxQuotaWaitSeconds   int    `json:"max_quota_wait_seconds"`
+	NoProgressRequests    int    `json:"no_progress_requests"`
+	NoProgressAction      string `json:"no_progress_action"`
+	Revision              int64  `json:"revision"`
 }
 
 func (s CollectionSettings) Valid() bool {

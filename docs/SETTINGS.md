@@ -118,4 +118,6 @@ Sessions persist in PostgreSQL, expire after twelve hours, and can be revoked in
 
 Back up **both** the PostgreSQL database and the state volume. Losing `vault.key` makes stored credentials unrecoverable. Do not regenerate it for an existing vault. A supplied `MASTER_KEY` must be exactly 32 bytes encoded as base64 or hexadecimal.
 
-See the [configuration options review](CONFIGURATION_REVIEW.md) for fixed defaults that can stay automatic and proposed advanced controls.
+See [application settings](CONFIGURATION_REVIEW.md) for available advanced controls, their defaults and the safeguards that remain automatic.
+
+Browser-only display controls are available through **Interface preferences** beside About. Operational controls stay in their corresponding application pages; see [application settings](CONFIGURATION_REVIEW.md) and the [interface review](INTERFACE_REVIEW.md).

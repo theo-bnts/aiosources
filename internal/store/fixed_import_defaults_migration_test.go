@@ -14,12 +14,11 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
 		t.Run(map[bool]string{false: "previous opt-out", true: "previous automatic recovery"}[enabled], func(t *testing.T) {
 			ctx, endpoint, db := activityDatabase(t)
 			if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.collection_settings
- ADD COLUMN auto_resume_interrupted BOOLEAN NOT NULL DEFAULT TRUE,
  ADD COLUMN default_request_timeout_seconds INTEGER NOT NULL DEFAULT 30,
  ADD COLUMN default_preview_pages INTEGER NOT NULL DEFAULT 3,
  ADD COLUMN default_max_pages INTEGER NOT NULL DEFAULT 0,
  ADD COLUMN default_max_duration_seconds INTEGER NOT NULL DEFAULT 0;
- DELETE FROM ingest.schema_migrations WHERE version=42`); err != nil {
+ DELETE FROM ingest.schema_migrations WHERE version IN (42,73); DROP TABLE ingest.runtime_settings`); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := db.pool.Exec(ctx, `UPDATE ingest.collection_settings SET workers=5,
@@ -48,6 +47,7 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
 			}
 			want := before
 			want.Revision++
+			want.AutoResumeInterrupted = true
 			for range 2 {
 				if err := db.Migrate(ctx); err != nil {
 					t.Fatal(err)
@@ -65,7 +65,7 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
 				t.Fatalf("stale draft accepted: %v", err)
 			}
 			var retired int
-			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='ingest' AND table_name='collection_settings' AND column_name IN ('auto_resume_interrupted','default_request_timeout_seconds','default_preview_pages','default_max_pages','default_max_duration_seconds')`).Scan(&retired); err != nil || retired != 0 {
+			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='ingest' AND table_name='collection_settings' AND column_name IN ('default_request_timeout_seconds','default_preview_pages','default_max_pages','default_max_duration_seconds')`).Scan(&retired); err != nil || retired != 0 {
 				t.Fatalf("retired storage: %d %v", retired, err)
 			}
 			db.Close()

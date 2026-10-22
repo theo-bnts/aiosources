@@ -1,3 +1,4 @@
+import { browserPreferences, useBrowserPreferences } from './browser-preferences.ts'
 import { useMemo } from 'react'
 import type { Run, RunMode, RunStatus } from './types'
 
@@ -41,17 +42,33 @@ export function number(value: number) {
   return integers.format(value)
 }
 export function useDate() {
+  const preferences = useBrowserPreferences()
   return useMemo(() => {
-    const dates = new Intl.DateTimeFormat('en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
+    const dates = new Intl.DateTimeFormat(
+      preferences.dateFormat === 'browser' ? undefined : 'en-GB',
+      {
+        timeZone: preferences.timeZone === 'utc' ? 'UTC' : undefined,
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      },
+    )
     return (value?: string) => {
       if (!value) return 'Not provided'
       const parsed = new Date(value)
-      return Number.isNaN(parsed.getTime()) ? value : dates.format(parsed)
+      if (Number.isNaN(parsed.getTime())) return value
+      if (preferences.dateFormat === 'iso') {
+        const date =
+          preferences.timeZone === 'utc'
+            ? parsed
+            : new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000)
+        return (
+          date.toISOString().slice(0, 16).replace('T', ' ') +
+          (preferences.timeZone === 'utc' ? ' UTC' : '')
+        )
+      }
+      return dates.format(parsed)
     }
-  }, [])
+  }, [preferences])
 }
 export function bytes(value: unknown) {
   if (value === null || value === undefined || value === '') return 'Not provided'
@@ -62,23 +79,29 @@ export function bytes(value: unknown) {
   return `${decimals.format(n / 1024 ** power)} ${['B', 'KiB', 'MiB', 'GiB', 'TiB'][power]}`
 }
 
-// datetime-local fields use the same browser timezone as displayed timestamps.
-export function localDateTime(value?: string | null, precision: 'minutes' | 'seconds' = 'minutes') {
+// Editable timestamps use the selected display timezone and retain their instant.
+export function localDateTime(
+  value?: string | null,
+  precision: 'minutes' | 'seconds' | 'milliseconds' = 'minutes',
+) {
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
-  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000)
+  return new Date(
+    parsed.getTime() -
+      (browserPreferences().timeZone === 'utc' ? 0 : parsed.getTimezoneOffset() * 60_000),
+  )
     .toISOString()
-    .slice(0, precision === 'seconds' ? 19 : 16)
+    .slice(0, precision === 'milliseconds' ? 23 : precision === 'seconds' ? 19 : 16)
 }
 
 export function dateTimeToISO(
   value: string,
   previous?: string | null,
-  precision: 'minutes' | 'seconds' = 'minutes',
+  precision: 'minutes' | 'seconds' | 'milliseconds' = 'minutes',
 ) {
   if (!value) return null
   // Untouched fields retain fractional seconds and the offset of a repeated DST hour.
   if (previous && localDateTime(previous, precision) === value) return previous
-  return new Date(value).toISOString()
+  return new Date(browserPreferences().timeZone === 'utc' ? value + 'Z' : value).toISOString()
 }

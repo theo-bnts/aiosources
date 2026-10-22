@@ -1,3 +1,4 @@
+import { useBrowserPreferences } from '@/lib/browser-preferences'
 import { ResultCount } from '@/components/common'
 import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -49,7 +50,7 @@ const explanations: Record<string, string> = {
   imports:
     'Unpublished data and checkpoints used to complete or resume imports. Successful publication releases that run’s preparation data.',
   'source-history':
-    'Collection diagnostics and published changes. Diagnostic content expires after seven days; evidence needed to resume unfinished work can remain.',
+    'Collection diagnostics and published changes. Diagnostic content follows the history retention policy; evidence needed to resume unfinished work can remain.',
   information: 'Local titles, identifiers and season information used for identification.',
   identification: 'Current identification decisions, manual reviews and pending work.',
   'information-queue': 'The information inventory and durable work waiting for an update.',
@@ -60,10 +61,11 @@ const explanations: Record<string, string> = {
   'shared-snapshots':
     'Snapshots and changes needed by enabled catalog shares. Imported remote records are counted under Sources.',
   'stream-history':
-    'Request summaries and returned results, retained for seven days. Service keys and playback credentials are excluded.',
-  'activity-history': 'Application activity and sanitized error messages, retained for seven days.',
+    'Request summaries and returned results, kept within the configured history retention period. Service keys and playback credentials are excluded.',
+  'activity-history':
+    'Application activity and sanitized error messages, kept within the configured history retention period.',
   'operation-history':
-    'Information updates, identification runs and availability check history, retained for seven days.',
+    'Information updates, identification runs and availability check history, kept within the configured history retention period.',
   state: 'Configuration, permissions and checkpoints needed by this feature.',
 }
 
@@ -124,7 +126,11 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
   const sources = [...(report.source_storage ?? [])].sort(
     (a, b) => b.bytes - a.bytes || a.provider_id.localeCompare(b.provider_id),
   )
-  const offset = Math.min(sourceOffset, Math.max(0, Math.ceil(sources.length / 50) - 1) * 50)
+  const { pageSize } = useBrowserPreferences()
+  const offset = Math.min(
+    Math.floor(sourceOffset / pageSize) * pageSize,
+    Math.max(0, Math.ceil(sources.length / pageSize) - 1) * pageSize,
+  )
   return (
     <div className="space-y-4">
       <Disclosure title="By source (estimated)">
@@ -141,7 +147,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sources.slice(offset, offset + 50).map((source) => (
+                {sources.slice(offset, offset + pageSize).map((source) => (
                   <TableRow key={source.provider_id}>
                     <TableCell className="break-words whitespace-normal">
                       {sourceName(source.provider_id)}
@@ -157,8 +163,13 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
             Source estimates appear when PostgreSQL has analyzed the stored data.
           </p>
         )}
-        {sources.length > 50 && (
-          <Pager total={sources.length} limit={50} offset={offset} onChange={setSourceOffset} />
+        {sources.length > pageSize && (
+          <Pager
+            total={sources.length}
+            limit={pageSize}
+            offset={offset}
+            onChange={setSourceOffset}
+          />
         )}
         <p className="help">
           Includes source records, preparation data, retained history and indexes. Estimates use
@@ -185,7 +196,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
               <p className="help text-amber-300">
                 {number(report.cancelled_import_count ?? 0)} cancelled import
                 {report.cancelled_import_count === 1 ? ' keeps' : 's keep'} prepared data for
-                resuming. This data does not expire after seven days.
+                resuming. This data is preserved while needed for recovery.
               </p>
             )}
             <ResultCount total={report.retained_import_count ?? 0} label="retained imports" />
@@ -349,13 +360,15 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
           </p>
           <Disclosure title="Retention and estimates" variant="inline">
             <p className="help">
-              Diagnostic history older than seven days is removed automatically in batches.
-              Published torrents, metadata and current identification decisions remain available.
+              Expired diagnostic history is removed automatically in batches, according to Storage
+              settings. Published torrents, metadata and current identification decisions remain
+              available.
             </p>
             <p className="help">
               Unfinished Full imports, including failed and cancelled runs, keep preparation data
-              needed to resume. Their checkpoints and coverage evidence can remain beyond seven
-              days. Successful publication clears preparation data for that run.
+              needed to resume. Their checkpoints and coverage evidence can remain beyond the
+              configured retention period. Successful publication clears preparation data for that
+              run.
             </p>
             <p className="help">
               Deleting records makes PostgreSQL space reusable; it does not necessarily shrink

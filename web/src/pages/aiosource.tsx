@@ -1,3 +1,4 @@
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
@@ -394,6 +395,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
         </>
       )}
       {section === 'debrid' && settingsForm}
+      {section === 'debrid' && <RuntimeSettingsPanel section="debrid" />}
       {section === 'debrid' && (
         <form
           aria-label="Private source playback"

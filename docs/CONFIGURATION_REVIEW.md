@@ -1,54 +1,42 @@
-# Configuration options review
+# Application settings
 
-[Back to README](../README.md) · [Current deployment settings](SETTINGS.md)
+[Back to README](../README.md) · [Deployment settings](SETTINGS.md)
 
-This inventory separates useful future settings from fixed behavior that can stay automatic. It covers operational choices an administrator could reasonably tune, grouped by purpose. Protocol identifiers, database column sizes, cryptographic constants and library implementation details are not user settings.
+Frequently used settings stay on their existing pages. Less common operational settings are folded until needed. Administrator settings are stored in PostgreSQL with independent revisions; they survive restarts and cannot silently overwrite a concurrent edit. Starting values are listed below; incoming Stremio budgets now use one policy for private and public installations.
 
-These are proposals, not newly available controls. Existing source schedules, request pacing and quotas, import concurrency, TMDB request rate, identification intervals, cache lifetime, response waiting time, storage mode, connection filters, proxy routing and public request limits are already configurable and are not missing options.
+## Available controls
 
-## Worth making configurable
-
-| Setting | Current behavior | Benefit and suggested location |
+| Where | What can be adjusted | Default and bounds |
 | --- | --- | --- |
-| Identification resource budget | Automatically selects 1–10 workers from the PostgreSQL pool capacity. | An optional bounded override could reserve resources on small servers or use larger servers. Keep Automatic as the default, in Metadata → Settings → Advanced settings. |
-| Debrid operation capacity | Four cache/preparation slots, four cleanup slots, four download-preparation slots and one shared public cache-probe slot per process. | Separate bounded limits could adapt to provider quotas and instance load. Group them in Debrid advanced settings; they are different from visitor request admission limits. |
-| Outgoing service request timeouts | Metadata and debrid clients use 60 seconds; the TMDB inventory download uses 10 minutes. Source request timeouts are already individually configurable. | An advanced timeout for each service class could help slow connections and proxies without changing source pacing. Place it under Network → Outgoing. |
-| Administrator session duration | 12 hours. | A bounded duration could suit a shared machine or a private installation. Keep it in Security advanced settings. |
-| Browser download duration | Transfers stop after at most 24 hours. | A bounded setting could accommodate large files and slow connections. Keep download authorization and destination checks independent of it. |
-| Connection request budgets | Catalog/Torznab requests have a 20-second budget; Stremio has a 70-second budget. | Advanced budgets could help unusually large catalogs. They must remain consistent with leases and provider waiting time, rather than exposing unrelated timeout fields. |
-| Interface refresh pacing | Active controls refresh every 5 seconds, collection statistics every 15 seconds and ordinary reads every 30 seconds. | Lower priority: one Normal / Reduced activity choice could reduce background requests without exposing a separate interval on every page. |
+| Debrid → Settings → Operation capacity | Cache update jobs, download preparations, cleanup jobs and public TorBox probes per application process | 4 / 4 / 4 / 1. The first three allow 1–32; public probes allow 1–16. A cache update may issue several provider calls. |
+| Network → Outgoing → Proxies → Request timeouts | Individual metadata requests, debrid requests and metadata inventory downloads | 60 / 60 / 600 seconds; bounds 5–600 / 5–600 / 30–3600. Source timeouts stay in each source definition. |
+| Network → Incoming → Request timeouts | Stremio, Torznab and shared catalog processing and delivery budgets | 70 / 20 / 20 seconds; bounds 10–600 / 5–600 / 5–600. Applies to private and public connections. |
+| Storage → Settings → History retention | History duration and ordinary cleanup interval | 7 days and 30 seconds; bounds 1–3650 days and 5–3600 seconds. |
+| Sources → Settings → Advanced settings → Recovery | Automatically resume imports interrupted by a process or connection failure | On. Turning it off leaves interrupted imports paused for manual resume. |
+| Interface preferences, beside About | Page size, date format, time zone and automatic refresh | 50 rows; browser language and time zone; Normal refresh. Page sizes: 25/50/100; date formats: browser/English/ISO; time zones: browser/UTC. |
 
-The first three have the clearest operational value. Any future control needs bounds, revision handling, restart persistence and the same effective limit in the workers as the value shown in the interface.
+Capacities apply to newly admitted work. Reducing a limit does not interrupt active work, replace its permits or lose its cleanup ownership. Increasing a limit lets queued work use the new capacity. Provider pacing remains enforced. Recoverable AllDebrid cache work uses the cache update queue; direct public TorBox probes have their own limit.
 
-## Fixed settings that can stay fixed
+Timeouts apply to new requests. A parent operation or incoming request can have a shorter remaining budget. Outgoing timeouts include reading the response body; the inventory download timeout excludes subsequent database processing. Incoming request leases outlive their delivery deadline so another replica cannot admit a replacement while the old request is still authorized to write. These budgets differ from **Debrid → Stream response timeout**, which controls how long a response waits for availability checks, and from an active file download's maximum lifetime.
 
-| Area | Current fixed behavior | Why a new control is not necessary |
-| --- | --- | --- |
-| Diagnostic retention | Seven days for expired history content. Live data and evidence needed to continue an import are preserved. | A single retention policy keeps storage predictable and follows the existing product choice. It is not a promise to delete every preparation row after seven days. |
-| History cleanup cadence | Runs at startup, every 30 seconds when idle and after one second when a pass removed content. | Backlog handling should remain automatic. |
-| History cleanup batches | Bounded batches of 5,000, with a 10-second pass budget. | These are interruption and database-load controls, not a user workflow. |
-| Stremio request history bounds | At most 10,000 requests within seven days, and 1,000 display summaries per large response, alongside the full returned count. | Keeps request diagnostics bounded without hiding the real result count. |
-| Storage measurement cadence | PostgreSQL storage is measured every minute. | Independent of how often a browser page refreshes; no additional page control is needed. |
-| Pagination | 50 rows per interface page. | A consistent page size is simpler. API-specific page limits retain their own contracts. |
-| Displayed dates | Use the browser's language and time zone. | No separate application preference is needed. |
-| Automatic recovery | Enabled for interrupted work with saved checkpoints; manual/error holds and cancellations retain their existing rules. | Recovery should follow the recorded cause, rather than a second global switch. |
-| Import defaults | Preview starts at three pages; other defaults come from the selected source or the run's explicit overrides. | The source and the per-run form already provide the relevant controls. |
-| Import ownership and publication | One active collection owns a source; Full imports publish atomically after successful completion. | These protect correctness and should not be disabled. |
-| Text search bounds | Up to 500 query characters and 100 source filters; searchable text has a bounded 128 KiB UTF-8 prefix per occurrence. | Bounds query and indexing cost. Original stored fields are not rewritten by the search projection. |
-| Matching batches | Fetch up to 250 queued records, using transaction groups of up to 25 with smaller groups for short queues. | The worker already adapts to available work. Resource concurrency is the useful potential setting, not every batch size. |
-| Matching candidates and decisions | Candidate overflow, contradictory identifiers, ambiguous works, dates and invalid numbering prevent unsafe matches. | Loosening these rules is not a normal setting; corrections should retain testable matching behavior. |
-| TMDB incremental window | A 14-day change window and dated inventory recovery are handled automatically. | These follow upstream capabilities and checkpoint semantics. |
-| Metadata request retries | Up to four immediate attempts with bounded delays; interrupted/failed automatic updates use the durable retry clock, with delays capped at 15 minutes. | Provider deadlines and restart recovery should stay coherent. The ordinary update interval is already configurable. |
-| Debrid cleanup retries | Exponential retry delay from 15 minutes up to 48 hours. | Temporary provider failures should not become a tight retry loop. |
-| Final checkpoint budgets | Short bounded writes preserve completed work while shutting down or cancelling. | These are internal completion guarantees. Source and service request timeouts are separate concerns. |
-| Browser retries | Reads have a bounded automatic retry; writes are not automatically replayed. | Avoids duplicate actions and preserves clear failure handling. |
-| Live event transport | A 15-second heartbeat and bounded write deadlines detect disconnected consoles. | This is transport maintenance, separate from import or metadata schedules. |
-| Incoming settings propagation | Other processes reload the shared incoming policy within one second. | Keep enforcement automatic after saving. |
-| Sign-in protection | The per-address front gate allows at most ten attempts per minute, alongside durable authentication protections. | Keep a protective minimum independent of public addon request limits. |
-| Two-step verification | Six-digit authenticator codes, replay protection and a ten-minute enrollment window. | These are interoperability and account-protection rules. |
-| Download authorization tickets | Ten-minute expiry, bound to the relevant session or public installation state. | Expiry protects the generated link; it is separate from the allowed duration of an already authorized transfer. |
-| Payload and definition bounds | Source definitions are bounded to 128 KiB, public Stremio configurations to 8 KiB and public Torznab configurations to 6,000 bytes. Other endpoints retain their own smaller body, query and response limits. | Input bounds protect memory, URLs and client interoperability; do not make arbitrary payload growth an ordinary option. |
-| Network and credential safeguards | TLS validation, trusted-hop parsing, destination checks, CSRF/origin checks, encrypted secrets and administrator credential isolation remain enforced. | These are security guarantees, not optional preferences. |
-| Public credential handling | Keys and optional announce URLs can be remembered locally in the visitor's browser; the server does not save the visitor's credentials. | Preserve the same privacy behavior across Search, Stremio and Torznab. |
+Cleanup remains progressive and transactional. Reducing retention can permanently delete older diagnostics; increasing it cannot restore deleted data. Published torrents, metadata, matching decisions, pending jobs and evidence needed to continue an import are preserved. Stremio history also retains its 10,000-request cap and up to 1,000 result summaries per request. A backlog is processed in bounded batches rather than one unbounded deletion.
 
-Values already available through a command-line option, environment variable or source definition remain configurable even when they have no separate global form field. See [deployment settings](SETTINGS.md) and [source configuration](CONFIGURATION.md) before adding a duplicate control.
+Recovery does not override manual pauses, quota holds, cancellations or authentication, certificate and configuration failures. Metadata update and identification automation retain their existing opt-ins and durable schedules.
+
+Interface preferences are browser-local, shared between public and administrator pages, and do not change server schedules. Reduced activity refreshes active controls every 15 seconds, statistics every 45 seconds and ordinary lists every 90 seconds, instead of 5/15/30 seconds. Dates in editable expiration fields use the selected display time zone while keeping their saved instant. Source schedule time zones remain independent.
+
+## Intentionally unchanged
+
+| Area | Current behavior and reason |
+| --- | --- |
+| Identification resources | Automatically chooses 1–10 concurrent workers from PostgreSQL pool capacity. This is the number of local records being identified concurrently, not a match confidence threshold or TMDB request rate. No override was added. |
+| Active browser download duration | A transfer through the application can last at most 24 hours. This is separate from preparing a debrid item or waiting for a search response. The ten-minute authorization ticket remains a separate protection. No duration control was added. |
+| Administrator session duration | 12 hours; unchanged. |
+| Processing batches | Matching fetches up to 250 queued records and commits in groups of up to 25; cleanup uses bounded batches of 5,000 with a ten-second pass budget. These balance database overhead, memory use and checkpoint frequency. No new batch-size control was added. |
+| Error retries | Source quota retries are already configurable. Metadata has up to four immediate attempts, then a durable retry clock; cleanup backs off from 15 minutes up to 48 hours. Writes in the browser are never automatically replayed. No additional retry switches were added. |
+| Matching reliability | Candidate overflow, contradictory IDs, ambiguous works, release years, seasons, episode numbering and season packs retain their safeguards. These decide whether a result is safe to publish; loosening them could create incorrect matches. Manual review remains available. |
+| Authentication and network protections | Password and two-step verification protections, replay checks, CSRF/origin checks, trusted-hop parsing, TLS validation, destination restrictions and encrypted administrator secrets remain enforced. No security opt-outs were added. |
+| Payload bounds | Source definitions remain limited to 128 KiB, public Stremio configurations to 8 KiB and public Torznab configurations to 6,000 bytes. Search, response and file limits retain their existing bounded contracts. |
+| Publication and recovery evidence | One active collection owns a source; full imports publish atomically on success. Diagnostic retention never discards live publication or evidence required to resume incomplete work. |
+
+See [deployment settings](SETTINGS.md) and [source configuration](CONFIGURATION.md) for settings already available through environment variables, command-line options or individual definitions.

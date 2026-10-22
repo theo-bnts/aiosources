@@ -24,7 +24,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		return 0, nil
 	}
 	var cutoff time.Time
-	if err = tx.QueryRow(ctx, `SELECT now()-interval '7 days'`).Scan(&cutoff); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'))`).Scan(&cutoff); err != nil {
 		return 0, databaseError("read history cutoff", err)
 	}
 	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true)`); err != nil {

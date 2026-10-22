@@ -111,7 +111,7 @@ export function StremioStatisticsPage() {
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />
             </dl>
             <p className="help">
-              Retained history: last 7 days, up to 10,000 requests.
+              Within the configured history retention period, up to 10,000 requests.
               {query.data.since && ` Oldest request: ${date(query.data.since)}.`}
             </p>
             {query.data.requests === 0 && (

@@ -38,12 +38,12 @@ func (s *Store) InitializeCollectionSettings(ctx context.Context, workers int) e
 	return databaseError("commit collection settings initialization", tx.Commit(ctx))
 }
 
-const collectionSettingsColumns = `COALESCE(workers,5),max_quota_retries,max_quota_wait_seconds,no_progress_requests,no_progress_action,revision`
+const collectionSettingsColumns = `COALESCE(workers,5),max_quota_retries,max_quota_wait_seconds,no_progress_requests,no_progress_action,revision,auto_resume_interrupted`
 
 func scanCollectionSettings(row scanner) (model.CollectionSettings, error) {
 	var value model.CollectionSettings
 	err := row.Scan(&value.Workers, &value.MaxQuotaRetries, &value.MaxQuotaWaitSeconds,
-		&value.NoProgressRequests, &value.NoProgressAction, &value.Revision)
+		&value.NoProgressRequests, &value.NoProgressAction, &value.Revision, &value.AutoResumeInterrupted)
 	return value, databaseError("read collection settings", err)
 }
 
@@ -77,10 +77,10 @@ func (s *Store) UpdateCollectionSettings(ctx context.Context, input model.Collec
 	}
 	defer rollback(tx)
 	result, err := tx.Exec(ctx, `UPDATE ingest.collection_settings SET workers=$1,max_quota_retries=$2,
-max_quota_wait_seconds=$3,no_progress_requests=$4,no_progress_action=$5,
+max_quota_wait_seconds=$3,no_progress_requests=$4,no_progress_action=$5,auto_resume_interrupted=COALESCE($7,auto_resume_interrupted),
 revision=revision+1 WHERE singleton AND revision=$6`,
 		input.Workers, input.MaxQuotaRetries, input.MaxQuotaWaitSeconds,
-		input.NoProgressRequests, input.NoProgressAction, input.Revision)
+		input.NoProgressRequests, input.NoProgressAction, input.Revision, input.AutoResumeInterrupted)
 	if err != nil {
 		return databaseError("update collection settings", err)
 	}

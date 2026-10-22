@@ -107,6 +107,7 @@ test('moved import settings preserve validation, persisted policies and concurre
   await expect(form.getByLabel('Request timeout (seconds)', { exact: true })).toHaveCount(0)
   await expect(form.getByLabel('Preview page budget', { exact: true })).toHaveCount(0)
   expect(Object.keys(original).sort()).toEqual([
+    'auto_resume_interrupted',
     'max_quota_retries',
     'max_quota_wait_seconds',
     'no_progress_action',
@@ -194,7 +195,7 @@ test('moved import settings preserve validation, persisted policies and concurre
   expect(resolved.revision).toBeGreaterThan(updated.revision)
 })
 
-test('browser timestamps and fixed 50-row pages ignore retired display preferences', async ({
+test('browser display defaults ignore retired preferences and stay separate from server settings', async ({
   page,
 }) => {
   const initial = await savedSettings(page)
@@ -214,7 +215,7 @@ test('browser timestamps and fixed 50-row pages ignore retired display preferenc
   const report = await (await page.request.get('/api/system-health')).json()
   const measured = await page.evaluate(
     (value) =>
-      new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
         new Date(value),
       ),
     report.database.measured_at,

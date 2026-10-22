@@ -60,3 +60,7 @@ The resolved address separates public request quotas and administrator sign-in p
 Open **Administration → Public access → Request limits**. Each restriction has its own switch. Keep the per-visitor link-creation and request quotas while switching off **Simultaneous public requests** if you do not want a shared admission ceiling. Switching off one limit leaves the others active. Defaults remain 12 link creations and 120 addon/Search requests per minute per visitor IP, with 50 simultaneous public requests. Administrator sign-in protection is separate.
 
 A disabled limit is saved as `0` (unlimited). Existing positive settings are preserved on upgrade. Request timeouts, input-size checks and the bounded capacity of individual operations still apply, even when an admission limit is off. Already active requests finish normally and remain counted if a limit is enabled again.
+
+## Request timeouts
+
+Less common timeout controls are folded under **Network → Outgoing → Proxies → Request timeouts** and **Network → Incoming → Request timeouts**. Outgoing controls bound metadata/debrid HTTP calls and inventory downloads. Incoming controls bound Stremio, Torznab and shared catalog processing and delivery, including public connections. Source timeouts stay in source definitions. See [application settings](CONFIGURATION_REVIEW.md) for defaults, bounds and lease behavior.

@@ -474,12 +474,10 @@ func (s *Service) publicAllDebridFlight(key, resource string, hashes []string, c
 	return f, err
 }
 func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, hashes []string) (checkErr error) {
-	select {
-	case s.publicProbe <- struct{}{}:
-		defer func() { <-s.publicProbe }()
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := s.acquireCapacity(ctx, &s.publicProbe, "public_checks", true); err != nil {
+		return err
 	}
+	defer s.publicProbe.release()
 	lock := "public-cache:torbox:" + resource
 	var release func()
 	for {

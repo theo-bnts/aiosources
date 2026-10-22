@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -22,7 +23,11 @@ func TestJSONAdapterUpgradePreservesSnapshotsAndRemoteHistory(t *testing.T) {
 		if catalog {
 			p.ID, p.HTTP.Catalog = "old-remote", true
 		}
-		if _, err = db.CreateRun(ctx, model.Run{ProviderID: p.ID, Mode: model.ModeFull, Config: p}); err != nil {
+		encoded, encodeErr := json.Marshal(p)
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
+		}
+		if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config) VALUES($1,$2,$2,'full','queued','original-definition',$3)`, p.ID+"-run", p.ID, encoded); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -72,3 +72,7 @@ Reproduce with `go test ./internal/store -run '^$' -bench 'BenchmarkCatalogReadP
 ## Release parser checks
 
 `TestReleaseQualityExamples` contains 58 independently labelled synthetic video examples covering title normalization, years, seasons, episode ranges and relative/absolute annotations. The corrected parser passes all 58. The examples deliberately exercise supported formats and edge cases; they do not estimate accuracy on arbitrary release names. Existing v1 correspondence tests, malformed numbering, conflicting identifiers and ambiguous file-selection tests remain separate safety checks.
+
+## Browser statistics pacing
+
+Frequent progress events do not invalidate fresh source, metadata and debrid statistics before their configured statistics interval. Lightweight controls keep their live cadence. Explicit writes bypass this coalescing so a saved action can refresh its result immediately. Normal statistics refresh every 15 seconds; Reduced activity uses 45 seconds. This avoids repeated full-catalog counts while an import emits many progress events, without caching or changing matching decisions.

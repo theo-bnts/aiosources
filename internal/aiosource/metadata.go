@@ -32,7 +32,15 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 		if err := s.metadataRate.wait(ctx); err != nil {
 			return false, err
 		}
-		res, err := s.MetadataHTTP.Do(req)
+		client := *s.MetadataHTTP
+		if client.Timeout == 0 {
+			timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
+			if err != nil {
+				return false, err
+			}
+			client.Timeout = timeout
+		}
+		res, err := client.Do(req)
 		if err != nil {
 			if ctx.Err() != nil {
 				return false, ctx.Err()
@@ -380,7 +388,10 @@ func (s *Service) inventory(ctx context.Context, typ, date string) error {
 	// temporary file before importing: http.Client.Timeout must not include
 	// PostgreSQL batch processing, which can take minutes on a small container.
 	client := *s.MetadataHTTP
-	client.Timeout = 10 * time.Minute
+	client.Timeout, err = s.outgoingTimeout(ctx, "inventory_seconds")
+	if err != nil {
+		return err
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return metadataTransportError(ctx, err)

@@ -30,9 +30,11 @@ func TestCollectionSettingsRejectUntrustedInvalidAndStaleWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	const path = "/api/settings/collections"
-	for _, method := range []string{http.MethodGet, http.MethodPut} {
-		if response := fixture.request(method, path, nil, nil); response.Code != http.StatusUnauthorized {
-			t.Fatalf("unauthenticated %s: %d", method, response.Code)
+	for _, protected := range []string{path, "/api/settings/runtime/debrid", "/api/settings/runtime/outgoing", "/api/settings/runtime/connections", "/api/settings/runtime/history"} {
+		for _, method := range []string{http.MethodGet, http.MethodPut} {
+			if response := fixture.request(method, protected, nil, nil); response.Code != http.StatusUnauthorized {
+				t.Fatalf("unauthenticated %s %s: %d", method, protected, response.Code)
+			}
 		}
 	}
 	cookie := fixture.login(t, "")
@@ -79,7 +81,7 @@ func TestCollectionSettingsRejectUntrustedInvalidAndStaleWrites(t *testing.T) {
 		{"unknown field", "extra", true, false},
 		{"excess retries", "max_quota_retries", 11, false},
 		{"negative quota wait", "max_quota_wait_seconds", -1, false},
-		{"retired recovery opt-out", "auto_resume_interrupted", false, false},
+		{"invalid recovery value", "auto_resume_interrupted", "false", false},
 		{"negative progress threshold", "no_progress_requests", -1, false},
 		{"invalid progress action", "no_progress_action", "ignore", false},
 		{"retired timeout default", "default_request_timeout_seconds", 90, false},

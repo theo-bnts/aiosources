@@ -346,7 +346,11 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 	if err != nil {
 		return "", model.ErrInvalid
 	}
-	life, cancel := context.WithTimeout(ctx, 60*time.Second)
+	budget, err := s.DB.ConnectionTimeout(ctx, "stremio")
+	if err != nil {
+		return "", err
+	}
+	life, cancel := context.WithTimeout(ctx, max(time.Second, budget-10*time.Second))
 	defer cancel()
 	stop := context.AfterFunc(s.ctx, cancel)
 	defer stop()

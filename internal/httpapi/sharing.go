@@ -290,7 +290,12 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "A valid sharing password is required")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), store.CatalogDownloadTimeout)
+	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "catalog")
+	if budgetErr != nil {
+		respondError(w, budgetErr)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()

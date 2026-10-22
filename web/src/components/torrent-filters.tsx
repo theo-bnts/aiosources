@@ -1,3 +1,5 @@
+import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
+import { dateTimeToISO } from '@/lib/format'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -21,6 +23,7 @@ export function TorrentSearchForm({
   filters: TorrentFilters
   onApply: (filters: TorrentFilters) => void
 }) {
+  const dateZone = useDateTimeZoneLabel()
   const providers = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
@@ -70,13 +73,13 @@ export function TorrentSearchForm({
             continue
           }
           if (next[key]) {
-            const parsed = new Date(next[key])
-            if (Number.isNaN(parsed.getTime())) {
+            const instant = dateTimeToISO(next[key]!, filters[key], 'milliseconds')!
+            if (Number.isNaN(new Date(instant).getTime())) {
               setError(new Error('Enter a valid publication date and time.'))
               setInvalidFields([key])
               return
             }
-            next[key] = parsed.toISOString()
+            next[key] = instant
           }
         }
         const invalidSize = (['min_size', 'max_size'] as const).find(
@@ -178,25 +181,18 @@ export function TorrentSearchForm({
           const value = filters[key]
           const timestamp = value ? new Date(value) : undefined
           const valid = timestamp && !Number.isNaN(timestamp.getTime())
-          const local = valid
-            ? new Date(timestamp.getTime() - timestamp.getTimezoneOffset() * 60000)
-                .toISOString()
-                .slice(0, -1)
-            : ''
           return (
             <div className="field sm:col-span-2" key={key}>
               <Label htmlFor={`torrent-${key}`}>
-                {key === 'published_after' ? 'Published after' : 'Published before'} (browser local
-                time)
+                {key === 'published_after' ? 'Published after' : 'Published before'} ({dateZone})
               </Label>
-              <Input
+              <DateTimeInput
                 id={`torrent-${key}`}
                 name={key}
-                type="datetime-local"
-                step="0.001"
+                precision="milliseconds"
                 aria-invalid={invalidFields.includes(key) || undefined}
                 aria-describedby={invalidFields.includes(key) ? 'torrent-filter-error' : undefined}
-                defaultValue={local}
+                defaultValue={value}
                 ref={(input) => {
                   if (input && dateInputs.current[key]?.input !== input) {
                     dateInputs.current[key] = { input, value: input.value }

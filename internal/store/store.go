@@ -24,6 +24,7 @@ import (
 const notificationChannel = "ingest_run_changes"
 
 type Store struct {
+	runtime        runtimeSettingsCache
 	pool           *pgxpool.Pool
 	collectionPool *pgxpool.Pool
 	mu             sync.Mutex

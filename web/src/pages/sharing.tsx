@@ -1,3 +1,4 @@
+import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { SourceFilter } from '@/components/source-filter'
 import { Statistic } from '@/components/statistic'
 import {
@@ -33,7 +34,7 @@ import type {
   ConnectionFormat,
   TorznabPreferences,
 } from '@/lib/catalog-types'
-import { dateTimeToISO, localDateTime, useDate } from '@/lib/format'
+import { useDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -580,7 +581,8 @@ function ShareForm({
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? defaultScope)
   const [sourceIDs, setSourceIDs] = useState(share?.source_ids ?? [])
   const [fields, setFields] = useState(share?.fields ?? data.fields)
-  const [expiresAt, setExpiresAt] = useState(localDateTime(share?.expires_at, 'seconds'))
+  const dateZone = useDateTimeZoneLabel()
+  const [expiresAt, setExpiresAt] = useState(share?.expires_at ?? '')
   const [requestsPerMinute, setRequestsPerMinute] = useState(
     limitValue(share?.requests_per_minute, requestsDefault),
   )
@@ -623,7 +625,7 @@ function ShareForm({
         scope,
         source_ids: scope === 'all' ? [] : sourceIDs,
         fields,
-        expires_at: dateTimeToISO(expiresAt, original?.expires_at, 'seconds'),
+        expires_at: expiresAt || null,
         requests_per_minute: requests,
         max_concurrent_downloads: concurrent,
         ...(original ? { revision: original.revision } : {}),
@@ -676,7 +678,7 @@ function ShareForm({
     scope !== (original?.scope ?? defaultScope) ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
     JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
-    expiresAt !== localDateTime(original?.expires_at, 'seconds') ||
+    expiresAt !== (original?.expires_at ?? '') ||
     requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
     maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault)
   useUnsavedChanges(
@@ -696,17 +698,16 @@ function ShareForm({
   const accessPolicy = (
     <fieldset className="min-w-0 space-y-4">
       <div className="field">
-        <Label htmlFor="share-expires">Expires at (browser local time)</Label>
-        <Input
+        <Label htmlFor="share-expires">Expires at ({dateZone})</Label>
+        <DateTimeInput
           id="share-expires"
-          type="datetime-local"
-          step="1"
+          precision="seconds"
           value={expiresAt}
-          onChange={(event) => setExpiresAt(event.target.value)}
+          onValueChange={setExpiresAt}
           aria-describedby="share-expires-help"
         />
         <p id="share-expires-help" className="help">
-          Uses the browser's timezone. Leave empty for no expiration. Expired access cannot be used.
+          Uses {dateZone}. Leave empty for no expiration. Expired access cannot be used.
         </p>
         {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
           <p className="help text-destructive">

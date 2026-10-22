@@ -94,7 +94,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if err != nil {
 		return databaseError("save Stremio request", err)
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM ingest.stremio_requests WHERE created_at<now()-interval '7 days' OR id<=COALESCE((SELECT id FROM ingest.stremio_requests ORDER BY id DESC OFFSET 10000 LIMIT 1),0)`); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM ingest.stremio_requests WHERE created_at<now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history')) OR id<=COALESCE((SELECT id FROM ingest.stremio_requests ORDER BY id DESC OFFSET 10000 LIMIT 1),0)`); err != nil {
 		return databaseError("bound Stremio history", err)
 	}
 	return databaseError("commit Stremio history", tx.Commit(ctx))
@@ -140,7 +140,7 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 		return out, databaseError("begin Stremio request list", err)
 	}
 	defer rollback(tx)
-	const filter = ` WHERE created_at>=now()-interval '7 days' AND ($1='' OR outcome=$1) AND ($2='' OR strpos(lower(resource),lower($2))>0) AND ($3='' OR origin=$3) AND ($4='' OR kind=$4)`
+	const filter = ` WHERE created_at>=now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history')) AND ($1='' OR outcome=$1) AND ($2='' OR strpos(lower(resource),lower($2))>0) AND ($3='' OR origin=$3) AND ($4='' OR kind=$4)`
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM ingest.stremio_requests`+filter, opts.Status, opts.Query, origin, kind).Scan(&out.Total); err != nil {
 		return out, databaseError("count Stremio requests", err)
 	}
@@ -165,7 +165,7 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 }
 
 func (s *Store) StremioRequest(ctx context.Context, id int64) (model.StremioRequest, error) {
-	item, err := scanStremioRequest(s.pool.QueryRow(ctx, `SELECT `+stremioSummaryColumns+`,results,calls FROM ingest.stremio_requests WHERE id=$1 AND created_at>=now()-interval '7 days'`, id), true)
+	item, err := scanStremioRequest(s.pool.QueryRow(ctx, `SELECT `+stremioSummaryColumns+`,results,calls FROM ingest.stremio_requests WHERE id=$1 AND created_at>=now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'))`, id), true)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return item, model.ErrNotFound
 	}
@@ -174,6 +174,6 @@ func (s *Store) StremioRequest(ctx context.Context, id int64) (model.StremioRequ
 
 func (s *Store) StremioStatistics(ctx context.Context) (model.StremioStatistics, error) {
 	var out model.StremioStatistics
-	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome='empty'),count(*) FILTER(WHERE outcome IN ('failed','cancelled','invalid','busy')),COALESCE(sum(returned),0),COALESCE(avg(duration_ms),0)::bigint,min(created_at) FROM ingest.stremio_requests WHERE created_at>=now()-interval '7 days'`).Scan(&out.Requests, &out.Empty, &out.Failed, &out.Results, &out.AverageMS, &out.Since)
+	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome='empty'),count(*) FILTER(WHERE outcome IN ('failed','cancelled','invalid','busy')),COALESCE(sum(returned),0),COALESCE(avg(duration_ms),0)::bigint,min(created_at) FROM ingest.stremio_requests WHERE created_at>=now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'))`).Scan(&out.Requests, &out.Empty, &out.Failed, &out.Results, &out.AverageMS, &out.Since)
 	return out, databaseError("read Stremio statistics", err)
 }

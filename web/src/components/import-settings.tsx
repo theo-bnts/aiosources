@@ -1,3 +1,4 @@
+import { Switch } from '@/components/ui/switch'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
@@ -39,6 +40,7 @@ const numberFields = {
 
 type NumberField = keyof typeof numberFields
 type FormValues = Record<NumberField, string> & {
+  auto_resume_interrupted: boolean
   no_progress_action: CollectionSettings['no_progress_action']
 }
 type Draft = { values: FormValues; base: CollectionSettings }
@@ -46,6 +48,7 @@ const numberKeys = Object.keys(numberFields) as NumberField[]
 
 function formValues(settings: CollectionSettings): FormValues {
   return {
+    auto_resume_interrupted: settings.auto_resume_interrupted ?? true,
     workers: String(settings.workers),
     max_quota_retries: String(settings.max_quota_retries),
     max_quota_wait_seconds: String(settings.max_quota_wait_seconds),
@@ -88,7 +91,8 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
   const dirty =
     draft !== null &&
     (numberKeys.some((key) => draft.values[key] !== String(draft.base[key])) ||
-      draft.values.no_progress_action !== draft.base.no_progress_action)
+      draft.values.no_progress_action !== draft.base.no_progress_action ||
+      draft.values.auto_resume_interrupted !== (draft.base.auto_resume_interrupted ?? true))
   useUnsavedChanges(dirty, 'advanced settings', save.isPending)
   const rejected = save.error instanceof ApiError && save.error.status === 409
   const conflict =
@@ -123,6 +127,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
     if (!draft || !dirty || save.isPending || conflict || invalid) return
     const value = draft.values
     save.mutate({
+      auto_resume_interrupted: value.auto_resume_interrupted,
       workers: Number(value.workers),
       max_quota_retries: Number(value.max_quota_retries),
       max_quota_wait_seconds: Number(value.max_quota_wait_seconds),
@@ -233,6 +238,25 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                     </p>
                   </div>
                 </div>
+              </fieldset>
+              <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
+                <legend className="pr-3 text-sm font-medium">Recovery · Immediate</legend>
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="collection-auto-resume"
+                    checked={values.auto_resume_interrupted}
+                    disabled={save.isPending}
+                    onCheckedChange={(value) => change({ auto_resume_interrupted: value })}
+                  />
+                  <Label htmlFor="collection-auto-resume">
+                    Automatically resume interrupted imports
+                  </Label>
+                </div>
+                <p className="help">
+                  Resume from the last committed checkpoint after a process or connection failure.
+                  Manual pauses, quota holds, cancellations and configuration failures still require
+                  attention. When disabled, interrupted imports remain paused for manual resume.
+                </p>
               </fieldset>
               {conflict && (
                 <div className="notice notice-warning space-y-3" role="alert">

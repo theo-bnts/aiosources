@@ -497,7 +497,7 @@ function useLiveUpdates(enabled = true) {
         timer = window.setTimeout(
           () => {
             timer = undefined
-            nextRefresh = performance.now() + LIVE_REFRESH_INTERVAL
+            nextRefresh = performance.now() + LIVE_REFRESH_INTERVAL()
             void refreshLiveData()
           },
           Math.max(500, nextRefresh - performance.now()),
@@ -727,7 +727,7 @@ export function AppShell({
           {footer}
         </aside>
         <div className="lg:pl-60">
-          <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border bg-background/95 py-3 pr-20 pl-5 backdrop-blur-sm sm:pr-32 md:pr-36 md:pl-9">
+          <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border bg-background/95 py-3 pr-32 pl-5 backdrop-blur-sm sm:pr-44 md:pr-48 md:pl-9">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <DialogTrigger asChild>
                 <Button

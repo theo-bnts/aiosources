@@ -26,6 +26,7 @@ import { AppShell, RootBoundary, SessionGate } from '@/app'
 import { Empty } from '@/components/common'
 import { WorkspaceLayout } from '@/components/workspace-layout'
 import { Button } from '@/components/ui/button'
+import { InterfacePreferences } from '@/components/interface-preferences'
 import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
 import './index.css'
@@ -165,7 +166,8 @@ const router = createBrowserRouter(
     <Route
       element={
         <>
-          <div className="fixed top-2.5 right-5 z-30 md:right-9 lg:top-3.5">
+          <div className="fixed top-2.5 right-5 z-30 flex items-center gap-2 md:right-9 lg:top-3.5">
+            <InterfacePreferences />
             <AboutDialog />
           </div>
           <UnsavedChangesProvider>

@@ -8,7 +8,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await page.goto('/health/settings')
   const retention = page
     .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Data retention', exact: true }) })
+    .filter({ has: page.getByRole('heading', { name: 'Stored data', exact: true }) })
   const mode = retention.getByLabel('Stored torrent information', { exact: true })
   await expect(mode).toHaveValue('compact')
   await expect(

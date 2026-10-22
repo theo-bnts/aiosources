@@ -182,9 +182,6 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/public/credentials", install(false))
 	protect := func(budget time.Duration, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx, cancel := context.WithTimeout(r.Context(), budget)
-			defer cancel()
-			r = r.WithContext(ctx)
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Cache-Control", "no-store")
 			w.Header().Set("Referrer-Policy", "no-referrer")
@@ -197,6 +194,18 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				return
 			}
 			defer release()
+			effective := budget
+			if budget > 5*time.Second {
+				configured, err := s.options.Store.ConnectionTimeout(r.Context(), "stremio")
+				if err != nil {
+					respondError(w, err)
+					return
+				}
+				effective = configured
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), effective)
+			defer cancel()
+			r = r.WithContext(ctx)
 			visitor, err := s.options.AIOSource.OpenPublicInstallation(r.Context(), s.auth.origin, r.PathValue("configuration"))
 			if err != nil {
 				writeError(w, 401, "Invalid public installation")

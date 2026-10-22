@@ -310,12 +310,10 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 			return result, model.ErrInvalid
 		}
 	}
-	select {
-	case s.downloadSlots <- struct{}{}:
-		defer func() { <-s.downloadSlots }()
-	default:
-		return result, model.ErrBusy
+	if err := s.acquireCapacity(ctx, &s.downloadSlots, "download_jobs", false); err != nil {
+		return result, err
 	}
+	defer s.downloadSlots.release()
 	title, err := s.DB.CatalogTitle(ctx, workID)
 	if err != nil {
 		return result, err

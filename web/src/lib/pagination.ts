@@ -1,3 +1,4 @@
+import { useBrowserPreferences } from './browser-preferences.ts'
 import { useViewSearchParams } from './detail-navigation'
 import { resetListView } from './list-view'
 
@@ -12,14 +13,15 @@ export function useURLPagination({
   limitKey = 'limit',
   offsetKey = 'offset',
 }: { limitKey?: string; offsetKey?: string } = {}) {
+  const { pageSize: preferredSize } = useBrowserPreferences()
   const [search, setSearch] = useViewSearchParams()
   return {
-    limit: pageSize,
-    offset: normalizePageOffset(search.get(offsetKey)),
+    limit: preferredSize,
+    offset: normalizePageOffset(search.get(offsetKey), preferredSize),
     setOffset(value: number) {
       const next = resetListView(search, [], offsetKey)
       next.delete(limitKey)
-      const offset = normalizePageOffset(value)
+      const offset = normalizePageOffset(value, preferredSize)
       if (offset) next.set(offsetKey, String(offset))
       setSearch(next)
     },

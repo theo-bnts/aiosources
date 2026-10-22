@@ -13,7 +13,7 @@ If the administrator offers **Torznab**, choose that page instead to create a co
 
 When permitted by the administrator, **Advanced** accepts your personal announce URLs for private sources. Leave them empty for cached-only private-source access. Never use someone else's account credentials.
 
-AIOSources does not save your submitted keys or announces on the server. Validated keys and optional personal announce URLs are automatically remembered in an encrypted configuration on your browser; use **Forget saved credentials** on a shared device. It does retain media-request history and safe diagnostics for seven days. You must trust the host processing your keys, and an encrypted installation link is still a credential. The sections below explain these boundaries.
+AIOSources does not save your submitted keys or announces on the server. Validated keys and optional personal announce URLs are automatically remembered in an encrypted configuration on your browser; use **Forget saved credentials** on a shared device. It does retain media-request history and safe diagnostics for the history retention period selected by the administrator (seven days by default). You must trust the host processing your keys, and an encrypted installation link is still a credential. The sections below explain these boundaries.
 
 ## Enable public access on your instance
 
@@ -83,7 +83,7 @@ Public activity uses the existing pages, visible only to administrators:
 
 There is no visitor database or stable visitor identifier. History does not save IP addresses, account email, username or visitor account fingerprints. Media identifiers and filenames remain activity data: the homepage explains this retention before visitors submit keys.
 
-History follows the existing seven-day cleanup. Stremio history is also capped at 10,000 requests, with at most 32 provider diagnostics per playback and 1,000 provider diagnostics per debrid operation. Summary pages do not load detailed provider-call bodies.
+History follows the administrator’s retention policy, seven days by default. Stremio history is also capped at 10,000 requests, with at most 32 provider diagnostics per playback and 1,000 provider diagnostics per debrid operation. Summary pages do not load detailed provider-call bodies.
 
 ## Admission and verification
 
@@ -107,7 +107,7 @@ Sources explicitly classified public can appear uncached. Private or unclassifie
 
 Turning source disclosure off hides names and source selectors on both pages, ignores source selections in existing visitor links and withdraws their announce exceptions. Turning public Torznab off revokes its encrypted keys; enabling it again does not revive them. This does not revoke Stremio installations. Turning all public access off revokes both. The Torznab, Stremio and administrator credentials use separate authentication boundaries and cannot be interchanged.
 
-Public Torznab shares the existing bounded, volatile anonymous admission limits. It records only safe request counts, timings and failures in Logs, under the ordinary seven-day retention. It stores no visitor key, announce, query, IP, profile or configuration. Protect the generated URL/key and redact query strings in external access logs.
+Public Torznab shares the existing bounded, volatile anonymous admission limits. It records only safe request counts, timings and failures in Logs, under the configured history retention policy (seven days by default). It stores no visitor key, announce, query, IP, profile or configuration. Protect the generated URL/key and redact query strings in external access logs.
 
 ## Public Search
 

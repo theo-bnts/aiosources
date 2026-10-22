@@ -1,3 +1,4 @@
+import { refreshInterval } from './browser-preferences.ts'
 import { QueryClient } from '@tanstack/react-query'
 
 export class ApiError extends Error {
@@ -38,9 +39,9 @@ export function retryRead(count: number, error: unknown) {
   )
 }
 
-export const AUTO_REFRESH_INTERVAL = 30_000
-export const LIVE_REFRESH_INTERVAL = 5_000
-export const COLLECTION_REFRESH_INTERVAL = 15_000
+export const AUTO_REFRESH_INTERVAL = () => refreshInterval('ordinary')
+export const LIVE_REFRESH_INTERVAL = () => refreshInterval('live')
+export const COLLECTION_REFRESH_INTERVAL = () => refreshInterval('statistics')
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -196,7 +197,28 @@ async function invalidateData(cancelRefetch: boolean) {
       'security',
       'collection-settings',
       'network-settings',
-    ].map((key) => queryClient.invalidateQueries({ queryKey: [key] }, { cancelRefetch })),
+    ].map((key) =>
+      queryClient.invalidateQueries(
+        {
+          queryKey: [key],
+          predicate: (query) => {
+            const heavy =
+              key === 'source-torrent-stats' ||
+              key === 'debrid-statistics' ||
+              (key === 'aiosource' && query.queryKey.length === 1)
+            // Progress events must not turn a slower statistics read into a five-second scan.
+            // Explicit writes still refresh immediately; settings and controls stay live.
+            return (
+              cancelRefetch ||
+              !heavy ||
+              Date.now() - Math.max(query.state.dataUpdatedAt, query.state.errorUpdatedAt) >=
+                COLLECTION_REFRESH_INTERVAL()
+            )
+          },
+        },
+        { cancelRefetch },
+      ),
+    ),
   )
 }
 

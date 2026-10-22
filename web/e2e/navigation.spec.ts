@@ -167,7 +167,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   )
   await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
   await storageTabs.getByRole('tab', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Data retention', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Stored data', exact: true })).toBeVisible()
   await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
   await expect(
     page.getByRole('button', { name: 'Reset all source data', exact: true }),

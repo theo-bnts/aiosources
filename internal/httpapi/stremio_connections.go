@@ -21,7 +21,12 @@ func (s *server) privateConnectionRequest(w http.ResponseWriter, r *http.Request
 		privateConnectionError(w, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), store.StremioRequestTimeout)
+	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "stremio")
+	if budgetErr != nil {
+		respondError(w, budgetErr)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()

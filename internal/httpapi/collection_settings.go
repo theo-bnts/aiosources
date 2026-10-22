@@ -22,12 +22,13 @@ func (s *server) collectionSettings(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) updateCollectionSettings(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Workers             *int    `json:"workers"`
-		MaxQuotaRetries     *int    `json:"max_quota_retries"`
-		MaxQuotaWaitSeconds *int    `json:"max_quota_wait_seconds"`
-		NoProgressRequests  *int    `json:"no_progress_requests"`
-		NoProgressAction    *string `json:"no_progress_action"`
-		Revision            *int64  `json:"revision"`
+		AutoResumeInterrupted *bool   `json:"auto_resume_interrupted"`
+		Workers               *int    `json:"workers"`
+		MaxQuotaRetries       *int    `json:"max_quota_retries"`
+		MaxQuotaWaitSeconds   *int    `json:"max_quota_wait_seconds"`
+		NoProgressRequests    *int    `json:"no_progress_requests"`
+		NoProgressAction      *string `json:"no_progress_action"`
+		Revision              *int64  `json:"revision"`
 	}
 	if !decodeJSON(w, r, &input) {
 		return
@@ -37,8 +38,19 @@ func (s *server) updateCollectionSettings(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "A complete collection settings object and revision are required")
 		return
 	}
+	resume := true
+	if input.AutoResumeInterrupted != nil {
+		resume = *input.AutoResumeInterrupted
+	} else {
+		current, err := s.options.Store.CollectionSettings(r.Context())
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		resume = current.AutoResumeInterrupted
+	}
 	settings := model.CollectionSettings{
-		Workers: *input.Workers, MaxQuotaRetries: *input.MaxQuotaRetries,
+		AutoResumeInterrupted: resume, Workers: *input.Workers, MaxQuotaRetries: *input.MaxQuotaRetries,
 		MaxQuotaWaitSeconds: *input.MaxQuotaWaitSeconds,
 		NoProgressRequests:  *input.NoProgressRequests, NoProgressAction: *input.NoProgressAction,
 		Revision: *input.Revision,

@@ -1,3 +1,4 @@
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
@@ -291,30 +292,29 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
               </p>
             )}
             <ErrorNotice error={save.error} />
-            <div className="toolbar justify-between">
+            <div className="toolbar">
+              <Button type="submit" disabled={!dirty || conflict || save.isPending}>
+                {save.isPending ? 'Saving…' : 'Save'}
+              </Button>
               <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
-              <div className="flex flex-wrap gap-2">
-                {conflict && (
-                  <Button
-                    type="button"
-                    variant="warning"
-                    disabled={save.isPending}
-                    onClick={() => {
-                      setDraft(null)
-                      save.reset()
-                    }}
-                  >
-                    Discard changes and reload
-                  </Button>
-                )}
-                <Button type="submit" disabled={!dirty || conflict || save.isPending}>
-                  {save.isPending ? 'Saving…' : 'Save'}
+              {conflict && (
+                <Button
+                  type="button"
+                  variant="warning"
+                  disabled={save.isPending}
+                  onClick={() => {
+                    setDraft(null)
+                    save.reset()
+                  }}
+                >
+                  Discard changes and reload
                 </Button>
-              </div>
+              )}
             </div>
           </form>
         )
       )}
+      {proxy && <RuntimeSettingsPanel section="connections" />}
     </div>
   )
 }

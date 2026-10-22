@@ -1,3 +1,4 @@
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -73,7 +74,7 @@ export function StorageSettingsPanel() {
   return (
     <>
       <section className="section-card">
-        <h2 className="section-title">Data retention</h2>
+        <h2 className="section-title">Stored data</h2>
         <ErrorNotice error={query.error} retry={() => void query.refetch()} />
         {query.isPending ? (
           <Loading label="Loading storage settings" />
@@ -141,6 +142,7 @@ export function StorageSettingsPanel() {
           )
         )}
       </section>
+      <RuntimeSettingsPanel section="history" />
       <Disclosure
         id="maintenance"
         title="Maintenance"

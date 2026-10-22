@@ -23,6 +23,7 @@ var ErrAuth = errors.New("provider refused credentials")
 var ErrInvalidResponse = errors.New("unusable provider response")
 
 type ProviderHTTP struct {
+	Timeout        func(context.Context) (time.Duration, error)
 	Client         *http.Client
 	ADBase, TBBase string
 	mu             sync.Mutex
@@ -95,7 +96,15 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	res, err := p.Client.Do(req)
+	client := *p.Client
+	if p.Timeout != nil && client.Timeout == 0 {
+		timeout, err := p.Timeout(ctx)
+		if err != nil {
+			return nil, err
+		}
+		client.Timeout = timeout
+	}
+	res, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()

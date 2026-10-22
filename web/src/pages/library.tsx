@@ -646,7 +646,8 @@ export function RawPageView() {
     queryFn: ({ signal }) => rawPage(id, signal),
     staleTime: Infinity,
     // Immutable archive bytes need one download; failed reads still recover.
-    refetchInterval: (query) => (query.state.status === 'success' ? false : AUTO_REFRESH_INTERVAL),
+    refetchInterval: (query) =>
+      query.state.status === 'success' ? false : AUTO_REFRESH_INTERVAL(),
   })
   const text = page.data?.text ?? ''
   const trimmed = text.trimStart()

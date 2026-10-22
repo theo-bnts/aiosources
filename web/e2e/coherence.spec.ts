@@ -321,6 +321,17 @@ test.describe('browser local dates', () => {
     await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
       '2026-10-25T02:30:10',
     )
+    const other = await page.context().newPage()
+    await other.goto('/providers/settings')
+    await other.getByRole('button', { name: 'Interface preferences', exact: true }).click()
+    await other
+      .getByRole('dialog', { name: 'Interface preferences' })
+      .getByLabel('Time zone', { exact: true })
+      .selectOption('utc')
+    await other.close()
+    await expect(editor.getByLabel('Expires at (UTC)', { exact: true })).toHaveValue(
+      '2026-10-25T01:30:10',
+    )
     await editor.getByLabel('Recipient / share name', { exact: true }).fill('Expiration renamed')
     await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
     await expect(editor).toHaveCount(0)

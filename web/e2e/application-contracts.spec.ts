@@ -19,7 +19,7 @@ test('Storage separates measurements from settings and has no backup API or dupl
     'aria-selected',
     'true',
   )
-  await expect(page.getByRole('heading', { name: 'Data retention', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Stored data', exact: true })).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: 'Reset all source data', exact: true }),
   ).toHaveCount(0)

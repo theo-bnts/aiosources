@@ -238,7 +238,7 @@ for (const width of [1440, 390]) {
     ).toBeVisible()
     await storage.locator('summary').filter({ hasText: 'Imports with prepared data' }).click()
     await expect(
-      storage.getByText('This data does not expire after seven days.', { exact: false }),
+      storage.getByText('This data is preserved while needed for recovery.', { exact: false }),
     ).toBeVisible()
     await expect(
       storage.getByRole('link', { name: /Open import from Readable source name/ }),

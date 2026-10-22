@@ -33,7 +33,11 @@ func (s *Service) retainHistory() {
 		}
 		failed = err != nil
 		stop()
+		seconds, policyErr := s.DB.RuntimeValue(s.ctx, "history", "cleanup_seconds")
 		delay := 30 * time.Second
+		if policyErr == nil {
+			delay = time.Duration(seconds) * time.Second
+		}
 		if err == nil && removed > 0 {
 			delay = time.Second
 		}

@@ -46,7 +46,7 @@ func legacyCatalogPageFixture(t *testing.T, ctx context.Context, db *Store, gran
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(CatalogDownloadTimeout)
+	deadline := time.Now().Add(20 * time.Second)
 	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,clock_timestamp(),$3)`, id, grant.Share.ID, deadline.Add(5*time.Second)); err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestCatalogMigrationSeedsExistingRowsAndDurableIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+"COMMIT;"); err != nil {
+	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+"COMMIT;"); err != nil {
 		t.Fatal(err)
 	}
 	grant := sharingGrant(t, ctx, db)
@@ -413,7 +413,7 @@ func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns); err != nil {
+	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema); err != nil {
 		t.Fatal(err)
 	}
 	source := "https://tracker.invalid/file?passkey=private-passkey"
