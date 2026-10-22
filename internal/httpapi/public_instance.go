@@ -206,6 +206,11 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			ctx, cancel := context.WithTimeout(r.Context(), effective)
 			defer cancel()
 			r = r.WithContext(ctx)
+			deadline, _ := ctx.Deadline()
+			if err := http.NewResponseController(w).SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+				respondError(w, err)
+				return
+			}
 			visitor, err := s.options.AIOSource.OpenPublicInstallation(r.Context(), s.auth.origin, r.PathValue("configuration"))
 			if err != nil {
 				writeError(w, 401, "Invalid public installation")

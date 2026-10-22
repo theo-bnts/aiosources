@@ -1,16 +1,60 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+type publicDeadlineRecorder struct {
+	*httptest.ResponseRecorder
+	deadline time.Time
+}
+
+func (w *publicDeadlineRecorder) SetWriteDeadline(deadline time.Time) error {
+	w.deadline = deadline
+	return nil
+}
+
+func TestPublicStremioDeliveryUsesConfiguredBudgetInsteadOfServerDefault(t *testing.T) {
+	f, _, _ := addonAPI(t)
+	policy, err := f.db.RuntimeSection(f.ctx, "connections")
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.Values["stremio_seconds"] = 120
+	if err := f.db.UpdateRuntimeSection(f.ctx, "connections", policy); err != nil {
+		t.Fatal(err)
+	}
+	// The fixture's overall 90-second deadline is shorter than the policy being
+	// exercised. Give these requests their own bounded, longer parent deadline.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(f.ctx), 3*time.Minute)
+	defer cancel()
+	for _, test := range []struct {
+		path   string
+		budget time.Duration
+	}{
+		{"stream/movie/tt1234567.json", 120 * time.Second},
+		{"play/torbox/source/movie/tt1234567", 120 * time.Second},
+		{"manifest.json", 5 * time.Second},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "https://addon.example/public/stremio/invalid/"+test.path, nil).WithContext(ctx)
+		w := &publicDeadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+		f.handler.ServeHTTP(w, r)
+		remaining := time.Until(w.deadline)
+		if w.Code != http.StatusUnauthorized || remaining < test.budget-time.Second || remaining > test.budget {
+			t.Fatal("public response deadline did not use its budget", test.path, w.Code, remaining)
+		}
+	}
+}
 
 func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *testing.T) {
 	f, addon, conn := addonAPI(t)
