@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { Loading } from '@/components/common'
 import { Disclosure } from '@/components/ui/disclosure'
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 
 const ImportSettingsPanel = lazy(() =>
   import('@/components/import-settings').then((m) => ({ default: m.ImportSettingsPanel })),
@@ -40,6 +41,7 @@ export function AdvancedImportSettings() {
         // ordinary navigation retains the shared unsaved-changes guard.
         <Suspense fallback={<Loading label="Loading advanced settings" />}>
           <ImportSettingsPanel active={open} />
+          <RuntimeSettingsPanel section="source_retries" />
         </Suspense>
       )}
     </Disclosure>

@@ -67,12 +67,18 @@ func (s *Store) createRun(ctx context.Context, run model.Run, resolveInitial boo
 		return model.Run{}, databaseError("begin collection", err)
 	}
 	defer rollback(tx)
+	captureRetries := run.Policy == nil || resolveInitial
 	if run.Policy == nil || run.Config.RequestTimeout == "" {
 		settings, err := scanCollectionSettings(tx.QueryRow(ctx, "SELECT "+collectionSettingsColumns+" FROM ingest.collection_settings WHERE singleton"))
 		if err != nil {
 			return model.Run{}, err
 		}
 		settings.ApplyDefaults(&run)
+	}
+	if captureRetries {
+		if err := captureSourceRetryPolicy(ctx, tx, &run); err != nil {
+			return model.Run{}, err
+		}
 	}
 	config, err := json.Marshal(run.Config)
 	if err != nil {
@@ -112,6 +118,26 @@ VALUES($1,$2,$3,$4,'queued',$5,$6,$7,$8,$9,(SELECT mode FROM ingest.storage_sett
 		return model.Run{}, databaseError("commit collection", err)
 	}
 	return created, nil
+}
+
+func captureSourceRetryPolicy(ctx context.Context, tx pgx.Tx, run *model.Run) error {
+	policy := *run.Policy
+	policy.SourceRetries = model.DefaultSourceRetryPolicy()
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT to_regclass('ingest.runtime_settings') IS NOT NULL`).Scan(&exists); err != nil {
+		return databaseError("locate source retry settings", err)
+	}
+	if exists {
+		err := tx.QueryRow(ctx, `SELECT (values->>'retries')::int,(values->>'initial_seconds')::int,(values->>'maximum_seconds')::int FROM ingest.runtime_settings WHERE section='source_retries'`).Scan(&policy.SourceRetries.Retries, &policy.SourceRetries.InitialSeconds, &policy.SourceRetries.MaximumSeconds)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return databaseError("capture source retry settings", err)
+		}
+	}
+	if !policy.SourceRetries.Valid() {
+		return model.ErrInvalid
+	}
+	run.Policy = &policy
+	return nil
 }
 
 func (s *Store) GetRun(ctx context.Context, id string) (model.Run, error) {

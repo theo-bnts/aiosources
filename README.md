@@ -157,7 +157,7 @@ Visitors must trust the host processing their keys and keep their installation U
 
 Diagnostic history is cleaned up after seven days by default; its duration and cleanup interval can be adjusted in Storage settings. Published records and saved progress for unfinished imports remain available. A cancelled or paused import may therefore retain preparation data; retained history is not the same as the live catalog. See [storage and operations](docs/OPERATIONS.md).
 
-Use **Interface preferences**, beside About, to choose the page size, date format, time zone and a lighter refresh mode on your browser. Less common capacity and timeout controls stay folded on their respective settings pages; see [application settings](docs/CONFIGURATION_REVIEW.md).
+Use **Interface preferences**, beside About, to choose the page size, date format, time zone and a lighter refresh mode on your browser. Advanced controls stay folded on the relevant page: identification resources and matching reliability in Metadata, retry policies in Sources and Debrid, authentication in Security, and download duration and configuration limits in Network. Defaults are ready to use; see [application settings](docs/CONFIGURATION_REVIEW.md) when you need to adjust them.
 
 Changing the storage mode affects new imports. If you want to import everything again, **Storage → Settings → Maintenance → Reset all source data** removes imported data and history while retaining source definitions, secrets, schedules, TMDB information and debrid caches. Review the confirmation carefully: this cannot be undone.
 

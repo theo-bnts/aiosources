@@ -10,11 +10,12 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("conflict")
-	ErrBusy     = errors.New("an operation is already active")
-	ErrInvalid  = errors.New("invalid configuration")
-	ErrStalled  = errors.New("pagination did not advance")
+	ErrNotFound           = errors.New("not found")
+	ErrConflict           = errors.New("conflict")
+	ErrBusy               = errors.New("an operation is already active")
+	ErrInvalid            = errors.New("invalid configuration")
+	ErrConfigurationLimit = errors.New("configuration size limit reached")
+	ErrStalled            = errors.New("pagination did not advance")
 )
 
 type Provider struct {

@@ -166,6 +166,8 @@ func respondError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "The state has changed. Reload before trying again.")
 	case errors.Is(err, model.ErrInvalid):
 		writeError(w, http.StatusUnprocessableEntity, "Invalid configuration or operation")
+	case errors.Is(err, model.ErrConfigurationLimit):
+		writeError(w, http.StatusUnprocessableEntity, "This configuration exceeds the instance's size limit. Reduce optional filters or announce URLs.")
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusServiceUnavailable, "Operation interrupted or timed out")
 	default:
@@ -287,6 +289,9 @@ func (s *server) validateProvider(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
+	if !s.sourceSizeAllowed(w, r, input.JSON) {
+		return
+	}
 	result := s.options.Providers.Validate(input.JSON)
 	if result.Issues == nil {
 		result.Issues = []string{}
@@ -300,6 +305,9 @@ func (s *server) saveProvider(w http.ResponseWriter, r *http.Request) {
 		Revision string `json:"revision"`
 	}
 	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if !s.sourceSizeAllowed(w, r, input.JSON) {
 		return
 	}
 	validation := s.options.Providers.Validate(input.JSON)

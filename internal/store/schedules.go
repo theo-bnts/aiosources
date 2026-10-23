@@ -249,6 +249,9 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				}
 				snapshot := model.Run{Config: config}
 				settings.ApplyDefaults(&snapshot)
+				if err := captureSourceRetryPolicy(ctx, tx, &snapshot); err != nil {
+					return clock, nil, err
+				}
 				config = snapshot.Config
 				policy, encodeErr := json.Marshal(snapshot.Policy)
 				if encodeErr != nil {

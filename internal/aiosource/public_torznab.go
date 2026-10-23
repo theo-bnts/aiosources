@@ -65,10 +65,14 @@ func (s *Service) CreatePublicTorznab(ctx context.Context, audience string, opti
 		return "", err
 	}
 	key := base64.RawURLEncoding.EncodeToString(sealed)
-	if len(key) > MaxPublicTorznabSize {
-		return "", model.ErrInvalid
+	configuration, err := WithPublicTorznabOptions(key, options)
+	if err != nil {
+		return "", err
 	}
-	return WithPublicTorznabOptions(key, options)
+	if err := s.CheckPublicConfigurationSize(ctx, "torznab", configuration); err != nil {
+		return "", err
+	}
+	return configuration, nil
 }
 
 func (s *Service) OpenPublicTorznab(ctx context.Context, audience, value string) (*PublicTorznabInstallation, error) {

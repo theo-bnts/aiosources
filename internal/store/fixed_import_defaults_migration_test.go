@@ -18,7 +18,7 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
  ADD COLUMN default_preview_pages INTEGER NOT NULL DEFAULT 3,
  ADD COLUMN default_max_pages INTEGER NOT NULL DEFAULT 0,
  ADD COLUMN default_max_duration_seconds INTEGER NOT NULL DEFAULT 0;
- DELETE FROM ingest.schema_migrations WHERE version IN (42,73); DROP TABLE ingest.runtime_settings`); err != nil {
+ DELETE FROM ingest.schema_migrations WHERE version IN (42,73,74); DROP TABLE ingest.runtime_settings`); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := db.pool.Exec(ctx, `UPDATE ingest.collection_settings SET workers=5,

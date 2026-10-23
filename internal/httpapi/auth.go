@@ -22,7 +22,6 @@ import (
 )
 
 const sessionCookie = "ingest_session"
-const sessionLifetime = 12 * time.Hour
 const maxPasswordProofBytes = 4096
 
 type session struct {
@@ -147,6 +146,10 @@ func (a *authentication) sessionHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (a *authentication) allowAttempt(r *http.Request) bool {
+	limit, err := a.db.RuntimeValue(r.Context(), "security", "login_per_minute")
+	if err != nil {
+		return false
+	}
 	address := inbound.Direct(r)
 	if a.clientAddress != nil {
 		address = a.clientAddress(r)
@@ -168,7 +171,7 @@ func (a *authentication) allowAttempt(r *http.Request) bool {
 		}
 		window.until = now.Add(time.Minute)
 	}
-	if window.attempts >= 10 {
+	if window.attempts >= limit {
 		a.mu.Unlock()
 		return false
 	}
@@ -240,7 +243,13 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash := sha256.Sum256([]byte(token))
-	next := &store.SecuritySessionCreate{ID: hex.EncodeToString(rawID[:]), TokenHash: hash[:], UserAgent: safeUserAgent(r.UserAgent()), ExpiresAt: time.Now().Add(sessionLifetime)}
+	hours, err := a.db.RuntimeValue(r.Context(), "security", "session_hours")
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "Authentication settings are unavailable")
+		return
+	}
+	lifetime := time.Duration(hours) * time.Hour
+	next := &store.SecuritySessionCreate{ID: hex.EncodeToString(rawID[:]), TokenHash: hash[:], UserAgent: safeUserAgent(r.UserAgent()), ExpiresAt: time.Now().Add(lifetime)}
 	if old, err := r.Cookie(sessionCookie); err == nil && len(old.Value) == 43 {
 		oldHash := sha256.Sum256([]byte(old.Value))
 		next.ReplaceTokenHash = oldHash[:]
@@ -261,7 +270,7 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "Could not create the session. Check service availability and retry.")
 		return
 	}
-	a.cookie(w, token, next.ExpiresAt, int(sessionLifetime.Seconds()))
+	a.cookie(w, token, next.ExpiresAt, int(lifetime.Seconds()))
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": csrfForToken(token)})
 }
 

@@ -78,6 +78,18 @@ func similarity(a, b string) float64 {
 	return 2 * float64(n) / float64(len(x)+len(y))
 }
 func ChooseMatch(p Release, candidates []Candidate, ids SourceIDs, overflow bool, observed SourceEpisode) Decision {
+	return ChooseMatchWithPolicy(p, candidates, ids, overflow, observed, model.DefaultMatchingPolicy())
+}
+
+func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, overflow bool, observed SourceEpisode, policy model.MatchingPolicy) Decision {
+	if policy == (model.MatchingPolicy{}) {
+		policy = model.DefaultMatchingPolicy()
+	}
+	if !policy.Valid() {
+		return Decision{Status: "unmatched", Reason: "invalid identification policy"}
+	}
+	minimum := float64(policy.MinimumSimilarity) / 100
+	margin := float64(policy.AmbiguityMargin) / 100
 	p = withSourceNumbering(p, observed)
 	if p.InvalidNumbering {
 		return Decision{Status: "unmatched", Reason: "invalid or unsupported numbering range"}
@@ -141,7 +153,7 @@ func ChooseMatch(p Release, candidates []Candidate, ids SourceIDs, overflow bool
 		wrongYear := p.Year != nil && !e.year
 		numberConflict := !hasCompatible || (!e.exact && e.titleScore >= .92 && compatible < .92)
 		short := utf8.RuneCountInString(strings.ReplaceAll(p.Normalized, " ", "")) < 5
-		e.eligible = (utf8.RuneCountInString(p.Normalized) >= 2 || (exactChar && e.year && e.id)) && !sc && !ec && !wrongType && !wrongYear && !numberConflict && !idConflict && !unverified && ((e.exact && (e.year || e.id || (!short && p.Type != ""))) || (utf8.RuneCountInString(p.Normalized) >= 10 && compatible >= .92 && e.year && e.id))
+		e.eligible = (utf8.RuneCountInString(p.Normalized) >= 2 || (exactChar && e.year && e.id)) && !sc && !ec && !wrongType && !wrongYear && !numberConflict && !idConflict && !unverified && ((e.exact && (e.year || e.id || (!short && p.Type != ""))) || (utf8.RuneCountInString(p.Normalized) >= 10 && compatible >= minimum && e.year && e.id))
 		switch {
 		case sc:
 			e.reason = "source season conflict"
@@ -203,7 +215,7 @@ func ChooseMatch(p Release, candidates []Candidate, ids SourceIDs, overflow bool
 	closeCompetitor := false
 	if winner != nil {
 		for _, e := range es {
-			if e.c.WorkID != winner.c.WorkID && (e.reason == "insufficient evidence" || e.reason == "source ID unverified" || (e.reason == "source ID conflict" && !e.exact && identified == nil)) && e.titleScore >= winner.titleScore-.08 && e.year {
+			if e.c.WorkID != winner.c.WorkID && (e.reason == "insufficient evidence" || e.reason == "source ID unverified" || (e.reason == "source ID conflict" && !e.exact && identified == nil)) && e.titleScore >= winner.titleScore-margin && e.year {
 				closeCompetitor = true
 			}
 		}

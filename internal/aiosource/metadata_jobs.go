@@ -9,8 +9,6 @@ import (
 	"github.com/theo-bnts/aiosources/internal/store"
 )
 
-const metadataWorkers = 16
-
 type metadataProgress struct {
 	saved, deferred, unavailable int
 	firstDeferred                error
@@ -19,6 +17,11 @@ type metadataProgress struct {
 // HTTP requests overlap, while one publisher commits small batches. Neither
 // in-flight requests nor results can grow with the size of the catalog.
 func (s *Service) processMetadataJobs(ctx context.Context, key string, jobs []store.AIOJob, history *operationHistory, progress *metadataProgress, autoMatch bool) error {
+	policy, err := s.DB.RuntimeValues(ctx, "metadata")
+	if err != nil {
+		return metadataStorageError(err)
+	}
+	workerCount := min(policy["workers"], len(jobs))
 	work, cancel := context.WithCancel(ctx)
 	var workers sync.WaitGroup
 	defer func() { cancel(); workers.Wait() }()
@@ -32,8 +35,8 @@ func (s *Service) processMetadataJobs(ctx context.Context, key string, jobs []st
 		input <- job
 	}
 	close(input)
-	output := make(chan result, metadataWorkers)
-	for range min(metadataWorkers, len(jobs)) {
+	output := make(chan result, workerCount)
+	for range workerCount {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
@@ -120,7 +123,7 @@ func (s *Service) processMetadataJobs(ctx context.Context, key string, jobs []st
 					batch = append(batch, *result.publication)
 				}
 			}
-			if len(batch) >= metadataWorkers || remaining == 0 {
+			if len(batch) >= policy["publication_batch"] || remaining == 0 {
 				if err := flush(); err != nil {
 					return err
 				}

@@ -25,6 +25,7 @@ type Environment struct {
 	LocalInstanceID string
 	// Nil preserves the standalone limit of three automatic 429 retries.
 	MaxQuotaRetries *int
+	SourceRetries   model.SourceRetryPolicy
 	// RateLimited retains every 429, including the final exhausted response.
 	// retryAt is zero when the source supplied no deadline; retry reports
 	// whether the transport can make another automatic attempt.

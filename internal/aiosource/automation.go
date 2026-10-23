@@ -126,5 +126,5 @@ func (s *Service) runAutomation() time.Duration {
 }
 
 func syncRetryDelay(attempt int) time.Duration {
-	return min(time.Minute*time.Duration(1<<min(max(attempt-1, 0), 4)), 15*time.Minute)
+	return model.RetryBackoff(attempt-1, time.Minute, 15*time.Minute)
 }

@@ -144,7 +144,7 @@ func TestMetadataPipelineOverlapsRequestsAndPreservesQueueOnStop(t *testing.T) {
 	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&committed, &pending); err != nil || committed == 0 || pending == 0 || committed+pending != len(ids) {
 		t.Fatalf("interruption lost work: committed=%d pending=%d %v", committed, pending, err)
 	}
-	if peak.Load() < 2 || peak.Load() > metadataWorkers {
+	if peak.Load() < 2 || peak.Load() > 16 {
 		t.Fatalf("invalid HTTP concurrency: %d", peak.Load())
 	}
 	if err := s.Sync(ctx, c); err != nil {

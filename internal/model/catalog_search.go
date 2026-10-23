@@ -67,11 +67,12 @@ type CatalogDownloadInput struct {
 }
 
 type CatalogDownload struct {
-	Service       string `json:"-"`
-	Status        string `json:"status"`
-	URL           string `json:"url,omitempty"`
-	OperationID   string `json:"operation_id"`
-	PreparationID string `json:"preparation_id,omitempty"`
+	Service         string `json:"-"`
+	Status          string `json:"status"`
+	URL             string `json:"url,omitempty"`
+	URLValidSeconds int    `json:"url_valid_seconds,omitempty"`
+	OperationID     string `json:"operation_id"`
+	PreparationID   string `json:"preparation_id,omitempty"`
 }
 
 type OperationDownload struct {

@@ -12,6 +12,8 @@ import (
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
+const historyBatchSize = 5000
+
 func ageCollectionHistory(t *testing.T, ctx context.Context, db *Store, id string) {
 	t.Helper()
 	tx, err := db.pool.Begin(ctx)

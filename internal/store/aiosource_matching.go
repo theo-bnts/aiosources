@@ -14,7 +14,7 @@ const aioCandidateLimit = 100
 
 // A bounded transaction shares candidate lookups between release variants.
 // Keep batches small so metadata publication can acquire its exclusive fence.
-const AIOMatchBatchSize = 25
+const AIOMaxMatchBatchSize = 100
 
 func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
 	rows, err := tx.Query(ctx, aioCandidatesQuery, filter.Title, filter.TMDB, filter.IMDb, filter.TVDB, filter.Type, filter.Year, filter.Seasons, filter.Episode, filter.ExactOnly)
@@ -40,7 +40,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	if len(picks) == 0 {
 		return nil, nil
 	}
-	if len(picks) > AIOMatchBatchSize || decide == nil {
+	if len(picks) > AIOMaxMatchBatchSize || decide == nil {
 		return nil, model.ErrInvalid
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -51,6 +51,13 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	var generation int64
 	if err = tx.QueryRow(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR SHARE`).Scan(&generation); err != nil {
 		return nil, databaseError("lock candidate generation", err)
+	}
+	var policy model.MatchingPolicy
+	if err = tx.QueryRow(ctx, `SELECT (values->>'minimum_similarity')::int,(values->>'ambiguity_margin')::int FROM ingest.runtime_settings WHERE section='matching'`).Scan(&policy.MinimumSimilarity, &policy.AmbiguityMargin); err != nil {
+		return nil, databaseError("read identification policy", err)
+	}
+	if !policy.Valid() {
+		return nil, model.ErrInvalid
 	}
 	if _, err = tx.Exec(ctx, `SELECT set_config('pg_trgm.similarity_threshold','0.5',true)`); err != nil {
 		return nil, err
@@ -80,6 +87,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 			return nil, err
 		}
 		r.CandidateGeneration = generation
+		r.MatchingPolicy = policy
 		records = append(records, r)
 		reviews = append(reviews, &review)
 	}

@@ -17,7 +17,12 @@ func (s *Service) retainHistory() {
 			return
 		case <-timer.C:
 		}
-		ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+		policy, policyErr := s.DB.RuntimeValues(s.ctx, "history")
+		pass := 10 * time.Second
+		if policyErr == nil {
+			pass = time.Duration(policy["pass_seconds"]) * time.Second
+		}
+		ctx, cancel := context.WithTimeout(s.ctx, pass)
 		removed, err := s.DB.PruneHistory(ctx)
 		if s.ctx.Err() != nil {
 			cancel()
@@ -33,10 +38,9 @@ func (s *Service) retainHistory() {
 		}
 		failed = err != nil
 		stop()
-		seconds, policyErr := s.DB.RuntimeValue(s.ctx, "history", "cleanup_seconds")
 		delay := 30 * time.Second
 		if policyErr == nil {
-			delay = time.Duration(seconds) * time.Second
+			delay = time.Duration(policy["cleanup_seconds"]) * time.Second
 		}
 		if err == nil && removed > 0 {
 			delay = time.Second

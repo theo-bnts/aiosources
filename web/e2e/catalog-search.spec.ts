@@ -342,6 +342,40 @@ test('mobile download controls handle pending and ready responses without keepin
   await expect(link).toHaveCount(0)
 })
 
+test('ready download actions expire with the link lifetime supplied by the server', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  await page.clock.install()
+  let preparations = 0
+  await page.route('**/api/catalog/*/download', async (route) => {
+    preparations++
+    await route.fulfill({
+      json: {
+        status: 'ready',
+        operation_id: 'synthetic-expiry',
+        url: '/api/catalog-downloads/expiring',
+        url_valid_seconds: 60,
+      },
+    })
+  })
+  await page.route('**/api/catalog-downloads/expiring', (route) =>
+    route.fulfill({
+      contentType: 'application/octet-stream',
+      headers: { 'Content-Disposition': 'attachment; filename="example.mkv"' },
+      body: 'Synthetic attachment',
+    }),
+  )
+  await page.goto(`/search/${ids.movie}?cached_only=false`)
+  await page.getByRole('button', { name: 'Download', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Download file', exact: true })).toBeVisible()
+  await page.clock.fastForward(61_000)
+  await expect(page.getByRole('button', { name: 'Download file', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
+  expect(preparations).toBe(1)
+})
+
 test('an uncached download starts automatically when the provider becomes ready', async ({
   page,
   server,

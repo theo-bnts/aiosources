@@ -332,6 +332,12 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             </p>
           )}
           {settingsForm}
+          <Disclosure title="Advanced settings">
+            <RuntimeSettingsPanel section="identification" />
+            <RuntimeSettingsPanel section="matching" />
+            <RuntimeSettingsPanel section="metadata" />
+            <RuntimeSettingsPanel section="metadata_retries" />
+          </Disclosure>
           <Disclosure title="Manual actions">
             {status.error && (
               <p role="status" className="notice notice-warning">
@@ -396,6 +402,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       )}
       {section === 'debrid' && settingsForm}
       {section === 'debrid' && <RuntimeSettingsPanel section="debrid" />}
+      {section === 'debrid' && <RuntimeSettingsPanel section="debrid_retries" />}
       {section === 'debrid' && (
         <form
           aria-label="Private source playback"

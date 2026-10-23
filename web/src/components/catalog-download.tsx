@@ -170,7 +170,9 @@ export function DownloadAction({
   }, [waiting, mutation.isPending, mutation.isError, run, checkVersion])
   useEffect(() => {
     if (!ready) return
-    const timer = window.setTimeout(() => setReady(null), 10 * 60_000)
+    const seconds = ready.url_valid_seconds ?? 600
+    const delay = Number.isFinite(seconds) ? Math.max(0, Math.min(seconds, 3600) - 1) * 1000 : 0
+    const timer = window.setTimeout(() => setReady(null), delay)
     return () => window.clearTimeout(timer)
   }, [ready])
   const details = [service.filename, service.size ? bytes(service.size) : null]

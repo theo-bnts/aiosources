@@ -14,16 +14,23 @@ func (s *Service) drainMatching(ctx context.Context, history *operationHistory) 
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		rows, err := s.DB.AIOMatchBatch(ctx, 250)
+		policy, err := s.DB.RuntimeValues(ctx, "identification")
+		if err != nil {
+			return err
+		}
+		rows, err := s.DB.AIOMatchBatch(ctx, policy["queue_batch"])
 		if err != nil || len(rows) == 0 {
 			return err
 		}
 		group, work := errgroup.WithContext(ctx)
 		workers := s.DB.AIOMatchWorkers()
+		if policy["workers"] > 0 {
+			workers = policy["workers"]
+		}
 		group.SetLimit(workers)
 		// Retain parallelism for a short queue, and amortize candidate discovery
 		// across more variants when enough work exists to fill every worker.
-		batchSize := max(10, min(store.AIOMatchBatchSize, (len(rows)+workers-1)/workers))
+		batchSize := max(min(10, policy["transaction_batch"]), min(policy["transaction_batch"], (len(rows)+workers-1)/workers))
 		outcomes := make([][]model.AIOMatchResult, (len(rows)+batchSize-1)/batchSize)
 		for start := 0; start < len(rows); start += batchSize {
 			chunk, index := rows[start:min(start+batchSize, len(rows))], start/batchSize
@@ -81,7 +88,7 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 	for i, work := range works {
 		candidates[i] = WorkCandidate(work)
 	}
-	d := ChooseMatch(p, candidates, SourceIDs{TMDB: r.TMDB, IMDb: r.IMDb, TVDB: r.TVDB}, overflow, SourceEpisode{r.Season, r.Episode})
+	d := ChooseMatchWithPolicy(p, candidates, SourceIDs{TMDB: r.TMDB, IMDb: r.IMDb, TVDB: r.TVDB}, overflow, SourceEpisode{r.Season, r.Episode}, r.MatchingPolicy)
 	result := model.AIOMatchResult{Record: r, Status: d.Status, Reason: d.Reason}
 	if d.Winner != nil {
 		for i := range works {

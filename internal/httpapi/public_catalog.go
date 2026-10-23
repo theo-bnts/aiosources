@@ -141,7 +141,11 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 			if !validCatalogFileURL(result.URL) {
 				return nil, aiosource.ErrInvalidResponse
 			}
-			data, e := json.Marshal(publicCatalogFileTicket{Service: result.Service, URL: result.URL, Audience: s.auth.origin, Generation: visitor.Generation, Expires: time.Now().Add(10 * time.Minute).Unix()})
+			expires, e := s.downloadTicketExpiry(r.Context())
+			if e != nil {
+				return nil, e
+			}
+			data, e := json.Marshal(publicCatalogFileTicket{Service: result.Service, URL: result.URL, Audience: s.auth.origin, Generation: visitor.Generation, Expires: expires})
 			if e != nil {
 				return nil, e
 			}
@@ -151,6 +155,7 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 				return nil, e
 			}
 			result.URL = "/api/public/catalog-downloads/" + base64.RawURLEncoding.EncodeToString(sealed)
+			result.URLValidSeconds = max(0, int(expires-time.Now().Unix()))
 		}
 		return result, err
 	}))
@@ -188,7 +193,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket publicCatalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || ticket.Audience != s.auth.origin || ticket.Expires <= now || ticket.Expires > now+600 || (ticket.Service != "alldebrid" && ticket.Service != "torbox") || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil || ticket.Audience != s.auth.origin || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || (ticket.Service != "alldebrid" && ticket.Service != "torbox") || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}

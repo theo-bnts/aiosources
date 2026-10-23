@@ -42,6 +42,7 @@ type AIOWork struct {
 	Revision        int64             `json:"revision"`
 }
 type AIORecord struct {
+	MatchingPolicy      MatchingPolicy      `json:"-"`
 	Presentation        map[string][]string `json:"-"`
 	SubtitleLanguages   []string            `json:"-"`
 	Bitrate             float64             `json:"-"`

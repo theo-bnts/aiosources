@@ -525,7 +525,11 @@ type AIOJob struct {
 }
 
 func (s *Store) AIOMetadataJobs(ctx context.Context) ([]AIOJob, error) {
-	rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id,version,attempts FROM ingest.aio_metadata_jobs WHERE next_attempt<=now() ORDER BY next_attempt,media_type,tmdb_id LIMIT 100`)
+	limit, err := s.RuntimeValue(ctx, "metadata", "queue_batch")
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id,version,attempts FROM ingest.aio_metadata_jobs WHERE next_attempt<=now() ORDER BY next_attempt,media_type,tmdb_id LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +549,11 @@ func (s *Store) FinishAIOMetadata(ctx context.Context, j AIOJob, success bool) e
 	if success {
 		_, err = s.pool.Exec(ctx, `DELETE FROM ingest.aio_metadata_jobs WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version)
 	} else {
-		_, err = s.pool.Exec(ctx, `UPDATE ingest.aio_metadata_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>LEAST(86400,60*power(2,LEAST(attempts,10)))::int) WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version)
+		policy, e := s.RuntimeValues(ctx, "metadata_retries")
+		if e != nil {
+			return e
+		}
+		_, err = s.pool.Exec(ctx, `UPDATE ingest.aio_metadata_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>LEAST($5::int,$4::int*power(2,LEAST(attempts,20)))::int) WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version, policy["detail_retry_seconds"], policy["detail_retry_max_seconds"])
 	}
 	return databaseError("finish metadata job", err)
 }

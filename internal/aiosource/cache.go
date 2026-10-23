@@ -65,7 +65,7 @@ func (s *Service) cacheFlightTriggered(service, key, resource string, hashes []s
 	return f, nil
 }
 func RetryDelay(attempt int) time.Duration {
-	return min(time.Duration(15)*time.Minute*time.Duration(1<<min(max(attempt, 0), 12)), 48*time.Hour)
+	return model.RetryBackoff(attempt, 15*time.Minute, 48*time.Hour)
 }
 func sameHashes(a, b []string) bool {
 	if len(a) != len(b) {
@@ -107,7 +107,12 @@ func (s *Service) checkResourceTriggered(ctx context.Context, service, key, reso
 	full := !found || !freshResource(v, hashes, now, ttl)
 	finalAt := v.CheckedAt.Add(ttl - 2*time.Minute)
 	finalDue := !now.Before(finalAt) && v.LastAttempt.Before(finalAt)
-	if !full && now.Sub(v.LastAttempt) < RetryDelay(v.Retry-1) && !finalDue {
+	policy, err := s.DB.RuntimeValues(ctx, "debrid_retries")
+	if err != nil {
+		return err
+	}
+	retryDelay := model.RetryBackoff(v.Retry-1, time.Duration(policy["delay_minutes"])*time.Minute, time.Duration(policy["maximum_hours"])*time.Hour)
+	if !full && now.Sub(v.LastAttempt) < retryDelay && !finalDue {
 		return nil
 	}
 	todo := append([]string{}, hashes...)

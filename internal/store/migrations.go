@@ -234,6 +234,7 @@ var migrations = []struct {
 	{71, releaseNumberingRecheckSchema},
 	{72, savedViewRetirementSchema},
 	{73, runtimeSettingsSchema},
+	{74, extendedRuntimeSettingsSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

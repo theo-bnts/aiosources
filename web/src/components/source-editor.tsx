@@ -1172,6 +1172,7 @@ export function SourceEditor({
   mode: requestedMode,
   onModeChange,
   jsonActions,
+  limitKiB = 128,
 }: {
   value: string
   onChange: (value: string) => void
@@ -1182,6 +1183,7 @@ export function SourceEditor({
   mode: 'visual' | 'json'
   onModeChange: (mode: 'visual' | 'json') => void
   jsonActions?: ReactNode
+  limitKiB?: number
 }) {
   const document = useMemo(() => parseProviderJSON(value), [value])
   const sourceStages = document.getIn(['http', 'catalog']) === true ? remoteStages : stages
@@ -1320,8 +1322,8 @@ export function SourceEditor({
               readOnly={readOnly}
             />
             <p className="help">
-              Strict JSON object · no comments, duplicate keys or trailing commas · 128 KiB maximum.
-              Untouched numeric values retain their exact representation.
+              Strict JSON object · no comments, duplicate keys or trailing commas · {limitKiB} KiB
+              maximum. Untouched numeric values retain their exact representation.
             </p>
           </>
         ) : (

@@ -31,6 +31,7 @@ export type CatalogRelease = {
   services: CatalogAvailability[]
 }
 export type CatalogDownload = {
+  url_valid_seconds?: number
   status: 'ready' | 'pending'
   url?: string
   operation_id: string

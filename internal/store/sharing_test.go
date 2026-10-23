@@ -327,7 +327,7 @@ func TestCatalogMigrationSeedsExistingRowsAndDurableIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+"COMMIT;"); err != nil {
+	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema+"COMMIT;"); err != nil {
 		t.Fatal(err)
 	}
 	grant := sharingGrant(t, ctx, db)
@@ -413,7 +413,7 @@ func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema); err != nil {
+	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema); err != nil {
 		t.Fatal(err)
 	}
 	source := "https://tracker.invalid/file?passkey=private-passkey"

@@ -24,6 +24,23 @@ INSERT INTO ingest.runtime_settings(section,values) VALUES
 
 const runtimeSettingsSchema = runtimePolicySchema + `ALTER TABLE ingest.collection_settings ADD COLUMN auto_resume_interrupted BOOLEAN NOT NULL DEFAULT TRUE;`
 
+const extendedRuntimeSettingsSchema = `
+ALTER TABLE ingest.runtime_settings DROP CONSTRAINT runtime_settings_section_check;
+ALTER TABLE ingest.runtime_settings ADD CONSTRAINT runtime_settings_section_check CHECK(section IN
+ ('debrid','outgoing','connections','history','identification','matching','metadata','metadata_retries','source_retries','debrid_retries','downloads','security','payloads'));
+UPDATE ingest.runtime_settings SET values='{"batch_size":5000,"pass_seconds":10}'::jsonb || values,revision=revision+1 WHERE section='history';
+INSERT INTO ingest.runtime_settings(section,values) VALUES
+ ('identification','{"workers":0,"queue_batch":250,"transaction_batch":25}'),
+ ('matching','{"minimum_similarity":92,"ambiguity_margin":8}'),
+ ('metadata','{"workers":16,"queue_batch":100,"publication_batch":16}'),
+ ('metadata_retries','{"request_attempts":4,"request_retry_seconds":1,"sync_retry_seconds":60,"sync_retry_max_seconds":900,"detail_retry_seconds":60,"detail_retry_max_seconds":86400}'),
+ ('source_retries','{"retries":3,"initial_seconds":2,"maximum_seconds":8}'),
+ ('debrid_retries','{"delay_minutes":15,"maximum_hours":48}'),
+ ('downloads','{"duration_hours":24,"ticket_minutes":10}'),
+ ('security','{"session_hours":12,"login_per_minute":10,"login_global_per_minute":60,"session_limit":256,"enrollment_minutes":10}'),
+ ('payloads','{"source_kib":128,"public_stremio_bytes":8192,"public_torznab_bytes":6000}');
+`
+
 type runtimeSettingsCache struct {
 	loading  chan struct{}
 	epoch    uint64
@@ -61,12 +78,34 @@ func (s *Store) UpdateRuntimeSection(ctx context.Context, section string, input 
 		return databaseError("begin runtime settings update", err)
 	}
 	defer rollback(tx)
+	matchingChanged := false
+	if section == "matching" {
+		// Fence publication before changing the decision policy. Existing manual
+		// reviews remain authoritative; automatic results are queued afresh.
+		if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+			return databaseError("lock identification policy", err)
+		}
+		if err := tx.QueryRow(ctx, `SELECT values<>$1::jsonb FROM ingest.runtime_settings WHERE section='matching'`, encoded).Scan(&matchingChanged); err != nil {
+			return databaseError("read previous identification policy", err)
+		}
+	}
 	result, err := tx.Exec(ctx, `UPDATE ingest.runtime_settings SET values=$2,revision=revision+1 WHERE section=$1 AND revision=$3`, section, encoded, input.Revision)
 	if err != nil {
 		return databaseError("save runtime settings", err)
 	}
 	if result.RowsAffected() != 1 {
 		return model.ErrConflict
+	}
+	if matchingChanged {
+		if _, err := tx.Exec(ctx, `
+DELETE FROM ingest.aio_matches m WHERE NOT EXISTS(SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=m.provider_id AND r.source_id=m.source_id AND r.active);
+INSERT INTO ingest.aio_match_queue(provider_id,source_id)
+ SELECT t.provider_id,t.source_id FROM ingest.torrents t WHERE NOT EXISTS(
+ SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=t.provider_id AND r.source_id=t.source_id AND r.active)
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
+UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL;`); err != nil {
+			return databaseError("queue identification policy review", err)
+		}
 	}
 	if err := notify(ctx, tx); err != nil {
 		return err
@@ -145,10 +184,35 @@ func (s *Store) loadRuntimeSettings(ctx context.Context) (map[string]model.Runti
 	if err := rows.Err(); err != nil {
 		return nil, databaseError("load runtime policy", err)
 	}
-	if len(sections) != 4 {
+	if len(sections) != len(model.RuntimeSections()) {
 		return nil, model.ErrInvalid
 	}
 	return sections, nil
+}
+
+func (s *Store) RuntimeValues(ctx context.Context, section string) (map[string]int, error) {
+	fields := model.RuntimeFields(section)
+	if fields == nil {
+		return nil, model.ErrInvalid
+	}
+	// Resolve the whole section from one snapshot, including related bounds.
+	if _, err := s.RuntimeValue(ctx, section, firstRuntimeKey(fields)); err != nil {
+		return nil, err
+	}
+	s.runtime.mu.Lock()
+	defer s.runtime.mu.Unlock()
+	values := make(map[string]int, len(fields))
+	for key, value := range s.runtime.sections[section].Values {
+		values[key] = value
+	}
+	return values, nil
+}
+
+func firstRuntimeKey(fields map[string]model.RuntimeField) string {
+	for key := range fields {
+		return key
+	}
+	return ""
 }
 
 func (s *Store) ConnectionTimeout(ctx context.Context, format string) (time.Duration, error) {

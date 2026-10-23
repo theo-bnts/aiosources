@@ -23,6 +23,11 @@ import (
 
 const catalogFilePurpose = "catalog-browser-download-v1"
 
+func (s *server) downloadTicketExpiry(ctx context.Context) (int64, error) {
+	minutes, err := s.options.Store.RuntimeValue(ctx, "downloads", "ticket_minutes")
+	return time.Now().Add(time.Duration(minutes) * time.Minute).Unix(), err
+}
+
 type catalogFileTicket struct {
 	Service string `json:"service,omitempty"`
 	URL     string `json:"url"`
@@ -47,7 +52,12 @@ func (s *server) writeCatalogDownload(w http.ResponseWriter, r *http.Request, it
 			respondError(w, aiosource.ErrInvalidResponse)
 			return
 		}
-		data, e := json.Marshal(catalogFileTicket{Service: item.Service, URL: item.URL, Session: r.Context().Value(sessionContextKey{}).(session).id, Expires: time.Now().Add(10 * time.Minute).Unix()})
+		expires, e := s.downloadTicketExpiry(r.Context())
+		if e != nil {
+			respondError(w, e)
+			return
+		}
+		data, e := json.Marshal(catalogFileTicket{Service: item.Service, URL: item.URL, Session: r.Context().Value(sessionContextKey{}).(session).id, Expires: expires})
 		if e != nil {
 			respondError(w, e)
 			return
@@ -59,6 +69,7 @@ func (s *server) writeCatalogDownload(w http.ResponseWriter, r *http.Request, it
 			return
 		}
 		item.URL = "/api/catalog-downloads/" + base64.RawURLEncoding.EncodeToString(sealed)
+		item.URLValidSeconds = max(0, int(expires-time.Now().Unix()))
 	}
 	writeJSON(w, http.StatusOK, item)
 }
@@ -142,7 +153,7 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket catalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && ticket.Service != "alldebrid" && ticket.Service != "torbox") || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+600 || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && ticket.Service != "alldebrid" && ticket.Service != "torbox") || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
@@ -157,7 +168,12 @@ func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, tick
 		respondError(w, model.ErrBusy)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 24*time.Hour)
+	hours, err := s.options.Store.RuntimeValue(r.Context(), "downloads", "duration_hours")
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(hours)*time.Hour)
 	defer cancel()
 	if ticket.Service != "" {
 		ctx = outbound.WithTarget(ctx, "download:"+ticket.Service)
@@ -200,7 +216,8 @@ func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, tick
 			return
 		}
 	}
-	if err = http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil && !errors.Is(err, http.ErrNotSupported) {
+	deadline, _ := ctx.Deadline()
+	if err = http.NewResponseController(w).SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		respondError(w, err)
 		return
 	}

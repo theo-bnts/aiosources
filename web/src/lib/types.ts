@@ -197,6 +197,7 @@ export interface SecretInfo {
   updated_at: string
 }
 export interface CollectionPolicy {
+  source_retries?: { retries: number; initial_seconds: number; maximum_seconds: number }
   max_quota_retries: number
   max_quota_wait_seconds: number
   no_progress_requests: number

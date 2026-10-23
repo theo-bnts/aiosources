@@ -24,8 +24,12 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 		return false, ErrInvalidResponse
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
+	policy, err := s.DB.RuntimeValues(ctx, "metadata_retries")
+	if err != nil {
+		return false, err
+	}
 	var retryErr error
-	for attempt := 0; attempt < 4; attempt++ {
+	for attempt := 0; attempt < policy["request_attempts"]; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return false, err
 		}
@@ -58,12 +62,12 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 		if res.StatusCode == 429 || res.StatusCode >= 500 {
 			retryErr = metadataHTTPError(res.StatusCode)
 			res.Body.Close()
-			delay := time.Duration(1<<attempt) * time.Second
+			delay := time.Duration(policy["request_retry_seconds"]*(1<<attempt)) * time.Second
 			delay = metadataRetryAfter(res.Header.Get("Retry-After"), delay, time.Now())
 			if res.StatusCode == 429 {
 				s.metadataRate.cooldown(delay)
 			}
-			if attempt == 3 {
+			if attempt == policy["request_attempts"]-1 {
 				break
 			}
 			timer := time.NewTimer(delay)
@@ -550,7 +554,11 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 		recovery, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		message := metadataDiagnostic(stage, syncErr).Message()
-		_ = s.DB.AIOFailedSync(recovery, time.Now().Add(syncRetryDelay(attempt)), message)
+		delay := syncRetryDelay(attempt)
+		if policy, err := s.DB.RuntimeValues(recovery, "metadata_retries"); err == nil {
+			delay = model.RetryBackoff(attempt-1, time.Duration(policy["sync_retry_seconds"])*time.Second, time.Duration(policy["sync_retry_max_seconds"])*time.Second)
+		}
+		_ = s.DB.AIOFailedSync(recovery, time.Now().Add(delay), message)
 	}()
 	trigger := "manual"
 	if automatic {

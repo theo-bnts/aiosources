@@ -127,7 +127,11 @@ func (s *Store) SecurityUpdate(ctx context.Context, currentID string, passwordHa
 		if err = tx.QueryRow(ctx, `SELECT count(*) FROM ingest.admin_sessions`).Scan(&count); err != nil {
 			return databaseError("count sessions", err)
 		}
-		if count >= 256 {
+		var limit int
+		if err := tx.QueryRow(ctx, `SELECT (values->>'session_limit')::int FROM ingest.runtime_settings WHERE section='security'`).Scan(&limit); err != nil {
+			return databaseError("read session limit", err)
+		}
+		if count >= limit {
 			return ErrSecurityLimit
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO ingest.admin_sessions(id,token_hash,user_agent,expires_at) VALUES($1,$2,$3,$4)`, next.ID, next.TokenHash, next.UserAgent, next.ExpiresAt); err != nil {
@@ -221,6 +225,10 @@ func (s *Store) RevokeAdminSessions(ctx context.Context, currentID, targetID str
 // AllowSecurityAttempt applies a durable per-client and global administrator
 // limit across replicas. Client identifiers are domain-separated hashes, not raw addresses.
 func (s *Store) AllowSecurityAttempt(ctx context.Context, clientHash string) (bool, error) {
+	policy, err := s.RuntimeValues(ctx, "security")
+	if err != nil {
+		return false, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return false, databaseError("begin authentication limit", err)
@@ -230,7 +238,7 @@ func (s *Store) AllowSecurityAttempt(ctx context.Context, clientHash string) (bo
 	for _, bucket := range []struct {
 		key   string
 		limit int
-	}{{"administrator", 60}, {"client-" + clientHash, 10}} {
+	}{{"administrator", policy["login_global_per_minute"]}, {"client-" + clientHash, policy["login_per_minute"]}} {
 		var count int
 		err = tx.QueryRow(ctx, `INSERT INTO ingest.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1)
  ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,

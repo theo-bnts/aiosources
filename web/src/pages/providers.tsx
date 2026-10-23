@@ -472,7 +472,14 @@ function ProviderForm({
     parsed.errors.length ? 'json' : 'visual',
   )
   const byteLength = useMemo(() => new TextEncoder().encode(json).length, [json])
-  const locallyInvalid = parsed.errors.length > 0 || byteLength > 128 * 1024
+  const limits = useQuery({
+    queryKey: ['runtime-settings', 'payloads'],
+    queryFn: ({ signal }) =>
+      api<{ values: Record<string, number> }>('/settings/runtime/payloads', { signal }),
+    refetchInterval: COLLECTION_REFRESH_INTERVAL,
+  })
+  const definitionLimit = limits.data?.values.source_kib ?? 128
+  const locallyInvalid = parsed.errors.length > 0 || byteLength > definitionLimit * 1024
   const dirty = json !== savedJSON || fieldDraft
   const externallyChanged = Boolean(document && document.revision !== revision)
   const validate = useMutation({
@@ -748,12 +755,14 @@ function ProviderForm({
           </div>
         </section>
       )}
-      {byteLength > 128 * 1024 && (
+      {byteLength > definitionLimit * 1024 && (
         <p className="notice notice-error" role="alert">
-          The definition exceeds the 128 KiB limit. Reduce its size before saving.
+          The definition exceeds this instance's {definitionLimit} KiB limit. Reduce its size before
+          saving.
         </p>
       )}
       <SourceEditor
+        limitKiB={definitionLimit}
         key={editorKey}
         value={json}
         onChange={(value) => {

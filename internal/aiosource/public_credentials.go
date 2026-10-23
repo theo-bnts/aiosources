@@ -126,6 +126,6 @@ func (s *Service) PublicBrowserCredential(ctx context.Context, audience string, 
 	}
 	profile := *installation
 	profile.StremioGeneration = 0
-	result.Credential, err = s.sealPublicInstallation(profile)
+	result.Credential, err = s.sealPublicInstallation(ctx, profile)
 	return result, err
 }

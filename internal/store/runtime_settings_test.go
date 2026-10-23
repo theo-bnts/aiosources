@@ -16,7 +16,7 @@ func TestRuntimeSettingsPreserveSectionsRevisionsAndEffectiveValues(t *testing.T
 		t.Fatal(err)
 	}
 	defer peer.Close()
-	for _, section := range []string{"debrid", "outgoing", "connections", "history"} {
+	for _, section := range model.RuntimeSections() {
 		initial, err := db.RuntimeSection(ctx, section)
 		if err != nil || !initial.Valid(section) {
 			t.Fatal(section, initial, err)
@@ -30,6 +30,7 @@ func TestRuntimeSettingsPreserveSectionsRevisionsAndEffectiveValues(t *testing.T
 			}
 		}
 	}
+	historyBefore, _ := db.RuntimeSection(ctx, "history")
 	initial, _ := db.RuntimeSection(ctx, "connections")
 	initial.Values["torznab_seconds"] = 45
 	if err := db.UpdateRuntimeSection(ctx, "connections", initial); err != nil {
@@ -60,13 +61,13 @@ func TestRuntimeSettingsPreserveSectionsRevisionsAndEffectiveValues(t *testing.T
 		time.Sleep(20 * time.Millisecond)
 	}
 	current, _ := db.RuntimeSection(ctx, "history")
-	if current.Revision != 1 || current.Values["days"] != 7 {
+	if current.Revision != historyBefore.Revision || current.Values["days"] != 7 {
 		t.Fatal("another section was overwritten", current)
 	}
 }
 
 func TestRuntimeSectionsRejectIncompleteAndUnboundedPolicies(t *testing.T) {
-	for _, section := range []string{"debrid", "outgoing", "connections", "history"} {
+	for _, section := range model.RuntimeSections() {
 		for key, field := range model.RuntimeFields(section) {
 			for _, invalid := range []int{field.Min - 1, field.Max + 1} {
 				value := model.DefaultRuntimeSection(section)

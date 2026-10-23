@@ -25,15 +25,17 @@ func (s CollectionSettings) Valid() bool {
 
 // CollectionPolicy is immutable for the lifetime of a run, including all resumes.
 type CollectionPolicy struct {
-	MaxQuotaRetries     int    `json:"max_quota_retries"`
-	MaxQuotaWaitSeconds int    `json:"max_quota_wait_seconds"`
-	NoProgressRequests  int    `json:"no_progress_requests"`
-	NoProgressAction    string `json:"no_progress_action"`
-	MaxDurationSeconds  int    `json:"max_duration_seconds"`
+	SourceRetries       SourceRetryPolicy `json:"source_retries"`
+	MaxQuotaRetries     int               `json:"max_quota_retries"`
+	MaxQuotaWaitSeconds int               `json:"max_quota_wait_seconds"`
+	NoProgressRequests  int               `json:"no_progress_requests"`
+	NoProgressAction    string            `json:"no_progress_action"`
+	MaxDurationSeconds  int               `json:"max_duration_seconds"`
 }
 
 func (p CollectionPolicy) Valid() bool {
 	return p.MaxQuotaRetries >= 0 && p.MaxQuotaRetries <= 10 &&
+		p.SourceRetries.Valid() &&
 		p.MaxQuotaWaitSeconds >= 0 && p.MaxQuotaWaitSeconds <= 86400 &&
 		p.NoProgressRequests >= 0 && p.NoProgressRequests <= 100000 &&
 		(p.NoProgressAction == "warn" || p.NoProgressAction == "pause") &&
@@ -41,7 +43,7 @@ func (p CollectionPolicy) Valid() bool {
 }
 
 func (s CollectionSettings) Policy() CollectionPolicy {
-	return CollectionPolicy{MaxQuotaRetries: s.MaxQuotaRetries, MaxQuotaWaitSeconds: s.MaxQuotaWaitSeconds,
+	return CollectionPolicy{SourceRetries: DefaultSourceRetryPolicy(), MaxQuotaRetries: s.MaxQuotaRetries, MaxQuotaWaitSeconds: s.MaxQuotaWaitSeconds,
 		NoProgressRequests: s.NoProgressRequests, NoProgressAction: s.NoProgressAction}
 }
 
@@ -62,6 +64,30 @@ func (r Run) EffectivePolicy() CollectionPolicy {
 		return CollectionPolicy{MaxQuotaRetries: 3, NoProgressAction: "warn"}
 	}
 	return *r.Policy
+}
+
+type SourceRetryPolicy struct {
+	Retries        int `json:"retries"`
+	InitialSeconds int `json:"initial_seconds"`
+	MaximumSeconds int `json:"maximum_seconds"`
+}
+
+func DefaultSourceRetryPolicy() SourceRetryPolicy { return SourceRetryPolicy{3, 2, 8} }
+
+// Older run snapshots contain no source retry policy. Keep their original
+// behavior without changing the immutable snapshot or consulting live settings.
+func (p SourceRetryPolicy) Effective() SourceRetryPolicy {
+	if p == (SourceRetryPolicy{}) {
+		return DefaultSourceRetryPolicy()
+	}
+	return p
+}
+
+func (p SourceRetryPolicy) Valid() bool {
+	if p == (SourceRetryPolicy{}) {
+		return true
+	}
+	return p.Retries >= 0 && p.Retries <= 10 && p.InitialSeconds >= 1 && p.InitialSeconds <= 60 && p.MaximumSeconds >= p.InitialSeconds && p.MaximumSeconds <= 900
 }
 
 type PauseReason string

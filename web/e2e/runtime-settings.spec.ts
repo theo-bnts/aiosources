@@ -2,6 +2,78 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test, expect } from './fixtures'
 
+test('advanced settings stay grouped, persist, and reject contradictory values', async ({
+  page,
+}) => {
+  await page.goto('/metadata/settings')
+  const advanced = page
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: /^Advanced settings$/ }) })
+  await advanced.locator(':scope > summary').click()
+  const processing = advanced
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: /^Identification processing$/ }) })
+  await processing.locator('summary').click()
+  const form = processing.getByRole('form', { name: 'Identification processing' })
+  await form.getByLabel('Queued torrents per pass', { exact: true }).fill('10')
+  await expect(form).toContainText('The saved batch cannot exceed the queued batch.')
+  await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await form.getByLabel('Torrents per saved batch', { exact: true }).fill('5')
+  await form.getByLabel('Maximum identification workers (0 = automatic)', { exact: true }).fill('2')
+  await form.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect(
+    (await (await page.request.get('/api/settings/runtime/identification')).json()).values,
+  ).toEqual({ workers: 2, queue_batch: 10, transaction_batch: 5 })
+  await page.goto('/security/settings')
+  await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+  const security = page.getByRole('form', { name: 'Authentication settings' })
+  await security
+    .getByLabel('New administrator session duration (hours)', { exact: true })
+    .fill('24')
+  await security.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(security.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await page.reload()
+  await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+  await expect(
+    security.getByLabel('New administrator session duration (hours)', { exact: true }),
+  ).toHaveValue('24')
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 1100 })
+    await expect(security).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(
+      false,
+    )
+    if (process.env.QA_DIRECTORY) {
+      await mkdir(process.env.QA_DIRECTORY, { recursive: true })
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({
+        path: join(process.env.QA_DIRECTORY, `advanced-security-${width}.png`),
+        fullPage: true,
+        animations: 'disabled',
+      })
+    }
+    await page.goto('/network/incoming')
+    for (const title of ['Browser downloads', 'Configuration limits']) {
+      await page.locator('summary', { hasText: title }).click()
+      await expect(page.getByRole('form', { name: title }).locator('input').first()).toBeVisible()
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(
+      false,
+    )
+    if (process.env.QA_DIRECTORY) {
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.screenshot({
+        path: join(process.env.QA_DIRECTORY, `advanced-network-${width}.png`),
+        fullPage: true,
+        animations: 'disabled',
+      })
+    }
+    await page.goto('/security/settings')
+    await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+  }
+})
+
 test('operational policies persist independently and reject stale updates', async ({ page }) => {
   await page.goto('/debrid/settings')
   const section = page

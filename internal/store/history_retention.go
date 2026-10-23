@@ -5,12 +5,14 @@ import (
 	"time"
 )
 
-const historyBatchSize = 5000
-
-// PruneHistory expires diagnostic content after seven days. Each pass is
+// PruneHistory expires diagnostic content under the saved retention policy. Each pass is
 // bounded and transactional; an interrupted pass is retried without removing
 // published fields, queued work, matching decisions or recovery evidence.
 func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
+	batchSize, err := s.RuntimeValue(ctx, "history", "batch_size")
+	if err != nil {
+		return 0, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return 0, databaseError("begin history cleanup", err)
@@ -68,7 +70,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	for _, table := range []string{"raw_records", "pages"} {
 		if result, e := tx.Exec(ctx, `UPDATE ingest.`+table+` SET payload_id=NULL,payload_retained=FALSE
  WHERE id IN (SELECT r.id FROM ingest.`+table+` r JOIN ingest.`+table+` payload ON payload.id=r.payload_id
- WHERE payload.created_at<$1 ORDER BY r.id LIMIT $2)`, cutoff, historyBatchSize); e != nil {
+ WHERE payload.created_at<$1 ORDER BY r.id LIMIT $2)`, cutoff, batchSize); e != nil {
 			return 0, databaseError("expire archive references", e)
 		} else {
 			removed += result.RowsAffected()
@@ -77,14 +79,14 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if err = exec(`DELETE FROM ingest.raw_records WHERE id IN (
  SELECT r.id FROM ingest.raw_records r WHERE r.created_at<$1
  AND NOT EXISTS(SELECT 1 FROM ingest.raw_records reference WHERE reference.payload_id=r.id)
- ORDER BY r.created_at,r.id LIMIT $2)`, cutoff, historyBatchSize); err != nil {
+ ORDER BY r.created_at,r.id LIMIT $2)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	// Fingerprints, filter coverage and the latest retry observation still serve
 	// an unfinished traversal. Their original response bytes are diagnostic only.
 	if result, e := tx.Exec(ctx, `UPDATE ingest.pages SET body=''::bytea,payload_id=NULL,payload_retained=FALSE
  WHERE id IN (SELECT id FROM ingest.pages WHERE created_at<$1
- AND (payload_retained OR octet_length(body)>0) ORDER BY created_at,id LIMIT $2)`, cutoff, historyBatchSize); e != nil {
+ AND (payload_retained OR octet_length(body)>0) ORDER BY created_at,id LIMIT $2)`, cutoff, batchSize); e != nil {
 		return 0, databaseError("expire response payloads", e)
 	} else {
 		removed += result.RowsAffected()
@@ -96,34 +98,34 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
    AND p.id<>(SELECT id FROM ingest.pages latest WHERE latest.run_id=r.id ORDER BY id DESC LIMIT 1)))
  AND NOT EXISTS(SELECT 1 FROM ingest.raw_records raw WHERE raw.page_id=p.id)
  AND NOT EXISTS(SELECT 1 FROM ingest.pages reference WHERE reference.payload_id=p.id)
- ORDER BY p.created_at,p.id LIMIT $3)`, cutoff, ids, historyBatchSize); err != nil {
+ ORDER BY p.created_at,p.id LIMIT $3)`, cutoff, ids, batchSize); err != nil {
 		return 0, err
 	}
 	for _, table := range []string{"activity_logs", "events", "operation_events", "stremio_requests"} {
 		if err = exec(`DELETE FROM ingest.`+table+` WHERE id IN (
- SELECT id FROM ingest.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, cutoff, historyBatchSize); err != nil {
+ SELECT id FROM ingest.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, cutoff, batchSize); err != nil {
 			return 0, err
 		}
 	}
 	if err = exec(`DELETE FROM ingest.operation_runs WHERE id IN (
  SELECT r.id FROM ingest.operation_runs r WHERE finished_at<$1 AND status<>'running'
  AND NOT EXISTS(SELECT 1 FROM ingest.operation_events e WHERE e.run_id=r.id)
- ORDER BY finished_at,id LIMIT $2 FOR UPDATE SKIP LOCKED)`, cutoff, historyBatchSize); err != nil {
+ ORDER BY finished_at,id LIMIT $2 FOR UPDATE SKIP LOCKED)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	for _, table := range []string{"run_record_identities", "run_scope_memberships", "run_scope_counts", "run_scope_refresh_candidates", "run_progress_identities"} {
 		if err = exec(`DELETE FROM ingest.`+table+` WHERE ctid IN (
- SELECT ctid FROM ingest.`+table+` WHERE run_id=ANY($1::text[]) LIMIT $2)`, ids, historyBatchSize); err != nil {
+ SELECT ctid FROM ingest.`+table+` WHERE run_id=ANY($1::text[]) LIMIT $2)`, ids, batchSize); err != nil {
 			return 0, err
 		}
 	}
 	before := removed
 	if err = exec(`DELETE FROM ingest.torrent_history WHERE id IN (
- SELECT id FROM ingest.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoff, historyBatchSize); err != nil {
+ SELECT id FROM ingest.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	if err = exec(`DELETE FROM ingest.torrent_history_baselines WHERE occurrence_id IN (
- SELECT occurrence_id FROM ingest.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoff, historyBatchSize); err != nil {
+ SELECT occurrence_id FROM ingest.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	if removed > before {
@@ -144,7 +146,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	// Serialize the immutable publication boundary with native writers. Keep
-	// the last state of each copy at that boundary plus all seven-day changes.
+	// the last state of each copy at that boundary plus all retained changes.
 	// Older readers must restart with Full; recent paged snapshots stay exact.
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
 		return 0, databaseError("lock catalog retention", err)
@@ -169,7 +171,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
  sequence=EXCLUDED.sequence,recorded_at=EXCLUDED.recorded_at WHERE previous.sequence<EXCLUDED.sequence
  RETURNING 1
 )
-DELETE FROM ingest.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoff, historyBatchSize); err != nil {
+DELETE FROM ingest.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	if err = tx.Commit(ctx); err != nil {

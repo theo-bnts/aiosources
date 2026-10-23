@@ -46,7 +46,7 @@ func TestCatalogFileAttachmentsAreSessionBoundAndStreamWithoutProviderCredential
 		t.Fatal(err)
 	}
 	calls := 0
-	s := &server{options: Options{Vault: addon.Vault}, auth: auth, files: make(chan struct{}, 1), fileClient: &http.Client{Transport: catalogFileRoundTrip(func(r *http.Request) (*http.Response, error) {
+	s := &server{options: Options{Store: f.db, Vault: addon.Vault}, auth: auth, files: make(chan struct{}, 1), fileClient: &http.Client{Transport: catalogFileRoundTrip(func(r *http.Request) (*http.Response, error) {
 		calls++
 		if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" || r.Header.Get("Referer") != "" || r.Header.Get("Range") != "bytes=2-4" {
 			t.Fatal("unsafe download headers", r.Header)

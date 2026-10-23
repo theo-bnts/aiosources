@@ -16,6 +16,14 @@ import (
 
 func TestScheduledBudgetContinuationPreservesCheckpointAndExplainsItsCause(t *testing.T) {
 	ctx, _, db := scheduleDatabase(t)
+	retries, err := db.RuntimeSection(ctx, "source_retries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	retries.Values["retries"] = 1
+	if err := db.UpdateRuntimeSection(ctx, "source_retries", retries); err != nil {
+		t.Fatal(err)
+	}
 	source := scheduledSource(t)
 	start := time.Now().UTC()
 	if _, err := db.ReconcileSchedules(ctx, []scheduling.Source{source}, start); err != nil {
@@ -25,6 +33,9 @@ func TestScheduledBudgetContinuationPreservesCheckpointAndExplainsItsCause(t *te
 	_, queued, err := db.AttemptSchedule(ctx, source, due, nil)
 	if err != nil || queued == nil {
 		t.Fatal("queue scheduled collection", err)
+	}
+	if queued.EffectivePolicy().SourceRetries.Retries != 1 {
+		t.Fatal("scheduled collection did not capture its source retry policy")
 	}
 	claimed, err := db.ClaimNext(ctx)
 	if err != nil || claimed == nil {
@@ -38,9 +49,20 @@ func TestScheduledBudgetContinuationPreservesCheckpointAndExplainsItsCause(t *te
 	if _, err := db.FinishRun(ctx, saved.ID, model.StatusPaused, "page budget reached", model.PauseBudget); err != nil {
 		t.Fatal(err)
 	}
+	retries, err = db.RuntimeSection(ctx, "source_retries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	retries.Values["retries"] = 0
+	if err := db.UpdateRuntimeSection(ctx, "source_retries", retries); err != nil {
+		t.Fatal(err)
+	}
 	_, continued, err := db.AttemptSchedule(ctx, source, due.Add(time.Minute), nil)
 	if err != nil || continued == nil || continued.ID != saved.ID || continued.Status != model.StatusQueued || continued.Pages != saved.Pages || string(continued.Cursor) != string(saved.Cursor) {
 		t.Fatalf("budget continuation lost its saved progress: %+v %v", continued, err)
+	}
+	if continued.EffectivePolicy() != saved.EffectivePolicy() {
+		t.Fatal("scheduled continuation changed its captured retry policy")
 	}
 	events, err := db.Events(ctx, saved.ID, model.ListOptions{Limit: 1})
 	if err != nil || len(events.Items) != 1 || events.Items[0].Message != "Scheduled collection queued for continuation" {

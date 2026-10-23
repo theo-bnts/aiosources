@@ -315,6 +315,8 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
         )
       )}
       {proxy && <RuntimeSettingsPanel section="connections" />}
+      {proxy && <RuntimeSettingsPanel section="downloads" />}
+      {proxy && <RuntimeSettingsPanel section="payloads" />}
     </div>
   )
 }

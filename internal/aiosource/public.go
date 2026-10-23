@@ -252,7 +252,7 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if stremio {
 		installation.StremioGeneration = access.StremioGeneration
 	}
-	return s.sealPublicInstallation(installation)
+	return s.sealPublicInstallation(ctx, installation)
 }
 
 // Old installation links had no protocol counter. They remain valid only until
@@ -269,7 +269,7 @@ func (s *Service) CheckPublicStremio(ctx context.Context, visitor *PublicInstall
 	return nil
 }
 
-func (s *Service) sealPublicInstallation(installation PublicInstallation) (string, error) {
+func (s *Service) sealPublicInstallation(ctx context.Context, installation PublicInstallation) (string, error) {
 	data, err := json.Marshal(installation)
 	if err != nil {
 		return "", model.ErrInvalid
@@ -280,10 +280,24 @@ func (s *Service) sealPublicInstallation(installation PublicInstallation) (strin
 		return "", err
 	}
 	configuration := base64.RawURLEncoding.EncodeToString(sealed)
-	if len(configuration) > MaxPublicInstallationSize {
-		return "", model.ErrInvalid
+	if err := s.CheckPublicConfigurationSize(ctx, "stremio", configuration); err != nil {
+		return "", err
 	}
 	return configuration, nil
+}
+
+func (s *Service) CheckPublicConfigurationSize(ctx context.Context, format, configuration string) error {
+	if format != "stremio" && format != "torznab" {
+		return model.ErrInvalid
+	}
+	limit, err := s.DB.RuntimeValue(ctx, "payloads", "public_"+format+"_bytes")
+	if err != nil {
+		return err
+	}
+	if len(configuration) > limit {
+		return model.ErrConfigurationLimit
+	}
+	return nil
 }
 
 func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {

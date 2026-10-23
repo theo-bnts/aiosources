@@ -149,9 +149,8 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			if err == nil {
 				configuration, err = aiosource.WithInstallationPreferences(configuration, input.Preferences)
 			}
-			if err == nil && len(configuration) > aiosource.MaxPublicInstallationSize {
-				writeError(w, 400, "The installation link is too large. Shorten optional announce URLs.")
-				return
+			if err == nil {
+				err = s.options.AIOSource.CheckPublicConfigurationSize(ctx, "stremio", configuration)
 			}
 			if err != nil {
 				if errors.Is(err, model.ErrNotFound) {

@@ -144,7 +144,12 @@ func (s *server) securityMFAEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	currentID := currentSession(r).id
-	expires := time.Now().Add(10 * time.Minute)
+	minutes, err := s.options.Store.RuntimeValue(r.Context(), "security", "enrollment_minutes")
+	if err != nil {
+		securityError(w, err)
+		return
+	}
+	expires := time.Now().Add(time.Duration(minutes) * time.Minute)
 	err = s.options.Store.SecurityUpdate(r.Context(), currentID, s.auth.passwordHash, func(state *store.SecurityState) (store.SecurityChange, error) {
 		if len(state.ActiveSecret) > 0 {
 			return store.SecurityChange{}, model.ErrConflict

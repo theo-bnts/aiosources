@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import {
   Dialog,
   DialogClose,
@@ -157,6 +158,7 @@ export function SecuritySettingsPage() {
         <div id="sessions" className="min-w-0 scroll-mt-20">
           <SecurityPage view="sessions" />
         </div>
+        <RuntimeSettingsPanel section="security" />
       </PageHeaderVisibility.Provider>
     </div>
   )
@@ -381,8 +383,8 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
             <div>
               <h2 className="section-title">Active sessions</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sessions expire after 12 hours. Device descriptions are deliberately coarse; no IP
-                address or raw user agent is stored.
+                Each session keeps the expiry assigned at sign-in. Device descriptions are
+                deliberately coarse; no IP address or raw user agent is stored.
               </p>
             </div>
             <ConfirmAction
@@ -504,7 +506,7 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
             <DialogTitle>{operation ? titles[operation] : 'Security verification'}</DialogTitle>
             <DialogDescription>
               {operation === 'enroll'
-                ? 'Confirm your current password to generate a private authenticator key. Setup expires after ten minutes.'
+                ? 'Confirm your current password to generate a private, time-limited authenticator key.'
                 : operation === 'confirm'
                   ? 'Add the key to your authenticator, then confirm with your password and a fresh six-digit code. Other sessions will be revoked.'
                   : operation === 'cancel'

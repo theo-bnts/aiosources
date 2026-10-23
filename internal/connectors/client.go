@@ -47,6 +47,7 @@ type Client struct {
 	returnEveryResponse                               bool
 	expectJSON                                        bool
 	maxQuotaRetries                                   int
+	sourceRetries                                     model.SourceRetryPolicy
 	rateLimited                                       func(context.Context, Response, time.Time, bool) error
 	transientFailure                                  func(context.Context, Response, time.Time, int, bool) error
 	responseObserved                                  func(Response, time.Time)
@@ -100,6 +101,11 @@ func NewClient(ctx context.Context, p model.Provider, env Environment) (*Client,
 		return nil, errors.New("request_limits require durable request admission")
 	}
 	c.maxQuotaRetries = maxHTTPRetries
+	c.sourceRetries = env.SourceRetries.Effective()
+	if !c.sourceRetries.Valid() {
+		cancel()
+		return nil, errors.New("invalid source retry policy")
+	}
 	if env.MaxQuotaRetries != nil {
 		if *env.MaxQuotaRetries < 0 || *env.MaxQuotaRetries > 10 {
 			cancel()
@@ -584,7 +590,7 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		retryAt := quota.until
 		if transient {
 			now := time.Now()
-			deadline := now.Add(transientRetryDelay(response.Header, now, attempt+1))
+			deadline := now.Add(c.transientRetryDelay(response.Header, now, attempt+1))
 			if deadline.After(c.next) {
 				c.next = deadline
 			}
@@ -607,7 +613,7 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		}
 		archiveQuota := response.StatusCode == http.StatusTooManyRequests && c.rateLimited != nil
 		archiveTransient := transient && c.transientFailure != nil
-		limit := maxHTTPRetries
+		limit := c.sourceRetries.Retries
 		if response.StatusCode == http.StatusTooManyRequests {
 			limit = c.maxQuotaRetries
 		}
@@ -633,7 +639,7 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		if retry {
 			continue
 		}
-		if transient && attempt >= maxHTTPRetries {
+		if transient && attempt >= c.sourceRetries.Retries {
 			response.Body.(*retainedBody).err = retained.TransientError(attempt + 1)
 		}
 		return response, nil
@@ -654,12 +660,18 @@ func transientHTTPStatus(status int) bool {
 }
 
 func transientRetryDelay(header http.Header, now time.Time, attempt int) time.Duration {
+	return sourceRetryDelay(model.DefaultSourceRetryPolicy(), header, now, attempt)
+}
+
+func (c *Client) transientRetryDelay(header http.Header, now time.Time, attempt int) time.Duration {
+	return sourceRetryDelay(c.sourceRetries, header, now, attempt)
+}
+
+func sourceRetryDelay(policy model.SourceRetryPolicy, header http.Header, now time.Time, attempt int) time.Duration {
 	if delay, valid := retryDelay(header.Get("Retry-After"), now); valid {
 		return delay
 	}
-	// Three automatic retries use 2s, 4s, 8s. Keep the final cooldown bounded
-	// at 8s as well, so an explicit resume cannot immediately hammer the source.
-	return (2 * time.Second) << min(attempt-1, maxHTTPRetries-1)
+	return model.RetryBackoff(attempt-1, time.Duration(policy.InitialSeconds)*time.Second, time.Duration(policy.MaximumSeconds)*time.Second)
 }
 
 type transientHTTPFailure struct {
@@ -686,13 +698,13 @@ func (e *transientHTTPFailure) Error() string {
 func (c *Client) retryHTMLDocument(ctx context.Context, response Response, attempt int) error {
 	response.InvalidDocument = true
 	c.mu.Lock()
-	retryAt := time.Now().Add(transientRetryDelay(response.Header, time.Now(), attempt))
+	retryAt := time.Now().Add(c.transientRetryDelay(response.Header, time.Now(), attempt))
 	if retryAt.After(c.next) {
 		c.next = retryAt
 	}
 	retryAt = c.next
 	c.mu.Unlock()
-	retry := attempt <= maxHTTPRetries
+	retry := attempt <= c.sourceRetries.Retries
 	if c.transientFailure != nil {
 		if err := c.transientFailure(ctx, response, retryAt, attempt, retry); err != nil {
 			return err
