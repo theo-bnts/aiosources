@@ -56,7 +56,7 @@ test('advanced import controls load on demand and folding preserves drafts and n
   })
   await page.goto('/providers/settings')
   const section = page.locator('#advanced-import-settings')
-  const toggle = section.locator('summary')
+  const toggle = section.locator(':scope > summary')
   const form = section.getByRole('form', { name: 'Advanced settings', exact: true })
   await expect(section).not.toHaveAttribute('open', '')
   await expect(form).toHaveCount(0)
