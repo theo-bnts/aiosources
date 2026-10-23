@@ -2,7 +2,7 @@ import { toggleProvider } from '@/lib/provider-state'
 import { ResultCount } from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
@@ -445,7 +445,7 @@ function ProviderForm({
   initialJSON?: string
 }) {
   const navigate = useNavigate()
-  const { state: navigationState, hash } = useLocation()
+  const { state: navigationState, hash, key: navigationKey } = useLocation()
   const returnView = useDetailBackLink({ to: '/providers/settings', label: 'All sources' })!
   // A source deletion removes its run details too. Return only to surviving
   // list views, keeping their filters, rather than to an erased detail page.
@@ -549,6 +549,19 @@ function ProviderForm({
     },
   })
   const markSaved = useUnsavedChanges(dirty, 'source configuration', save.isPending)
+  const appliedResets = useRef(new Set<string>())
+  useEffect(() => {
+    if (!navigationState?.resetSourceEditor || appliedResets.current.has(navigationKey)) return
+    appliedResets.current.add(navigationKey)
+    // This navigation was confirmed by the shared discard dialog. Reset only its
+    // unsaved editor state; future searches and Back retain ordinary drafts.
+    setJSON(savedJSON)
+    setFieldDraft(false)
+    setValidation(null)
+    setRemote(null)
+    setEditorKey((key) => key + 1)
+  }, [navigationState, navigationKey])
+
   const loadRemote = useMutation({
     mutationFn: () =>
       api<ProviderDocument>(`/providers/${encodeURIComponent(sourceID ?? validation?.id ?? '')}`),

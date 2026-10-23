@@ -4,6 +4,12 @@
 
 Frequently used settings stay on their existing pages. Less common operational settings are folded until needed. Administrator settings are stored in PostgreSQL with independent revisions; they survive restarts and cannot silently overwrite a concurrent edit. Starting values are listed below; incoming Stremio budgets now use one policy for private and public installations.
 
+## Find a setting
+
+Use **Search settings** in the sticky top bar, on desktop or mobile. You can also press **Ctrl+K** or **⌘K**. Search by name or topic, then choose a result; the matching page opens, folded sections expand, and the field is highlighted. For settings belonging to a source, connection, remote catalog or proxy, choose which one to edit first.
+
+Typing searches a local index of setting names. It does not send search text to the server, inspect credentials or save changes. Unsaved edits keep their normal navigation protection. A disabled field stays disabled; a source option that needs additional configuration opens its owning section. Public visitors only see the controls enabled for them and their browser preferences.
+
 ## Available controls
 
 | Where | What can be adjusted | Default and bounds |

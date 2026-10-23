@@ -16,6 +16,7 @@ AIOSources is open source and self-hosted. It comes without sources or content: 
 - **Watch or download.** Use Stremio or AIOStreams, connect Torznab-compatible apps, or download from the web interface with AllDebrid or TorBox.
 - **Connections you control.** Create separate app connections with their own filters. Share a selected catalog with another instance, or optionally open a visitor page.
 - **Visibility without guesswork.** See what was imported, what was returned to Stremio, which operations need attention and where storage is used.
+- **Settings within reach.** Find a setting from the search bar on any page, on desktop or mobile. Open the right section directly, including advanced options and individual source or connection settings.
 
 Already using someone else's public instance? Start with [the visitor guide](docs/PUBLIC_INSTANCES.md#use-a-public-instance). You do not need to host AIOSources or create an administrator account.
 

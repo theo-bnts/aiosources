@@ -435,7 +435,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 const change = (patch: Partial<Tracker>) =>
                   update('trackers', { trackers: { [p.id]: patch } })
                 return (
-                  <div key={p.id} className="space-y-3 border-t pt-4">
+                  <div key={p.id} id={`tracker-${p.id}`} className="space-y-3 border-t pt-4">
                     <h3 className="font-medium">{p.name}</h3>
                     <label className="flex items-center gap-3 text-sm">
                       <Switch

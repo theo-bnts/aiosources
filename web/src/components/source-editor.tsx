@@ -1,3 +1,6 @@
+import { useSettingDestination } from '@/lib/settings-navigation'
+import { useLocation } from 'react-router-dom'
+import { useNotification } from '@/lib/notifications'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   FingerprintIcon,
@@ -1201,6 +1204,25 @@ export function SourceEditor({
   }, [initialStage, sourceStages])
   const [editError, setEditError] = useState('')
   const [drafts, setDrafts] = useState<Set<string>>(() => new Set())
+  const destination = useSettingDestination()
+  const location = useLocation()
+  const notify = useNotification()
+  useEffect(() => {
+    if (destination?.entity !== 'source') return
+    const stage = sourceStages.findIndex((stage) => stage.id === destination.stage)
+    if (stage < 0) return
+    if (drafts.size > 0) {
+      if (location.state?.resetSourceEditor) return
+      notify({
+        message: 'Finish or discard the pending field draft before opening another source stage.',
+        warning: true,
+      })
+      return
+    }
+    setSelected(stage)
+    onModeChange('visual')
+    // Run once per requested destination; normal stage clicks keep their behavior.
+  }, [destination, location.key])
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
   const reportDraft = useCallback((key: string, invalid: boolean) => {
@@ -1256,7 +1278,13 @@ export function SourceEditor({
   const current = sourceStages[selected]
   return (
     <SourceEditorContext.Provider value={{ document, change, reportDraft, readOnly }}>
-      <div className="space-y-4">
+      <div
+        data-settings-editor="source"
+        data-settings-draft={
+          drafts.size > 0 || Boolean(editError) || document.errors.length > 0 || undefined
+        }
+        className="space-y-4"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div
             className="inline-flex gap-1 rounded-md border border-border bg-card p-1"

@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { highlightSetting, useSettingDestination } from '@/lib/settings-navigation'
 import { GearSixIcon } from '@phosphor-icons/react'
 import {
   useBrowserPreferences,
@@ -17,11 +20,29 @@ import {
 
 export function InterfacePreferences() {
   const preferences = useBrowserPreferences()
+  const setting = useSettingDestination()
+  const location = useLocation()
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (setting?.public !== 'interface') return
+    setOpen(true)
+    let cleanup: (() => void) | undefined
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const control = document.getElementById(setting.control!)
+        if (control) cleanup = highlightSetting(control)
+      })
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      cleanup?.()
+    }
+  }, [setting, location.key])
   function change<K extends keyof BrowserPreferences>(key: K, value: BrowserPreferences[K]) {
     saveBrowserPreferences({ ...preferences, [key]: value })
   }
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
           variant="outline"

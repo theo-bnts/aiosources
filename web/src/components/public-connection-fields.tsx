@@ -34,7 +34,7 @@ export function PublicAnnounceFields({
   useEffect(() => setRemoved([]), [saved])
   if (!sources.length) return null
   return (
-    <Disclosure title="Advanced">
+    <Disclosure id="public-announce-settings" title="Advanced">
       <p className="help">
         Optional: supply your own complete announce URL to allow uncached downloads from a private
         source.{' '}

@@ -258,7 +258,10 @@ export function FieldSection({
   children: ReactNode
 }) {
   return (
-    <section className="space-y-5 border-t border-border pt-6 first-of-type:border-0 first-of-type:pt-0">
+    <section
+      data-settings-section={title}
+      className="space-y-5 border-t border-border pt-6 first-of-type:border-0 first-of-type:pt-0"
+    >
       <div>
         <h3 className="font-medium">{title}</h3>
         {description && <p className="help mt-1 max-w-2xl">{description}</p>}
@@ -286,6 +289,7 @@ export function AdvancedSection({
   })
   return (
     <Disclosure
+      data-settings-section={title}
       title={
         <span className="flex flex-wrap items-center justify-between gap-2">
           <span>{title}</span>

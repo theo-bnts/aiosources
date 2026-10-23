@@ -1,3 +1,4 @@
+import { useSettingsEditor } from '@/lib/settings-navigation'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { SourceFilter } from '@/components/source-filter'
 import { Statistic } from '@/components/statistic'
@@ -202,6 +203,12 @@ export default function SharingPage({
   const [credential, setCredential] = useState<SharePassword | null>(null)
   const notify = useNotification()
   const shares = useShares(format)
+  useSettingsEditor(
+    format === 'catalog' ? 'share' : format,
+    shares.data ? (shares.data.items ?? []) : undefined,
+    (share) => openEditor(share),
+    () => setEditing(null),
+  )
   const httpsReady = stremio || Boolean(shares.data?.public_url.startsWith('https://'))
   function rememberFocus() {
     returnFocus.current =
@@ -492,6 +499,8 @@ export default function SharingPage({
         }}
       >
         <DialogContent
+          data-settings-editor={format === 'catalog' ? 'share' : format}
+          data-settings-entity={editing === 'new' ? 'new' : editing?.id}
           className="sm:max-w-2xl"
           showCloseButton={!saving}
           onCloseAutoFocus={(event) => {

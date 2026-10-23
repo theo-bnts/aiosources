@@ -1,3 +1,4 @@
+import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -52,6 +53,21 @@ export function NetworkPage() {
     },
   })
   const settings = query.data
+  useSettingsEditor(
+    'proxy',
+    settings?.proxies,
+    (proxy) => {
+      if (settings)
+        setEditing({
+          settings,
+          proxy:
+            proxy === 'new'
+              ? { id: `proxy-${crypto.randomUUID()}`, name: '', url: '', enabled: false }
+              : proxy,
+        })
+    },
+    () => setEditing(null),
+  )
   return (
     <div className="page">
       <div className="flex justify-end">
@@ -174,6 +190,7 @@ export function NetworkPage() {
       <RuntimeSettingsPanel section="outgoing" />
       {editing && (
         <ProxyEditor
+          key={editing.proxy.id}
           initial={editing.proxy}
           snapshot={editing.settings}
           onClose={() => setEditing(null)}
@@ -219,7 +236,11 @@ function ProxyEditor({
         if (!open && !save.isPending) onClose()
       }}
     >
-      <DialogContent showCloseButton={!save.isPending}>
+      <DialogContent
+        data-settings-editor="proxy"
+        data-settings-entity={existing ? initial.id : 'new'}
+        showCloseButton={!save.isPending}
+      >
         <DialogHeader>
           <DialogTitle>{existing ? 'Edit proxy' : 'Add proxy'}</DialogTitle>
           <DialogDescription>

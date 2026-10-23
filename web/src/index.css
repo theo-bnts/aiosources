@@ -160,3 +160,16 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Settings navigation uses the same primary focus color without moving layout. */
+[data-app-shell]
+  main
+  :is(#secrets, #verification, #sessions, #maintenance, #advanced-import-settings) {
+  scroll-margin-top: calc(var(--app-header-height, 4rem) + 1rem);
+}
+[data-setting-highlight] {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+  scroll-margin-block: 1rem;
+}

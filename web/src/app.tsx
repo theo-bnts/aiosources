@@ -1,3 +1,5 @@
+import { SettingsSearch } from '@/components/settings-search'
+import { SettingsDestination } from '@/components/settings-destination'
 import {
   Component,
   Suspense,
@@ -615,6 +617,19 @@ export function AppShell({
   })
   const [mobileOpen, setMobileOpen] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const header = headerRef.current
+    const shell = shellRef.current
+    if (!header || !shell) return
+    const measure = () =>
+      shell.style.setProperty('--app-header-height', `${header.getBoundingClientRect().height}px`)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
   const previousPath = useRef(location.pathname)
   const focusMainOnClose = useRef(false)
   useEffect(() => {
@@ -677,6 +692,13 @@ export function AppShell({
         ),
       })),
   }
+  const connectionStatus = publicMode
+    ? 'Public access'
+    : live === 'live'
+      ? 'Live updates'
+      : live === 'connecting'
+        ? 'Connecting to updates'
+        : 'Reconnecting · refreshing every 30 s'
   const branding = (
     <>
       <DatabaseIcon size={32} aria-hidden="true" className="shrink-0 text-primary" />
@@ -713,7 +735,7 @@ export function AppShell({
         setMobileOpen(open)
       }}
     >
-      <div className="min-h-dvh">
+      <div ref={shellRef} data-app-shell className="min-h-dvh">
         <a
           href="#main-content"
           className="fixed left-4 top-3 z-50 -translate-y-24 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:translate-y-0"
@@ -727,8 +749,11 @@ export function AppShell({
           {footer}
         </aside>
         <div className="lg:pl-60">
-          <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 border-b border-border bg-background/95 py-3 pr-32 pl-5 backdrop-blur-sm sm:pr-44 md:pr-48 md:pl-9">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+          <header
+            ref={headerRef}
+            className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3 pr-28 sm:pr-40 lg:pr-0">
               <DialogTrigger asChild>
                 <Button
                   variant="ghost"
@@ -777,21 +802,31 @@ export function AppShell({
                 )}
               </nav>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="order-last w-full basis-full lg:order-none lg:w-auto lg:basis-auto">
+              <SettingsSearch
+                visibility={{
+                  admin: !publicMode,
+                  search: publicInfo.data?.search_enabled,
+                  stremio: publicInfo.data?.stremio_enabled,
+                  torznab: publicInfo.data?.torznab_enabled,
+                  sources: Boolean(publicInfo.data?.sources?.length),
+                  announces: Boolean(publicInfo.data?.private_sources?.length),
+                  services: publicInfo.data?.providers.map((service) => service.id),
+                }}
+              />
+            </div>
+            <div className="mr-36 hidden shrink-0 items-center gap-3 lg:flex">
               <span
                 className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"
                 role="status"
+                title={connectionStatus}
               >
                 <span
                   className={`size-1.5 rounded-full ${live === 'live' ? 'bg-primary' : 'bg-muted-foreground'}`}
                 />
-                {publicMode
-                  ? 'Public access'
-                  : live === 'live'
-                    ? 'Live updates'
-                    : live === 'connecting'
-                      ? 'Connecting to updates'
-                      : 'Reconnecting · refreshing every 30 s'}
+                <span className="sr-only max-w-60 truncate 2xl:not-sr-only">
+                  {connectionStatus}
+                </span>
               </span>
             </div>
           </header>
@@ -817,6 +852,7 @@ export function AppShell({
               </PageHeaderVisibility.Provider>
             </PageHeadingLevel.Provider>
           </main>
+          <SettingsDestination />
         </div>
         <DialogContent
           id="mobile-navigation"

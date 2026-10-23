@@ -1,3 +1,4 @@
+import { useSettingsEditor } from '@/lib/settings-navigation'
 import { toggleProvider } from '@/lib/provider-state'
 import { SecretPicker } from '@/components/secret-picker'
 import { Statistic } from '@/components/statistic'
@@ -159,6 +160,12 @@ export default function RemotesPage() {
   const [saving, setSaving] = useState(false)
   const notify = useNotification()
   const remotes = useRemotes()
+  useSettingsEditor(
+    'remote',
+    remotes.data ? (remotes.data.items ?? []) : undefined,
+    (remote) => openEditor(remote),
+    () => setEditing(null),
+  )
   const items = remotes.data?.items ?? []
   const visible = items.filter(
     (remote) =>
@@ -354,6 +361,8 @@ export default function RemotesPage() {
         }}
       >
         <DialogContent
+          data-settings-editor="remote"
+          data-settings-entity={editing === 'new' ? 'new' : editing?.id}
           className="sm:max-w-2xl"
           showCloseButton={!saving}
           onCloseAutoFocus={(event) => {
