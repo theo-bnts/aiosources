@@ -72,7 +72,7 @@ On small screens, **Open navigation** opens a side panel. Escape returns focus t
 
 ## Everyday controls
 
-**Run manual import** offers **Preview**, **Update**, **Rebuild source catalog** and, where supported, **Fetch source details**. These use the existing `preview`, `incremental`, `full` and `metadata` API modes. The first Update still initializes the source with Full. Applied page/duration limits are visible before starting; **Advanced import settings** retains exact overrides and known-page stopping. Reaching a budget keeps the existing Pause/Resume behavior.
+**Run manual import** offers **Preview**, **Update**, **Rebuild source catalog** and, where supported, **Fetch source details**. These use the existing `preview`, `incremental`, `full` and `metadata` API modes. The first Update still initializes the source with Full. Applied page/duration limits are visible before starting; **Advanced** retains exact overrides and known-page stopping. Reaching a budget keeps the existing Pause/Resume behavior.
 
 These four functions have separate purposes:
 
@@ -85,7 +85,7 @@ These four functions have separate purposes:
 
 The update interval defaults to 15 minutes (5–1440 minutes), measured from the last successfully completed update stored in PostgreSQL. Changing the interval takes effect immediately; restarting does not reset the clock. The identification interval defaults to 30 seconds after the previous attempt finishes (5–86400 seconds). Both intervals can be adjusted in Schedules and survive restarts. The server checks pending work at startup, after saved configuration changes and at least every 30 seconds (more often for shorter identification intervals) while the console is closed. Metadata notifications use the same identification admission clock; interrupted workers retain their uncompleted queue without advancing it. New/changed torrents wait for available local film information instead of being marked unidentified against an empty catalog. Only queued identification work starts a background matcher. Saved runs and their progress appear in History; important failures remain visible in Settings and Logs.
 
-Failed information updates keep their published catalog, pending queue and checkpoints. Retry delays of 1, 2, 4, 8 and at most 15 minutes are the defaults; adjust their initial delay and maximum in **Metadata → Settings → Advanced settings → Information retries**. Retry clocks are saved in PostgreSQL and survive restarts. A successful local matching pass cannot clear a TMDB failure. A change-history gap over 14 days remains blocked until an explicitly confirmed metadata reset; automation never silently deletes the catalog. There is no application backup or restore service.
+Failed information updates keep their published catalog, pending queue and checkpoints. Retry delays of 1, 2, 4, 8 and at most 15 minutes are the defaults; adjust their initial delay and maximum in **Metadata → Settings → Advanced → Information retries**. Retry clocks are saved in PostgreSQL and survive restarts. A successful local matching pass cannot clear a TMDB failure. A change-history gap over 14 days remains blocked until an explicitly confirmed metadata reset; automation never silently deletes the catalog. There is no application backup or restore service.
 
 **Manual actions** retains immediate information downloads, torrent identification and stop controls for active tasks. Stopping a current task preserves committed progress; disable its automatic option and save to prevent future runs.
 
@@ -231,7 +231,7 @@ Docker Block I/O and PostgreSQL statistics are cumulative. Compare two timestamp
 
 Daily growth samples, diagnostics, configurable thresholds, their tables and API are removed. Existing operational logs remain available. The backup product and its worker, API, settings and database tables are removed. Existing deployment archive files are left in place. Storage categories use current page names and are ordered by size. Monitoring never removes published source data.
 
-Dates use the browser timezone and all console lists use 50 rows. Overview and Preferences are removed. Old bookmarks redirect to their replacement page. Collection policy remains available in Sources → Settings → Advanced settings. Running/queued import counts and per-source catalog counts belong to Sources → Statistics; local information, identification counts and results belong to Metadata → Statistics; configured service and temporary cleanup counts belong to Debrid → Statistics.
+Dates use the browser timezone and all console lists use 50 rows. Overview and Preferences are removed. Old bookmarks redirect to their replacement page. Collection policy remains available in Sources → Settings → Advanced. Running/queued import counts and per-source catalog counts belong to Sources → Statistics; local information, identification counts and results belong to Metadata → Statistics; configured service and temporary cleanup counts belong to Debrid → Statistics.
 
 ## Existing PostgreSQL data
 

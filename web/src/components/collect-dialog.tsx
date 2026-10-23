@@ -238,7 +238,7 @@ export function CollectDialog({
             · {Number(maxDuration || 0) === 0 ? 'unlimited duration' : `${maxDuration} seconds`}.
             Imports pause when a limit is reached and can resume from the saved point.
           </p>
-          <Disclosure title="Advanced import settings">
+          <Disclosure title="Advanced">
             {!remote && mode === 'incremental' && (
               <div className="field">
                 <Label htmlFor="collect-known-pages">Known pages (X)</Label>

@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import { findNodeAtLocation, parseTree } from 'jsonc-parser'
 import { test, expect } from './fixtures'
@@ -340,7 +341,7 @@ test('blank numeric rows stay editable without deleting or shifting sibling valu
   await importSource(page, initial)
   await saveSource(page, id)
   await page.getByRole('tab', { name: /^Connection/ }).click()
-  await page.getByText('Headers & search', { exact: true }).click()
+  await openDisclosure(page, 'Headers & search')
   await page.getByLabel('Category 1', { exact: true }).fill('')
   await expect(page.getByLabel('Category 1', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Category 2', { exact: true })).toHaveValue('5000')

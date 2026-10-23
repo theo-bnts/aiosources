@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test, expect } from './fixtures'
@@ -8,7 +9,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
   await page.goto('/metadata/settings')
   const advanced = page
     .locator('details')
-    .filter({ has: page.locator('summary', { hasText: /^Advanced settings$/ }) })
+    .filter({ has: page.locator('summary', { hasText: /^Advanced$/ }) })
   await advanced.locator(':scope > summary').click()
   const processing = advanced
     .locator('details')
@@ -26,7 +27,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
     (await (await page.request.get('/api/settings/runtime/identification')).json()).values,
   ).toEqual({ workers: 2, queue_batch: 10, transaction_batch: 5 })
   await page.goto('/security/settings')
-  await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+  await openDisclosure(page, 'Authentication settings')
   const security = page.getByRole('form', { name: 'Authentication settings' })
   await security
     .getByLabel('New administrator session duration (hours)', { exact: true })
@@ -34,7 +35,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
   await security.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(security.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+  await openDisclosure(page, 'Authentication settings')
   await expect(
     security.getByLabel('New administrator session duration (hours)', { exact: true }),
   ).toHaveValue('24')
@@ -55,7 +56,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
     }
     await page.goto('/network/incoming')
     for (const title of ['Browser downloads', 'Configuration limits']) {
-      await page.locator('summary', { hasText: title }).click()
+      await openDisclosure(page, title)
       await expect(page.getByRole('form', { name: title }).locator('input').first()).toBeVisible()
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(
@@ -70,7 +71,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
       })
     }
     await page.goto('/security/settings')
-    await page.locator('summary', { hasText: /^Authentication settings$/ }).click()
+    await openDisclosure(page, 'Authentication settings')
   }
 })
 
@@ -78,16 +79,16 @@ test('operational policies persist independently and reject stale updates', asyn
   await page.goto('/debrid/settings')
   const section = page
     .locator('details')
-    .filter({ has: page.locator('summary', { hasText: 'Operation capacity' }) })
+    .filter({ has: page.locator(':scope > summary', { hasText: /^Operation capacity$/ }) })
   await expect(section).not.toHaveAttribute('open', '')
-  await section.locator('summary').click()
+  await openDisclosure(page, 'Operation capacity')
   const form = section.getByRole('form', { name: 'Operation capacity' })
   const initial = await (await page.request.get('/api/settings/runtime/debrid')).json()
   await form.getByLabel('Simultaneous download preparations', { exact: true }).fill('2')
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await section.locator('summary').click()
+  await openDisclosure(page, 'Operation capacity')
   await expect(form.getByLabel('Simultaneous download preparations', { exact: true })).toHaveValue(
     '2',
   )
@@ -98,7 +99,7 @@ test('operational policies persist independently and reject stale updates', asyn
   })
   expect(stale.status()).toBe(409)
   await page.goto('/network/outgoing')
-  await page.locator('summary', { hasText: 'Request timeouts' }).click()
+  await openDisclosure(page, 'Request timeouts')
   const timeouts = page.getByRole('form', { name: 'Request timeouts' })
   await timeouts.getByLabel('Debrid request timeout (seconds)', { exact: true }).fill('90')
   await timeouts.getByRole('button', { name: 'Save', exact: true }).click()
@@ -107,7 +108,7 @@ test('operational policies persist independently and reject stale updates', asyn
     (await (await page.request.get('/api/settings/runtime/debrid')).json()).values.download_jobs,
   ).toBe(2)
   await page.goto('/health/settings')
-  await page.locator('summary', { hasText: 'History retention' }).click()
+  await openDisclosure(page, 'History retention')
   const history = page.getByRole('form', { name: 'History retention' })
   await history.getByLabel('Keep history (days)', { exact: true }).fill('14')
   await history.getByRole('button', { name: 'Save', exact: true }).click()
@@ -116,10 +117,11 @@ test('operational policies persist independently and reject stale updates', asyn
     14,
   )
   await page.goto('/import-settings')
+  await openDisclosure(page, 'Import execution')
   const recovery = page.getByRole('switch', { name: 'Automatically resume interrupted imports' })
   await expect(recovery).toBeChecked()
   await recovery.click()
-  const imports = page.getByRole('form', { name: 'Advanced settings', exact: true })
+  const imports = page.getByRole('form', { name: 'Import execution', exact: true })
   await imports.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(imports.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(
@@ -198,7 +200,7 @@ test('settings and shared controls fit desktop and mobile', async ({ page }) => 
             : route === '/health/settings'
               ? 'History retention'
               : 'Request timeouts'
-        await page.locator('summary', { hasText: sectionName }).click()
+        await openDisclosure(page, sectionName)
         await expect(
           page.getByRole('form', { name: sectionName }).locator('input').first(),
         ).toBeVisible()

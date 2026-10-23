@@ -70,7 +70,7 @@ Configure existing WARP, VPN or other HTTP(S)/SOCKS5 proxies in **Administration
 
 ## Collection concurrency
 
-Open **Sources → Settings → Advanced settings** to change **Simultaneous imports** from **1 to 32**. The setting persists in PostgreSQL and applies immediately to all collection processes sharing that database, without restarting.
+Open **Sources → Settings → Advanced → Import execution** to change **Simultaneous imports** from **1 to 32**. The setting persists in PostgreSQL and applies immediately to all collection processes sharing that database, without restarting.
 
 - Increasing the limit wakes queued work.
 - Decreasing it leaves active runs and their checkpoints intact. New runs wait until the active count falls below the new limit.
@@ -96,9 +96,9 @@ Useful progress means a previously unseen **native source ID within that run**, 
 
 Page and duration budgets apply independently to each attempt. A time limit is checked at safe response boundaries and during cooldown waits; it does not interrupt an in-flight response or impose a timeout on atomic Full publication. Preview starts with a fixed three-page budget. Other manual imports use the source’s `schedule.max_pages` limit, also used for scheduled imports, or unlimited pages when it is omitted. The **Run manual import** dialog can override pages and duration for one run; `0` explicitly selects unlimited. Duration is otherwise unlimited. A source without `request_timeout` uses the fixed `30s` timeout.
 
-Technical interruptions always recover automatically from the last committed checkpoint when the source remains valid and enabled and no other worker holds its lease. Manual, quota and no-progress holds, cancellations and authentication, certificate or configuration failures remain deliberate stops. Restore marks restored work as manually paused until explicit review; it does not change this fixed recovery behavior.
+**Automatically resume interrupted imports** is enabled by default in **Advanced → Import execution**. When enabled, technical interruptions recover from the last committed checkpoint if the source remains valid and enabled and no other worker holds its lease. When disabled, interrupted imports remain paused for manual resume. Manual, quota and no-progress holds, cancellations and authentication, certificate or configuration failures remain deliberate stops.
 
-Open **Sources → Settings → Advanced settings** for the remaining shared concurrency, quota and useful-progress controls. One **Save** applies the complete form atomically. Validation, revision conflicts, folding and the unsaved-changes guard retain drafts. Configure source-specific timing and page limits in each source’s **Schedules** section, and request timeouts in **Imports**. Statistics appear in their dedicated first tab.
+Open **Sources → Settings → Advanced → Import execution** for the remaining shared concurrency, quota and useful-progress controls. **Temporary source errors** is a separate group beside **Import execution**, with its own Save button. Across Settings pages, **Advanced** contains independent groups; manual actions and maintenance are grouped there too. Folding a group preserves unsaved edits. Frequently used filters remain separate. One **Save** applies the complete form atomically. Validation, revision conflicts, folding and the unsaved-changes guard retain drafts. Configure source-specific timing and page limits in each source’s **Schedules** section, and request timeouts in **Imports**. Statistics appear in their dedicated first tab.
 
 ### Durable operation
 
@@ -106,7 +106,7 @@ Start the installation from its deployment directory with `docker compose up -d`
 
 An existing installation must be migrated, not replaced with empty volumes. Take a verified deployment backup first, preserve the vault key, pause active collection, and stop PostgreSQL before copying a physical cluster. Retain the original storage until the new installation has been checked. Preserve the PostgreSQL major version, source bytes, vault key, run snapshots and checkpoints; changing paths or volume names is not a migration. Never use `docker compose down --volumes` or prune these volumes as a restart procedure.
 
-Technical restart recovery is always enabled. It does not release manual, quota or no-progress holds; budget-paused scheduled runs follow their existing continuation rules. Recovery keeps the same run and immutable source snapshot. Use external deployment backup tooling to preserve PostgreSQL, private definitions and the vault key together.
+Automatic recovery keeps the same run and original source configuration. Budget-paused scheduled runs follow their existing continuation rules. Use external deployment backup tooling to preserve PostgreSQL, private definitions and the vault key together.
 
 ## Administrator security
 

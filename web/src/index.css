@@ -173,3 +173,26 @@
   border-radius: var(--radius);
   scroll-margin-block: 1rem;
 }
+
+/* Nested settings keep usable space on phones. Long actions wrap inside their
+   group instead of extending into the next card; icon buttons retain their size. */
+[data-slot='disclosure'][data-variant='card']
+  [data-slot='disclosure'][data-variant='card']
+  > [data-slot='disclosure-content'] {
+  @apply px-3 sm:px-4;
+}
+[data-slot='disclosure-content'] [data-slot='button']:not([data-size^='icon']) {
+  @apply h-auto max-w-full whitespace-normal;
+}
+[data-slot='disclosure-content'] [data-slot='button'][data-size='default'] {
+  @apply min-h-9;
+}
+[data-slot='disclosure-content'] [data-slot='button'][data-size='sm'] {
+  @apply min-h-8;
+}
+[data-slot='disclosure-content'] [data-slot='button'][data-size='xs'] {
+  @apply min-h-6;
+}
+[data-slot='disclosure-content'] [data-slot='button'][data-size='lg'] {
+  @apply min-h-10;
+}

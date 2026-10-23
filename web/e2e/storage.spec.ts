@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -19,7 +20,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   const reset = maintenance.getByRole('button', { name: 'Reset all source data', exact: true })
   const resetStatus = maintenance.locator('#source-data-reset-status')
   await expect(reset).toBeHidden()
-  await maintenance.getByText('Maintenance', { exact: true }).click()
+  await openDisclosure(page, 'Maintenance')
   await expect(save).toBeDisabled()
   await expect(reset).toBeEnabled()
   await mode.selectOption('full')
@@ -44,7 +45,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await page.reload()
   await expect(mode).toHaveValue('full')
   await expect(reset).toBeHidden()
-  await maintenance.getByText('Maintenance', { exact: true }).click()
+  await openDisclosure(page, 'Maintenance')
   await reset.click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText(

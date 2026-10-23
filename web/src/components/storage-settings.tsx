@@ -1,4 +1,5 @@
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
+import { AdvancedSettings } from '@/components/advanced-settings'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -142,42 +143,46 @@ export function StorageSettingsPanel() {
           )
         )}
       </section>
-      <RuntimeSettingsPanel section="history" />
-      <Disclosure
-        id="maintenance"
-        title="Maintenance"
-        open={maintenanceOpen}
-        onOpenChange={setMaintenanceOpen}
-      >
-        <ConfirmAction
-          variant="destructive"
-          title="Reset all source data?"
-          label="Reset source data"
-          description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
-          action={reset}
-          trigger={
-            <Button
-              variant="destructive"
-              disabled={Boolean(resetUnavailableReason)}
-              aria-describedby="source-data-reset-help source-data-reset-status"
-            >
-              Reset all source data
-            </Button>
-          }
-        />
-        <p className="help" id="source-data-reset-help">
-          Optional: start over to reclaim space used by previously stored source data. Queued and
-          paused imports are removed with their data.
-        </p>
-        <p
-          className={resetUnavailableReason ? 'help text-amber-800 dark:text-amber-300' : 'sr-only'}
-          id="source-data-reset-status"
-          role="status"
-          aria-live="polite"
+      <AdvancedSettings>
+        <RuntimeSettingsPanel section="history" />
+        <Disclosure
+          id="maintenance"
+          title="Maintenance"
+          open={maintenanceOpen}
+          onOpenChange={setMaintenanceOpen}
         >
-          {resetUnavailableReason}
-        </p>
-      </Disclosure>
+          <ConfirmAction
+            variant="destructive"
+            title="Reset all source data?"
+            label="Reset source data"
+            description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
+            action={reset}
+            trigger={
+              <Button
+                variant="destructive"
+                disabled={Boolean(resetUnavailableReason)}
+                aria-describedby="source-data-reset-help source-data-reset-status"
+              >
+                Reset all source data
+              </Button>
+            }
+          />
+          <p className="help" id="source-data-reset-help">
+            Optional: start over to reclaim space used by previously stored source data. Queued and
+            paused imports are removed with their data.
+          </p>
+          <p
+            className={
+              resetUnavailableReason ? 'help text-amber-800 dark:text-amber-300' : 'sr-only'
+            }
+            id="source-data-reset-status"
+            role="status"
+            aria-live="polite"
+          >
+            {resetUnavailableReason}
+          </p>
+        </Disclosure>
+      </AdvancedSettings>
     </>
   )
 }

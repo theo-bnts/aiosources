@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -199,6 +200,7 @@ test('public classification disables announce editing without deleting the saved
     ).status(),
   ).toBe(204)
   await page.goto('/debrid/settings')
+  await openDisclosure(page, 'Private source playback')
   const form = page.getByRole('form', { name: 'Private source playback', exact: true })
   const privateSource = form.getByRole('switch', { name: 'Private source', exact: true })
   const announce = form.getByLabel('Announce URL secret', { exact: true })
@@ -214,6 +216,7 @@ test('public classification disables announce editing without deleting the saved
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByText('Changes saved.', { exact: true })).toBeVisible()
   await page.reload()
+  await openDisclosure(page, 'Private source playback')
   await expect(privateSource).not.toBeChecked()
   await expect(announce).toBeDisabled()
   await expect(announce).toHaveValue('example-announce')

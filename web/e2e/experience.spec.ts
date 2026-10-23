@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect, createStremioAccess } from './fixtures'
 
@@ -29,7 +30,8 @@ test('save feedback distinguishes reverted controls from committed changes', asy
   expect(writes).toEqual(['/api/aiosource/config'])
 
   await page.goto('/import-settings')
-  const advanced = page.getByRole('form', { name: 'Advanced settings', exact: true })
+  await openDisclosure(page, 'Import execution')
+  const advanced = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = advanced.getByLabel('Simultaneous imports', { exact: true })
   const originalWorkers = await workers.inputValue()
   await workers.fill(originalWorkers === '7' ? '6' : '7')

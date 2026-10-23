@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -105,7 +106,7 @@ test('manual action failures use notifications without replaying a rejected oper
     })
   })
   await page.goto('/metadata/settings')
-  await page.getByText('Manual actions', { exact: true }).click()
+  await openDisclosure(page, 'Manual actions')
   await page.getByRole('button', { name: 'Identify torrents', exact: true }).click()
   const notice = page.locator('[data-request-notice]')
   await expect(notice).toContainText('Synthetic task is already running.')

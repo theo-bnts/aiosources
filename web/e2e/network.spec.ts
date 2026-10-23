@@ -80,7 +80,7 @@ test('proxy profiles use Secrets and route services independently without activa
   const editor = page.getByRole('dialog', { name: 'Add proxy', exact: true })
   await editor.getByLabel('Name', { exact: true }).fill('Personal gateway')
   await editor.getByLabel('Proxy URL', { exact: true }).fill('socks5://127.0.0.1:1')
-  await editor.getByText('Authentication', { exact: true }).click()
+  await editor.getByText('Advanced', { exact: true }).click()
   for (const [label, value] of [
     ['username', 'synthetic-proxy-user'],
     ['password', 'synthetic-proxy-password'],

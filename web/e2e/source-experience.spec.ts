@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect, createStremioAccess } from './fixtures'
 
@@ -169,7 +170,7 @@ test('source setup keeps essentials visible and advanced configuration lossless'
   await expect(page.getByLabel('Page size', { exact: true })).toHaveValue('100')
   await page.getByRole('tab', { name: /^Source fields/ }).click()
   await expect(page.getByLabel('Native ID pattern', { exact: true })).toBeHidden()
-  await page.getByText('Native identity', { exact: true }).click()
+  await openDisclosure(page, 'Native identity')
   await expect(page.getByLabel('Native ID pattern', { exact: true })).toHaveValue('/items/([0-9]+)')
   await page.getByLabel('Native ID pattern', { exact: true }).fill('/entries/([0-9]+)')
   await page.getByRole('button', { name: 'JSON', exact: true }).click()

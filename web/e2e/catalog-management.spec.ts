@@ -80,7 +80,7 @@ test('remote manual imports share the source action dialog and open remote histo
     await expect(action).toHaveValue('incremental')
     await expect(action.getByRole('option')).toHaveText(['Preview', 'Sync changes', 'Full resync'])
     await action.selectOption(mode)
-    await dialog.getByText('Advanced import settings', { exact: true }).click()
+    await dialog.getByText('Advanced', { exact: true }).click()
     await expect(dialog.getByLabel('Known pages (X)', { exact: true })).toHaveCount(0)
     await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('0')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

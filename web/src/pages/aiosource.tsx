@@ -1,3 +1,4 @@
+import { AdvancedSettings } from '@/components/advanced-settings'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -319,6 +320,71 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       </fieldset>
     </form>
   )
+  const maintenance = (
+    <Disclosure
+      id="maintenance"
+      title="Maintenance"
+      open={maintenanceOpen}
+      onOpenChange={setMaintenanceOpen}
+    >
+      {section === 'metadata' && (
+        <>
+          <p className="help">
+            Rebuild information or identification results when needed. Each action explains what it
+            removes before confirmation.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <ConfirmAction
+              title="Reset metadata catalog?"
+              description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
+              label="Reset metadata"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-metadata')}
+              trigger={
+                <Button variant="destructive" disabled={busy}>
+                  Reset metadata
+                </Button>
+              }
+            />
+            <ConfirmAction
+              title="Reset title matches?"
+              description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
+              label="Reset matches"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-mapping')}
+              trigger={
+                <Button variant="destructive" disabled={busy}>
+                  Reset matches
+                </Button>
+              }
+            />
+          </div>
+        </>
+      )}
+      {section === 'debrid' && (
+        <>
+          <p className="help">
+            Available, absent and unknown results stay distinct. Cache observations and retries
+            survive restart and are isolated by provider account.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <ConfirmAction
+              title="Reset cache observations?"
+              description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
+              label="Reset cache"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-cache')}
+              trigger={
+                <Button variant="destructive" disabled={action.isPending}>
+                  Reset cache
+                </Button>
+              }
+            />
+          </div>
+        </>
+      )}
+    </Disclosure>
+  )
   return (
     <div className="page">
       <ErrorNotice error={query.error ?? secrets.error ?? providers.error} />
@@ -332,60 +398,61 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             </p>
           )}
           {settingsForm}
-          <Disclosure title="Advanced settings">
-            <RuntimeSettingsPanel section="identification" />
-            <RuntimeSettingsPanel section="matching" />
+          <AdvancedSettings>
             <RuntimeSettingsPanel section="metadata" />
             <RuntimeSettingsPanel section="metadata_retries" />
-          </Disclosure>
-          <Disclosure title="Manual actions">
-            {status.error && (
-              <p role="status" className="notice notice-warning">
-                {messageText(status.error)}{' '}
-                <Link className="data-link" to="/metadata/history">
-                  View history
-                </Link>
+            <RuntimeSettingsPanel section="identification" />
+            <RuntimeSettingsPanel section="matching" />
+            <Disclosure title="Manual actions">
+              {status.error && (
+                <p role="status" className="notice notice-warning">
+                  {messageText(status.error)}{' '}
+                  <Link className="data-link" to="/metadata/history">
+                    View history
+                  </Link>
+                </p>
+              )}
+              <p className="help">
+                Run a task now without changing its automatic settings. Stopping the current task
+                preserves committed progress; disable its automatic option to stop future runs.
               </p>
-            )}
-            <p className="help">
-              Run a task now without changing its automatic settings. Stopping the current task
-              preserves committed progress; disable its automatic option to stop future runs.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                disabled={busy || !status.config.tmdb_secret || status.rebuild_required}
-                onClick={() => action.mutate('sync')}
-              >
-                Download information updates
-              </Button>
-              {status.syncing && (
+              <div className="flex flex-wrap gap-3">
                 <Button
-                  variant="warning"
-                  onClick={() => action.mutate('stop-sync')}
-                  disabled={action.isPending}
+                  disabled={busy || !status.config.tmdb_secret || status.rebuild_required}
+                  onClick={() => action.mutate('sync')}
                 >
-                  Stop information updates
+                  Download information updates
                 </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                disabled={busy || !status.status.has_information}
-                onClick={() => action.mutate('match')}
-              >
-                Identify torrents
-              </Button>
-              {status.matching && (
+                {status.syncing && (
+                  <Button
+                    variant="warning"
+                    onClick={() => action.mutate('stop-sync')}
+                    disabled={action.isPending}
+                  >
+                    Stop information updates
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-3">
                 <Button
-                  variant="warning"
-                  onClick={() => action.mutate('stop-matching')}
-                  disabled={action.isPending}
+                  disabled={busy || !status.status.has_information}
+                  onClick={() => action.mutate('match')}
                 >
-                  Stop identification
+                  Identify torrents
                 </Button>
-              )}
-            </div>
-          </Disclosure>
+                {status.matching && (
+                  <Button
+                    variant="warning"
+                    onClick={() => action.mutate('stop-matching')}
+                    disabled={action.isPending}
+                  >
+                    Stop identification
+                  </Button>
+                )}
+              </div>
+            </Disclosure>
+            {maintenance}
+          </AdvancedSettings>
         </>
       )}
       {section === 'stremio' && (
@@ -400,143 +467,81 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           />
         </>
       )}
-      {section === 'debrid' && settingsForm}
-      {section === 'debrid' && <RuntimeSettingsPanel section="debrid" />}
-      {section === 'debrid' && <RuntimeSettingsPanel section="debrid_retries" />}
       {section === 'debrid' && (
-        <form
-          aria-label="Private source playback"
-          onSubmit={(e) => {
-            e.preventDefault()
-            submit('trackers')
-          }}
-        >
-          <fieldset disabled={save.isPending} className="contents">
-            <Panel title="Private source playback">
-              <p className="help">
-                For uncached private torrents, add the complete announce URL, including its passkey,
-                in{' '}
-                <Link className="data-link" to="/security/settings#secrets">
-                  Secrets
-                </Link>
-                , or directly below, then save the playback settings. The URL is used exactly as
-                supplied by the tracker, whatever the position of the passkey.
-              </p>
-              {providers.data?.items?.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Add your own sources first. No tracker is bundled.
-                </p>
-              )}
-              {providers.data?.items?.map((p) => {
-                const tracker = trackersConfig?.trackers[p.id] ?? {
-                  private: true,
-                  announce_secret: '',
-                }
-                const change = (patch: Partial<Tracker>) =>
-                  update('trackers', { trackers: { [p.id]: patch } })
-                return (
-                  <div key={p.id} id={`tracker-${p.id}`} className="space-y-3 border-t pt-4">
-                    <h3 className="font-medium">{p.name}</h3>
-                    <label className="flex items-center gap-3 text-sm">
-                      <Switch
-                        aria-label="Private source"
-                        checked={tracker.private}
-                        onCheckedChange={(checked) => change({ private: checked })}
-                      />
-                      Private source
-                    </label>
-                    <SecretPicker
-                      inputId={`announce-${p.id}`}
-                      label="Announce URL secret"
-                      value={tracker.announce_secret}
-                      onChange={(reference) => change({ announce_secret: reference })}
-                      prefix={`announce_${p.id}`}
-                      addLabel="Add announce URL"
-                      valueLabel="Complete announce URL"
-                      disabled={save.isPending || !tracker.private}
-                    />
-                  </div>
-                )
-              })}
-              {footer('trackers')}
-            </Panel>
-          </fieldset>
-        </form>
-      )}
-      {section === 'debrid' && (
-        <Disclosure title="Manual actions">
-          <Button
-            disabled={action.isPending || !status.config.alldebrid_secret}
-            onClick={() => action.mutate('retry-cleanup')}
-          >
-            Retry temporary cleanup
-          </Button>
-        </Disclosure>
-      )}
-      {section !== 'stremio' && (
-        <Disclosure
-          id="maintenance"
-          title="Maintenance"
-          open={maintenanceOpen}
-          onOpenChange={setMaintenanceOpen}
-        >
-          {section === 'metadata' && (
-            <>
-              <p className="help">
-                Rebuild information or identification results when needed. Each action explains what
-                it removes before confirmation.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <ConfirmAction
-                  title="Reset metadata catalog?"
-                  description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
-                  label="Reset metadata"
-                  variant="destructive"
-                  action={() => action.mutateAsync('reset-metadata')}
-                  trigger={
-                    <Button variant="destructive" disabled={busy}>
-                      Reset metadata
-                    </Button>
-                  }
-                />
-                <ConfirmAction
-                  title="Reset title matches?"
-                  description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
-                  label="Reset matches"
-                  variant="destructive"
-                  action={() => action.mutateAsync('reset-mapping')}
-                  trigger={
-                    <Button variant="destructive" disabled={busy}>
-                      Reset matches
-                    </Button>
-                  }
-                />
-              </div>
-            </>
-          )}
-          {section === 'debrid' && (
-            <>
-              <p className="help">
-                Available, absent and unknown results stay distinct. Cache observations and retries
-                survive restart and are isolated by provider account.
-              </p>
-              <div className="flex flex-wrap items-center gap-4">
-                <ConfirmAction
-                  title="Reset cache observations?"
-                  description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
-                  label="Reset cache"
-                  variant="destructive"
-                  action={() => action.mutateAsync('reset-cache')}
-                  trigger={
-                    <Button variant="destructive" disabled={action.isPending}>
-                      Reset cache
-                    </Button>
-                  }
-                />
-              </div>
-            </>
-          )}
-        </Disclosure>
+        <>
+          {settingsForm}
+          <AdvancedSettings>
+            <Disclosure title="Private source playback">
+              <form
+                aria-label="Private source playback"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  submit('trackers')
+                }}
+              >
+                <fieldset disabled={save.isPending} className="space-y-4">
+                  <p className="help">
+                    For uncached private torrents, add the complete announce URL, including its
+                    passkey, in{' '}
+                    <Link className="data-link" to="/security/settings#secrets">
+                      Secrets
+                    </Link>
+                    , or directly below, then save the playback settings. The URL is used exactly as
+                    supplied by the tracker, whatever the position of the passkey.
+                  </p>
+                  {providers.data?.items?.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Add your own sources first. No tracker is bundled.
+                    </p>
+                  )}
+                  {providers.data?.items?.map((p) => {
+                    const tracker = trackersConfig?.trackers[p.id] ?? {
+                      private: true,
+                      announce_secret: '',
+                    }
+                    const change = (patch: Partial<Tracker>) =>
+                      update('trackers', { trackers: { [p.id]: patch } })
+                    return (
+                      <div key={p.id} id={`tracker-${p.id}`} className="space-y-3 border-t pt-4">
+                        <h3 className="font-medium">{p.name}</h3>
+                        <label className="flex items-center gap-3 text-sm">
+                          <Switch
+                            aria-label="Private source"
+                            checked={tracker.private}
+                            onCheckedChange={(checked) => change({ private: checked })}
+                          />
+                          Private source
+                        </label>
+                        <SecretPicker
+                          inputId={`announce-${p.id}`}
+                          label="Announce URL secret"
+                          value={tracker.announce_secret}
+                          onChange={(reference) => change({ announce_secret: reference })}
+                          prefix={`announce_${p.id}`}
+                          addLabel="Add announce URL"
+                          valueLabel="Complete announce URL"
+                          disabled={save.isPending || !tracker.private}
+                        />
+                      </div>
+                    )
+                  })}
+                  {footer('trackers')}
+                </fieldset>
+              </form>
+            </Disclosure>
+            <RuntimeSettingsPanel section="debrid" />
+            <RuntimeSettingsPanel section="debrid_retries" />
+            <Disclosure title="Manual actions">
+              <Button
+                disabled={action.isPending || !status.config.alldebrid_secret}
+                onClick={() => action.mutate('retry-cleanup')}
+              >
+                Retry temporary cleanup
+              </Button>
+            </Disclosure>
+            {maintenance}
+          </AdvancedSettings>
+        </>
       )}
     </div>
   )

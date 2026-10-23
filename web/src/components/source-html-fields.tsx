@@ -81,12 +81,14 @@ function HTMLFieldSettings({
   identity = false,
   link = false,
   count = false,
+  optionsInline = false,
 }: {
   path: ProviderPath
   label: string
   identity?: boolean
   link?: boolean
   count?: boolean
+  optionsInline?: boolean
 }) {
   const { document } = useSourceEditor()
   const hash = path.at(-1) === 'info_hash'
@@ -94,6 +96,50 @@ function HTMLFieldSettings({
   const size = path.at(-1) === 'size'
   const date = path.at(-1) === 'published_at'
   const format = document.getIn([...path, 'format'])
+  const extractionOptions = (
+    <>
+      {format === 'date' && (
+        <FieldGrid>
+          <TextField
+            path={[...path, 'date_layout']}
+            label={`${label} date layout`}
+            placeholder="2006-01-02 15:04:05"
+            help="Leave empty for ISO / email dates. Custom formats use Go’s reference date shown above."
+          />
+          <TextField
+            path={[...path, 'timezone']}
+            label={`${label} timezone`}
+            placeholder="UTC"
+            help="Used when the displayed date has no timezone, for example Europe/Paris."
+          />
+        </FieldGrid>
+      )}
+      <TextField
+        path={[...path, 'pattern']}
+        label={`${label} extraction pattern`}
+        placeholder={identity ? '/items/([0-9]+)' : '([0-9]+)'}
+        help="Optional regular expression. Its single capture, or the complete match without captures, becomes the value."
+      />
+      {!identity && !link && !count && (
+        <>
+          {!title && (
+            <BooleanField
+              path={[...path, 'required']}
+              label={`${label} required`}
+              help="A missing value stops the page. Optional fields are omitted when no value matches."
+            />
+          )}
+          {!hash && !title && !size && !date && (
+            <BooleanField
+              path={[...path, 'all']}
+              label={`${label} multiple values`}
+              help="Collect all matching values, for example category IDs or languages."
+            />
+          )}
+        </>
+      )}
+    </>
+  )
   return (
     <div className="min-w-0 space-y-4">
       <FieldGrid>
@@ -166,55 +212,20 @@ function HTMLFieldSettings({
           }
         />
       )}
-      <AdvancedSection
-        title={`${label} extraction options`}
-        configuredPaths={[
-          [...path, 'pattern'],
-          [...path, 'date_layout'],
-          [...path, 'timezone'],
-        ]}
-      >
-        {format === 'date' && (
-          <FieldGrid>
-            <TextField
-              path={[...path, 'date_layout']}
-              label={`${label} date layout`}
-              placeholder="2006-01-02 15:04:05"
-              help="Leave empty for ISO / email dates. Custom formats use Go’s reference date shown above."
-            />
-            <TextField
-              path={[...path, 'timezone']}
-              label={`${label} timezone`}
-              placeholder="UTC"
-              help="Used when the displayed date has no timezone, for example Europe/Paris."
-            />
-          </FieldGrid>
-        )}
-        <TextField
-          path={[...path, 'pattern']}
-          label={`${label} extraction pattern`}
-          placeholder={identity ? '/items/([0-9]+)' : '([0-9]+)'}
-          help="Optional regular expression. Its single capture, or the complete match without captures, becomes the value."
-        />
-        {!identity && !link && !count && (
-          <>
-            {!title && (
-              <BooleanField
-                path={[...path, 'required']}
-                label={`${label} required`}
-                help="A missing value stops the page. Optional fields are omitted when no value matches."
-              />
-            )}
-            {!hash && !title && !size && !date && (
-              <BooleanField
-                path={[...path, 'all']}
-                label={`${label} multiple values`}
-                help="Collect all matching values, for example category IDs or languages."
-              />
-            )}
-          </>
-        )}
-      </AdvancedSection>
+      {optionsInline ? (
+        extractionOptions
+      ) : (
+        <AdvancedSection
+          title={`${label} extraction options`}
+          configuredPaths={[
+            [...path, 'pattern'],
+            [...path, 'date_layout'],
+            [...path, 'timezone'],
+          ]}
+        >
+          {extractionOptions}
+        </AdvancedSection>
+      )}
     </div>
   )
 }
@@ -243,7 +254,7 @@ function HTMLFieldMap({ path, detail = false }: { path: ProviderPath; detail?: b
                 <TrashIcon />
               </Button>
             </div>
-            <HTMLFieldSettings path={[...path, key]} label={label} />
+            <HTMLFieldSettings path={[...path, key]} label={label} optionsInline={detail} />
           </div>
         )
       })}
@@ -284,8 +295,6 @@ function HTMLFieldMap({ path, detail = false }: { path: ProviderPath; detail?: b
 }
 
 export function HTMLMappingSettings() {
-  const { document, change } = useSourceEditor()
-  const details = document.kindIn(['html', 'details']) !== undefined
   return (
     <>
       <FieldSection title="Listing structure">
@@ -314,21 +323,34 @@ export function HTMLMappingSettings() {
       >
         <HTMLFieldMap path={['html', 'fields']} />
       </FieldSection>
-      <AdvancedSection
-        title="Detail pages"
-        configuredPaths={[['html', 'details']]}
-        description="Fetch missing fields from each record’s detail page. Existing listing values are kept. These extra requests use the same authentication, proxy and request limits."
-      >
-        {details ? (
-          <>
-            <HTMLFieldSettings path={['html', 'details', 'url']} label="Detail link" link />
+    </>
+  )
+}
+
+export function HTMLDetailSettings() {
+  const { document, change } = useSourceEditor()
+  const details = document.kindIn(['html', 'details']) !== undefined
+  return (
+    <AdvancedSection
+      title="Detail pages"
+      configuredPaths={[['html', 'details']]}
+      description="Fetch missing fields from each record’s detail page. Existing listing values are kept. These extra requests use the same authentication, proxy and request limits."
+    >
+      {details ? (
+        <>
+          <AdvancedSection title="Page selection">
+            <HTMLFieldSettings
+              path={['html', 'details', 'url']}
+              label="Detail link"
+              link
+              optionsInline
+            />
             <TextField
               path={['html', 'details', 'page_selector']}
               label="Detail container selector"
               placeholder="#item-details"
               help="One container unique to a valid detail page. Its field selectors are relative to this container."
             />
-            <HTMLFieldMap path={['html', 'details', 'fields']} detail />
             <ConfirmAction
               trigger={<Button variant="warning">Remove detail settings</Button>}
               label="Remove detail settings"
@@ -337,32 +359,35 @@ export function HTMLMappingSettings() {
               action={async () => change((next) => next.deleteIn(['html', 'details']))}
               variant="warning"
             />
-          </>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={() =>
-              change((next) =>
-                next.setIn(['html', 'details'], {
-                  url: { selector: 'a.details', attribute: 'href' },
-                  page_selector: '#item-details',
-                  fields: {
-                    info_hash: {
-                      selector: "a[href^='magnet:']",
-                      attribute: 'href',
-                      format: 'info_hash',
-                      required: true,
-                    },
+          </AdvancedSection>
+          <AdvancedSection title="Detail field mappings">
+            <HTMLFieldMap path={['html', 'details', 'fields']} detail />
+          </AdvancedSection>
+        </>
+      ) : (
+        <Button
+          variant="outline"
+          onClick={() =>
+            change((next) =>
+              next.setIn(['html', 'details'], {
+                url: { selector: 'a.details', attribute: 'href' },
+                page_selector: '#item-details',
+                fields: {
+                  info_hash: {
+                    selector: "a[href^='magnet:']",
+                    attribute: 'href',
+                    format: 'info_hash',
+                    required: true,
                   },
-                }),
-              )
-            }
-          >
-            <PlusIcon /> Configure detail pages
-          </Button>
-        )}
-      </AdvancedSection>
-    </>
+                },
+              }),
+            )
+          }
+        >
+          <PlusIcon /> Configure detail pages
+        </Button>
+      )}
+    </AdvancedSection>
   )
 }
 
@@ -416,60 +441,62 @@ export function HTMLPaginationSettings() {
           help="A marker shown only when no torrents exist. Without a matching marker, a page with no records fails safely instead of replacing your catalog."
         />
       </FieldSection>
-      <AdvancedSection title="Request parameters">
-        <FieldGrid>
-          <JSONField path={['page_size']} label="Page size" integer placeholder="100" />
-          <TextField
-            path={['pagination', 'size_param']}
-            label="Page-size parameter"
-            placeholder="Leave empty for the website’s fixed size"
-          />
-        </FieldGrid>
-        {strategy === 'page' || strategy === 'offset' ? (
-          <SelectField
-            path={['pagination', 'in']}
-            label="Parameter location"
-            choices={['query', 'body']}
-            fallback="URL query (default)"
-            labels={{ query: 'URL query', body: 'POST form' }}
-            help="Form parameters require HTTP method POST."
-          />
-        ) : null}
-      </AdvancedSection>
-      <AdvancedSection
-        title="Response checks"
-        configuredPaths={[
-          ['html', 'total'],
-          ['html', 'current'],
-        ]}
-      >
-        {(['total', 'current'] as const).map((key) => {
-          const label = key === 'total' ? 'Total records' : 'Current position'
-          return document.kindIn(['html', key]) !== undefined ? (
-            <div key={key} className="space-y-4">
-              <h4 className="font-medium">{label}</h4>
-              <HTMLFieldSettings path={['html', key]} label={label} count />
+      <AdvancedSection title="Advanced">
+        <AdvancedSection title="Request parameters">
+          <FieldGrid>
+            <JSONField path={['page_size']} label="Page size" integer placeholder="100" />
+            <TextField
+              path={['pagination', 'size_param']}
+              label="Page-size parameter"
+              placeholder="Leave empty for the website’s fixed size"
+            />
+          </FieldGrid>
+          {strategy === 'page' || strategy === 'offset' ? (
+            <SelectField
+              path={['pagination', 'in']}
+              label="Parameter location"
+              choices={['query', 'body']}
+              fallback="URL query (default)"
+              labels={{ query: 'URL query', body: 'POST form' }}
+              help="Form parameters require HTTP method POST."
+            />
+          ) : null}
+        </AdvancedSection>
+        <AdvancedSection
+          title="Response checks"
+          configuredPaths={[
+            ['html', 'total'],
+            ['html', 'current'],
+          ]}
+        >
+          {(['total', 'current'] as const).map((key) => {
+            const label = key === 'total' ? 'Total records' : 'Current position'
+            return document.kindIn(['html', key]) !== undefined ? (
+              <div key={key} className="space-y-4">
+                <h4 className="font-medium">{label}</h4>
+                <HTMLFieldSettings path={['html', key]} label={label} count optionsInline />
+                <Button
+                  variant="warning"
+                  size="sm"
+                  onClick={() => change((next) => next.deleteIn(['html', key]))}
+                >
+                  Remove {label.toLowerCase()} check
+                </Button>
+              </div>
+            ) : (
               <Button
-                variant="warning"
+                key={key}
+                variant="outline"
                 size="sm"
-                onClick={() => change((next) => next.deleteIn(['html', key]))}
+                onClick={() =>
+                  change((next) => next.setIn(['html', key], { selector: '', format: 'integer' }))
+                }
               >
-                Remove {label.toLowerCase()} check
+                <PlusIcon /> Add {label.toLowerCase()} check
               </Button>
-            </div>
-          ) : (
-            <Button
-              key={key}
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                change((next) => next.setIn(['html', key], { selector: '', format: 'integer' }))
-              }
-            >
-              <PlusIcon /> Add {label.toLowerCase()} check
-            </Button>
-          )
-        })}
+            )
+          })}
+        </AdvancedSection>
       </AdvancedSection>
     </>
   )

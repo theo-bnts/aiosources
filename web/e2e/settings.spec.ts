@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import type { CollectionSettings } from '../src/lib/collection-types'
 import { test, expect } from './fixtures'
@@ -12,7 +13,8 @@ test('the full import concurrency range persists without local-capacity warnings
   page,
 }) => {
   await page.goto('/import-settings')
-  const form = page.getByRole('form', { name: 'Advanced settings', exact: true })
+  await openDisclosure(page, 'Import execution')
+  const form = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   const save = form.getByRole('button', { name: 'Save', exact: true })
   await expect(workers).toHaveAttribute('min', '1')
@@ -36,6 +38,7 @@ test('the full import concurrency range persists without local-capacity warnings
     expect((await savedSettings(page)).workers).toBe(Number(value))
   }
   await page.reload()
+  await openDisclosure(page, 'Import execution')
   await expect(workers).toHaveValue('1')
   for (const value of ['0', '33', '1.5']) {
     await workers.fill(value)
@@ -57,11 +60,13 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await page.goto('/providers/settings')
   const section = page.locator('#advanced-import-settings')
   const toggle = section.locator(':scope > summary')
-  const form = section.getByRole('form', { name: 'Advanced settings', exact: true })
+  const form = section.getByRole('form', { name: 'Import execution', exact: true })
   await expect(section).not.toHaveAttribute('open', '')
   await expect(form).toHaveCount(0)
   expect(requests).toEqual([])
   await toggle.click()
+  expect(requests).toEqual([])
+  await openDisclosure(page, 'Import execution')
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   await expect(workers).toHaveValue(String(original.workers))
   const changed = original.workers === 7 ? '6' : '7'
@@ -70,7 +75,7 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await expect(form).toBeHidden()
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   const prompt = page.getByRole('alertdialog')
-  await expect(prompt).toContainText('advanced settings')
+  await expect(prompt).toContainText('import execution settings')
   await prompt.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await toggle.click()
   await expect(workers).toHaveValue(changed)
@@ -83,8 +88,10 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await toggle.click()
   await expect(section).toHaveAttribute('open', '')
   await expect.poll(() => new URL(page.url()).searchParams.get('settings')).toBe('advanced')
+  await openDisclosure(page, 'Import execution')
   await expect(workers).toHaveValue(changed)
   await page.goto('/import-settings')
+  await openDisclosure(page, 'Import execution')
   await expect(workers).toHaveValue(changed)
   await expect(page).toHaveURL(/\/providers\/settings\?settings=advanced#advanced-import-settings$/)
 })
@@ -95,7 +102,8 @@ test('moved import settings preserve validation, persisted policies and concurre
 }) => {
   const original = await savedSettings(page)
   await page.goto('/import-settings')
-  const form = page.getByRole('form', { name: 'Advanced settings', exact: true })
+  await openDisclosure(page, 'Import execution')
+  const form = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   const progress = form.getByLabel('Responses without new source IDs', { exact: true })
   const save = form.getByRole('button', { name: 'Save', exact: true })
@@ -139,6 +147,7 @@ test('moved import settings preserve validation, persisted policies and concurre
   })
   expect(updated.revision).toBeGreaterThan(original.revision)
   await page.reload()
+  await openDisclosure(page, 'Import execution')
   await expect(workers).toHaveValue('3')
   await expect(progress).toHaveValue('7')
   await expect(page.getByLabel('Display timezone', { exact: true })).toHaveCount(0)

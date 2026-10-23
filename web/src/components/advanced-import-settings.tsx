@@ -15,6 +15,7 @@ export function AdvancedImportSettings() {
   const container = useRef<HTMLDetailsElement>(null)
   const open = search.get('settings') === 'advanced'
   const [visited, setVisited] = useState(open)
+  const [executionOpen, setExecutionOpen] = useState(false)
   useEffect(() => {
     if (open) setVisited(true)
     if (open && location.hash === '#advanced-import-settings') {
@@ -26,7 +27,7 @@ export function AdvancedImportSettings() {
     <Disclosure
       id="advanced-import-settings"
       ref={container}
-      title="Advanced settings"
+      title="Advanced"
       className="scroll-mt-6"
       open={open}
       onOpenChange={(expanded) => {
@@ -39,8 +40,10 @@ export function AdvancedImportSettings() {
       {(visited || open) && (
         // Folding only hides the form. Keep its draft and pending save mounted;
         // ordinary navigation retains the shared unsaved-changes guard.
-        <Suspense fallback={<Loading label="Loading advanced settings" />}>
-          <ImportSettingsPanel active={open} />
+        <Suspense fallback={<Loading label="Loading import settings" />}>
+          <Disclosure title="Import execution" open={executionOpen} onOpenChange={setExecutionOpen}>
+            <ImportSettingsPanel active={open && executionOpen} />
+          </Disclosure>
           <RuntimeSettingsPanel section="source_retries" />
         </Suspense>
       )}

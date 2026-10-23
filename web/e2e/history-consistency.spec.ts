@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Locator, Page } from '@playwright/test'
 import pg from 'pg'
 import { test, expect } from './fixtures'
@@ -156,9 +157,9 @@ test('operation errors remain in their history and manual controls without appea
   await page.goto('/metadata/settings')
   const manual = page
     .locator('details')
-    .filter({ has: page.locator('summary', { hasText: 'Manual actions' }) })
+    .filter({ has: page.locator(':scope > summary', { hasText: /^Manual actions$/ }) })
   await expect(manual.getByText(message, { exact: false })).toBeHidden()
-  await manual.locator('summary').click()
+  await openDisclosure(page, 'Manual actions')
   await expect(manual.getByRole('status')).toContainText(message)
   await expect(manual.getByRole('link', { name: 'View history', exact: true })).toBeVisible()
   for (const path of ['/debrid', '/debrid/settings', '/addon', '/addon/settings']) {

@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import { test, expect, addRemotePassword } from './fixtures'
 
@@ -110,7 +111,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await page.goto('/metadata/settings')
   // A synthetic credential must never initiate a real TMDB download.
   await page.getByLabel('Automatically update film & series information').uncheck()
-  await page.getByText('Manual actions', { exact: true }).click()
+  await openDisclosure(page, 'Manual actions')
   await storeCredential(page, 'Add TMDB token', 'TMDB read access token', 'synthetic-tmdb-token')
   await expect(
     page.getByRole('button', { name: 'Download information updates', exact: true }),
@@ -155,6 +156,7 @@ test('full announce URLs added inline keep playback and debrid drafts independen
   await createSource(page, server.sourceURL, 'inline-private')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/debrid/settings')
+  await openDisclosure(page, 'Private source playback')
   const original = await configuration(page)
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await storeCredential(
@@ -307,7 +309,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await expect(save).toBeDisabled()
   await page.getByLabel('Daily time', { exact: true }).fill('02:30')
   await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue('Europe/Paris')
-  await page.getByText('Advanced schedule settings', { exact: true }).click()
+  await page.getByText('Advanced', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('12')
   await save.click()
   await expect(save).toBeDisabled()
@@ -330,7 +332,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await expect(save).toBeDisabled()
   await page.reload()
   await expect(page.getByLabel('Cron expression', { exact: true })).toHaveValue(custom)
-  await page.getByText('Advanced schedule settings', { exact: true }).click()
+  await page.getByText('Advanced', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('13')
   await save.click()
   await expect(save).toBeDisabled()
@@ -365,7 +367,7 @@ test('source schedule conflicts merge untouched controls while preserving local 
   })
   const original = await source(page, 'schedule-conflict')
   await page.goto('/providers/schedule-conflict#schedules')
-  await page.getByText('Advanced schedule settings', { exact: true }).click()
+  await page.getByText('Advanced', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('12')
   const session = await (await page.request.get('/api/session')).json()
   expect(
@@ -585,7 +587,7 @@ test.describe('real local imports', () => {
         await expect(
           dialog.getByText('The first update automatically', { exact: false }),
         ).toBeVisible()
-        await dialog.getByText('Advanced import settings', { exact: true }).click()
+        await dialog.getByText('Advanced', { exact: true }).click()
         await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('1')
         await dialog.getByLabel('Duration budget per attempt (seconds)', { exact: true }).fill('30')
         await dialog.getByLabel('Known pages (X)', { exact: true }).fill('1')

@@ -35,28 +35,24 @@ function add(
     })
 }
 
-const runtimeLocations: Record<RuntimeSection, [string, string, string[]?]> = {
-  debrid: ['/debrid/settings', 'Debrid', []],
-  debrid_retries: ['/debrid/settings', 'Debrid', []],
-  outgoing: ['/network/outgoing', 'Administration / Network / Outgoing', []],
-  connections: ['/network/incoming', 'Administration / Network / Incoming', []],
-  downloads: ['/network/incoming', 'Administration / Network / Incoming', []],
-  payloads: ['/network/incoming', 'Administration / Network / Incoming', []],
-  history: ['/health/settings', 'Administration / Storage', []],
-  security: ['/security/settings', 'Administration / Security', []],
-  source_retries: [
-    '/providers/settings?settings=advanced',
-    'Sources / Sources',
-    ['Advanced settings'],
-  ],
-  identification: ['/metadata/settings', 'Metadata / Metadata', ['Advanced settings']],
-  matching: ['/metadata/settings', 'Metadata / Metadata', ['Advanced settings']],
-  metadata: ['/metadata/settings', 'Metadata / Metadata', ['Advanced settings']],
-  metadata_retries: ['/metadata/settings', 'Metadata / Metadata', ['Advanced settings']],
+const runtimeLocations: Record<RuntimeSection, [string, string]> = {
+  debrid: ['/debrid/settings', 'Debrid'],
+  debrid_retries: ['/debrid/settings', 'Debrid'],
+  outgoing: ['/network/outgoing', 'Administration / Network / Outgoing'],
+  connections: ['/network/incoming', 'Administration / Network / Incoming'],
+  downloads: ['/network/incoming', 'Administration / Network / Incoming'],
+  payloads: ['/network/incoming', 'Administration / Network / Incoming'],
+  history: ['/health/settings', 'Administration / Storage'],
+  security: ['/security/settings', 'Administration / Security'],
+  source_retries: ['/providers/settings?settings=advanced', 'Sources / Sources'],
+  identification: ['/metadata/settings', 'Metadata / Metadata'],
+  matching: ['/metadata/settings', 'Metadata / Metadata'],
+  metadata: ['/metadata/settings', 'Metadata / Metadata'],
+  metadata_retries: ['/metadata/settings', 'Metadata / Metadata'],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
   const definition = runtimeSections[section]
-  const [route, group, parents = []] = runtimeLocations[section]
+  const [route, group] = runtimeLocations[section]
   for (const [key, title] of definition.fields)
     settings.push({
       id: `runtime.${section}.${key}`,
@@ -64,7 +60,7 @@ for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
       route,
       group: `${group} / ${definition.title}`,
       control: `runtime-${section}-${key}`,
-      reveal: [...parents, definition.title],
+      reveal: ['Advanced', definition.title],
       keywords: `${section.replaceAll('_', ' ')} ${key.replaceAll('_', ' ')} ${definition.help}`,
     })
 }
@@ -75,14 +71,14 @@ for (const [key, field] of Object.entries(importNumberFields))
     route: '/providers/settings?settings=advanced',
     group: 'Sources / Sources / Import execution',
     control: `collection-${key}`,
-    reveal: ['Advanced settings'],
+    reveal: ['Advanced', 'Import execution'],
     keywords: field.help,
   })
 add(
   {
     route: '/providers/settings?settings=advanced',
     group: 'Sources / Sources / Import execution',
-    reveal: ['Advanced settings'],
+    reveal: ['Advanced', 'Import execution'],
   },
   [
     ['imports.progress', 'At the no-progress threshold', 'pause stop no progress'],
@@ -122,10 +118,18 @@ add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
   ['debrid.cache', 'Cache validity (minutes)', 'availability expiration cache'],
   ['debrid.response', 'Stream response timeout (seconds)'],
 ])
-add({ route: '/debrid/settings', group: 'Debrid / Private source playback', entity: 'tracker' }, [
-  ['tracker.private', 'Private source', 'private tracker privee'],
-  ['tracker.announce', 'Announce URL secret', 'passkey tracker announce annonce'],
-])
+add(
+  {
+    route: '/debrid/settings',
+    group: 'Debrid / Private source playback',
+    entity: 'tracker',
+    reveal: ['Advanced', 'Private source playback'],
+  },
+  [
+    ['tracker.private', 'Private source', 'private tracker privee'],
+    ['tracker.announce', 'Announce URL secret', 'passkey tracker announce annonce'],
+  ],
+)
 add(
   {
     route: '/health/settings',
@@ -140,7 +144,7 @@ settings.push({
   route: '/health/settings',
   group: 'Administration / Storage / Maintenance',
   label: 'Reset all source data',
-  reveal: ['Maintenance'],
+  reveal: ['Advanced', 'Maintenance'],
   keywords: 'reset delete reinitialiser supprimer maintenance',
 })
 add(
@@ -225,7 +229,7 @@ add(
 for (const setting of settings.filter(
   (entry) => entry.entity === 'proxy' && ['Username', 'Password'].includes(entry.title),
 ))
-  setting.reveal = ['Authentication']
+  setting.reveal = ['Advanced']
 settings.push(
   {
     id: 'security.secrets',
@@ -514,7 +518,6 @@ source('schedules', [
 for (const setting of settings.filter((entry) => entry.entity === 'source')) {
   if (setting.stage === 'schedules') setting.fallback = 'Automatic imports'
   if (setting.stage === 'pagination') setting.fallback = 'Page strategy'
-  if (setting.id === 'source.detail-container') setting.fallback = 'Detail pages'
   if (
     [
       'source.query',
@@ -530,6 +533,7 @@ for (const setting of settings.filter((entry) => entry.entity === 'source')) {
   if (['source.search-mode', 'source.category-requests'].includes(setting.id))
     setting.adapters = ['torznab']
   if (setting.stage === 'mapping') setting.fallback = 'Record selection'
+  if (setting.id === 'source.detail-container') setting.fallback = 'Detail pages'
   if (setting.stage === 'connection') setting.fallback = 'Endpoint'
   if (setting.stage === 'collection') setting.fallback = 'Bounded traversal'
   if (

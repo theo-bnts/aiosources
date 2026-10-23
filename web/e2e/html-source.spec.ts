@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures'
@@ -48,7 +49,7 @@ test('HTML uses the source stages, validates selectors without requests and keep
 }) => {
   await newHTMLSource(page, server.sourceURL)
   await page.getByRole('tab', { name: 'Connection', exact: true }).click()
-  await page.locator('summary').filter({ hasText: 'Additional listings' }).click()
+  await openDisclosure(page, 'Additional listings')
   await page.getByRole('button', { name: 'Add additional listing paths', exact: true }).click()
   await page.getByLabel('Additional listing paths 1', { exact: true }).fill('/catalog/audio')
   await page.getByRole('tab', { name: 'Source fields', exact: true }).click()
@@ -57,8 +58,10 @@ test('HTML uses the source stages, validates selectors without requests and keep
   expect(invalid.valid).toBe(false)
   expect(invalid.issues.join(' ')).toContain('HTML selector')
   await page.getByLabel('Title selector', { exact: true }).fill('.title')
-  await page.locator('summary').filter({ hasText: 'Detail pages' }).click()
+  await openDisclosure(page, 'Detail pages')
   await page.getByRole('button', { name: 'Configure detail pages', exact: true }).click()
+  await openDisclosure(page, 'Page selection')
+  await openDisclosure(page, 'Detail field mappings')
   await expect(page.getByLabel('Detail container selector', { exact: true })).toHaveValue(
     '#item-details',
   )
@@ -123,8 +126,10 @@ test.describe('HTML collection', () => {
     server,
   }) => {
     await newHTMLSource(page, server.sourceURL + '/html', true)
-    await page.locator('summary').filter({ hasText: 'Detail pages' }).click()
+    await openDisclosure(page, 'Detail pages')
     await page.getByRole('button', { name: 'Configure detail pages', exact: true }).click()
+    await openDisclosure(page, 'Page selection')
+    await openDisclosure(page, 'Detail field mappings')
     await page.getByLabel('Detail Info hash selector', { exact: true }).fill('.hash')
     await expect(page.getByLabel('Detail Info hash attribute', { exact: true })).toHaveValue('href')
     await page.getByLabel('Detail Info hash attribute', { exact: true }).fill('')

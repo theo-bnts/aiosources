@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import type { SecretInfo } from '../src/lib/types'
 import { test, expect } from './fixtures'
@@ -260,6 +261,7 @@ test('debrid drafts require review before adopting another writer after a separa
   ).toBe(204)
   await page.goto('/debrid/settings')
   const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  await openDisclosure(page, 'Private source playback')
   const playback = page.getByRole('form', { name: 'Private source playback', exact: true })
   // The fixture has no enabled source; a private-playback draft changes only
   // this form's tracker map and never publishes the separate debrid draft.

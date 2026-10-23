@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { CodeEditor } from '@/components/code-editor'
 import {
   HTMLMappingSettings,
+  HTMLDetailSettings,
   HTMLPaginationSettings,
   SourceHTMLCompatibility,
 } from '@/components/source-html-fields'
@@ -115,7 +116,7 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
         />
       </FieldGrid>
       <SourceHTMLCompatibility />
-      <AdvancedSection title="Definition format">
+      <AdvancedSection title="Advanced">
         <JSONField
           path={['version']}
           label="Definition version"
@@ -147,7 +148,7 @@ function SourceSecretField({ path, label }: { path: string[]; label: string }) {
   )
 }
 
-function AuthenticationSettings() {
+function AuthenticationSettings({ advanced = false }: { advanced?: boolean }) {
   const { document, change } = useSourceEditor()
   const type = document.getIn(['auth', 'type']) || 'none'
   const fields = [
@@ -181,6 +182,23 @@ function AuthenticationSettings() {
   )
     incompatible.push('in')
   if (!named && document.getIn(['auth', 'name'])) incompatible.push('name')
+  if (advanced)
+    return (
+      <AdvancedSection
+        title="Other authentication settings"
+        description="Settings for other authentication types are retained. Editing the type never clears these values."
+      >
+        <FieldGrid>
+          {fields
+            .filter((field) => !field.active)
+            .map((field) => (
+              <SourceSecretField key={field.key} path={['auth', field.key]} label={field.label} />
+            ))}
+          {type !== 'api_key' && placement}
+          {!named && name}
+        </FieldGrid>
+      </AdvancedSection>
+    )
   return (
     <FieldSection
       title="Authentication"
@@ -234,20 +252,6 @@ function AuthenticationSettings() {
           />
         </div>
       )}
-      <AdvancedSection
-        title="Other authentication settings"
-        description="Settings for other authentication types are retained. Editing the type never clears these values."
-      >
-        <FieldGrid>
-          {fields
-            .filter((field) => !field.active)
-            .map((field) => (
-              <SourceSecretField key={field.key} path={['auth', field.key]} label={field.label} />
-            ))}
-          {type !== 'api_key' && placement}
-          {!named && name}
-        </FieldGrid>
-      </AdvancedSection>
     </FieldSection>
   )
 }
@@ -277,18 +281,6 @@ function ConnectionSettings() {
             fallback="Default · GET"
           />
         )}
-        {!torznab && (
-          <AdvancedSection
-            title="Additional listings"
-            configuredPaths={[['http', 'listing_paths']]}
-          >
-            <StringArrayField
-              path={['http', 'listing_paths']}
-              label="Additional listing paths"
-              help="Paths on the same source, such as /catalog/audio. Imported after Source URL with the same fields and request settings. Each listing keeps its own pagination and update boundary."
-            />
-          </AdvancedSection>
-        )}
       </FieldSection>
       <AuthenticationSettings />
       {!torznab && (
@@ -298,16 +290,6 @@ function ConnectionSettings() {
             label="Base query · Full and all modes"
             help="Shared filters and Full ordering. Values are strict JSON, including strings in quotes."
           />
-          <AdvancedSection
-            title="Incremental ordering"
-            configuredPaths={[['http', 'incremental_query']]}
-          >
-            <MapField
-              path={['http', 'incremental_query']}
-              label="Incremental query overrides"
-              help="Applied only during Incremental collection. Configure newest-first ordering independently from Full here."
-            />
-          </AdvancedSection>
           {document.getIn(['http', 'method']) === 'POST' ? (
             <JSONField
               path={['http', 'body']}
@@ -319,36 +301,9 @@ function ConnectionSettings() {
               }
               multiline
             />
-          ) : (
-            <AdvancedSection title="Request body">
-              <JSONField
-                path={['http', 'body']}
-                label="Request body · JSON"
-                multiline
-                help="Used for POST requests. Existing values are retained when the HTTP method changes."
-              />
-            </AdvancedSection>
-          )}
+          ) : null}
         </FieldSection>
       )}
-      <AdvancedSection
-        title={html ? 'Headers' : 'Headers & search'}
-        configuredPaths={[
-          ['http', 'headers'],
-          ['http', 'secret_headers'],
-          ...(!torznab && !html ? [['search']] : []),
-        ]}
-        description="Ordinary headers contain non-secret values. Secret headers map a header name to a vault reference."
-      >
-        <MapField path={['http', 'headers']} label="HTTP headers" strings />
-        <MapField path={['http', 'secret_headers']} label="Secret header references" strings />
-        {!torznab && !html && <TextField path={['search', 'query']} label="Search query" />}
-        {!torznab && !html && (
-          <ArrayField path={['search', 'categories']} label="Categories" initial={0}>
-            {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
-          </ArrayField>
-        )}
-      </AdvancedSection>
       {torznab && (
         <FieldSection title="Search scope">
           <FieldGrid>
@@ -393,28 +348,87 @@ function ConnectionSettings() {
           </ArrayField>
         </FieldSection>
       )}
-      {!html && (
-        <AdvancedSection title="Adapter compatibility">
-          {torznab && (
-            <SelectField
-              path={['http', 'method']}
-              label="HTTP method"
-              choices={['GET', 'POST']}
-              fallback="Default · GET"
+      <AdvancedSection title="Advanced">
+        {!torznab && (
+          <AdvancedSection
+            title="Additional listings"
+            configuredPaths={[['http', 'listing_paths']]}
+          >
+            <StringArrayField
+              path={['http', 'listing_paths']}
+              label="Additional listing paths"
+              help="Paths on the same source, such as /catalog/audio. Imported after Source URL with the same fields and request settings. Each listing keeps its own pagination and update boundary."
             />
+          </AdvancedSection>
+        )}
+        <AuthenticationSettings advanced />
+        {!torznab && (
+          <>
+            <AdvancedSection
+              title="Incremental ordering"
+              configuredPaths={[['http', 'incremental_query']]}
+            >
+              <MapField
+                path={['http', 'incremental_query']}
+                label="Incremental query overrides"
+                help="Applied only during Incremental collection. Configure newest-first ordering independently from Full here."
+              />
+            </AdvancedSection>
+            {document.getIn(['http', 'method']) !== 'POST' && (
+              <AdvancedSection title="Request body">
+                <JSONField
+                  path={['http', 'body']}
+                  label="Request body · JSON"
+                  multiline
+                  help="Used for POST requests. Existing values are retained when the HTTP method changes."
+                />
+              </AdvancedSection>
+            )}
+          </>
+        )}
+        <AdvancedSection
+          title={html ? 'Headers' : 'Headers & search'}
+          configuredPaths={[
+            ['http', 'headers'],
+            ['http', 'secret_headers'],
+            ...(!torznab && !html ? [['search']] : []),
+          ]}
+          description="Ordinary headers contain non-secret values. Secret headers map a header name to a vault reference."
+        >
+          <MapField path={['http', 'headers']} label="HTTP headers" strings />
+          <MapField path={['http', 'secret_headers']} label="Secret header references" strings />
+          {!torznab && !html && <TextField path={['search', 'query']} label="Search query" />}
+          {!torznab && !html && (
+            <ArrayField path={['search', 'categories']} label="Categories" initial={0}>
+              {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
+            </ArrayField>
           )}
-          <BooleanField
-            path={['http', 'catalog']}
-            label="Normalized catalog"
-            help="Enable only for a compatible catalog endpoint."
-          />
-          {torznab && <MapField path={['http', 'query']} label="Base query · Full and all modes" />}
-          {torznab && (
-            <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
-          )}
-          {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
         </AdvancedSection>
-      )}
+        {!html && (
+          <AdvancedSection title="Adapter compatibility">
+            {torznab && (
+              <SelectField
+                path={['http', 'method']}
+                label="HTTP method"
+                choices={['GET', 'POST']}
+                fallback="Default · GET"
+              />
+            )}
+            <BooleanField
+              path={['http', 'catalog']}
+              label="Normalized catalog"
+              help="Enable only for a compatible catalog endpoint."
+            />
+            {torznab && (
+              <MapField path={['http', 'query']} label="Base query · Full and all modes" />
+            )}
+            {torznab && (
+              <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
+            )}
+            {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
+          </AdvancedSection>
+        )}
+      </AdvancedSection>
     </>
   )
 }
@@ -450,6 +464,57 @@ function PaginationSettings() {
       active: strategy !== 'none',
     },
   ]
+  const advanced = (
+    <>
+      <AdvancedSection
+        title="Other pagination parameters"
+        description="Changing strategy keeps these settings; it never removes fields from the definition."
+      >
+        <FieldGrid>
+          <SelectField
+            path={['pagination', 'in']}
+            label="Parameter location"
+            choices={['query', 'body']}
+            fallback="Default · query"
+            help="Body pagination requires POST."
+          />
+          {strategy !== 'page' && strategy !== 'offset' && (
+            <JSONField path={['pagination', 'start']} label="Starting page or offset" integer />
+          )}
+          {parameters
+            .filter((field) => !field.active)
+            .map((field) => (
+              <TextField
+                key={field.key}
+                path={['pagination', field.key]}
+                label={field.label}
+                placeholder={field.placeholder}
+              />
+            ))}
+        </FieldGrid>
+      </AdvancedSection>
+      <AdvancedSection
+        title="Response checks"
+        configuredPaths={[
+          ['pagination', 'current_path'],
+          ['pagination', 'total_path'],
+        ]}
+      >
+        <FieldGrid>
+          <TextField
+            path={['pagination', 'total_path']}
+            label="Total pointer"
+            placeholder="/meta/total"
+          />
+          <TextField
+            path={['pagination', 'current_path']}
+            label="Current page pointer"
+            placeholder="/meta/current_page"
+          />
+        </FieldGrid>
+      </AdvancedSection>
+    </>
+  )
   const fields = (
     <>
       <FieldSection title="Page strategy">
@@ -488,33 +553,6 @@ function PaginationSettings() {
               />
             ))}
         </FieldGrid>
-        <AdvancedSection
-          title="Other pagination parameters"
-          description="Changing strategy keeps these settings; it never removes fields from the definition."
-        >
-          <FieldGrid>
-            <SelectField
-              path={['pagination', 'in']}
-              label="Parameter location"
-              choices={['query', 'body']}
-              fallback="Default · query"
-              help="Body pagination requires POST."
-            />
-            {strategy !== 'page' && strategy !== 'offset' && (
-              <JSONField path={['pagination', 'start']} label="Starting page or offset" integer />
-            )}
-            {parameters
-              .filter((field) => !field.active)
-              .map((field) => (
-                <TextField
-                  key={field.key}
-                  path={['pagination', field.key]}
-                  label={field.label}
-                  placeholder={field.placeholder}
-                />
-              ))}
-          </FieldGrid>
-        </AdvancedSection>
       </FieldSection>
       <FieldSection title="Response pointers">
         <FieldGrid>
@@ -525,26 +563,6 @@ function PaginationSettings() {
             help="Use when the response supplies the next URL or cursor. Empty stops at an empty page."
           />
         </FieldGrid>
-        <AdvancedSection
-          title="Response checks"
-          configuredPaths={[
-            ['pagination', 'current_path'],
-            ['pagination', 'total_path'],
-          ]}
-        >
-          <FieldGrid>
-            <TextField
-              path={['pagination', 'total_path']}
-              label="Total pointer"
-              placeholder="/meta/total"
-            />
-            <TextField
-              path={['pagination', 'current_path']}
-              label="Current page pointer"
-              placeholder="/meta/current_page"
-            />
-          </FieldGrid>
-        </AdvancedSection>
       </FieldSection>
     </>
   )
@@ -562,10 +580,16 @@ function PaginationSettings() {
       {torznab ? (
         <>
           <p className="notice">Torznab reads pagination from its RSS response.</p>
-          <AdvancedSection title="Pagination settings">{fields}</AdvancedSection>
+          <AdvancedSection title="Advanced">
+            <AdvancedSection title="Pagination settings">{fields}</AdvancedSection>
+            {advanced}
+          </AdvancedSection>
         </>
       ) : (
-        fields
+        <>
+          {fields}
+          <AdvancedSection title="Advanced">{advanced}</AdvancedSection>
+        </>
       )}
     </>
   )
@@ -575,7 +599,46 @@ function MappingSettings() {
   const { document } = useSourceEditor()
   const torznab = document.get('adapter') === 'torznab'
   const html = document.get('adapter') === 'html'
-  const Selection = torznab ? AdvancedSection : FieldSection
+  const recordSelection = (
+    <FieldSection
+      title={torznab ? 'JSON mappings' : 'Record selection'}
+      description="JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
+    >
+      <FieldGrid>
+        <TextField
+          path={['http', 'items_path']}
+          label="Items pointer"
+          placeholder="/data"
+          help="Array of records in the response. Empty selects the response root."
+        />
+        <TextField
+          path={['mapping', 'id']}
+          label="Native source ID pointer"
+          placeholder="/id"
+          help="Stable identity within this source, independent from the torrent hash."
+        />
+      </FieldGrid>
+      <MapField
+        path={['mapping', 'fields']}
+        label="Field mappings"
+        strings
+        suggestions={[
+          'title',
+          'info_hash',
+          'size',
+          'published_at',
+          'imdb_id',
+          'tmdb_id',
+          'tvdb_id',
+          'season',
+          'episode',
+          'audiolangs',
+          'categories',
+        ]}
+        help="Map catalog field names to pointers relative to each item, such as title → /name."
+      />
+    </FieldSection>
+  )
   return (
     <>
       {html ? (
@@ -583,87 +646,54 @@ function MappingSettings() {
       ) : (
         <>
           {torznab && (
-            <AdvancedSection
-              title="Native identity"
-              configuredPaths={[
-                ['options', 'id_source'],
-                ['options', 'id_pattern'],
-              ]}
-            >
-              <FieldGrid>
-                <SelectField
-                  path={['options', 'id_source']}
-                  label="Native ID from"
-                  choices={['guid', 'link']}
-                  fallback="RSS identifier (default)"
-                  labels={{ guid: 'RSS identifier', link: 'Item link' }}
-                  help="Choose the field containing the source’s stable item identifier."
-                />
-                <TextField
-                  path={['options', 'id_pattern']}
-                  label="Native ID pattern"
-                  placeholder="/items/([0-9]+)"
-                  help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
-                />
-              </FieldGrid>
-            </AdvancedSection>
-          )}
-          {torznab && (
             <p className="notice">
               Torznab reads torrent fields from its native RSS format. Custom JSON field settings
               remain accessible below. These fields do not configure IMDb identification.
             </p>
           )}
-          <Selection
-            title="Record selection"
-            description="JSON mappings use JSON Pointers (RFC 6901), relative to the response or each item as noted. Torznab uses its native RSS mapping."
-          >
-            <FieldGrid>
-              <TextField
-                path={['http', 'items_path']}
-                label="Items pointer"
-                placeholder="/data"
-                help="Array of records in the response. Empty selects the response root."
-              />
-              <TextField
-                path={['mapping', 'id']}
-                label="Native source ID pointer"
-                placeholder="/id"
-                help="Stable identity within this source, independent from the torrent hash."
-              />
-            </FieldGrid>
-            <MapField
-              path={['mapping', 'fields']}
-              label="Field mappings"
-              strings
-              suggestions={[
-                'title',
-                'info_hash',
-                'size',
-                'published_at',
-                'imdb_id',
-                'tmdb_id',
-                'tvdb_id',
-                'season',
-                'episode',
-                'audiolangs',
-                'categories',
-              ]}
-              help="Map catalog field names to pointers relative to each item, such as title → /name."
-            />
-          </Selection>
+          {!torznab && recordSelection}
         </>
       )}
-      <AdvancedSection
-        title="Output selection"
-        configuredPaths={[['output', 'fields']]}
-        description="Output fields control presentation. Storage → Settings → Data retention controls which mapped fields and processing details are retained. Leave empty for the default output."
-      >
-        <StringArrayField
-          path={['output', 'fields']}
-          label="Output fields"
-          help="Use field names or attributes.NAME selectors."
-        />
+      <AdvancedSection title="Advanced">
+        {torznab && (
+          <AdvancedSection
+            title="Native identity"
+            configuredPaths={[
+              ['options', 'id_source'],
+              ['options', 'id_pattern'],
+            ]}
+          >
+            <FieldGrid>
+              <SelectField
+                path={['options', 'id_source']}
+                label="Native ID from"
+                choices={['guid', 'link']}
+                fallback="RSS identifier (default)"
+                labels={{ guid: 'RSS identifier', link: 'Item link' }}
+                help="Choose the field containing the source’s stable item identifier."
+              />
+              <TextField
+                path={['options', 'id_pattern']}
+                label="Native ID pattern"
+                placeholder="/items/([0-9]+)"
+                help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
+              />
+            </FieldGrid>
+          </AdvancedSection>
+        )}
+        {torznab && <AdvancedSection title="Record selection">{recordSelection}</AdvancedSection>}
+        {html && <HTMLDetailSettings />}
+        <AdvancedSection
+          title="Output selection"
+          configuredPaths={[['output', 'fields']]}
+          description="Output fields control presentation. Storage → Settings → Data retention controls which mapped fields and processing details are retained. Leave empty for the default output."
+        >
+          <StringArrayField
+            path={['output', 'fields']}
+            label="Output fields"
+            help="Use field names or attributes.NAME selectors."
+          />
+        </AdvancedSection>
       </AdvancedSection>
     </>
   )
@@ -686,100 +716,106 @@ function TraversalSettings() {
     >
       {configured ? (
         <>
-          <Button
-            variant="warning"
-            size="sm"
-            onClick={() => change((next) => next.delete('traversal'))}
-          >
-            Remove traversal configuration
-          </Button>
-          <FieldGrid>
-            <JSONField path={['traversal', 'window_pages']} label="Window pages" integer />
-            <JSONField
-              path={['traversal', 'minimum_total']}
-              label="Minimum expected total"
-              integer
+          <AdvancedSection title="Coverage & ordering">
+            <FieldGrid>
+              <JSONField path={['traversal', 'window_pages']} label="Window pages" integer />
+              <JSONField
+                path={['traversal', 'minimum_total']}
+                label="Minimum expected total"
+                integer
+              />
+              <SelectField
+                path={['traversal', 'total_mode']}
+                label="Coverage total mode"
+                choices={['strict', 'at_least']}
+                fallback="Default · strict"
+              />
+              <SelectField
+                path={['traversal', 'incremental_order']}
+                label="Incremental listing order"
+                choices={['id', 'published_at']}
+                fallback="Default · id"
+                help="ID order is checked strictly. Publication-sorted listings use known source IDs as the stopping boundary and tolerate date reordering."
+              />
+            </FieldGrid>
+            <StringArrayField
+              path={['traversal', 'total_paths']}
+              label="Total pointers"
+              help="Response pointers used to determine expected scope coverage."
             />
-            <SelectField
-              path={['traversal', 'total_mode']}
-              label="Coverage total mode"
-              choices={['strict', 'at_least']}
-              fallback="Default · strict"
+            <ArrayField
+              path={['traversal', 'scopes']}
+              label="Scopes"
+              initial={{ id: '', match: {} }}
+              help="Each matching scope tracks its own observed native IDs."
+            >
+              {(path) => (
+                <>
+                  <TextField path={[...path, 'id']} label="Scope identifier" />
+                  <MapField path={[...path, 'query']} label="Scope query" />
+                  <MapField
+                    path={[...path, 'match']}
+                    label="Mapped field matches"
+                    help="Scalar values to match against mapped fields."
+                  />
+                </>
+              )}
+            </ArrayField>
+            <Button
+              variant="warning"
+              size="sm"
+              onClick={() => change((next) => next.delete('traversal'))}
+            >
+              Remove traversal configuration
+            </Button>
+          </AdvancedSection>
+          <AdvancedSection title="Query partitions">
+            <ArrayField
+              path={['traversal', 'partitions']}
+              label="Partitions"
+              initial={{ parameter: '', start: 0, end: 0 }}
+              help="Inclusive ranges. Specify either an end value or an end-year offset, never both."
+            >
+              {(path) => (
+                <FieldGrid>
+                  <TextField path={[...path, 'parameter']} label="Partition parameter" />
+                  <JSONField path={[...path, 'start']} label="Partition start" integer />
+                  <JSONField
+                    path={[...path, 'end']}
+                    label="Partition end"
+                    integer
+                    help="Clear when using an end-year offset."
+                  />
+                  <JSONField
+                    path={[...path, 'end_year_offset']}
+                    label="End-year offset"
+                    integer
+                    help="Clear when using an explicit end."
+                  />
+                </FieldGrid>
+              )}
+            </ArrayField>
+            <ArrayField path={['traversal', 'query_variants']} label="Query variants" initial={{}}>
+              {(path) => <MapField path={path} label="Variant parameters" />}
+            </ArrayField>
+          </AdvancedSection>
+          <AdvancedSection title="Field enrichment">
+            <StringArrayField
+              path={['traversal', 'enrich_fields']}
+              label="Source detail fields"
+              help="Fields filled by Metadata mode through ID recovery, not by discovery itself. An optional follow-up after Incremental can fill these fields for newly inserted torrents only."
             />
-            <SelectField
-              path={['traversal', 'incremental_order']}
-              label="Incremental listing order"
-              choices={['id', 'published_at']}
-              fallback="Default · id"
-              help="ID order is checked strictly. Publication-sorted listings use known source IDs as the stopping boundary and tolerate date reordering."
+            <BooleanField
+              path={['traversal', 'metadata_after_incremental']}
+              label="Fetch source details after updates"
+              allowEnabled={metadataSupported}
+              help={
+                metadataSupported
+                  ? 'Off by default. After a successful Incremental or its initial Full, queue a separate Metadata run only for newly inserted native torrents still missing configured fields. Existing torrents are excluded; no eligible new torrents means no follow-up.'
+                  : 'Unavailable: requires native HTTP/JSON, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
+              }
             />
-          </FieldGrid>
-          <StringArrayField
-            path={['traversal', 'total_paths']}
-            label="Total pointers"
-            help="Response pointers used to determine expected scope coverage."
-          />
-          <StringArrayField
-            path={['traversal', 'enrich_fields']}
-            label="Source detail fields"
-            help="Fields filled by Metadata mode through ID recovery, not by discovery itself. An optional follow-up after Incremental can fill these fields for newly inserted torrents only."
-          />
-          <BooleanField
-            path={['traversal', 'metadata_after_incremental']}
-            label="Fetch source details after updates"
-            allowEnabled={metadataSupported}
-            help={
-              metadataSupported
-                ? 'Off by default. After a successful Incremental or its initial Full, queue a separate Metadata run only for newly inserted native torrents still missing configured fields. Existing torrents are excluded; no eligible new torrents means no follow-up.'
-                : 'Unavailable: requires native HTTP/JSON, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
-            }
-          />
-          <ArrayField
-            path={['traversal', 'scopes']}
-            label="Scopes"
-            initial={{ id: '', match: {} }}
-            help="Each matching scope tracks its own observed native IDs."
-          >
-            {(path) => (
-              <>
-                <TextField path={[...path, 'id']} label="Scope identifier" />
-                <MapField path={[...path, 'query']} label="Scope query" />
-                <MapField
-                  path={[...path, 'match']}
-                  label="Mapped field matches"
-                  help="Scalar values to match against mapped fields."
-                />
-              </>
-            )}
-          </ArrayField>
-          <ArrayField
-            path={['traversal', 'partitions']}
-            label="Partitions"
-            initial={{ parameter: '', start: 0, end: 0 }}
-            help="Inclusive ranges. Specify either an end value or an end-year offset, never both."
-          >
-            {(path) => (
-              <FieldGrid>
-                <TextField path={[...path, 'parameter']} label="Partition parameter" />
-                <JSONField path={[...path, 'start']} label="Partition start" integer />
-                <JSONField
-                  path={[...path, 'end']}
-                  label="Partition end"
-                  integer
-                  help="Clear when using an end-year offset."
-                />
-                <JSONField
-                  path={[...path, 'end_year_offset']}
-                  label="End-year offset"
-                  integer
-                  help="Clear when using an explicit end."
-                />
-              </FieldGrid>
-            )}
-          </ArrayField>
-          <ArrayField path={['traversal', 'query_variants']} label="Query variants" initial={{}}>
-            {(path) => <MapField path={path} label="Variant parameters" />}
-          </ArrayField>
+          </AdvancedSection>
           <TraversalOptions />
           <RecoverySettings />
         </>
@@ -1011,6 +1047,8 @@ function CollectionSettings() {
             ]}
           />
         </FieldGrid>
+      </FieldSection>
+      <AdvancedSection title="Advanced">
         <AdvancedSection title="Rate-limit headers" configuredPaths={[['rate_limit_reset']]}>
           <SelectField
             path={['rate_limit_reset']}
@@ -1019,20 +1057,22 @@ function CollectionSettings() {
             fallback="Default · epoch"
           />
         </AdvancedSection>
-      </FieldSection>
-      <RequestLimitsSettings />
-      <AdvancedSection
-        title="Adapter options"
-        configuredPaths={[['options']]}
-        description="Adapter-specific options are preserved as arbitrary JSON. Configure only options supported by the selected adapter."
-      >
-        <MapField
-          path={['options']}
-          label="Options"
-          excludeKeys={torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []}
-        />
+        <RequestLimitsSettings />
+        <AdvancedSection
+          title="Adapter options"
+          configuredPaths={[['options']]}
+          description="Adapter-specific options are preserved as arbitrary JSON. Configure only options supported by the selected adapter."
+        >
+          <MapField
+            path={['options']}
+            label="Options"
+            excludeKeys={
+              torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []
+            }
+          />
+        </AdvancedSection>
+        {document.get('adapter') !== 'html' && <TraversalSettings />}
       </AdvancedSection>
-      {document.get('adapter') !== 'html' && <TraversalSettings />}
     </>
   )
 }
@@ -1124,11 +1164,12 @@ function SourceScheduleSettings() {
         {invalidPolicy && (
           <p className="help text-destructive" role="alert">
             Source details require configured metadata enrichment. A periodic rebuild requires an
-            automatic Update schedule. Review the mode and advanced settings before saving.
+            automatic Update schedule. Review the collection mode and Advanced options before
+            saving.
           </p>
         )}
       </FieldSection>
-      <AdvancedSection title="Advanced schedule settings">
+      <AdvancedSection title="Advanced">
         <DurationSelect
           label="Rebuild whole source periodically"
           value={fullEvery}

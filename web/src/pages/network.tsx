@@ -1,5 +1,6 @@
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
+import { AdvancedSettings } from '@/components/advanced-settings'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
@@ -187,7 +188,9 @@ export function NetworkPage() {
           />
         ))
       )}
-      <RuntimeSettingsPanel section="outgoing" />
+      <AdvancedSettings>
+        <RuntimeSettingsPanel section="outgoing" />
+      </AdvancedSettings>
       {editing && (
         <ProxyEditor
           key={editing.proxy.id}
@@ -289,7 +292,7 @@ function ProxyEditor({
               Use an address reachable from AIOSources. Keep credentials in Secrets.
             </p>
           </div>
-          <Disclosure title="Authentication">
+          <Disclosure title="Advanced">
             <SecretPicker
               label="Username"
               value={draft.username_ref ?? ''}

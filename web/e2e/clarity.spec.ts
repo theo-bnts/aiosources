@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -5,6 +6,7 @@ test('navigation waits for an explicit save to finish without offering to discar
   page,
 }) => {
   await page.goto('/import-settings')
+  await openDisclosure(page, 'Import execution')
   const workers = page.getByLabel('Simultaneous imports', { exact: true })
   await workers.fill('2')
   let release!: () => void
@@ -17,7 +19,7 @@ test('navigation waits for an explicit save to finish without offering to discar
   })
   try {
     await page
-      .getByRole('form', { name: 'Advanced settings', exact: true })
+      .getByRole('form', { name: 'Import execution', exact: true })
       .getByRole('button', { name: 'Save', exact: true })
       .click()
     await page
@@ -105,11 +107,12 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   const beforeSettings = await page.evaluate(() => history.state.idx)
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await expect.poll(() => page.evaluate(() => history.state.idx)).toBe(beforeSettings + 1)
-  await page.getByText('Advanced settings', { exact: true }).click()
+  await openDisclosure(page, 'Advanced')
+  await openDisclosure(page, 'Import execution')
   const workers = page.getByLabel('Simultaneous imports', { exact: true })
   await workers.fill('7')
   await page.evaluate(() => history.back())
-  await expect(prompt).toContainText('advanced settings')
+  await expect(prompt).toContainText('import execution settings')
   await expect(prompt.getByRole('button', { name: 'Keep editing', exact: true })).toBeFocused()
   await prompt.getByRole('button', { name: 'Keep editing' }).click()
   await expect(workers).toHaveValue('7')
@@ -123,7 +126,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await reloading
   await expect(workers).toHaveValue('7')
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
-  await expect(prompt).toContainText('advanced settings')
+  await expect(prompt).toContainText('import execution settings')
   await prompt.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await expect(prompt).toHaveCount(0)
   await expect(workers).toHaveValue('7')
@@ -138,11 +141,12 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
     .getByRole('link', { name: 'Sources', exact: true })
     .click()
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
-  await page.getByText('Advanced settings', { exact: true }).click()
+  await openDisclosure(page, 'Advanced')
+  await openDisclosure(page, 'Import execution')
   await expect(workers).toHaveValue(String(persisted.settings.workers))
   // All shared controls remain together inside the single optional section.
   await expect(
-    page.getByRole('form', { name: 'Advanced settings', exact: true }).locator('details'),
+    page.getByRole('form', { name: 'Import execution', exact: true }).locator('details'),
   ).toHaveCount(0)
   const retries = page.getByLabel('Automatic retries after HTTP 429', { exact: true })
   await retries.fill('11')
@@ -150,7 +154,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await expect(retries).toHaveAttribute('aria-invalid', 'true')
   await expect(
     page
-      .getByRole('form', { name: 'Advanced settings', exact: true })
+      .getByRole('form', { name: 'Import execution', exact: true })
       .getByRole('button', { name: 'Save', exact: true }),
   ).toBeDisabled()
   await retries.fill(String(persisted.settings.max_quota_retries))

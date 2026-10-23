@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -101,7 +102,7 @@ test('a real manual identification appears in metadata history without mixing so
     await db.end()
   }
   await page.goto('/metadata/settings')
-  await page.getByText('Manual actions', { exact: true }).click()
+  await openDisclosure(page, 'Manual actions')
   await page.getByRole('button', { name: 'Identify torrents', exact: true }).click()
   await expect
     .poll(async () => {

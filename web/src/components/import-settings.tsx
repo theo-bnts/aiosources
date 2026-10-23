@@ -67,7 +67,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
     (numberKeys.some((key) => draft.values[key] !== String(draft.base[key])) ||
       draft.values.no_progress_action !== draft.base.no_progress_action ||
       draft.values.auto_resume_interrupted !== (draft.base.auto_resume_interrupted ?? true))
-  useUnsavedChanges(dirty, 'advanced settings', save.isPending)
+  useUnsavedChanges(dirty, 'import execution settings', save.isPending)
   const rejected = save.error instanceof ApiError && save.error.status === 409
   const conflict =
     draft !== null && (rejected || (data && data.settings.revision !== draft.base.revision))
@@ -149,22 +149,15 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
   }
 
   return (
-    <section className="space-y-5" aria-labelledby="collection-settings-heading">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h2 id="collection-settings-heading" className="font-medium">
-            Import execution
-          </h2>
-        </div>
-      </div>
+    <section className="space-y-5" aria-label="Import execution">
       <ErrorNotice error={overview.error} retry={() => void overview.refetch()} />
       {overview.isPending ? (
-        <Loading label="Loading advanced settings" />
+        <Loading label="Loading import settings" />
       ) : (
         data &&
         values && (
           <>
-            <form onSubmit={submit} aria-label="Advanced settings" className="space-y-6" noValidate>
+            <form onSubmit={submit} aria-label="Import execution" className="space-y-6" noValidate>
               <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
                 <legend className="pr-3 text-sm font-medium">Concurrency · Immediate</legend>
                 <div className="max-w-sm">{numberInput('workers')}</div>
@@ -237,7 +230,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                   <p>
                     These settings changed while you were editing. Your unsaved draft is preserved.
                     {latestAvailable
-                      ? ' Choose whether to use the saved settings or keep your entire draft before saving again. Keeping your draft will replace all saved advanced settings on the next save.'
+                      ? ' Choose whether to use the saved settings or keep your entire draft before saving again. Keeping your draft will replace all saved import execution settings on the next save.'
                       : ' Refresh the saved settings before choosing how to continue.'}
                   </p>
                   <div className="toolbar">
@@ -289,7 +282,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                   saving={save.isPending}
                   saved={save.isSuccess}
                   message={invalid ? 'Correct the highlighted values before saving.' : undefined}
-                  savedMessage="Advanced settings saved. Each setting applies at the scope shown above."
+                  savedMessage="Import execution settings saved. Each setting applies at the scope shown above."
                 />
               </div>
             </form>

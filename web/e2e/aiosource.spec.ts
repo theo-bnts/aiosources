@@ -1,15 +1,17 @@
+import { openDisclosure } from './disclosures'
 import { test, expect, createStremioAccess } from './fixtures'
 import pg from 'pg'
 import type { Page } from '@playwright/test'
 
 async function expectMaintenanceFooter(page: Page) {
-  await expect(page.locator('.page > :last-child > summary')).toHaveText('Maintenance')
-  await expect(
-    page.locator('.page > details > summary').filter({ hasText: /^Maintenance$/ }),
-  ).toHaveCount(1)
-  await expect(
-    page.locator('.page section details > summary').filter({ hasText: /^Maintenance$/ }),
-  ).toHaveCount(0)
+  const advanced = page.locator('.page > details').filter({
+    has: page.locator(':scope > summary', { hasText: /^Advanced$/ }),
+  })
+  await expect(advanced).toHaveCount(1)
+  await expect(advanced.locator(':scope > div > :last-child > summary')).toHaveText('Maintenance')
+  await expect(page.locator('.page > details > summary', { hasText: /^Maintenance$/ })).toHaveCount(
+    0,
+  )
 }
 
 test('metadata configuration persists and missing information explains disabled actions', async ({
@@ -24,7 +26,7 @@ test('metadata configuration persists and missing information explains disabled 
   await expectMaintenanceFooter(page)
   await expect(page.getByLabel('Automatically update film & series information')).toBeChecked()
   await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
-  await page.getByText('Manual actions', { exact: true }).click()
+  await openDisclosure(page, 'Manual actions')
   await expect(
     page.getByRole('button', { name: 'Download information updates', exact: true }),
   ).toBeDisabled()
@@ -53,7 +55,7 @@ test('metadata configuration persists and missing information explains disabled 
   expect(
     (await (await page.request.get('/api/aiosource/controls')).json()).config.match_seconds,
   ).toBe(5)
-  await page.getByText('Manual actions', { exact: true }).click()
+  await openDisclosure(page, 'Manual actions')
   await expect(page.getByRole('button', { name: 'Identify torrents' })).toBeDisabled()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(statisticsRequests).toHaveLength(0)
@@ -76,7 +78,8 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   server,
 }) => {
   await page.goto('/metadata/settings')
-  await expect(page.getByText('Manual actions', { exact: true })).toBeVisible()
+  await expect(page.getByText('Manual actions', { exact: true })).toBeHidden()
+  await openDisclosure(page, 'Advanced')
   await expect(
     page.getByRole('button', { name: 'Download information updates', exact: true }),
   ).toHaveCount(0)
@@ -138,7 +141,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     const retry = await (await page.request.get('/api/aiosource')).json()
     expect(retry.automation.updates).toBe('retry')
     await expect(page.getByRole('alert')).toHaveCount(0)
-    await page.getByText('Manual actions', { exact: true }).click()
+    await openDisclosure(page, 'Manual actions')
     await expect(
       page.getByRole('status').filter({ hasText: 'Committed progress is preserved.' }),
     ).toBeVisible()
@@ -244,6 +247,7 @@ test('private playback saves independently and fields have space below their lab
   }
   await page.goto('/debrid/settings')
   const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  await openDisclosure(page, 'Private source playback')
   const playback = page.getByRole('form', { name: 'Private source playback', exact: true })
   const source = page.locator('div.border-t').filter({
     has: page.getByRole('heading', { name: 'Synthetic private source', exact: true }),
@@ -300,6 +304,7 @@ test('private playback saves independently and fields have space below their lab
   await playback.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(playback.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
+  await openDisclosure(page, 'Private source playback')
   await expect(selector).toHaveValue('private_announce_url')
   await expect(page.getByLabel('Announce URL (without passkey)')).toHaveCount(0)
   await expect(page.getByLabel('Passkey secret', { exact: true })).toHaveCount(0)
