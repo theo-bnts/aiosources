@@ -33,6 +33,9 @@ func initializeRemoteCursor(ctx context.Context, tx pgx.Tx, run model.Run) error
 		return nil
 	}
 	state := model.CatalogCursor{Version: 1}
+	if err := tx.QueryRow(ctx, `SELECT cache_generation FROM ingest.aio_state`).Scan(&state.CacheGeneration); err != nil {
+		return err
+	}
 	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM ingest.remote_checkpoints WHERE provider_id=$1", run.ProviderID).Scan(&state.BaseEndpoint, &state.BaseCheckpoint)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return databaseError("read catalogue publication baseline", err)
@@ -62,6 +65,7 @@ func remoteBaselineMatches(ctx context.Context, tx pgx.Tx, run model.Run) (bool,
 }
 
 type RemoteState struct {
+	Entities     model.CatalogEntities
 	Endpoint     string
 	Checkpoint   string
 	LastSyncedAt time.Time
@@ -73,7 +77,7 @@ func (s *Store) RemoteStates(ctx context.Context, providerIDs []string) (map[str
 	if len(providerIDs) == 0 {
 		return result, nil
 	}
-	rows, err := s.pool.Query(ctx, "SELECT provider_id,endpoint,checkpoint,last_synced_at FROM ingest.remote_checkpoints WHERE provider_id=ANY($1::text[])", providerIDs)
+	rows, err := s.pool.Query(ctx, "SELECT provider_id,endpoint,checkpoint,last_synced_at,catalog_entities FROM ingest.remote_checkpoints WHERE provider_id=ANY($1::text[])", providerIDs)
 	if err != nil {
 		return nil, databaseError("list remote catalogue checkpoints", err)
 	}
@@ -81,8 +85,12 @@ func (s *Store) RemoteStates(ctx context.Context, providerIDs []string) (map[str
 	for rows.Next() {
 		var id string
 		var state RemoteState
-		if err := rows.Scan(&id, &state.Endpoint, &state.Checkpoint, &state.LastSyncedAt); err != nil {
+		var data []byte
+		if err := rows.Scan(&id, &state.Endpoint, &state.Checkpoint, &state.LastSyncedAt, &data); err != nil {
 			return nil, databaseError("read remote catalogue state", err)
+		}
+		if err := json.Unmarshal(data, &state.Entities); err != nil {
+			return nil, err
 		}
 		result[id] = state
 	}
@@ -144,8 +152,11 @@ WHERE staged.run_id=$1 AND staged.deleted AND live.provider_id=$2 AND live.sourc
 		}
 	}
 	if remote {
-		if _, err := tx.Exec(ctx, `INSERT INTO ingest.remote_checkpoints(provider_id,endpoint,checkpoint)
-VALUES($1,$2,$3) ON CONFLICT(provider_id) DO UPDATE SET endpoint=EXCLUDED.endpoint,checkpoint=EXCLUDED.checkpoint,last_synced_at=NOW()`, run.ProviderID, run.Config.URL, state.Checkpoint); err != nil {
+		if err := publishCatalogEntities(ctx, tx, run, state); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO ingest.remote_checkpoints(provider_id,endpoint,checkpoint,catalog_entities)
+VALUES($1,$2,$3,$4) ON CONFLICT(provider_id) DO UPDATE SET endpoint=EXCLUDED.endpoint,checkpoint=EXCLUDED.checkpoint,last_synced_at=NOW(),catalog_entities=EXCLUDED.catalog_entities`, run.ProviderID, run.Config.URL, state.Checkpoint, catalogEntitiesJSON(state.Entities)); err != nil {
 			return databaseError("publish remote catalogue checkpoint", err)
 		}
 	}

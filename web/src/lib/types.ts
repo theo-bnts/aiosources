@@ -35,6 +35,7 @@ export interface Provider {
   adapter: string
   url: string
   enabled: boolean
+  catalog_entities?: import('./catalog-types').CatalogEntities
   catalog_sync?: CatalogSync
   auth: {
     type: string

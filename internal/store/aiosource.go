@@ -382,6 +382,9 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 		id = work.ID
 		rev = work.Revision
 	}
+	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
+		return err
+	}
 	_, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized)
 	if err != nil {
 		return databaseError("save correspondence", err)
@@ -598,6 +601,9 @@ func (s *Store) deleteAIOWork(ctx context.Context, typ, id string, job *AIOJob) 
 	if err = queueAIOAliases(ctx, tx, workID, aliases); err != nil {
 		return err
 	}
+	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
+		return err
+	}
 	if _, err = tx.Exec(ctx, `DELETE FROM ingest.aio_works WHERE id=$1`, workID); err != nil {
 		return databaseError("remove deleted metadata", err)
 	}
@@ -625,7 +631,7 @@ func (s *Store) ResetAIOMapping(ctx context.Context) error {
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;TRUNCATE ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;SELECT ingest.lock_catalog_entity_writes();TRUNCATE ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
 	return databaseError("reset local metadata", err)
 }
 

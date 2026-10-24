@@ -7,7 +7,13 @@ export type TorznabPreferences = Omit<TorznabOptions, 'sources' | 'media'>
 export type ConnectionFormat = 'catalog' | 'torznab' | 'stremio'
 export type StremioPreferences = InstallationOptions & LanguagePreferences
 
+export interface CatalogEntities {
+  metadata?: boolean
+  availability?: boolean
+}
+
 export interface CatalogShare {
+  catalog_entities?: CatalogEntities
   torznab_preferences?: TorznabPreferences
   format?: ConnectionFormat
   media_types?: string[]
@@ -42,6 +48,7 @@ export interface SharePassword {
 }
 
 export interface RemoteCatalog {
+  received_entities?: CatalogEntities
   id: string
   name: string
   url: string

@@ -95,7 +95,7 @@ func (s *Store) FinishAIOCleanup(ctx context.Context, v model.AIOCleanup, succes
 	return databaseError("finish temporary magnet cleanup", err)
 }
 func (s *Store) ResetAIOCache(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `TRUNCATE ingest.aio_availability,ingest.aio_shared_availability,ingest.aio_resources;UPDATE ingest.aio_state SET cache_generation=cache_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT cache_generation FROM ingest.aio_state FOR UPDATE;TRUNCATE ingest.aio_availability,ingest.aio_shared_availability,ingest.aio_resources;UPDATE ingest.aio_state SET cache_generation=cache_generation+1`)
 	return databaseError("reset availability cache", err)
 }
 

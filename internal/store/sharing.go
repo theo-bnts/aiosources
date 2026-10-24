@@ -21,7 +21,7 @@ var ErrCatalogAuthentication = errors.New("catalogue authentication required")
 var ErrCatalogCursor = errors.New("invalid catalogue continuation")
 var ErrCatalogExpired = errors.New("catalogue snapshot expired")
 
-const shareColumns = "id,name,enabled,scope,source_ids,fields,revision,created_at,updated_at,last_access_at,last_sync_at,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences"
+const shareColumns = "id,name,enabled,scope,source_ids,fields,revision,created_at,updated_at,last_access_at,last_sync_at,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences,catalog_entities"
 
 func shareFormat(format string) string {
 	if format == "" {
@@ -46,6 +46,12 @@ func catalogField(name string) bool {
 
 func ValidateShare(input model.ShareInput) error {
 	format := shareFormat(input.Format)
+	if input.CatalogEntities.Availability && !slices.Contains(input.Fields, "info_hash") {
+		return model.ErrInvalid
+	}
+	if format != "catalog" && !input.CatalogEntities.Empty() {
+		return model.ErrInvalid
+	}
 	if format != "catalog" && format != "torznab" && format != "stremio" {
 		return model.ErrInvalid
 	}
@@ -111,8 +117,8 @@ func ValidateShare(input model.ShareInput) error {
 
 func scanShare(row scanner) (model.Share, error) {
 	var item model.Share
-	var preferences, torznabPreferences []byte
-	err := row.Scan(&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes, &preferences, &torznabPreferences)
+	var preferences, torznabPreferences, entities []byte
+	err := row.Scan(&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes, &preferences, &torznabPreferences, &entities)
 	if err == nil && item.Format == "stremio" {
 		var p model.StreamPreferences
 		err = json.Unmarshal(preferences, &p)
@@ -122,6 +128,9 @@ func scanShare(row scanner) (model.Share, error) {
 		var p model.TorznabPreferences
 		err = json.Unmarshal(torznabPreferences, &p)
 		item.TorznabPreferences = &p
+	}
+	if err == nil {
+		err = json.Unmarshal(entities, &item.CatalogEntities)
 	}
 	return item, err
 }
@@ -212,9 +221,15 @@ func (s *Store) CreateShare(ctx context.Context, input model.ShareInput) (model.
 		return result, databaseError("begin share creation", err)
 	}
 	defer rollback(tx)
-	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14::jsonb,'{}'::jsonb)) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input)))
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+		return model.ShareCredential{}, err
+	}
+	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences,catalog_entities) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14::jsonb,'{}'::jsonb),$15::jsonb) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
 	if err != nil {
 		return model.ShareCredential{}, databaseError("create share", err)
+	}
+	if err := seedCatalogEntities(ctx, tx, result.Share); err != nil {
+		return model.ShareCredential{}, err
 	}
 	if err := recordAccessActivityTx(ctx, tx, shareActivity(input.Format, "created"), id); err != nil {
 		return model.ShareCredential{}, err
@@ -232,7 +247,7 @@ func lockShareRevision(ctx context.Context, tx pgx.Tx, id string, expected int64
 	}
 	// Policy triggers and source resets use publication before recipient rows.
 	// Acquiring it before the revision lock avoids a cycle with snapshot cleanup.
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
 		return databaseError("lock share publication policy", err)
 	}
 	var revision int64
@@ -266,9 +281,12 @@ func (s *Store) UpdateShare(ctx context.Context, id string, input model.ShareInp
 	if input.MediaTypes == nil {
 		input.MediaTypes = []string{}
 	}
-	item, err := scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11,stream_preferences=$12,torznab_preferences=COALESCE($13::jsonb,torznab_preferences) WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input)))
+	item, err := scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11,stream_preferences=$12,torznab_preferences=COALESCE($13::jsonb,torznab_preferences),catalog_entities=$14::jsonb WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
 	if err != nil {
 		return item, databaseError("update share", err)
+	}
+	if err := seedCatalogEntities(ctx, tx, item); err != nil {
+		return model.Share{}, err
 	}
 	if err := recordAccessActivityTx(ctx, tx, shareActivity(input.Format, "permissions_changed"), id); err != nil {
 		return model.Share{}, err

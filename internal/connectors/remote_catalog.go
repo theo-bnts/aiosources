@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,6 +19,11 @@ import (
 )
 
 func validateRemoteCatalog(p model.Provider) error {
+	for name := range p.HTTP.Headers {
+		if strings.EqualFold(name, model.CatalogEntitiesHeader) {
+			return errors.New("catalog data permissions must use catalog_entities, not a custom header")
+		}
+	}
 	u, err := url.Parse(p.URL)
 	if err != nil || !validHTTPURL(u) || u.Scheme != "https" || len(p.URL) > 8192 || strings.TrimSpace(p.URL) != p.URL || u.RawQuery != "" || u.ForceQuery || strings.ContainsAny(u.Host, "\\%") {
 		return errors.New("remote catalogue URL must be HTTPS without credentials, query parameters or fragments")
@@ -123,7 +129,11 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	} else if state.Checkpoint != "" {
 		query.Set("checkpoint", state.Checkpoint)
 	}
-	response, err := c.client.Do(ctx, Request{Method: http.MethodGet, Query: query, DisableRedirects: true, Headers: http.Header{"Accept": {"application/json"}}})
+	headers := http.Header{"Accept": {"application/json"}}
+	if selection := c.provider.CatalogEntities.Header(); selection != "" {
+		headers.Set(model.CatalogEntitiesHeader, selection)
+	}
+	response, err := c.client.Do(ctx, Request{Method: http.MethodGet, Query: query, DisableRedirects: true, Headers: headers})
 	restarted := false
 	if (err == nil || FailureCode(err) == "http") && response.StatusCode == http.StatusGone && state.Cursor != "" {
 		var expired struct {
@@ -134,7 +144,7 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 			// authoritative Full and reset staging only after validating its page.
 			// Keep the original endpoint/checkpoint fence and expected publisher.
 			query.Del("cursor")
-			response, err = c.client.Do(ctx, Request{Method: http.MethodGet, Query: query, DisableRedirects: true, Headers: http.Header{"Accept": {"application/json"}}})
+			response, err = c.client.Do(ctx, Request{Method: http.MethodGet, Query: query, DisableRedirects: true, Headers: headers})
 			state.Mode, state.Cursor, state.Checkpoint = "", "", ""
 			restarted = true
 		}
@@ -160,15 +170,43 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	// Decode original item fragments separately so raw archives retain wire bytes,
 	// including unsupported/malformed items, rather than re-marshaled copies.
 	var envelope struct {
-		Version    int               `json:"version"`
-		InstanceID string            `json:"instance_id"`
-		Mode       string            `json:"mode"`
-		Items      []json.RawMessage `json:"items"`
-		NextCursor string            `json:"next_cursor"`
-		Checkpoint string            `json:"checkpoint"`
+		Version    int                   `json:"version"`
+		Entities   model.CatalogEntities `json:"entities"`
+		Supplement json.RawMessage       `json:"supplement"`
+		InstanceID string                `json:"instance_id"`
+		Mode       string                `json:"mode"`
+		Items      []json.RawMessage     `json:"items"`
+		NextCursor string                `json:"next_cursor"`
+		Checkpoint string                `json:"checkpoint"`
 	}
 	if !utf8.Valid(response.Body) || decodeJSON(response.Body, &envelope) != nil {
 		return fail("invalid remote catalogue envelope")
+	}
+	if envelope.Version == 2 {
+		if c.provider.CatalogEntities.Empty() || envelope.Entities.Intersect(c.provider.CatalogEntities) != envelope.Entities {
+			return fail("Remote catalog returned unrequested data permissions")
+		}
+		if len(envelope.Supplement) > 0 {
+			decoder := json.NewDecoder(bytes.NewReader(envelope.Supplement))
+			decoder.DisallowUnknownFields()
+			if decoder.Decode(&page.CatalogSupplement) != nil || decoder.Decode(new(any)) != io.EOF {
+				return fail("Invalid shared catalog data")
+			}
+		}
+		if len(envelope.Items)+len(page.CatalogSupplement.Metadata)+len(page.CatalogSupplement.Availability) > c.provider.PageSize || !page.CatalogSupplement.Valid(envelope.Entities, time.Now()) {
+			return fail("Invalid shared metadata or cache observations")
+		}
+	} else if !envelope.Entities.Empty() || len(envelope.Supplement) > 0 {
+		return fail("Shared data requires catalog protocol version 2")
+	}
+	if state.Protocol != 0 && (state.Protocol != envelope.Version || state.Entities != envelope.Entities) {
+		return fail("Remote catalog data permissions changed during traversal")
+	}
+	page.Metadata["catalog_version"] = envelope.Version
+	page.Metadata["shared_metadata"] = len(page.CatalogSupplement.Metadata)
+	page.Metadata["shared_cache_observations"] = len(page.CatalogSupplement.Availability)
+	if len(envelope.Items) == 0 {
+		page.Metadata["auxiliary_response"] = true
 	}
 	page.Items = make([]model.Record, 0, len(envelope.Items))
 	invalidItem := false
@@ -185,7 +223,7 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 		}
 		page.Items = append(page.Items, record)
 	}
-	if envelope.Version != 1 || !catalogText(envelope.InstanceID) || (envelope.Mode != "full" && envelope.Mode != "incremental") || envelope.Items == nil || len(envelope.Items) > c.provider.PageSize || (envelope.NextCursor == "") == (envelope.Checkpoint == "") || (envelope.NextCursor != "" && len(envelope.Items) == 0) || len(envelope.NextCursor) > 16384 || len(envelope.Checkpoint) > 16384 {
+	if (envelope.Version != 1 && envelope.Version != 2) || !catalogText(envelope.InstanceID) || (envelope.Mode != "full" && envelope.Mode != "incremental") || envelope.Items == nil || len(envelope.Items) > c.provider.PageSize || (envelope.NextCursor == "") == (envelope.Checkpoint == "") || (envelope.NextCursor != "" && len(envelope.Items) == 0 && envelope.Version != 2) || len(envelope.NextCursor) > 16384 || len(envelope.Checkpoint) > 16384 {
 		return fail("unsupported or inconsistent remote catalogue envelope")
 	}
 	if (state.InstanceID != "" && envelope.InstanceID != state.InstanceID) || (state.Mode != "" && envelope.Mode != state.Mode) || (state.Mode == "" && state.Checkpoint == "" && envelope.Mode != "full") || (envelope.NextCursor != "" && envelope.NextCursor == state.Cursor) {
@@ -199,7 +237,7 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	if restarted {
 		page.Metadata["catalog_snapshot_restarted"] = true
 	}
-	page.Next, err = json.Marshal(model.CatalogCursor{Version: 1, InstanceID: envelope.InstanceID, Mode: envelope.Mode, Cursor: envelope.NextCursor, Checkpoint: envelope.Checkpoint, Done: page.Done, BaseEndpoint: state.BaseEndpoint, BaseCheckpoint: state.BaseCheckpoint})
+	page.Next, err = json.Marshal(model.CatalogCursor{Version: 1, Protocol: envelope.Version, Entities: envelope.Entities, CacheGeneration: state.CacheGeneration, InstanceID: envelope.InstanceID, Mode: envelope.Mode, Cursor: envelope.NextCursor, Checkpoint: envelope.Checkpoint, Done: page.Done, BaseEndpoint: state.BaseEndpoint, BaseCheckpoint: state.BaseCheckpoint})
 	if err != nil {
 		return fail("could not encode catalogue continuation")
 	}

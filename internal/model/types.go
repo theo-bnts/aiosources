@@ -19,28 +19,29 @@ var (
 )
 
 type Provider struct {
-	Version         int            `json:"version"`
-	ID              string         `json:"id"`
-	Name            string         `json:"name"`
-	Adapter         string         `json:"adapter"`
-	URL             string         `json:"url"`
-	Enabled         bool           `json:"enabled"`
-	Auth            Auth           `json:"auth"`
-	RequestInterval string         `json:"request_interval"`
-	RequestLimits   *RequestLimits `json:"request_limits,omitempty"`
-	RequestTimeout  string         `json:"request_timeout,omitempty"`
-	RateLimitReset  string         `json:"rate_limit_reset,omitempty"`
-	PageSize        int            `json:"page_size"`
-	Search          Search         `json:"search"`
-	HTTP            HTTPConfig     `json:"http"`
-	HTML            *HTMLConfig    `json:"html,omitempty"`
-	Pagination      Pagination     `json:"pagination"`
-	Mapping         Mapping        `json:"mapping"`
-	Traversal       *JSONTraversal `json:"traversal,omitempty"`
-	Output          Output         `json:"output"`
-	Schedule        Schedule       `json:"schedule"`
-	CatalogSync     *CatalogSync   `json:"catalog_sync,omitempty"`
-	Options         map[string]any `json:"options,omitempty"`
+	Version         int             `json:"version"`
+	ID              string          `json:"id"`
+	Name            string          `json:"name"`
+	Adapter         string          `json:"adapter"`
+	URL             string          `json:"url"`
+	Enabled         bool            `json:"enabled"`
+	Auth            Auth            `json:"auth"`
+	RequestInterval string          `json:"request_interval"`
+	RequestLimits   *RequestLimits  `json:"request_limits,omitempty"`
+	RequestTimeout  string          `json:"request_timeout,omitempty"`
+	RateLimitReset  string          `json:"rate_limit_reset,omitempty"`
+	PageSize        int             `json:"page_size"`
+	Search          Search          `json:"search"`
+	HTTP            HTTPConfig      `json:"http"`
+	HTML            *HTMLConfig     `json:"html,omitempty"`
+	Pagination      Pagination      `json:"pagination"`
+	Mapping         Mapping         `json:"mapping"`
+	Traversal       *JSONTraversal  `json:"traversal,omitempty"`
+	Output          Output          `json:"output"`
+	Schedule        Schedule        `json:"schedule"`
+	CatalogSync     *CatalogSync    `json:"catalog_sync,omitempty"`
+	CatalogEntities CatalogEntities `json:"catalog_entities,omitzero"`
+	Options         map[string]any  `json:"options,omitempty"`
 }
 
 const DefaultCatalogSyncMinutes = 60
@@ -306,15 +307,16 @@ type Record struct {
 // Next is opaque, JSON-serializable adapter state. Done means the complete
 // requested traversal ended, not merely that a short page was returned.
 type Page struct {
-	Body             []byte
-	ContentType      string
-	Items            []Record
-	Next             json.RawMessage
-	Done             bool
-	Position         string
-	Error            string
-	ResetStaging     bool
-	RequireUniqueIDs bool
+	CatalogSupplement CatalogSupplement
+	Body              []byte
+	ContentType       string
+	Items             []Record
+	Next              json.RawMessage
+	Done              bool
+	Position          string
+	Error             string
+	ResetStaging      bool
+	RequireUniqueIDs  bool
 	// Adapter-supplied repeat evidence when native IDs are unavailable. This
 	// must not establish native membership or an Incremental known-page boundary.
 	FallbackFingerprint string

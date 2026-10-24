@@ -42,23 +42,28 @@ type CatalogItem struct {
 // CatalogEnvelope is the versioned HTTP/JSON sharing protocol. A checkpoint is
 // published only on the final page; next_cursor and checkpoint are exclusive.
 type CatalogEnvelope struct {
-	Version    int           `json:"version"`
-	InstanceID string        `json:"instance_id"`
-	Mode       string        `json:"mode"`
-	Items      []CatalogItem `json:"items"`
-	NextCursor string        `json:"next_cursor,omitempty"`
-	Checkpoint string        `json:"checkpoint,omitempty"`
+	Entities   CatalogEntities   `json:"entities,omitzero"`
+	Supplement CatalogSupplement `json:"supplement,omitzero"`
+	Version    int               `json:"version"`
+	InstanceID string            `json:"instance_id"`
+	Mode       string            `json:"mode"`
+	Items      []CatalogItem     `json:"items"`
+	NextCursor string            `json:"next_cursor,omitempty"`
+	Checkpoint string            `json:"checkpoint,omitempty"`
 }
 
 // CatalogCursor is immutable run continuation state, separate from the last
 // successfully published cross-run checkpoint.
 type CatalogCursor struct {
-	Version        int    `json:"catalog_version"`
-	InstanceID     string `json:"instance_id"`
-	Mode           string `json:"mode"`
-	Cursor         string `json:"cursor,omitempty"`
-	Checkpoint     string `json:"checkpoint,omitempty"`
-	BaseCheckpoint string `json:"base_checkpoint,omitempty"`
-	BaseEndpoint   string `json:"base_endpoint,omitempty"`
-	Done           bool   `json:"done,omitempty"`
+	Protocol        int             `json:"protocol,omitempty"`
+	Entities        CatalogEntities `json:"entities,omitzero"`
+	CacheGeneration int64           `json:"cache_generation,omitempty"`
+	Version         int             `json:"catalog_version"`
+	InstanceID      string          `json:"instance_id"`
+	Mode            string          `json:"mode"`
+	Cursor          string          `json:"cursor,omitempty"`
+	Checkpoint      string          `json:"checkpoint,omitempty"`
+	BaseCheckpoint  string          `json:"base_checkpoint,omitempty"`
+	BaseEndpoint    string          `json:"base_endpoint,omitempty"`
+	Done            bool            `json:"done,omitempty"`
 }

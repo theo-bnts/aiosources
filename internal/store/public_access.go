@@ -138,7 +138,7 @@ func (s *Store) SaveSharedAvailability(ctx context.Context, service string, a mo
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) SELECT $1,$2,$3,$4,$5 FROM ingest.aio_state WHERE cache_generation=$6 ON CONFLICT(service,hash) DO UPDATE SET cached=EXCLUDED.cached,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files WHERE ingest.aio_shared_availability.checked_at<=EXCLUDED.checked_at`, service, strings.ToLower(a.Hash), a.Cached, a.CheckedAt, data, a.Generation)
+	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) SELECT $1,$2,$3,$4,$5 FROM ingest.aio_state WHERE cache_generation=$6 ON CONFLICT(service,hash) DO UPDATE SET cached=EXCLUDED.cached,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files,catalog_import_source='' WHERE ingest.aio_shared_availability.catalog_import_source<>'' OR ingest.aio_shared_availability.checked_at<=EXCLUDED.checked_at`, service, strings.ToLower(a.Hash), a.Cached, a.CheckedAt, data, a.Generation)
 	return databaseError("save shared availability", err)
 }
 func (s *Store) ForgetSharedAvailability(ctx context.Context, service, hash string, observed time.Time) error {

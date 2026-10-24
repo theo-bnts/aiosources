@@ -8,6 +8,8 @@ export interface RemoteDraft {
   url: string
   enabled: boolean
   secretRef: string
+  metadata: boolean
+  availability: boolean
   autoSync: boolean
   intervalMinutes: string
 }
@@ -20,6 +22,8 @@ export function remoteDraft(document?: ProviderDocument): RemoteDraft {
     url: provider?.url ?? '',
     enabled: provider?.enabled ?? false,
     secretRef: provider?.auth.secret_ref ?? '',
+    metadata: provider?.catalog_entities?.metadata ?? false,
+    availability: provider?.catalog_entities?.availability ?? false,
     autoSync: provider?.catalog_sync?.enabled ?? !document,
     intervalMinutes: String(provider?.catalog_sync?.interval_minutes ?? 60),
   }
@@ -107,6 +111,9 @@ export function remoteJSON(
   update(['name'], draft.name.trim(), initial.name)
   update(['url'], draft.url.trim(), initial.url)
   update(['enabled'], draft.enabled, initial.enabled)
+  if (draft.metadata || draft.availability)
+    json.set('catalog_entities', { metadata: draft.metadata, availability: draft.availability })
+  else json.delete('catalog_entities')
   json.delete('schedule')
   json.set('catalog_sync', {
     enabled: draft.autoSync,
@@ -131,6 +138,9 @@ export function mergeRemoteDraft(
     url: current.url === previous.url ? latest.url : current.url,
     enabled: current.enabled === previous.enabled ? latest.enabled : current.enabled,
     secretRef: current.secretRef === previous.secretRef ? latest.secretRef : current.secretRef,
+    metadata: current.metadata === previous.metadata ? latest.metadata : current.metadata,
+    availability:
+      current.availability === previous.availability ? latest.availability : current.availability,
     autoSync: current.autoSync === previous.autoSync ? latest.autoSync : current.autoSync,
     intervalMinutes:
       current.intervalMinutes === previous.intervalMinutes

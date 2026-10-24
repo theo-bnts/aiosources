@@ -1,3 +1,4 @@
+import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { toggleProvider } from '@/lib/provider-state'
 import { SecretPicker } from '@/components/secret-picker'
@@ -276,6 +277,14 @@ export default function RemotesPage() {
                         )}
                     </dd>
                   </div>
+                  <div>
+                    <dt className="text-muted-foreground">Data received</dt>
+                    <dd className="mt-1">
+                      {remote.has_checkpoint
+                        ? catalogEntitiesSummary(remote.received_entities)
+                        : 'Not synchronized yet'}
+                    </dd>
+                  </div>
                 </dl>
                 {remote.last_run?.error && (
                   <p role="status" className="notice notice-error break-words">
@@ -375,8 +384,8 @@ export default function RemotesPage() {
               {editing === 'new' ? 'Add remote catalog' : 'Edit remote catalog'}
             </DialogTitle>
             <DialogDescription>
-              Connect to a shared catalog. Published torrent fields are imported; film and series
-              identification is performed locally.
+              Connect to a shared catalog and choose which additional data to receive.
+              Identification and reviews stay local.
             </DialogDescription>
           </DialogHeader>
           {editing && (
@@ -578,6 +587,18 @@ function RemoteForm({
             onCheckedChange={(value) => change('enabled', value)}
           />
         </div>
+        <CatalogDataControls
+          id="remote-data"
+          receiving
+          value={{ metadata: draft.metadata, availability: draft.availability }}
+          onChange={(value) =>
+            setDraft((current) => ({
+              ...current,
+              metadata: value.metadata ?? false,
+              availability: value.availability ?? false,
+            }))
+          }
+        />
         <section
           className="space-y-4 rounded-md border border-border p-4"
           aria-label="Automatic synchronization"

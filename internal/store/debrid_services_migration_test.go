@@ -25,7 +25,7 @@ INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finish
 	}
 	snapshot := func() string {
 		var v string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('settings',(SELECT jsonb_agg(to_jsonb(s)) FROM ingest.settings s),'history',(SELECT jsonb_agg(to_jsonb(r)) FROM ingest.operation_runs r),'cache',(SELECT jsonb_agg(to_jsonb(c)) FROM ingest.aio_shared_availability c))::text`).Scan(&v); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('settings',(SELECT jsonb_agg(to_jsonb(s)) FROM ingest.settings s),'history',(SELECT jsonb_agg(to_jsonb(r)) FROM ingest.operation_runs r),'cache',(SELECT jsonb_agg(to_jsonb(c)-'catalog_import_source') FROM ingest.aio_shared_availability c))::text`).Scan(&v); err != nil {
 			t.Fatal(err)
 		}
 		return v

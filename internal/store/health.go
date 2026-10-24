@@ -28,11 +28,11 @@ func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*mode
 		return nil, databaseError("measure database storage", err)
 	}
 	rows, err := tx.Query(ctx, `SELECT CASE
-WHEN n.nspname='ingest' AND `+sourceStorageRelations+` THEN 'sources'
+WHEN n.nspname='ingest' AND (`+sourceStorageRelations+` OR c.relname='run_catalog_entities') THEN 'sources'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_preparations','aio_cleanup','aio_incidents') THEN 'debrid'
 WHEN n.nspname='ingest' AND c.relname IN ('stremio_requests','aio_public_access') THEN 'stremio'
-WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','remote_checkpoints','shares') OR c.relname LIKE 'share_%') THEN 'sharing'
+WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','catalog_entity_changes','remote_checkpoints','shares') OR c.relname LIKE 'share_%') THEN 'sharing'
 WHEN n.nspname='ingest' AND c.relname IN ('activity_logs','operation_runs','operation_events','operation_downloads') THEN 'logs'
 WHEN n.nspname='ingest' AND (c.relname IN ('secrets','security_settings','security_attempts','security_recovery_codes') OR c.relname LIKE 'admin_%') THEN 'access'
 ELSE 'other' END AS category,
@@ -45,7 +45,7 @@ CASE
  WHEN c.relname IN ('aio_inventory','aio_metadata_jobs','aio_title_variants','aio_season_requests') THEN 'information-queue'
  WHEN c.relname IN ('aio_availability','aio_shared_availability','aio_resources') THEN 'availability'
  WHEN c.relname IN ('aio_cleanup','aio_incidents','aio_preparations') THEN 'debrid-operations'
- WHEN c.relname IN ('catalog_journal','catalog_baselines') THEN 'shared-snapshots'
+ WHEN c.relname IN ('catalog_journal','catalog_baselines','catalog_entity_changes') THEN 'shared-snapshots'
  WHEN c.relname='stremio_requests' THEN 'stream-history'
  WHEN c.relname='activity_logs' THEN 'activity-history'
  WHEN c.relname IN ('operation_runs','operation_events','operation_downloads') THEN 'operation-history'

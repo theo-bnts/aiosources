@@ -270,6 +270,7 @@ func validateProvider(p model.Provider) []string {
 	}
 	add(p.RateLimitReset != "epoch" && p.RateLimitReset != "relative", "rate_limit_reset must be epoch or relative")
 	add(p.PageSize < 1 || p.PageSize > 10000, "page_size must be between 1 and 10000")
+	add(!p.IsRemoteCatalog() && !p.CatalogEntities.Empty(), "catalog_entities is only supported for remote catalogs")
 	settings, err := scheduling.Settings(p)
 	if err != nil {
 		issues = append(issues, err.Error())

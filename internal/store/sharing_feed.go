@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -19,6 +21,7 @@ import (
 // CatalogPageRequest is read-only traversal state; neither fields nor providers
 // are caller-selectable. Zero Limit means the initial default or a cursor's size.
 type CatalogPageRequest struct {
+	Entities   model.CatalogEntities
 	Limit      int
 	Cursor     string
 	Checkpoint string
@@ -26,16 +29,25 @@ type CatalogPageRequest struct {
 }
 
 type catalogToken struct {
-	Version    int    `json:"v"`
-	InstanceID string `json:"instance"`
-	ShareID    string `json:"share"`
-	Revision   int64  `json:"revision"`
-	Kind       string `json:"kind"`
-	Mode       string `json:"mode,omitempty"`
-	Low        int64  `json:"low,omitempty"`
-	High       int64  `json:"high"`
-	Limit      int    `json:"limit,omitempty"`
-	After      int64  `json:"after,omitempty"`
+	Requested   model.CatalogEntities `json:"requested,omitzero"`
+	Entities    model.CatalogEntities `json:"entities,omitzero"`
+	Phase       string                `json:"phase,omitempty"`
+	AuxLow      int64                 `json:"aux_low,omitempty"`
+	AuxHigh     int64                 `json:"aux_high,omitempty"`
+	CacheBefore time.Time             `json:"cache_before,omitzero"`
+	AuxUpper    int64                 `json:"aux_upper,omitempty"`
+	AuxAfter    int64                 `json:"aux_after,omitempty"`
+	AuxIdentity string                `json:"aux_identity,omitempty"`
+	Version     int                   `json:"v"`
+	InstanceID  string                `json:"instance"`
+	ShareID     string                `json:"share"`
+	Revision    int64                 `json:"revision"`
+	Kind        string                `json:"kind"`
+	Mode        string                `json:"mode,omitempty"`
+	Low         int64                 `json:"low,omitempty"`
+	High        int64                 `json:"high"`
+	Limit       int                   `json:"limit,omitempty"`
+	After       int64                 `json:"after,omitempty"`
 }
 
 func signCatalogToken(key []byte, value catalogToken) (string, error) {
@@ -74,7 +86,7 @@ func parseCatalogToken(key []byte, raw string) (catalogToken, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&value); err != nil || value.Version != 1 || value.Revision < 1 || value.High < 0 || value.Low < 0 || value.Low > value.High {
+	if err := decoder.Decode(&value); err != nil || value.Version != 1 || value.Revision < 1 || value.High < 0 || value.Low < 0 || value.Low > value.High || value.AuxLow < 0 || value.AuxHigh < value.AuxLow || value.AuxAfter < 0 || value.AuxAfter > value.AuxUpper || (value.Phase != "" && value.Phase != "entities" && value.Phase != "availability") {
 		return catalogToken{}, ErrCatalogCursor
 	}
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
@@ -181,14 +193,23 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	}
 	defer rollback(tx)
 	var share model.Share
+	var entities []byte
 	// Recheck current policy for every page, including authenticated old cursors.
 	// Serialize permission changes with the export, never with network writes.
-	err = tx.QueryRow(ctx, `SELECT s.enabled,s.scope,s.source_ids,s.fields,s.revision FROM ingest.shares s JOIN ingest.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp() FOR UPDATE OF s`, shareID, d.revision, d.id).Scan(&share.Enabled, &share.Scope, &share.SourceIDs, &share.Fields, &share.Revision)
+	err = tx.QueryRow(ctx, `SELECT s.enabled,s.scope,s.source_ids,s.fields,s.revision,s.catalog_entities FROM ingest.shares s JOIN ingest.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp() FOR UPDATE OF s`, shareID, d.revision, d.id).Scan(&share.Enabled, &share.Scope, &share.SourceIDs, &share.Fields, &share.Revision, &entities)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrCatalogAuthentication
 	}
 	if err != nil {
 		return result, databaseError("authorize catalogue export", err)
+	}
+	if err = json.Unmarshal(entities, &share.CatalogEntities); err != nil {
+		return result, err
+	}
+	if !request.Entities.Empty() {
+		result.Version = 2
+		result.Entities = request.Entities.Intersect(share.CatalogEntities)
+		result.Entities.Availability = result.Entities.Availability && slices.Contains(share.Fields, "info_hash")
 	}
 	var signingKey []byte
 	if err := tx.QueryRow(ctx, `SELECT instance_id,signing_key FROM ingest.catalog_identity WHERE singleton`).Scan(&result.InstanceID, &signingKey); err != nil {
@@ -198,19 +219,19 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	if err := tx.QueryRow(ctx, "SELECT floor FROM ingest.catalog_retention WHERE singleton FOR SHARE").Scan(&floor); err != nil {
 		return result, databaseError("read retained catalog boundary", err)
 	}
-	state := catalogToken{Version: 1, InstanceID: result.InstanceID, ShareID: shareID, Revision: share.Revision, Kind: "page", Mode: "full", Limit: request.Limit}
+	state := catalogToken{Version: 1, InstanceID: result.InstanceID, ShareID: shareID, Revision: share.Revision, Kind: "page", Mode: "full", Limit: request.Limit, Requested: request.Entities, Entities: result.Entities}
 	if state.Limit == 0 {
 		state.Limit = 100
 	}
 	if request.Cursor != "" {
 		state, err = parseCatalogToken(signingKey, request.Cursor)
-		if err != nil || state.Kind != "page" || state.InstanceID != result.InstanceID || state.ShareID != shareID || state.Revision != share.Revision || (state.Mode != "full" && state.Mode != "incremental") || state.Limit < 1 || state.Limit > 1000 || (request.Limit != 0 && request.Limit != state.Limit) || (state.Mode == "full" && state.Low != 0) || state.After < 1 || state.After > state.High {
+		if err != nil || state.Kind != "page" || state.InstanceID != result.InstanceID || state.ShareID != shareID || state.Revision != share.Revision || (state.Mode != "full" && state.Mode != "incremental") || state.Limit < 1 || state.Limit > 1000 || (request.Limit != 0 && request.Limit != state.Limit) || (state.Mode == "full" && state.Low != 0) || (state.Phase == "" && state.After < 1) || state.After > state.High || state.Requested != request.Entities || state.Entities != result.Entities || state.AuxHigh > state.AuxUpper {
 			return result, ErrCatalogCursor
 		}
 	} else {
 		if request.Checkpoint != "" {
 			checkpoint, parseErr := parseCatalogToken(signingKey, request.Checkpoint)
-			if parseErr != nil || checkpoint.Kind != "checkpoint" || checkpoint.InstanceID != result.InstanceID || checkpoint.ShareID != shareID || checkpoint.Revision > share.Revision || checkpoint.Low != 0 || checkpoint.Mode != "" || checkpoint.Limit != 0 || checkpoint.After != 0 {
+			if parseErr != nil || checkpoint.Kind != "checkpoint" || checkpoint.InstanceID != result.InstanceID || checkpoint.ShareID != shareID || checkpoint.Revision > share.Revision || checkpoint.Low != 0 || checkpoint.Mode != "" || checkpoint.Limit != 0 || checkpoint.After != 0 || checkpoint.Phase != "" || checkpoint.AuxAfter != 0 || checkpoint.AuxIdentity != "" || checkpoint.AuxUpper != 0 {
 				return result, ErrCatalogCursor
 			}
 			// An authentic older scope is authoritative-full, never an incremental
@@ -218,10 +239,22 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 			if checkpoint.Revision == share.Revision {
 				state.Mode = "incremental"
 				state.Low = checkpoint.High
+				if checkpoint.Requested == state.Requested && checkpoint.Entities == state.Entities {
+					state.AuxLow = checkpoint.AuxHigh
+				}
 			}
 		}
 		if err := tx.QueryRow(ctx, "SELECT GREATEST(COALESCE(MAX(sequence),0),$1::bigint) FROM ingest.catalog_journal", floor).Scan(&state.High); err != nil {
 			return result, databaseError("capture catalogue publication boundary", err)
+		}
+		if !state.Entities.Empty() {
+			if err = tx.QueryRow(ctx, `SELECT GREATEST(pg_snapshot_xmin(pg_current_snapshot())::text::bigint-1,0),GREATEST(pg_snapshot_xmax(pg_current_snapshot())::text::bigint-1,0)`).Scan(&state.AuxHigh, &state.AuxUpper); err != nil {
+				return result, err
+			}
+			state.CacheBefore = time.Now().UTC()
+			if state.AuxLow > state.AuxHigh {
+				return result, ErrCatalogCursor
+			}
 		}
 		if state.Low > state.High {
 			return result, ErrCatalogCursor
@@ -234,47 +267,73 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 		if request.Cursor != "" {
 			return result, ErrCatalogExpired
 		}
-		state.Mode, state.Low = "full", 0
+		state.Mode, state.Low, state.AuxLow = "full", 0, 0
 	}
 	result.Mode = state.Mode
-	rows, err := tx.Query(ctx, catalogPageSQL, state.High, share.Scope == "all", share.SourceIDs, state.Mode, state.Low, state.After, state.Limit+1)
-	if err != nil {
-		return result, databaseError("read catalogue page", err)
-	}
 	more := false
-	for rows.Next() {
-		if len(result.Items) == state.Limit {
+	if state.Phase == "entities" || state.Phase == "availability" {
+		if state.Phase == "availability" {
+			more, err = catalogAvailabilityPage(ctx, tx, share, &state, &result)
+		} else {
+			more, err = catalogEntityPage(ctx, tx, share, &state, &result)
+		}
+		if err != nil {
+			return result, err
+		}
+		if !more && state.Phase == "entities" && state.Entities.Availability {
+			state.Phase = "availability"
+			state.CacheBefore = time.Now().UTC()
+			state.AuxAfter = 0
+			state.AuxIdentity = ""
 			more = true
-			break
 		}
-		var item model.CatalogItem
-		var origin, fields []byte
-		if err := rows.Scan(&origin, &fields, &item.Deleted, &state.After); err != nil {
-			rows.Close()
-			return result, databaseError("read catalogue item", err)
+	} else {
+		rows, err := tx.Query(ctx, catalogPageSQL, state.High, share.Scope == "all", share.SourceIDs, state.Mode, state.Low, state.After, state.Limit+1)
+		if err != nil {
+			return result, databaseError("read catalogue page", err)
 		}
-		if err := json.Unmarshal(origin, &item.Origin); err != nil {
-			rows.Close()
-			return result, errors.New("could not decode catalogue provenance")
-		}
-		item.ID = model.CatalogItemID(item.Origin)
-		if !item.Deleted {
-			item.Fields, err = projectCatalogFields(fields, share.Fields)
-			if err != nil {
-				rows.Close()
-				return result, err
+		for rows.Next() {
+			if len(result.Items) == state.Limit {
+				more = true
+				break
 			}
+			var item model.CatalogItem
+			var origin, fields []byte
+			if err := rows.Scan(&origin, &fields, &item.Deleted, &state.After); err != nil {
+				rows.Close()
+				return result, databaseError("read catalogue item", err)
+			}
+			if err := json.Unmarshal(origin, &item.Origin); err != nil {
+				rows.Close()
+				return result, errors.New("could not decode catalogue provenance")
+			}
+			item.ID = model.CatalogItemID(item.Origin)
+			if !item.Deleted {
+				item.Fields, err = projectCatalogFields(fields, share.Fields)
+				if err != nil {
+					rows.Close()
+					return result, err
+				}
+			}
+			result.Items = append(result.Items, item)
 		}
-		result.Items = append(result.Items, item)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return result, databaseError("read catalogue page", err)
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return result, databaseError("read catalogue page", err)
+		}
+		if !more && !state.Entities.Empty() {
+			state.Phase = "entities"
+			if !state.Entities.Metadata {
+				state.Phase = "availability"
+				state.CacheBefore = time.Now().UTC()
+			}
+			more = true
+		}
 	}
 	if more {
 		result.NextCursor, err = signCatalogToken(signingKey, state)
 	} else {
-		result.Checkpoint, err = signCatalogToken(signingKey, catalogToken{Version: 1, InstanceID: result.InstanceID, ShareID: shareID, Revision: share.Revision, Kind: "checkpoint", High: state.High})
+		result.Checkpoint, err = signCatalogToken(signingKey, catalogToken{Version: 1, InstanceID: result.InstanceID, ShareID: shareID, Revision: share.Revision, Kind: "checkpoint", High: state.High, Requested: state.Requested, Entities: state.Entities, AuxHigh: state.AuxHigh})
 	}
 	if err != nil {
 		return result, err

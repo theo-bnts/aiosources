@@ -8,6 +8,7 @@ import (
 
 // Share contains only owner-visible configuration, never credential material.
 type Share struct {
+	CatalogEntities        CatalogEntities     `json:"catalog_entities,omitzero"`
 	TorznabPreferences     *TorznabPreferences `json:"torznab_preferences,omitempty"`
 	StreamPreferences      *StreamPreferences  `json:"stream_preferences,omitempty"`
 	Format                 string              `json:"format"`
@@ -30,6 +31,7 @@ type Share struct {
 }
 
 type ShareInput struct {
+	CatalogEntities        CatalogEntities     `json:"catalog_entities,omitzero"`
 	TorznabPreferences     *TorznabPreferences `json:"torznab_preferences,omitempty"`
 	StreamPreferences      *StreamPreferences  `json:"stream_preferences,omitempty"`
 	Format                 string              `json:"format,omitempty"`

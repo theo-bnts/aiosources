@@ -137,11 +137,11 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
 	if err := json.Unmarshal(viewJSON, &viewFilters); err != nil || viewFilters.MinSize != "9007199254740993" || viewFilters.Sort != "recent" || viewRevision != 2 {
 		t.Fatalf("historical saved filters changed incorrectly: %+v %v", viewFilters, err)
 	}
-	remaining, err := db.Share(ctx, mixed.Share.ID)
+	remaining, err := legacyReadShare(t, ctx, db, mixed.Share.ID)
 	if err != nil || !remaining.Enabled || !reflect.DeepEqual(remaining.Fields, []string{"title"}) {
 		t.Fatalf("remaining permissions lost: %+v %v", remaining, err)
 	}
-	empty, err := db.Share(ctx, only.Share.ID)
+	empty, err := legacyReadShare(t, ctx, db, only.Share.ID)
 	if err != nil || empty.Enabled || len(empty.Fields) != 0 {
 		t.Fatalf("empty share gained permissions: %+v %v", empty, err)
 	}

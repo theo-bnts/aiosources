@@ -14,20 +14,21 @@ func (s *server) registerRemoteRoutes(mux *http.ServeMux) {
 }
 
 type remoteSummary struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	URL           string            `json:"url"`
-	Enabled       bool              `json:"enabled"`
-	Valid         bool              `json:"valid"`
-	Revision      string            `json:"revision"`
-	SecretRef     string            `json:"secret_ref"`
-	Sync          model.CatalogSync `json:"sync"`
-	SyncState     string            `json:"sync_state"`
-	NextSyncAt    *time.Time        `json:"next_sync_at,omitempty"`
-	SyncError     string            `json:"sync_error,omitempty"`
-	LastRun       *model.Run        `json:"last_run,omitempty"`
-	HasCheckpoint bool              `json:"has_checkpoint"`
-	LastSyncedAt  *time.Time        `json:"last_synced_at,omitempty"`
+	ReceivedEntities model.CatalogEntities `json:"received_entities,omitzero"`
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	URL              string                `json:"url"`
+	Enabled          bool                  `json:"enabled"`
+	Valid            bool                  `json:"valid"`
+	Revision         string                `json:"revision"`
+	SecretRef        string                `json:"secret_ref"`
+	Sync             model.CatalogSync     `json:"sync"`
+	SyncState        string                `json:"sync_state"`
+	NextSyncAt       *time.Time            `json:"next_sync_at,omitempty"`
+	SyncError        string                `json:"sync_error,omitempty"`
+	LastRun          *model.Run            `json:"last_run,omitempty"`
+	HasCheckpoint    bool                  `json:"has_checkpoint"`
+	LastSyncedAt     *time.Time            `json:"last_synced_at,omitempty"`
 }
 
 func (s *server) listRemotes(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +75,7 @@ func (s *server) listRemotes(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if state, ok := states[item.ID]; ok && state.Endpoint == item.URL && state.Checkpoint != "" {
+			item.ReceivedEntities = state.Entities
 			item.HasCheckpoint = true
 			item.LastSyncedAt = &state.LastSyncedAt
 		}

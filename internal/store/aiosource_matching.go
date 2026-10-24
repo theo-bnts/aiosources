@@ -159,6 +159,9 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(provider_id,source_id) DO UPDATE SET
 fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, workID, revision, result.Status, result.Reason, r.Normalized)
 		batch.Queue(`DELETE FROM ingest.aio_match_queue WHERE provider_id=$1 AND source_id=$2 AND version=$3`, r.Provider, r.SourceID, r.QueueVersion)
 	}
+	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
+		return nil, err
+	}
 	if err = tx.SendBatch(ctx, batch).Close(); err != nil {
 		return nil, databaseError("save correspondence batch", err)
 	}

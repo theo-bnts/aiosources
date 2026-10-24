@@ -290,6 +290,9 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 		}
 	}
 	if page.Error == "" {
+		if err := stageCatalogEntities(ctx, tx, run, page.CatalogSupplement, resetStaging); err != nil {
+			return model.Run{}, err
+		}
 		if resetStaging {
 			if _, err := tx.Exec(ctx, "DELETE FROM ingest.staged_torrents WHERE run_id=$1", run.ID); err != nil {
 				return model.Run{}, databaseError("reset collection staging", err)
@@ -444,6 +447,10 @@ WHERE id=$1 RETURNING `+runColumns, run.ID, pages, primaryCount, errorCount, cur
 		"auxiliary_records": len(page.Items) - primaryCount, "errors": errorCount,
 		"done": page.Error == "" && page.Done, "emitted": pages > 0,
 		"payload_retained": false,
+	}
+	if page.Error == "" && len(page.CatalogSupplement.Metadata)+len(page.CatalogSupplement.Availability) > 0 {
+		eventValues["metadata"] = len(page.CatalogSupplement.Metadata)
+		eventValues["cache_observations"] = len(page.CatalogSupplement.Availability)
 	}
 	if page.Error == "" && run.Config.Traversal != nil && run.Config.Traversal.TotalMode == "at_least" {
 		if scope, ok := page.Metadata["coverage_scope"].(string); ok {

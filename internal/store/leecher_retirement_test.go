@@ -32,10 +32,7 @@ INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('fixture','queu
 	}
 	shares := []model.ShareCredential{}
 	for _, name := range []string{"Mixed", "Counter only"} {
-		share, err := db.CreateShare(ctx, model.ShareInput{Name: name, Scope: "all", Fields: []string{"title"}})
-		if err != nil {
-			t.Fatal(err)
-		}
+		share := legacyShareFixture(t, ctx, db, model.ShareInput{Name: name, Scope: "all", Fields: []string{"title"}})
 		shares = append(shares, share)
 	}
 	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET enabled=TRUE,fields=CASE WHEN id=$1 THEN ARRAY['title','leechers'] ELSE ARRAY['leechers'] END WHERE id IN ($1,$2)`, shares[0].Share.ID, shares[1].Share.ID); err != nil {

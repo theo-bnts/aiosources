@@ -694,6 +694,12 @@ func (s *Store) FinishRun(ctx context.Context, id string, status model.RunStatus
 		return model.Run{}, model.ErrConflict
 	}
 	if status == model.StatusSucceeded && run.Mode != model.ModePreview && remoteCatalog(run.Config) {
+		// Metadata publication always takes its fence before torrent locks.
+		if run.Config.CatalogEntities.Metadata {
+			if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+				return model.Run{}, err
+			}
+		}
 		// Match the journal's table/statement lock order before checking ownership.
 		// Native publication cannot arrive between this check and replacement.
 		if _, err := tx.Exec(ctx, "LOCK TABLE ingest.torrents IN ROW EXCLUSIVE MODE; SELECT pg_advisory_xact_lock(1768843109,3)"); err != nil {

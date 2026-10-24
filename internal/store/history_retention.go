@@ -158,6 +158,9 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if _, err = tx.Exec(ctx, `SELECT ingest.sync_catalog_tracking()`); err != nil {
 		return 0, databaseError("reconcile catalog storage", err)
 	}
+	if _, err = tx.Exec(ctx, `SELECT ingest.prune_catalog_entity_index()`); err != nil {
+		return 0, databaseError("release inactive shared data index", err)
+	}
 	if err = exec(`WITH expired AS MATERIALIZED (
  SELECT sequence,provider_id,source_id,origin,fields,deleted,recorded_at FROM ingest.catalog_journal
  WHERE recorded_at<$1 ORDER BY recorded_at,sequence LIMIT $2

@@ -153,7 +153,7 @@ func TestRemoteCatalogRejectsProtocolViolationsRetainingWireBytes(t *testing.T) 
 		name   string
 		change func(*model.CatalogEnvelope)
 	}{
-		{"unsupported version", func(e *model.CatalogEnvelope) { e.Version = 2 }},
+		{"unsupported version", func(e *model.CatalogEnvelope) { e.Version = 99 }},
 		{"forged identity", func(e *model.CatalogEnvelope) { e.Items[0].ID = "forged" }},
 		{"full tombstone", func(e *model.CatalogEnvelope) { e.Items[0].Deleted = true; e.Items[0].Fields = nil }},
 		{"ambiguous completion", func(e *model.CatalogEnvelope) { e.NextCursor = "next" }},

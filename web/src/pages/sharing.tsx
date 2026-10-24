@@ -1,3 +1,4 @@
+import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
 import { ResultSorting } from '@/components/result-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
@@ -57,6 +58,7 @@ import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 function shareBody(share: CatalogShare) {
   return {
     format: share.format,
+    catalog_entities: share.catalog_entities,
     media_types: share.media_types,
     stream_preferences: share.stream_preferences,
     torznab_preferences: share.torznab_preferences,
@@ -317,19 +319,32 @@ export default function SharingPage({
                     {connection ? 'Filters' : 'Authorized fields'}
                   </dt>
                   <dd className="mt-1 break-words">
-                    {stremio
-                      ? stremioPreferenceSummary(share.stream_preferences)
-                      : torznab
-                        ? share.media_types?.length
-                          ? share.media_types
-                              .map(
-                                (type) =>
-                                  torznabMediaTypes.find((option) => option.value === type)
-                                    ?.label ?? type,
-                              )
-                              .join(', ')
-                          : 'All media'
-                        : share.fields.join(', ') || 'No fields selected'}
+                    {stremio ? (
+                      stremioPreferenceSummary(share.stream_preferences)
+                    ) : torznab ? (
+                      share.media_types?.length ? (
+                        share.media_types
+                          .map(
+                            (type) =>
+                              torznabMediaTypes.find((option) => option.value === type)?.label ??
+                              type,
+                          )
+                          .join(', ')
+                      ) : (
+                        'All media'
+                      )
+                    ) : (
+                      <>
+                        {share.fields.join(', ') || 'No fields selected'}
+                        {!connection &&
+                          (share.catalog_entities?.metadata ||
+                            share.catalog_entities?.availability) && (
+                            <span className="mt-1 block text-muted-foreground">
+                              {catalogEntitiesSummary(share.catalog_entities)}
+                            </span>
+                          )}
+                      </>
+                    )}
                     {torznab && share.torznab_preferences?.services?.length ? (
                       <>
                         {' '}
@@ -592,6 +607,7 @@ function ShareForm({
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? defaultScope)
   const [sourceIDs, setSourceIDs] = useState(share?.source_ids ?? [])
   const [fields, setFields] = useState(share?.fields ?? data.fields)
+  const [catalogEntities, setCatalogEntities] = useState(share?.catalog_entities ?? {})
   const dateZone = useDateTimeZoneLabel()
   const [expiresAt, setExpiresAt] = useState(share?.expires_at ?? '')
   const [requestsPerMinute, setRequestsPerMinute] = useState(
@@ -621,6 +637,7 @@ function ShareForm({
         throw new Error('Choose a valid expiration date and time.')
       const body = {
         format,
+        ...(!connection ? { catalog_entities: catalogEntities } : {}),
         media_types: torznab ? mediaTypes : [],
         ...(torznab ? { torznab_preferences: torznabPreferences } : {}),
         ...(stremio
@@ -688,6 +705,11 @@ function ShareForm({
     name !== (original?.name ?? '') ||
     scope !== (original?.scope ?? defaultScope) ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
+    (!connection &&
+      Boolean(catalogEntities.metadata) !== Boolean(original?.catalog_entities?.metadata)) ||
+    (!connection &&
+      Boolean(catalogEntities.availability) !==
+        Boolean(original?.catalog_entities?.availability)) ||
     JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
     expiresAt !== (original?.expires_at ?? '') ||
     requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
@@ -839,24 +861,34 @@ function ShareForm({
                       type="checkbox"
                       className="accent-primary"
                       checked={fields.includes(field)}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        if (field === 'info_hash' && !event.target.checked)
+                          setCatalogEntities((current) => ({ ...current, availability: false }))
                         setFields(
                           event.target.checked
                             ? [...fields, field]
                             : fields.filter((value) => value !== field),
                         )
-                      }
+                      }}
                     />
                     <span className="mono">{field}</span>
                   </label>
                 ))}
               </div>
               <p className="help">
-                No download URLs, magnets, tracker passkeys, arbitrary metadata or raw data.
-                Original provenance accompanies authorized fields.
+                No download URLs, magnets, tracker passkeys, custom payloads or raw data. Original
+                provenance accompanies authorized fields.
               </p>
             </fieldset>
           </Disclosure>
+        )}
+        {!connection && (
+          <CatalogDataControls
+            id="share-data"
+            value={catalogEntities}
+            onChange={setCatalogEntities}
+            allowAvailability={fields.includes('info_hash')}
+          />
         )}
         <Disclosure title="Advanced">
           <Disclosure title="Request limits">{requestLimits}</Disclosure>

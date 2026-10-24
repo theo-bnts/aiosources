@@ -69,20 +69,7 @@ func ParseID(id, mediaType string) (Resource, error) {
 	}
 	return r, err
 }
-func Normalize(s string) string {
-	var b strings.Builder
-	for _, r := range norm.NFKD.String(strings.ToLower(s)) {
-		if unicode.Is(unicode.Mn, r) {
-			continue
-		}
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte(' ')
-		}
-	}
-	return strings.Join(strings.Fields(b.String()), " ")
-}
+func Normalize(s string) string { return model.NormalizeTitle(s) }
 
 type Release struct {
 	Title, Normalized string

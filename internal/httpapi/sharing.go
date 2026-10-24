@@ -128,6 +128,10 @@ func (s *server) listShares(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input model.ShareInput) bool {
+	if input.CatalogEntities.Availability && !slices.Contains(input.Fields, "info_hash") {
+		writeError(w, http.StatusUnprocessableEntity, "Select info_hash before sharing debrid cache observations")
+		return false
+	}
 	if err := store.ValidateShare(input); err != nil {
 		message := "Provide a name, safe fields, source permissions, requests per minute between 1 and 3600, and concurrent downloads between 1 and 16"
 		if input.Format == "stremio" {
@@ -266,7 +270,7 @@ func (s *server) decodeShare(w http.ResponseWriter, r *http.Request, input *mode
 
 func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Vary", "Authorization")
+	w.Header().Set("Vary", "Authorization, "+model.CatalogEntitiesHeader)
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		writeError(w, http.StatusMethodNotAllowed, "Shared catalogues are read-only")
@@ -318,7 +322,12 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Use either cursor or checkpoint, never both")
 		return
 	}
-	request := store.CatalogPageRequest{Cursor: query.Get("cursor"), Checkpoint: query.Get("checkpoint"), Head: r.Method == http.MethodHead}
+	requestedEntities, validEntities := model.ParseCatalogEntities(r.Header.Get(model.CatalogEntitiesHeader))
+	if !validEntities || len(r.Header.Values(model.CatalogEntitiesHeader)) > 1 {
+		writeError(w, 400, "Invalid catalog data selection")
+		return
+	}
+	request := store.CatalogPageRequest{Entities: requestedEntities, Cursor: query.Get("cursor"), Checkpoint: query.Get("checkpoint"), Head: r.Method == http.MethodHead}
 	if query.Has("limit") {
 		request.Limit, err = strconv.Atoi(query.Get("limit"))
 		if err != nil || request.Limit < 1 || request.Limit > 1000 {

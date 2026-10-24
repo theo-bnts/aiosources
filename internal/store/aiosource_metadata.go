@@ -81,6 +81,24 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 	if len(inputs) > 100 {
 		return model.ErrInvalid
 	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin metadata publication", err)
+	}
+	defer rollback(tx)
+	if err = saveAIOMetadataBatch(ctx, tx, inputs, ""); err != nil {
+		return err
+	}
+	return databaseError("publish metadata batch", tx.Commit(ctx))
+}
+
+func saveAIOMetadataBatch(ctx context.Context, tx pgx.Tx, inputs []AIOMetadataPublication, importSource string) error {
+	if len(inputs) == 0 {
+		return nil
+	}
+	if len(inputs) > 100 {
+		return model.ErrInvalid
+	}
 	keys := make([]string, len(inputs))
 	types, tmdbIDs := []string{}, []string{}
 	seen := map[string]bool{}
@@ -111,11 +129,7 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 			}
 		}
 	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return databaseError("begin metadata publication", err)
-	}
-	defer rollback(tx)
+	var err error
 	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
 		return databaseError("lock metadata publication", err)
 	}
@@ -160,12 +174,19 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 	if err != nil {
 		return model.ErrInvalid
 	}
-	rows, err = tx.Query(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult,display_title,localized_titles)
-SELECT type,tmdb,imdb,tvdb,years,adult,display_title,localized_titles FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean,display_title text,localized_titles jsonb) ORDER BY type,tmdb
+	// Imported assertions are never exported and cannot change the shared index.
+	// A large mirror publication must not hold the cache publication fence.
+	if importSource == "" {
+		if err = lockCatalogEntityWrites(ctx, tx); err != nil {
+			return err
+		}
+	}
+	rows, err = tx.Query(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult,display_title,localized_titles,catalog_import_source)
+SELECT type,tmdb,imdb,tvdb,years,adult,display_title,localized_titles,$3 FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean,display_title text,localized_titles jsonb) ORDER BY type,tmdb
 ON CONFLICT(media_type,tmdb_id) DO UPDATE SET imdb_id=EXCLUDED.imdb_id,tvdb_id=EXCLUDED.tvdb_id,years=EXCLUDED.years,adult=EXCLUDED.adult,
-display_title=EXCLUDED.display_title,localized_titles=EXCLUDED.localized_titles,
+display_title=EXCLUDED.display_title,localized_titles=EXCLUDED.localized_titles,catalog_import_source=EXCLUDED.catalog_import_source,catalog_import_updated_at=NULL,
 revision=ingest.aio_works.revision+CASE WHEN (EXCLUDED.media_type||':'||EXCLUDED.tmdb_id)=ANY($2::text[]) THEN 1 ELSE 0 END,updated_at=now()
-RETURNING id,media_type,tmdb_id`, body, changedKeys)
+RETURNING id,media_type,tmdb_id`, body, changedKeys, importSource)
 	if err != nil {
 		return databaseError("save metadata batch", err)
 	}
@@ -253,7 +274,7 @@ RETURNING id,media_type,tmdb_id`, body, changedKeys)
 	if err = finishAIOJobs(ctx, tx, jobs); err != nil {
 		return databaseError("acknowledge metadata batch", err)
 	}
-	return databaseError("publish metadata batch", tx.Commit(ctx))
+	return nil
 }
 
 func finishAIOJobs(ctx context.Context, tx pgx.Tx, jobs []AIOJob) error {
