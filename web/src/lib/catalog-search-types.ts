@@ -1,3 +1,4 @@
+import type { DebridService } from '@/lib/debrid'
 export type CatalogTitle = {
   id: number
   type: 'movie' | 'tv'
@@ -12,7 +13,7 @@ export type CatalogTitle = {
 }
 export type CatalogSelection = { season?: number; episode?: number }
 export type CatalogAvailability = {
-  service: 'alldebrid' | 'torbox'
+  service: DebridService
   state: 'cached' | 'uncached' | 'unknown' | 'unavailable' | 'invalid'
   can_add: boolean
   filename?: string

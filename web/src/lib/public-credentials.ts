@@ -1,3 +1,4 @@
+import { debridProviders, isDebridService } from './debrid'
 import { useSyncExternalStore } from 'react'
 import { api, ApiError, queryClient } from './api'
 
@@ -15,8 +16,8 @@ function parse(value: unknown): PublicCredential | null {
     typeof item.credential !== 'string' ||
     !/^[A-Za-z0-9_-]{32,8192}$/.test(item.credential) ||
     !Array.isArray(item.services) ||
-    item.services.length > 2 ||
-    !item.services.every((service) => service === 'alldebrid' || service === 'torbox') ||
+    item.services.length > debridProviders.length ||
+    !item.services.every(isDebridService) ||
     (item.announces !== undefined &&
       (!Array.isArray(item.announces) ||
         item.announces.length > 128 ||

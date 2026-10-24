@@ -2,6 +2,7 @@ package aiosource
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,22 +44,28 @@ func recordProviderCall(ctx context.Context, path string, status int, started ti
 	}
 	phase := "provider_request"
 	switch path {
-	case "torrents/checkcached":
+	case "torrents/checkcached", "cache/check":
 		phase = "provider_availability"
-	case "v4.1/magnet/status":
+	case "v4.1/magnet/status", "torrents":
 		phase = "provider_inventory"
-	case "v4/magnet/upload":
+	case "v4/magnet/upload", "torrents/addMagnet", "seedbox/add", "torrents/add", "transfer/create":
 		phase = "provider_add"
-	case "v4/magnet/files", "torrents/mylist":
+	case "v4/magnet/files", "torrents/mylist", "torrents/info", "seedbox/list":
 		phase = "provider_files"
 	case "v4/magnet/delete":
 		phase = "provider_cleanup"
-	case "v4/link/unlock":
+	case "v4/link/unlock", "unrestrict/link", "generate/link", "transfer/directdl":
 		phase = "provider_unlock"
 	case "torrents/createtorrent":
 		phase = "provider_add"
 	case "torrents/requestdl":
 		phase = "provider_playback"
+	}
+	if strings.HasPrefix(path, "torrents/info/") {
+		phase = "provider_files"
+	}
+	if strings.HasPrefix(path, "torrents/selectFiles/") {
+		phase = "provider_add"
 	}
 	code := providerFailureCode(err)
 	h.recordCall(ctx, model.ProviderCall{Phase: phase, HTTPStatus: status, DurationMS: time.Since(started).Milliseconds(), ErrorCode: code})

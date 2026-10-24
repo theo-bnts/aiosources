@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/outbound"
 )
 
 var ErrPending = errors.New("torrent is not ready")
@@ -23,15 +21,16 @@ var ErrAuth = errors.New("provider refused credentials")
 var ErrInvalidResponse = errors.New("unusable provider response")
 
 type ProviderHTTP struct {
-	Timeout        func(context.Context) (time.Duration, error)
-	Client         *http.Client
-	ADBase, TBBase string
-	mu             sync.Mutex
-	next           map[string]time.Time
+	Timeout                        func(context.Context) (time.Duration, error)
+	Client                         *http.Client
+	ADBase, TBBase                 string
+	RDBase, PMBase, DLBase, DBBase string
+	mu                             sync.Mutex
+	next                           map[string]time.Time
 }
 
 func NewProviderHTTP() *ProviderHTTP {
-	return &ProviderHTTP{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ADBase: "https://api.alldebrid.com", TBBase: "https://api.torbox.app/v1/api", next: map[string]time.Time{}}
+	return &ProviderHTTP{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ADBase: "https://api.alldebrid.com", TBBase: "https://api.torbox.app/v1/api", RDBase: "https://api.real-debrid.com/rest/1.0", PMBase: "https://www.premiumize.me/api", DLBase: "https://debrid-link.com/api/v2", DBBase: "https://www.deepbrid.com/api/v1", next: map[string]time.Time{}}
 }
 
 // Documented demonstration keys authenticate static fixtures, not an account.
@@ -50,9 +49,11 @@ func (p *ProviderHTTP) pace(ctx context.Context, service string) error {
 		return err
 	}
 	p.mu.Lock()
-	gap := 200 * time.Millisecond
+	gap := 250 * time.Millisecond
 	if service == "alldebrid" {
 		gap = 110 * time.Millisecond
+	} else if service == "torbox" {
+		gap = 200 * time.Millisecond
 	}
 	now := time.Now()
 	at := maxTime(now, p.next[service])
@@ -74,58 +75,11 @@ func maxTime(a, b time.Time) time.Time {
 	return b
 }
 func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path string, body io.Reader, contentType string) (payload json.RawMessage, requestErr error) {
-	started := time.Now()
-	status := 0
-	defer func() { recordProviderCall(ctx, strings.Split(path, "?")[0], status, started, requestErr) }()
-	if strings.TrimSpace(key) == "" || (service == "alldebrid" && allDebridDemoKey(key)) {
-		return nil, ErrAuth
-	}
-	if err := p.pace(ctx, service); err != nil {
+	started, meta := time.Now(), providerResponseMetadata{}
+	defer func() { recordProviderCall(ctx, strings.Split(path, "?")[0], meta.Status, started, requestErr) }()
+	b, err := p.exchange(ctx, service, key, method, path, body, contentType, &meta)
+	if err != nil {
 		return nil, err
-	}
-	base := p.TBBase
-	if service == "alldebrid" {
-		base = p.ADBase
-	}
-	req, err := http.NewRequestWithContext(ctx, method, base+"/"+path, body)
-	if err != nil {
-		return nil, ErrInvalidResponse
-	}
-	req = req.WithContext(outbound.WithTarget(req.Context(), "debrid:"+service))
-	req.Header.Set("Authorization", "Bearer "+key)
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	client := *p.Client
-	if p.Timeout != nil && client.Timeout == 0 {
-		timeout, err := p.Timeout(ctx)
-		if err != nil {
-			return nil, err
-		}
-		client.Timeout = timeout
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		var timed net.Error
-		if errors.As(err, &timed) && timed.Timeout() {
-			return nil, newProviderError("timeout", "")
-		}
-		return nil, newProviderError("provider_unavailable", "")
-	}
-	defer res.Body.Close()
-	status = res.StatusCode
-	b, err := io.ReadAll(io.LimitReader(res.Body, 8<<20+1))
-	if err != nil || len(b) > 8<<20 {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		if res.StatusCode != http.StatusOK {
-			return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), nil)
-		}
-		return nil, ErrInvalidResponse
 	}
 	var envelope struct {
 		Status  string          `json:"status"`
@@ -135,18 +89,9 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		Error   json.RawMessage `json:"error"`
 	}
 	if json.Unmarshal(b, &envelope) != nil {
-		if res.StatusCode != http.StatusOK {
-			return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), nil)
-		}
 		return nil, ErrInvalidResponse
 	}
-	var rejected *ProviderError
-	if len(envelope.Error) > 0 && string(envelope.Error) != "null" {
-		rejected = providerResponseError(envelope.Error)
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, providerHTTPError(res.StatusCode, res.Header.Get("Retry-After"), rejected)
-	}
+	rejected := decodeProviderError(service, b)
 	if service == "alldebrid" && len(envelope.Demo) > 0 {
 		switch string(envelope.Demo) {
 		case `true`, `"true"`:
@@ -161,7 +106,7 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		success = envelope.Status == "success"
 	}
 	if rejected != nil {
-		return nil, newProviderError(rejected.Code, res.Header.Get("Retry-After"))
+		return nil, newProviderError(rejected.Code, meta.RetryAfter)
 	}
 	if !success {
 		return nil, newProviderError("provider_error", "")
@@ -175,11 +120,11 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 		}
 		if json.Unmarshal(envelope.Data, &data) == nil {
 			if len(data.Error) > 0 && string(data.Error) != "null" {
-				return nil, newProviderError(providerResponseError(data.Error).Code, res.Header.Get("Retry-After"))
+				return nil, newProviderError(providerResponseError(data.Error).Code, meta.RetryAfter)
 			}
 			for _, magnet := range data.Magnets {
 				if len(magnet.Error) > 0 && string(magnet.Error) != "null" {
-					return nil, newProviderError(providerResponseError(magnet.Error).Code, res.Header.Get("Retry-After"))
+					return nil, newProviderError(providerResponseError(magnet.Error).Code, meta.RetryAfter)
 				}
 			}
 		}

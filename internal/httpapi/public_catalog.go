@@ -193,7 +193,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket publicCatalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || ticket.Audience != s.auth.origin || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || (ticket.Service != "alldebrid" && ticket.Service != "torbox") || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil || ticket.Audience != s.auth.origin || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !model.IsDebridService(ticket.Service) || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}

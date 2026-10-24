@@ -13,7 +13,7 @@ AIOSources is open source and self-hosted. It comes without sources or content: 
 - **One place to search.** Find films and series by clean titles, in your browser language when available. Compare releases by size, with filters for year, language and cached availability.
 - **Your choice of sources.** Add compatible sources through a visual editor or your own JSON definitions. Preview their results and choose when they update.
 - **Better identification.** Link releases to film and series information, including seasons and episodes. Review uncertain matches and correct them yourself.
-- **Watch or download.** Use Stremio or AIOStreams, connect Torznab-compatible apps, or download from the web interface with AllDebrid or TorBox.
+- **Watch or download.** Use Stremio or AIOStreams, connect Torznab-compatible apps, or download from the web interface with your configured debrid services.
 - **Connections you control.** Create separate app connections with their own filters. Share a selected catalog with another instance, or optionally open a visitor page.
 - **Visibility without guesswork.** See what was imported, what was returned to Stremio, which operations need attention and where storage is used.
 - **Settings within reach.** Find a setting from the search bar on any page, on desktop or mobile. Open the right section directly, including advanced options and individual source or connection settings.
@@ -22,7 +22,7 @@ Already using someone else's public instance? Start with [the visitor guide](doc
 
 ## Get started
 
-You need Docker Compose and a source connection you are authorized to use. TMDB information is needed for film and series identification. AllDebrid and TorBox accounts are optional for administrators and are required for debrid playback.
+You need Docker Compose and a source connection you are authorized to use. TMDB information is needed for film and series identification. A supported debrid account is optional for administrators and required for debrid playback.
 
 ### 1. Start your instance
 
@@ -89,7 +89,7 @@ Enable the source, then use **Run manual import → Preview** to check a sample 
 
 In **Metadata → Settings**, add your own [TMDB API read access token](https://www.themoviedb.org/settings/api). Enable automatic information updates and torrent identification. Review uncertain results in **Identification**; you can search for the correct title and choose a match.
 
-For debrid playback, add your AllDebrid or TorBox key in **Debrid → Settings**. Availability checks show which versions are already cached. AllDebrid checks can create temporary account entries; AIOSources only cleans up entries it has confirmed it created.
+For debrid playback, add your key in **Debrid → Settings**. Supported services, in alphabetical order: **AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox**. Cache checks depend on what each service can verify; unknown availability is never presented as a cache miss. See [debrid playback](docs/DEBRID.md) for service differences and setup. AllDebrid checks can create temporary account entries; AIOSources only cleans up entries it has confirmed it created.
 
 If a service needs a different outgoing connection, open **Administration → Network**. Add an existing WARP, VPN or other proxy, test it, then select it for that service in **Routing**. You can also route all outgoing connections or individual sources through it. See [proxy setup](docs/NETWORK.md).
 
@@ -138,7 +138,7 @@ Only permitted torrent information is transferred. Accounts, source credentials,
 
 An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Search and Torznab. Administration stays protected.
 
-For Stremio, visitors supply at least one personal AllDebrid or TorBox key. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys and optional personal announce URLs are remembered automatically on the visitor’s browser in an encrypted configuration shared by Search, Stremio and Torznab; **Forget saved credentials** clears it. Fresh cached-availability observations can be reused across users, independently for each debrid service.
+For Stremio, visitors supply at least one personal key for a supported debrid service. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys and optional personal announce URLs are remembered automatically on the visitor’s browser in an encrypted configuration shared by Search, Stremio and Torznab; **Forget saved credentials** clears it. Verified provider-wide availability can be reused across users, independently for each debrid service. Account-only observations stay separate.
 
 The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
 
@@ -188,7 +188,7 @@ Most settings and credentials are managed from the interface. The complete appli
 | --- | --- | --- |
 | `DATABASE_URL` | Required | PostgreSQL connection URL. |
 | `BIND` | `0.0.0.0:7000` | Address and port on which the application listens. |
-| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`. Setting this does not enable HTTPS; HTTPS is required for catalog sharing and public access. |
+| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`, also used for link previews. Setting this does not enable HTTPS; HTTPS is required for catalog sharing and public access. |
 | `ADMIN_PASSWORD` | Generated when omitted | Administration password, 12–72 bytes. An omitted password is saved as `/data/admin-password`; it can be read locally with `/aiosource password`. |
 | `DATA_DIR` | `/data` | Private application state, including the encryption key. Preserve this storage when updating. |
 | `PROVIDERS_DIR` | `/data/providers` | Private JSON source definitions. |
@@ -218,4 +218,4 @@ AIOSources is available under the [MIT License](LICENSE). It builds on [Ingest](
 
 Film and series information is supplied by [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Its API and data have separate [usage and attribution requirements](https://developer.themoviedb.org/docs/faq), including licensing for commercial use. TMDB attribution and licenses are also accessible from **About AIOSources** in the application.
 
-AIOSources is an independent project. Stremio, AIOStreams, AllDebrid, TorBox and TMDB names identify compatible services and do not imply affiliation or endorsement.
+AIOSources is an independent project. Stremio, AIOStreams, TMDB and debrid service names identify compatible services and do not imply affiliation or endorsement.

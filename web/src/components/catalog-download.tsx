@@ -1,3 +1,4 @@
+import { serviceNames } from '@/lib/debrid'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -18,7 +19,6 @@ import { ErrorNotice } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-const serviceNames = { alldebrid: 'AllDebrid', torbox: 'TorBox' }
 const cacheLabels = {
   cached: 'Cached',
   uncached: 'Not cached',

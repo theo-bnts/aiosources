@@ -153,7 +153,7 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket catalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && ticket.Service != "alldebrid" && ticket.Service != "torbox") || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && !model.IsDebridService(ticket.Service)) || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}

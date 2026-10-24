@@ -1,3 +1,4 @@
+import { debridProviders, serviceNames } from '@/lib/debrid'
 import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -48,11 +49,10 @@ const kinds = {
   cleanup: 'Temporary magnet cleanup',
   download: 'Download preparation',
 }
-const services = {
+const services: Record<string, string> = {
   tmdb: 'TMDB',
   local: 'Local identification',
-  alldebrid: 'AllDebrid',
-  torbox: 'TorBox',
+  ...serviceNames,
 }
 const triggers = {
   manual: 'Manual',
@@ -148,8 +148,11 @@ export function OperationHistoryPage({ section }: { section: Section }) {
               onChange={(e) => filter('service', e.target.value)}
             >
               <option value="">All services</option>
-              <option value="alldebrid">AllDebrid</option>
-              <option value="torbox">TorBox</option>
+              {debridProviders.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.name}
+                </option>
+              ))}
             </select>
           )}
         </div>

@@ -95,7 +95,7 @@ func TestStreamsUseCurrentSourceNamesWithoutChangingPlaybackIdentity(t *testing.
 				t.Fatal("renaming changed available streams", err)
 			}
 			for i, item := range second {
-				if !strings.Contains(first[i].Name, "Example Library") || !strings.Contains(item.Name, p.Name) || !strings.Contains(item.Title, p.Name) || strings.Contains(item.Name+item.Title, id) {
+				if first[i].Hints.Indexer != "Example Library" || item.Hints.Indexer != p.Name || !strings.Contains(item.Title, p.Name) || strings.Contains(item.Name+item.Title, id) {
 					t.Fatal("stream presentation did not use the current display name")
 				}
 				if item.URL != first[i].URL || item.InfoHash != first[i].InfoHash || item.Hints.BingeGroup != first[i].Hints.BingeGroup {
@@ -122,7 +122,7 @@ func TestStreamsUseCurrentSourceNamesWithoutChangingPlaybackIdentity(t *testing.
 				t.Fatal(err)
 			}
 			fallback, err := s.Streams(ctx, "https://addon.example", token, "movie", "tt1234567")
-			if err != nil || len(fallback) != want || !strings.Contains(fallback[0].Name, id) {
+			if err != nil || len(fallback) != want || fallback[0].Hints.Indexer != id || !strings.Contains(fallback[0].Title, id) {
 				t.Fatal("removed source definition prevented existing playback", err)
 			}
 			if err := registry.Close(); err != nil {

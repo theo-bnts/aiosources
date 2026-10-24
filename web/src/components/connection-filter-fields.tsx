@@ -13,10 +13,7 @@ export const torznabMediaTypes = [
   { value: 'tv', label: 'Series' },
   { value: 'other', label: 'Other / not identified' },
 ]
-export const debridServices = [
-  { id: 'alldebrid', name: 'AllDebrid' },
-  { id: 'torbox', name: 'TorBox' },
-]
+export { debridServices } from '@/lib/debrid'
 
 export function MediaTypeFilter({
   id,

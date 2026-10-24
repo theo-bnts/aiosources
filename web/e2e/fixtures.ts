@@ -1,6 +1,7 @@
 import { test as base, expect, type Page, type Locator } from '@playwright/test'
 import type { SharePassword } from '../src/lib/catalog-types'
 import { startServer, type TestServer } from './server'
+import { debridProviders } from '../src/lib/debrid'
 
 export const test = base.extend<{ server: TestServer; collectionSource: boolean }>({
   collectionSource: [false, { option: true }],
@@ -95,8 +96,7 @@ export async function selectMultiple(scope: Page | Locator, label: string, value
     tv: 'Series',
     anime: 'Anime',
     other: 'Other / not identified',
-    torbox: 'TorBox',
-    alldebrid: 'AllDebrid',
+    ...Object.fromEntries(debridProviders.map(({ id, name }) => [id, name])),
     direct: 'Direct torrents',
   }
   for (const value of values)

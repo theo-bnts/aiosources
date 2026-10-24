@@ -16,28 +16,29 @@ func (s *Service) CacheStatistics(ctx context.Context) ([]model.SharedCacheStats
 	if err != nil {
 		return nil, err
 	}
-	for _, provider := range []struct{ service, secret string }{{"alldebrid", config.AllDebridSecret}, {"torbox", config.TorBoxSecret}} {
-		if provider.secret == "" {
+	for _, provider := range model.DebridProviders() {
+		secret := config.DebridSecret(provider.ID)
+		if secret == "" {
 			continue
 		}
-		key, err := s.key(ctx, provider.secret)
+		key, err := s.key(ctx, secret)
 		if err != nil {
 			return nil, err
 		}
-		checks, err := s.DB.AvailabilityCheckStats(ctx, provider.service, fingerprint(key), after)
+		checks, err := s.DB.AvailabilityCheckStats(ctx, provider.ID, fingerprint(key), after)
 		if err != nil {
 			return nil, err
 		}
 		found := false
 		for i := range items {
-			if items[i].Service == provider.service {
+			if items[i].Service == provider.ID {
 				items[i].Checks = &checks
 				found = true
 				break
 			}
 		}
 		if !found {
-			items = append(items, model.SharedCacheStats{Service: provider.service, Checks: &checks})
+			items = append(items, model.SharedCacheStats{Service: provider.ID, Checks: &checks})
 		}
 	}
 	return items, nil

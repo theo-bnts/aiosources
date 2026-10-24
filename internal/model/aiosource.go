@@ -9,6 +9,10 @@ type AIOConfig struct {
 	TMDBSecret            string                `json:"tmdb_secret"`
 	AllDebridSecret       string                `json:"alldebrid_secret"`
 	TorBoxSecret          string                `json:"torbox_secret"`
+	DebridLinkSecret      string                `json:"debridlink_secret"`
+	DeepbridSecret        string                `json:"deepbrid_secret"`
+	PremiumizeSecret      string                `json:"premiumize_secret"`
+	RealDebridSecret      string                `json:"realdebrid_secret"`
 	AutoSync              bool                  `json:"auto_sync"`
 	AutoMatch             bool                  `json:"auto_match"`
 	SyncMinutes           int                   `json:"sync_minutes"`

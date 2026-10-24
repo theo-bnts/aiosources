@@ -123,7 +123,7 @@ func (s *Store) SharedAvailability(ctx context.Context, service string, hashes [
 	return out, databaseError("read shared availability", rows.Err())
 }
 func (s *Store) SaveSharedAvailability(ctx context.Context, service string, a model.AIOAvailability) error {
-	if (service != "alldebrid" && service != "torbox") || !sharedHashRE.MatchString(a.Hash) || a.CheckedAt.IsZero() {
+	if !model.IsDebridService(service) || !sharedHashRE.MatchString(a.Hash) || a.CheckedAt.IsZero() {
 		return model.ErrInvalid
 	}
 	files := append([]model.AIOFile{}, a.Files...)

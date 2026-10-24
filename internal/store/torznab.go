@@ -125,14 +125,15 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	if policy.Public || q.CachedOnly {
 		services := q.Services
 		if services == nil {
-			services = []string{"alldebrid", "torbox"}
+			services = model.DebridServices()
 		}
 		for _, service := range services {
-			if service != "alldebrid" && service != "torbox" {
+			if !model.IsDebridService(service) {
 				return result, model.ErrInvalid
 			}
 		}
 		cached := "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+
 		if policy.Public {
 			clauses = append(clauses, "(t.provider_id=ANY("+bind(policy.UncachedSources)+"::text[]) OR "+cached+")")
 		}

@@ -30,13 +30,12 @@ var subtitleMarker = regexp.MustCompile(`(?i)\b(?:VOSTFR|SUBFRENCH)\b`)
 
 func formatStream(stream Stream, rec model.AIORecord) Stream {
 	name := "AIOSources"
-	if stream.Hints.Indexer != "" {
-		name += " · " + stream.Hints.Indexer
-	}
 	if stream.Hints.Service != "" {
-		service, marker := "TorBox", "TB"
-		if stream.Hints.Service == "alldebrid" {
-			service, marker = "AllDebrid", "AD"
+		service, marker := model.ServiceName(stream.Hints.Service), ""
+		for _, provider := range model.DebridProviders() {
+			if provider.ID == stream.Hints.Service {
+				marker = provider.Marker
+			}
 		}
 		status := "❓ Cache unknown"
 		prefix := ""

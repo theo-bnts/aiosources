@@ -233,7 +233,7 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 		if visitor != nil {
 			canAdd = (configured && !tracker.Private) || announces[row.Provider] != ""
 		}
-		for _, service := range []string{"alldebrid", "torbox"} {
+		for _, service := range model.DebridServices() {
 			states, enabled := availability[service]
 			if !enabled {
 				continue
@@ -301,12 +301,12 @@ func (s *Service) CatalogDownload(ctx context.Context, workID int64, input model
 }
 
 func (s *Service) catalogDownload(ctx context.Context, workID int64, input model.CatalogDownloadInput, operationID, expectedAccount string, visitor *PublicInstallation) (result model.CatalogDownload, downloadErr error) {
-	if (input.Service != "alldebrid" && input.Service != "torbox") || !store.ValidOccurrenceID(input.OccurrenceID) || input.Fingerprint == "" || len(input.Fingerprint) > 128 {
+	if !model.IsDebridService(input.Service) || !store.ValidOccurrenceID(input.OccurrenceID) || input.Fingerprint == "" || len(input.Fingerprint) > 128 {
 		return result, model.ErrInvalid
 	}
 	if input.PreparationID != "" {
 		id, err := strconv.ParseInt(input.PreparationID, 10, 64)
-		if input.AllowUncached || err != nil || id < 0 || (input.Service == "alldebrid" && id == 0) || strconv.FormatInt(id, 10) != input.PreparationID {
+		if input.AllowUncached || ((input.Service == "alldebrid" || input.Service == "torbox") && (err != nil || id < 0 || (input.Service == "alldebrid" && id == 0) || strconv.FormatInt(id, 10) != input.PreparationID)) || len(input.PreparationID) > 1024 {
 			return result, model.ErrInvalid
 		}
 	}
@@ -389,10 +389,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	if visitor != nil {
 		key = visitor.Services[input.Service]
 	} else {
-		secret := config.TorBoxSecret
-		if input.Service == "alldebrid" {
-			secret = config.AllDebridSecret
-		}
+		secret := config.DebridSecret(input.Service)
 		key, err = s.key(ctx, secret)
 		if err != nil {
 			return result, err
@@ -453,10 +450,7 @@ func (s *Service) CheckOperationDownload(ctx context.Context, id string) (result
 	if err != nil {
 		return model.CatalogDownload{}, err
 	}
-	secret := config.TorBoxSecret
-	if saved.Input.Service == "alldebrid" {
-		secret = config.AllDebridSecret
-	}
+	secret := config.DebridSecret(saved.Input.Service)
 	key, err := s.key(ctx, secret)
 	if err != nil {
 		return model.CatalogDownload{}, err

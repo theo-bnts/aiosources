@@ -34,6 +34,7 @@ type Service struct {
 	lastError                 string
 	flights                   map[string]*flight
 	probes                    map[string]*adProbe
+	visitorPreparations       map[string]visitorPreparation
 	slots                     capacityGate
 	downloadSlots             capacityGate
 	cleanupSlots              capacityGate
@@ -141,7 +142,7 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 	if c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid
 	}
-	refs := []string{c.TMDBSecret, c.AllDebridSecret, c.TorBoxSecret}
+	refs := c.SecretReferences()
 	for id, t := range c.Trackers {
 		if !providers.ValidID(id) {
 			return model.ErrInvalid
@@ -354,8 +355,8 @@ func (s *Service) maintenance() {
 				_ = s.RecoverCleanup(s.ctx, key, false)
 			}
 		}
-		for service, name := range map[string]string{"alldebrid": c.AllDebridSecret, "torbox": c.TorBoxSecret} {
-			if name == "" {
+		for service, name := range c.DebridSecrets() {
+			if name == "" || service == "deepbrid" {
 				continue
 			}
 			key, e := s.key(s.ctx, name)

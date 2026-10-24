@@ -4,6 +4,10 @@ export type Config = {
   tmdb_secret: string
   alldebrid_secret: string
   torbox_secret: string
+  debridlink_secret: string
+  deepbrid_secret: string
+  premiumize_secret: string
+  realdebrid_secret: string
   auto_sync: boolean
   auto_match: boolean
   sync_minutes: number

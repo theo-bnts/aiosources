@@ -59,6 +59,12 @@ func (s *Store) SaveAIOAvailability(ctx context.Context, service, account string
 	}
 	return nil
 }
+
+func (s *Store) ForgetAIOAvailability(ctx context.Context, service, account, hash string, observed time.Time) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM ingest.aio_availability WHERE service=$1 AND account=$2 AND hash=$3 AND checked_at<=$4`, service, account, hash, observed)
+	return databaseError("invalidate account availability", err)
+}
+
 func (s *Store) AddAIOCleanup(ctx context.Context, v model.AIOCleanup) error {
 	_, err := s.pool.Exec(ctx, `INSERT INTO ingest.aio_cleanup(account,hash,magnet_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, v.Account, v.Hash, v.ID)
 	return databaseError("persist temporary magnet ownership", err)

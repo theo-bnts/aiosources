@@ -24,7 +24,13 @@ type PublicProvider struct {
 }
 
 // Adding a provider requires an adapter; unrecognized URL fields never become endpoints.
-var PublicProviders = []PublicProvider{{"alldebrid", "AllDebrid"}, {"torbox", "TorBox"}}
+var PublicProviders = func() []PublicProvider {
+	providers := []PublicProvider{}
+	for _, provider := range model.DebridProviders() {
+		providers = append(providers, PublicProvider{provider.ID, provider.Name})
+	}
+	return providers
+}()
 
 type PublicInstallation struct {
 	Preferences       model.StreamPreferences `json:"-"`
@@ -453,10 +459,36 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 				}
 			}
 		}
+	} else if service == "deepbrid" {
+		generation, e := s.DB.AIOCacheGeneration(ctx)
+		if e != nil {
+			return nil, e
+		}
+		pending := []string{}
+		for _, hash := range missing {
+			item := s.visitorPreparation(service, key, hash)
+			if len(item.Files) > 0 && item.Generation == generation {
+				states[hash] = model.AIOAvailability{Hash: hash, Cached: true, CheckedAt: time.Now(), Files: item.Files}
+			} else if item.ID != "" {
+				pending = append(pending, hash)
+			}
+		}
+		if len(pending) > 0 {
+			check, cancel := context.WithTimeout(ctx, time.Duration(min(c.ResponseSeconds, 15))*time.Second)
+			observed, _ := s.checkPublicService(check, service, key, resource, pending)
+			cancel()
+			for _, item := range observed {
+				states[item.Hash] = item
+			}
+		}
+
 	} else {
 		check, cancel := context.WithTimeout(ctx, time.Duration(min(c.ResponseSeconds, 15))*time.Second)
-		_ = s.checkPublicTorBox(check, key, resource, missing)
+		observed, _ := s.checkPublicService(check, service, key, resource, missing)
 		cancel()
+		for _, item := range observed {
+			states[item.Hash] = item
+		}
 	}
 	items, err = s.DB.SharedAvailability(ctx, service, hashes, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
 	if err != nil {
@@ -487,92 +519,16 @@ func (s *Service) publicAllDebridFlight(key, resource string, hashes []string, c
 	}
 	return f, err
 }
-func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, hashes []string) (checkErr error) {
-	if err := s.acquireCapacity(ctx, &s.publicProbe, "public_checks", true); err != nil {
-		return err
-	}
-	defer s.publicProbe.release()
-	lock := "public-cache:torbox:" + resource
-	var release func()
-	for {
-		var locked bool
-		var err error
-		release, locked, err = s.DB.AIOLock(ctx, lock)
-		if err != nil {
-			return err
-		}
-		if locked {
-			break
-		}
-		timer := time.NewTimer(50 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
-		}
-	}
-	defer release()
-	c, err := s.DB.AIOConfig(ctx)
-	if err != nil {
-		return err
-	}
-	previous, err := s.DB.SharedAvailability(ctx, "torbox", hashes, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
-	if err != nil {
-		return err
-	}
-	known := map[string]bool{}
-	for _, a := range previous {
-		known[a.Hash] = true
-	}
-	todo := []string{}
-	for _, h := range hashes {
-		if !known[h] {
-			todo = append(todo, h)
-		}
-	}
-	if len(todo) == 0 {
-		return nil
-	}
-	h, err := s.beginOperation(ctx, "cache", "torbox", "playback", resource, lock)
-	if err != nil {
-		return err
-	}
-	defer func() { h.finish(ctx, checkErr) }()
-	ctx = withProviderHistory(ctx, h)
-	h.checkpoint(ctx, "availability")
-	generation, err := s.DB.AIOCacheGeneration(ctx)
-	if err != nil {
-		return err
-	}
-	for start := 0; start < len(todo); start += 100 {
-		items, e := s.Providers.TBCheck(ctx, key, todo[start:min(len(todo), start+100)])
-		if e != nil {
-			h.run.Errors++
-			return e
-		}
-		for _, a := range items {
-			a.Generation = generation
-			if err = s.DB.SaveSharedAvailability(ctx, "torbox", a); err != nil {
-				return err
-			}
-			h.run.Processed++
-			if a.Cached {
-				h.run.Results["cached"]++
-			} else {
-				h.run.Results["uncached"]++
-			}
-		}
-		h.checkpoint(ctx, "availability")
-	}
-	return nil
+func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, hashes []string) error {
+	_, err := s.checkPublicService(ctx, "torbox", key, resource, hashes)
+	return err
 }
 func (p *ProviderHTTP) ValidateKey(ctx context.Context, service, key string) error {
 	path := "user/me?settings=false"
 	if service == "alldebrid" {
 		path = "v4/user"
 	} else if service != "torbox" {
-		return model.ErrInvalid
+		return p.validateExtendedKey(ctx, service, key)
 	}
 	data, err := p.request(ctx, service, key, "GET", path, nil, "")
 	if err != nil {
@@ -617,7 +573,7 @@ func (s *Service) TracePlayback(ctx context.Context, origin, service, mediaType,
 	started := time.Now()
 	item := newStremioHistory(mediaType, id)
 	item.Origin, item.Kind = origin, "playback"
-	if service == "alldebrid" || service == "torbox" {
+	if model.IsDebridService(service) {
 		item.Service = service
 	}
 	h := &playbackCalls{}

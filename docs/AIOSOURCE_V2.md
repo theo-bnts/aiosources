@@ -21,7 +21,7 @@ This is a clean deployment into a fresh database and state volume. Legacy tables
 | TMDB local catalog and IMDb correspondence | `aiosource/metadata.go`, `matching.go`, `release.go`; typed works/titles/seasons/episodes, durable versioned jobs and change/inventory checkpoints |
 | Matching safety | Every supplied external identifier is checked, including Torznab arrays; source observations veto conflicts; stale torrent fingerprints and metadata revisions cannot publish |
 | Metadata reset / match / independent stops | Authenticated extension API and Metadata page; cross-process worker locks protect resets |
-| AllDebrid / TorBox settings and availability | Encrypted vault references, transactional configuration revisions and account-scoped resource/observation tables |
+| Debrid settings and availability | Encrypted vault references, transactional configuration revisions and account-scoped resource/observation tables; [provider capabilities](DEBRID.md) distinguish global cache checks from account inventory |
 | Response budget and retry state | Owned single-flight resource tasks, bounded concurrency, independent positive validity, backoff and one final pre-expiry attempt; restart resumes current-account work |
 | Temporary AD deletion | Confirmed ownership persists before publication, account/hash locks separate cleanup from playback, failed jobs remain for explicit retry and inventory reconciliation |
 | Deferred Stremio playback | Revocable installation token, CORS, recognized AIOStreams markers, metadata-rich streams and exact episode file selection |

@@ -14,7 +14,7 @@ func TestStreamInteroperability(t *testing.T) {
 	published := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	record := model.AIORecord{Provider: "example-id", Title: "Example.Movie.2021.1080p.WEB-DL.H264", Hash: strings.Repeat("a", 40), Size: 5000000000, Languages: []string{"fra", "eng"}, PublishedAt: &published, DurationSeconds: 5400}
 	resource := Resource{Kind: "imdb", ID: "tt1234567", Type: "movie"}
-	for _, service := range []string{"direct", "alldebrid", "torbox"} {
+	for _, service := range append([]string{"direct"}, model.DebridServices()...) {
 		for _, cache := range []string{"cached", "download", "unknown"} {
 			if service == "direct" && cache != "unknown" {
 				continue
@@ -52,6 +52,11 @@ func TestStreamInteroperability(t *testing.T) {
 					} else if hints["cached"] != (cache == "cached") {
 						t.Fatal("cache is not an exact boolean")
 					}
+					if service == "deepbrid" && (strings.Contains(stream.Name, "[DB+") || strings.Contains(stream.Name, "[DB download]")) {
+						// AIOStreams already reserves DB for Debrider. Do not make
+						// an unsupported service look like another provider.
+						t.Fatal("Deepbrid used another service's recognized marker")
+					}
 				}
 				for _, private := range []string{"seeders", "peers", "attributes", "secret", "api_key", "videoHash"} {
 					if _, exists := object[private]; exists {
@@ -66,6 +71,27 @@ func TestStreamInteroperability(t *testing.T) {
 				t.Log("AIO_CONTRACT=" + string(data))
 			})
 		}
+	}
+}
+
+func TestStreamPresentationSeparatesSourceAndLanguageNamesFromServiceAliases(t *testing.T) {
+	// EN, SR and AD are all recognized service aliases in AIOStreams. Audio
+	// evidence and arbitrary source names must not change the stream's service.
+	record := model.AIORecord{Title: "Example.Movie.2021.mkv", Hash: strings.Repeat("a", 40), Languages: []string{"en", "sr"}}
+	for _, service := range []string{"direct", "deepbrid"} {
+		stream := baseStream(record, Resource{Type: "movie"}, "AD")
+		if service == "deepbrid" {
+			cached := true
+			stream = playbackStream(stream, record, service, &cached, nil, "https://playback.example.invalid/movie")
+		}
+		if stream.Hints.Indexer != "AD" || !strings.Contains(stream.Title, "🧭 AD") || !strings.Contains(stream.Name, "English / Serbian") || strings.Contains(stream.Name, "· AD") {
+			t.Fatal("source or audio metadata was lost or used as a service label")
+		}
+		encoded, err := json.Marshal(stream)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("AIO_CONTRACT=" + string(encoded))
 	}
 }
 

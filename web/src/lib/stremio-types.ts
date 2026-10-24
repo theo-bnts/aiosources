@@ -1,10 +1,11 @@
+import type { DebridService } from '@/lib/debrid'
 export type StremioResult = {
   name: string
   provider: string
   provider_name?: string
   source_id: string
   title: string
-  service: 'direct' | 'alldebrid' | 'torbox'
+  service: 'direct' | DebridService
   cache: 'direct' | 'cached' | 'download' | 'unknown'
   filename: string
   size: number
@@ -12,7 +13,7 @@ export type StremioResult = {
 export type StremioRequest = {
   origin: 'private' | 'public'
   kind: 'stream' | 'manifest' | 'playback'
-  service: '' | 'alldebrid' | 'torbox'
+  service: '' | DebridService
   calls?: {
     phase: string
     duration_ms: number

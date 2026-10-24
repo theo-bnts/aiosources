@@ -6,7 +6,7 @@ export const runtimeSections = {
       ['cache_jobs', 'Simultaneous cache updates', 1, 32],
       ['download_jobs', 'Simultaneous download preparations', 1, 32],
       ['cleanup_jobs', 'Simultaneous cleanup operations', 1, 32],
-      ['public_checks', 'Simultaneous public TorBox checks', 1, 16],
+      ['public_checks', 'Simultaneous public availability checks', 1, 16],
     ],
   },
   outgoing: {

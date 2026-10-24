@@ -1,3 +1,4 @@
+import { debridProviders } from '@/lib/debrid'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
@@ -31,12 +32,9 @@ export function DebridStatistics({ config }: { config: Config }) {
           <section className="space-y-4" aria-label="Availability checks">
             <h2 className="section-title">Availability checks</h2>
             <div className="grid gap-5 md:grid-cols-2">
-              {(
-                [
-                  ['alldebrid', 'AllDebrid', Boolean(config.alldebrid_secret)],
-                  ['torbox', 'TorBox', Boolean(config.torbox_secret)],
-                ] as const
-              ).map(([service, name, configured]) => {
+              {debridProviders.map((provider) => {
+                const { id: service, name } = provider
+                const configured = Boolean(config[provider.secret])
                 const item = query.data.items.find((item) => item.service === service)
                 const counts = item?.checks ?? item
                 const cached = counts?.cached ?? 0,
@@ -50,6 +48,7 @@ export function DebridStatistics({ config }: { config: Config }) {
                         {configured ? 'Configured' : 'Not configured'}
                       </Badge>
                     </div>
+                    {'hint' in provider && <p className="help">{provider.hint}</p>}
                     <dl className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <dt className="text-muted-foreground">Cached</dt>
@@ -67,7 +66,7 @@ export function DebridStatistics({ config }: { config: Config }) {
                     <p className="help">
                       {total
                         ? `${number(total)} ${item?.checks ? 'account checks' : 'shared observations'} · Last check: ${date(counts?.last_checked ?? undefined)}`
-                        : 'No checks in the current cache period.'}
+                        : 'No verified observations in the current cache period.'}
                     </p>
                     {item?.checks && (
                       <p className="help">

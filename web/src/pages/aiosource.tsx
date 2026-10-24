@@ -1,3 +1,4 @@
+import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { AdvancedSettings } from '@/components/advanced-settings'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
@@ -166,14 +167,14 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       return next
     })
   }
-  const secret = (label: string, key: 'tmdb_secret' | 'alldebrid_secret' | 'torbox_secret') => (
+  const secret = (label: string, key: 'tmdb_secret' | DebridSecret) => (
     <SecretPicker
       inputId={key}
       label={label}
       value={config?.[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
       prefix={key.replace('_secret', '')}
-      addLabel={`Add ${key === 'tmdb_secret' ? 'TMDB token' : key === 'alldebrid_secret' ? 'AllDebrid key' : 'TorBox key'}`}
+      addLabel={`Add ${key === 'tmdb_secret' ? 'TMDB token' : `${debridProviders.find((provider) => provider.secret === key)?.name} key`}`}
       valueLabel={label}
       disabled={save.isPending}
     />
@@ -289,8 +290,12 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               </>
             ) : (
               <>
-                {secret('AllDebrid API key', 'alldebrid_secret')}
-                {secret('TorBox API key', 'torbox_secret')}
+                {debridProviders.map((provider) => (
+                  <div key={provider.id} className="min-w-0 space-y-2">
+                    {secret(`${provider.name} API key`, provider.secret)}
+                    {'hint' in provider && <p className="help">{provider.hint}</p>}
+                  </div>
+                ))}
                 {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
                 {number('Stream response timeout (seconds)', 'response_seconds', 2, 60)}
               </>
@@ -460,8 +465,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           <SharingPage
             format="stremio"
             services={[
-              ...(config.alldebrid_secret ? [{ id: 'alldebrid', name: 'AllDebrid' }] : []),
-              ...(config.torbox_secret ? [{ id: 'torbox', name: 'TorBox' }] : []),
+              ...debridProviders.filter((provider) => config[provider.secret]),
               { id: 'direct', name: 'Direct torrents' },
             ]}
           />

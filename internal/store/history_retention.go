@@ -65,6 +65,10 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		}
 		return databaseError("expire history batch", err)
 	}
+	if err = exec(`DELETE FROM ingest.aio_preparations WHERE (service,account,hash) IN (
+ SELECT service,account,hash FROM ingest.aio_preparations WHERE expires_at<now() ORDER BY expires_at LIMIT $1)`, batchSize); err != nil {
+		return 0, err
+	}
 	// A reference never keeps an old original archive alive indefinitely. New
 	// observations retain their processing identity, with no archived payload.
 	for _, table := range []string{"raw_records", "pages"} {

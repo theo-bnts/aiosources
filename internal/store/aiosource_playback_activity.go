@@ -9,7 +9,7 @@ import (
 // Each failed playback remains diagnosable, independently of deduplicated
 // provider incidents. No external message, source identity, key or URL is stored.
 func (s *Store) RecordPlaybackFailure(ctx context.Context, service, stage, code string) error {
-	if service != "alldebrid" && service != "torbox" {
+	if !model.IsDebridService(service) {
 		return model.ErrInvalid
 	}
 	operation := map[string]string{

@@ -154,9 +154,9 @@ func (s *Service) checkResourceTriggered(ctx context.Context, service, key, reso
 		return err
 	}
 	var checkErr error
-	if service == "torbox" {
+	if service != "alldebrid" {
 		for start := 0; start < len(todo); start += 100 {
-			results, e := s.Providers.TBCheck(ctx, key, todo[start:min(len(todo), start+100)])
+			results, e := s.checkProviderAvailability(ctx, service, key, todo[start:min(len(todo), start+100)], false)
 			if e != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -437,7 +437,7 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 	out := map[string]map[string]model.AIOAvailability{}
 	keys := map[string]string{}
 	flights := []*flight{}
-	for service, name := range map[string]string{"alldebrid": c.AllDebridSecret, "torbox": c.TorBoxSecret} {
+	for service, name := range c.DebridSecrets() {
 		if name == "" {
 			continue
 		}
@@ -465,6 +465,15 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 		}
 		if len(missing) == 0 {
 			continue
+		}
+		if service == "deepbrid" {
+			prepared, err := s.DB.AIOPreparations(ctx, service, fingerprint(key), missing)
+			if err != nil {
+				return nil, err
+			}
+			if len(prepared) == 0 {
+				continue
+			}
 		}
 		resourceState, found, err := s.DB.AIOResource(ctx, service, fingerprint(key), resource)
 		if err != nil {

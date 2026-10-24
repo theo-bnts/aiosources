@@ -55,7 +55,7 @@ func TestInternalSecretsCannotCrossPurposesOrVaultCRUD(t *testing.T) {
 func TestPublicSearchCapabilitiesHaveSeparatePurposes(t *testing.T) {
 	ctx, db := openDatabase(t)
 	v := openVault(t, ctx, db, bytes.Repeat([]byte{0x24}, 32))
-	purposes := []string{"public-installation-v1", "public-playback-v1", "public-torznab-v1", "public-catalog-source-v1", "public-catalog-preparation-v1", "public-catalog-file-v1", "catalog-browser-download-v1"}
+	purposes := []string{"provider-preparation-v1", "public-installation-v1", "public-playback-v1", "public-torznab-v1", "public-catalog-source-v1", "public-catalog-preparation-v1", "public-catalog-file-v1", "catalog-browser-download-v1"}
 	for _, purpose := range purposes {
 		sealed, err := v.Seal(purpose, []byte("synthetic-capability-payload"))
 		if err != nil {

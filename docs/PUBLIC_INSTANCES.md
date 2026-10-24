@@ -5,7 +5,7 @@ Use an existing public instance to connect your apps, or enable a visitor page o
 ## Use a public instance
 
 1. Open the instance address supplied by its administrator. No administrator account is needed.
-2. Choose **Connections → Stremio**, enter your personal AllDebrid or TorBox key (at least one is required), then create your installation link.
+2. Choose **Connections → Stremio**, enter at least one personal key for a [supported debrid service](DEBRID.md), then create your installation link.
 3. Adjust optional **Filters** and install the generated link in Stremio or AIOStreams. When AIOSources handles playback, leave **Service Wrap** and **Reconfigure Service** disabled for this addon in AIOStreams.
 4. Keep the link private. It contains your encrypted configuration and grants access using your account.
 
@@ -19,7 +19,7 @@ AIOSources does not save your submitted keys or announces on the server. Validat
 
 Public access is optional and disabled by default. An administrator can enable it in **Administration → Public access** after setting `PUBLIC_URL` to the instance's external HTTPS origin. Literal loopback HTTP addresses are accepted for local testing.
 
-Under **Connections**, choose separately whether to offer **Search**, **Stremio** and **Torznab**. Only enabled pages appear in public navigation; a direct link to a disabled page opens an available connection, or the administrator login if none remain. Existing instances keep Stremio enabled after upgrading. Stremio visitors enter an AllDebrid key, a TorBox key, or both, and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Search and Torznab are opt-in; Torznab uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
+Under **Connections**, choose separately whether to offer **Search**, **Stremio** and **Torznab**. Only enabled pages appear in public navigation; a direct link to a disabled page opens an available connection, or the administrator login if none remain. Existing instances keep Stremio enabled after upgrading. Stremio visitors enter one or more personal keys for supported debrid services and create an installation link for Stremio or AIOStreams. At least one service is required for Stremio. Search and Torznab are opt-in; Torznab uses the recipient's download client for debrid accounts. **Admin login** opens the ordinary administration login. Visitors do not receive access to Sources, Settings, Secrets, Logs or histories.
 
 When disabled, the homepage keeps its ordinary login. Disabling public access revokes existing public installation links; enabling it again does not restore those links. Private installations and administrator sessions retain their behavior.
 
@@ -44,6 +44,10 @@ The shared cache is indexed independently by **service and info hash**. It conta
 A visitor's fresh TorBox check can be reused by the administrator or another visitor; administrator observations can be reused in the other direction. A request with only AllDebrid does not mark TorBox as checked. Each service has independent freshness. Positive observations use the configured cache validity; negatives expire after at most 15 minutes. Failed or malformed responses stay unknown. Older results cannot overwrite newer observations, and a cache reset rejects writers from the previous cache generation.
 
 **TorBox** offers a read-only cache check. Missing observations are checked with the visitor's key during the stream request, without adding torrents. Cached-only private-source playback uses its documented cached-only creation option. The selected file is resolved again within the visitor's account.
+
+**Premiumize** uses its global cache check and reads cached file lists without creating a cloud transfer. **Debrid-Link** accepts a bare hash only when it is already cached; this can add a ready item to the visitor's account, but never submits an uncached magnet during a cache check. Failed checks stay unknown.
+
+**Real-Debrid** has no documented global cache check. Ready files already in the visitor's account can be used, but an inventory miss remains unknown and is never shared as provider-wide availability. **Deepbrid** confirms ready files after an explicitly authorized preparation. Its temporary visitor preparation locators expire and are never saved to PostgreSQL; after a restart it cannot reconstruct those account-only observations from a hash. Neither service is probed by starting uncached torrents.
 
 **AllDebrid** availability probing can create account entries. Missing shared observations use the administrator's existing recoverable probes and ownership-aware cleanup, with one public-triggered probe active at a time. An administrator AllDebrid account is therefore needed to fill a cold AllDebrid cache for private-source results. A confirmed new upload that is immediately ready, supplies usable files and successfully resolves visitor playback also contributes a positive shared observation. An existing account download alone is not promoted into global availability.
 
@@ -93,7 +97,7 @@ By default, budgets use the direct connection address. Behind a reverse proxy, c
 
 Automated backend tests cover installation encryption, revocation, administration isolation, independent cache expiry, reset fencing, error handling, account isolation, cache disappearance and history privacy. Browser tests cover enabled and disabled modes, credential clearing, mobile layout and history navigation. Provider HTTP fixtures exercise actual adapter requests and response parsing without contacting live accounts. This is not live validation with two independently subscribed provider accounts; provider account or network restrictions can still affect a particular deployment.
 
-Provider references: [AllDebrid API](https://docs.alldebrid.com/), [TorBox API](https://api-docs.torbox.app/).
+See [debrid playback](DEBRID.md) for supported services, cache limitations and official API references.
 
 ## Public navigation and Torznab
 

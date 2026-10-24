@@ -1,3 +1,4 @@
+import { serviceNames } from '@/lib/debrid'
 import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -45,7 +46,7 @@ const outcomes = {
   busy: 'Too many active requests',
   pending: 'Playback pending',
 } as const
-const services = { direct: 'Direct', alldebrid: 'AllDebrid', torbox: 'TorBox' } as const
+const services = serviceNames
 const cacheLabels = {
   direct: 'Direct',
   cached: 'Cached',

@@ -30,7 +30,7 @@ The endpoint is `/torznab/ACCESS_ID/api`. Every call, including capabilities, re
 | `limit`, `offset` | Page size and offset. Default 100, maximum 200. Zero limit and an offset beyond the total return an empty page with its total. |
 | `minage`, `maxage` | Minimum/maximum age in whole days, applied to known publication dates. |
 | `minsize`, `maxsize` | Minimum/maximum size in whole MiB. |
-| `services`, `cached_only` | AIOSources extensions: select known cache services (`alldebrid`, `torbox`) and require fresh positive shared cache availability. No provider calls are made. |
+| `services`, `cached_only` | AIOSources extensions: select cache services and require fresh positive shared cache availability. Supported IDs: `alldebrid`, `debridlink`, `deepbrid`, `premiumize`, `realdebrid`, `torbox`. No provider calls are made; account-only evidence from Real-Debrid and Deepbrid is not included. See [debrid playback](DEBRID.md). |
 | `extended`, `attrs`, `o=xml` | Compatibility parameters. Responses include all supported safe attributes. JSON output and unsupported search families are not advertised. |
 
 For example, a client can use `&sources=alpha,beta&media=movie` while another uses `&sources=beta&media=tv` with the same endpoint and key. `sources` and `media` are AIOSources extensions; `cat`, capabilities, RSS, errors and pagination follow Torznab conventions. Prefer your client's parameter fields instead of manually combining URLs with duplicate parameter names.

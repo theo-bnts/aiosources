@@ -67,7 +67,7 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 		return err
 	}
 	defer rollback(tx)
-	refs := []string{c.TMDBSecret, c.AllDebridSecret, c.TorBoxSecret}
+	refs := c.SecretReferences()
 	for _, t := range c.Trackers {
 		refs = append(refs, t.AnnounceSecret, t.PasskeySecret)
 	}

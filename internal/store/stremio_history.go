@@ -26,7 +26,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if (item.Origin != "private" && item.Origin != "public") || (item.Kind != "stream" && item.Kind != "manifest" && item.Kind != "playback") {
 		return model.ErrInvalid
 	}
-	if item.Service != "" && (item.Kind != "playback" || (item.Service != "alldebrid" && item.Service != "torbox")) {
+	if item.Service != "" && (item.Kind != "playback" || !model.IsDebridService(item.Service)) {
 		return model.ErrInvalid
 	}
 	if len(item.Calls) > 32 {
@@ -62,7 +62,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 		if strings.Contains(result.SourceID, "://") || strings.HasPrefix(result.SourceID, "magnet:") {
 			result.SourceID = ""
 		}
-		if (result.Service != "direct" && result.Service != "alldebrid" && result.Service != "torbox") || (result.Cache != "direct" && result.Cache != "cached" && result.Cache != "download" && result.Cache != "unknown") || result.Size < 0 {
+		if (result.Service != "direct" && !model.IsDebridService(result.Service)) || (result.Cache != "direct" && result.Cache != "cached" && result.Cache != "download" && result.Cache != "unknown") || result.Size < 0 {
 			return model.ErrInvalid
 		}
 		result.Title = string([]rune(result.Title)[:min(1024, len([]rune(result.Title)))])

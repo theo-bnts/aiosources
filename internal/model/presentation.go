@@ -49,7 +49,7 @@ func ValidStreamPreferences(p StreamPreferences) bool {
 // Saved access can select more sources than fit into a public installation URL.
 // The playback policy has the same source bound as other saved access grants.
 func ValidPlaybackPreferences(p StreamPreferences) bool {
-	if len(p.Sources) > 1000 || len(p.Services) > 3 || len(p.Types) > 3 {
+	if len(p.Sources) > 1000 || len(p.Services) > len(DebridServices())+1 || len(p.Types) > 3 {
 		return false
 	}
 	seen := map[string]bool{}
@@ -59,7 +59,7 @@ func ValidPlaybackPreferences(p StreamPreferences) bool {
 		}
 		seen[source] = true
 	}
-	for _, pair := range []struct{ values, allowed []string }{{p.Services, []string{"alldebrid", "torbox", "direct"}}, {p.Types, []string{"movie", "series", "anime"}}} {
+	for _, pair := range []struct{ values, allowed []string }{{p.Services, append(DebridServices(), "direct")}, {p.Types, []string{"movie", "series", "anime"}}} {
 		clear(seen)
 		for _, value := range pair.values {
 			if !slices.Contains(pair.allowed, value) || seen[value] {

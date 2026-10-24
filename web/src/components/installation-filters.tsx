@@ -1,3 +1,4 @@
+import { serviceNames } from '@/lib/debrid'
 import type { InstallationOptions } from '@/lib/language-preferences'
 import { ConnectionFilterFields, stremioMediaTypes } from '@/components/connection-filter-fields'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -31,7 +32,7 @@ export function InstallationFilters({
       .filter((id) => !services.some((service) => service.id === id))
       .map((id) => ({
         id,
-        name: `${{ alldebrid: 'AllDebrid', torbox: 'TorBox', direct: 'Direct torrents' }[id] || id} (not configured)`,
+        name: `${serviceNames[id] || id} (not configured)`,
       })),
   ]
   const fields = (

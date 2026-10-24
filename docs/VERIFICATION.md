@@ -1,5 +1,17 @@
 # Public release verification
 
+## Debrid expansion and link previews — 24 October 2026
+
+The production browser suite passes 179 scenarios and the frontend unit suite passes 46 tests. The six-service layouts are checked at 320, 390 and 1,440 pixels, including administrator credentials, public browser storage, connection filters, statistics, routing and download controls. Anonymous initial HTML includes the local preview image and never reflects a credential-bearing request URL.
+
+Provider contract and PostgreSQL integration tests cover the four added adapters: usable-account validation, rate and capacity errors, ready/pending/deleted transfers, exact episode selection, private-source permissions, encrypted continuation bindings, restart reuse and visitor-state isolation. Upgrade tests preserve existing credentials, configuration and history. Deadline and cache-reset tests retain only verified evidence from the current generation.
+
+Twenty-one synthetic responses were checked against the service-classification methods and service catalog from [AIOStreams revision ed8b085](https://github.com/Viren070/AIOStreams/tree/ed8b085f081bc8442dc59ac9de4a4a2070b93f0a). Five services are recognized by name; Deepbrid remains HTTP playback. Audio and source labels do not become incorrect service identifiers.
+
+No paid provider account was available. These checks validate documented contracts and application behavior with simulated providers, not live delivery for every subscription. See [Debrid playback](DEBRID.md) for the differences between global cache checks and account-specific evidence.
+
+## Earlier release baseline
+
 Verified on 17 October 2026 using the embedded production application, PostgreSQL 18.6 and disposable databases. Source and service fixtures use fictitious addresses or isolated local servers; no production credential or private source definition is required.
 
 ## Completed local checks

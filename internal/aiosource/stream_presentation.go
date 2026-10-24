@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 )
 
 type streamLanguage struct {
@@ -118,13 +120,20 @@ func streamLanguages(r model.AIORecord) []streamLanguage {
 
 func streamLanguageLabel(languages []streamLanguage) string {
 	labels, flags := []string{}, []string{}
-	for _, language := range languages {
-		labels = append(labels, strings.ToUpper(language.code))
-		if language.flag != "" {
-			flags = append(flags, language.flag)
+	for _, item := range languages {
+		label := "MULTI"
+		if item.code != "multi" {
+			// Short codes such as EN and SR are also service aliases in
+			// aggregators. Keep audio names unambiguous without changing the
+			// normalized language evidence used for filtering.
+			label = display.English.Languages().Name(language.Make(item.code))
+		}
+		labels = append(labels, label)
+		if item.flag != "" {
+			flags = append(flags, item.flag)
 		}
 	}
-	return strings.TrimSpace(strings.Join(labels, "/") + " " + strings.Join(flags, " "))
+	return strings.TrimSpace(strings.Join(labels, " / ") + " " + strings.Join(flags, " "))
 }
 
 func streamSize(bytes int64) string {

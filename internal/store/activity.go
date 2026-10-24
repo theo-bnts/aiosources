@@ -25,7 +25,7 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	if err := validateActivityPage(options.ListOptions); err != nil {
 		return result, err
 	}
-	if options.Service != "" && options.Service != "tmdb" && options.Service != "alldebrid" && options.Service != "torbox" && options.Service != "network" {
+	if options.Service != "" && options.Service != "tmdb" && !model.IsDebridService(options.Service) && options.Service != "network" {
 		return result, model.ErrInvalid
 	}
 	for _, level := range options.Levels {

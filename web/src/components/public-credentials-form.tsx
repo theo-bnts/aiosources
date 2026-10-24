@@ -1,3 +1,4 @@
+import { debridProviders } from '@/lib/debrid'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from '@/lib/api'
 import {
@@ -113,44 +114,48 @@ export function PublicCredentialsForm({
       }}
     >
       <fieldset disabled={pending} className="space-y-5">
-        {info.providers.map((provider) => {
-          const retained = saved?.services.includes(provider.id) && !removed.includes(provider.id)
-          return (
-            <div className="field" key={provider.id}>
-              <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-              <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                <Input
-                  id={`public-${provider.id}`}
-                  name={provider.id}
-                  type="password"
-                  autoComplete="off"
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  maxLength={512}
-                  placeholder={
-                    retained ? 'Saved on this browser · enter a key to replace it' : undefined
-                  }
-                />
-                {retained && (saved?.services.length ?? 0) > 1 && (
-                  <Button
-                    type="button"
-                    variant="warning"
-                    size="sm"
-                    className="self-start sm:self-auto"
-                    onClick={() => setRemoved((ids) => [...ids, provider.id])}
-                  >
-                    Remove key
-                  </Button>
-                )}
+        <div className="grid items-start gap-5 md:grid-cols-2">
+          {info.providers.map((provider) => {
+            const details = debridProviders.find((item) => item.id === provider.id)
+            const retained = saved?.services.includes(provider.id) && !removed.includes(provider.id)
+            return (
+              <div className="field" key={provider.id}>
+                <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                  <Input
+                    id={`public-${provider.id}`}
+                    name={provider.id}
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    maxLength={512}
+                    placeholder={
+                      retained ? 'Saved on this browser · enter a key to replace it' : undefined
+                    }
+                  />
+                  {retained && (saved?.services.length ?? 0) > 1 && (
+                    <Button
+                      type="button"
+                      variant="warning"
+                      size="sm"
+                      className="self-start sm:self-auto"
+                      onClick={() => setRemoved((ids) => [...ids, provider.id])}
+                    >
+                      Remove key
+                    </Button>
+                  )}
+                </div>
+                {details && 'hint' in details && <p className="help">{details.hint}</p>}
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
         <p className="help">
           Enter at least one key. Your keys and optional announce URLs are remembered automatically
           on this browser in an encrypted configuration, shared between Search, Stremio and Torznab.
-          The server does not save them. Request history retains media, results and errors for up to
-          7 days without identifying you.
+          The server does not save them. Request history retains media, results and errors for the
+          instance’s configured retention period without identifying you.
         </p>
         {children}
       </fieldset>

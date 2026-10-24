@@ -19,6 +19,11 @@ func ServiceName(service string) string {
 	case "torbox":
 		return "TorBox"
 	default:
+		for _, provider := range DebridProviders() {
+			if provider.ID == service {
+				return provider.Name
+			}
+		}
 		return ""
 	}
 }

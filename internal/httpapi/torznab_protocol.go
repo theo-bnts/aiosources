@@ -52,7 +52,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 	if v.Has("services") {
 		q.Services = strings.Split(v.Get("services"), ",")
 		for _, service := range q.Services {
-			if service != "alldebrid" && service != "torbox" {
+			if !model.IsDebridService(service) {
 				return q, v, model.ErrInvalid
 			}
 		}

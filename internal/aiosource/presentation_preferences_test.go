@@ -52,7 +52,7 @@ func TestFormatterPreservesStructuredMetadataAndOmitsMissingFields(t *testing.T)
 			t.Fatal("display metadata missing", value, out.Title)
 		}
 	}
-	if !strings.Contains(out.Name, "Cached") || !strings.Contains(out.Name, "FR") || out.Hints.Size != 9_000_000_000 || out.Hints.Service != "alldebrid" || out.Hints.FolderName != r.Title {
+	if !strings.Contains(out.Name, "Cached") || !strings.Contains(out.Name, "French") || out.Hints.Size != 9_000_000_000 || out.Hints.Service != "alldebrid" || out.Hints.FolderName != r.Title {
 		t.Fatal(out)
 	}
 	empty := baseStream(model.AIORecord{Title: "Example"}, Resource{Type: "movie"}, "")

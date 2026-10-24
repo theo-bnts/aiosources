@@ -86,6 +86,7 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 	if q.Mode == "caps" {
 		response = torznabCaps(share, origin)
 	} else {
+
 		match := func(rec model.AIORecord) bool {
 			return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode)
 		}

@@ -1,3 +1,4 @@
+import { debridProviders } from './debrid.ts'
 import { runtimeSections, type RuntimeSection } from './runtime-settings-definitions.ts'
 import { importNumberFields } from './import-settings-definitions.ts'
 
@@ -21,6 +22,8 @@ export type Setting = {
 }
 
 const settings: Setting[] = []
+const providerSettingSuffix = (id: string) =>
+  id === 'alldebrid' ? 'ad' : id === 'torbox' ? 'tb' : id
 function add(
   base: Omit<Setting, 'id' | 'title'>,
   fields: readonly (readonly [string, string, string?])[],
@@ -113,8 +116,14 @@ add(
   ],
 )
 add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
-  ['debrid.ad', 'AllDebrid API key', 'credential token cle'],
-  ['debrid.tb', 'TorBox API key', 'credential token cle'],
+  ...debridProviders.map(
+    (p) =>
+      [
+        `debrid.${providerSettingSuffix(p.id)}`,
+        `${p.name} API key`,
+        'credential token cle',
+      ] as const,
+  ),
   ['debrid.cache', 'Cache validity (minutes)', 'availability expiration cache'],
   ['debrid.response', 'Stream response timeout (seconds)'],
 ])
@@ -199,8 +208,7 @@ add(
   [
     ['routing.default', 'Outgoing connections', 'default connection'],
     ['routing.tmdb', 'TMDB'],
-    ['routing.ad', 'AllDebrid'],
-    ['routing.tb', 'TorBox'],
+    ...debridProviders.map((p) => [`routing.${providerSettingSuffix(p.id)}`, p.name] as const),
     ['routing.downloads', 'Browser downloads'],
   ],
 )
@@ -576,8 +584,9 @@ for (const [area, route] of [
         reveal: area === 'search' ? ['Debrid services'] : [],
       },
       [
-        [`visitor.${area}.ad`, 'AllDebrid API key'],
-        [`visitor.${area}.tb`, 'TorBox API key'],
+        ...debridProviders.map(
+          (p) => [`visitor.${area}.${providerSettingSuffix(p.id)}`, `${p.name} API key`] as const,
+        ),
       ],
     )
   settings.push({
@@ -658,9 +667,10 @@ export function visibleSettings(visibility: SettingsVisibility) {
     if (!setting.public || !visibility[setting.public]) return false
     if (setting.title === 'Sources' && !visibility.sources) return false
     if (setting.id.endsWith('.announces') && !visibility.announces) return false
-    if (setting.title === 'AllDebrid API key' && !visibility.services?.includes('alldebrid'))
-      return false
-    if (setting.title === 'TorBox API key' && !visibility.services?.includes('torbox')) return false
+    const provider = debridProviders.find(
+      (provider) => setting.title === `${provider.name} API key`,
+    )
+    if (provider && !visibility.services?.includes(provider.id)) return false
     return true
   })
 }

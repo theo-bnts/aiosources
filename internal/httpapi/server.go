@@ -127,7 +127,7 @@ func New(options Options) (http.Handler, error) {
 	mux.HandleFunc("/api/", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "API route not found")
 	}))
-	mux.Handle("/", staticFrontend(options.Frontend))
+	mux.Handle("/", staticFrontend(options.Frontend, auth.origin))
 	return securityHeaders(recoverRequests(mux)), nil
 }
 
@@ -668,7 +668,7 @@ func (s *server) torrents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, normalizedList(result))
 }
 
-func staticFrontend(frontend fs.FS) http.Handler {
+func staticFrontend(frontend fs.FS, origins ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -705,6 +705,21 @@ func staticFrontend(frontend fs.FS) http.Handler {
 		}
 		if name == "index.html" {
 			w.Header().Set("Cache-Control", "no-cache")
+			// Social crawlers read the initial HTML without running JavaScript.
+			// Use only the configured origin, never request paths, query strings,
+			// forwarded headers or a visitor's credential-bearing URL.
+			data, err := io.ReadAll(file)
+			if err != nil {
+				http.Error(w, "Asset read failed", http.StatusInternalServerError)
+				return
+			}
+			origin := ""
+			if len(origins) > 0 {
+				origin = sharePreviewOrigin(origins[0])
+			}
+			data = bytes.ReplaceAll(data, []byte("__AIOSOURCES_PUBLIC_ORIGIN__"), []byte(origin))
+			http.ServeContent(w, r, name, info.ModTime(), bytes.NewReader(data))
+			return
 		} else if strings.HasPrefix(name, "assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {

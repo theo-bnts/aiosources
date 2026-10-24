@@ -33,7 +33,7 @@ type Behavior struct {
 }
 
 func Manifest() map[string]any {
-	return map[string]any{"id": "org.aiosource.v2", "version": "2.1.0", "name": "AIOSources", "description": "Local sources with verified IMDb mapping and optional AllDebrid / TorBox playback", "resources": []any{map[string]any{"name": "stream", "types": []string{"movie", "series", "anime"}, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}, "types": []string{"movie", "series", "anime"}, "catalogs": []any{}, "behaviorHints": map[string]bool{"configurable": true}}
+	return map[string]any{"id": "org.aiosource.v2", "version": "2.1.0", "name": "AIOSources", "description": "Search your source catalogs with verified film and series identification, optional debrid playback, and Stremio integration", "resources": []any{map[string]any{"name": "stream", "types": []string{"movie", "series", "anime"}, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}, "types": []string{"movie", "series", "anime"}, "catalogs": []any{}, "behaviorHints": map[string]bool{"configurable": true}}
 }
 func (s *Service) magnet(ctx context.Context, rec model.AIORecord, c model.AIOConfig) (string, []string, error) {
 	q := url.Values{"dn": {rec.Title}}
@@ -168,12 +168,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	var availability map[string]map[string]model.AIOAvailability
 	// Filter before availability checks, so an unselected service is never
 	// contacted. The stored configuration and visitor credential remain intact.
-	if !AllowsInstallation(preferences, "", "alldebrid", mediaType) {
-		c.AllDebridSecret = ""
-	}
-	if !AllowsInstallation(preferences, "", "torbox", mediaType) {
-		c.TorBoxSecret = ""
-	}
+	c = c.RestrictDebrid(preferences.Services)
 	if visitor == nil {
 		availability, err = s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
 	} else {
@@ -230,7 +225,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			recordResult(rec, stream, "direct", "direct")
 			continue
 		}
-		for _, service := range []string{"alldebrid", "torbox"} {
+		for _, service := range model.DebridServices() {
 			states, enabled := availability[service]
 			if !enabled {
 				continue
@@ -339,7 +334,7 @@ type playbackPolicy struct {
 }
 
 func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sourceID, mediaType, id string, visitor *PublicInstallation, policy playbackPolicy) (string, error) {
-	if service != "alldebrid" && service != "torbox" {
+	if !model.IsDebridService(service) {
 		return "", model.ErrInvalid
 	}
 	r, err := ParseID(id, mediaType)
@@ -390,10 +385,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 	var key, magnet string
 	var observed model.AIOAvailability
 	if visitor == nil {
-		name := c.TorBoxSecret
-		if service == "alldebrid" {
-			name = c.AllDebridSecret
-		}
+		name := c.DebridSecret(service)
 		if name == "" {
 			return "", model.ErrInvalid
 		}
@@ -428,6 +420,13 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		announce := ""
 		if private {
 			items, e := s.DB.SharedAvailability(life, service, []string{rec.Hash}, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
+			if e == nil && len(items) == 0 && (service == "realdebrid" || service == "deepbrid") {
+				states, checkErr := s.publicServiceAvailability(life, c, "playback:"+rec.Hash, []string{rec.Hash}, service, key)
+				e = checkErr
+				if state, known := states[rec.Hash]; known {
+					items = append(items, state)
+				}
+			}
 			if e != nil {
 				return "", e
 			}
@@ -456,7 +455,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 	if err != nil {
 		return "", err
 	}
-	if service == "torbox" {
+	if service != "alldebrid" && service != "torbox" {
+		link, err = s.prepareProvider(life, service, key, rec, magnet, r, cachedOnly, policy, generation, visitor != nil)
+	} else if service == "torbox" {
 		var prepared string
 		link, prepared, err = s.Providers.tbPrepare(life, key, rec.Hash, magnet, r, cachedOnly, policy.PreparationID)
 		if policy.PreparedID != nil {

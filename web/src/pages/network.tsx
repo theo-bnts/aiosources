@@ -1,3 +1,4 @@
+import { debridProviders } from '@/lib/debrid'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { AdvancedSettings } from '@/components/advanced-settings'
@@ -505,8 +506,7 @@ export function NetworkRoutingPage() {
               <h2 className="section-title">Debrid</h2>
               <div className="grid gap-5 md:grid-cols-2">
                 {[
-                  ['debrid:alldebrid', 'AllDebrid'],
-                  ['debrid:torbox', 'TorBox'],
+                  ...debridProviders.map((provider) => [`debrid:${provider.id}`, provider.name]),
                   ['downloads', 'Browser downloads'],
                 ].map(([target, label]) => (
                   <ConnectionSelect

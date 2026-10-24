@@ -10,11 +10,11 @@ type TorznabPreferences struct {
 }
 
 func (p TorznabPreferences) Valid() bool {
-	if len(p.Services) > 2 {
+	if len(p.Services) > len(DebridServices()) {
 		return false
 	}
 	for i, service := range p.Services {
-		if (service != "alldebrid" && service != "torbox") || slices.Contains(p.Services[:i], service) {
+		if !IsDebridService(service) || slices.Contains(p.Services[:i], service) {
 			return false
 		}
 	}

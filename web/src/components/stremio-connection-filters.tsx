@@ -1,3 +1,4 @@
+import { serviceNames } from '@/lib/debrid'
 import { stremioMediaTypes } from '@/components/connection-filter-fields'
 import { InstallationFilters } from '@/components/installation-filters'
 import { LanguageFilter } from '@/components/language-filter'
@@ -53,12 +54,7 @@ export function stremioPreferenceSummary(value?: StremioPreferences) {
         (type) => stremioMediaTypes.find((option) => option.value === type)?.label || type,
       ),
     )
-  if (value.services?.length)
-    filters.push(
-      ...value.services.map(
-        (id) => ({ alldebrid: 'AllDebrid', torbox: 'TorBox', direct: 'Direct torrents' })[id] || id,
-      ),
-    )
+  if (value.services?.length) filters.push(...value.services.map((id) => serviceNames[id] || id))
   if (value.mode && value.mode !== 'all') {
     const preferred = resolvedLanguage(value)
     const language = new Intl.DisplayNames(['en'], { type: 'language' }).of(preferred) || preferred
