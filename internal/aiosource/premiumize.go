@@ -77,10 +77,13 @@ func (p *ProviderHTTP) PMCheck(ctx context.Context, key string, hashes []string)
 		item := model.AIOAvailability{Hash: hashes[i], Cached: cached, Shareable: true, CheckedAt: time.Now()}
 		if cached {
 			// Listing cached files is read-only: no cloud transfer is created.
-			// A missing file list never turns a cache hit into a negative check.
-			item.Files, _ = p.pmDirect(ctx, key, "magnet:?xt=urn:btih:"+hashes[i])
-			if ctx.Err() != nil {
-				return out, ctx.Err()
+			// Failed listings stay unknown and stop this batch. Publishing an
+			// incomplete hit would prevent the requested episode from being
+			// rechecked until cache expiry, and ignoring quota errors would keep
+			// calling an already rate-limited account.
+			item.Files, err = p.pmDirect(ctx, key, "magnet:?xt=urn:btih:"+hashes[i])
+			if err != nil {
+				return out, err
 			}
 		}
 		out = append(out, item)

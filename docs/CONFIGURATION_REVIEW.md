@@ -14,7 +14,7 @@ Typing searches a local index of setting names. It does not send search text to 
 
 | Where | What can be adjusted | Default and bounds |
 | --- | --- | --- |
-| Debrid → Settings → Advanced → Operation capacity | Cache update jobs, download preparations, cleanup jobs and public TorBox probes per application process | 4 / 4 / 4 / 1. The first three allow 1–32; public probes allow 1–16. A cache update may issue several provider calls. |
+| Debrid → Settings → Advanced → Operation capacity | Cache update jobs, download preparations, cleanup jobs and request-scoped public availability checks per application process | 4 / 4 / 4 / 1. The first three allow 1–32; public probes allow 1–16. A cache update may issue several provider calls. |
 | Network → Outgoing → Proxies → Advanced → Request timeouts | Individual metadata requests, debrid requests and metadata inventory downloads | 60 / 60 / 600 seconds; bounds 5–600 / 5–600 / 30–3600. Source timeouts stay in each source definition. |
 | Network → Incoming → Trusted proxy → Advanced → Request timeouts | Stremio, Torznab and shared catalog processing and delivery budgets | 70 / 20 / 20 seconds; bounds 10–600 / 5–600 / 5–600. Applies to private and public connections. |
 | Network → Incoming → Trusted proxy → Advanced → Browser downloads | Maximum active transfer duration and validity of new file links | 24 hours (1–168) and 10 minutes (1–60). Applies to public and administrator downloads. |

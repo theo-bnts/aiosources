@@ -110,6 +110,35 @@ func TestExtendedProviderErrorsRetainCategoriesAndRetryHints(t *testing.T) {
 	}
 }
 
+func TestPremiumizeStopsOnFileListingFailureWithoutPublishingIncompleteHits(t *testing.T) {
+	hashes := []string{strings.Repeat("a", 40), strings.Repeat("b", 40), strings.Repeat("c", 40)}
+	for _, failure := range []struct {
+		status int
+		body   string
+	}{
+		{429, `{"status":"error","code":"rate_limit_reached"}`},
+		{200, `{"status":"success","content":[{"path":"Example.S01E02.mkv","size":100}]}`},
+	} {
+		calls := 0
+		p := extendedProviderTest(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/cache/check" {
+				fmt.Fprint(w, `{"status":"success","response":[false,true,true]}`)
+				return
+			}
+			if r.URL.Path != "/transfer/directdl" {
+				t.Error("unexpected provider request")
+			}
+			calls++
+			w.WriteHeader(failure.status)
+			fmt.Fprint(w, failure.body)
+		})
+		items, err := p.PMCheck(context.Background(), "synthetic-key", hashes)
+		if err == nil || calls != 1 || len(items) != 1 || items[0].Hash != hashes[0] || items[0].Cached {
+			t.Fatalf("failed listing was ignored or published as availability: %+v %v", items, err)
+		}
+	}
+}
+
 func TestRealDebridCacheChecksReadOnlyAndLeaveMissingHashesUnknown(t *testing.T) {
 	hash, missing := strings.Repeat("a", 40), strings.Repeat("b", 40)
 	p := extendedProviderTest(t, func(w http.ResponseWriter, r *http.Request) {
