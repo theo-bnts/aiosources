@@ -270,7 +270,7 @@ func (s *server) decodeShare(w http.ResponseWriter, r *http.Request, input *mode
 
 func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Vary", "Authorization, "+model.CatalogEntitiesHeader)
+	w.Header().Set("Vary", "Authorization, "+model.CatalogEntitiesHeader+", "+model.CatalogDetailsHeader)
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		writeError(w, http.StatusMethodNotAllowed, "Shared catalogues are read-only")
@@ -323,10 +323,13 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestedEntities, validEntities := model.ParseCatalogEntities(r.Header.Get(model.CatalogEntitiesHeader))
-	if !validEntities || len(r.Header.Values(model.CatalogEntitiesHeader)) > 1 {
+	requestedDetails, validDetails := model.ParseCatalogDetails(r.Header.Get(model.CatalogDetailsHeader))
+	if !validEntities || !validDetails || len(r.Header.Values(model.CatalogEntitiesHeader)) > 1 || len(r.Header.Values(model.CatalogDetailsHeader)) > 1 {
 		writeError(w, 400, "Invalid catalog data selection")
 		return
 	}
+	requestedEntities.Identifiers, requestedEntities.Languages = requestedDetails.Identifiers, requestedDetails.Languages
+	requestedEntities.Technical, requestedEntities.Files = requestedDetails.Technical, requestedDetails.Files
 	request := store.CatalogPageRequest{Entities: requestedEntities, Cursor: query.Get("cursor"), Checkpoint: query.Get("checkpoint"), Head: r.Method == http.MethodHead}
 	if query.Has("limit") {
 		request.Limit, err = strconv.Atoi(query.Get("limit"))

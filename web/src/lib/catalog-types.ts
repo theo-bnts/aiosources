@@ -10,6 +10,23 @@ export type StremioPreferences = InstallationOptions & LanguagePreferences
 export interface CatalogEntities {
   metadata?: boolean
   availability?: boolean
+  identifiers?: boolean
+  languages?: boolean
+  technical?: boolean
+  files?: boolean
+}
+
+export const catalogEntityKeys = [
+  'identifiers',
+  'languages',
+  'technical',
+  'files',
+  'metadata',
+  'availability',
+] as const satisfies readonly (keyof CatalogEntities)[]
+
+export function catalogEntitiesKey(value?: CatalogEntities) {
+  return catalogEntityKeys.map((key) => Boolean(value?.[key])).join(',')
 }
 
 export interface CatalogShare {

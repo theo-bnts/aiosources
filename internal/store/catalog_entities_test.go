@@ -67,7 +67,11 @@ func applyCatalogEntityPage(t *testing.T, ctx context.Context, db *Store, run mo
 	items := []model.Record{}
 	for _, item := range page.Items {
 		origin := item.Origin
-		items = append(items, model.Record{SourceID: item.ID, Fields: item.Fields, Origin: &origin, Deleted: item.Deleted})
+		fields := item.Fields
+		if len(item.Details) > 0 {
+			fields = model.ReplaceCatalogDetails(fields, item.Details)
+		}
+		items = append(items, model.Record{SourceID: item.ID, Fields: fields, Origin: &origin, Deleted: item.Deleted})
 	}
 	cursor, _ := json.Marshal(state)
 	updated, err := db.SavePage(ctx, run, model.Page{ContentType: "application/json", Body: []byte("validated envelope"), Items: items, CatalogSupplement: page.Supplement, Next: cursor, Done: state.Done, ResetStaging: run.Pages == 0 && page.Mode == "full", RequireUniqueIDs: true}, "")

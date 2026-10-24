@@ -89,3 +89,13 @@ test('entity destinations encode identifiers and keep configuration selection se
     '/torznab?configure=new#setting=torznab.rate',
   )
 })
+
+test('catalog sharing and reception expose the same data menu and exact searchable leaf controls', () => {
+  for (const entity of ['share', 'remote']) {
+    for (const key of ['identifiers', 'languages', 'technical', 'files'])
+      assert.deepEqual(settingByID(`${entity}.${key}`)?.reveal, ['Shared data', 'Torrents'])
+    assert.deepEqual(settingByID(`${entity}.metadata`)?.reveal, ['Shared data', 'Metadata'])
+    assert.deepEqual(settingByID(`${entity}.availability`)?.reveal, ['Shared data', 'Debrid'])
+  }
+  assert.deepEqual(settingByID('share.fields')?.reveal, ['Shared data', 'Torrents'])
+})

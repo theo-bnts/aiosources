@@ -20,7 +20,7 @@ import (
 
 func validateRemoteCatalog(p model.Provider) error {
 	for name := range p.HTTP.Headers {
-		if strings.EqualFold(name, model.CatalogEntitiesHeader) {
+		if strings.EqualFold(name, model.CatalogEntitiesHeader) || strings.EqualFold(name, model.CatalogDetailsHeader) {
 			return errors.New("catalog data permissions must use catalog_entities, not a custom header")
 		}
 	}
@@ -133,6 +133,9 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	if selection := c.provider.CatalogEntities.Header(); selection != "" {
 		headers.Set(model.CatalogEntitiesHeader, selection)
 	}
+	if selection := c.provider.CatalogEntities.DetailsHeader(); selection != "" {
+		headers.Set(model.CatalogDetailsHeader, selection)
+	}
 	response, err := c.client.Do(ctx, Request{Method: http.MethodGet, Query: query, DisableRedirects: true, Headers: headers})
 	restarted := false
 	if (err == nil || FailureCode(err) == "http") && response.StatusCode == http.StatusGone && state.Cursor != "" {
@@ -182,29 +185,40 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	if !utf8.Valid(response.Body) || decodeJSON(response.Body, &envelope) != nil {
 		return fail("invalid remote catalogue envelope")
 	}
-	if envelope.Version == 2 {
+	if envelope.Version == 2 || envelope.Version == 3 {
 		if c.provider.CatalogEntities.Empty() || envelope.Entities.Intersect(c.provider.CatalogEntities) != envelope.Entities {
 			return fail("Remote catalog returned unrequested data permissions")
 		}
 		if len(envelope.Supplement) > 0 {
 			decoder := json.NewDecoder(bytes.NewReader(envelope.Supplement))
+			decoder.UseNumber()
 			decoder.DisallowUnknownFields()
 			if decoder.Decode(&page.CatalogSupplement) != nil || decoder.Decode(new(any)) != io.EOF {
 				return fail("Invalid shared catalog data")
 			}
 		}
-		if len(envelope.Items)+len(page.CatalogSupplement.Metadata)+len(page.CatalogSupplement.Availability) > c.provider.PageSize || !page.CatalogSupplement.Valid(envelope.Entities, time.Now()) {
-			return fail("Invalid shared metadata or cache observations")
+		if (envelope.Version == 2 && (envelope.Entities.HasTorrentDetails() || len(page.CatalogSupplement.Torrents) > 0)) || len(envelope.Items)+len(page.CatalogSupplement.Metadata)+len(page.CatalogSupplement.Availability)+len(page.CatalogSupplement.Torrents) > c.provider.PageSize || !page.CatalogSupplement.Valid(envelope.Entities, time.Now()) {
+			return fail("Invalid shared catalog data")
 		}
 	} else if !envelope.Entities.Empty() || len(envelope.Supplement) > 0 {
-		return fail("Shared data requires catalog protocol version 2")
+		return fail("Shared data requires a compatible catalog protocol")
 	}
 	if state.Protocol != 0 && (state.Protocol != envelope.Version || state.Entities != envelope.Entities) {
 		return fail("Remote catalog data permissions changed during traversal")
 	}
+	// Match the loop protection used for ordinary torrent items. Validation still
+	// runs first, so a self-origin marker cannot conceal a malformed payload.
+	torrents := page.CatalogSupplement.Torrents[:0]
+	for _, entry := range page.CatalogSupplement.Torrents {
+		if entry.Origin.InstanceID != c.localInstanceID {
+			torrents = append(torrents, entry)
+		}
+	}
+	page.CatalogSupplement.Torrents = torrents
 	page.Metadata["catalog_version"] = envelope.Version
 	page.Metadata["shared_metadata"] = len(page.CatalogSupplement.Metadata)
 	page.Metadata["shared_cache_observations"] = len(page.CatalogSupplement.Availability)
+	page.Metadata["shared_torrent_information"] = len(page.CatalogSupplement.Torrents)
 	if len(envelope.Items) == 0 {
 		page.Metadata["auxiliary_response"] = true
 	}
@@ -213,17 +227,20 @@ func (c *httpJSONConnector) fetchCatalog(ctx context.Context, checkpoint json.Ra
 	for _, raw := range envelope.Items {
 		record := model.Record{Raw: raw, ContentType: "application/json"}
 		var item model.CatalogItem
-		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || decodeJSON(raw, &item) != nil || !catalogText(item.Origin.InstanceID) || !catalogText(item.Origin.ProviderID) || !catalogText(item.Origin.SourceID) || item.ID != model.CatalogItemID(item.Origin) || !catalogFields(item.Fields) || (item.Deleted && (envelope.Mode != "incremental" || len(item.Fields) != 0)) {
+		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) || decodeJSON(raw, &item) != nil || !catalogText(item.Origin.InstanceID) || !catalogText(item.Origin.ProviderID) || !catalogText(item.Origin.SourceID) || item.ID != model.CatalogItemID(item.Origin) || !catalogFields(item.Fields) || !model.ValidCatalogDetails(item.Details, envelope.Entities) || (len(item.Details) > 0 && envelope.Version != 3) || (item.Deleted && (envelope.Mode != "incremental" || len(item.Fields) != 0 || len(item.Details) > 0)) {
 			record.Error = "invalid remote catalogue identity or fields"
 			invalidItem = true
 		} else {
 			record.SourceID, record.Fields, record.Deleted = item.ID, item.Fields, item.Deleted
+			if len(item.Details) > 0 {
+				record.Fields = model.ReplaceCatalogDetails(item.Fields, item.Details)
+			}
 			record.Origin = &item.Origin
 			record.Ignored = item.Origin.InstanceID == c.localInstanceID
 		}
 		page.Items = append(page.Items, record)
 	}
-	if (envelope.Version != 1 && envelope.Version != 2) || !catalogText(envelope.InstanceID) || (envelope.Mode != "full" && envelope.Mode != "incremental") || envelope.Items == nil || len(envelope.Items) > c.provider.PageSize || (envelope.NextCursor == "") == (envelope.Checkpoint == "") || (envelope.NextCursor != "" && len(envelope.Items) == 0 && envelope.Version != 2) || len(envelope.NextCursor) > 16384 || len(envelope.Checkpoint) > 16384 {
+	if (envelope.Version != 1 && envelope.Version != 2 && envelope.Version != 3) || !catalogText(envelope.InstanceID) || (envelope.Mode != "full" && envelope.Mode != "incremental") || envelope.Items == nil || len(envelope.Items) > c.provider.PageSize || (envelope.NextCursor == "") == (envelope.Checkpoint == "") || (envelope.NextCursor != "" && len(envelope.Items) == 0 && envelope.Version == 1) || len(envelope.NextCursor) > 16384 || len(envelope.Checkpoint) > 16384 {
 		return fail("unsupported or inconsistent remote catalogue envelope")
 	}
 	if (state.InstanceID != "" && envelope.InstanceID != state.InstanceID) || (state.Mode != "" && envelope.Mode != state.Mode) || (state.Mode == "" && state.Checkpoint == "" && envelope.Mode != "full") || (envelope.NextCursor != "" && envelope.NextCursor == state.Cursor) {

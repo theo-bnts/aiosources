@@ -136,7 +136,7 @@ Torznab searches your imported catalog without contacting your sources or TMDB. 
 
 **Sources → Remote catalogs** imports a catalog shared with you. Add its URL and sharing password, enable the connection and choose an update interval. **Run manual import** also offers **Sync changes** or **Full resync**. Your current copy stays available until a new import completes successfully.
 
-Transfers always respect the selected sources and fields. Both owners can also opt into **Additional data**: film and series information, and recent shareable debrid cache observations. Metadata is deduplicated by TMDB identity, local information stays authoritative, and identification is performed locally. Accounts, credentials, announce URLs, download links and matching decisions are never transferred. See [sharing and remote catalogs](docs/SHARING.md).
+Transfers always respect the selected sources and fields. The same **Shared data** menu on both sides lets you include torrent identifiers, seasons and episodes, languages, audio/video details and file information, plus film and series information and recent shareable debrid cache observations. Every optional group is off by default. Metadata is deduplicated by TMDB identity, local information stays authoritative, and identification is performed locally. Accounts, credentials, announce URLs, download links and matching decisions are never transferred. See [sharing and remote catalogs](docs/SHARING.md).
 
 ## Offer public access
 

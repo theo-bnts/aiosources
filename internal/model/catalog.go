@@ -37,6 +37,7 @@ type CatalogItem struct {
 	Origin  CatalogOrigin  `json:"origin"`
 	Deleted bool           `json:"deleted,omitempty"`
 	Fields  map[string]any `json:"fields,omitempty"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // CatalogEnvelope is the versioned HTTP/JSON sharing protocol. A checkpoint is

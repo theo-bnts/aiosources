@@ -373,20 +373,24 @@ Use the application schema with `adapter` = `"json"` and `http.catalog` = `true`
 - Auth must be bearer with a vault `secret_ref`. `page_size` is 1–1000, default 100.
 - GET only, no body, query overrides, secret_headers, root options, or traversal. Non-secret ordinary headers can still be configured.
 - The effective fixed envelope is items_path `/items`, mapping.id `/id`, no mapping.fields, cursor pagination in query, cursor_param `cursor`, size_param `limit`, next_path `/next_cursor`, start `0`, and no total_path/current_path. Omitted/empty defaultable strings are filled accordingly. Inactive page_param/offset_param and search fields do not customize the remote protocol.
-- Output selectors do not transform shared occurrences. Remote Full and Incremental both stage privately and publish the exact completed mirror/checkpoint atomically, preserving provenance and removals. The native detail-fetch run mode is unavailable. Optional shared metadata and cache observations are configured by `catalog_entities` below. The connection wizard starts with automatic synchronization every 60 minutes; a JSON definition with neither `catalog_sync` nor a legacy timing rule remains manual.
+- Output selectors do not transform shared occurrences. Remote Full and Incremental both stage privately and publish the exact completed mirror/checkpoint atomically, preserving provenance and removals. The native detail-fetch run mode is unavailable. Optional torrent details, shared metadata and cache observations are configured by `catalog_entities` below. The connection wizard starts with automatic synchronization every 60 minutes; a JSON definition with neither `catalog_sync` nor a legacy timing rule remains manual.
 
 Optional additional data is configured independently of synchronization timing:
 
 ```json
 {
   "catalog_entities": {
+    "identifiers": true,
+    "languages": true,
+    "technical": true,
+    "files": true,
     "metadata": true,
     "availability": true
   }
 }
 ```
 
-Both booleans default to false; the block is accepted only for remote catalogs. The sender must independently authorize each entity. Metadata is deduplicated by media type/TMDB ID, does not overwrite locally acquired metadata, and does not import match decisions. Only fresh account-independent positive cache observations are accepted, with no keys, account IDs or download links. Both publish only after a successful sync. Older senders continue transferring torrents. See [additional data and trust](SHARING.md#import-a-shared-catalog).
+All six booleans default to false; the block is accepted only for remote catalogs. `identifiers` includes source media IDs, categories, years and season/episode numbering; `languages` includes audio/subtitle labels; `technical` includes audio/video tags, duration and bitrate; `files` includes safe filenames, relative folders, sizes and torrent file positions. Arbitrary nested payloads, URLs and tracker/account settings are excluded. Changing one of these first four choices refreshes the local torrent mirror on the next new sync, without contacting the original sources. Metadata/cache choices remain independent. The sender must independently authorize each entity. Metadata is deduplicated by media type/TMDB ID, does not overwrite locally acquired metadata, and does not import match decisions. Only fresh account-independent positive cache observations are accepted, with no keys, account IDs or download links. All groups publish only after a successful sync. Older senders continue transferring the groups they support, including basic torrents. See [additional data and trust](SHARING.md#import-a-shared-catalog).
 
 Remote catalogues have a dedicated timing block:
 

@@ -29,7 +29,7 @@ INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finish
 	snapshot := func() string {
 		t.Helper()
 		var value string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('torrents',(SELECT jsonb_agg(to_jsonb(t)) FROM ingest.torrents t),'matches',(SELECT jsonb_agg(to_jsonb(m)) FROM ingest.aio_matches m),'operations',(SELECT jsonb_agg(to_jsonb(r)) FROM ingest.operation_runs r),'old_migrations',(SELECT jsonb_agg(to_jsonb(v) ORDER BY version) FROM ingest.schema_migrations v WHERE version<=52))::text`).Scan(&value); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('torrents',(SELECT jsonb_agg(to_jsonb(t)-'catalog_details_tx') FROM ingest.torrents t),'matches',(SELECT jsonb_agg(to_jsonb(m)) FROM ingest.aio_matches m),'operations',(SELECT jsonb_agg(to_jsonb(r)) FROM ingest.operation_runs r),'old_migrations',(SELECT jsonb_agg(to_jsonb(v) ORDER BY version) FROM ingest.schema_migrations v WHERE version<=52))::text`).Scan(&value); err != nil {
 			t.Fatal(err)
 		}
 		return value

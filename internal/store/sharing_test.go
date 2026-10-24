@@ -79,7 +79,7 @@ func legacyCatalogPageFixture(t *testing.T, ctx context.Context, db *Store, gran
 		}
 		var item model.CatalogItem
 		var origin, fields []byte
-		if err = rows.Scan(&origin, &fields, &item.Deleted, &state.After); err != nil {
+		if err = rows.Scan(&origin, &fields, &item.Deleted, &state.After, new(string), new(string)); err != nil {
 			rows.Close()
 			t.Fatal(err)
 		}

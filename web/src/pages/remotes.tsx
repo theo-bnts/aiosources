@@ -514,7 +514,7 @@ function RemoteForm({
         }
       }}
     >
-      <fieldset className="space-y-5" disabled={busy}>
+      <fieldset className="min-w-0 space-y-5" disabled={busy}>
         <div className="grid items-start gap-4 sm:grid-cols-2">
           <div className="field">
             <Label htmlFor="remote-id">Local source identifier</Label>
@@ -590,12 +590,16 @@ function RemoteForm({
         <CatalogDataControls
           id="remote-data"
           receiving
-          value={{ metadata: draft.metadata, availability: draft.availability }}
+          value={draft}
           onChange={(value) =>
             setDraft((current) => ({
               ...current,
               metadata: value.metadata ?? false,
               availability: value.availability ?? false,
+              identifiers: value.identifiers ?? false,
+              languages: value.languages ?? false,
+              technical: value.technical ?? false,
+              files: value.files ?? false,
             }))
           }
         />

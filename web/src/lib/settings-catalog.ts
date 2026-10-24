@@ -299,12 +299,47 @@ add(
     ['remote.url', 'HTTPS catalog URL'],
     ['remote.password', 'Sharing password'],
     ['remote.enabled', 'Connection enabled'],
-    ['remote.metadata', 'Film and series information', 'TMDB titles translations additional data'],
-    ['remote.availability', 'Debrid cache observations', 'shared availability additional data'],
     ['remote.auto', 'Automatic synchronization'],
     ['remote.interval', 'Synchronization interval (minutes)'],
   ],
 )
+for (const [entity, route, group] of [
+  ['share', '/sharing/settings', 'Connections / Shared catalogs'],
+  ['remote', '/remotes/settings', 'Sources / Remote catalogs'],
+] as const) {
+  add(
+    {
+      route,
+      group: `${group} / Shared data / Torrents`,
+      entity,
+      reveal: ['Shared data', 'Torrents'],
+    },
+    [
+      ...(entity === 'share' ? [[`${entity}.fields`, 'Published fields'] as const] : []),
+      [
+        `${entity}.identifiers`,
+        'Identifiers and episodes',
+        'media IDs categories years seasons numbering',
+      ],
+      [`${entity}.languages`, 'Audio and subtitle languages'],
+      [`${entity}.technical`, 'Audio and video information', 'quality codecs HDR duration bitrate'],
+      [`${entity}.files`, 'File information', 'filenames folders sizes'],
+    ],
+  )
+  add(
+    {
+      route,
+      group: `${group} / Shared data / Metadata`,
+      entity,
+      reveal: ['Shared data', 'Metadata'],
+    },
+    [[`${entity}.metadata`, 'Film and series information', 'TMDB titles translations']],
+  )
+  add(
+    { route, group: `${group} / Shared data / Debrid`, entity, reveal: ['Shared data', 'Debrid'] },
+    [[`${entity}.availability`, 'Debrid cache observations', 'shared availability']],
+  )
+}
 for (const [entity, route, name] of [
   ['stremio', '/addon/settings', 'Stremio'],
   ['torznab', '/torznab', 'Torznab'],
@@ -317,10 +352,7 @@ for (const [entity, route, name] of [
   add(
     { route, group: `${group} / Filters`, entity, reveal: ['Filters'] },
     entity === 'share'
-      ? [
-          [`${entity}.sources`, 'Sources'],
-          [`${entity}.fields`, 'Safe fields to share'],
-        ]
+      ? [[`${entity}.sources`, 'Sources']]
       : [
           [`${entity}.media`, 'Media types'],
           [`${entity}.sources`, 'Sources'],
@@ -328,11 +360,6 @@ for (const [entity, route, name] of [
           [`${entity}.services`, 'Services'],
         ],
   )
-  if (entity === 'share')
-    add({ route, group: `${group} / Additional data`, entity, reveal: ['Additional data'] }, [
-      ['share.metadata', 'Film and series information', 'TMDB titles translations'],
-      ['share.availability', 'Debrid cache observations', 'shared availability'],
-    ])
   if (entity !== 'share') {
     add({ route, group: `${group} / Filters`, entity, reveal: ['Filters'] }, [
       [`${entity}.max-results`, 'Maximum results'],

@@ -1,3 +1,5 @@
+import { catalogEntitiesKey, type CatalogEntities } from '@/lib/catalog-types'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
 import { ResultSorting } from '@/components/result-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
@@ -337,8 +339,7 @@ export default function SharingPage({
                       <>
                         {share.fields.join(', ') || 'No fields selected'}
                         {!connection &&
-                          (share.catalog_entities?.metadata ||
-                            share.catalog_entities?.availability) && (
+                          Object.values(share.catalog_entities ?? {}).some(Boolean) && (
                             <span className="mt-1 block text-muted-foreground">
                               {catalogEntitiesSummary(share.catalog_entities)}
                             </span>
@@ -607,7 +608,9 @@ function ShareForm({
   const [scope, setScope] = useState<CatalogShare['scope']>(share?.scope ?? defaultScope)
   const [sourceIDs, setSourceIDs] = useState(share?.source_ids ?? [])
   const [fields, setFields] = useState(share?.fields ?? data.fields)
-  const [catalogEntities, setCatalogEntities] = useState(share?.catalog_entities ?? {})
+  const [catalogEntities, setCatalogEntities] = useState<CatalogEntities>(
+    share?.catalog_entities ?? {},
+  )
   const dateZone = useDateTimeZoneLabel()
   const [expiresAt, setExpiresAt] = useState(share?.expires_at ?? '')
   const [requestsPerMinute, setRequestsPerMinute] = useState(
@@ -706,11 +709,8 @@ function ShareForm({
     scope !== (original?.scope ?? defaultScope) ||
     JSON.stringify(sourceIDs) !== JSON.stringify(original?.source_ids ?? []) ||
     (!connection &&
-      Boolean(catalogEntities.metadata) !== Boolean(original?.catalog_entities?.metadata)) ||
-    (!connection &&
-      Boolean(catalogEntities.availability) !==
-        Boolean(original?.catalog_entities?.availability)) ||
-    JSON.stringify(fields) !== JSON.stringify(original?.fields ?? data.fields) ||
+      catalogEntitiesKey(catalogEntities) !== catalogEntitiesKey(original?.catalog_entities)) ||
+    [...fields].sort().join(',') !== [...(original?.fields ?? data.fields)].sort().join(',') ||
     expiresAt !== (original?.expires_at ?? '') ||
     requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
     maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault)
@@ -799,7 +799,7 @@ function ShareForm({
         if (!busy && !conflict && (!original || dirty)) save.mutate()
       }}
     >
-      <fieldset className="space-y-5" disabled={busy}>
+      <fieldset className="min-w-0 space-y-5" disabled={busy}>
         <div className="field">
           <Label htmlFor="share-name">
             {connection ? 'Access name' : 'Recipient / share name'}
@@ -852,34 +852,6 @@ function ShareForm({
               sources={sourceOptions}
               onChange={selectSources}
             />
-            <fieldset className="space-y-3">
-              <legend className="mb-2 text-sm font-medium">Safe fields to share</legend>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {data.fields.map((field) => (
-                  <label key={field} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="accent-primary"
-                      checked={fields.includes(field)}
-                      onChange={(event) => {
-                        if (field === 'info_hash' && !event.target.checked)
-                          setCatalogEntities((current) => ({ ...current, availability: false }))
-                        setFields(
-                          event.target.checked
-                            ? [...fields, field]
-                            : fields.filter((value) => value !== field),
-                        )
-                      }}
-                    />
-                    <span className="mono">{field}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="help">
-                No download URLs, magnets, tracker passkeys, custom payloads or raw data. Original
-                provenance accompanies authorized fields.
-              </p>
-            </fieldset>
           </Disclosure>
         )}
         {!connection && (
@@ -888,6 +860,39 @@ function ShareForm({
             value={catalogEntities}
             onChange={setCatalogEntities}
             allowAvailability={fields.includes('info_hash')}
+            publishedFields={
+              <div className="field">
+                <Label htmlFor="share-fields">Published fields</Label>
+                <MultiSelect
+                  id="share-fields"
+                  label="Published fields"
+                  allLabel="All published fields"
+                  value={fields}
+                  options={data.fields.map((field) => ({
+                    value: field,
+                    label:
+                      (
+                        {
+                          title: 'Title',
+                          size: 'Size',
+                          info_hash: 'Info hash',
+                          published_at: 'Publication date',
+                          category: 'Category',
+                          categories: 'Categories',
+                        } as Record<string, string>
+                      )[field] ?? field,
+                  }))}
+                  onChange={(selection) => {
+                    const next = selection.length
+                      ? data.fields.filter((field) => selection.includes(field))
+                      : data.fields
+                    setFields(next)
+                    if (!next.includes('info_hash'))
+                      setCatalogEntities((current) => ({ ...current, availability: false }))
+                  }}
+                />
+              </div>
+            }
           />
         )}
         <Disclosure title="Advanced">

@@ -10,7 +10,7 @@ import (
 )
 
 func stageCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, supplement model.CatalogSupplement, reset bool) error {
-	if !supplement.Valid(run.Config.CatalogEntities, time.Now()) || (!run.Config.IsRemoteCatalog() && (len(supplement.Metadata)+len(supplement.Availability) > 0)) {
+	if !supplement.Valid(run.Config.CatalogEntities, time.Now()) || (!run.Config.IsRemoteCatalog() && (len(supplement.Metadata)+len(supplement.Availability)+len(supplement.Torrents) > 0)) {
 		return model.ErrInvalid
 	}
 	if reset {
@@ -25,7 +25,7 @@ func stageCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, supplem
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO ingest.run_catalog_entities(run_id,kind,identity,data) VALUES($1,$2,$3,$4)
 ON CONFLICT(run_id,kind,identity) DO UPDATE SET data=EXCLUDED.data
-WHERE CASE WHEN EXCLUDED.kind='metadata' THEN (EXCLUDED.data->>'updated_at')::timestamptz>=(ingest.run_catalog_entities.data->>'updated_at')::timestamptz
+WHERE CASE WHEN EXCLUDED.kind='torrent' THEN TRUE WHEN EXCLUDED.kind='metadata' THEN (EXCLUDED.data->>'updated_at')::timestamptz>=(ingest.run_catalog_entities.data->>'updated_at')::timestamptz
 ELSE (EXCLUDED.data->>'checked_at')::timestamptz>=(ingest.run_catalog_entities.data->>'checked_at')::timestamptz END`, run.ID, kind, key, body)
 		return databaseError("stage shared data", err)
 	}
@@ -39,10 +39,18 @@ ELSE (EXCLUDED.data->>'checked_at')::timestamptz>=(ingest.run_catalog_entities.d
 			return err
 		}
 	}
+	for _, entry := range supplement.Torrents {
+		if err := put("torrent", entry.ID, entry); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func publishCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, state model.CatalogCursor) error {
+	if err := publishCatalogTorrentDetails(ctx, tx, run); err != nil {
+		return err
+	}
 	var metadataCount, cacheCount int64
 	if run.Config.CatalogEntities.Metadata {
 		after := ""

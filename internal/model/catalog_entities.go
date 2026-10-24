@@ -11,14 +11,27 @@ import (
 )
 
 const CatalogEntitiesHeader = "X-AIOSources-Catalog-Entities"
+const CatalogDetailsHeader = "X-AIOSources-Catalog-Details"
 
 // Both sides opt in. These are data permissions, never account configuration.
 type CatalogEntities struct {
 	Metadata     bool `json:"metadata,omitempty"`
 	Availability bool `json:"availability,omitempty"`
+	Identifiers  bool `json:"identifiers,omitempty"`
+	Languages    bool `json:"languages,omitempty"`
+	Technical    bool `json:"technical,omitempty"`
+	Files        bool `json:"files,omitempty"`
 }
 
-func (e CatalogEntities) Empty() bool { return !e.Metadata && !e.Availability }
+func (e CatalogEntities) HasTorrentDetails() bool {
+	return e.Identifiers || e.Languages || e.Technical || e.Files
+}
+func (e CatalogEntities) TorrentDetails() CatalogEntities {
+	return CatalogEntities{Identifiers: e.Identifiers, Languages: e.Languages, Technical: e.Technical, Files: e.Files}
+}
+func (e CatalogEntities) Empty() bool {
+	return !e.Metadata && !e.Availability && !e.HasTorrentDetails()
+}
 func (e CatalogEntities) Header() string {
 	var names []string
 	if e.Metadata {
@@ -56,7 +69,9 @@ func ParseCatalogEntities(value string) (CatalogEntities, bool) {
 	return e, true
 }
 func (e CatalogEntities) Intersect(other CatalogEntities) CatalogEntities {
-	return CatalogEntities{Metadata: e.Metadata && other.Metadata, Availability: e.Availability && other.Availability}
+	return CatalogEntities{Metadata: e.Metadata && other.Metadata, Availability: e.Availability && other.Availability,
+		Identifiers: e.Identifiers && other.Identifiers, Languages: e.Languages && other.Languages,
+		Technical: e.Technical && other.Technical, Files: e.Files && other.Files}
 }
 
 // No local database IDs, match decisions, normalized aliases or remote URLs.
@@ -94,6 +109,7 @@ type CatalogCacheObservation struct {
 type CatalogSupplement struct {
 	Metadata     []CatalogMetadata         `json:"metadata,omitempty"`
 	Availability []CatalogCacheObservation `json:"availability,omitempty"`
+	Torrents     []CatalogTorrentDetails   `json:"torrents,omitempty"`
 }
 
 var catalogNumber = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
@@ -186,7 +202,7 @@ func (a CatalogCacheObservation) Valid(now time.Time) bool {
 }
 
 func (s CatalogSupplement) Valid(permissions CatalogEntities, now time.Time) bool {
-	if (!permissions.Metadata && len(s.Metadata) > 0) || (!permissions.Availability && len(s.Availability) > 0) || len(s.Metadata)+len(s.Availability) > 100 {
+	if (!permissions.Metadata && len(s.Metadata) > 0) || (!permissions.Availability && len(s.Availability) > 0) || len(s.Metadata)+len(s.Availability)+len(s.Torrents) > 100 {
 		return false
 	}
 	seen := map[string]bool{}
@@ -200,6 +216,13 @@ func (s CatalogSupplement) Valid(permissions CatalogEntities, now time.Time) boo
 	for _, a := range s.Availability {
 		key := a.Service + ":" + a.Hash
 		if seen[key] || !a.Valid(now) {
+			return false
+		}
+		seen[key] = true
+	}
+	for _, t := range s.Torrents {
+		key := "torrent:" + t.ID
+		if seen[key] || !t.Valid(permissions) {
 			return false
 		}
 		seen[key] = true

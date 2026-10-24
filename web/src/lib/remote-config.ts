@@ -1,15 +1,14 @@
 import type { ProviderDocument } from './types'
 import { parseProviderJSON } from './provider-json'
 import { isJSONAdapter } from './source-adapters'
+import { catalogEntityKeys, type CatalogEntities } from './catalog-types'
 
-export interface RemoteDraft {
+export interface RemoteDraft extends Required<CatalogEntities> {
   id: string
   name: string
   url: string
   enabled: boolean
   secretRef: string
-  metadata: boolean
-  availability: boolean
   autoSync: boolean
   intervalMinutes: string
 }
@@ -24,6 +23,10 @@ export function remoteDraft(document?: ProviderDocument): RemoteDraft {
     secretRef: provider?.auth.secret_ref ?? '',
     metadata: provider?.catalog_entities?.metadata ?? false,
     availability: provider?.catalog_entities?.availability ?? false,
+    identifiers: provider?.catalog_entities?.identifiers ?? false,
+    languages: provider?.catalog_entities?.languages ?? false,
+    technical: provider?.catalog_entities?.technical ?? false,
+    files: provider?.catalog_entities?.files ?? false,
     autoSync: provider?.catalog_sync?.enabled ?? !document,
     intervalMinutes: String(provider?.catalog_sync?.interval_minutes ?? 60),
   }
@@ -111,8 +114,11 @@ export function remoteJSON(
   update(['name'], draft.name.trim(), initial.name)
   update(['url'], draft.url.trim(), initial.url)
   update(['enabled'], draft.enabled, initial.enabled)
-  if (draft.metadata || draft.availability)
-    json.set('catalog_entities', { metadata: draft.metadata, availability: draft.availability })
+  if (catalogEntityKeys.some((key) => draft[key]))
+    json.set(
+      'catalog_entities',
+      Object.fromEntries(catalogEntityKeys.filter((key) => draft[key]).map((key) => [key, true])),
+    )
   else json.delete('catalog_entities')
   json.delete('schedule')
   json.set('catalog_sync', {
@@ -141,6 +147,11 @@ export function mergeRemoteDraft(
     metadata: current.metadata === previous.metadata ? latest.metadata : current.metadata,
     availability:
       current.availability === previous.availability ? latest.availability : current.availability,
+    identifiers:
+      current.identifiers === previous.identifiers ? latest.identifiers : current.identifiers,
+    languages: current.languages === previous.languages ? latest.languages : current.languages,
+    technical: current.technical === previous.technical ? latest.technical : current.technical,
+    files: current.files === previous.files ? latest.files : current.files,
     autoSync: current.autoSync === previous.autoSync ? latest.autoSync : current.autoSync,
     intervalMinutes:
       current.intervalMinutes === previous.intervalMinutes

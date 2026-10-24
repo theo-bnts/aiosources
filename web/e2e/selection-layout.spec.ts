@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures'
+import { openDisclosure } from './disclosures'
 
 const libraries = Array.from({ length: 6 }, (_, index) => ({
   id: `layout-library-${index}`,
@@ -84,6 +85,7 @@ test('long selections stay inside Stremio, Torznab, sharing and torrent-search f
       .getByLabel(connection ? 'Access name' : 'Recipient / share name', { exact: true })
       .fill('Layout example')
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
+    if (!connection) await openDisclosure(page, 'Torrents')
     const sources = editor.getByRole('button', { name: 'Sources', exact: true })
     await selectEveryOption(page, sources)
     for (const label of ['Media types', 'Services']) {

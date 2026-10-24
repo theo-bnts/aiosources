@@ -33,6 +33,7 @@ type catalogToken struct {
 	Entities    model.CatalogEntities `json:"entities,omitzero"`
 	Phase       string                `json:"phase,omitempty"`
 	AuxLow      int64                 `json:"aux_low,omitempty"`
+	DetailsLow  int64                 `json:"details_low,omitempty"`
 	AuxHigh     int64                 `json:"aux_high,omitempty"`
 	CacheBefore time.Time             `json:"cache_before,omitzero"`
 	AuxUpper    int64                 `json:"aux_upper,omitempty"`
@@ -86,7 +87,7 @@ func parseCatalogToken(key []byte, raw string) (catalogToken, error) {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&value); err != nil || value.Version != 1 || value.Revision < 1 || value.High < 0 || value.Low < 0 || value.Low > value.High || value.AuxLow < 0 || value.AuxHigh < value.AuxLow || value.AuxAfter < 0 || value.AuxAfter > value.AuxUpper || (value.Phase != "" && value.Phase != "entities" && value.Phase != "availability") {
+	if err := decoder.Decode(&value); err != nil || value.Version != 1 || value.Revision < 1 || value.High < 0 || value.Low < 0 || value.Low > value.High || value.AuxLow < 0 || value.AuxHigh < value.AuxLow || value.DetailsLow < 0 || value.DetailsLow > value.AuxHigh || value.AuxAfter < 0 || value.AuxAfter > value.AuxUpper || (value.Phase != "" && value.Phase != "entities" && value.Phase != "availability" && value.Phase != "details") {
 		return catalogToken{}, ErrCatalogCursor
 	}
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
@@ -152,14 +153,14 @@ WITH states AS (
     SELECT provider_id,source_id,origin,fields,deleted,sequence FROM ingest.catalog_baselines
     WHERE sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
 ), copies AS (
-    SELECT DISTINCT ON (provider_id,source_id,origin) origin,fields,deleted,sequence
+    SELECT DISTINCT ON (provider_id,source_id,origin) provider_id,source_id,origin,fields,deleted,sequence
     FROM states
     ORDER BY provider_id,source_id,origin,sequence DESC
 ), chosen AS (
-    SELECT DISTINCT ON (origin) origin,fields,deleted,sequence
+    SELECT DISTINCT ON (origin) provider_id,source_id,origin,fields,deleted,sequence
     FROM copies ORDER BY origin,deleted ASC,sequence DESC
 )
-SELECT origin,fields,deleted,sequence FROM chosen
+SELECT origin,fields,deleted,sequence,provider_id,source_id FROM chosen
 WHERE (($4='full' AND NOT deleted) OR ($4='incremental' AND origin IN (
     SELECT origin FROM ingest.catalog_journal WHERE sequence>$5 AND sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
 )))
@@ -208,6 +209,9 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	}
 	if !request.Entities.Empty() {
 		result.Version = 2
+		if request.Entities.HasTorrentDetails() {
+			result.Version = 3
+		}
 		result.Entities = request.Entities.Intersect(share.CatalogEntities)
 		result.Entities.Availability = result.Entities.Availability && slices.Contains(share.Fields, "info_hash")
 	}
@@ -231,7 +235,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	} else {
 		if request.Checkpoint != "" {
 			checkpoint, parseErr := parseCatalogToken(signingKey, request.Checkpoint)
-			if parseErr != nil || checkpoint.Kind != "checkpoint" || checkpoint.InstanceID != result.InstanceID || checkpoint.ShareID != shareID || checkpoint.Revision > share.Revision || checkpoint.Low != 0 || checkpoint.Mode != "" || checkpoint.Limit != 0 || checkpoint.After != 0 || checkpoint.Phase != "" || checkpoint.AuxAfter != 0 || checkpoint.AuxIdentity != "" || checkpoint.AuxUpper != 0 {
+			if parseErr != nil || checkpoint.Kind != "checkpoint" || checkpoint.InstanceID != result.InstanceID || checkpoint.ShareID != shareID || checkpoint.Revision > share.Revision || checkpoint.Low != 0 || checkpoint.DetailsLow != 0 || checkpoint.Mode != "" || checkpoint.Limit != 0 || checkpoint.After != 0 || checkpoint.Phase != "" || checkpoint.AuxAfter != 0 || checkpoint.AuxIdentity != "" || checkpoint.AuxUpper != 0 {
 				return result, ErrCatalogCursor
 			}
 			// An authentic older scope is authoritative-full, never an incremental
@@ -241,6 +245,13 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 				state.Low = checkpoint.High
 				if checkpoint.Requested == state.Requested && checkpoint.Entities == state.Entities {
 					state.AuxLow = checkpoint.AuxHigh
+				}
+				// Detail permissions govern the exact local torrent mirror. Refresh
+				// it when these choices change so deselected facts cannot remain.
+				if checkpoint.Requested.TorrentDetails() != state.Requested.TorrentDetails() || checkpoint.Entities.TorrentDetails() != state.Entities.TorrentDetails() {
+					state.Mode, state.Low, state.AuxLow = "full", 0, 0
+				} else if state.Entities.HasTorrentDetails() {
+					state.DetailsLow = checkpoint.AuxHigh
 				}
 			}
 		}
@@ -252,7 +263,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 				return result, err
 			}
 			state.CacheBefore = time.Now().UTC()
-			if state.AuxLow > state.AuxHigh {
+			if state.AuxLow > state.AuxHigh || state.DetailsLow > state.AuxHigh {
 				return result, ErrCatalogCursor
 			}
 		}
@@ -267,39 +278,43 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 		if request.Cursor != "" {
 			return result, ErrCatalogExpired
 		}
-		state.Mode, state.Low, state.AuxLow = "full", 0, 0
+		state.Mode, state.Low, state.AuxLow, state.DetailsLow = "full", 0, 0, 0
 	}
 	result.Mode = state.Mode
 	more := false
-	if state.Phase == "entities" || state.Phase == "availability" {
+	if state.Phase != "" {
 		if state.Phase == "availability" {
 			more, err = catalogAvailabilityPage(ctx, tx, share, &state, &result)
+		} else if state.Phase == "details" {
+			more, err = catalogDetailsPage(ctx, tx, share, &state, &result)
 		} else {
 			more, err = catalogEntityPage(ctx, tx, share, &state, &result)
 		}
 		if err != nil {
 			return result, err
 		}
-		if !more && state.Phase == "entities" && state.Entities.Availability {
-			state.Phase = "availability"
-			state.CacheBefore = time.Now().UTC()
-			state.AuxAfter = 0
-			state.AuxIdentity = ""
-			more = true
+		if !more {
+			more = nextCatalogPhase(&state)
 		}
 	} else {
-		rows, err := tx.Query(ctx, catalogPageSQL, state.High, share.Scope == "all", share.SourceIDs, state.Mode, state.Low, state.After, state.Limit+1)
+		limit := state.Limit
+		if state.Entities.HasTorrentDetails() {
+			limit = min(limit, 100)
+		}
+		rows, err := tx.Query(ctx, catalogPageSQL, state.High, share.Scope == "all", share.SourceIDs, state.Mode, state.Low, state.After, limit+1)
 		if err != nil {
 			return result, databaseError("read catalogue page", err)
 		}
+		var keys []catalogLocalKey
 		for rows.Next() {
-			if len(result.Items) == state.Limit {
+			if len(result.Items) == limit {
 				more = true
 				break
 			}
 			var item model.CatalogItem
 			var origin, fields []byte
-			if err := rows.Scan(&origin, &fields, &item.Deleted, &state.After); err != nil {
+			var key catalogLocalKey
+			if err := rows.Scan(&origin, &fields, &item.Deleted, &state.After, &key.provider, &key.source); err != nil {
 				rows.Close()
 				return result, databaseError("read catalogue item", err)
 			}
@@ -316,18 +331,19 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 				}
 			}
 			result.Items = append(result.Items, item)
+			keys = append(keys, key)
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return result, databaseError("read catalogue page", err)
 		}
-		if !more && !state.Entities.Empty() {
-			state.Phase = "entities"
-			if !state.Entities.Metadata {
-				state.Phase = "availability"
-				state.CacheBefore = time.Now().UTC()
+		if state.Entities.HasTorrentDetails() {
+			if err = enrichCatalogItems(ctx, tx, share, state.Entities, result.Items, keys); err != nil {
+				return result, err
 			}
-			more = true
+		}
+		if !more {
+			more = nextCatalogPhase(&state)
 		}
 	}
 	if more {
@@ -348,4 +364,32 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 		return model.CatalogEnvelope{}, err
 	}
 	return result, nil
+}
+
+func nextCatalogPhase(state *catalogToken) bool {
+	switch state.Phase {
+	case "":
+		if state.Entities.HasTorrentDetails() && state.Mode == "incremental" {
+			state.Phase = "details"
+			break
+		}
+		fallthrough
+	case "details":
+		if state.Entities.Metadata {
+			state.Phase = "entities"
+			break
+		}
+		fallthrough
+	case "entities":
+		if state.Entities.Availability {
+			state.Phase = "availability"
+			state.CacheBefore = time.Now().UTC()
+			break
+		}
+		fallthrough
+	default:
+		return false
+	}
+	state.AuxAfter, state.AuxIdentity = 0, ""
+	return true
 }
