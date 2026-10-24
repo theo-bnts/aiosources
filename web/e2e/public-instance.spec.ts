@@ -44,7 +44,7 @@ test('public access preserves the access proxy cookie without an administrator s
     if (url.pathname === '/api/public/install') {
       expect(request.postDataJSON()).toEqual({
         services: { torbox: 'synthetic-visitor-key' },
-        preferences: { language: 'en', mode: 'unknown' },
+        preferences: { language: 'en', mode: 'all' },
       })
       return route.fulfill({
         json: {

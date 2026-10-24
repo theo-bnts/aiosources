@@ -1,3 +1,4 @@
+import { Disclosure } from '@/components/ui/disclosure'
 import { importNumberFields as numberFields } from '@/lib/import-settings-definitions'
 import { Switch } from '@/components/ui/switch'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -158,19 +159,23 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
         values && (
           <>
             <form onSubmit={submit} aria-label="Import execution" className="space-y-6" noValidate>
-              <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-                <legend className="pr-3 text-sm font-medium">Concurrency · Immediate</legend>
+              <Disclosure title="Concurrency">
+                <p className="help">Applies immediately.</p>
                 <div className="max-w-sm">{numberInput('workers')}</div>
-              </fieldset>
-              <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-                <legend className="pr-3 text-sm font-medium">Quota handling · New imports</legend>
+              </Disclosure>
+              <Disclosure title="Quota handling">
+                <p className="help">
+                  Defaults captured by new imports. Existing runs keep their saved policy.
+                </p>
                 <div className="grid items-start gap-5 md:grid-cols-2">
                   {numberInput('max_quota_retries')}
                   {numberInput('max_quota_wait_seconds')}
                 </div>
-              </fieldset>
-              <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-                <legend className="pr-3 text-sm font-medium">Useful progress · New imports</legend>
+              </Disclosure>
+              <Disclosure title="Useful progress">
+                <p className="help">
+                  Defaults captured by new imports. Existing runs keep their saved policy.
+                </p>
                 <div className="grid items-start gap-5 md:grid-cols-2">
                   {numberInput('no_progress_requests')}
                   <div className="space-y-2">
@@ -205,9 +210,9 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                     </p>
                   </div>
                 </div>
-              </fieldset>
-              <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-                <legend className="pr-3 text-sm font-medium">Recovery · Immediate</legend>
+              </Disclosure>
+              <Disclosure title="Recovery">
+                <p className="help">Applies immediately.</p>
                 <div className="flex items-center gap-3">
                   <Switch
                     id="collection-auto-resume"
@@ -224,7 +229,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                   Manual pauses, quota holds, cancellations and configuration failures still require
                   attention. When disabled, interrupted imports remain paused for manual resume.
                 </p>
-              </fieldset>
+              </Disclosure>
               {conflict && (
                 <div className="notice notice-warning space-y-3" role="alert">
                   <p>

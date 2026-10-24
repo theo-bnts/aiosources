@@ -1,3 +1,6 @@
+import { Disclosure } from '@/components/ui/disclosure'
+import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
+import { readResultSorting } from '@/lib/result-preferences'
 import { LanguageFilter } from '@/components/language-filter'
 import {
   useLanguagePreferences,
@@ -77,7 +80,7 @@ export function CatalogSearchPage() {
     <div className={visitor ? 'space-y-6' : 'page'}>
       <form
         key={`${q}:${kind}:${year}`}
-        className="flex flex-wrap items-end gap-3 rounded-md border border-border p-4"
+        className="space-y-4 rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
           const data = new FormData(event.currentTarget)
@@ -101,27 +104,36 @@ export function CatalogSearchPage() {
             placeholder="Search films and series"
           />
         </div>
-        <div className="field">
-          <Label htmlFor="catalog-type">Type</Label>
-          <select id="catalog-type" name="type" className="native-select" defaultValue={kind}>
-            <option value="">Films and series</option>
-            <option value="movie">Films</option>
-            <option value="tv">Series</option>
-          </select>
-        </div>
-        <div className="field w-28">
-          <Label htmlFor="catalog-year">Year</Label>
-          <Input
-            id="catalog-year"
-            name="year"
-            type="number"
-            min={1000}
-            max={9999}
-            step={1}
-            defaultValue={year}
-            placeholder="Any year"
-          />
-        </div>
+        <Disclosure title="Filters" open>
+          <div className="grid items-start gap-4 sm:grid-cols-2">
+            <div className="field">
+              <Label htmlFor="catalog-type">Type</Label>
+              <select
+                id="catalog-type"
+                name="type"
+                className="native-select w-full"
+                defaultValue={kind}
+              >
+                <option value="">Films and series</option>
+                <option value="movie">Films</option>
+                <option value="tv">Series</option>
+              </select>
+            </div>
+            <div className="field min-w-0">
+              <Label htmlFor="catalog-year">Year</Label>
+              <Input
+                id="catalog-year"
+                name="year"
+                type="number"
+                min={1000}
+                max={9999}
+                step={1}
+                defaultValue={year}
+                placeholder="Any year"
+              />
+            </div>
+          </div>
+        </Disclosure>
         <Button type="submit">
           <MagnifyingGlassIcon />
           Search
@@ -245,13 +257,28 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     !discloseSources && search.get('sort') === 'source'
       ? 'size_desc'
       : search.get('sort') || 'size_desc'
-  const cachedOnly = search.get('cached_only') !== 'false'
+  const sorting = search.has('sorting')
+    ? readResultSorting(search.get('sorting'))
+    : readResultSorting(
+        search.has('sort') && sort !== 'size_desc'
+          ? JSON.stringify([
+              {
+                field: sort === 'source' ? 'source' : 'published',
+                direction: sort === 'source' ? 'asc' : 'desc',
+              },
+            ])
+          : null,
+      )
+  const responseSeconds = Number(search.get('response_seconds')) || undefined
+  const cachedOnly = search.get('cached_only') === 'true'
   const provider = discloseSources ? search.get('provider') || '' : ''
   const query = params({
     ...selection,
     language,
     language_mode: preferences.mode,
     sort,
+    sorting: search.get('sorting') || '',
+    response_seconds: responseSeconds,
     provider,
     cached_only: String(cachedOnly),
     limit: pagination.limit,
@@ -278,6 +305,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
   if (provider && !sourceOptions.includes(provider)) sourceOptions.push(provider)
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
+    if (key === 'sorting') next.delete('sort')
     value ? next.set(key, value) : next.delete(key)
     next.delete('offset')
     setSearch(next, { flushSync: true, preventScrollReset: true })
@@ -295,120 +323,117 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
         title.data && (
           <>
             <TitleDetails title={title.data} />
-            <section
-              aria-label="Source release filters"
-              className="space-y-4 rounded-md border border-border p-4"
-            >
-              <div className="flex max-w-sm items-center justify-between gap-3">
-                <Label htmlFor="catalog-cached">Cached results only</Label>
-                <Switch
-                  id="catalog-cached"
-                  checked={cachedOnly}
-                  onCheckedChange={(checked) => filter('cached_only', checked ? '' : 'false')}
-                />
-              </div>
-              <LanguageFilter
-                value={preferences}
-                onChange={(next) => {
-                  setPreferences(next)
-                  pagination.setOffset(0)
-                }}
-              />
-              <div className="flex flex-wrap items-end gap-3">
-                {title.data.type === 'tv' && (
-                  <form
-                    key={`${selection.season}:${selection.episode}`}
-                    className="flex flex-wrap items-end gap-3"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      const data = new FormData(event.currentTarget)
-                      const next = new URLSearchParams(search)
-                      next.set('season', String(data.get('season')))
-                      next.set('episode', String(data.get('episode')))
-                      next.delete('offset')
-                      setSearch(next)
-                    }}
-                  >
-                    <div className="field w-24">
-                      <Label htmlFor="catalog-season">Season</Label>
-                      {title.data.seasons?.length ? (
-                        <select
-                          id="catalog-season"
-                          name="season"
-                          className="native-select"
-                          defaultValue={selection.season}
-                        >
-                          {!title.data.seasons.includes(selection.season ?? 1) && (
-                            <option value={selection.season}>{selection.season}</option>
-                          )}
-                          {title.data.seasons.map((season) => (
-                            <option key={season} value={season}>
-                              {season}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <Input
-                          id="catalog-season"
-                          name="season"
-                          type="number"
-                          min={0}
-                          max={999}
-                          required
-                          defaultValue={selection.season}
-                        />
-                      )}
-                    </div>
-                    <div className="field w-24">
-                      <Label htmlFor="catalog-episode">Episode</Label>
-                      <Input
-                        id="catalog-episode"
-                        name="episode"
-                        type="number"
-                        min={1}
-                        max={9999}
-                        required
-                        defaultValue={selection.episode}
-                      />
-                    </div>
-                    <Button type="submit" variant="outline">
-                      Show episode
-                    </Button>
-                  </form>
-                )}
-                <div className="field">
-                  <Label htmlFor="release-sort">Sort versions</Label>
-                  <select
-                    id="release-sort"
-                    className="native-select"
-                    value={sort}
-                    onChange={(event) => filter('sort', event.target.value)}
-                  >
-                    <option value="recent">Newest first</option>
-                    <option value="size_desc">Largest first</option>
-                    {discloseSources && <option value="source">Source name</option>}
-                  </select>
+            <section aria-label="Source release filters">
+              <Disclosure title="Filters" open>
+                <div className="flex max-w-sm items-center justify-between gap-3">
+                  <Label htmlFor="catalog-cached">Cached results only</Label>
+                  <Switch
+                    id="catalog-cached"
+                    checked={cachedOnly}
+                    onCheckedChange={(checked) => filter('cached_only', checked ? 'true' : '')}
+                  />
                 </div>
-                {discloseSources && (
-                  <div className="field">
-                    <Label htmlFor="release-source">Source</Label>
-                    <select
-                      id="release-source"
-                      className="native-select"
-                      value={provider}
-                      onChange={(event) => filter('provider', event.target.value)}
+                <LanguageFilter
+                  value={preferences}
+                  sorting={sorting.some((rule) => rule.field === 'language')}
+                  onChange={(next) => {
+                    setPreferences(next)
+                    pagination.setOffset(0)
+                  }}
+                />
+                <div className="flex flex-wrap items-end gap-3">
+                  {title.data.type === 'tv' && (
+                    <form
+                      key={`${selection.season}:${selection.episode}`}
+                      className="flex flex-wrap items-end gap-3"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        const data = new FormData(event.currentTarget)
+                        const next = new URLSearchParams(search)
+                        next.set('season', String(data.get('season')))
+                        next.set('episode', String(data.get('episode')))
+                        next.delete('offset')
+                        setSearch(next)
+                      }}
                     >
-                      <option value="">All sources</option>
-                      {sourceOptions.map((value) => (
-                        <option key={value} value={value}>
-                          {sourceName(value)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
+                      <div className="field w-24">
+                        <Label htmlFor="catalog-season">Season</Label>
+                        {title.data.seasons?.length ? (
+                          <select
+                            id="catalog-season"
+                            name="season"
+                            className="native-select"
+                            defaultValue={selection.season}
+                          >
+                            {!title.data.seasons.includes(selection.season ?? 1) && (
+                              <option value={selection.season}>{selection.season}</option>
+                            )}
+                            {title.data.seasons.map((season) => (
+                              <option key={season} value={season}>
+                                {season}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            id="catalog-season"
+                            name="season"
+                            type="number"
+                            min={0}
+                            max={999}
+                            required
+                            defaultValue={selection.season}
+                          />
+                        )}
+                      </div>
+                      <div className="field w-24">
+                        <Label htmlFor="catalog-episode">Episode</Label>
+                        <Input
+                          id="catalog-episode"
+                          name="episode"
+                          type="number"
+                          min={1}
+                          max={9999}
+                          required
+                          defaultValue={selection.episode}
+                        />
+                      </div>
+                      <Button type="submit" variant="outline">
+                        Show episode
+                      </Button>
+                    </form>
+                  )}
+                  {discloseSources && (
+                    <div className="field">
+                      <Label htmlFor="release-source">Source</Label>
+                      <select
+                        id="release-source"
+                        className="native-select"
+                        value={provider}
+                        onChange={(event) => filter('provider', event.target.value)}
+                      >
+                        <option value="">All sources</option>
+                        {sourceOptions.map((value) => (
+                          <option key={value} value={value}>
+                            {sourceName(value)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <ResponseTimeout
+                  value={responseSeconds}
+                  onChange={(value) => filter('response_seconds', value ? String(value) : '')}
+                />
+              </Disclosure>
             </section>
+            <ResultSorting
+              value={sorting}
+              onChange={(next) => filter('sorting', next.length ? JSON.stringify(next) : '')}
+              language
+              sources={discloseSources}
+            />
             <ErrorNotice error={releases.error} retry={() => void releases.refetch()} />
             {releases.isPending ? (
               <Loading label="Checking source releases" />

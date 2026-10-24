@@ -54,7 +54,7 @@ func WithInstallationPreferences(token string, p model.StreamPreferences) (strin
 	if !ValidStreamPreferences(p) {
 		return "", model.ErrInvalid
 	}
-	advanced := len(p.Sources) > 0 || len(p.Services) > 0 || len(p.Types) > 0 || p.CachedOnly
+	advanced := len(p.Sources) > 0 || len(p.Services) > 0 || len(p.Types) > 0 || p.CachedOnly || !p.ResultPreferences.Empty()
 	if !advanced {
 		if p.Mode == "" {
 			return token, nil
@@ -86,7 +86,7 @@ func InstallationManifest(p model.StreamPreferences) map[string]any {
 		manifest["types"] = p.Types
 		manifest["resources"] = []any{map[string]any{"name": "stream", "types": p.Types, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}
 	}
-	if len(p.Sources) > 0 || len(p.Services) > 0 || len(p.Types) > 0 || p.CachedOnly {
+	if len(p.Sources) > 0 || len(p.Services) > 0 || len(p.Types) > 0 || p.CachedOnly || !p.ResultPreferences.Empty() {
 		data, _ := json.Marshal(p)
 		hash := sha256.Sum256(data)
 		manifest["id"] = "org.aiosource.v2." + hex.EncodeToString(hash[:8])

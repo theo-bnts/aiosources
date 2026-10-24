@@ -1,6 +1,9 @@
 package httpapi
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -85,6 +88,26 @@ func catalogReleaseInput(w http.ResponseWriter, r *http.Request) (model.ListOpti
 	}
 	opts.Sort = r.URL.Query().Get("sort")
 	preferences := model.StreamPreferences{Language: catalogLanguage(r), Mode: r.URL.Query().Get("language_mode")}
+	if raw := r.URL.Query().Get("sorting"); raw != "" {
+		if len(raw) > 512 {
+			respondError(w, model.ErrInvalid)
+			return opts, selection, filters, false
+		}
+		decoder := json.NewDecoder(bytes.NewBufferString(raw))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&preferences.Sorting) != nil || decoder.Decode(new(any)) != io.EOF {
+			respondError(w, model.ErrInvalid)
+			return opts, selection, filters, false
+		}
+	}
+	if raw := r.URL.Query().Get("response_seconds"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			respondError(w, model.ErrInvalid)
+			return opts, selection, filters, false
+		}
+		preferences.ResponseSeconds = n
+	}
 	if !aiosource.ValidStreamPreferences(preferences) {
 		respondError(w, model.ErrInvalid)
 		return opts, selection, filters, false

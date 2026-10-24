@@ -31,6 +31,7 @@ test('save feedback distinguishes reverted controls from committed changes', asy
 
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const advanced = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = advanced.getByLabel('Simultaneous imports', { exact: true })
   const originalWorkers = await workers.inputValue()

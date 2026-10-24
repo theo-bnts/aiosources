@@ -94,7 +94,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
     expect(new URL(page.url()).searchParams.get('q')).toBe(query)
   }
   await search.fill('gain -cam')
-  await page.getByLabel('Sort results', { exact: true }).selectOption('relevance')
+  await page.getByLabel('Sort by', { exact: true }).selectOption('relevance')
   await searchButton.click()
   await expect(results).toHaveCount(1)
   await expect(page.getByText('Saved views', { exact: true })).toHaveCount(0)

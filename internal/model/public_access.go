@@ -16,6 +16,7 @@ type PublicAccess struct {
 // PublicTorznabOptions travel in the client URL, never a saved visitor profile.
 // Personal credentials are encrypted separately from these optional filters.
 type PublicTorznabOptions struct {
+	ResultPreferences
 	Sources    []string `json:"sources,omitempty"`
 	MediaTypes []string `json:"media,omitempty"`
 	Services   []string `json:"services,omitempty"`

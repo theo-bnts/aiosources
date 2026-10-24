@@ -342,6 +342,7 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 	}
 	if !access.ExposeSources {
 		preferences.Sources = nil
+		preferences.ResultPreferences = preferences.ResultPreferences.WithHiddenSources()
 	}
 	out.Preferences = preferences
 	return &out, nil
@@ -450,7 +451,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 			if e == nil {
 				f, e := s.publicAllDebridFlight(adminKey, resource, missing, c)
 				if e == nil {
-					wait, cancel := context.WithTimeout(ctx, time.Duration(min(c.ResponseSeconds, 15))*time.Second)
+					wait, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 					select {
 					case <-f.done:
 					case <-wait.Done():
@@ -474,7 +475,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 			}
 		}
 		if len(pending) > 0 {
-			check, cancel := context.WithTimeout(ctx, time.Duration(min(c.ResponseSeconds, 15))*time.Second)
+			check, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 			observed, _ := s.checkPublicService(check, service, key, resource, pending)
 			cancel()
 			for _, item := range observed {
@@ -483,7 +484,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 		}
 
 	} else {
-		check, cancel := context.WithTimeout(ctx, time.Duration(min(c.ResponseSeconds, 15))*time.Second)
+		check, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 		observed, _ := s.checkPublicService(check, service, key, resource, missing)
 		cancel()
 		for _, item := range observed {

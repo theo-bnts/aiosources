@@ -89,6 +89,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await visitor.getByLabel('Cached results only', { exact: true }).uncheck()
     expect(await visitor.locator('summary').allTextContents()).toEqual([
       'Filters',
+      'Sorting',
       'Advanced',
       'Full endpoint URL',
     ])

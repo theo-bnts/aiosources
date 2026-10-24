@@ -28,7 +28,7 @@ type PublicTorznabInstallation struct {
 }
 
 func ValidPublicTorznabOptions(o model.PublicTorznabOptions) bool {
-	cache := model.TorznabPreferences{Services: o.Services, CachedOnly: o.CachedOnly}
+	cache := model.TorznabPreferences{ResultPreferences: o.ResultPreferences, Services: o.Services, CachedOnly: o.CachedOnly}
 	if !ValidStreamPreferences(model.StreamPreferences{Sources: o.Sources}) || !cache.Valid() || len(o.MediaTypes) > 3 {
 		return false
 	}
@@ -109,6 +109,7 @@ func (s *Service) OpenPublicTorznab(ctx context.Context, audience, value string)
 	if !access.ExposeSources {
 		clear(v.Announces)
 		v.Options.Sources = nil
+		v.Options.ResultPreferences = v.Options.ResultPreferences.WithHiddenSources()
 	}
 	return &v, nil
 }
@@ -156,7 +157,7 @@ func WithPublicTorznabOptions(credential string, options model.PublicTorznabOpti
 	if !ValidPublicTorznabOptions(options) {
 		return "", model.ErrInvalid
 	}
-	if len(options.Sources) == 0 && len(options.MediaTypes) == 0 && len(options.Services) == 0 && !options.CachedOnly {
+	if len(options.Sources) == 0 && len(options.MediaTypes) == 0 && len(options.Services) == 0 && !options.CachedOnly && options.ResultPreferences.Empty() {
 		return credential, nil
 	}
 	data, err := json.Marshal(options)

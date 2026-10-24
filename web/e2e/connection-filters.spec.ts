@@ -83,6 +83,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   await expect(dialog.getByLabel('Media types', { exact: true })).toBeHidden()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
   await selectMultiple(dialog, 'Media types', ['movie'])
+  await dialog.getByRole('switch', { name: 'Filter languages', exact: true }).check()
   await dialog.getByLabel('Preferred language', { exact: true }).selectOption('fr')
   await dialog.getByLabel('Cached results only', { exact: true }).check()
   await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
@@ -288,12 +289,20 @@ for (const format of ['stremio', 'torznab'] as const) {
     await expect(editor.getByLabel('Sources', { exact: true })).toBeHidden()
     await expect(editor.getByLabel('Requests per minute', { exact: true })).toBeHidden()
     await expect(editor.getByLabel('Concurrent requests', { exact: true })).toBeHidden()
-    expect(await editor.locator('summary').allTextContents()).toEqual(['Filters', 'Advanced'])
+    expect(await editor.locator('summary').allTextContents()).toEqual([
+      'Filters',
+      'Sorting',
+      'Advanced',
+      'Request limits',
+      'Expiration',
+    ])
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
     await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
       'All sources',
     )
     await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
+    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await expect(editor.getByLabel('Requests per minute', { exact: true })).toHaveValue('')
     await expect(editor.getByLabel('Concurrent requests', { exact: true })).toHaveValue('')
     await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
@@ -349,6 +358,8 @@ for (const format of ['stremio', 'torznab'] as const) {
     await page.getByRole('menuitemcheckbox', { name: 'Alpha library', exact: true }).click()
     await page.keyboard.press('Escape')
     await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
+    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await editor.getByLabel('Requests per minute', { exact: true }).fill('9')
     await editor.getByLabel('Concurrent requests', { exact: true }).fill('1')
     await editor
@@ -372,6 +383,8 @@ for (const format of ['stremio', 'torznab'] as const) {
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitem', { name: 'All sources', exact: true }).click()
     await editor.locator('summary', { hasText: /^Advanced$/ }).click()
+    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
+    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await editor.getByLabel('Requests per minute', { exact: true }).fill('')
     await editor.getByLabel('Concurrent requests', { exact: true }).fill('')
     await editor.getByLabel('Expires at (browser local time)', { exact: true }).fill('')
@@ -397,13 +410,15 @@ test('new Stremio access uses the same browser language defaults and saves a res
   await dialog.getByLabel('Access name', { exact: true }).fill('Browser language access')
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
   await expect(dialog.getByLabel('Preferred language', { exact: true })).toHaveValue('')
-  await expect(dialog.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
+  await expect(
+    dialog.getByRole('switch', { name: 'Filter languages', exact: true }),
+  ).not.toBeChecked()
   await expect(dialog.getByLabel('Include', { exact: true })).toHaveValue('unknown')
   await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
   await dialog.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   const data = await (await page.request.get('/api/stremio/connections')).json()
-  expect(data.items[0].stream_preferences).toMatchObject({ language: 'en', mode: 'unknown' })
+  expect(data.items[0].stream_preferences).toMatchObject({ language: 'en', mode: 'all' })
   await expect(
     page.getByRole('region', { name: 'Access Browser language access', exact: true }),
-  ).toContainText('English + MULTI + unknown')
+  ).toContainText('All results')
 })

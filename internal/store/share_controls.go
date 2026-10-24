@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 // CatalogQuotaError is safe to expose: it contains no credential or share data.
@@ -40,6 +42,8 @@ type CatalogDownload struct {
 	closeOnce sync.Once
 	closeErr  error
 }
+
+func (d *CatalogDownload) Deadline() time.Time { return d.deadline }
 
 func (s *Store) BeginCatalogDownload(ctx context.Context, shareID, password string) (*CatalogDownload, error) {
 	return s.beginShareRequest(ctx, shareID, password, "catalog")
@@ -83,9 +87,10 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	defer rollback(tx)
 	var revision int64
 	var requests, concurrent int
+	var preferencesJSON []byte
 	// Recheck under the lock: rotation, revocation and expiry may have changed
 	// since the first read. Admissions and quota changes remain atomic.
-	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads FROM ingest.shares WHERE id=$1 AND format=$2 FOR UPDATE`, shareID, format).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent)
+	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads,torznab_preferences FROM ingest.shares WHERE id=$1 AND format=$2 FOR UPDATE`, shareID, format).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent, &preferencesJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
 	}
@@ -94,6 +99,16 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	}
 	if subtle.ConstantTimeCompare(hash, candidate[:]) != 1 || !enabled || !unexpired {
 		return nil, ErrCatalogAuthentication
+	}
+	if format == "torznab" {
+		var preferences model.TorznabPreferences
+		if json.Unmarshal(preferencesJSON, &preferences) != nil || !preferences.Valid() {
+			return nil, model.ErrInvalid
+		}
+		if preferences.ResponseSeconds > 0 {
+			timeout = min(timeout, time.Duration(preferences.ResponseSeconds)*time.Second)
+			deadline = time.Now().Add(timeout)
+		}
 	}
 	var now time.Time
 	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {

@@ -22,6 +22,7 @@ import { PublicSearchEntry } from '@/components/public-search-entry'
 import { usePublicCredential } from '@/lib/public-credentials'
 import { InstallationFilters } from '@/components/installation-filters'
 import type { InstallationOptions } from '@/lib/language-preferences'
+import { ResultSorting } from '@/components/result-controls'
 
 export function PublicEntry({
   layout = (content) => content,
@@ -91,8 +92,14 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
     const allowed = new Set((info.sources ?? info.private_sources ?? []).map((source) => source.id))
     const selected = installationOptions.sources ?? []
     const sources = selected.filter((id) => allowed.has(id))
-    if (selected.length !== sources.length) {
-      const next = { ...installationOptions, sources }
+    const sorting = installationOptions.sorting?.filter(
+      (rule) => Boolean(info.sources) || rule.field !== 'source',
+    )
+    if (
+      selected.length !== sources.length ||
+      sorting?.length !== installationOptions.sorting?.length
+    ) {
+      const next = { ...installationOptions, sources, sorting }
       setInstallationOptions(next)
       setManifest((current) => (current ? preferenceManifest(current, preferences, next) : ''))
     }
@@ -130,6 +137,7 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
             <LanguageFilter
               layout="stacked"
               value={preferences}
+              sorting={installationOptions.sorting?.some((rule) => rule.field === 'language')}
               onChange={(next) => {
                 setPreferences(next)
                 setManifest((current) =>
@@ -138,6 +146,18 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
               }}
             />
           </InstallationFilters>
+          <ResultSorting
+            value={installationOptions.sorting}
+            language
+            sources={Boolean(info.sources)}
+            onChange={(sorting) => {
+              const next = { ...installationOptions, sorting }
+              setInstallationOptions(next)
+              setManifest((current) =>
+                current ? preferenceManifest(current, preferences, next) : '',
+              )
+            }}
+          />
           <PublicAnnounceFields sources={info.private_sources ?? []} pending={false} />
           {manifestError && (
             <p className="text-sm text-destructive" role="alert">

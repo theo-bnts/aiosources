@@ -2,6 +2,7 @@ import { serviceNames } from '@/lib/debrid'
 import type { InstallationOptions } from '@/lib/language-preferences'
 import { ConnectionFilterFields, stremioMediaTypes } from '@/components/connection-filter-fields'
 import { Disclosure } from '@/components/ui/disclosure'
+import { ResultLimits } from '@/components/result-controls'
 import { useId, useRef, type ReactNode } from 'react'
 
 export function InstallationFilters({
@@ -53,6 +54,7 @@ export function InstallationFilters({
         showSources={showSources}
       />
       {children}
+      <ResultLimits value={value} onChange={onChange} cache />
       {showHelp && (
         <p className="help">
           Filters belong to this link. Copy or install a separate link for each configuration;

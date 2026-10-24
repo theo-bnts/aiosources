@@ -297,7 +297,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                   </div>
                 ))}
                 {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
-                {number('Stream response timeout (seconds)', 'response_seconds', 2, 60)}
               </>
             )}
           </div>

@@ -1,4 +1,12 @@
-export type TorrentSort = 'recent' | 'oldest' | 'size_desc' | 'relevance'
+export type TorrentSort =
+  | 'recent'
+  | 'oldest'
+  | 'size_desc'
+  | 'size_asc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'relevance'
+  | 'relevance_asc'
 
 export interface TorrentFilters {
   q?: string
@@ -16,6 +24,10 @@ export const torrentSortOptions: { value: TorrentSort; label: string }[] = [
   { value: 'recent', label: 'Most recent' },
   { value: 'oldest', label: 'Oldest first' },
   { value: 'size_desc', label: 'Largest first' },
+  { value: 'size_asc', label: 'Smallest first' },
+  { value: 'name_asc', label: 'Name (A–Z)' },
+  { value: 'name_desc', label: 'Name (Z–A)' },
+  { value: 'relevance_asc', label: 'Search relevance (ascending)' },
   { value: 'relevance', label: 'Search relevance' },
 ]
 
@@ -54,3 +66,10 @@ export function torrentFilterParams(filters: TorrentFilters) {
 export function occurrenceHref(id: string) {
   return `/torrents?${new URLSearchParams({ occurrence: id })}`
 }
+
+export const torrentSorting = [
+  { label: 'Last imported', asc: 'oldest', desc: 'recent' },
+  { label: 'Size', asc: 'size_asc', desc: 'size_desc' },
+  { label: 'Name', asc: 'name_asc', desc: 'name_desc' },
+  { label: 'Search relevance', asc: 'relevance_asc', desc: 'relevance' },
+]

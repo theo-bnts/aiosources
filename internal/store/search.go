@@ -132,7 +132,7 @@ func NormalizeSearchFilters(input model.SearchFilters) (model.SearchFilters, err
 	switch input.Sort {
 	case "":
 		input.Sort = "recent"
-	case "recent", "oldest", "size_desc", "relevance":
+	case "recent", "oldest", "size_desc", "size_asc", "name_asc", "name_desc", "relevance", "relevance_asc":
 	default:
 		return input, model.ErrInvalid
 	}
@@ -204,11 +204,21 @@ func torrentSearchSQL(options model.ListOptions) (string, string, []any, []any) 
 		order = "last_seen_at ASC"
 	case "size_desc":
 		order = "search_size DESC NULLS LAST"
-	case "relevance":
+	case "size_asc":
+		order = "search_size ASC NULLS LAST"
+	case "name_asc":
+		order = "lower(fields->>'title') ASC"
+	case "name_desc":
+		order = "lower(fields->>'title') DESC"
+	case "relevance", "relevance_asc":
 		if options.Query != "" {
 			queryParameter := bind(options.Query)
-			order = "ts_rank_cd(search_document,websearch_to_tsquery('simple'::regconfig," + queryParameter + ")) DESC," +
-				"public.word_similarity(" + queryParameter + "," + torrentSearchTextSQL + ") DESC,last_seen_at DESC"
+			direction := "DESC"
+			if options.Sort == "relevance_asc" {
+				direction = "ASC"
+			}
+			order = "ts_rank_cd(search_document,websearch_to_tsquery('simple'::regconfig," + queryParameter + ")) " + direction + "," +
+				"public.word_similarity(" + queryParameter + "," + torrentSearchTextSQL + ") " + direction + ",last_seen_at DESC"
 		}
 	}
 	return filter, " ORDER BY " + order + ",provider_id,source_id", filterArgs, args

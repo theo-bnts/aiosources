@@ -129,7 +129,10 @@ test('catalog search groups clean titles, sorts source versions and retains the 
     (url) =>
       url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
   )
-  await expect(page.getByRole('switch', { name: 'Cached results only', exact: true })).toBeChecked()
+  await expect(
+    page.getByRole('switch', { name: 'Cached results only', exact: true }),
+  ).not.toBeChecked()
+  await page.getByRole('switch', { name: 'Cached results only', exact: true }).check()
   await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
   await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toHaveCount(0)
   await page.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
@@ -140,11 +143,14 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   ).not.toBeChecked()
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
   const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
-  await expect(filters.getByLabel('Sort versions', { exact: true })).toHaveValue('size_desc')
-  await expect(filters.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
+  await page.locator('summary', { hasText: /^Sorting$/ }).click()
+  await expect(page.getByLabel('Sort by', { exact: true })).toHaveValue('')
+  await expect(
+    filters.getByRole('switch', { name: 'Filter languages', exact: true }),
+  ).not.toBeChecked()
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
-  await page.getByLabel('Sort versions', { exact: true }).selectOption('size_desc')
+  await page.getByLabel('Sort by', { exact: true }).selectOption('size')
   await expect(page.locator('main tbody tr').first()).toContainText('2160p')
   await page.getByLabel('Source', { exact: true }).selectOption('alpha')
   await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
@@ -636,7 +642,10 @@ test.describe('browser language preferences', () => {
     await page.goto('/search?q=example')
     await expect(page.getByRole('link', { name: 'Film Exemple', exact: true })).toBeVisible()
     await page.goto(`/search/${ids.movie}?cached_only=false`)
-    await expect(page.getByRole('switch', { name: 'Filter languages', exact: true })).toBeChecked()
+    await expect(
+      page.getByRole('switch', { name: 'Filter languages', exact: true }),
+    ).not.toBeChecked()
+    await page.getByRole('switch', { name: 'Filter languages', exact: true }).check()
     await expect(page.locator('[data-result-count]')).toHaveText('4 source releases')
     await expect(page.locator('main tbody tr').first()).toContainText('FRENCH')
     await expect(page.locator('main tbody')).not.toContainText('GERMAN')
@@ -652,10 +661,10 @@ test.describe('browser language preferences', () => {
     await expect(editor.getByLabel('Preferred language', { exact: true })).toHaveValue('')
     await expect(
       editor.getByRole('switch', { name: 'Filter languages', exact: true }),
-    ).toBeChecked()
-    await editor.getByRole('switch', { name: 'Filter languages', exact: true }).click()
+    ).not.toBeChecked()
+    await editor.getByRole('switch', { name: 'Filter languages', exact: true }).check()
     await expect(
       editor.getByRole('switch', { name: 'Filter languages', exact: true }),
-    ).not.toBeChecked()
+    ).toBeChecked()
   })
 })

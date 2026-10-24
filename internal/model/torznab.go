@@ -5,12 +5,13 @@ import "slices"
 // TorznabPreferences select known availability, never a recipient's credentials.
 // Public connections carry these settings in their URL; private access saves them.
 type TorznabPreferences struct {
+	ResultPreferences
 	Services   []string `json:"services,omitempty"`
 	CachedOnly bool     `json:"cached_only,omitempty"`
 }
 
 func (p TorznabPreferences) Valid() bool {
-	if len(p.Services) > len(DebridServices()) {
+	if !p.ResultPreferences.Valid(false) || len(p.Services) > len(DebridServices()) {
 		return false
 	}
 	for i, service := range p.Services {
@@ -24,7 +25,9 @@ func (p TorznabPreferences) Valid() bool {
 // Query parameters may narrow access settings, never relax a saved or public
 // connection's cache policy. An empty intersection must stay empty, not become All.
 func (q TorznabQuery) WithPreferences(p TorznabPreferences) TorznabQuery {
+	q.ResultPreferences = p.ResultPreferences
 	q.CachedOnly = q.CachedOnly || p.CachedOnly
+	q.MaxResults = p.ResultLimit(q.CachedOnly)
 	if len(p.Services) == 0 {
 		return q
 	}
@@ -45,6 +48,8 @@ func (q TorznabQuery) WithPreferences(p TorznabPreferences) TorznabQuery {
 // TorznabQuery contains validated protocol filters, never an API key or URL.
 type TorznabQuery struct {
 	SearchFilters
+	ResultPreferences
+	SourceNames      map[string]string
 	Mode             string
 	Services         []string
 	CachedOnly       bool

@@ -112,9 +112,11 @@ Choose **Download** to start a ready file in your browser. Choose **Add to debri
 ### Stremio and AIOStreams
 
 1. Open **Connections → Stremio → Settings** and create a connection.
-2. Choose any optional **Filters**: media types, sources, playback services, languages and cached-only results. Expiration and limits are in **Advanced**.
+2. Choose any optional **Filters**: media types, sources, playback services, languages and cached-only results. New connections have no optional filter or limit enabled. Use **Sorting** to combine up to three rules, each ascending or descending. **Advanced → Request limits** and **Advanced → Expiration** control access.
 3. Save the generated manifest URL securely and enable the connection.
 4. Install that URL in Stremio or add it as a custom addon in AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
+
+**Maximum results** limits both the response and the torrents considered for new availability checks, using your sorting rules and already-known cache information. **Maximum cached results** stops new checks once enough cached torrents are found; other unchecked results remain **Unknown**, and existing local cache observations can supply more without provider calls. When **Cached results only** is enabled, only the cached limit applies and caps the returned results. An optional **Stream response timeout** sets this connection’s availability wait within the instance request deadline. Empty controls use the normal instance behavior.
 
 Create as many connections as you need. Each has independent settings and can be disabled or revoked. Saved filter changes apply to its existing URL without reinstalling. New connections include all sources by default.
 
@@ -123,6 +125,8 @@ Keep installation URLs private: they grant the access you configured. Private-so
 ### Torznab-compatible apps
 
 Open **Connections → Torznab → Settings**, create an access and select its filters. Enable it, then copy the Torznab URL and generated API key into your client. In Prowlarr, choose **Generic Torznab**.
+
+Torznab offers the same sorting priorities, result caps, optional response timeout and advanced access sections where applicable. Its cached filters read existing observations without contacting debrid services; language sorting is reserved for Stremio and Search. Result caps apply across all pages.
 
 Torznab searches your imported catalog without contacting your sources or TMDB. Each access can select several sources and media types, and additional URL filters can narrow it for different clients. Private-source magnets do not include the administrator's announce URL; recipients need their own authorized source access. See the [Torznab guide](docs/TORZNAB.md).
 

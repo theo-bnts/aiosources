@@ -1,3 +1,4 @@
+import { ResultSorting } from '@/components/result-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { SourceFilter } from '@/components/source-filter'
@@ -18,6 +19,7 @@ import {
   StremioConnectionFilters,
   defaultStremioPreferences,
   stremioPreferenceSummary,
+  stremioPreferencesKey,
 } from '@/components/stremio-connection-filters'
 import { resolvedLanguage } from '@/lib/language-preferences'
 import { torznabCachePreferences } from '@/lib/torznab-preferences'
@@ -680,8 +682,8 @@ function ShareForm({
       JSON.stringify(torznabPreferences) !==
         JSON.stringify(torznabCachePreferences(original?.torznab_preferences ?? {}))) ||
     (stremio &&
-      JSON.stringify(streamPreferences) !==
-        JSON.stringify(original?.stream_preferences ?? defaultStremioPreferences())) ||
+      stremioPreferencesKey(streamPreferences) !==
+        stremioPreferencesKey(original?.stream_preferences ?? defaultStremioPreferences())) ||
     JSON.stringify(mediaTypes) !== JSON.stringify(original?.media_types ?? []) ||
     name !== (original?.name ?? '') ||
     scope !== (original?.scope ?? defaultScope) ||
@@ -704,26 +706,28 @@ function ShareForm({
     setSourceIDs(ids)
     setScope(ids.length ? 'selected' : 'all')
   }
-  const accessPolicy = (
-    <fieldset className="min-w-0 space-y-4">
-      <div className="field">
-        <Label htmlFor="share-expires">Expires at ({dateZone})</Label>
-        <DateTimeInput
-          id="share-expires"
-          precision="seconds"
-          value={expiresAt}
-          onValueChange={setExpiresAt}
-          aria-describedby="share-expires-help"
-        />
-        <p id="share-expires-help" className="help">
-          Uses {dateZone}. Leave empty for no expiration. Expired access cannot be used.
+  const expiration = (
+    <div className="field">
+      <Label htmlFor="share-expires">Expires at ({dateZone})</Label>
+      <DateTimeInput
+        id="share-expires"
+        precision="seconds"
+        value={expiresAt}
+        onValueChange={setExpiresAt}
+        aria-describedby="share-expires-help"
+      />
+      <p id="share-expires-help" className="help">
+        Uses {dateZone}. Leave empty for no expiration. Expired access cannot be used.
+      </p>
+      {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
+        <p className="help text-destructive">
+          This date is in the past. Access will remain blocked.
         </p>
-        {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
-          <p className="help text-destructive">
-            This date is in the past. Access will remain blocked.
-          </p>
-        )}
-      </div>
+      )}
+    </div>
+  )
+  const requestLimits = (
+    <fieldset className="min-w-0 space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="field">
           <Label htmlFor="share-request-limit">Requests per minute</Label>
@@ -796,21 +800,28 @@ function ShareForm({
             onSourceIDsChange={selectSources}
           />
         ) : torznab ? (
-          <Disclosure title="Filters">
-            <TorznabFilters
-              value={{ ...torznabPreferences, media: mediaTypes, sources: sourceIDs }}
-              onChange={({ media, sources, ...options }) => {
-                setMediaTypes(media ?? [])
-                selectSources(sources ?? [])
-                setTorznabPreferences(torznabCachePreferences(options))
-              }}
-              sources={sourceOptions}
-              showSources
+          <>
+            <Disclosure title="Filters">
+              <TorznabFilters
+                value={{ ...torznabPreferences, media: mediaTypes, sources: sourceIDs }}
+                onChange={({ media, sources, ...options }) => {
+                  setMediaTypes(media ?? [])
+                  selectSources(sources ?? [])
+                  setTorznabPreferences(torznabCachePreferences(options))
+                }}
+                sources={sourceOptions}
+                showSources
+              />
+              <p className="help">
+                Services select the local availability cache. Configure downloads in your client.
+              </p>
+            </Disclosure>
+            <ResultSorting
+              value={torznabPreferences.sorting}
+              onChange={(sorting) => setTorznabPreferences({ ...torznabPreferences, sorting })}
+              defaultOrder="newest first"
             />
-            <p className="help">
-              Services select the local availability cache. Configure downloads in your client.
-            </p>
-          </Disclosure>
+          </>
         ) : (
           <Disclosure title="Filters">
             <SourceFilter
@@ -847,7 +858,10 @@ function ShareForm({
             </fieldset>
           </Disclosure>
         )}
-        <Disclosure title="Advanced">{accessPolicy}</Disclosure>
+        <Disclosure title="Advanced">
+          <Disclosure title="Request limits">{requestLimits}</Disclosure>
+          <Disclosure title="Expiration">{expiration}</Disclosure>
+        </Disclosure>
       </fieldset>
       <p className="help">
         {original

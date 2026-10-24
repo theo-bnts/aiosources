@@ -29,6 +29,7 @@ test('advanced source forms save independently and folding preserves both drafts
   const initial = await (await page.request.get('/api/settings/collections')).json()
   await openDisclosure(page, 'Advanced')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const imports = page.getByRole('form', { name: 'Import execution', exact: true })
   await imports.getByLabel('Simultaneous imports', { exact: true }).fill('7')
   await openDisclosure(page, 'Temporary source errors')
@@ -43,6 +44,7 @@ test('advanced source forms save independently and folding preserves both drafts
     initial.settings,
   )
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(imports.getByLabel('Simultaneous imports', { exact: true })).toHaveValue('7')
   await imports.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(imports.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()

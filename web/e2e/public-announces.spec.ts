@@ -43,7 +43,7 @@ test('visitor announce fields are opt-in, use source names and clear personal in
       submissions++
       expect(route.request().postDataJSON()).toEqual({
         services: { torbox: 'synthetic-visitor-key' },
-        preferences: { language: 'en', mode: 'unknown' },
+        preferences: { language: 'en', mode: 'all' },
         announces: { 'private-example': ownAnnounce },
       })
       return route.fulfill({
@@ -70,7 +70,11 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await expect(visitor.locator('summary', { hasText: 'Advanced' })).toBeVisible()
-    expect(await visitor.locator('summary').allTextContents()).toEqual(['Filters', 'Advanced'])
+    expect(await visitor.locator('summary').allTextContents()).toEqual([
+      'Filters',
+      'Sorting',
+      'Advanced',
+    ])
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeHidden()
     await visitor.locator('summary', { hasText: 'Filters' }).click()
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeVisible()

@@ -7,10 +7,12 @@ export function LanguageFilter({
   value,
   onChange,
   layout = 'inline',
+  sorting = false,
 }: {
   value: LanguagePreferences
   onChange: (value: LanguagePreferences) => void
   layout?: 'inline' | 'stacked'
+  sorting?: boolean
 }) {
   const id = useId()
   const last = useRef<Exclude<LanguagePreferences['mode'], 'all'>>(
@@ -87,7 +89,7 @@ export function LanguageFilter({
           id={`${id}-language`}
           className={layout === 'stacked' ? 'native-select w-full' : 'native-select max-w-full'}
           value={value.language}
-          disabled={value.mode === 'all'}
+          disabled={value.mode === 'all' && !sorting}
           onChange={(e) => onChange({ ...value, language: e.target.value })}
         >
           <option value="">Browser language ({names.of(browserLanguage())})</option>

@@ -49,11 +49,6 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
 	controller := http.NewResponseController(w)
-	deadline, _ := ctx.Deadline()
-	if err := controller.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		torznabError(w, 503, 910, "Delivery unavailable")
-		return
-	}
 	download, err := s.options.Store.BeginTorznabRequest(ctx, r.PathValue("id"), values.Get("apikey"))
 	if err != nil {
 		var quota *store.CatalogQuotaError
@@ -65,6 +60,13 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		} else {
 			torznabError(w, 503, 910, "Delivery unavailable")
 		}
+		return
+	}
+	ctx, deliveryCancel := context.WithDeadline(ctx, download.Deadline())
+	defer deliveryCancel()
+	if err := controller.SetWriteDeadline(download.Deadline()); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		_ = download.Close()
+		torznabError(w, 503, 910, "Delivery unavailable")
 		return
 	}
 	stop := context.AfterFunc(ctx, func() { _ = download.Close() })
@@ -90,6 +92,12 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 		match := func(rec model.AIORecord) bool {
 			return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode)
 		}
+		providers, _ := s.options.Providers.List()
+		names := map[string]string{}
+		for _, p := range providers {
+			names[p.ID] = p.Name
+		}
+		q.SourceNames = names
 		result, e := download.Torznab(ctx, q, match)
 		if e != nil {
 			if errors.Is(e, store.ErrCatalogAuthentication) {
@@ -99,13 +107,6 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 			_ = s.options.Store.RecordActivity(ctx, "warn", "torznab.failed", "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(started).Milliseconds()})
 			torznabError(w, 503, 910, "Search unavailable; try again later")
 			return
-		}
-		// Display names are best effort, as in Stremio. An unreadable source
-		// definition cannot revoke an already authorized published record.
-		providers, _ := s.options.Providers.List()
-		names := map[string]string{}
-		for _, p := range providers {
-			names[p.ID] = p.Name
 		}
 		response = torznabResults(result, names, origin)
 		// Only counts enter ordinary seven-day logs. Never store the key, search

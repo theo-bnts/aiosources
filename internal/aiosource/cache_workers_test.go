@@ -91,7 +91,7 @@ func TestStremioEpisodeNeedsFileEvidenceForCachedMarker(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `{"success":true,"data":{"%s":{"hash":"%s","files":[]}}}`, hash, hash)
+		fmt.Fprintf(w, `{"success":true,"data":{"%s":{"hash":"%s","name":"Example","size":1000,"files":[]}}}`, hash, hash)
 	}))
 	t.Cleanup(server.Close)
 	s.Providers.TBBase, s.Providers.Client = server.URL, server.Client()

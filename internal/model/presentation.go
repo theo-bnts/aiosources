@@ -11,6 +11,7 @@ import (
 // StreamPreferences are installation and view preferences, never credentials.
 // An empty mode preserves older installations which did not select a language.
 type StreamPreferences struct {
+	ResultPreferences
 	Language   string   `json:"language"`
 	Mode       string   `json:"mode"`
 	Sources    []string `json:"sources,omitempty"`
@@ -49,7 +50,10 @@ func ValidStreamPreferences(p StreamPreferences) bool {
 // Saved access can select more sources than fit into a public installation URL.
 // The playback policy has the same source bound as other saved access grants.
 func ValidPlaybackPreferences(p StreamPreferences) bool {
-	if len(p.Sources) > 1000 || len(p.Services) > len(DebridServices())+1 || len(p.Types) > 3 {
+	if !p.ResultPreferences.Valid(true) || p.ResponseSeconds > 60 || len(p.Sources) > 1000 || len(p.Services) > len(DebridServices())+1 || len(p.Types) > 3 {
+		return false
+	}
+	if p.Language == "" && slices.ContainsFunc(p.Sorting, func(rule ResultSort) bool { return rule.Field == "language" }) {
 		return false
 	}
 	seen := map[string]bool{}

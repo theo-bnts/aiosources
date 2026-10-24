@@ -1,4 +1,6 @@
-export type TorznabOptions = {
+import { resultPreferences, type ResultPreferences } from './result-preferences.ts'
+
+export type TorznabOptions = ResultPreferences & {
   sources?: string[]
   media?: string[]
   services?: string[]
@@ -9,8 +11,9 @@ export type TorznabOptions = {
 // Keep saved drafts and URL configurations in the same canonical form.
 export function torznabCachePreferences(
   value: TorznabOptions,
-): Pick<TorznabOptions, 'services' | 'cached_only'> {
+): Pick<TorznabOptions, 'services' | 'cached_only'> & ResultPreferences {
   return {
+    ...resultPreferences(value),
     ...(value.services?.length ? { services: value.services } : {}),
     ...(value.cached_only ? { cached_only: true } : {}),
   }

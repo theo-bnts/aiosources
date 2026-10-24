@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { resultPreferences, type ResultPreferences } from './result-preferences.ts'
 
 export type LanguagePreferences = {
   language: string
@@ -6,7 +7,7 @@ export type LanguagePreferences = {
 }
 const key = 'aiosources.language-preferences'
 export function defaultLanguagePreferences(): LanguagePreferences {
-  return { language: '', mode: 'unknown' }
+  return { language: '', mode: 'all' }
 }
 export function browserLanguage() {
   return (navigator.languages?.[0] || navigator.language || 'en').split(/[-_]/)[0].toLowerCase()
@@ -40,11 +41,12 @@ export function useLanguagePreferences() {
   }
   return [value, update] as const
 }
-export type InstallationOptions = {
+export type InstallationOptions = ResultPreferences & {
   sources?: string[]
   services?: string[]
   types?: string[]
   cached_only?: boolean
+  max_cached?: number
 }
 
 // Keep generated links within the same bounded contract as the server.
@@ -79,7 +81,9 @@ export function preferenceManifest(
     (options.sources?.length ||
       options.services?.length ||
       options.types?.length ||
-      options.cached_only)
+      options.cached_only ||
+      options.max_cached ||
+      Object.keys(resultPreferences(options)).length)
   ) {
     const preferences = { language: resolvedLanguage(value), mode: value.mode, ...options }
     const data = new TextEncoder().encode(JSON.stringify(preferences))

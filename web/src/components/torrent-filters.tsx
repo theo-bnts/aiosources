@@ -1,10 +1,12 @@
+import { Disclosure } from '@/components/ui/disclosure'
+import { QuerySorting } from '@/components/result-controls'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { dateTimeToISO } from '@/lib/format'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { Items, ProviderSummary } from '@/lib/types'
-import { torrentFilterKeys, torrentSortOptions, type TorrentFilters } from '@/lib/search-types'
+import { torrentFilterKeys, torrentSorting, type TorrentFilters } from '@/lib/search-types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +30,7 @@ export function TorrentSearchForm({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
+  const [sort, setSort] = useState<string>(filters.sort || 'recent')
   const [error, setError] = useState<Error | null>(null)
   const [invalidFields, setInvalidFields] = useState<string[]>([])
   const form = useRef<HTMLFormElement>(null)
@@ -111,7 +114,7 @@ export function TorrentSearchForm({
         onApply(next)
       }}
     >
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_13rem] sm:items-end">
+      <div>
         <div className="field">
           <Label htmlFor="torrent-search">Search text</Label>
           <Input
@@ -121,93 +124,81 @@ export function TorrentSearchForm({
             placeholder="Title, ID or info hash (complete or partial)"
           />
         </div>
-        <div className="field">
-          <Label htmlFor="torrent-sort">Sort results</Label>
-          <select
-            id="torrent-sort"
-            name="sort"
-            className="native-select w-full"
-            defaultValue={filters.sort ?? 'recent'}
-          >
-            {filters.sort && !torrentSortOptions.some((item) => item.value === filters.sort) && (
-              <option value={filters.sort}>{filters.sort}</option>
-            )}
-            {torrentSortOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
       <p className="help">Combine fragments, "exact phrases", -exclusions or OR alternatives.</p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="field sm:col-span-2">
-          <Label htmlFor="torrent-sources">Sources</Label>
-          <SourceMultiSelect
-            id="torrent-sources"
-            value={selectedSources}
-            options={[...choices].map(([value, label]) => ({ value, label }))}
-            onChange={setSelectedSources}
-          />
-        </div>
-        <div className="field sm:col-span-2">
-          <Label htmlFor="torrent-category">Category</Label>
-          <Input
-            id="torrent-category"
-            name="category"
-            defaultValue={filters.category ?? ''}
-            placeholder="Exact category, ignoring case"
-          />
-        </div>
-        {rangeFields.map(([key, label, placeholder]) => (
-          <div className="field xl:col-span-2" key={key}>
-            <Label htmlFor={`torrent-${key}`}>{label}</Label>
-            <Input
-              id={`torrent-${key}`}
-              name={key}
-              defaultValue={filters[key] ?? ''}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={1000}
-              aria-invalid={invalidFields.includes(key) || undefined}
-              aria-describedby={invalidFields.includes(key) ? 'torrent-filter-error' : undefined}
-              title="Enter a nonnegative whole number without separators."
-              placeholder={placeholder}
+      <Disclosure title="Filters" open>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="field sm:col-span-2">
+            <Label htmlFor="torrent-sources">Sources</Label>
+            <SourceMultiSelect
+              id="torrent-sources"
+              value={selectedSources}
+              options={[...choices].map(([value, label]) => ({ value, label }))}
+              onChange={setSelectedSources}
             />
           </div>
-        ))}
-        {(['published_after', 'published_before'] as const).map((key) => {
-          const value = filters[key]
-          const timestamp = value ? new Date(value) : undefined
-          const valid = timestamp && !Number.isNaN(timestamp.getTime())
-          return (
-            <div className="field sm:col-span-2" key={key}>
-              <Label htmlFor={`torrent-${key}`}>
-                {key === 'published_after' ? 'Published after' : 'Published before'} ({dateZone})
-              </Label>
-              <DateTimeInput
+          <div className="field sm:col-span-2">
+            <Label htmlFor="torrent-category">Category</Label>
+            <Input
+              id="torrent-category"
+              name="category"
+              defaultValue={filters.category ?? ''}
+              placeholder="Exact category, ignoring case"
+            />
+          </div>
+          {rangeFields.map(([key, label, placeholder]) => (
+            <div className="field xl:col-span-2" key={key}>
+              <Label htmlFor={`torrent-${key}`}>{label}</Label>
+              <Input
                 id={`torrent-${key}`}
                 name={key}
-                precision="milliseconds"
+                defaultValue={filters[key] ?? ''}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={1000}
                 aria-invalid={invalidFields.includes(key) || undefined}
                 aria-describedby={invalidFields.includes(key) ? 'torrent-filter-error' : undefined}
-                defaultValue={value}
-                ref={(input) => {
-                  if (input && dateInputs.current[key]?.input !== input) {
-                    dateInputs.current[key] = { input, value: input.value }
-                  }
-                }}
+                title="Enter a nonnegative whole number without separators."
+                placeholder={placeholder}
               />
-              {value && !valid && (
-                <p className="text-xs text-destructive">
-                  Invalid date in URL. Choose a valid date or clear filters.
-                </p>
-              )}
             </div>
-          )
-        })}
-      </div>
+          ))}
+          {(['published_after', 'published_before'] as const).map((key) => {
+            const value = filters[key]
+            const timestamp = value ? new Date(value) : undefined
+            const valid = timestamp && !Number.isNaN(timestamp.getTime())
+            return (
+              <div className="field sm:col-span-2" key={key}>
+                <Label htmlFor={`torrent-${key}`}>
+                  {key === 'published_after' ? 'Published after' : 'Published before'} ({dateZone})
+                </Label>
+                <DateTimeInput
+                  id={`torrent-${key}`}
+                  name={key}
+                  precision="milliseconds"
+                  aria-invalid={invalidFields.includes(key) || undefined}
+                  aria-describedby={
+                    invalidFields.includes(key) ? 'torrent-filter-error' : undefined
+                  }
+                  defaultValue={value}
+                  ref={(input) => {
+                    if (input && dateInputs.current[key]?.input !== input) {
+                      dateInputs.current[key] = { input, value: input.value }
+                    }
+                  }}
+                />
+                {value && !valid && (
+                  <p className="text-xs text-destructive">
+                    Invalid date in URL. Choose a valid date or clear filters.
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </Disclosure>
+      <QuerySorting value={sort} onChange={setSort} options={torrentSorting} />
+      <input type="hidden" name="sort" value={sort} />
       <div className="flex flex-wrap gap-2">
         <Button type="submit">Search</Button>
         <ClearFiltersButton
@@ -216,6 +207,7 @@ export function TorrentSearchForm({
             setError(null)
             setInvalidFields([])
             setSelectedSources([])
+            setSort('recent')
             onApply({})
           }}
         />

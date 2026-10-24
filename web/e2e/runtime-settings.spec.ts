@@ -118,6 +118,8 @@ test('operational policies persist independently and reject stale updates', asyn
   )
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
+  await openDisclosure(page, 'Recovery')
   const recovery = page.getByRole('switch', { name: 'Automatically resume interrupted imports' })
   await expect(recovery).toBeChecked()
   await recovery.click()

@@ -58,9 +58,9 @@ test('oversized connection selections cannot produce an installable link', () =>
   assert.equal(preferenceManifestError('/stremio/token~fr~all/manifest.json', {}), null)
 })
 
-test('every new language filter starts with the browser locale, MULTI and unknown languages', () => {
-  assert.deepEqual(defaultLanguagePreferences(), { language: '', mode: 'unknown' })
+test('new language filters are disabled without changing the browser locale fallback', () => {
+  assert.deepEqual(defaultLanguagePreferences(), { language: '', mode: 'all' })
   const first = defaultLanguagePreferences()
   first.mode = 'all'
-  assert.equal(defaultLanguagePreferences().mode, 'unknown')
+  assert.equal(defaultLanguagePreferences().mode, 'all')
 })

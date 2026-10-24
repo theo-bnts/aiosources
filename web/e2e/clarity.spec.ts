@@ -7,6 +7,7 @@ test('navigation waits for an explicit save to finish without offering to discar
 }) => {
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const workers = page.getByLabel('Simultaneous imports', { exact: true })
   await workers.fill('2')
   let release!: () => void
@@ -109,6 +110,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await expect.poll(() => page.evaluate(() => history.state.idx)).toBe(beforeSettings + 1)
   await openDisclosure(page, 'Advanced')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const workers = page.getByLabel('Simultaneous imports', { exact: true })
   await workers.fill('7')
   await page.evaluate(() => history.back())
@@ -143,11 +145,13 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await openDisclosure(page, 'Advanced')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(String(persisted.settings.workers))
-  // All shared controls remain together inside the single optional section.
+  // All groups share one explicit save and preserve their drafts when folded.
   await expect(
     page.getByRole('form', { name: 'Import execution', exact: true }).locator('details'),
-  ).toHaveCount(0)
+  ).toHaveCount(4)
+  await openDisclosure(page, 'Quota handling')
   const retries = page.getByLabel('Automatic retries after HTTP 429', { exact: true })
   await retries.fill('11')
   await expect(retries).toBeVisible()

@@ -176,7 +176,7 @@ test('retired saved views have no controls or API and search URLs remain usable'
     expect(response.status()).toBe(404)
   }
   await page.reload()
-  await expect(page.getByLabel('Sort results', { exact: true })).toHaveValue('size_desc')
+  await expect(page.getByLabel('Sort by', { exact: true })).toHaveValue('size_desc')
 })
 
 test('named secret creation recovers a lost acknowledgement without replacing a different value', async ({
@@ -297,7 +297,7 @@ test('debrid drafts require review before adopting another writer after a separa
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await configuration.getByRole('button', { name: 'Load latest settings', exact: true }).click()
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
-  await expect(page.getByLabel('Stream response timeout (seconds)')).toHaveValue('12')
+  await expect(page.getByLabel('Stream response timeout (seconds)')).toHaveCount(0)
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const saved = await (await page.request.get('/api/aiosource')).json()

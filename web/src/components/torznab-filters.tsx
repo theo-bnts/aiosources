@@ -4,6 +4,7 @@ import {
   torznabMediaTypes,
   debridServices,
 } from '@/components/connection-filter-fields'
+import { ResultLimits } from '@/components/result-controls'
 
 export type { TorznabOptions } from '@/lib/torznab-preferences'
 export function TorznabFilters({
@@ -22,22 +23,25 @@ export function TorznabFilters({
   showSources?: boolean
 }) {
   return (
-    <ConnectionFilterFields
-      id={id}
-      media={value.media ?? []}
-      mediaOptions={torznabMediaTypes.filter(
-        (type) => !mediaTypes?.length || mediaTypes.includes(type.value),
-      )}
-      onMediaChange={(media) => onChange({ ...value, media })}
-      sources={sources}
-      sourceIDs={value.sources ?? []}
-      onSourcesChange={(sources) => onChange({ ...value, sources })}
-      services={debridServices}
-      serviceIDs={value.services ?? []}
-      onServicesChange={(services) => onChange({ ...value, services })}
-      cachedOnly={value.cached_only ?? false}
-      onCachedChange={(cached_only) => onChange({ ...value, cached_only })}
-      showSources={showSources}
-    />
+    <>
+      <ConnectionFilterFields
+        id={id}
+        media={value.media ?? []}
+        mediaOptions={torznabMediaTypes.filter(
+          (type) => !mediaTypes?.length || mediaTypes.includes(type.value),
+        )}
+        onMediaChange={(media) => onChange({ ...value, media })}
+        sources={sources}
+        sourceIDs={value.sources ?? []}
+        onSourcesChange={(sources) => onChange({ ...value, sources })}
+        services={debridServices}
+        serviceIDs={value.services ?? []}
+        onServicesChange={(services) => onChange({ ...value, services })}
+        cachedOnly={value.cached_only ?? false}
+        onCachedChange={(cached_only) => onChange({ ...value, cached_only })}
+        showSources={showSources}
+      />
+      <ResultLimits value={value} onChange={onChange} />
+    </>
   )
 }

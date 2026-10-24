@@ -59,6 +59,10 @@ export function revealSettingParents(element: HTMLElement) {
 }
 
 export function highlightSetting(element: HTMLElement) {
+  // Disabled controls stay disabled: navigation highlights their labeled field
+  // without changing a filter or attempting to focus an inert native input.
+  if (element.matches('input:disabled, select:disabled, textarea:disabled, button:disabled'))
+    element = element.closest<HTMLElement>('.field') ?? element.parentElement ?? element
   element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
   const focusable = element.matches(
     'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex]',

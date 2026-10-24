@@ -15,6 +15,7 @@ import { CopyButton } from '@/components/copy-button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ErrorNotice } from '@/components/common'
 import { TorznabFilters, type TorznabOptions } from '@/components/torznab-filters'
+import { ResultSorting } from '@/components/result-controls'
 import {
   PublicAnnounceFields,
   clearPublicCredentials,
@@ -45,8 +46,11 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     const allowed = new Set((info.sources ?? []).map((source) => source.id))
     const selected = options.sources ?? []
     const sources = selected.filter((id) => allowed.has(id))
-    if (selected.length !== sources.length) {
-      setOptions({ ...options, sources })
+    const sorting = options.sorting?.filter(
+      (rule) => Boolean(info.sources) || rule.field !== 'source',
+    )
+    if (selected.length !== sources.length || sorting?.length !== options.sorting?.length) {
+      setOptions({ ...options, sources, sorting })
     }
   }, [info.sources, options])
   async function create(form: HTMLFormElement) {
@@ -123,6 +127,12 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
                 id="public-torznab"
               />
             </Disclosure>
+            <ResultSorting
+              value={options.sorting}
+              onChange={(sorting) => setOptions({ ...options, sorting })}
+              sources={Boolean(info.sources)}
+              defaultOrder="newest first"
+            />
             <PublicAnnounceFields sources={info.private_sources ?? []} pending={pending} torznab />
           </fieldset>
           <p className="help">

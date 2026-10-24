@@ -14,6 +14,7 @@ test('the full import concurrency range persists without local-capacity warnings
 }) => {
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const form = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   const save = form.getByRole('button', { name: 'Save', exact: true })
@@ -39,6 +40,7 @@ test('the full import concurrency range persists without local-capacity warnings
   }
   await page.reload()
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue('1')
   for (const value of ['0', '33', '1.5']) {
     await workers.fill(value)
@@ -67,6 +69,7 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await toggle.click()
   expect(requests).toEqual([])
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   await expect(workers).toHaveValue(String(original.workers))
   const changed = original.workers === 7 ? '6' : '7'
@@ -89,9 +92,11 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await expect(section).toHaveAttribute('open', '')
   await expect.poll(() => new URL(page.url()).searchParams.get('settings')).toBe('advanced')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(changed)
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(changed)
   await expect(page).toHaveURL(/\/providers\/settings\?settings=advanced#advanced-import-settings$/)
 })
@@ -103,11 +108,14 @@ test('moved import settings preserve validation, persisted policies and concurre
   const original = await savedSettings(page)
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   const form = page.getByRole('form', { name: 'Import execution', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
+  await openDisclosure(page, 'Useful progress')
+  await openDisclosure(page, 'Quota handling')
   const progress = form.getByLabel('Responses without new source IDs', { exact: true })
   const save = form.getByRole('button', { name: 'Save', exact: true })
-  await expect(form.locator('details')).toHaveCount(0)
+  await expect(form.locator('details')).toHaveCount(4)
   await expect(
     form.getByLabel('Automatically resume technically interrupted runs', { exact: true }),
   ).toHaveCount(0)
@@ -148,10 +156,12 @@ test('moved import settings preserve validation, persisted policies and concurre
   expect(updated.revision).toBeGreaterThan(original.revision)
   await page.reload()
   await openDisclosure(page, 'Import execution')
+  await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue('3')
   await expect(progress).toHaveValue('7')
   await expect(page.getByLabel('Display timezone', { exact: true })).toHaveCount(0)
 
+  await openDisclosure(page, 'Useful progress')
   await progress.fill('11')
   const session = await (await page.request.get('/api/session')).json()
   let releaseSave!: () => void

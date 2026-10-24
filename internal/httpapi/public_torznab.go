@@ -119,6 +119,15 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer clear(visitor.Announces)
+	if visitor.Options.ResponseSeconds > 0 {
+		budget = min(budget, time.Duration(visitor.Options.ResponseSeconds)*time.Second)
+	}
+	ctx, responseCancel := context.WithDeadline(ctx, start.Add(budget))
+	defer responseCancel()
+	if err := controller.SetWriteDeadline(start.Add(budget)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		torznabError(w, 503, 910, "Delivery unavailable")
+		return
+	}
 	if queryErr != nil {
 		code := 201
 		if errors.Is(queryErr, model.ErrNotFound) {
@@ -133,7 +142,7 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	// Services only select known shared availability; credentials are configured
 	// in the recipient's download client. No provider calls or visitor rows here.
-	q = q.WithPreferences(model.TorznabPreferences{Services: visitor.Options.Services, CachedOnly: visitor.Options.CachedOnly})
+	q = q.WithPreferences(model.TorznabPreferences{ResultPreferences: visitor.Options.ResultPreferences, Services: visitor.Options.Services, CachedOnly: visitor.Options.CachedOnly})
 	var response any
 	if q.Mode == "caps" {
 		response = torznabCaps(model.Share{MediaTypes: visitor.Options.MediaTypes}, s.auth.origin)
@@ -141,12 +150,6 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		policy, announces, e := s.options.AIOSource.PublicTorznabPolicy(ctx, visitor)
 		if e != nil {
 			torznabError(w, 503, 910, "Search unavailable")
-			return
-		}
-		result, e := s.options.Store.PublicTorznabCatalog(ctx, q, visitor.Options.Sources, visitor.Options.MediaTypes, policy, func(rec model.AIORecord) bool { return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode) })
-		if e != nil {
-			_ = s.options.Store.RecordActivity(ctx, "warn", "torznab.public_failed", "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(start).Milliseconds()})
-			torznabError(w, 503, 910, "Search unavailable; try again later")
 			return
 		}
 		names := map[string]string{}
@@ -159,6 +162,13 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 			for _, source := range list {
 				names[source.ID] = source.Name
 			}
+		}
+		q.SourceNames = names
+		result, e := s.options.Store.PublicTorznabCatalog(ctx, q, visitor.Options.Sources, visitor.Options.MediaTypes, policy, func(rec model.AIORecord) bool { return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode) })
+		if e != nil {
+			_ = s.options.Store.RecordActivity(ctx, "warn", "torznab.public_failed", "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(start).Milliseconds()})
+			torznabError(w, 503, 910, "Search unavailable; try again later")
+			return
 		}
 		if q.CachedOnly {
 			announces = nil

@@ -45,7 +45,7 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 		return result, model.ErrInvalid
 	}
 	q = q.WithPreferences(preferences)
-	if q.CachedOnly {
+	if q.CachedOnly || slices.ContainsFunc(q.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" }) {
 		config, e := readAIOConfig(ctx, tx)
 		if e != nil {
 			return result, e
@@ -107,10 +107,10 @@ func (s *Store) PublicTorznabCatalog(ctx context.Context, q model.TorznabQuery, 
 func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope string, sources, media []string, policy TorznabVisibility, episodeMatch func(model.AIORecord) bool) (model.List[model.TorznabRecord], error) {
 	result := model.List[model.TorznabRecord]{Items: []model.TorznabRecord{}, Limit: q.Limit, Offset: q.Offset}
 	filters, err := NormalizeSearchFilters(q.SearchFilters)
-	if err != nil || q.Limit < 0 || q.Limit > 200 || q.Offset < 0 || q.Offset > 2147483647 || ((q.Season != nil || q.Episode != nil) && (episodeMatch == nil || (filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == ""))) {
+	if err != nil || !q.ResultPreferences.Valid(false) || q.Limit < 0 || q.Limit > 200 || q.Offset < 0 || q.Offset > 2147483647 || ((q.Season != nil || q.Episode != nil) && (episodeMatch == nil || (filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == ""))) {
 		return result, model.ErrInvalid
 	}
-	if (policy.Public || q.CachedOnly) && policy.CacheAfter.IsZero() {
+	if (policy.Public || q.CachedOnly || slices.ContainsFunc(q.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" })) && policy.CacheAfter.IsZero() {
 		return result, model.ErrInvalid
 	}
 	args := []any{}
@@ -122,6 +122,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	if len(filters.Providers) > 0 {
 		clauses = append(clauses, "t.provider_id=ANY("+bind(filters.Providers)+"::text[])")
 	}
+	cached := "false"
 	if policy.Public || q.CachedOnly {
 		services := q.Services
 		if services == nil {
@@ -132,7 +133,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 				return result, model.ErrInvalid
 			}
 		}
-		cached := "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+		cached = "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
 
 		if policy.Public {
 			clauses = append(clauses, "(t.provider_id=ANY("+bind(policy.UncachedSources)+"::text[]) OR "+cached+")")
@@ -216,7 +217,51 @@ WHERE ` + strings.Join(clauses, " AND ")
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,
 'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,(SELECT instance_id FROM ingest.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
-	query := "SELECT " + columns + from + ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
+	order := []string{}
+	for _, rule := range q.Sorting {
+		column := ""
+		direction := strings.ToUpper(rule.Direction)
+		switch rule.Field {
+		case "size":
+			column = "t.search_size"
+		case "name":
+			column = "lower(t.fields->>'title')"
+		case "source":
+			names, e := json.Marshal(q.SourceNames)
+			if e != nil {
+				return result, model.ErrInvalid
+			}
+			column = "lower(COALESCE(" + bind(string(names)) + "::jsonb->>t.provider_id,t.provider_id))"
+		case "published", "age":
+			column = "COALESCE(t.search_published_at,t.first_seen_at)"
+			if rule.Field == "age" {
+				if direction == "ASC" {
+					direction = "DESC"
+				} else {
+					direction = "ASC"
+				}
+			}
+		case "cached":
+			if cached == "false" {
+				services := q.Services
+				if services == nil {
+					services = model.DebridServices()
+				}
+				cached = "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+			}
+			column = "(" + cached + ")"
+		}
+		order = append(order, column+" "+direction+" NULLS LAST")
+	}
+	if len(order) == 0 {
+		order = append(order, "COALESCE(t.search_published_at,t.first_seen_at) DESC")
+	}
+	order = append(order, "t.provider_id", "t.source_id")
+	if q.MaxResults > 0 {
+		q.Limit = min(q.Limit, max(0, q.MaxResults-q.Offset))
+	}
+	result.Limit = q.Limit
+	query := "SELECT " + columns + from + " ORDER BY " + strings.Join(order, ",")
 	if !filtered {
 		query += " LIMIT " + bind(q.Limit) + " OFFSET " + bind(q.Offset)
 	}
@@ -250,6 +295,9 @@ WHERE ` + strings.Join(clauses, " AND ")
 	rows.Close()
 	if err != nil {
 		return result, databaseError("read Torznab results", err)
+	}
+	if q.MaxResults > 0 {
+		result.Total = min(result.Total, int64(q.MaxResults))
 	}
 	return result, nil
 }

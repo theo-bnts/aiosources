@@ -300,6 +300,7 @@ test('catalog sharing starts with all sources and keeps optional controls in Fil
   ).toHaveCount(0)
   await expect(dialog.getByText('leechers', { exact: true })).toHaveCount(0)
   await dialog.getByText('Advanced', { exact: true }).click()
+  await dialog.getByText('Expiration', { exact: true }).click()
   await expect(dialog.getByLabel('Expires at (browser local time)', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

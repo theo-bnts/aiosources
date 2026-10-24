@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -83,6 +83,8 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 		history.Origin = "public"
 	}
 	names := map[string]string{}
+	var preferences model.StreamPreferences
+	ranks := []resultRank{}
 	defer func() {
 		history.DurationMS = time.Since(history.CreatedAt).Milliseconds()
 		if streamErr != nil {
@@ -96,11 +98,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			if len(streams) > 0 {
 				history.Outcome = "results"
 			}
-			history.Returned = len(streams)
 		}
 		if streamErr == nil {
-			sort.SliceStable(streams, func(i, j int) bool { return streams[i].Hints.Size > streams[j].Hints.Size })
-			sort.SliceStable(history.Results, func(i, j int) bool { return history.Results[i].Size > history.Results[j].Size })
+			streams, history.Results = sortStreamResults(streams, history.Results, ranks, preferences)
+			history.Returned = len(streams)
 			if len(history.Results) > 1000 {
 				history.Results = history.Results[:1000]
 				history.Truncated = true
@@ -110,6 +111,16 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	}()
 	recordResult := func(rec model.AIORecord, item Stream, service, cache string) {
 		history.Results = append(history.Results, model.StremioResult{Name: item.Name, Provider: rec.Provider, ProviderName: names[rec.Provider], SourceID: rec.SourceID, Title: item.Title, Service: service, Cache: cache, Filename: item.Hints.Filename, Size: max(0, item.Hints.Size)})
+		rank := recordRank(rec, names[rec.Provider], sortingLanguage(preferences))
+		rank.size = item.Hints.Size
+		rank.identity += ":" + service
+		if item.Hints.Cached != nil {
+			rank.cached = 0
+			if *item.Hints.Cached {
+				rank.cached = 2
+			}
+		}
+		ranks = append(ranks, rank)
 	}
 	r, err := ParseID(id, mediaType)
 	if err != nil {
@@ -119,7 +130,6 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if err != nil {
 		return nil, err
 	}
-	var preferences model.StreamPreferences
 	if visitor != nil {
 		preferences = visitor.Preferences
 	} else {
@@ -165,25 +175,24 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if len(eligible) == 0 {
 		return []Stream{}, nil
 	}
+	if preferences.ResponseSeconds > 0 {
+		c.ResponseSeconds = preferences.ResponseSeconds
+	}
 	var availability map[string]map[string]model.AIOAvailability
 	// Filter before availability checks, so an unselected service is never
 	// contacted. The stored configuration and visitor credential remain intact.
 	c = c.RestrictDebrid(preferences.Services)
-	if visitor == nil {
-		availability, err = s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
-	} else {
-		filtered := *visitor
-		filtered.Services = map[string]string{}
+	var filtered *PublicInstallation
+	if visitor != nil {
+		copy := *visitor
+		copy.Services = map[string]string{}
 		for service, key := range visitor.Services {
 			if AllowsInstallation(preferences, "", service, mediaType) {
-				filtered.Services[service] = key
+				copy.Services[service] = key
 			}
 		}
-		availability, err = s.publicAvailability(ctx, c, streamResourceKey(r, rows), hashes, &filtered)
-		clear(filtered.Services)
-	}
-	if err != nil {
-		return nil, err
+		filtered = &copy
+		defer clear(copy.Services)
 	}
 	// Resolve names once for the whole response, including remote catalogs.
 	// Presentation must not prevent playback if a definition becomes unreadable.
@@ -195,6 +204,57 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 			return nil, e
 		}
 		exposeNames = access.ExposeSources
+	}
+	var plan *availabilityPlan
+	if preferences.MaxResults > 0 || preferences.MaxCached > 0 || slices.ContainsFunc(preferences.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" }) {
+		plan, err = s.planAvailability(ctx, c, hashes, filtered)
+		if err != nil {
+			return nil, err
+		}
+		defer clear(plan.keys)
+	}
+	keys := make(map[string]resultRank, len(eligible))
+	for _, rec := range eligible {
+		name := names[rec.Provider]
+		if !exposeNames {
+			name = ""
+		}
+		rank := recordRank(rec, name, sortingLanguage(preferences))
+		if plan != nil {
+			rank.cached = rankCache(rec.Hash, plan.states)
+		}
+		keys[rec.Provider+":"+rec.SourceID] = rank
+	}
+	slices.SortStableFunc(eligible, func(a, b model.AIORecord) int {
+		return compareResults(keys[a.Provider+":"+a.SourceID], keys[b.Provider+":"+b.SourceID], preferences.Sorting)
+	})
+	// Bound the candidate set before contacting any provider. Cache ordering can
+	// reuse all local evidence; unknown candidates follow the remaining rules.
+	if !preferences.CachedOnly && preferences.MaxResults > 0 && len(eligible) > preferences.MaxResults {
+		eligible = eligible[:preferences.MaxResults]
+	}
+	hashes = hashes[:0]
+	for _, rec := range eligible {
+		hashes = append(hashes, rec.Hash)
+	}
+	if preferences.MaxCached > 0 {
+		allowNoFiles := map[string]bool{}
+		for _, rec := range eligible {
+			tracker, configured := c.Trackers[rec.Provider]
+			// Public private-source results need the selected file, even when
+			// the visitor could otherwise authorize an uncached download.
+			if visitor == nil || (configured && !tracker.Private) {
+				allowNoFiles[rec.Hash] = true
+			}
+		}
+		availability, err = s.limitedAvailability(ctx, c, streamResourceKey(r, rows), hashes, plan, preferences.MaxCached, r, allowNoFiles)
+	} else if filtered != nil {
+		availability, err = s.publicAvailability(ctx, c, streamResourceKey(r, rows), hashes, filtered)
+	} else {
+		availability, err = s.Availability(ctx, c, streamResourceKey(r, rows), hashes)
+	}
+	if err != nil {
+		return nil, err
 	}
 	out := []Stream{}
 	for _, rec := range eligible {
@@ -264,6 +324,10 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 				// Global readiness cannot certify the requested video when listing files
 				// failed. Retain playback but present the cache as unverified.
 				known = false
+			}
+			if preferences.CachedOnly && !known {
+				history.FileUnavailable++
+				continue
 			}
 			segments := []string{"stremio", token, "play", service, rec.Provider, rec.SourceID, mediaType, id}
 			if visitor != nil {

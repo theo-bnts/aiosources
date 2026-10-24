@@ -22,6 +22,12 @@ export type Setting = {
 }
 
 const settings: Setting[] = []
+const importCategory = (key: string) =>
+  key === 'workers'
+    ? 'Concurrency'
+    : key.startsWith('max_quota')
+      ? 'Quota handling'
+      : 'Useful progress'
 const providerSettingSuffix = (id: string) =>
   id === 'alldebrid' ? 'ad' : id === 'torbox' ? 'tb' : id
 function add(
@@ -72,9 +78,9 @@ for (const [key, field] of Object.entries(importNumberFields))
     id: `imports.${key}`,
     title: field.label,
     route: '/providers/settings?settings=advanced',
-    group: 'Sources / Sources / Import execution',
+    group: `Sources / Sources / Import execution / ${importCategory(key)}`,
     control: `collection-${key}`,
-    reveal: ['Advanced', 'Import execution'],
+    reveal: ['Advanced', 'Import execution', importCategory(key)],
     keywords: field.help,
   })
 add(
@@ -125,7 +131,6 @@ add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
       ] as const,
   ),
   ['debrid.cache', 'Cache validity (minutes)', 'availability expiration cache'],
-  ['debrid.response', 'Stream response timeout (seconds)'],
 ])
 add(
   {
@@ -321,6 +326,27 @@ for (const [entity, route, name] of [
           [`${entity}.services`, 'Services'],
         ],
   )
+  if (entity !== 'share') {
+    add({ route, group: `${group} / Filters`, entity, reveal: ['Filters'] }, [
+      [`${entity}.max-results`, 'Maximum results'],
+      [`${entity}.max-cached`, 'Maximum cached results'],
+      [
+        `${entity}.response`,
+        entity === 'stremio' ? 'Stream response timeout (seconds)' : 'Response timeout (seconds)',
+      ],
+    ])
+    add({ route, group: `${group} / Sorting`, entity, reveal: ['Sorting'] }, [
+      [
+        `${entity}.sorting`,
+        'Sort by',
+        entity === 'stremio'
+          ? 'cached language size publication age name source ascending descending priority'
+          : 'cached size publication age name source ascending descending priority',
+      ],
+      [`${entity}.sorting-secondary`, 'Then by (2)'],
+      [`${entity}.sorting-third`, 'Then by (3)'],
+    ])
+  }
   if (entity === 'stremio')
     add({ route, group: `${group} / Filters`, entity, reveal: ['Filters'] }, [
       ['stremio.language-filter', 'Filter languages'],
@@ -343,7 +369,7 @@ for (const [entity, route, name] of [
       group: `${group} / Advanced`,
       entity,
       control,
-      reveal: ['Advanced'],
+      reveal: ['Advanced', key === 'expires' ? 'Expiration' : 'Request limits'],
       keywords: 'expiration expiry rate limits expiration limites',
     })
 }
@@ -615,6 +641,12 @@ for (const [area, route] of [
         [`visitor.${area}.sources`, 'Sources'],
         [`visitor.${area}.cached`, 'Cached results only'],
         [`visitor.${area}.services`, 'Services'],
+        [`visitor.${area}.max-results`, 'Maximum results'],
+        [`visitor.${area}.max-cached`, 'Maximum cached results'],
+        [
+          `visitor.${area}.response`,
+          area === 'stremio' ? 'Stream response timeout (seconds)' : 'Response timeout (seconds)',
+        ],
         ...(area === 'stremio'
           ? ([
               [`visitor.${area}.language-filter`, 'Filter languages'],
@@ -624,6 +656,34 @@ for (const [area, route] of [
           : []),
       ],
     )
+  if (area !== 'search')
+    add(
+      {
+        route,
+        group: `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'} / Sorting`,
+        public: area,
+        reveal: ['Sorting'],
+      },
+      [
+        [
+          `visitor.${area}.sorting`,
+          'Sort by',
+          area === 'stremio'
+            ? 'cached language size publication age name ascending descending priority'
+            : 'cached size publication age name ascending descending priority',
+        ],
+        [`visitor.${area}.sorting-secondary`, 'Then by (2)'],
+        [`visitor.${area}.sorting-third`, 'Then by (3)'],
+      ],
+    )
+}
+
+for (const setting of settings) {
+  if (setting.id === 'imports.progress' || setting.id === 'imports.recovery') {
+    const category = setting.id === 'imports.recovery' ? 'Recovery' : 'Useful progress'
+    setting.reveal = ['Advanced', 'Import execution', category]
+    setting.group += ` / ${category}`
+  }
 }
 
 export const settingsCatalog: readonly Setting[] = settings

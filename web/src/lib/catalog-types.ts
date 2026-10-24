@@ -2,7 +2,7 @@ import type { Run, CatalogSync, ScheduleSummary } from './types'
 import type { InstallationOptions, LanguagePreferences } from './language-preferences'
 import type { TorznabOptions } from './torznab-preferences'
 
-export type TorznabPreferences = Pick<TorznabOptions, 'services' | 'cached_only'>
+export type TorznabPreferences = Omit<TorznabOptions, 'sources' | 'media'>
 
 export type ConnectionFormat = 'catalog' | 'torznab' | 'stremio'
 export type StremioPreferences = InstallationOptions & LanguagePreferences

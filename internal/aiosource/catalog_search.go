@@ -149,33 +149,31 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	if opts.ProviderID != "" {
 		rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return rec.Provider != opts.ProviderID })
 	}
-	if opts.Sort == "" || opts.Sort == "size_desc" {
-		slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
-			if a.Size > b.Size {
-				return -1
-			}
-			if a.Size < b.Size {
-				return 1
-			}
-			return 0
-		})
-	}
-	if opts.Sort == "source" {
-		names := s.sourceNames()
-		name := func(id string) string {
-			if names[id] != "" {
-				return strings.ToLower(names[id])
-			}
-			return strings.ToLower(id)
+	rules := prefs.Sorting
+	if len(rules) == 0 {
+		switch opts.Sort {
+		case "recent":
+			rules = []model.ResultSort{{Field: "published", Direction: "desc"}}
+		case "source":
+			rules = []model.ResultSort{{Field: "source", Direction: "asc"}}
 		}
-		slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
-			return strings.Compare(name(a.Provider), name(b.Provider))
-		})
 	}
+	if visitor != nil && !access.ExposeSources && slices.ContainsFunc(rules, func(rule model.ResultSort) bool { return rule.Field == "source" }) {
+		return result, model.ErrInvalid
+	}
+	names := s.sourceNames()
+	ranks := make(map[string]resultRank, len(rows))
+	for _, row := range rows {
+		ranks[row.OccurrenceID] = recordRank(row.AIORecord, names[row.Provider], sortingLanguage(prefs))
+	}
+	slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
+		return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
+	})
+	allResults := filters.CachedOnly || visitor != nil || slices.ContainsFunc(rules, func(rule model.ResultSort) bool { return rule.Field == "cached" })
 	result.Total = int64(len(rows))
 	start := min(offset, len(rows))
 	page := rows[start : start+min(limit, len(rows)-start)]
-	if filters.CachedOnly || visitor != nil {
+	if allResults {
 		// Evaluate availability before pagination: an uncached first page must
 		// not hide cached releases further down the result set or inflate totals.
 		page = rows
@@ -186,6 +184,9 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	c, err := s.DB.AIOConfig(ctx)
 	if err != nil {
 		return result, err
+	}
+	if prefs.ResponseSeconds > 0 {
+		c.ResponseSeconds = prefs.ResponseSeconds
 	}
 	hashes := []string{}
 	records := []model.AIORecord{}
@@ -217,10 +218,6 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	}
 	if err != nil {
 		return result, err
-	}
-	names := map[string]string{}
-	if visitor != nil && access.ExposeSources {
-		names = s.sourceNames()
 	}
 	for _, row := range page {
 		languages := []string{}
@@ -279,11 +276,29 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 				item.Provider = ""
 			}
 		}
+		rank := ranks[row.OccurrenceID]
+		rank.cached = 0
+		for _, service := range item.Services {
+			if service.State == "cached" {
+				rank.cached = 2
+				break
+			}
+			if service.State == "unknown" {
+				rank.cached = 1
+			}
+		}
+		if len(item.Services) == 0 {
+			rank.cached = 1
+		}
+		ranks[row.OccurrenceID] = rank
 		if !filters.CachedOnly || slices.ContainsFunc(item.Services, func(service model.CatalogAvailability) bool { return service.State == "cached" }) {
 			result.Items = append(result.Items, item)
 		}
 	}
-	if filters.CachedOnly || visitor != nil {
+	slices.SortStableFunc(result.Items, func(a, b model.CatalogRelease) int {
+		return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
+	})
+	if allResults {
 		result.Total = int64(len(result.Items))
 		start = min(offset, len(result.Items))
 		result.Items = result.Items[start : start+min(limit, len(result.Items)-start)]
