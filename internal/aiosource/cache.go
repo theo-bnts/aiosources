@@ -46,11 +46,12 @@ func (s *Service) cacheFlightTriggered(service, key, resource string, hashes []s
 			// An expired resource joining a warm retry needs a full check,
 			// including previously positive hashes. Queue one owned follow-up
 			// rather than treating the older retry as that full check.
-			stopPrevious := context.AfterFunc(ctx, previous.cancel)
-			defer stopPrevious()
 			select {
 			case <-previous.done:
 			case <-ctx.Done():
+				// Cancellation must reach the replaced check before this owner
+				// completes, including when reset precedes this goroutine's start.
+				previous.cancel()
 				f.err = ctx.Err()
 				return
 			}

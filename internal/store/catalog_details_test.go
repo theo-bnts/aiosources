@@ -241,17 +241,39 @@ func TestCatalogDetailsRespectBasicFieldWhitelistAndBoundedPages(t *testing.T) {
 	}
 }
 
-func TestCatalogDetailsAreNotDownloadedAgainWhenOtherDataChoicesChange(t *testing.T) {
+func TestCatalogDetailsKeepAcknowledgementWhenOtherDataChoicesChange(t *testing.T) {
 	ctx, db := sharingDatabase(t)
+	// PostgreSQL acknowledgements are cluster-wide. An older in-flight writer
+	// legitimately causes replay, even though this catalog has not changed.
+	writer, err := db.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rollback(writer)
+	if _, err = writer.Exec(ctx, `SELECT pg_current_xact_id()`); err != nil {
+		t.Fatal(err)
+	}
 	publishSharingRow(t, ctx, db, "source", "one", `{"title":"Example","language":"fr"}`, nil)
 	grant := detailedCatalogGrant(t, ctx, db)
 	first := detailedCatalogPages(t, ctx, db, grant, "", detailedCatalogEntities)
 	selection := detailedCatalogEntities
 	selection.Metadata, selection.Availability = true, true
 	delta := detailedCatalogPages(t, ctx, db, grant, first[len(first)-1].Checkpoint, selection)
+	var key []byte
+	if err = db.pool.QueryRow(ctx, `SELECT signing_key FROM ingest.catalog_identity WHERE singleton`).Scan(&key); err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, err := parseCatalogToken(key, first[len(first)-1].Checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	continuation, err := parseCatalogToken(key, delta[0].NextCursor)
+	if err != nil || checkpoint.AuxHigh == 0 || continuation.DetailsLow != checkpoint.AuxHigh {
+		t.Fatal("metadata/cache choices reset the previously acknowledged torrent-fact boundary", err)
+	}
 	for _, page := range delta {
-		if page.Mode != "incremental" || len(page.Items)+len(page.Supplement.Torrents) != 0 {
-			t.Fatal("metadata/cache permission change unnecessarily downloaded torrent facts again")
+		if page.Mode != "incremental" || len(page.Items) != 0 {
+			t.Fatal("metadata/cache permission change unnecessarily downloaded torrents again")
 		}
 	}
 }

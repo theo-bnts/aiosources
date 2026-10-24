@@ -68,6 +68,29 @@ func TestCacheResetCancelsWarmRetryAndItsExpiryFollowUp(t *testing.T) {
 	}
 }
 
+func TestCanceledCacheFollowUpCancelsItsPredecessorBeforeCompleting(t *testing.T) {
+	life, cancel := context.WithCancel(context.Background())
+	cancel()
+	previousContext, cancelPrevious := context.WithCancel(context.Background())
+	defer cancelPrevious()
+	hashes := []string{strings.Repeat("a", 40)}
+	identity := "torbox:" + fingerprint("synthetic-key") + ":movie:example:" + fingerprint(strings.Join(hashes, ","))
+	previous := &flight{warm: true, done: make(chan struct{}), cancel: cancelPrevious}
+	s := &Service{ctx: life, flights: map[string]*flight{identity: previous}}
+	next, err := s.cacheFlightTriggered("torbox", "synthetic-key", "movie:example", hashes, model.AIOConfig{}, "playback", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-next.done:
+		if !errors.Is(next.err, context.Canceled) || previousContext.Err() != context.Canceled {
+			t.Fatal("cancelled follow-up completed without synchronously cancelling its predecessor")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled follow-up did not finish")
+	}
+}
+
 func TestExpiredResourceJoiningWarmRetryRechecksEveryCandidate(t *testing.T) {
 	ctx, s, conn := testService(t)
 	key, known, pending := "synthetic-key", strings.Repeat("a", 40), strings.Repeat("b", 40)
