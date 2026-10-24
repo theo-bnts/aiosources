@@ -257,3 +257,55 @@ func TestLimitedAvailabilityTimeoutAndQuotaKeepKnownResultsAndLeaveOthersUnknown
 		}
 	}
 }
+
+func TestLimitedAllDebridRetainsNegativeRetryClockAndNeverDeletesExistingItems(t *testing.T) {
+	ctx, s, _ := testService(t)
+	if err := s.Vault.Put(ctx, "ad", "synthetic-test-key"); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := s.DB.AIOConfig(ctx)
+	c.AllDebridSecret = "ad"
+	c.CacheMinutes = 1440
+	c.ResponseSeconds = 5
+	if err := s.DB.SetAIOConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.Repeat("a", 40)
+	freshHash := strings.Repeat("b", 40)
+	generation, _ := s.DB.AIOCacheGeneration(ctx)
+	miss := model.AIOAvailability{Hash: hash, Cached: false, CheckedAt: time.Now().Add(-16 * time.Minute), Generation: generation}
+	if err := s.DB.SaveAIOAvailability(ctx, "alldebrid", fingerprint("synthetic-test-key"), miss); err != nil {
+		t.Fatal(err)
+	}
+	freshMiss := miss
+	freshMiss.Hash = freshHash
+	freshMiss.CheckedAt = time.Now()
+	if err := s.DB.SaveAIOAvailability(ctx, "alldebrid", fingerprint("synthetic-test-key"), freshMiss); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		switch r.URL.Path {
+		case "/v4.1/magnet/status":
+			fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"statusCode":4}]}}`, hash)
+		case "/v4/magnet/files":
+			fmt.Fprint(w, `{"status":"success","data":{"magnets":[{"id":7,"files":[{"n":"Example.mkv","s":100,"l":"https://files.example/video"}]}]}}`)
+		default:
+			t.Error("existing administrator item was submitted or deleted")
+			w.WriteHeader(400)
+		}
+	}))
+	defer server.Close()
+	s.Providers.ADBase, s.Providers.Client = server.URL, server.Client()
+	for attempt := range 2 {
+		plan, err := s.planAvailability(ctx, c, []string{freshHash, hash}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		states, err := s.limitedAvailability(ctx, c, "movie:retry-clock", []string{freshHash, hash}, plan, 1, Resource{Type: "movie"}, nil)
+		if err != nil || !states["alldebrid"][hash].Cached || len(states["alldebrid"][hash].Files) != 1 || calls.Load() != 2 {
+			t.Fatal("negative retry stopped updating, or fresh positive was queried again", attempt, states, calls.Load(), err)
+		}
+	}
+}

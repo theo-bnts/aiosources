@@ -105,6 +105,14 @@ func (s *Service) limitedAvailability(ctx context.Context, c model.AIOConfig, re
 	}
 	check, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 	defer cancel()
+	var negativeRetryBefore time.Time
+	if !p.public && p.keys["alldebrid"] != "" {
+		delay, err := s.DB.RuntimeValue(ctx, "debrid_retries", "delay_minutes")
+		if err != nil {
+			return nil, err
+		}
+		negativeRetryBefore = time.Now().Add(-time.Duration(delay) * time.Minute)
+	}
 	stopped := map[string]bool{}
 	for start := 0; start < len(unique) && count() < target && check.Err() == nil; {
 		end := min(len(unique), start+min(100, target-count()))
@@ -114,7 +122,12 @@ func (s *Service) limitedAvailability(ctx context.Context, c model.AIOConfig, re
 			}
 			todo := []string{}
 			for _, hash := range unique[start:end] {
-				if _, known := p.states[service][hash]; !known {
+				observed, known := p.states[service][hash]
+				// Account-only AD misses use the existing retry clock, rather
+				// than staying negative for the entire positive-cache lifetime.
+				// checkResourceTriggered still enforces its saved backoff.
+				retry := service == "alldebrid" && !p.public && !observed.Cached && !observed.CheckedAt.After(negativeRetryBefore)
+				if !known || retry {
 					todo = append(todo, hash)
 				}
 			}
