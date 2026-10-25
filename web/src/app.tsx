@@ -37,6 +37,7 @@ import {
   ListChecksIcon,
   BroadcastIcon,
   GlobeIcon,
+  UsersThreeIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -246,7 +247,7 @@ const navigationGroups: NavigationGroup[] = [
         to: '/public-access',
         label: 'Public access',
         description: 'Visitor access, source visibility and public connections.',
-        icon: ShieldCheckIcon,
+        icon: UsersThreeIcon,
       },
       {
         to: '/health',

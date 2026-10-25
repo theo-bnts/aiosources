@@ -64,7 +64,7 @@ test('public navigation only offers enabled connections and follows policy chang
     await access.getByLabel('Allow public Search', { exact: true }).uncheck()
     await save()
     await expect(
-      visitor.getByRole('heading', { name: 'Open a session', exact: true }),
+      visitor.getByRole('heading', { name: 'Administrator sign-in', exact: true }),
     ).toBeVisible()
     await expect(visitor.getByRole('button', { name: 'Start searching', exact: true })).toHaveCount(
       0,

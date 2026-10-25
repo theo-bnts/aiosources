@@ -47,6 +47,9 @@
   body {
     @apply m-0 bg-background font-sans text-sm text-foreground antialiased;
   }
+  fieldset {
+    min-inline-size: 0;
+  }
   button,
   input,
   select,
@@ -107,7 +110,7 @@
     @apply overflow-hidden rounded-md border border-border bg-card/30;
   }
   .field {
-    @apply grid min-w-0 gap-2;
+    @apply grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2;
   }
   .label {
     @apply text-sm font-medium;
@@ -131,7 +134,7 @@
     @apply border-destructive/40 bg-destructive/10 text-destructive;
   }
   .native-select {
-    @apply h-9 min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:outline-ring disabled:opacity-50;
+    @apply h-9 min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs focus-visible:outline-ring disabled:opacity-50 md:text-sm dark:bg-input/30;
   }
   .editor-frame {
     @apply overflow-hidden rounded-md border border-input;
@@ -170,7 +173,7 @@
 [data-setting-highlight] {
   outline: 2px solid var(--primary);
   outline-offset: 4px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   scroll-margin-block: 1rem;
 }
 

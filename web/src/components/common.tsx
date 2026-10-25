@@ -67,16 +67,18 @@ export function PageHeader({
       )}
       <div className="page-heading">
         {(visibility.title || showDescription) && (
-          <div>
+          <div className="min-w-0 flex-1">
             {visibility.title && (
-              <Heading className={level === 1 ? 'page-title' : 'section-title'}>{title}</Heading>
+              <Heading className={`break-words ${level === 1 ? 'page-title' : 'section-title'}`}>
+                {title}
+              </Heading>
             )}
             {showDescription && (
               <p
                 className={
                   visibility.title
-                    ? 'page-description'
-                    : 'max-w-3xl text-sm leading-6 text-muted-foreground'
+                    ? 'page-description break-words'
+                    : 'max-w-3xl break-words text-sm leading-6 text-muted-foreground'
                 }
               >
                 {description}

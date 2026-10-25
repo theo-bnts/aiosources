@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
+import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 
 function WorkSummary({ work }: { work: ReviewWork }) {
   const title = work.display_title || work.titles[0] || `TMDB ${work.tmdb}`
@@ -261,11 +261,15 @@ function ReviewForm({
         </Button>
       </form>
       <ErrorNotice error={candidates.error} retry={() => void candidates.refetch()} />
-      {candidates.isFetching && <Loading label="Searching local information" />}
+      {candidates.isLoading && <Loading label="Searching local information" />}
+      {candidates.data && (
+        <ResultCount total={candidates.data.items?.length ?? 0} label="candidates" />
+      )}
       <div
         className="max-h-72 space-y-2 overflow-y-auto"
         role="radiogroup"
         aria-label="Candidate films and series"
+        aria-busy={candidates.isFetching}
       >
         {candidates.data?.items?.map((work) => (
           <label

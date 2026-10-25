@@ -56,10 +56,10 @@ export function Login() {
           </div>
           <div>
             <p className="font-semibold tracking-tight">AIOSources</p>
-            <p className="text-xs text-muted-foreground">Data administration</p>
+            <p className="text-xs text-muted-foreground">Administration</p>
           </div>
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Open a session</h1>
+        <h1 className="page-title">Administrator sign-in</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           Sign in with your administrator password. If two-step verification is enabled, an
           authenticator or recovery code is also required.

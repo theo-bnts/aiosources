@@ -33,7 +33,7 @@ export function MultiSelect({
             aria-label={label}
             type="button"
             variant="outline"
-            className="min-w-0 w-full max-w-full justify-between"
+            className="min-w-0 w-full max-w-full justify-between py-1 text-base md:text-sm"
           >
             <span className="min-w-0 flex-1 truncate text-left" title={selected}>
               {selected}
