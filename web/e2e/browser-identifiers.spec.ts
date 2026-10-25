@@ -21,9 +21,23 @@ for (const entry of ['button', 'settings link'] as const) {
       await page.getByRole('button', { name: 'Add proxy', exact: true }).click()
     const editor = page.getByRole('dialog', { name: 'Add proxy', exact: true })
     await expect(editor).toBeVisible()
+    // A settings destination focuses its field after the dialog autofocus.
+    // Wait for that navigation to finish before typing in a different field.
+    if (entry === 'settings link')
+      await expect(editor.getByLabel('Proxy URL', { exact: true })).toBeFocused()
     await editor.getByLabel('Name', { exact: true }).fill('Synthetic local gateway')
     await editor.getByLabel('Proxy URL', { exact: true }).fill('socks5://127.0.0.1:1')
+    await expect(editor.getByLabel('Name', { exact: true })).toHaveValue('Synthetic local gateway')
+    await expect(editor.getByLabel('Proxy URL', { exact: true })).toHaveValue(
+      'socks5://127.0.0.1:1',
+    )
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        new URL(response.url()).pathname === '/api/settings/network',
+    )
     await editor.getByRole('button', { name: 'Save', exact: true }).click()
+    expect((await saved).status()).toBe(200)
     await expect(editor).toBeHidden()
     const settings = await (await page.request.get('/api/settings/network')).json()
     expect(settings.proxies).toHaveLength(1)
