@@ -138,7 +138,7 @@ func providerFailureCode(err error) string {
 
 func stopProviderChecks(err error) bool {
 	switch providerFailureCode(err) {
-	case "authentication", "subscription", "rate_limit", "account_limit", "provider_unavailable", "timeout":
+	case "authentication", "subscription", "rate_limit", "account_limit", "provider_unavailable", "timeout", "cancelled":
 		return true
 	}
 	return false

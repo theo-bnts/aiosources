@@ -58,12 +58,14 @@ function changedStorage(event: StorageEvent) {
   notify()
 }
 
+// Credentials can change in another tab while this one shows Administration.
+// Keep the store current even when no public form is subscribed to it.
+if (typeof window !== 'undefined') window.addEventListener('storage', changedStorage)
+
 function subscribe(listener: () => void) {
-  if (!listeners.size) window.addEventListener('storage', changedStorage)
   listeners.add(listener)
   return () => {
     listeners.delete(listener)
-    if (!listeners.size) window.removeEventListener('storage', changedStorage)
   }
 }
 

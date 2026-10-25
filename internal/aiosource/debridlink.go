@@ -100,7 +100,13 @@ func (p *ProviderHTTP) DLCheck(ctx context.Context, key string, hashes []string)
 		if item.Zip || item.Hash == "" {
 			item, err = p.dlInfo(ctx, key, item.ID, hash)
 		}
-		if err != nil || item.Percent == nil || *item.Percent != 100 {
+		if err != nil {
+			if stopProviderChecks(err) {
+				return out, err
+			}
+			continue
+		}
+		if item.Percent == nil || *item.Percent != 100 {
 			continue
 		}
 		files, err := dlFiles(item, true)
