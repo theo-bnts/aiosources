@@ -1,6 +1,7 @@
 import { lazy, Suspense, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { usePublicCredential } from '@/lib/public-credentials'
+import { randomID } from '@/lib/random-id'
 import { PublicSearchContext } from '@/lib/public-search'
 import { Loading } from './common'
 import { Disclosure } from './ui/disclosure'
@@ -18,7 +19,7 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const saved = usePublicCredential()
   const location = useLocation()
   const configuration = saved?.services.length ? saved.credential : ''
-  const scope = useMemo(() => crypto.randomUUID(), [configuration])
+  const scope = useMemo(() => randomID(), [configuration])
   const id = /^\/public\/search\/([0-9]+)$/.exec(location.pathname)?.[1]
   const form = (
     <PublicCredentialsForm

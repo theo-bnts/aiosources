@@ -1,5 +1,6 @@
 import { useId, useState } from 'react'
 import { compareListNames } from '@/lib/list-view'
+import { randomID } from '@/lib/random-id'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, queryClient } from '@/lib/api'
 import type { Items, SecretInfo } from '@/lib/types'
@@ -101,9 +102,7 @@ export function SecretPicker({
           className="self-start"
           disabled={disabled || save.isPending || Boolean(value)}
           onClick={() => {
-            const suffix = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
-              byte.toString(16).padStart(2, '0'),
-            ).join('')
+            const suffix = randomID()
             setReference(`${prefix.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)}_${suffix}`)
             save.reset()
             setSecretValue('')

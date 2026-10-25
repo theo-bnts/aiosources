@@ -1,4 +1,5 @@
 import { debridProviders } from '@/lib/debrid'
+import { randomID } from '@/lib/random-id'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { AdvancedSettings } from '@/components/advanced-settings'
@@ -77,7 +78,7 @@ export function NetworkPage() {
           settings,
           proxy:
             proxy === 'new'
-              ? { id: `proxy-${crypto.randomUUID()}`, name: '', url: '', enabled: false }
+              ? { id: `proxy-${randomID()}`, name: '', url: '', enabled: false }
               : proxy,
         })
     },
@@ -92,7 +93,7 @@ export function NetworkPage() {
             if (settings)
               setEditing({
                 settings,
-                proxy: { id: `proxy-${crypto.randomUUID()}`, name: '', url: '', enabled: false },
+                proxy: { id: `proxy-${randomID()}`, name: '', url: '', enabled: false },
               })
           }}
         >
