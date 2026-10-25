@@ -9,7 +9,7 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Access name', { exact: true }).fill('External application')
-  await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create access', exact: true }).click()
   await expect(
     dialog.getByRole('heading', { name: 'Save this API key now', exact: true }),
   ).toBeVisible()
@@ -47,7 +47,7 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   await selectMultiple(dialog, 'Media types', ['movie', 'tv'])
   await selectMultiple(dialog, 'Services', ['torbox'])
   await dialog.getByRole('switch', { name: 'Cached results only', exact: true }).check()
-  await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const response = await page.request.get('/api/torznab/endpoints')
   const data = await response.json()
@@ -86,7 +86,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   await dialog.getByRole('switch', { name: 'Filter languages', exact: true }).check()
   await dialog.getByLabel('Preferred language', { exact: true }).selectOption('fr')
   await dialog.getByLabel('Cached results only', { exact: true }).check()
-  await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create access', exact: true }).click()
   await expect(
     dialog.getByRole('heading', { name: 'Save this manifest URL now', exact: true }),
   ).toBeVisible()
@@ -130,7 +130,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   await card.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.locator('summary', { hasText: 'Filters' }).click()
   await selectMultiple(dialog, 'Media types', ['series'])
-  await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const changed = await (await page.request.get(manifest)).json()
   expect(changed.types).toEqual(firstManifest.types)
@@ -240,7 +240,7 @@ test('saved service selections remain editable without widening access after a k
     .getByRole('menuitemcheckbox', { name: 'AllDebrid (not configured)', exact: true })
     .uncheck()
   await page.keyboard.press('Escape')
-  await dialog.getByRole('button', { name: 'Save permissions', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const data = await (await page.request.get('/api/stremio/connections')).json()
   expect(data.items[0].stream_preferences.services).toEqual(['torbox'])
@@ -325,7 +325,7 @@ for (const format of ['stremio', 'torznab'] as const) {
     expect(bounds.right).toBeLessThanOrEqual(bounds.viewport)
     if (process.env.QA_DIRECTORY)
       await page.screenshot({ path: `${process.env.QA_DIRECTORY}/${format}-expiry-mobile.png` })
-    await editor.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+    await editor.getByRole('button', { name: 'Create access', exact: true }).click()
     await page
       .getByRole('button', {
         name: format === 'stremio' ? 'I have saved the manifest URL' : 'I have saved the API key',
@@ -349,9 +349,7 @@ for (const format of ['stremio', 'torznab'] as const) {
       await editor.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
       await selectMultiple(editor, 'Services', ['torbox'])
       await selectMultiple(editor, 'Services', [])
-      await expect(
-        editor.getByRole('button', { name: 'Save permissions', exact: true }),
-      ).toBeDisabled()
+      await expect(editor.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
       await expect(editor.getByText('No unsaved changes', { exact: true })).toBeVisible()
     }
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
@@ -365,7 +363,7 @@ for (const format of ['stremio', 'torznab'] as const) {
     await editor
       .getByLabel('Expires at (browser local time)', { exact: true })
       .fill('2032-01-01T12:00')
-    await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(editor).toHaveCount(0)
     access = (await (await page.request.get(endpoint)).json()).items[0]
     expect(access).toMatchObject({
@@ -388,7 +386,7 @@ for (const format of ['stremio', 'torznab'] as const) {
     await editor.getByLabel('Requests per minute', { exact: true }).fill('')
     await editor.getByLabel('Concurrent requests', { exact: true }).fill('')
     await editor.getByLabel('Expires at (browser local time)', { exact: true }).fill('')
-    await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(editor).toHaveCount(0)
     access = (await (await page.request.get(endpoint)).json()).items[0]
     expect(access).toMatchObject({
@@ -414,7 +412,7 @@ test('new Stremio access uses the same browser language defaults and saves a res
     dialog.getByRole('switch', { name: 'Filter languages', exact: true }),
   ).not.toBeChecked()
   await expect(dialog.getByLabel('Include', { exact: true })).toHaveValue('unknown')
-  await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create access', exact: true }).click()
   await dialog.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   const data = await (await page.request.get('/api/stremio/connections')).json()
   expect(data.items[0].stream_preferences).toMatchObject({ language: 'en', mode: 'all' })

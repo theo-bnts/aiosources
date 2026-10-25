@@ -1,5 +1,13 @@
+import { ImportLastRun } from '@/components/import-last-run'
 import { toggleProvider } from '@/lib/provider-state'
-import { ResultCount } from '@/components/common'
+import {
+  ResultCount,
+  ConfirmAction,
+  Empty,
+  ErrorNotice,
+  Loading,
+  PageHeader,
+} from '@/components/common'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -28,7 +36,7 @@ import type {
   ScheduleSummary,
   Validation,
 } from '@/lib/types'
-import { messageText, useDate } from '@/lib/format'
+import { messageText } from '@/lib/format'
 import { frequencyLabel } from '@/lib/schedule-input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,27 +52,22 @@ import {
 import { CodeEditor } from '@/components/code-editor'
 import { SourceEditor } from '@/components/source-editor'
 import { CollectDialog } from '@/components/collect-dialog'
-import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
+import { ListFilters, useListFilters } from '@/components/list-filters'
+import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
 import { AdvancedImportSettings } from '@/components/advanced-import-settings'
 import { useDetailBackLink, useListViewState } from '@/lib/detail-navigation'
-import {
-  ConfirmAction,
-  Empty,
-  ErrorNotice,
-  Loading,
-  PageHeader,
-  RunStatusBadge,
-} from '@/components/common'
 
 export function ProvidersPage() {
   const listState = useListViewState()
-  const filters = useSourceFilters()
+  const filters = useListFilters()
   const providers = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
-  const items = (providers.data?.items ?? []).filter((source) => !source.remote_catalog)
+  const items = (providers.data?.items ?? [])
+    .filter((source) => !source.remote_catalog)
+    .sort(compareListNames)
   const schedules = useQuery({
     queryKey: ['schedules'],
     queryFn: ({ signal }) => api<Items<ScheduleSummary>>('/schedules', { signal }),
@@ -73,7 +76,7 @@ export function ProvidersPage() {
   const bySource = new Map((schedules.data?.items ?? []).map((item) => [item.provider_id, item]))
   const visible = items.filter(
     (source) =>
-      sourceMatches(filters.query, source.name, source.id, source.adapter) &&
+      matchesListQuery(filters.query, source.name, source.id, source.adapter) &&
       (!filters.state ||
         (filters.state === 'enabled' && source.enabled) ||
         (filters.state === 'disabled' && !source.enabled) ||
@@ -108,8 +111,8 @@ export function ProvidersPage() {
           })
         }}
       />
-      {(items.length > 0 || filtered) && (
-        <SourceFilters
+      {providers.data && (items.length > 0 || filtered) && (
+        <ListFilters
           filters={filters}
           states={[
             { value: 'enabled', label: 'Enabled' },
@@ -120,6 +123,7 @@ export function ProvidersPage() {
           total={items.length}
         />
       )}
+      {providers.data && !items.length && !filtered && <ResultCount total={0} label="sources" />}
       <ErrorNotice error={providers.error} retry={() => void providers.refetch()} />
       <ErrorNotice error={schedules.error} retry={() => void schedules.refetch()} />
       {providers.isPending ? (
@@ -170,7 +174,6 @@ function SourceCard({
   toggling: boolean
   onToggle: () => void
 }) {
-  const date = useDate()
   const name = source.name || source.id
   const run = schedule?.last_run ?? source.last_run
   const active =
@@ -192,13 +195,11 @@ function SourceCard({
       ? messageText(schedule.last_error)
       : ''
   const scheduleState =
-    schedule?.state === 'paused'
-      ? 'Budget reached · continues on the next tick'
-      : schedule?.state === 'blocked'
-        ? 'Existing run needs review in History'
-        : schedule?.state === 'invalid'
-          ? 'Source needs review'
-          : ''
+    schedule?.state === 'blocked'
+      ? 'Existing run needs review in History'
+      : schedule?.state === 'invalid'
+        ? 'Source needs review'
+        : ''
   return (
     <section className="section-card" aria-label={`Source ${name}`}>
       <div className="flex items-start justify-between gap-3">
@@ -245,23 +246,24 @@ function SourceCard({
           {scheduleState && (
             <p className="help mt-1 text-amber-800 dark:text-amber-300">{scheduleState}</p>
           )}
-          {scheduleError && scheduleError !== scheduleState && (
-            <p className="help mt-1 break-words text-destructive">{scheduleError}</p>
-          )}
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Last run</dt>
-          <dd className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-            {run ? (
-              <Link to={`/runs/${encodeURIComponent(run.id)}`} state={listState}>
-                <RunStatusBadge run={run} />
-              </Link>
-            ) : (
-              <span className="text-muted-foreground">No runs</span>
+          {scheduleError &&
+            scheduleError !== scheduleState &&
+            (!run ||
+              !['failed', 'paused'].includes(run.status) ||
+              scheduleError !== messageText(run.error || '')) && (
+              <p className="help mt-1 break-words text-destructive">{scheduleError}</p>
             )}
-            {next && <span className="text-muted-foreground">Next: {date(next)}</span>}
-          </dd>
         </div>
+        <ImportLastRun
+          run={run}
+          next={next || undefined}
+          state={listState}
+          hint={
+            schedule?.state === 'paused' && !run?.error
+              ? 'Budget reached · continues on the next tick'
+              : undefined
+          }
+        />
       </dl>
       <div className="toolbar">
         <CollectDialog

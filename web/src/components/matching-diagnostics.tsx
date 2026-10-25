@@ -1,5 +1,13 @@
 import { Disclosure } from '@/components/ui/disclosure'
-import { ResultCount } from '@/components/common'
+import { compareListNames } from '@/lib/list-view'
+import {
+  ResultCount,
+  ClearFiltersButton,
+  ListEmpty,
+  ErrorNotice,
+  Loading,
+  Pager,
+} from '@/components/common'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -11,7 +19,6 @@ import { useURLPagination } from '@/lib/pagination'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { useDate } from '@/lib/format'
 import { identificationResults } from '@/lib/identification'
-import { ClearFiltersButton, ListEmpty, ErrorNotice, Loading, Pager } from '@/components/common'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -139,7 +146,7 @@ export function MatchingDiagnostics() {
                 {provider && !providers.data?.items?.some((item) => item.id === provider) && (
                   <option value={provider}>{provider}</option>
                 )}
-                {providers.data?.items?.map((item) => (
+                {[...(providers.data?.items ?? [])].sort(compareListNames).map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name || item.id}
                   </option>

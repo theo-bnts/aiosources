@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { compareListNames } from '@/lib/list-view'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, queryClient } from '@/lib/api'
 import type { Items, SecretInfo } from '@/lib/types'
@@ -68,7 +69,7 @@ export function SecretPicker({
       await queryClient.invalidateQueries({ queryKey: ['secrets'] })
     },
   })
-  const entries = secrets.data?.items ?? []
+  const entries = [...(secrets.data?.items ?? [])].sort(compareListNames)
   return (
     <div className="field min-w-0 grid-cols-1">
       <Label htmlFor={id}>{label}</Label>

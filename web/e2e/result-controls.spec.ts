@@ -49,7 +49,7 @@ test('Stremio saves independent sorting priorities, optional limits and a timeou
         fullPage: true,
       })
   }
-  await editor.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await editor.getByRole('button', { name: 'Create access', exact: true }).click()
   await editor.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   const saved = (await (await page.request.get('/api/stremio/connections')).json()).items[0]
     .stream_preferences
@@ -151,7 +151,7 @@ test('reverting Stremio result controls restores the saved state without an unne
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const editor = page.getByRole('dialog')
   await editor.getByLabel('Access name', { exact: true }).fill('Unfiltered playback')
-  await editor.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+  await editor.getByRole('button', { name: 'Create access', exact: true }).click()
   await editor.getByRole('button', { name: 'I have saved the manifest URL', exact: true }).click()
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await editor.locator('summary', { hasText: /^Filters$/ }).click()
@@ -168,6 +168,6 @@ test('reverting Stremio result controls restores the saved state without an unne
   await editor.locator('summary', { hasText: /^Sorting$/ }).click()
   await editor.getByLabel('Sort by', { exact: true }).selectOption('cached')
   await editor.getByLabel('Sort by', { exact: true }).selectOption('')
-  await expect(editor.getByRole('button', { name: 'Save permissions', exact: true })).toBeDisabled()
+  await expect(editor.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await expect(editor.getByText('No unsaved changes', { exact: true })).toBeVisible()
 })

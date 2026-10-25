@@ -1,5 +1,3 @@
-import { serviceNames } from '@/lib/debrid'
-import { stremioMediaTypes } from '@/components/connection-filter-fields'
 import { InstallationFilters } from '@/components/installation-filters'
 import { LanguageFilter } from '@/components/language-filter'
 import type { StremioPreferences } from '@/lib/catalog-types'
@@ -64,36 +62,4 @@ export function StremioConnectionFilters({
       />
     </>
   )
-}
-
-export function stremioPreferenceSummary(value?: StremioPreferences) {
-  if (!value) return 'All results'
-  const filters: string[] = []
-  if (value.types?.length)
-    filters.push(
-      ...value.types.map(
-        (type) => stremioMediaTypes.find((option) => option.value === type)?.label || type,
-      ),
-    )
-  if (value.services?.length) filters.push(...value.services.map((id) => serviceNames[id] || id))
-  if (value.mode && value.mode !== 'all') {
-    const preferred = resolvedLanguage(value)
-    const language = new Intl.DisplayNames(['en'], { type: 'language' }).of(preferred) || preferred
-    filters.push(
-      language +
-        (value.mode === 'preferred'
-          ? ''
-          : value.mode === 'multi'
-            ? ' + MULTI'
-            : ' + MULTI + unknown'),
-    )
-  }
-  if (value.cached_only) filters.push('Cached only')
-  const limit = value.cached_only ? value.max_cached : value.max_results
-  if (limit) filters.push(`Up to ${limit} results`)
-  if (!value.cached_only && value.max_cached) filters.push(`Cache target: ${value.max_cached}`)
-  if (value.sorting?.length)
-    filters.push(`${value.sorting.length} sorting ${value.sorting.length === 1 ? 'rule' : 'rules'}`)
-  if (value.response_seconds) filters.push(`${value.response_seconds}s availability wait`)
-  return filters.join(' · ') || 'All results'
 }

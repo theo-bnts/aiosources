@@ -1,4 +1,5 @@
 import { MultiSelect } from '@/components/ui/multi-select'
+import { compareListLabels } from '@/lib/list-view'
 
 export function SourceMultiSelect(props: {
   id: string
@@ -6,5 +7,13 @@ export function SourceMultiSelect(props: {
   options: { value: string; label: string }[]
   onChange: (value: string[]) => void
 }) {
-  return <MultiSelect {...props} label="Sources" allLabel="All sources" name="provider" />
+  return (
+    <MultiSelect
+      {...props}
+      options={[...props.options].sort(compareListLabels)}
+      label="Sources"
+      allLabel="All sources"
+      name="provider"
+    />
+  )
 }

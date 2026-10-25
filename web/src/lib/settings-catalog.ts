@@ -243,6 +243,15 @@ for (const setting of settings.filter(
   (entry) => entry.entity === 'proxy' && ['Username', 'Password'].includes(entry.title),
 ))
   setting.reveal = ['Advanced']
+settings.push({
+  id: 'security.secret-references',
+  title: 'Using references in JSON',
+  group: 'Administration / Security / Advanced',
+  route: '/security/settings',
+  control: 'secret-reference-help',
+  reveal: ['Advanced', 'Using references in JSON'],
+  keywords: 'secrets auth.secret_ref auth.username_ref auth.password_ref http.secret_headers',
+})
 settings.push(
   {
     id: 'security.secrets',

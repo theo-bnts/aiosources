@@ -176,7 +176,7 @@ test('long source names never stretch filter fields beyond small-screen layouts'
     await page.setViewportSize({ width, height: 844 })
     for (const [path, field, value] of [
       ['/metadata/identification', 'Source', 'mobile-example'],
-      ['/runs', 'Filter by source', 'mobile-example'],
+      ['/runs', 'Source', 'mobile-example'],
       ['/logs', 'Source or service', 'source:mobile-example'],
     ]) {
       await page.goto(path)

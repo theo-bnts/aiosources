@@ -88,7 +88,7 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
       debridProviders.map((p) => p.id),
     )
     await dialog.getByLabel('Access name', { exact: true }).fill(`All services ${format}`)
-    await dialog.getByRole('button', { name: 'Create disabled access', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Create access', exact: true }).click()
     await dialog
       .getByRole('button', {
         name: format === 'stremio' ? 'I have saved the manifest URL' : 'I have saved the API key',

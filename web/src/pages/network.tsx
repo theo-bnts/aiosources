@@ -8,10 +8,13 @@ import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phospho
 import { api, ApiError, ConnectionError } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { Link } from 'react-router-dom'
+import { ListFilters, useListFilters } from '@/components/list-filters'
+import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import type { NetworkProxy, NetworkSettings } from '@/lib/network-types'
 import { useNetworkSettings, useSaveNetwork } from '@/lib/network-settings'
 import type { Items, ProviderSummary } from '@/lib/types'
-import { ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
+import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
 import { SecretPicker } from '@/components/secret-picker'
 import { Button } from '@/components/ui/button'
@@ -34,6 +37,7 @@ function proxyInUse(settings: NetworkSettings, id: string) {
 }
 
 export function NetworkPage() {
+  const filters = useListFilters()
   const query = useNetworkSettings()
   const save = useSaveNetwork()
   const notify = useNotification()
@@ -55,6 +59,15 @@ export function NetworkPage() {
     },
   })
   const settings = query.data
+  const items = [...(settings?.proxies ?? [])].sort(compareListNames)
+  const visible = items.filter(
+    (proxy) =>
+      matchesListQuery(filters.query, proxy.name, proxy.id, proxy.url) &&
+      (!filters.state ||
+        (filters.state === 'enabled' && proxy.enabled) ||
+        (filters.state === 'disabled' && !proxy.enabled)),
+  )
+  const filtered = Boolean(filters.query || filters.state)
   useSettingsEditor(
     'proxy',
     settings?.proxies,
@@ -89,13 +102,28 @@ export function NetworkPage() {
       </div>
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       <ErrorNotice error={save.error} retry={() => void query.refetch().then(() => save.reset())} />
+      {settings &&
+        (items.length || filtered ? (
+          <ListFilters
+            kind="proxy"
+            filters={filters}
+            count={visible.length}
+            total={items.length}
+            states={[
+              { value: 'enabled', label: 'Enabled' },
+              { value: 'disabled', label: 'Disabled' },
+            ]}
+          />
+        ) : (
+          <ResultCount total={0} label="proxies" />
+        ))}
       {query.isPending ? (
         <Loading label="Loading proxies" />
       ) : (
         settings &&
-        (settings.proxies.length ? (
+        (visible.length ? (
           <div className="space-y-4">
-            {settings.proxies.map((proxy) => {
+            {visible.map((proxy) => {
               const used = proxyInUse(settings, proxy.id)
               return (
                 <section key={proxy.id} className="section-card" aria-label={`Proxy ${proxy.name}`}>
@@ -175,7 +203,11 @@ export function NetworkPage() {
                   </div>
                   {used && (
                     <p className="help">
-                      Assigned in Routing. Change those assignments before deleting this proxy.
+                      Assigned in{' '}
+                      <Link to="/network/outgoing/routing" className="data-link">
+                        Routing
+                      </Link>
+                      . Change those assignments before deleting this proxy.
                     </p>
                   )}
                 </section>
@@ -184,8 +216,12 @@ export function NetworkPage() {
           </div>
         ) : (
           <Empty
-            title="No proxies configured"
-            description="Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Routing."
+            title={filtered ? 'No proxies match these filters' : 'No proxies configured'}
+            description={
+              filtered
+                ? 'Clear the filters to see your other proxies.'
+                : 'Add a WARP, VPN or other HTTP(S) or SOCKS5 proxy, then choose where to use it in Routing.'
+            }
           />
         ))
       )}
@@ -389,7 +425,7 @@ function ConnectionSelect({
         {inherit && <option value="">{inherit}</option>}
         <option value="system">System connection</option>
         <option value="direct">Direct connection</option>
-        {settings.proxies.map((proxy) => (
+        {[...settings.proxies].sort(compareListNames).map((proxy) => (
           <option key={proxy.id} value={proxy.id} disabled={!proxy.enabled}>
             {proxy.name}
             {!proxy.enabled ? ' · disabled' : ''}
@@ -409,7 +445,7 @@ export function NetworkRoutingPage() {
   const [draft, setDraft] = useState<NetworkSettings | null>(null)
   const save = useSaveNetwork(() => setDraft(null))
   const settings = draft ?? query.data
-  const sources = providers.data?.items ?? []
+  const sources = [...(providers.data?.items ?? [])].sort(compareListNames)
   const dirty = Boolean(
     draft &&
     query.data &&

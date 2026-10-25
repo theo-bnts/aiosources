@@ -470,8 +470,8 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
     data: { json: JSON.stringify(concurrent), revision: created.revision },
   })
   expect(updated.status()).toBe(200)
-  await dialog.getByRole('button', { name: 'Save remote', exact: true }).click()
-  await expect(dialog.getByRole('button', { name: 'Save remote', exact: true })).toBeDisabled()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await dialog.getByRole('button', { name: 'Reload source, keep edits', exact: true }).click()
   await expect(dialog.getByLabel('Display name', { exact: true })).toHaveValue(
     'Synthetic renamed remote',
@@ -479,7 +479,7 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   await expect(
     dialog.getByLabel('Synchronization interval (minutes)', { exact: true }),
   ).toHaveValue('90')
-  await dialog.getByRole('button', { name: 'Save remote', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).toBeHidden()
   const renamed = await source(page, 'interval-remote')
   expect(renamed.provider.name).toBe('Synthetic renamed remote')
@@ -547,7 +547,7 @@ test('legacy remote schedules convert to intervals without changing credentials 
     dialog.getByLabel('Synchronization interval (minutes)', { exact: true }),
   ).toHaveValue('1440')
   await dialog.getByLabel('Display name', { exact: true }).fill('Converted remote')
-  await dialog.getByRole('button', { name: 'Save remote', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(dialog).toBeHidden()
   const saved = await source(page, 'legacy-remote')
   expect(saved.provider.catalog_sync).toEqual({ enabled: false, interval_minutes: 1440 })

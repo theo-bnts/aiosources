@@ -6,8 +6,9 @@ import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
 import type { Controls, Status } from '@/lib/aiosource-types'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
-import { Empty, ErrorNotice, Loading, PageHeader } from '@/components/common'
-import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
+import { Empty, ErrorNotice, Loading, PageHeader, ResultCount } from '@/components/common'
+import { ListFilters, useListFilters } from '@/components/list-filters'
+import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
@@ -17,7 +18,7 @@ import { number, percentage, useDate } from '@/lib/format'
 export function SourceStatisticsPage() {
   const location = useLocation()
   const listState = useListViewState()
-  const filters = useSourceFilters()
+  const filters = useListFilters()
   const providers = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
@@ -27,11 +28,13 @@ export function SourceStatisticsPage() {
     queryFn: ({ signal }) => api<CollectionOverview>('/settings/collections', { signal }),
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
-  const items = (providers.data?.items ?? []).filter((source) => !source.remote_catalog)
+  const items = (providers.data?.items ?? [])
+    .filter((source) => !source.remote_catalog)
+    .sort(compareListNames)
   const counts = useSourceTorrentStats(Boolean(providers.data))
   const visible = items.filter(
     (source) =>
-      sourceMatches(filters.query, source.name, source.id, source.adapter) &&
+      matchesListQuery(filters.query, source.name, source.id, source.adapter) &&
       (!filters.state ||
         (filters.state === 'enabled' && source.enabled) ||
         (filters.state === 'disabled' && !source.enabled) ||
@@ -90,8 +93,8 @@ export function SourceStatisticsPage() {
           history and indexes; shared metadata and caches are separate.
         </p>
       )}
-      {(items.length > 0 || filtered) && (
-        <SourceFilters
+      {providers.data && (items.length > 0 || filtered) && (
+        <ListFilters
           filters={filters}
           states={[
             { value: 'enabled', label: 'Enabled' },
@@ -102,6 +105,7 @@ export function SourceStatisticsPage() {
           total={items.length}
         />
       )}
+      {providers.data && !items.length && !filtered && <ResultCount total={0} label="sources" />}
       {providers.isPending ? (
         <Loading />
       ) : visible.length ? (

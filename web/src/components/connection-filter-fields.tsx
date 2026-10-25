@@ -3,16 +3,7 @@ import { MultiSelect } from '@/components/ui/multi-select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 
-export const stremioMediaTypes = [
-  { value: 'movie', label: 'Movies' },
-  { value: 'series', label: 'Series' },
-  { value: 'anime', label: 'Anime' },
-]
-export const torznabMediaTypes = [
-  { value: 'movie', label: 'Movies' },
-  { value: 'tv', label: 'Series' },
-  { value: 'other', label: 'Other / not identified' },
-]
+export { stremioMediaTypes, torznabMediaTypes } from '@/lib/connection-options'
 export { debridServices } from '@/lib/debrid'
 
 export function MediaTypeFilter({

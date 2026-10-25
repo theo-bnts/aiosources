@@ -1,5 +1,14 @@
 import { debridProviders, serviceNames } from '@/lib/debrid'
-import { ResultCount } from '@/components/common'
+import {
+  ResultCount,
+  ClearFiltersButton,
+  ListEmpty,
+  ErrorNotice,
+  Loading,
+  PageHeader,
+  Pager,
+  RunStatusBadge,
+} from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -24,15 +33,6 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table'
-import {
-  ClearFiltersButton,
-  ListEmpty,
-  ErrorNotice,
-  Loading,
-  PageHeader,
-  Pager,
-  RunStatusBadge,
-} from '@/components/common'
 
 type Section = 'metadata' | 'debrid'
 const statuses: Record<OperationStatus, string> = {
@@ -124,11 +124,9 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   }
   return (
     <div className="page">
-      <div className="toolbar rounded-md border border-border p-4">
+      <div className="toolbar items-end rounded-md border border-border p-4">
         <div className="field">
-          <Label htmlFor="operation-type" className="sr-only">
-            {section === 'metadata' ? 'Filter by operation' : 'Filter by service'}
-          </Label>
+          <Label htmlFor="operation-type">{section === 'metadata' ? 'Operation' : 'Service'}</Label>
           {section === 'metadata' ? (
             <select
               id="operation-type"
@@ -158,9 +156,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
         </div>
         {section === 'debrid' && (
           <div className="field">
-            <Label htmlFor="debrid-operation-kind" className="sr-only">
-              Filter by operation
-            </Label>
+            <Label htmlFor="debrid-operation-kind">Operation</Label>
             <select
               id="debrid-operation-kind"
               className="native-select"
@@ -175,9 +171,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
           </div>
         )}
         <div className="field">
-          <Label htmlFor="operation-status" className="sr-only">
-            Filter by status
-          </Label>
+          <Label htmlFor="operation-status">Status</Label>
           <select
             id="operation-status"
             className="native-select"

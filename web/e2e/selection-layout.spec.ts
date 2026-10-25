@@ -115,7 +115,7 @@ test('long selections stay inside Stremio, Torznab, sharing and torrent-search f
     }
     await editor
       .getByRole('button', {
-        name: connection ? 'Create disabled access' : 'Create disabled share',
+        name: connection ? 'Create access' : 'Create share',
         exact: true,
       })
       .click()

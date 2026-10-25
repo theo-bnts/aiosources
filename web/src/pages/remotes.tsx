@@ -1,3 +1,4 @@
+import { ImportLastRun } from '@/components/import-last-run'
 import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { toggleProvider } from '@/lib/provider-state'
@@ -23,7 +24,8 @@ import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/
 import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
-import { SourceFilters, sourceMatches, useSourceFilters } from '@/components/source-filters'
+import { ListFilters, useListFilters } from '@/components/list-filters'
+import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
 import { CollectDialog } from '@/components/collect-dialog'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
@@ -40,7 +42,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { ConfirmAction, Empty, ErrorNotice, Loading, RunStatusBadge } from '@/components/common'
+import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 
 function safeConfigurationError(error: unknown) {
   if (error instanceof ConnectionError) return error
@@ -73,8 +75,11 @@ function useRemotes() {
 
 export function RemoteStatisticsPage() {
   const remotes = useRemotes()
+  const filters = useListFilters()
   const date = useDate()
-  const items = remotes.data?.items ?? []
+  const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
+  const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))
+  const filtered = Boolean(filters.query || filters.state)
   const counts = useSourceTorrentStats(items.length > 0)
   const totals = items.reduce(
     (total, remote) => {
@@ -115,9 +120,20 @@ export function RemoteStatisticsPage() {
                 value={items.filter((item) => item.has_checkpoint).length}
               />
             </dl>
-            {items.length ? (
+            {items.length > 0 || filtered ? (
+              <ListFilters
+                kind="remote"
+                filters={filters}
+                states={remoteStates}
+                count={visible.length}
+                total={items.length}
+              />
+            ) : (
+              <ResultCount total={0} label="remote catalogs" />
+            )}
+            {visible.length ? (
               <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {items.map((remote) => (
+                {visible.map((remote) => (
                   <section
                     key={remote.id}
                     className="section-card"
@@ -140,8 +156,12 @@ export function RemoteStatisticsPage() {
             ) : (
               !remotes.isError && (
                 <Empty
-                  title="No remote catalogs"
-                  description="Add a catalog in Settings to import a shared library."
+                  title={filtered ? 'No remote catalogs match these filters' : 'No remote catalogs'}
+                  description={
+                    filtered
+                      ? 'Clear the filters to see your other remote catalogs.'
+                      : 'Add a catalog in Settings to import a shared library.'
+                  }
                 />
               )
             )}
@@ -152,10 +172,25 @@ export function RemoteStatisticsPage() {
   )
 }
 
+const remoteStates = [
+  { value: 'enabled', label: 'Enabled' },
+  { value: 'disabled', label: 'Disabled' },
+  { value: 'invalid', label: 'Needs fixing' },
+]
+
+function matchesRemoteFilters(remote: RemoteCatalog, filters: ReturnType<typeof useListFilters>) {
+  return (
+    matchesListQuery(filters.query, remote.name, remote.id) &&
+    (!filters.state ||
+      (filters.state === 'enabled' && remote.enabled) ||
+      (filters.state === 'disabled' && !remote.enabled) ||
+      (filters.state === 'invalid' && !remote.valid))
+  )
+}
+
 export default function RemotesPage() {
   const listState = useListViewState()
-  const filters = useSourceFilters()
-  const date = useDate()
+  const filters = useListFilters()
   const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<RemoteCatalog | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
@@ -167,15 +202,8 @@ export default function RemotesPage() {
     (remote) => openEditor(remote),
     () => setEditing(null),
   )
-  const items = remotes.data?.items ?? []
-  const visible = items.filter(
-    (remote) =>
-      sourceMatches(filters.query, remote.name, remote.id) &&
-      (!filters.state ||
-        (filters.state === 'enabled' && remote.enabled) ||
-        (filters.state === 'disabled' && !remote.enabled) ||
-        (filters.state === 'invalid' && !remote.valid)),
-  )
+  const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
+  const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))
   const filtered = Boolean(filters.query || filters.state)
   function openEditor(remote: RemoteCatalog | 'new') {
     returnFocus.current =
@@ -191,17 +219,17 @@ export default function RemotesPage() {
           Add remote catalog
         </Button>
       </div>
-      {(items.length > 0 || filtered) && (
-        <SourceFilters
+      {remotes.data && (items.length > 0 || filtered) && (
+        <ListFilters
+          kind="remote"
           filters={filters}
-          states={[
-            { value: 'enabled', label: 'Enabled' },
-            { value: 'disabled', label: 'Disabled' },
-            { value: 'invalid', label: 'Needs fixing' },
-          ]}
+          states={remoteStates}
           count={visible.length}
           total={items.length}
         />
+      )}
+      {remotes.data && !items.length && !filtered && (
+        <ResultCount total={0} label="remote catalogs" />
       )}
       <ErrorNotice
         error={toggle.error}
@@ -230,14 +258,14 @@ export default function RemotesPage() {
                     <h2 className="section-title break-words">{remote.name || remote.id}</h2>
                     <p className="mono mt-1 break-all text-muted-foreground">{remote.url}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-3">
+                    {!remote.valid && <Badge variant="warning">Needs fixing</Badge>}
                     <Switch
                       checked={remote.enabled}
                       aria-label={`${remote.enabled ? 'Disable' : 'Enable'} ${remote.name || remote.id}`}
                       disabled={toggle.isPending || (!remote.enabled && !remote.valid)}
                       onCheckedChange={() => toggle.mutate(remote)}
                     />
-                    {!remote.valid && <Badge variant="destructive">Invalid configuration</Badge>}
                   </div>
                 </div>
                 <dl className="grid gap-4 text-sm md:grid-cols-2">
@@ -246,37 +274,39 @@ export default function RemotesPage() {
                     <dd className="mt-1">
                       {remote.sync.enabled
                         ? `Every ${remote.sync.interval_minutes} minutes`
-                        : 'Manual imports only'}
+                        : 'Manual only'}
                     </dd>
-                    {remote.sync_error && (
-                      <p className="help mt-1 text-destructive">{messageText(remote.sync_error)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Last run</dt>
-                    <dd className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-                      {remote.last_run ? (
-                        <Link
-                          to={`/remotes/history/${encodeURIComponent(remote.last_run.id)}`}
-                          state={listState}
-                        >
-                          <RunStatusBadge run={remote.last_run} />
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">No runs</span>
+                    {remote.sync_error &&
+                      (!remote.last_run ||
+                        !['failed', 'paused'].includes(remote.last_run.status) ||
+                        messageText(remote.sync_error) !==
+                          messageText(remote.last_run.error || '')) && (
+                        <p className="help mt-1 text-destructive">
+                          {messageText(remote.sync_error)}
+                        </p>
                       )}
-                      {remote.enabled &&
-                        remote.valid &&
-                        remote.sync.enabled &&
-                        remote.next_sync_at &&
-                        ['waiting', 'paused'].includes(remote.sync_state) &&
-                        !['queued', 'running'].includes(remote.last_run?.status ?? '') && (
-                          <span className="text-muted-foreground">
-                            Next: {date(remote.next_sync_at)}
-                          </span>
-                        )}
-                    </dd>
                   </div>
+                  <ImportLastRun
+                    run={remote.last_run}
+                    remote
+                    state={listState}
+                    next={
+                      remote.enabled &&
+                      remote.valid &&
+                      remote.sync.enabled &&
+                      ['waiting', 'paused'].includes(remote.sync_state) &&
+                      !['queued', 'running'].includes(remote.last_run?.status ?? '')
+                        ? remote.next_sync_at
+                        : undefined
+                    }
+                    hint={
+                      remote.last_run?.status === 'paused'
+                        ? remote.enabled && remote.sync.enabled && remote.sync_state === 'paused'
+                          ? 'This import will resume at the next automatic sync, keeping its saved progress. You can also resume it now from run details.'
+                          : 'A paused run has unpublished progress. Resume or cancel it from run details before starting another sync.'
+                        : undefined
+                    }
+                  />
                   <div>
                     <dt className="text-muted-foreground">Data received</dt>
                     <dd className="mt-1">
@@ -286,18 +316,6 @@ export default function RemotesPage() {
                     </dd>
                   </div>
                 </dl>
-                {remote.last_run?.error && (
-                  <p role="status" className="notice notice-error break-words">
-                    Latest run error: {messageText(remote.last_run.error)}
-                  </p>
-                )}
-                {remote.last_run?.status === 'paused' && (
-                  <p className="help">
-                    {remote.enabled && remote.sync.enabled && remote.sync_state === 'paused'
-                      ? 'This import will resume at the next automatic sync, keeping its saved progress. You can also resume it now from run details.'
-                      : 'A paused run has unpublished progress. Resume or cancel it from run details before starting another sync.'}
-                  </p>
-                )}
                 <div className="toolbar">
                   <CollectDialog
                     providerId={remote.id}
@@ -357,7 +375,7 @@ export default function RemotesPage() {
             title={filtered ? 'No remote catalogs match these filters' : 'No remote catalogs'}
             description={
               filtered
-                ? 'Clear the filters to see your other sources.'
+                ? 'Clear the filters to see your other remote catalogs.'
                 : 'Add a shared HTTPS catalog URL and select or store its password in Secrets.'
             }
           />
@@ -681,7 +699,7 @@ function RemoteForm({
             !draft.id.trim()
           }
         >
-          {save.isPending ? 'Saving…' : original ? 'Save remote' : 'Create remote catalog'}
+          {save.isPending ? 'Saving…' : original ? 'Save' : 'Create remote catalog'}
         </Button>
       </DialogFooter>
     </form>

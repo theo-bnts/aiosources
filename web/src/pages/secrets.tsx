@@ -1,4 +1,13 @@
-import { ResultCount } from '@/components/common'
+import {
+  ResultCount,
+  ConfirmAction,
+  Empty,
+  ErrorNotice,
+  Loading,
+  PageHeader,
+} from '@/components/common'
+import { ListFilters, useListFilters } from '@/components/list-filters'
+import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -28,15 +37,18 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table'
-import { ConfirmAction, Empty, ErrorNotice, Loading, PageHeader } from '@/components/common'
 
 export default function SecretsPage() {
+  const filters = useListFilters()
   const date = useDate()
   const returnFocus = useRef<HTMLElement | null>(null)
   const secrets = useQuery({
     queryKey: ['secrets'],
     queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
   })
+  const items = [...(secrets.data?.items ?? [])].sort(compareListNames)
+  const visible = items.filter((secret) => matchesListQuery(filters.query, secret.name))
+  const filtered = Boolean(filters.query)
   const [editing, setEditing] = useState<{
     name: string
     rotate: boolean
@@ -119,10 +131,20 @@ export default function SecretsPage() {
         </p>
       </div>
       <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
-      {secrets.data && <ResultCount total={secrets.data.items?.length ?? 0} label="secrets" />}
+      {secrets.data &&
+        (items.length || filtered ? (
+          <ListFilters
+            kind="secret"
+            filters={filters}
+            count={visible.length}
+            total={items.length}
+          />
+        ) : (
+          <ResultCount total={0} label="secrets" />
+        ))}
       {secrets.isPending ? (
         <Loading />
-      ) : secrets.data?.items?.length ? (
+      ) : visible.length ? (
         <div className="table-frame">
           <Table>
             <TableHeader>
@@ -133,7 +155,7 @@ export default function SecretsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {secrets.data.items.map((secret) => (
+              {visible.map((secret) => (
                 <TableRow key={secret.name}>
                   <TableCell className="font-mono text-xs">{secret.name}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -153,10 +175,11 @@ export default function SecretsPage() {
                         trigger={
                           <Button
                             variant="destructive"
-                            size="icon-sm"
+                            size="sm"
                             aria-label={`Delete secret ${secret.name}`}
                           >
                             <TrashIcon />
+                            Delete
                           </Button>
                         }
                         action={async () => {
@@ -179,20 +202,15 @@ export default function SecretsPage() {
         !secrets.isError && (
           <Empty
             icon={KeyIcon}
-            title="The vault contains no secrets"
-            description="Add the keys, passwords or cookies your sources need. The server never returns their values."
+            title={filtered ? 'No secrets match these filters' : 'The vault contains no secrets'}
+            description={
+              filtered
+                ? 'Clear the filters to see your other secrets.'
+                : 'Add the keys, passwords or cookies your sources need. The server never returns their values.'
+            }
           />
         )
       )}
-      <Disclosure title="Using references in JSON">
-        <p className="help">
-          Reference stored names in <code className="mono">auth.secret_ref</code>,{' '}
-          <code className="mono">auth.username_ref</code>,{' '}
-          <code className="mono">auth.password_ref</code> or{' '}
-          <code className="mono">http.secret_headers</code>. Keep secret values out of JSON
-          definitions.
-        </p>
-      </Disclosure>
       <Dialog
         open={Boolean(editing)}
         unsavedChanges={{
@@ -310,5 +328,19 @@ export default function SecretsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export function SecretReferencesHelp() {
+  return (
+    <Disclosure id="secret-reference-help" tabIndex={-1} title="Using references in JSON">
+      <p className="help">
+        Reference stored names in <code className="mono">auth.secret_ref</code>,{' '}
+        <code className="mono">auth.username_ref</code>,{' '}
+        <code className="mono">auth.password_ref</code> or{' '}
+        <code className="mono">http.secret_headers</code>. Keep secret values out of JSON
+        definitions.
+      </p>
+    </Disclosure>
   )
 }

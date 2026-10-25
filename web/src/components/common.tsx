@@ -186,13 +186,23 @@ export function Empty({
   )
 }
 
-export function ResultCount({ total, label = 'results' }: { total: number; label?: string }) {
+export function ResultCount({
+  total,
+  shown,
+  label = 'results',
+}: {
+  total: number
+  shown?: number
+  label?: string
+}) {
   const singular = label
     .replace(/entries$/, 'entry')
     .replace(/categories$/, 'category')
+    .replace(/proxies$/, 'proxy')
     .replace(/s$/, '')
   return (
     <p className="help" role="status" data-result-count>
+      {shown !== undefined && <>Showing {number(shown)} of </>}
       {number(total)} {total === 1 ? singular : label}
     </p>
   )

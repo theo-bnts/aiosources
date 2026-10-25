@@ -1,4 +1,15 @@
-import { ResultCount } from '@/components/common'
+import { compareListNames, resetListView } from '@/lib/list-view'
+import {
+  ResultCount,
+  ConfirmAction,
+  ErrorNotice,
+  Loading,
+  PageHeader,
+  Pager,
+  RunStatusBadge,
+  ClearFiltersButton,
+  ListEmpty,
+} from '@/components/common'
 import { useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
@@ -8,7 +19,6 @@ import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
 import { messageText, useDate, runModeLabel, number, statusLabels } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
-import { resetListView } from '@/lib/list-view'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -23,16 +33,6 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table'
-import {
-  ConfirmAction,
-  ErrorNotice,
-  Loading,
-  PageHeader,
-  Pager,
-  RunStatusBadge,
-  ClearFiltersButton,
-  ListEmpty,
-} from '@/components/common'
 import { RawTableView } from '@/pages/library'
 import type { RunChanges } from '@/lib/history-types'
 import { decodeSearchJSON } from '@/lib/search-json'
@@ -129,7 +129,9 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
   })
-  const sources = providers.data?.items?.filter((item) => Boolean(item.remote_catalog) === remote)
+  const sources = providers.data?.items
+    ?.filter((item) => Boolean(item.remote_catalog) === remote)
+    .sort(compareListNames)
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
     value ? next.set(key, value) : next.delete(key)
@@ -139,11 +141,9 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
   return (
     <div className="page">
       <PageHeader title="History" />
-      <div className="toolbar rounded-md border border-border p-4">
+      <div className="toolbar items-end rounded-md border border-border p-4">
         <div className="field">
-          <Label htmlFor="run-provider" className="sr-only">
-            Filter by source
-          </Label>
+          <Label htmlFor="run-provider">{remote ? 'Remote catalog' : 'Source'}</Label>
           <select
             id="run-provider"
             className="native-select min-w-48"
@@ -162,9 +162,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
           </select>
         </div>
         <div className="field">
-          <Label htmlFor="run-status" className="sr-only">
-            Filter by status
-          </Label>
+          <Label htmlFor="run-status">Status</Label>
           <select
             id="run-status"
             className="native-select"

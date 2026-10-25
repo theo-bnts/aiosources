@@ -184,7 +184,7 @@ test.describe('remote catalog history and ownership', () => {
       await expect(page.locator('main tbody')).not.toContainText('Native source')
       await expect(page.locator('main tbody')).toContainText('Full sync')
       await expect(
-        page.getByLabel('Filter by source', { exact: true }).getByRole('option'),
+        page.getByLabel('Remote catalog', { exact: true }).getByRole('option'),
       ).toHaveText(['All remote catalogs', 'Remote copy'])
       await page.getByRole('link', { name: 'Open run remote-copy-run', exact: true }).click()
       await expect(page).toHaveURL(/\/remotes\/history\/remote-copy-run$/)

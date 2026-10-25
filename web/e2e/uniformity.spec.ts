@@ -80,19 +80,26 @@ test('source directories share filters and a stale activation is reloaded withou
   await addSource(page, server.origin, server.sourceURL, 'beta', 'Beta local')
   await addRemote(page)
   const views = [
-    ['/providers', 'beta', 'disabled', 'Showing 1 of 2 sources'],
-    ['/remotes/settings', 'remote', 'disabled', 'Showing 1 of 1 source'],
+    ['/providers', 'beta', 'disabled', 'Showing 1 of 2 sources', 'Source filters', 'Find a source'],
+    [
+      '/remotes/settings',
+      'remote',
+      'disabled',
+      'Showing 1 of 1 remote catalog',
+      'Remote catalog filters',
+      'Find a remote catalog',
+    ],
   ]
-  for (const [route, query, state, count] of views) {
+  for (const [route, query, state, count, region, label] of views) {
     await page.goto(`${route}?q=${query}&state=${state}`)
-    const filters = page.getByRole('region', { name: 'Source filters', exact: true })
+    const filters = page.getByRole('region', { name: region, exact: true })
     await expect(filters.getByRole('status')).toHaveText(count)
     await page.reload()
-    await expect(filters.getByLabel('Find a source', { exact: true })).toHaveValue(query)
-    await filters.getByLabel('Find a source', { exact: true }).fill('missing source')
+    await expect(filters.getByLabel(label, { exact: true })).toHaveValue(query)
+    await filters.getByLabel(label, { exact: true }).fill('missing source')
     await expect(filters.getByRole('status')).toHaveText(count.replace('Showing 1', 'Showing 0'))
     await filters.getByRole('button', { name: 'Clear filters', exact: true }).click()
-    await expect(filters.getByLabel('Find a source', { exact: true })).toHaveValue('')
+    await expect(filters.getByLabel(label, { exact: true })).toHaveValue('')
     expect(new URL(page.url()).searchParams.has('state')).toBe(false)
   }
   await page.goto('/providers/settings')
@@ -174,7 +181,7 @@ test('source, schedule and remote editors disable no-op saves and clear reverted
   const remote = await (await page.request.get('/api/providers/remote')).json()
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   const dialog = page.getByRole('dialog')
-  const remoteSave = dialog.getByRole('button', { name: 'Save remote', exact: true })
+  const remoteSave = dialog.getByRole('button', { name: 'Save', exact: true })
   await expect(remoteSave).toBeDisabled()
   const remoteName = dialog.getByLabel('Display name', { exact: true })
   await remoteName.fill('Unsaved remote')

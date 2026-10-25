@@ -51,7 +51,7 @@ test('catalog share additional data is opt-in, persisted and safe on mobile', as
         path: join(process.env.QA_DIRECTORY, `catalog-sharing-${width}.png`),
       })
   }
-  await dialog.getByRole('button', { name: 'Create disabled share', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Create share', exact: true }).click()
   await page.getByRole('button', { name: 'I have saved the password', exact: true }).click()
   const saved = (await (await page.request.get('/api/shares')).json()).items
   expect(saved).toHaveLength(1)
@@ -79,11 +79,11 @@ test('catalog share additional data is opt-in, persisted and safe on mobile', as
   ).toBeChecked()
   await dialog.getByRole('button', { name: 'Published fields', exact: true }).click()
   await page.getByRole('menuitem', { name: 'All published fields', exact: true }).click()
-  await expect(dialog.getByRole('button', { name: 'Save permissions', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await dialog.getByRole('switch', { name: 'Audio and video information', exact: true }).uncheck()
-  await expect(dialog.getByRole('button', { name: 'Save permissions', exact: true })).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
   await dialog.getByRole('switch', { name: 'Audio and video information', exact: true }).check()
-  await expect(dialog.getByRole('button', { name: 'Save permissions', exact: true })).toBeDisabled()
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 })
 
 test('remote catalogs request additional data only after an explicit choice', async ({ page }) => {
@@ -141,7 +141,7 @@ test('remote catalogs request additional data only after an explicit choice', as
   await expect(
     edit.getByRole('switch', { name: 'Film and series information', exact: true }),
   ).toBeChecked()
-  await expect(edit.getByRole('button', { name: 'Save remote', exact: true })).toBeDisabled()
+  await expect(edit.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 })
 
 test('catalog detail settings links open the same leaf controls on both sides', async ({

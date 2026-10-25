@@ -1,5 +1,14 @@
 import { serviceNames } from '@/lib/debrid'
-import { ResultCount } from '@/components/common'
+import {
+  ResultCount,
+  ClearFiltersButton,
+  Empty,
+  ErrorNotice,
+  Loading,
+  ListEmpty,
+  PageHeader,
+  Pager,
+} from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
@@ -25,15 +34,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  ClearFiltersButton,
-  Empty,
-  ErrorNotice,
-  Loading,
-  ListEmpty,
-  PageHeader,
-  Pager,
-} from '@/components/common'
 
 const origins = { private: 'Private installation', public: 'Public installation' } as const
 const kinds = { stream: 'Streams', manifest: 'Manifest', playback: 'Playback' } as const
@@ -159,7 +159,7 @@ export function StremioHistoryPage() {
   return (
     <div className="page">
       <form
-        className="toolbar rounded-md border border-border p-4"
+        className="toolbar items-end rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
           filter({ q: String(new FormData(event.currentTarget).get('q') ?? '').trim() })

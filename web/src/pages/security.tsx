@@ -14,7 +14,7 @@ import type {
   SecurityStatus,
 } from '@/lib/security-types'
 import { Switch } from '@/components/ui/switch'
-import SecretsPage from '@/pages/secrets'
+import SecretsPage, { SecretReferencesHelp } from '@/pages/secrets'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -134,13 +134,13 @@ export function SecuritySettingsPage() {
   })
   const revealed = useRef('')
   useEffect(() => {
-    const requested = key + hash
-    if (
-      fetching ||
-      revealed.current === requested ||
-      !['#secrets', '#verification', '#sessions'].includes(hash)
-    )
+    // Filtering a list changes the location key, but must not scroll back to its anchor.
+    const requested = hash
+    if (!['#secrets', '#verification', '#sessions'].includes(hash)) {
+      revealed.current = ''
       return
+    }
+    if (fetching || revealed.current === requested) return
     const frame = requestAnimationFrame(() => {
       document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
       revealed.current = requested
@@ -161,6 +161,7 @@ export function SecuritySettingsPage() {
         </div>
         <AdvancedSettings>
           <RuntimeSettingsPanel section="security" />
+          <SecretReferencesHelp />
         </AdvancedSettings>
       </PageHeaderVisibility.Provider>
     </div>

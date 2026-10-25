@@ -123,11 +123,11 @@ test('a connection setting chooses the existing access and opens its exact filte
   await search.getByRole('option').first().click()
   const choose = page.getByRole('dialog', { name: 'Choose Stremio access', exact: true })
   await choose.getByRole('option', { name: /Living room/ }).click()
-  const editor = page.getByRole('dialog', { name: 'Edit permissions & limits', exact: true })
+  const editor = page.getByRole('dialog', { name: 'Edit access', exact: true })
   await expect(editor.getByLabel('Preferred language', { exact: true })).toBeVisible()
   await expect(editor.getByLabel('Preferred language', { exact: true })).toBeDisabled()
   await expect(editor.getByLabel('Preferred language', { exact: true }).locator('..')).toBeFocused()
-  await expect(editor.getByRole('button', { name: 'Save permissions', exact: true })).toBeDisabled()
+  await expect(editor.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 })
 
 test('settings search remains reachable on narrow screens and does not overflow', async ({
@@ -294,7 +294,7 @@ test('empty connection lists can open a new configuration through search without
   await page.getByRole('combobox', { name: 'Find a setting' }).fill('torznab requests per minute')
   await page.getByRole('option').first().click()
   await page.getByRole('option', { name: 'Create access…', exact: true }).click()
-  const editor = page.getByRole('dialog', { name: 'Create disabled access', exact: true })
+  const editor = page.getByRole('dialog', { name: 'Create access', exact: true })
   await expect(editor.getByLabel('Requests per minute', { exact: true })).toBeFocused()
   expect(writes).toEqual([])
 })

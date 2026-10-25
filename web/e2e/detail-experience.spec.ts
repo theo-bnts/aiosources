@@ -267,7 +267,7 @@ test('sharing forms use common draft feedback and do not write reverted edits', 
   const dialog = page.getByRole('dialog')
   await page.goto('/sharing/settings')
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
-  const shareSave = dialog.getByRole('button', { name: 'Save permissions', exact: true })
+  const shareSave = dialog.getByRole('button', { name: 'Save', exact: true })
   await expect(shareSave).toBeDisabled()
   await dialog.getByLabel('Recipient / share name', { exact: true }).fill('Changed share')
   await expect(shareSave).toBeEnabled()
@@ -278,7 +278,7 @@ test('sharing forms use common draft feedback and do not write reverted edits', 
   await expect(dialog).toBeHidden()
   expect(writes).toBe(0)
   await page.goto('/secrets')
-  const advanced = page.locator('details').filter({ hasText: 'Using references in JSON' })
+  const advanced = page.locator('#secret-reference-help')
   expect(await advanced.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(false)
   await page
     .locator('.page-heading')

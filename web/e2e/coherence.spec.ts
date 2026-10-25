@@ -333,7 +333,7 @@ test.describe('browser local dates', () => {
       '2026-10-25T01:30:10',
     )
     await editor.getByLabel('Recipient / share name', { exact: true }).fill('Expiration renamed')
-    await editor.getByRole('button', { name: 'Save permissions', exact: true }).click()
+    await editor.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(editor).toHaveCount(0)
     const shares = await (await page.request.get('/api/shares')).json()
     expect(shares.items).toHaveLength(1)
