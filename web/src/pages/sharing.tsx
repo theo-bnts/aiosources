@@ -451,9 +451,7 @@ export default function SharingPage({
                     share.requests_per_minute > 0 ||
                     share.max_concurrent_downloads > 0) && (
                     <div>
-                      <dt className="text-muted-foreground">
-                        {connection ? 'Request limits' : 'Download limits'}
-                      </dt>
+                      <dt className="text-muted-foreground">Request limits</dt>
                       <dd className="mt-1">
                         {share.requests_per_minute
                           ? `${share.requests_per_minute} requests per minute`
@@ -980,9 +978,9 @@ function ShareForm({
       {conflict && (
         <div className="notice space-y-3">
           <p>
-            The share changed on the server. Your permission draft is preserved. Reload its current
-            revision, then review before replacing its permissions. Its current enabled state will
-            be kept.
+            This {connection ? 'access' : 'share'} changed on the server. Your settings draft is
+            preserved. Reload its current revision, then review before saving. Its current enabled
+            state will be kept.
           </p>
           <Button type="button" variant="outline" disabled={busy} onClick={() => reload.mutate()}>
             Reload revision, keep draft
@@ -991,7 +989,7 @@ function ShareForm({
       )}
       {reloaded && !conflict && (
         <p className="notice" role="status">
-          Current revision loaded. Review your permission draft before saving.
+          Current revision loaded. Review your settings draft before saving.
         </p>
       )}
       <FormStatus dirty={dirty} saving={save.isPending} />
