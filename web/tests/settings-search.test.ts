@@ -79,7 +79,8 @@ test('entity destinations encode identifiers and keep configuration selection se
   assert.equal(url.pathname, '/providers/archive%20%2F%20one')
   assert.equal(url.searchParams.get('configure'), 'archive / one')
   assert.equal(settingFromHash(url.hash), source)
-  assert.equal(settingURL(source, 'new'), '/providers/new')
+  assert.equal(settingURL(source, 'new', true), '/providers/new')
+  assert.equal(settingURL(source, 'new'), '/providers/id/new?configure=new#setting=source.timeout')
   assert.equal(
     settingURL(settingByID('imports.workers')!),
     '/providers/settings?settings=advanced#setting=imports.workers',

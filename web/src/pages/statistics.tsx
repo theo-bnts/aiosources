@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { api, params, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
+import { sourceSettingsPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
 import type { Controls, Status } from '@/lib/aiosource-types'
@@ -113,11 +114,7 @@ export function SourceStatisticsPage() {
           {visible.map((source) => (
             <section key={source.id} className="section-card">
               <h2 className="section-title">
-                <Link
-                  className="data-link"
-                  to={`/providers/${encodeURIComponent(source.id)}`}
-                  state={listState}
-                >
+                <Link className="data-link" to={sourceSettingsPath(source.id)} state={listState}>
                   {source.name || source.id}
                 </Link>
               </h2>

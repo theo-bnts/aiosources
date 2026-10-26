@@ -21,7 +21,7 @@ import { Link } from 'react-router-dom'
 import { ApiError } from '@/lib/api'
 import { RequestNotices } from '@/lib/request-notices'
 import { messageText, number, statusLabels } from '@/lib/format'
-import { useDetailBackLink } from '@/lib/detail-navigation'
+import { useDetailBackLink, type BackLink } from '@/lib/detail-navigation'
 import type { Run } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,7 +46,7 @@ export function PageHeader({
   title: string
   description?: string
   actions?: ReactNode
-  back?: { to: string; label: string }
+  back?: BackLink
 }) {
   const level = useContext(PageHeadingLevel)
   const visibility = useContext(PageHeaderVisibility)
@@ -59,6 +59,7 @@ export function PageHeader({
       {back && (
         <Link
           to={back.to}
+          state={back.state}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon aria-hidden="true" className="size-4" />

@@ -1,6 +1,7 @@
 import { debridProviders } from './debrid.ts'
 import { runtimeSections, type RuntimeSection } from './runtime-settings-definitions.ts'
 import { importNumberFields } from './import-settings-definitions.ts'
+import { sourceSettingsPath } from './source-navigation.ts'
 
 export type SettingsEntity =
   'source' | 'remote' | 'stremio' | 'torznab' | 'share' | 'proxy' | 'tracker' | 'source-route'
@@ -745,10 +746,10 @@ export function settingFromHash(hash: string) {
     return undefined
   }
 }
-export function settingURL(setting: Setting, entity?: string) {
-  if (setting.entity === 'source' && entity === 'new') return '/providers/new'
+export function settingURL(setting: Setting, entity?: string, create = false) {
+  if (setting.entity === 'source' && create) return '/providers/new'
   let route = setting.route
-  if (setting.entity === 'source' && entity) route = `/providers/${encodeURIComponent(entity)}`
+  if (setting.entity === 'source' && entity) route = sourceSettingsPath(entity)
   const url = new URL(route || '/', 'https://settings.invalid')
   if (setting.entity && entity) url.searchParams.set('configure', entity)
   return url.pathname + url.search + settingsHash(setting.id)

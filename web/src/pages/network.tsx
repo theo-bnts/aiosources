@@ -83,6 +83,11 @@ export function NetworkPage() {
         })
     },
     () => setEditing(null),
+    editing
+      ? editing.settings.proxies.some((proxy) => proxy.id === editing.proxy.id)
+        ? editing.proxy.id
+        : 'new'
+      : null,
   )
   return (
     <div className="page">

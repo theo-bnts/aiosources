@@ -9,6 +9,7 @@ import { publicAPI } from '@/lib/public-credentials'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import { prepareBrowserDownload } from '@/lib/browser-download'
+import { useListViewState } from '@/lib/detail-navigation'
 import type {
   CatalogRelease,
   CatalogSelection,
@@ -43,6 +44,7 @@ export function DownloadAction({
   preparing?: boolean
 }) {
   const visitor = usePublicSearch()
+  const listState = useListViewState()
   const preparation = useRef('')
   const [ready, setReady] = useState<CatalogDownload | null>(null)
   const [waiting, setWaiting] = useState(preparing)
@@ -235,7 +237,7 @@ export function DownloadAction({
         )}
         {!visitor && operation && !operationID && (
           <Button asChild size="sm" variant="ghost">
-            <Link to={`/debrid/history/${encodeURIComponent(operation)}`}>
+            <Link to={`/debrid/history/${encodeURIComponent(operation)}`} state={listState}>
               View operation
               <ArrowRightIcon />
             </Link>

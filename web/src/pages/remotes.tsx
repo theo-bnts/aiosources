@@ -201,6 +201,7 @@ export default function RemotesPage() {
     remotes.data ? (remotes.data.items ?? []) : undefined,
     (remote) => openEditor(remote),
     () => setEditing(null),
+    editing === 'new' ? 'new' : (editing?.id ?? null),
   )
   const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
   const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))

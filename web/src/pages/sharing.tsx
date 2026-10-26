@@ -259,6 +259,7 @@ export default function SharingPage({
     shares.data ? (shares.data.items ?? []) : undefined,
     (share) => openEditor(share),
     () => setEditing(null),
+    editing === 'new' ? 'new' : (editing?.id ?? null),
   )
   const originReady =
     stremio ||

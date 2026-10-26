@@ -60,3 +60,46 @@ test('return links reject external addresses, arbitrary routes and malformed bro
   ])
     assert.equal(detailBackLink(state, fallback), fallback)
 })
+
+test('nested details retain the original filtered view on each return', () => {
+  const history = listViewState({ pathname: '/runs', search: '?provider=example&status=failed' })
+  const run = listViewState(
+    { pathname: '/runs/run-one', search: '?tab=raw&raw_offset=50' },
+    history,
+  )
+  const back = detailBackLink(run, { to: '/runs', label: 'History' })!
+  assert.equal(back.to, '/runs/run-one?tab=raw&raw_offset=50')
+  assert.deepEqual(back.state, history)
+  assert.deepEqual(detailBackLink(back.state, { to: '/runs', label: 'History' }), {
+    to: '/runs?provider=example&status=failed',
+    label: 'Sources history',
+  })
+})
+
+test('download operations can return to releases and then the original title search', () => {
+  const titles = listViewState({ pathname: '/search', search: '?q=example&type=movie&year=2021' })
+  const releases = listViewState(
+    { pathname: '/search/123', search: '?q=example&cached_only=true' },
+    titles,
+  )
+  const back = detailBackLink(releases, { to: '/debrid/history', label: 'History' })!
+  assert.equal(back.to, '/search/123?q=example&cached_only=true')
+  assert.equal(back.label, 'Source releases')
+  assert.deepEqual(back.state, titles)
+})
+
+test('return ancestry copies only valid local views and bounds cyclic browser state', () => {
+  const view = { pathname: '/runs/run-one', search: '?tab=raw', returnView: {} }
+  view.returnView = view
+  let result = detailBackLink({ returnView: view }, { to: '/runs', label: 'History' })!
+  let depth = 0
+  while (result.state) {
+    result = detailBackLink(result.state, { to: '/runs', label: 'History' })!
+    assert.ok(++depth <= 6)
+  }
+  const state = listViewState(
+    { pathname: '/runs/run-one', search: '' },
+    { returnView: { pathname: '//outside.example', search: '' }, credential: 'do-not-copy' },
+  )
+  assert.deepEqual(state, { returnView: { pathname: '/runs/run-one', search: '' } })
+})

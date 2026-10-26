@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { settingFromHash } from './settings-catalog'
+import { isSourceSettingsPath } from './source-navigation'
+import { settingsEditorDestination, settingsEditorNavigationKey } from './settings-editor'
 
 export function useSettingDestination() {
   const location = useLocation()
@@ -9,7 +11,7 @@ export function useSettingDestination() {
   if (setting.public === 'interface') return setting
   const path = setting.route.split('?')[0]
   if (setting.entity === 'source')
-    return /^\/providers\/(?!settings$)[^/]+$/.test(location.pathname) ? setting : undefined
+    return isSourceSettingsPath(location.pathname) ? setting : undefined
   return path === location.pathname ? setting : undefined
 }
 
@@ -20,31 +22,37 @@ export function useSettingsEditor<T extends { id: string }>(
   items: readonly T[] | undefined,
   open: (item: T | 'new') => void,
   close: () => void,
+  currentSelection: string | null,
 ) {
   const setting = useSettingDestination()
   const location = useLocation()
-  const handled = useRef('')
+  const handled = useRef<{ key: string; editor: boolean } | null>(null)
+  const navigationKey = settingsEditorNavigationKey(location)
   const callback = useRef(open)
   callback.current = open
   const closeCallback = useRef(close)
   closeCallback.current = close
   useEffect(() => {
-    if (handled.current === location.key) return
-    if (
-      location.state?.settingsNavigation &&
-      setting?.public !== 'interface' &&
-      setting?.entity !== entity
-    ) {
-      handled.current = location.key
-      closeCallback.current()
+    if (handled.current?.key === navigationKey) return
+    if (setting?.public === 'interface') {
+      handled.current = { key: navigationKey, editor: handled.current?.editor ?? false }
       return
     }
-    if (!items || setting?.entity !== entity) return
-    const selected = new URLSearchParams(location.search).get('configure')
+    const destination = settingsEditorDestination(location)
+    if (destination?.entity !== entity) {
+      const closeEditor = handled.current?.editor || location.state?.settingsNavigation
+      handled.current = { key: navigationKey, editor: false }
+      if (closeEditor) closeCallback.current()
+      return
+    }
+    if (!items) return
+    const selected = destination.id
     const item = selected === 'new' ? 'new' : items.find((item) => item.id === selected)
-    handled.current = location.key
-    if (item) callback.current(item)
-  }, [items, setting, entity, location.key, location.search, location.state])
+    handled.current = { key: navigationKey, editor: true }
+    // Moving to another field must preserve a new connection's temporary ID,
+    // saved revision and draft instead of mounting a fresh form.
+    if (item && selected !== currentSelection) callback.current(item)
+  }, [items, setting, entity, navigationKey, location, currentSelection])
 }
 
 export function revealSettingParents(element: HTMLElement) {

@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useBlocker } from 'react-router-dom'
+import { changesSettingsEditor, type SettingsEditorIdentity } from './settings-editor'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -51,11 +52,18 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   }, [])
   const guard = useMemo(() => ({ register, discard }), [register, discard])
   const blocker = useBlocker(
-    useCallback(
-      ({ currentLocation, nextLocation }) =>
-        entries.current.size > 0 && currentLocation.pathname !== nextLocation.pathname,
-      [],
-    ),
+    useCallback(({ currentLocation, nextLocation }) => {
+      if (!entries.current.size) return false
+      if (currentLocation.pathname !== nextLocation.pathname) return true
+      const editor = document.querySelector<HTMLElement>(
+        '[data-settings-editor]:not([data-settings-editor="source"])',
+      )
+      if (!editor?.dataset.settingsEditor || !editor.dataset.settingsEntity) return false
+      return changesSettingsEditor(currentLocation, nextLocation, {
+        entity: editor.dataset.settingsEditor as SettingsEditorIdentity['entity'],
+        id: editor.dataset.settingsEntity,
+      })
+    }, []),
   )
   const dirty = [...entries.current.values()].filter(
     (entry) => !closing || closing.scope === 'all' || entry.scope === closing.scope,

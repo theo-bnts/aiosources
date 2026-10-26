@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
+import { isSourceSettingsPath } from './source-navigation.ts'
 
 const viewLabels: Record<string, string> = {
   '/': 'Sources',
@@ -18,39 +19,64 @@ const viewLabels: Record<string, string> = {
   '/metadata/history': 'Metadata history',
   '/debrid/history': 'Debrid history',
 }
-type BackLink = { to: string; label: string }
-type ListView = { pathname: string; search: string }
+type ListView = { pathname: string; search: string; returnView?: ListView }
+export type BackLink = { to: string; label: string; state?: { returnView: ListView } }
 
 function viewLabel(pathname: string) {
   if (Object.hasOwn(viewLabels, pathname)) return viewLabels[pathname]
   if (/^\/(?:runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(pathname))
     return 'Processed records'
-  if (/^\/providers\/[A-Za-z0-9_-]{1,128}$/.test(pathname)) return 'Source settings'
+  if (isSourceSettingsPath(pathname)) return 'Source settings'
+  if (/^\/(?:public\/)?search\/[1-9][0-9]{0,15}$/.test(pathname)) return 'Source releases'
   return undefined
 }
 
-export function listViewState(view: ListView) {
-  return viewLabel(view.pathname) ? { returnView: view } : undefined
-}
-
-export function detailBackLink(state: unknown, fallback?: BackLink): BackLink | undefined {
-  if (!fallback || !state || typeof state !== 'object') return fallback
-  const view = (state as { returnView?: Partial<ListView> }).returnView
+function checkedView(value: unknown, depth = 0): ListView | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth >= 6) return undefined
+  const view = value as Partial<ListView>
   if (
-    !view ||
     typeof view.pathname !== 'string' ||
     !viewLabel(view.pathname) ||
     typeof view.search !== 'string' ||
     (view.search !== '' && !view.search.startsWith('?')) ||
     view.search.includes('#')
   )
-    return fallback
-  return { to: view.pathname + view.search, label: viewLabel(view.pathname)! }
+    return undefined
+  const parent = checkedView(view.returnView, depth + 1)
+  return {
+    pathname: view.pathname,
+    search: view.search,
+    ...(parent ? { returnView: parent } : {}),
+  }
+}
+
+function viewFromState(state: unknown, depth = 0) {
+  return state && typeof state === 'object'
+    ? checkedView((state as { returnView?: unknown }).returnView, depth)
+    : undefined
+}
+
+export function listViewState(view: ListView, state?: unknown) {
+  const current = checkedView(view)
+  if (!current) return undefined
+  const parent = viewFromState(state, 1)
+  return { returnView: { ...current, ...(parent ? { returnView: parent } : {}) } }
+}
+
+export function detailBackLink(state: unknown, fallback?: BackLink): BackLink | undefined {
+  if (!fallback) return fallback
+  const view = viewFromState(state)
+  if (!view) return fallback
+  return {
+    to: view.pathname + view.search,
+    label: viewLabel(view.pathname)!,
+    ...(view.returnView ? { state: { returnView: view.returnView } } : {}),
+  }
 }
 
 export function useListViewState() {
-  const { pathname, search } = useLocation()
-  return listViewState({ pathname, search })
+  const { pathname, search, state } = useLocation()
+  return listViewState({ pathname, search }, state)
 }
 
 export function useDetailBackLink(fallback?: BackLink) {

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftIcon, ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api } from '@/lib/api'
+import { randomID } from '@/lib/random-id'
 import { useDiscardChanges } from '@/lib/unsaved-changes'
 import {
   createSettingsIndex,
@@ -144,11 +145,11 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
   useEffect(() => {
     if (results.current) results.current.scrollTop = 0
   }, [query, selected])
-  function go(setting: Setting, entity?: string) {
+  function go(setting: Setting, entity?: string, create = false) {
     const target =
       setting.public === 'interface'
         ? `${location.pathname}${location.search}${settingURL(setting).slice(1)}`
-        : settingURL(setting, entity)
+        : settingURL(setting, entity, create)
     const resetSourceEditor =
       setting.entity === 'source' &&
       Boolean(document.querySelector('[data-settings-editor="source"][data-settings-draft="true"]'))
@@ -160,21 +161,15 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
         state: {
           ...(samePage ? location.state : undefined),
           settingsNavigation: true,
+          settingsNavigationId: randomID(),
           resetSourceEditor,
         },
       })
     }
-    const editor = document.querySelector<HTMLElement>(
-      '[data-settings-editor]:not([data-settings-editor="source"])',
-    )
-    const differentEditor =
-      setting.public !== 'interface' &&
-      editor &&
-      (editor.dataset.settingsEditor !== setting.entity || editor.dataset.settingsEntity !== entity)
-    // React Router guards route changes. Switching editors on the same page needs
-    // the same protection because only query parameters change in that case.
+    // Source drafts can explicitly reset on the same route. Connection editor
+    // changes, including browser history, use the shared navigation guard.
     if (
-      (resetSourceEditor || differentEditor) &&
+      resetSourceEditor &&
       location.pathname === new URL(target, window.location.origin).pathname
     ) {
       // Return to the underlying editor if the user chooses Keep editing.
@@ -187,7 +182,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
     if (selected) {
       const entity = choices[index]
       if (entity) go(selected, entity.id)
-      else if (index === visible.length && canCreate) go(selected, 'new')
+      else if (index === visible.length && canCreate) go(selected, 'new', true)
     } else {
       const setting = matches[index]
       if (!setting) return

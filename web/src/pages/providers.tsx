@@ -13,6 +13,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { sourceSettingsPath } from '@/lib/source-navigation'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
 import {
   PlusIcon,
@@ -204,11 +205,7 @@ function SourceCard({
     <section className="section-card" aria-label={`Source ${name}`}>
       <div className="flex items-start justify-between gap-3">
         <h2 className="section-title min-w-0 flex-1 break-words">
-          <Link
-            className="data-link"
-            to={`/providers/${encodeURIComponent(source.id)}`}
-            state={listState}
-          >
+          <Link className="data-link" to={sourceSettingsPath(source.id)} state={listState}>
             {name}
           </Link>
         </h2>
@@ -228,7 +225,7 @@ function SourceCard({
           <dd className="mt-1">
             <Link
               className="data-link"
-              to={`/providers/${encodeURIComponent(source.id)}#schedules`}
+              to={`${sourceSettingsPath(source.id)}#schedules`}
               state={listState}
             >
               {schedule
@@ -276,7 +273,7 @@ function SourceCard({
           }
         />
         <Button size="sm" variant="outline" asChild>
-          <Link to={`/providers/${encodeURIComponent(source.id)}`} state={listState}>
+          <Link to={sourceSettingsPath(source.id)} state={listState}>
             <PencilSimpleIcon />
             Edit
           </Link>
@@ -542,7 +539,7 @@ function ProviderForm({
       await refreshData()
       markSaved()
       if (!sourceID || result.provider.id !== sourceID)
-        navigate(`/providers/${encodeURIComponent(result.provider.id)}`, {
+        navigate(sourceSettingsPath(result.provider.id), {
           replace: true,
           state: navigationState,
           // Mount the saved editor before the old form can accept another edit.

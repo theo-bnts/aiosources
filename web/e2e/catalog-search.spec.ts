@@ -562,6 +562,7 @@ test('an added file can be followed and downloaded from its original history ope
       }),
     )
     await page.goto(`/search/${ids.movie}?cached_only=false`)
+    const releasesView = page.url()
     await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
     await page.getByRole('link', { name: 'View operation', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`/debrid/history/${operation}$`))
@@ -584,6 +585,8 @@ test('an added file can be followed and downloaded from its original history ope
     expect((await started).suggestedFilename()).toBe('followed.mkv')
     expect(page.context().pages()).toHaveLength(1)
     await expect(page).toHaveURL(new RegExp(`/debrid/history/${operation}$`))
+    await page.getByRole('link', { name: 'Source releases', exact: true }).click()
+    await expect(page).toHaveURL(releasesView)
   } finally {
     await db.end()
   }

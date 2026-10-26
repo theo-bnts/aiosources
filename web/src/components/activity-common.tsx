@@ -2,6 +2,7 @@ import { BugIcon, InfoIcon, WarningIcon, WarningCircleIcon } from '@phosphor-ico
 import { Link } from 'react-router-dom'
 import { activityServices, type ActivityLevel } from '@/lib/activity-types'
 import { useSourceNames } from '@/lib/source-names'
+import { sourceSettingsPath } from '@/lib/source-navigation'
 import { Badge } from '@/components/ui/badge'
 
 export function LevelBadge({ level }: { level: ActivityLevel }) {
@@ -50,7 +51,7 @@ export function ActivityLinks({
         </Link>
       )}
       {provider_id && (
-        <Link className="data-link break-all" to={`/providers/${encodeURIComponent(provider_id)}`}>
+        <Link className="data-link break-all" to={sourceSettingsPath(provider_id)}>
           Source: {sourceName(provider_id)}
         </Link>
       )}

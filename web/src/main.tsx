@@ -210,6 +210,7 @@ const router = createBrowserRouter(
           <Route path="providers" element={<SourceStatisticsPage />} />
           <Route path="providers/settings" element={<ProvidersPage />} />
           <Route path="providers/new" element={<ProviderEditor key="new" />} />
+          <Route path="providers/id/:id" element={<ProviderEditor />} />
           <Route path="providers/:id" element={<ProviderEditor />} />
           <Route path="runs" element={<RunsPage />} />
           <Route path="runs/:id" element={<RunDetailPage />} />

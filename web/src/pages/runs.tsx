@@ -1,4 +1,5 @@
 import { compareListNames, resetListView } from '@/lib/list-view'
+import { sourceSettingsPath } from '@/lib/source-navigation'
 import {
   ResultCount,
   ConfirmAction,
@@ -570,10 +571,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
                   : ' and mode still match. '}
                 Choose Keep paused to require an explicit Resume instead. Otherwise, resolve the
                 blocked run manually.{' '}
-                <Link
-                  className="data-link"
-                  to={`/providers/${encodeURIComponent(run.provider_id)}#schedules`}
-                >
+                <Link className="data-link" to={`${sourceSettingsPath(run.provider_id)}#schedules`}>
                   View source settings
                 </Link>
               </>
