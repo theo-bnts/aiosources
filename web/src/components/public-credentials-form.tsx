@@ -123,13 +123,16 @@ export function PublicCredentialsForm({
                 <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
                 <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                   <Input
+                    key={retained ? 'remembered' : 'new'}
                     id={`public-${provider.id}`}
                     name={provider.id}
                     type="password"
+                    revealLabel={`${provider.name} API key`}
                     autoComplete="off"
                     spellCheck={false}
                     autoCapitalize="off"
                     maxLength={512}
+                    autoFocus={removed.includes(provider.id)}
                     placeholder={
                       retained ? 'Saved on this browser · enter a key to replace it' : undefined
                     }
@@ -140,7 +143,11 @@ export function PublicCredentialsForm({
                       variant="warning"
                       size="sm"
                       className="self-start sm:self-auto"
-                      onClick={() => setRemoved((ids) => [...ids, provider.id])}
+                      onClick={() =>
+                        setRemoved((ids) =>
+                          ids.includes(provider.id) ? ids : [...ids, provider.id],
+                        )
+                      }
                     >
                       Remove key
                     </Button>

@@ -568,6 +568,7 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                 id="security-password"
                 name="password"
                 type="password"
+                revealLabel="current password"
                 autoComplete="current-password"
                 required
                 value={password}

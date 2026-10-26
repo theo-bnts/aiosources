@@ -63,12 +63,12 @@ test('public access preserves the access proxy cookie without an administrator s
     ).toBeVisible()
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await expect(visitor.getByRole('link', { name: 'Admin login', exact: true })).toBeVisible()
-    await visitor.getByLabel('TorBox API key').fill('synthetic-visitor-key')
+    await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-visitor-key')
     await visitor.getByRole('button', { name: 'Create installation link' }).click()
     await expect(visitor.getByLabel('Manifest URL', { exact: true })).toHaveValue(
       `${server.origin}/public/stremio/synthetic-encrypted-link/manifest.json`,
     )
-    await expect(visitor.getByLabel('TorBox API key')).toHaveValue('')
+    await expect(visitor.getByLabel('TorBox API key', { exact: true })).toHaveValue('')
     expect(publicRequests).toContain('/api/public/config')
     expect(publicRequests).toContain('/api/public/install')
     expect(rejected).toBe(0)
@@ -125,8 +125,11 @@ test('public access is opt-in and visitors get a private link without administra
     ).toBeVisible()
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await expect(visitor.getByRole('link', { name: 'Admin login', exact: true })).toBeVisible()
-    await expect(visitor.getByLabel('AllDebrid API key')).toHaveAttribute('type', 'password')
-    const key = visitor.getByLabel('TorBox API key')
+    await expect(visitor.getByLabel('AllDebrid API key', { exact: true })).toHaveAttribute(
+      'type',
+      'password',
+    )
+    const key = visitor.getByLabel('TorBox API key', { exact: true })
     await expect(key).toHaveAttribute('type', 'password')
     await visitor.getByRole('button', { name: 'Create installation link' }).click()
     await expect(visitor.getByRole('alert')).toContainText('Enter at least one service key.')

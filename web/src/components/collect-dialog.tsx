@@ -224,9 +224,9 @@ export function CollectDialog({
               </p>
             ) : !remote && !definition.isError && !metadataSupported ? (
               <p className="help">
-                Fetching source details is unavailable for this source. It requires native
-                HTTP/JSON, ID recovery and configured missing-metadata fields; remote catalogs are
-                not supported.
+                Fetching source details is unavailable for this source. It requires a JSON source,
+                ID recovery and configured missing-metadata fields; remote catalogs are not
+                supported.
               </p>
             ) : null}
           </div>

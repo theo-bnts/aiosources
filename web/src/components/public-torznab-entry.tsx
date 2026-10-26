@@ -192,17 +192,36 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
             <Input
               id="public-torznab-key"
               type="password"
+              revealLabel="API key"
               autoComplete="off"
               readOnly
               value={credential}
             />
-            <CopyButton value={credential} label="Copy API key" />
+            <CopyButton
+              value={credential}
+              label="Copy API key"
+              manualCopyMessage="Clipboard access is unavailable. Reveal the API key and copy it manually."
+              successMessage="Copied to your clipboard. Keep it private."
+            />
           </div>
           <Disclosure title="Full endpoint URL">
             <div className="field">
               <Label htmlFor="public-torznab-full">Endpoint URL</Label>
-              <Input id="public-torznab-full" readOnly value={full} />
-              <CopyButton value={full} label="Copy endpoint URL" />
+              <Input
+                id="public-torznab-full"
+                type="password"
+                revealLabel="endpoint URL"
+                autoComplete="off"
+                spellCheck={false}
+                readOnly
+                value={full}
+              />
+              <CopyButton
+                value={full}
+                label="Copy endpoint URL"
+                manualCopyMessage="Clipboard access is unavailable. Reveal the endpoint URL and copy it manually."
+                successMessage="Copied to your clipboard. Keep it private."
+              />
             </div>
           </Disclosure>
         </section>

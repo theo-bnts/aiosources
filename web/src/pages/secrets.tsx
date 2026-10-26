@@ -272,6 +272,7 @@ export default function SecretsPage() {
               <Input
                 id="secret-value"
                 type="password"
+                revealLabel={editing?.rotate ? 'new secret value' : 'secret value'}
                 required
                 value={value}
                 disabled={busy}

@@ -154,6 +154,7 @@ export function SecretPicker({
                 <Input
                   id={`${id}-value`}
                   type="password"
+                  revealLabel={valueLabel}
                   required
                   value={secretValue}
                   disabled={save.isPending}

@@ -325,9 +325,12 @@ SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title
     }
     await page.goto(`/raw?run=${run.id}`)
     await expect(
-      page.getByText('1 errors · 0 ignored · 0 enrichment · 1 accepted', { exact: false }),
+      page.getByText('1 error · 0 ignored · 0 enrichment · 1 accepted', { exact: false }),
     ).toBeVisible()
-    await page.getByLabel('Processing result', { exact: true }).selectOption('error')
+    await page
+      .getByRole('form', { name: 'Processed record filters', exact: true })
+      .getByLabel('Processing result', { exact: true })
+      .selectOption('error')
     await expect(page.getByRole('link', { name: 'Rejected sample', exact: true })).toBeVisible()
     await expect(page.getByText('Missing source identifier', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Rejected sample', exact: true }).click()

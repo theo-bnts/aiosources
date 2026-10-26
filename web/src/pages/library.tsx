@@ -10,7 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, ApiError, AUTO_REFRESH_INTERVAL, downloadBytes, params, rawPage } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
-import type { Items, Page, ProviderSummary, RawDetail, RawRecord, Torrent } from '@/lib/types'
+import type { Page, RawDetail, RawRecord, Torrent } from '@/lib/types'
 import { messageText, useDate, number } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
@@ -18,6 +18,7 @@ import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Disclosure } from '@/components/ui/disclosure'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
@@ -42,93 +43,63 @@ import { OccurrenceDialog, TorrentTable } from '@/components/torrent-history'
 import { readTorrentFilters, torrentFilterParams, type TorrentFilters } from '@/lib/search-types'
 import { decodeSearchJSON, exactField, exactJSON } from '@/lib/search-json'
 
-function BrowseFilters({
-  provider,
+function ProcessedRecordFilters({
   q,
+  processing,
   onFilter,
+  onProcessingChange,
   onClear,
-  hideProvider = false,
 }: {
-  provider: string
   q: string
-  onFilter: (provider: string, q: string) => void
+  processing: string
+  onFilter: (q: string) => void
+  onProcessingChange: (value: string) => void
   onClear: () => void
-  hideProvider?: boolean
 }) {
-  const form = useRef<HTMLFormElement>(null)
-  const providers = useQuery({
-    queryKey: ['providers'],
-    queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
-    enabled: !hideProvider,
-  })
   return (
-    <div className="space-y-3">
-      <form
-        ref={form}
-        className="toolbar rounded-md border border-border p-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          const values = new FormData(event.currentTarget)
-          onFilter(String(values.get('provider') ?? provider), String(values.get('q') ?? '').trim())
-        }}
-      >
-        <div className="relative min-w-48 flex-1 sm:max-w-md">
-          <Label htmlFor={hideProvider ? 'raw-search' : 'library-search'} className="sr-only">
-            Search
-          </Label>
-          <MagnifyingGlassIcon
-            className="pointer-events-none absolute left-3 top-2.5 text-muted-foreground"
-            size={16}
-          />
-          <Input
-            key={q}
-            id={hideProvider ? 'raw-search' : 'library-search'}
-            name="q"
-            defaultValue={q}
-            placeholder="Search data…"
-            className="pl-9"
-          />
+    <form
+      className="space-y-4 rounded-md border border-border p-4"
+      aria-label="Processed record filters"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onFilter(String(new FormData(event.currentTarget).get('q') ?? '').trim())
+      }}
+    >
+      <div className="field">
+        <Label htmlFor="raw-search">Search text</Label>
+        <Input
+          key={q}
+          id="raw-search"
+          name="q"
+          defaultValue={q}
+          placeholder="Search record data…"
+        />
+      </div>
+      <Disclosure title="Filters" open>
+        <div className="field max-w-sm">
+          <Label htmlFor="run-raw-processing">Processing result</Label>
+          <select
+            id="run-raw-processing"
+            className="native-select w-full"
+            value={processing}
+            onChange={(event) => onProcessingChange(event.target.value)}
+          >
+            <option value="">All results</option>
+            <option value="error">Errors</option>
+            <option value="ignored">Ignored</option>
+            <option value="enrichment">Enrichment</option>
+            <option value="accepted">Accepted</option>
+          </select>
         </div>
-        {!hideProvider && (
-          <>
-            <Label htmlFor="library-provider" className="sr-only">
-              Source
-            </Label>
-            <select
-              id="library-provider"
-              name="provider"
-              className="native-select min-w-44"
-              key={provider}
-              defaultValue={provider}
-            >
-              <option value="">All sources</option>
-              {provider && (
-                <option value={provider}>
-                  {providers.data?.items?.find((item) => item.id === provider)?.name || provider}
-                </option>
-              )}
-              {providers.data?.items?.map((item) =>
-                item.id === provider ? null : (
-                  <option key={item.id} value={item.id}>
-                    {item.name || item.id}
-                  </option>
-                ),
-              )}
-            </select>
-          </>
-        )}
-        <Button id={hideProvider ? 'raw-submit' : 'library-submit'} variant="outline" type="submit">
+      </Disclosure>
+      <div className="flex flex-wrap gap-2">
+        <Button id="raw-submit" type="submit">
+          <MagnifyingGlassIcon />
           Search
         </Button>
-        <ClearFiltersButton
-          onClear={() => {
-            form.current?.reset()
-            onClear()
-          }}
-        />
-      </form>
-      <ErrorNotice error={providers.error} retry={() => void providers.refetch()} />
-    </div>
+        <ClearFiltersButton onClear={onClear} />
+      </div>
+    </form>
   )
 }
 
@@ -287,17 +258,21 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
   })
   return (
     <div className="space-y-5">
-      <BrowseFilters
-        provider=""
+      <ProcessedRecordFilters
         q={q}
-        hideProvider
+        processing={processing}
         onClear={() =>
           setSearch(resetListView(search, [qKey, statusKey], offsetKey), { flushSync: true })
         }
-        onFilter={(_provider, nextQ) => {
+        onFilter={(nextQ) => {
           const next = new URLSearchParams(search)
           next.delete(offsetKey)
           nextQ ? next.set(qKey, nextQ) : next.delete(qKey)
+          setSearch(next, { flushSync: true })
+        }}
+        onProcessingChange={(value) => {
+          const next = resetListView(search, [], offsetKey)
+          value ? next.set(statusKey, value) : next.delete(statusKey)
           setSearch(next, { flushSync: true })
         }}
       />
@@ -308,32 +283,13 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
             errors remain in Events, and imported torrents remain in Search.
           </p>
         )}
-        <div className="field max-w-sm">
-          <Label htmlFor={runId ? 'run-raw-processing' : 'raw-processing'}>Processing result</Label>
-          <select
-            id={runId ? 'run-raw-processing' : 'raw-processing'}
-            className="native-select"
-            value={processing}
-            onChange={(event) => {
-              const next = new URLSearchParams(search)
-              next.delete(offsetKey)
-              event.target.value ? next.set(statusKey, event.target.value) : next.delete(statusKey)
-              setSearch(next)
-            }}
-          >
-            <option value="">All results</option>
-            <option value="error">Errors</option>
-            <option value="ignored">Ignored</option>
-            <option value="enrichment">Enrichment</option>
-            <option value="accepted">Accepted</option>
-          </select>
-        </div>
         {records.data?.counts && !compact && (
           <p className="help" role="status">
-            {number(records.data.counts.error)} errors · {number(records.data.counts.ignored)}{' '}
-            ignored · {number(records.data.counts.enrichment)} enrichment ·{' '}
-            {number(records.data.counts.accepted)} accepted across the current source, import and
-            text filters.
+            {number(records.data.counts.error)}{' '}
+            {records.data.counts.error === 1 ? 'error' : 'errors'} ·{' '}
+            {number(records.data.counts.ignored)} ignored · {number(records.data.counts.enrichment)}{' '}
+            enrichment · {number(records.data.counts.accepted)} accepted across the current source,
+            import and text filters.
           </p>
         )}
         <p className="help">

@@ -170,13 +170,27 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
         <section className="section-card">
           <div className="field">
             <Label htmlFor="public-manifest">Manifest URL</Label>
-            <Input id="public-manifest" value={manifest} readOnly />
+            <Input
+              id="public-manifest"
+              value={manifest}
+              type="password"
+              revealLabel="manifest URL"
+              autoComplete="off"
+              spellCheck={false}
+              readOnly
+            />
           </div>
           <p className="help">
             This encrypted link gives access to your service configuration. Keep it private.
           </p>
           <div className="flex flex-wrap gap-3">
-            <CopyButton value={manifest} label="Copy manifest URL" variant="default" />
+            <CopyButton
+              value={manifest}
+              label="Copy manifest URL"
+              variant="default"
+              manualCopyMessage="Clipboard access is unavailable. Reveal the manifest URL and copy it manually."
+              successMessage="Copied to your clipboard. Keep it private."
+            />
             <Button variant="outline" asChild>
               <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
             </Button>

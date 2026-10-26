@@ -58,7 +58,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(
       'Connections',
     )
-    await expect(visitor.getByLabel('TorBox API key')).toBeVisible()
+    await expect(visitor.getByLabel('TorBox API key', { exact: true })).toBeVisible()
     await navigation.getByRole('link', { name: 'Torznab', exact: true }).click()
     await expect(
       visitor.getByRole('heading', { name: 'Torznab', exact: true, level: 1 }),
@@ -99,7 +99,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await announceField.fill(own)
     await announceField
       .locator('..')
-      .getByRole('button', { name: 'Reveal password', exact: true })
+      .getByRole('button', { name: 'Reveal Example Library announce URL', exact: true })
       .click()
     await expect(announceField).toHaveAttribute('type', 'text')
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
@@ -136,7 +136,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     ).toBeVisible()
     await visitor.locator('summary', { hasText: 'Advanced' }).click()
     await expect(announceField).toHaveAttribute('placeholder', /Saved on this browser/)
-    await expect(visitor.getByLabel('TorBox API key')).toHaveValue('')
+    await expect(visitor.getByLabel('TorBox API key', { exact: true })).toHaveValue('')
     await navigation.getByRole('link', { name: 'Torznab', exact: true }).click()
     await expect(
       visitor.getByRole('button', { name: 'Create connection link', exact: true }),

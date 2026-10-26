@@ -51,9 +51,11 @@ export function PublicAnnounceFields({
             <Label htmlFor={`public-announce-${source.id}`}>{source.name} announce URL</Label>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
               <Input
+                key={retained ? 'remembered' : 'new'}
                 id={`public-announce-${source.id}`}
                 name={`announce:${source.id}`}
                 type="password"
+                revealLabel={`${source.name} announce URL`}
                 autoComplete="off"
                 spellCheck={false}
                 autoCapitalize="off"
@@ -64,6 +66,7 @@ export function PublicAnnounceFields({
                 }
                 maxLength={8192}
                 disabled={pending}
+                autoFocus={removed.includes(source.id)}
               />
               {retained && (
                 <Button
@@ -72,7 +75,9 @@ export function PublicAnnounceFields({
                   size="sm"
                   className="self-start sm:self-auto"
                   disabled={pending}
-                  onClick={() => setRemoved((ids) => [...ids, source.id])}
+                  onClick={() =>
+                    setRemoved((ids) => (ids.includes(source.id) ? ids : [...ids, source.id]))
+                  }
                 >
                   Remove announce
                 </Button>

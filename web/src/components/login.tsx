@@ -77,6 +77,7 @@ export function Login() {
               id="password"
               name="password"
               type="password"
+              revealLabel="administrator password"
               autoComplete="current-password"
               autoFocus
               required

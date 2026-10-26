@@ -85,14 +85,14 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     await visitor.locator('summary', { hasText: 'Advanced' }).click()
     await expect(announce).toHaveAttribute('type', 'password')
     await expect(announce).toHaveAttribute('autocomplete', 'off')
-    await visitor.getByLabel('TorBox API key').fill('synthetic-visitor-key')
+    await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-visitor-key')
     await announce.fill(ownAnnounce)
     await visitor.getByRole('button', { name: 'Create installation link' }).click()
     await expect(visitor.getByLabel('Manifest URL', { exact: true })).toHaveValue(
       `${server.origin}/public/stremio/encrypted-own-configuration/manifest.json`,
     )
     await expect(announce).toHaveValue('')
-    await expect(visitor.getByLabel('TorBox API key')).toHaveValue('')
+    await expect(visitor.getByLabel('TorBox API key', { exact: true })).toHaveValue('')
     expect(submissions).toBe(1)
     const stored = await visitor.evaluate(() => JSON.stringify([localStorage, sessionStorage]))
     expect(stored.includes('visitor-private-passkey')).toBe(false)

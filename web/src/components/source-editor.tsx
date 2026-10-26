@@ -812,7 +812,7 @@ function TraversalSettings() {
               help={
                 metadataSupported
                   ? 'Off by default. After a successful Incremental or its initial Full, queue a separate Metadata run only for newly inserted native torrents still missing configured fields. Existing torrents are excluded; no eligible new torrents means no follow-up.'
-                  : 'Unavailable: requires native HTTP/JSON, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
+                  : 'Unavailable: requires a JSON source, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
               }
             />
           </AdvancedSection>
