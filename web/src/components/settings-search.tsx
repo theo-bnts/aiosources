@@ -180,9 +180,9 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
   }
   function choose(index: number) {
     if (selected) {
-      const entity = choices[index]
-      if (entity) go(selected, entity.id)
-      else if (index === visible.length && canCreate) go(selected, 'new', true)
+      const entity = visible[index]
+      if (index === visible.length && canCreate) go(selected, 'new', true)
+      else if (entity) go(selected, entity.id)
     } else {
       const setting = matches[index]
       if (!setting) return

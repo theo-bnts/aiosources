@@ -2,6 +2,44 @@ import { test, expect } from './fixtures'
 
 const proxyAddress = 'socks5://gateway.example:1080'
 
+test('creating an access from a long settings list never opens an existing hidden access', async ({
+  page,
+}) => {
+  const session = await (await page.request.get('/api/session')).json()
+  for (let index = 1; index <= 51; index++) {
+    const response = await page.request.post('/api/stremio/connections', {
+      headers: { 'X-CSRF-Token': session.csrf_token },
+      data: {
+        name: `Example access ${String(index).padStart(2, '0')}`,
+        enabled: false,
+        scope: 'all',
+        fields: ['title', 'info_hash'],
+        stream_preferences: { mode: 'all', language: '' },
+      },
+    })
+    expect(response.status()).toBe(201)
+  }
+  await page.goto('/addon/settings')
+  for (const keyboard of [false, true]) {
+    await page.getByRole('button', { name: 'Search settings', exact: true }).click()
+    const search = page.getByRole('dialog', { name: 'Search settings', exact: true })
+    await expect(search.getByRole('combobox')).toBeFocused()
+    await search.getByRole('combobox').fill('stremio access name')
+    await expect(search.getByRole('option').first()).toContainText('Access name')
+    await search.getByRole('option').first().click()
+    const choices = page.getByRole('dialog', { name: 'Choose Stremio access', exact: true })
+    await expect(choices.getByRole('option')).toHaveCount(51)
+    await expect(choices.getByText('51 configurations · 50 shown', { exact: true })).toBeVisible()
+    if (keyboard) {
+      await choices.getByRole('combobox').press('ArrowUp')
+      await choices.getByRole('combobox').press('Enter')
+    } else await choices.getByRole('option', { name: 'Create access…', exact: true }).click()
+    const editor = page.getByRole('dialog', { name: 'Create access', exact: true })
+    await expect(editor.getByLabel('Access name', { exact: true })).toHaveValue('')
+    await editor.getByRole('button', { name: 'Close', exact: true }).click()
+  }
+})
+
 test.beforeEach(async ({ page }) => {
   const session = await (await page.request.get('/api/session')).json()
   const network = await (await page.request.get('/api/settings/network')).json()
