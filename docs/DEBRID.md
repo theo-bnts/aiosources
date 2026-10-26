@@ -1,40 +1,47 @@
-# Debrid playback
+# Debrid services and downloads
 
-Add your service key in **Debrid → Settings**, choose its encrypted secret reference, then save. You can configure several services and select different ones for each Stremio or Torznab connection. The service lists use alphabetical order throughout the interface.
+[Back to README](../README.md) · [Public instances](PUBLIC_INSTANCES.md)
 
-| Service | Availability shown before playback | Important behavior |
-| --- | --- | --- |
-| AllDebrid | Verified cache observations, with recoverable checks through the administrator's configured account | Checks may create temporary entries. Only entries confirmed as created by AIOSources are eligible for automatic cleanup. |
-| Debrid-Link | Files verified ready after submitting a bare hash | The official API accepts hashes only when cached. A check may add a ready account item. An unsuccessful check remains unknown. |
-| Deepbrid | Ready files from an earlier preparation | No documented global hash-cache check exists. Preparing a new download requires permission to download that source. |
-| Premiumize | Its global cache check and cached file list | Cached playback does not create a cloud transfer. An explicit **Add to debrid** action can create an uncached transfer. |
-| Real-Debrid | Ready files already in your account | The current documented API does not provide global instant availability. Missing account entries remain unknown. |
-| TorBox | Its global cache check and file list | Cached-only preparation uses the provider's cached-only creation option. |
+A debrid service can prepare a torrent and provide a playable or downloadable file through your account. AIOSources supports **AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox**.
 
-## Search, watch and download
+## Add your account
 
-**Search** starts with **Cached results only** enabled. Turn it off to see versions that need preparation or whose cache cannot be checked. **Unknown** means the service has not supplied sufficient evidence; it does not mean that the torrent is absent from its cache.
+1. Open **Debrid → Settings** and choose the service.
+2. Add its API key through **Secrets**, select that secret and save.
+3. Choose your availability-check and cleanup preferences. Less common options are in **Advanced**.
+4. Select the services you want when creating a Stremio or Torznab connection. You can use several services together.
 
-Choose **Download** for a ready file, or **Add to debrid** to authorize preparation. Follow a pending operation in **Debrid → History**. A readiness check reuses the same transfer; it does not silently recreate one that you deleted. Account changes, modified source records and expired preparation links require a new explicit action.
+Only configured services appear as download choices for the administrator. Public visitors use their own keys. Use accounts and access methods permitted by each service.
 
-The selected video must match the requested episode. Samples, ambiguous episodes and archives that cannot be resolved into named video files are not substituted for a playable file. Deepbrid's multi-file playback depends on the file metadata its link generator supplies; a ZIP or an unnamed file is rejected rather than guessed.
+## Understand availability
 
-Private-source uncached downloads require the appropriate announce URL. A source marked private without an announce stays cached-only. Visitors can supply their own announce only when the administrator permits it; the administrator's announces are never used for their downloads.
+| Status | Meaning |
+| --- | --- |
+| Cached | The service has a usable cached-availability observation for this release. |
+| Not cached | The service confirmed that it was not cached when checked. |
+| Unknown | It has not been checked, the service could not verify it, or the observation is no longer current. |
 
-Stremio playback uses the same connection links and file metadata for all six services. [AIOStreams currently recognizes](https://github.com/Viren070/AIOStreams/blob/main/packages/core/src/utils/constants.ts) five of them as named debrid services; Deepbrid playback remains an ordinary HTTP stream, without AIOStreams-specific Deepbrid service filters. AIOSources does not mislabel it as another service.
+Services do not all expose the same availability information:
 
-Audio languages use full names and flags so short codes are not confused with service names. Source names remain in the description and structured indexer hint. AIOSources omits an unknown cache flag; AIOStreams currently uses a binary cache flag and can display that unknown state as uncached.
+- **AllDebrid, Debrid-Link, Premiumize and TorBox** can provide reusable cached observations through their supported checks. Some checks can add an item to your account.
+- **Deepbrid and Real-Debrid** rely on ready files already prepared in your account when a global cache check is unavailable. An absent account item remains **Unknown**.
 
-## Shared availability and privacy
+Availability can change. A file removed from an account or no longer available may need preparation again. Errors and account limits are shown in the operation history; unknown results are not presented as verified cache misses.
 
-Only verified, reusable provider-wide observations enter the shared cache. Account inventories, object IDs, account file links and credentials are not promoted into that cache. Torznab's cache filters read shared observations; they do not query a recipient's personal account. Real-Debrid and Deepbrid therefore cannot provide a complete global cache list through those filters.
+## Download or prepare a release
 
-Administrator transfer references can be retained for seven days to avoid duplicate preparation and support readiness checks after a restart. Visitor references remain in bounded, short-lived memory or encrypted continuation links, without visitor keys or announces being saved to PostgreSQL. Histories retain the service, safe steps and fixed error categories, never upstream response bodies or credential-bearing URLs.
+In **Search**, open a title and choose a release. **Download** starts a ready file in your browser. **Add to debrid** starts preparation; use **View operation** to follow it in **Debrid → History** and download when ready.
 
-Authentication failures, expired subscriptions, rate limits, full accounts, oversized torrents, unavailable services and missing items use the application's common error handling. Provider failures do not manufacture negative cache results or authorize another download.
+Browser downloads pass through your AIOSources instance without being saved to its disk. Stremio and compatible players open the supplied playback link themselves. Your service's bandwidth and account limits still apply.
 
-## Verification and provider documentation
+An uncached private-source release requires an announce URL authorized for that account. Public visitors cannot use the administrator's announce URL. [Visitor announce URLs](PUBLIC_INSTANCES.md#private-sources) are optional and controlled by the administrator.
 
-Protocol and integration tests cover success, pending and deleted transfers, credential errors, account quotas, malformed responses, episode selection, private-source restrictions and credential isolation. The new adapters are verified against documented response contracts with simulated provider servers; paid-account delivery cannot be confirmed without real accounts.
+## Control checks and cleanup
 
-Official references: [AllDebrid](https://docs.alldebrid.com/), [Debrid-Link](https://debrid-link.com/api_doc/v2/seedbox-add), [Deepbrid](https://www.deepbrid.com/api-docs/), [Premiumize](https://www.premiumize.me/api), [Real-Debrid](https://api.real-debrid.com/), [TorBox](https://api-docs.torbox.app/).
+Connection **Filters** can restrict results to cached files or set result and cache-check limits. With a maximum cached-results target, existing local observations are reused; new checks stop after reaching the target. Unchecked releases remain **Unknown**. These settings do not guarantee that a provider will return a particular number of files.
+
+**Stream response timeout** controls how long to wait for availability results. Leave it empty to use **Instance default**, which is five seconds on a new instance, or set a different value for that connection.
+
+AIOSources cleans up only temporary items it can confirm it created and that are eligible under your cleanup settings. It does not remove unrelated personal library items. Use **Debrid → Statistics** and **History** to review availability, preparation and cleanup.
+
+If a service blocks your server's address, configure an existing WARP or compatible outgoing proxy in [Network](NETWORK.md).

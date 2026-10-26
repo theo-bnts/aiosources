@@ -210,9 +210,11 @@ func TestStremioAuthenticationCORSAndInstallation(t *testing.T) {
 	}
 	var m struct {
 		ID        string
+		Logo      string
+		Version   string
 		Resources []any
 	}
-	if json.Unmarshal(manifest.Body.Bytes(), &m) != nil || !strings.HasPrefix(m.ID, "org.aiosource.v2.connection.") || len(m.Resources) != 1 {
+	if json.Unmarshal(manifest.Body.Bytes(), &m) != nil || !strings.HasPrefix(m.ID, "org.aiosource.v2.connection.") || len(m.Resources) != 1 || m.Logo != aiosource.LogoURL || m.Version != aiosource.Version {
 		t.Fatal("invalid manifest")
 	}
 	if response := f.request("GET", "/stremio/invalid/manifest.json", "", false, ""); response.Code != 401 {

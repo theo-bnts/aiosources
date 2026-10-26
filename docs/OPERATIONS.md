@@ -1,244 +1,64 @@
-# Using and maintaining your instance
+# Search, history and maintenance
 
-[Back to README](../README.md) · [Source configuration](CONFIGURATION.md) · [Restarts and temporary failures](RESTART_SAFETY.md)
-
-Use this guide to review results, follow imports and understand storage. Advanced recovery and publication details follow the everyday controls.
+[Back to README](../README.md) · [Sources](CONFIGURATION.md) · [Debrid](DEBRID.md)
 
 ## Find the right page
 
-| I want to… | Open |
+| Page | Use it to |
 | --- | --- |
-| Find a film or series and compare versions | **Search** |
-| Find a particular imported torrent or hash | **Sources → Torrents** |
-| Correct an uncertain film or series match | **Metadata → Identification** |
-| Follow a source import | **Sources → History**, then open its run |
-| Follow a shared catalog import | **Sources → Remote catalogs → History** |
-| See what Stremio received | **Connections → Stremio → History** |
-| Follow download preparation | **Debrid → History** |
-| Explain a failed operation | **Administration → Logs** |
-| Find what uses disk space | **Administration → Storage → Statistics** |
+| Search | Find identified films and series, choose an episode and compare releases. |
+| Torrents | Search records directly as imported from your sources or remote catalogs. |
+| Identification | Find unrecognized or uncertain records and choose the correct film or series. |
+| Sources | Add sources, schedule imports and inspect their history. |
+| Metadata | Update film and series information and control automatic identification. |
+| Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
+| Connections | Create Stremio or Torznab access and share catalogs. |
+| Administration | Manage security, network, public access, storage and Logs. |
 
-## Identification review and Stremio requests
+The settings search stays available on desktop and mobile. Select a result to open the relevant control, including a section inside **Advanced**.
 
-**Metadata → Identification** lists imported torrents and their current decisions. Its main search accepts the same title fragments, source IDs, info hashes and punctuation variants as **Torrents**. Open **Review** to search the downloaded film and series information by partial title or IMDb/TMDB/TVDB identifier, choose an entry, then confirm. Optional episode correction is folded separately. Reviews apply to one source occurrence and leave imported fields untouched. Source identity evidence (title, hash, identifiers and numbering) is fenced separately from ancillary fields; changed evidence requires another review, while ordinary metadata updates and ancillary changes retain the choice. Concurrent source, work or review changes reject the write. **Use automatic matching** removes the manual choice and queues normal identification. Resetting matches or metadata retains reviews; an unavailable reviewed work cannot be published until its information becomes available again. Reviews are included in database backups.
+## Search and choose a release
 
-The matching upgrade reconsiders previous misses and affected numbering decisions once. Existing manual reviews remain active. The temporary increase in awaiting-identification counts represents queued review of existing records, without recollecting sources. Series identification uses source numbering and verified season/episode dates, including seasons that span two calendar years. Contradictory evidence remains rejected. Explicit multi-season packs can serve their declared seasons, but playback still requires a unique video matching the requested episode.
+Search uses your imported information, including local titles and aliases. It does not contact TMDB or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
 
-**Stremio → Statistics / Settings / History** separates installation from usage. Each authorized stream lookup records its resource, preparation time, matched records, eligible torrents, exclusions and returned result count. Request details retain the returned names, titles, source identities, services, cache states, filenames and sizes. Playback URLs, magnets, installation tokens, credentials, announce addresses and request headers are never recorded. History is bounded to 10,000 requests within the configured history retention period (seven days by default); very large responses retain the first 1,000 display summaries and their complete returned count. Database failures in history recording do not change the addon response; a fixed diagnostic is written to the server log.
+Use type and year filters to narrow titles. A series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
 
-## Console navigation
+Sorting can prioritize cached status, language, size, publication date, age, name or source. Several priorities apply in order. Optional language and cached-only filters restrict what is shown; leave them off to see all permitted results. Cache checks and downloads may still contact your debrid service.
 
-Sources groups Sources, Remote catalogs and Torrents. Metadata groups Metadata and Identification. Debrid and Search are independent entries, with Search immediately above Connections. Connections groups Stremio, Torznab and Shared catalogs. Administration groups Security, Network, Public access, Storage and Logs. Network expands into Incoming and Outgoing; Outgoing contains Proxies and Routing. Public access contains Settings and Request limits.
+**Download** opens a ready file in your browser. **Add to debrid** starts preparation, with **View operation** linking to its progress in Debrid history.
 
-| Page | Views |
+## Review identification
+
+In **Identification**, search for a record or filter its status. Open **Review**, check the suggested title and year, then choose the correct result. You can edit the title and year search if the release name is unusual.
+
+Manual decisions take priority over automatic suggestions. An uncertain match is kept for review instead of being silently accepted. Season and episode information affects which releases appear for a selected episode.
+
+## History and troubleshooting
+
+Histories show recent activity first. Open a run or operation to see its related events and details. Use **First**, **Previous**, **Next** and **Latest** to navigate longer lists.
+
+| What you see | What to do |
 | --- | --- |
-| Sources | Statistics / Settings / History |
-| Torrents | Individual imported records and filters |
-| Metadata | Statistics / Settings / History |
-| Identification | Review individual torrent decisions |
-| Debrid | Statistics / Settings / History |
-| Search | Clean film and series titles, source versions and downloads |
-| Stremio | Statistics / Settings / History |
-| Torznab | Saved endpoint access and filters |
-| Shared catalogs | Statistics / Settings for access granted to other instances |
-| Remote catalogs | Statistics / Settings / History for imported catalogs |
-| Public access | Settings for Search and connections / Request limits |
-| Security | Statistics / Settings (secrets, two-step verification and sessions) |
-| Network | Incoming → Trusted proxy; Outgoing → Proxies / Routing |
-| Storage | Statistics / Settings (data retention and maintenance) |
-| Logs | Service activity and alerts; optional Debug |
+| Queued | Wait for an available import slot. |
+| Running | Follow its progress; another scheduled run cannot use the same source at once. |
+| Paused by a page or time budget | Resume it, adjust the limit or wait for an eligible scheduled continuation. |
+| Rate limit / HTTP 429 | Respect the retry time and review request spacing or quotas. |
+| Authentication error | Check the selected secret and the account's permissions. |
+| Response could not be processed | Check whether the source returned the expected listing, rather than an error or login page. |
+| Advertised total changed | Review the source's pagination policy. A changing catalog may need a less strict total policy; do not assume a rejected page completed the import. |
 
-**Sources → History** follows active and past source imports, previews and source-detail updates. Open a specific run, then **Processed records**, to inspect its accepted, ignored and rejected records. There is no global observation browser. **Metadata → History** follows information updates and torrent identification; **Debrid → History** follows cache verification and temporary magnet cleanup. **Logs** contains activity and alerts from all services.
+Historical error counts include earlier attempts and do not necessarily mean the current attempt is unhealthy. Saving a changed definition does not alter a running import; a new run uses the new settings.
 
-**Sources** groups source setup, imported torrents and import monitoring. **Sources → Remote catalogs** manages imported catalogues and their simple synchronization intervals. Native source schedules are the sixth settings section in each source editor, after Source fields and Imports. Source cards show their schedule, latest run and next eligible attempt; active imports omit the next attempt. **Torrents** searches the local published records, with record details, provenance and history; it does not contact trackers. **Metadata** contains film/series information and local identification, including IMDb matching. Run-scoped processing details belong to Sources; film and series decisions have their own **Metadata → Identification** page.
+**Logs** groups application activity and failures. Request histories show what the addon returned and the calls made during an operation without saving visitor credentials. When reporting a problem, include the version and relevant error text, with private data removed.
 
-**Sources → Statistics** and **Remote catalogs** show each source's **Imported torrents**, **Identified**, **Not identified**, **Needs review** and **Awaiting identification** counts. Imported torrents counts distinct currently published source IDs, including separate IDs with the same info hash. The four identification counts sum to that total and use the same freshness rules as Metadata: queued, changed or obsolete matches are pending. Click a number to open Torrents or **Metadata → Identification** filtered to that source and result. Counts refresh every 15 seconds while the page is open; unavailable counts are reported instead of displaying a false zero.
+## Storage and retention
 
-**Awaiting import completion** links to the current Full import or remote sync, or its latest incomplete attempt. A resumed older import takes priority while queued or running. Its retained non-deleted records may include updates to existing torrents, so this count is kept separate from the imported total. Paused and failed progress remains visible; Preview and older completed/cancelled or superseded attempts do not inflate the current counts.
+**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film and series information and shared caches are counted separately.
 
-**Connections** groups Stremio installation, Torznab endpoints, catalog access granted to others and public access controls. **Debrid** contains availability and playback-provider configuration with its operation history. **Administration → Network** selects outgoing proxies globally or per service/source; see [proxy setup](NETWORK.md). **Security → Statistics** summarizes stored secrets, verification and sessions; **Settings** groups their controls. **Storage → Statistics** displays database and local filesystem measurements; **Settings** contains data retention and maintenance.
+Choose the storage mode in **Storage → Settings**. The compact option keeps information used by search, identification, playback and sharing while avoiding unnecessary source payloads. A mode change applies to new data; it does not automatically rewrite all older records.
 
-Groups with several menu entries can be expanded independently. Pages with only one entry are direct links. Breadcrumbs use the same definitions as the menu, including **Sources / Sources**, and display the page's title and short description once. Histories and Security views use horizontal tabs. Root tab panels omit repeated titles and introductory descriptions; source and operation details retain their specific names.
+History retention defaults to seven days and is configurable. It cleans up eligible diagnostic history, not your published catalog. Some saved work for resumable imports can remain longer. Removing rows can free reusable space without immediately shrinking the PostgreSQL volume.
 
-Switching page tabs preserves the current scroll position and keyboard focus. Overflowing horizontal tab bars reveal their active tab without scrolling the document, including after resizing or font loading. A click creates one browser-history entry, so Back returns to the preceding view. Source-editor stage navigation also avoids scrolling when keyboard focus changes. Choosing a different menu page resets the document to the top and focuses its content. Tab navigation uses the same unsaved-change and pending-save protection as other page changes.
+**Advanced → Maintenance → Reset all source data** clears collected source data so it can be imported again. Read the confirmation carefully and expect sources to need another import. Source definitions and reusable Secrets are kept. Other resets are scoped to the page where they appear, such as matching or debrid caches.
 
-The console remembers group choices in the current browser. Entering a page opens its group without resetting the other choices, including source, run and archived-response detail pages. Navigation remains usable if browser preference storage is unavailable.
-
-Open views update automatically, using live events and periodic reads, without a Refresh toolbar. Background reads preserve drafts and their original revision; concurrent changes still require review before saving. Connection alerts have an opaque panel background on desktop and mobile, and clear after a successful session check.
-
-The desktop sidebar and mobile panel share the same **AIOSources** header: a 24 px title and 32 px database icon, vertically centered without increasing the header height.
-
-On small screens, **Open navigation** opens a side panel. Escape returns focus to the opening button; selecting a page closes the panel and moves focus to the page content. The logo and **Sign out** remain fixed while the navigation list scrolls.
-
-## Everyday controls
-
-**Run manual import** offers **Preview**, **Update**, **Rebuild source catalog** and, where supported, **Fetch source details**. These use the existing `preview`, `incremental`, `full` and `metadata` API modes. The first Update still initializes the source with Full. Applied page/duration limits are visible before starting; **Advanced** retains exact overrides and known-page stopping. Reaching a budget keeps the existing Pause/Resume behavior.
-
-These four functions have separate purposes:
-
-- **Film & series information** downloads TMDB titles and verified identifiers.
-- **Torrent identification** uses local downloaded information to identify films and series conservatively.
-- **Fetch source details** fills eligible missing torrent fields from the original source.
-- **Source fields** maps the source's JSON fields or native Torznab data into torrent fields.
-
-**Metadata → Settings → Schedules** controls the two global background tasks. Both are enabled for new installations. Save a TMDB read access token to start downloading film and series information automatically; existing saved manual choices remain unchanged and can be enabled here. No additional source schedule is required. Each source’s **Schedules** settings section controls its automatic collection.
-
-The update interval defaults to 15 minutes (5–1440 minutes), measured from the last successfully completed update stored in PostgreSQL. Changing the interval takes effect immediately; restarting does not reset the clock. The identification interval defaults to 30 seconds after the previous attempt finishes (5–86400 seconds). Both intervals can be adjusted in Schedules and survive restarts. The server checks pending work at startup, after saved configuration changes and at least every 30 seconds (more often for shorter identification intervals) while the console is closed. Metadata notifications use the same identification admission clock; interrupted workers retain their uncompleted queue without advancing it. New/changed torrents wait for available local film information instead of being marked unidentified against an empty catalog. Only queued identification work starts a background matcher. Saved runs and their progress appear in History; important failures remain visible in Settings and Logs.
-
-Failed information updates keep their published catalog, pending queue and checkpoints. Retry delays of 1, 2, 4, 8 and at most 15 minutes are the defaults; adjust their initial delay and maximum in **Metadata → Settings → Advanced → Information retries**. Retry clocks are saved in PostgreSQL and survive restarts. A successful local matching pass cannot clear a TMDB failure. A change-history gap over 14 days remains blocked until an explicitly confirmed metadata reset; automation never silently deletes the catalog. There is no application backup or restore service.
-
-**Manual actions** retains immediate information downloads, torrent identification and stop controls for active tasks. Stopping a current task preserves committed progress; disable its automatic option and save to prevent future runs.
-
-Metadata and matching have independent automatic toggles. Catalog resets, cache resets and cleanup retries remain available with their existing confirmations. Replace or revoke individual Stremio installation keys from their access cards; there is no global installation token. Failed temporary AllDebrid cleanup remains visible outside the collapsed section.
-
-Credentials for TMDB, the supported debrid services and source authentication can be added where they are used. **Store and select** creates a fresh encrypted vault entry without changing another secret or saving the surrounding configuration. Save that configuration separately to apply the reference. Cancelling clears the unsubmitted value; abandoning an already stored entry leaves it available in **Security → Secrets**. A retry after a lost response reuses the new reference rather than creating duplicates. Private announce credentials store the complete URL, including a passkey anywhere in its path or query, with an independent playback Save button.
-
-**Add key/token** is disabled while a reference is selected. Clear the selector to add a separate credential, or rotate the existing value in **Security → Secrets**.
-
-Schedule editors offer interval presets and daily times with IANA timezones; exact custom durations/Cron and all advanced limits remain available. An existing 24-hour interval remains an interval. Revision conflicts retain local edits and refresh untouched controls from the current server version before an explicit retry.
-
-## Runs and storage
-
-The corresponding **Sources**, **Metadata**, **Debrid** and **Stremio** pages show their own configuration, missing credentials and current activity. Credentials being configured does not assert that an external service has verified them.
-
-In **Metadata**, click **Identified torrents**, **Needs review**, **Not identified** or **Awaiting identification** to inspect current results by source and title. A changed torrent, queued reanalysis or obsolete metadata revision appears as pending, without an old IMDb identifier. Explanations guide source/metadata corrections; there is no forced identification. Phones show complete explanations in cards; larger screens retain the results table. **Information pending** counts TMDB information jobs separately. Dates use the browser's timezone.
-
-Open a specific run in **Sources → History**, then **Processed records**, for advanced diagnostics. Processing errors, ignored records, enrichment and accepted records are counted and searched only within that run. Literal case-insensitive fragments use the search index; only the selected page resolves archive references. `GET /api/raw` requires a `run` parameter and rejects global scans. Old `/raw?run=…` bookmarks redirect to the corresponding run; unscoped bookmarks redirect to History. Retained archives and unavailable payloads remain distinguishable; diagnostic content expires according to Storage history settings (seven days by default).
-
-**Sources** stores strict JSON and offers six **Visual stages** plus advanced **JSON** editing. The final stage configures automatic imports; remote catalogs use their separate basic interval in **Sources → Remote catalogs → Settings**. **Import JSON** changes only the draft, and **Export JSON** downloads that draft; neither publishes a source or starts collection. **Check configuration** and **Save** make no source HTTP request and start no run. Fix invalid local field/JSON drafts before saving or switching stages. Revision conflicts preserve local edits for comparison and explicit reconciliation; see the [configuration workflow](CONFIGURATION.md#configure-your-sources). Existing YAML definitions require [offline migration](CONFIGURATION.md#migrating-existing-sources), which leaves historical run snapshots and checkpoints unchanged.
-
-- **Preview:** uses a fixed default of three complete nonempty pages, adjustable for an individual launch; stores a parsed sample without publishing torrents or retaining raw response/record bodies.
-- **Incremental:** discovers newest native identities and merges valid records into the published dataset as pages commit. For ordered bounded JSON sources, each selected scope stops after X consecutive pages entirely known from collections completed before run creation. Remote catalogues keep their existing atomic synchronization and checkpoint semantics.
-- **Initial Full:** requesting Incremental manually or through a schedule first queues Full when no native Full or Incremental has succeeded for this source. A successful empty catalogue also initializes the source; Preview, Metadata, failed, cancelled and paused collections do not. Existing successful discovery history is recognized without resetting data. Remote sources require a checkpoint for their exact endpoint. The effective mode and `initial_full: true` are saved at admission, under the provider queue lock, and explained in the run details and events. Page/duration budgets, secrets, immutable snapshots, pauses and resumes stay unchanged. A scheduled initial Full paused by its budget continues as the same run even without a periodic Full routine. Success enables subsequent Incrementals; it also preserves the configured Metadata follow-up for newly added native torrents.
-- **Full:** exhaustively discovers the selected catalogue, stages records privately and replaces that source's published membership atomically only after traversal completes. Detail requests may recover genuinely missing identities, but Full does not run missing-metadata enrichment. Previously collected detail-only metadata is preserved for an unchanged native ID and hash.
-- **Metadata:** a separate job for supported native HTTP/JSON sources. A standalone manual or scheduled run walks the entire published catalogue present at run creation, including old records. With **Metadata after Incremental** enabled, successful Incremental or initial Full completion instead queues a linked Metadata run only for its newly added native torrents still missing configured fields. No eligible new records means no follow-up; paused, failed or cancelled collections do not trigger it. Metadata fills absent/null fields and missing attribute keys without overwriting known values. It never discovers, inserts or removes torrents.
-- Successful publication uses the collection context, not the short shutdown-cleanup deadline. Large atomic publications may take longer than page collection. If shutdown interrupts publication, the transaction rolls back and the completed traversal remains resumable; Resume retries publication without downloading committed pages again.
-- A Full/Incremental/Metadata page or duration budget ends **Paused**, not Succeeded. Resume grants fresh per-attempt budgets and keeps the original run snapshot, rather than silently switching to edited JSON or newer execution defaults. A scheduled budget pause can continue at a later tick while its source revision and mode still match. Scheduled Metadata follow-ups continue under their originating Incremental schedule; manual follow-ups require explicit Resume.
-- **Pause** is a durable manual hold. A queued run stops before fetching; a running run shows **Pausing…**, commits its in-flight result and stops at the next committed page boundary without retaining the raw body. An accepted pause on the final page also holds Full publication until explicit Resume.
-- Manual holds survive restarts and block later scheduled work for the same source. **Keep paused** converts an automatic budget pause into a manual hold. If the in-flight request fails, the run remains **Failed** with its failure details and hold intact; Resume or Cancel releases that hold.
-- **Cancel** interrupts source requests and terminates paused or failed-held runs; it takes precedence over Pause and cannot publish a partial Full run. Interrupted workers recover without taking over another process's live provider lock. Technical interruptions always resume automatically, never manual, quota/no-progress or authentication/certificate/configuration holds. Restored work requires explicit review and Resume.
-- Automatic recovery also requires a currently valid, enabled source definition. Source deletion is serialized with manual, scheduled and recovery admission, so a deleted or disabled source cannot silently restart from an old snapshot. Unavailable sources retain their interrupted checkpoint for operator review.
-
-**Records** in run details and run lists counts distinct valid source IDs retained from accepted pages in the run's current traversal. Repeated observations of an ID count once; different IDs remain separate even when their info hashes match. Ignored, auxiliary and invalid records do not contribute. The count survives pause/resume; an accepted traversal reset starts a new identity set. Bounded reconciliation can temporarily decrease this derived count while stale scopes are re-enumerated, or retire an ID whose latest valid observation leaves the selected scopes. Unaffected scope coverage is preserved. Existing runs are reconstructed from their retained history when upgrading. The run API exposes this metric as `distinct_records`; `records` remains the cumulative primary-observation count, including repeats.Diagnostic observations expire according to Storage history settings (seven days by default); compact traversal evidence remains available for unfinished work.
-
-On a run page, open **Run details** for timestamps and the per-attempt page budget. Publication totals and committed history are grouped in the **Published changes** tab, separate from collection progress.
-
-An automatic Metadata follow-up inherits its successful parent's immutable configuration, policy, budgets and trigger. The parent remains **Succeeded**: its **Events** contain **Open Metadata follow-up · new torrents only**, and the child links back to the Incremental. The run API includes `metadata_parent_run_id` only for linked follow-ups. Enabling the source option does not rewrite existing snapshots or enqueue work for historical completed runs.
-
-The authenticated lifecycle endpoints are `POST /api/runs/{id}/pause`, `/resume` and `/cancel`. They return the updated run. `pause_requested` identifies a durable manual hold; `pause_reason` distinguishes `manual`, `budget`, `quota`, `no_progress` and `interrupted`. A manual hold survives pausing, restart and an in-flight failure. The CLI offers the same `pause`, `resume` and `cancel` commands with `--run ID`.
-
-Opaque continuation state is private to the backend: run responses and the console never expose the stored cursor, which may contain a source token or signed URL. Resume uses the committed checkpoint; no separate Resume point tab is needed.
-
-For a bounded source that cannot establish complete coverage, inspect the `source_error` event's `coverage_expected`, `coverage_observed` and configured `minimum_total`. This evidence is retained even when the failing completeness check made no HTTP request. Historical archives and earlier events are not rewritten.
-
-### Diagnosing rejected pages and historical errors
-
-HTTP 200 means the request succeeded, not that its pagination was accepted. New ordinary HTTP/JSON and Torznab pagination rejections retain a finite `failure_reason` alongside the existing recovery category `failure_code`. **History → Events** shows the reason, safe numeric context and remediation without needing an archived body. `expected_total` / `actual_total` compare the committed total with the returned total; `expected_position` / `actual_position` compare requested or next positions. For a page that exceeds or ends before its advertised bound, `expected_total` is that bound and `actual_position` is the observed cumulative offset. HTTP status and requested offset are included when available. The event's `page` remains the retained observation index, not the source's page number.
-
-Reasons are `invalid_position`, `position_mismatch`, `invalid_total`, `total_changed`, `records_exceed_total`, `empty_before_total`, `invalid_continuation`, `continuation_repeated`, `continuation_mismatch`, `premature_end`, `unexpected_continuation`, `pagination_overflow` and `publication_order_invalid`. Context is restricted to nonnegative, browser-safe integers; malformed values, upstream messages, URLs, opaque cursors and credentials are never copied into these diagnostics. Malformed Torznab XML or pagination attributes that the SDK cannot decode retain the coarse parse failure rather than guessing a detailed cause from raw text. Bounded-window, Metadata and remote-catalogue collectors retain their specialized diagnostics.
-
-On rejection, the last successful checkpoint remains fixed and Full does not publish partial results. Check the expected/actual values against the source's ordering, pagination fields and total policy. If the upstream response is corrected, **Resume** retries the rejected page. If configuration must change, edit the source and start a new run; Resume always uses the original immutable configuration. Detailed diagnostics do not relax total consistency or alter automatic recovery categories.
-
-Historical `publication_order_invalid` events identify date inversions rejected by an older publication-mode collector. Their `requested_page` and one-based `record_index` remain useful evidence, but dates no longer act as an Incremental completion boundary. The corrected collector requests the same newest-first listing and checks consecutive pages of native IDs accepted by collections completed before the original run began. **Resume** continues the existing scope/page and known-page streak without a timestamp frontier. It does not sort, drop offending records, reduce the configured boundary or erase old errors.
-
-**Historical errors** is a cumulative count across attempts and rejected records, not a current health indicator. A **Completed** run (`succeeded` in the API) can retain errors from earlier failures, retries or rejected individual records. Use Events and Processed records to distinguish recovered attempts from record omissions. Current failures are shown by **Failed** and the current failure notice. Existing history is not rewritten, and older generic failures cannot be retroactively assigned a precise reason.
-
-**Known-page baseline:** a published native ID qualifies only when accepted by a Full or Incremental run completed before the current run was created, without skipped invalid primary records on committed pages. Recovered request failures are compatible with a complete collection. Merely publishing a prefix before failure or Pause cannot hide the unvisited remainder from the next Incremental. A run completed after the current run began cannot change its baseline during Resume.
-
-This guard does not rewrite historical successful runs or retroactively fill gaps they may have missed. If an older Incremental stopped prematurely, use a source-appropriate Incremental backfill with **Known pages = 0**. Use Full only when the source can prove exhaustive coverage; a capped Torznab query union is not such proof.
-
-Bounded JSON sources can explicitly set `traversal.total_mode` to `"at_least"` for cumulative discovery against each scope's first advertised total. The default remains strict reconciliation. A small category deficit is checked against a complete, validated single-page root before numeric recovery; an upstream reclassification can lower its target only with complete native-identity and classification evidence. Partial or malformed responses cannot certify completion. The run history records the adjustment, and existing numeric checkpoints remain resumable without changing their saved source definition. Cumulative mode avoids scope retirement solely because totals change; it does not promise an exact current-catalogue mirror. Changing this policy or pacing in source JSON does not mutate an existing run's snapshot.
-
-Ordered bounded JSON Incremental scans each selected scope until its configured known-page boundary instead of repeating the exhaustive Full crawl. `traversal.incremental_order` selects strict descending numeric `id` validation by default, or a publication-sorted listing (`published_at`) that tolerates date reordering. Every identity on each consecutive boundary page must belong to the completed-collection baseline above; current-run writes and shared hashes cannot satisfy it. Invalid records, repeated pages and unproven window ends remain failures. In **Start a run**, **Known pages (X)** accepts an integer from 0 to 10000: blank inherits `source.schedule.known_pages`, while 0 disables early stopping. This override is submitted only for Incremental, captured in that run's immutable snapshot and never written back to the source. Full and Metadata do not use it.
-
-For generic paginated Incremental sources, the consecutive-known-page count is committed with the checkpoint. Pause, per-attempt budgets and Resume preserve it. A newly encountered identity resets the count; auxiliary requests and rejected pages cannot silently reset it.
-
-Ordinary HTTP/JSON can keep Full oldest-first and use `http.incremental_query` for newest-first Incremental without changing listing filters. With `"allow_total_growth": true`, a positive **Known pages (X)** requires this explicit override; simply enabling early stopping on an ascending feed could miss all recent additions. Use ordering parameters verified against the upstream API. With this option, Incremental accepts both increases and decreases in advertised totals, including differently aged cached counts; Full and Preview still reject decreases. Disabling the option keeps exact total consistency in every mode. Returned positions, record bounds and completion evidence are still checked, and known-page stopping is unchanged. The override and base query survive Resume in the immutable run snapshot; save JSON changes and start a new run to use them. Flexible totals do not provide an atomic catalogue snapshot: removals/reordering can shift offsets and records prepended after an Incremental has begun may wait until the next run.
-
-Torznab Incremental with `category_scope` set to `"each"` or `"advertised"` also applies **Known pages (X)** separately to every category. At X consecutive entirely known pages, it moves to the next category and starts that category's counter at zero. The counter and category offset are saved together, so a budget pause cannot reset or carry a boundary into another category. Only identities in the original completed-collection baseline qualify, even when a new identity appears in several categories. Full remains exhaustive.
-
-When a server returns a retryable 429, the shared transport saves its status, failure and deadline before its next attempt, not the raw response body. The run respects the full source deadline without advancing its checkpoint. Saved quota policy controls retry count and maximum automatic wait; a longer wait pauses safely, including after a successful response that exhausts quota. Explicit Resume accepts that saved wait but never sends early. Recovered quota failures remain in the error history.
-
-A JSON GET that receives invalid HTML with HTTP 200 immediately after HTTP 429 shares the existing bounded transient-retry path and cooldown. Each rejection is saved before retrying, with a parse classification and unchanged checkpoint. Valid JSON with a mislabeled HTML content type is accepted. Ordinary invalid JSON, HTML without a preceding quota response, writes and non-JSON adapters do not gain automatic parse retries. Exhaustion preserves Full staging and the previous published catalog; explicit Resume can recover the same request once the source responds correctly.
-
-The useful-progress guard counts successful data responses without a native ID previously unseen within the run. It excludes quota errors and auxiliary/control traffic, including Metadata responses that update existing identities rather than discover new ones. A warning is emitted once per stalled streak; the alternative pause action requires explicit Resume and then grants a fresh allowance. Records sharing a hash still represent distinct progress if their native IDs differ.
-
-**History → Events** shows the most recent events first, using fixed 50-row pages with the common First/Previous/Next/Last controls below the table and an exact event count. First returns to recent entries; Last opens the oldest page. Live updates refresh the count and visible events without changing the selected page. The browser saves this page in `events_offset`, independently of the run's other lists. The API uses `GET /api/runs/{id}/events?limit=50&offset=0` and returns `items`, `total`, `limit` and `offset`; `limit` accepts 1–200. Rows and total come from the same database snapshot.
-
-New response bodies and original record bytes are **not stored**, including failure responses. **Storage saving** also omits successful per-record observations and unused mapped fields, including unused details inside nested metadata. **All mapped fields** retains the additional selected fields and per-record observations, without duplicate interpreted-field snapshots. Actual retained fields remain in the native catalogue or private Full staging; Preview keeps its parsed sample in both modes. Record errors, per-page counters, native identity and coverage ledgers, fingerprints, totals and durable resume state remain available. `output.fields` controls catalogue presentation, not the storage policy.
-
-**History → specific run → Processed records** distinguishes unavailable payloads explicitly with `payload_retained: false`. New response bodies and original item bytes are not stored. Archive downloads return HTTP 404 when their content is unavailable or has expired.
-
-History retention and the ordinary cleanup interval are configurable in **Storage → Settings → History retention**. Cleanup runs automatically, independently of source and metadata schedules. Completed source and metadata/debrid operation histories, response observations, processed records, publication changes, activity logs and Stremio requests expire according to Storage history settings (seven days by default). Cleanup uses bounded transactions and continues in small batches while a backlog remains; a failed pass rolls back and retries. PostgreSQL reuses deleted space through vacuuming; existing data files may retain their size.
-
-Source and Metadata statistics reuse the existing matching fingerprint, calculated when torrent fields change. The first upgrade computes the stored fingerprint for existing torrents once, which can extend startup on a large catalog. Counts and matching freshness rules remain exact.
-
-Published torrents, local metadata, matching decisions/reviews, account availability, active operation counters, pending jobs and required recovery state do not expire with history. Paused work and unsuccessful Full imports with staging retain their immutable configuration, cursor, fingerprint/coverage evidence and prepared fields. Their original processed records and payloads still expire; optional provenance links become unavailable. A pending metadata follow-up retains its parent's identity membership. Successful collection initialization and trusted known-page boundaries are kept compactly so history expiry cannot cause another initial Full or a false early stop.
-
-Catalog sharing compacts expired journal changes into one reference state per copy, alongside the recent change journal. An older checkpoint requests an authoritative Full; an expired paged snapshot is explicitly rejected and the remote connector starts a fresh Full before resetting staging. Recent paged snapshots and deltas remain exact.
-
-Explicit historical deduplication can replace strictly identical physical copies with `raw_records.payload_id` or `pages.payload_id` references. Observation IDs, run/page provenance, errors and checkpoints remain independent; archive APIs resolve the retained original, so downloads and interpreted-field searches stay unchanged. Raw copies must match the provider, native source ID, content type, exact bytes and interpreted fields—not merely an info hash. References point directly to an older inline original. Cleanup detaches references before expiring that original; recent processing identities survive with an unavailable payload.
-
-Deleting duplicate physical copies makes space reusable by PostgreSQL. Returning that space to the filesystem requires table compaction such as `VACUUM FULL`, which takes exclusive table locks and needs temporary free disk space. Pause collection at a committed checkpoint before this maintenance and resume the same run afterward; no new Full or Metadata traversal is needed.
-
-For native Incremental and Preview discovery, an individual normalisation error does not stop otherwise valid page traversal. The rejected observation retains its ID and error, not new raw bytes, and is excluded from publication; a running or successful status alone does not prove that every observed record was accepted. Correcting a source definition does not change an existing run's immutable snapshot or retry earlier rejected records.
-
-Full discovery fails closed when a primary record cannot be interpreted or retained. It retains the error observation once without advancing the last successful checkpoint or partially changing that page's staging, scope coverage or identity set, including when the page requested a reset. The previously published catalogue remains unchanged. After a source-response correction, Resume retries the rejected page; a definition correction requires a new Full because the existing snapshot is immutable. Earlier runs and historical archives remain intact.
-
-A Metadata response whose interpreted fields still cannot be represented in the database—for example, a NUL in a field other than `metadata.nfoContent`—fails the run after retaining its error observation once. Binary NFO text is retained using the reversible Base64 representation documented in [Configuration](CONFIGURATION.md#standalone-metadata-collection), so it does not block the run. For other rejected fields, the last successful checkpoint remains unchanged: the failed candidate is neither silently skipped nor automatically requested in a loop, and the rejected page does not partially enrich the catalogue. After the source response is corrected, Resume retries that candidate without replaying earlier committed work. Editing source JSON still does not alter the failed run's immutable snapshot.
-
-### Torrents and occurrence history
-
-**Torrents** searches PostgreSQL directly. Words match case-insensitive fragments anywhere in titles, provider IDs, source record IDs and info hashes, including the middle of a word or a dotted release title. Separate fragments with spaces to require all of them, in any order; use `OR` for alternatives and `-fragment` to exclude a fragment. Surrounding punctuation such as brackets and colons is ignored for unquoted words. Dots and hyphens also separate unquoted title fragments. Quoted phrases retain whole-word phrase matching, including phrase exclusions such as `-"blue ocean"`. Unquoted `%`, `_` and backslashes are literal characters, not wildcard operators. Relevance puts whole-word matches first, then ranks fragment matches by text similarity; similarity never adds results that do not match the query.
-
-Text and filters share one always-visible form and one **Search** button. The same text box accepts complete or partial hexadecimal info hashes, as well as complete Base32 hashes. The Sources dropdown supports multiple selections. Combine text with category, exact size bounds and publication dates; sort by recency, age, size or relevance. Numeric bounds remain decimal strings so values larger than JavaScript's safe integer range stay exact. Date inputs use the browser's local time zone; saved bounds retain their exact instant and fractional precision. Both text indexes use the same bounded UTF-8 prefix, up to 128 KiB per occurrence; complete field values remain stored. Unmapped properties and their names are not searched. Short fragments with fewer than three consecutive letters or digits are supported but can require scanning more records; adding another fragment or a source filter narrows the search. The exact `info_hash` API filter remains compatible with existing clients.
-
-Seeders, peers and leechers are no longer collected, stored in interpreted records or returned by catalog APIs. Upgrades remove existing counters and retired search filters without adding publication/history events or invalidating current identifications and manual reviews. Existing raw response archives retain their original bytes and integrity. Cleaning a large history can extend the first upgrade's startup. A share allowing only retired counters becomes disabled with no granted fields; choose durable fields explicitly before enabling it again.
-
-Upgrading builds the fragment index automatically in the schema migration transaction. Existing published fields, identities and occurrence history remain intact. The initial index build can extend startup on a large catalogue. The 30-second database connection budget does not limit migrations; stopping the process still cancels the upgrade, rolls it back and retries it at the next start.
-
-Filters and sorting stay in the page URL. Bookmark or share an administration URL to reuse a search; signing in is still required.
-
-**An info hash is not a record identity.** Every `(provider_id, source_id)` remains independent, including different IDs within one provider. **Related occurrences** offers navigation to matching hashes; it never merges, deletes or hides another tracker's record.
-
-Each occurrence has publication history and provenance, including deleted records. **History → Published changes** counts actual additions, field/provenance changes and deletions; a successful unchanged run reports zero changes. Before/after views distinguish missing fields from explicit values and preserve exact numbers. History starts with the current occurrence baseline when upgrading; earlier revisions are not invented. Preview runs never publish. Full and remote incremental runs publish only on successful completion; native Incremental and Metadata record each committed page, with Metadata restricted to updates of existing matching identities.
-
-## Logs
-
-**Logs** is the single persistent activity view for import outcomes, useful-progress warnings, scheduling failures, service or health transitions. It defaults to `info`, `warn` and `error`; enable **Debug** to include detailed request activity. Filters cover severity, source or service, run, text and time. Entries retain links to their run and relevant service.
-
-The previous notification inbox, bell, read/unread state and external delivery feature are removed. Every notification already referenced a log; upgrade preserves its title and service context on that log. Existing external delivery outcomes become sanitized `external_notification.*` log entries, and pending deliveries are cancelled. Payload bodies, destination URLs, signing keys and vault values are never copied. Obsolete tables, secret dependencies, API handlers and the sender are removed; vault entries remain encrypted until their owner removes them. Old page bookmarks redirect to Logs.
-
-Activity changes still use the authenticated live event stream. A browser does not need to remain open for jobs or their logs to persist. The original event and checkpoint are committed atomically with the log. Historical source events and published data are not rewritten.
-
-Debrid errors distinguish request rate limits, account capacity, subscription restrictions, rejected or oversized torrents, missing files and temporary service failures. Logs and the Stremio and Debrid histories use the same categories, including API errors returned with HTTP 200. Provider response messages and bodies are never retained: they can contain credentials or private URLs. Temporary playback failures return a bounded `Retry-After` header; account capacity failures require freeing capacity or waiting for the account limit to reset.
-
-A failed availability check preserves earlier observations and never records the failed request as an uncached torrent. Checks stop on account-wide limits or temporary service failures. Further checks follow the existing saved retry delay. Torrent creation is never automatically replayed after a provider error, and personal account torrents are never deleted to make room.
-
-Download preparation distinguishes an in-progress torrent from a missing file or an explicit provider cache miss. Readiness checks reuse the exact account item bound to the currently authorized release; they do not create another torrent if it has been deleted. Administrator preparation references can survive a restart; visitor references remain in bounded memory or encrypted continuation links. See [debrid playback](DEBRID.md) for provider capabilities and retention. If an item is deleted while Search is checking readiness, automatic checks stop and the download control offers an explicit new attempt when the source permits it. A cached-only request cannot start an uncached transfer. TorBox's `DOWNLOAD_NOT_CACHED` response replaces stale positive cache evidence for that hash; an account-specific missing-item error does not invalidate provider-wide availability. Missing files do not mark the whole service unavailable. Provider categories remain visible in sanitized histories and Logs. A link already handed to the browser can still expire or be revoked at the provider; resolve a new link rather than reusing it.
-
-## Database
-
-**Storage** contains only PostgreSQL availability and size, local available space, and storage usage by category. Tables and indexes are included; database overhead is separate. Local space describes the application state-directory filesystem, which may differ from PostgreSQL storage.
-
-Expand a storage category to see its purpose, data allocation and indexes. **Sources** also provides estimates by source and the largest imports retaining prepared data, with direct links to their runs. Cancelled imports that keep preparation data are called out explicitly; their resumable data can remain beyond the configured history retention period. These controls explain existing retention without deleting anything.
-
-Category sizes are measured PostgreSQL allocations; per-source and per-import sizes are estimates from PostgreSQL statistics. Unanalyzed or infrequent data may not be attributable, so estimates do not necessarily add up to the measured total. Measurements are cached in the existing once-per-minute background check. Expanding a row does not scan source records. Allocated space may include space PostgreSQL can reuse after cleanup; it is not the total size of torrent files.
-
-Measurements refresh every minute without traversing source history. A failed database measurement marks earlier values unavailable and stale; it does not replace them with zero. `/healthz` checks connectivity without counting catalog or history rows.
-
-Docker Block I/O and PostgreSQL statistics are cumulative. Compare two timestamped readings before attributing old totals to current activity. PostgreSQL `blks_read` counts requested blocks outside its shared buffer; these can still be served by the operating system cache. `temp_bytes` tracks temporary query files and `pg_stat_wal.wal_bytes` tracks generated WAL. Per-table insertion/update/deletion deltas distinguish active collection from metadata or matching work. A counter reset invalidates that interval. See the [PostgreSQL statistics reference](https://www.postgresql.org/docs/18/monitoring-stats.html) and [Docker stats reference](https://docs.docker.com/reference/cli/docker/container/stats/).
-
-Daily growth samples, diagnostics, configurable thresholds, their tables and API are removed. Existing operational logs remain available. The backup product and its worker, API, settings and database tables are removed. Existing deployment archive files are left in place. Storage categories use current page names and are ordered by size. Monitoring never removes published source data.
-
-Dates use the browser timezone and all console lists use 50 rows. Overview and Preferences are removed. Old bookmarks redirect to their replacement page. Collection policy remains available in Sources → Settings → Advanced. Running/queued import counts and per-source catalog counts belong to Sources → Statistics; local information, identification counts and results belong to Metadata → Statistics; configured service and temporary cleanup counts belong to Debrid → Statistics.
-
-## Existing PostgreSQL data
-
-To import historical `public.torrents` rows in the same database:
-
-```sh
-docker compose exec ingest /ingest import-legacy
-```
-
-Import is additive and idempotent. It preserves the source table, does not overwrite freshly collected records, and does not fabricate original responses for historical rows. A ledger prevents later imports from resurrecting rows removed by a completed full run.
+Back up before resetting or deleting data you may need. See [installation and backups](SETTINGS.md#preserve-your-data).

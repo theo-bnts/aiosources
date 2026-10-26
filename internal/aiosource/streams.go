@@ -32,9 +32,6 @@ type Behavior struct {
 	Duration    float64 `json:"duration,omitempty"`
 }
 
-func Manifest() map[string]any {
-	return map[string]any{"id": "org.aiosource.v2", "version": "2.1.0", "name": "AIOSources", "description": "Search your source catalogs with verified film and series identification, optional debrid playback, and Stremio integration", "resources": []any{map[string]any{"name": "stream", "types": []string{"movie", "series", "anime"}, "idPrefixes": []string{"tt", "imdb:", "tmdb:", "tvdb:", "mal:"}}}, "types": []string{"movie", "series", "anime"}, "catalogs": []any{}, "behaviorHints": map[string]bool{"configurable": true}}
-}
 func (s *Service) magnet(ctx context.Context, rec model.AIORecord, c model.AIOConfig) (string, []string, error) {
 	q := url.Values{"dn": {rec.Title}}
 	sources := []string{}

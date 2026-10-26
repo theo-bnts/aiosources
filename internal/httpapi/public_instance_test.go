@@ -105,6 +105,11 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
+	manifest := f.request("GET", "/public/stremio/"+configuration+"~en~unknown/manifest.json", "", false, "")
+	var identity struct{ ID, Logo, Version string }
+	if manifest.Code != http.StatusOK || json.Unmarshal(manifest.Body.Bytes(), &identity) != nil || identity.Logo != aiosource.LogoURL || identity.Version != aiosource.Version || identity.ID != "org.aiosource.v2" {
+		t.Fatal("public installation lost the addon logo, version or identity", manifest.Code)
+	}
 	response := f.request("GET", "/public/stremio/"+configuration+"~en~unknown/stream/movie/tt1234567.json", "", false, "")
 	var payload struct {
 		Streams []aiosource.Stream `json:"streams"`

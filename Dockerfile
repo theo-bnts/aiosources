@@ -14,7 +14,7 @@ COPY internal/ ./internal/
 COPY cmd/ ./cmd/
 COPY web/assets_embed.go ./web/assets_embed.go
 COPY --from=panel /build/web/dist/ ./web/dist/
-ARG VERSION=2.0.0
+ARG VERSION=2.2.0
 ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags production -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /aiosource ./cmd/ingest \

@@ -1,66 +1,47 @@
-# Configure incoming and outgoing connections
+# Network and proxies
 
-[Back to README](../README.md) · [Deployment settings](SETTINGS.md)
+[Back to README](../README.md) · [Installation settings](SETTINGS.md)
 
-Use **Administration → Network** to manage incoming visitor requests and outgoing service connections. For example, you can recognize visitor IPs behind a reverse proxy or send AllDebrid requests through an existing Cloudflare WARP proxy.
+**Administration → Network** separates incoming requests from outgoing service connections. Incoming settings recognize visitors behind a reverse proxy; outgoing settings route AIOSources through an existing WARP, VPN or compatible proxy.
 
-AIOSources connects to an existing proxy; it does not install or start a VPN. Supported addresses use `http://`, `https://`, `socks5://` or `socks5h://`. HTTP and HTTPS proxies must support CONNECT tunnels. A VPN can be used when its gateway provides one of these proxy interfaces.
+## Incoming proxies
 
-## Add and test a proxy
+Open **Network → Incoming** when using Cloudflare, a tunnel or another reverse proxy.
 
-1. In **Network → Outgoing → Proxies**, choose **Add proxy** and give it a recognizable name.
-2. Enter the address reachable from AIOSources, such as `socks5://warp:40000`. The port must match your proxy's configuration.
-3. If authentication is required, expand **Authentication** and select or add the username and password through **Secrets**. Keep credentials out of the address.
-4. Save, then choose **Test connection**. This contacts Cloudflare's public connection-test endpoint through that proxy and displays its exit IP and WARP status when reported. Testing does not enable the profile or change routing, and sends no source or debrid credentials.
-5. Enable the profile, open **Network → Outgoing → Routing** and select where to use it. Save your routing changes.
+1. Select **IP address header**. For Cloudflare, choose `CF-Connecting-IP` with **Single IP address**. `X-Real-IP` works the same way. For `X-Forwarded-For`, choose **Comma-separated IP chain**.
+2. Enter **Trusted proxy addresses**, one address or CIDR network per line. The page shows the direct address seen by AIOSources. With a tunnel, use the connector address or its dedicated network. For Cloudflare's ordinary proxy, use its [published IP ranges](https://www.cloudflare.com/ips/).
+3. Enable **Trust an incoming proxy header**, save and check the displayed visitor address.
 
-The test verifies that an HTTPS connection works through the proxy. A particular service may still refuse that exit IP or have an unrelated outage. Settings changes and test outcomes appear under **Network** in **Logs**; credentials, proxy addresses and exit IPs are not included in those log entries.
+Trust only proxies you control or explicitly authorize, and prevent direct access that bypasses their protections. Missing or invalid headers use the direct connection address. Both IPv4 and IPv6 are supported. The trusted-proxy setting does not provide HTTPS or replace sign-in.
 
-## Choose which requests use it
+Public quotas are configured separately in **Administration → Public access → Request limits**. Each limit can be disabled independently. Correct incoming-proxy settings prevent all visitors being counted as one address.
 
-**Default connection** applies to sources, remote catalogs, metadata, debrid services and browser downloads. New sources inherit it automatically.
+## Outgoing proxies
 
-Use **Sources**, **Metadata** and **Debrid** for exceptions, in the same order as the main menu:
+AIOSources uses an existing proxy; it does not install or start WARP or a VPN. Supported addresses use `http://`, `https://`, `socks5://` or `socks5h://`. HTTP proxies must support HTTPS tunneling.
 
-- **Use default connection** follows the saved default.
-- **System connection** preserves the application's existing connection behavior, including environment proxy settings where previously supported.
-- **Direct connection** explicitly bypasses both managed and environment proxies.
-- A named proxy uses that profile.
+1. Open **Network → Outgoing → Proxies → Add proxy**.
+2. Name the connection and enter an address reachable from AIOSources, such as `socks5://warp:40000`.
+3. If needed, add its username and password through **Secrets**, under **Advanced**.
+4. Save and choose **Test connection**. This checks the exit address and reports WARP status when available; it does not enable the profile.
+5. Enable the proxy, open **Routing** and select the requests that should use it.
 
-For an AllDebrid-only setup, leave the default on **System connection** and select your proxy next to **AllDebrid**. TorBox, metadata and sources keep their own connections. Source routing applies to imports, previews and source-detail requests, including already queued runs. TMDB routing covers both information requests and export downloads.
+Set a default connection, or choose exceptions for individual sources, metadata, debrid services, remote catalogs and browser downloads. For an AllDebrid-only proxy, leave the default unchanged and select that proxy beside **AllDebrid**.
 
-**Browser downloads** follow their debrid service's connection unless you select an explicit override. These files pass through AIOSources without being saved to its disk. **Stremio playback links are opened by the player**: this setting routes AIOSources' provider requests, not the player's file transfers.
+A selected proxy that becomes unavailable blocks its assigned requests; AIOSources does not silently fall back to a direct connection. Change its assignments before deleting it. Deleting a proxy does not delete its reusable Secrets.
 
-Saved changes apply to new requests without restarting the application. Requests already in progress may finish on their existing connection. An unavailable or disabled selected proxy blocks its assigned requests; AIOSources never retries them through a direct connection. Change the assignments before deleting a profile. Deleting one leaves its encrypted Secrets available for reuse.
+### WARP and Docker
 
-## Cloudflare WARP and Docker
+Configure WARP's proxy mode using [Cloudflare's guide](https://developers.cloudflare.com/warp-client/warp-modes/), then use the protocol and port it provides. Other VPNs work when they expose a compatible proxy.
 
-Configure WARP's local proxy mode first, following [Cloudflare's WARP modes guide](https://developers.cloudflare.com/warp-client/warp-modes/). Use the protocol and listening port provided by that installation. Other VPN gateways work the same way when they expose a compatible proxy; the VPN name alone does not imply proxy support.
+The address must be reachable **from the AIOSources container**. `127.0.0.1` refers to that container, not the host or another container. A hostname such as `warp` works when the gateway is reachable on the same Docker network. Keep the proxy restricted to its intended clients.
 
-The address must work **from inside the AIOSources container**. `127.0.0.1` there refers to AIOSources itself. A hostname such as `warp` works only if a proxy with that name is reachable on the same Docker network. A proxy listening only on the host's loopback interface is not automatically reachable through `host.docker.internal`; provide a connection reachable from your container using your gateway's supported configuration. Keep the proxy restricted to the intended clients rather than exposing an unauthenticated proxy to the internet.
+### What gets routed?
 
-The gateway's own request, traffic and account limits still apply. Proxy routing preserves HTTPS certificate checks and the existing destination protections for remote catalogs and browser downloads. Public visitors inherit the administrator's routing and cannot view or change proxy profiles or credentials.
+Routing controls requests made by AIOSources, including imports, metadata and debrid API calls. Browser downloads pass through the instance and follow their selected connection. Playback files opened directly by Stremio or another player use that player's own network connection.
 
-## Recognize visitors behind a proxy
+## Timeouts
 
-Open **Administration → Network → Incoming** when requests arrive through Cloudflare, a tunnel or another reverse proxy. This is independent of outgoing WARP/VPN routing.
+Less common outgoing request timeouts are in **Network → Outgoing → Proxies → Advanced**. Incoming request and download limits are in **Network → Incoming → Advanced**. Individual sources keep their timeout in their source definition, and connections can have their own response timeout in **Filters**.
 
-1. Select **IP address header**. Cloudflare's orange-cloud proxy and Tunnel normally send `CF-Connecting-IP`; use **Single IP address**. `X-Real-IP` works the same way. For `X-Forwarded-For`, use **Comma-separated IP chain**. Custom header names are supported with either format.
-2. Enter **Trusted proxy addresses**, one IP or CIDR network per line. The page shows the direct connection address currently seen by AIOSources. With Tunnel, trust the `cloudflared` connector address or its dedicated network. With Cloudflare's standard proxy, use [Cloudflare's published IPv4 and IPv6 ranges](https://www.cloudflare.com/ips/). An intermediate local reverse proxy must be included too when using an address chain.
-3. Enable **Trust an incoming proxy header** and save. Check the displayed visitor address using the saved settings.
-
-Trust only peers allowed to assert visitor addresses. Restrict direct access to AIOSources when relying on your proxy's protections. The application rejects a universal `/0` trust rule. Your proxy must overwrite a single-address header or append the genuine connecting address to a chain. Arbitrary regex extraction is intentionally unnecessary: supported values are plain IPv4/IPv6 addresses or comma-separated lists of those addresses. RFC `Forwarded: for=...` syntax, hostnames and address/port pairs are not accepted.
-
-A chain is read right to left from the connected proxy, stopping at the first untrusted hop. A visitor cannot gain a new quota merely by prepending an invented address. Untrusted connections and missing, malformed, duplicate single-address or oversized headers use the direct connection address. Header trust is disabled after an upgrade until explicitly configured. It never changes authentication, HTTPS detection, the configured public origin or outgoing proxy settings.
-
-The resolved address separates public request quotas and administrator sign-in protection. Public request counters are volatile; visitor IPs, header values and the diagnostic addresses are not added to public histories or Logs. Administration keeps its existing hashed sign-in throttling records. **Administration → Public access → Request limits** controls visitor quotas. Changes saved in this process apply immediately; other processes sharing the database reload their policy within one second. Limits and in-flight counters are per process.
-
-## Adjust public request limits
-
-Open **Administration → Public access → Request limits**. Each restriction has its own switch. Keep the per-visitor link-creation and request quotas while switching off **Simultaneous public requests** if you do not want a shared admission ceiling. Switching off one limit leaves the others active. Defaults remain 12 link creations and 120 addon/Search requests per minute per visitor IP, with 50 simultaneous public requests. Administrator sign-in protection is separate.
-
-A disabled limit is saved as `0` (unlimited). Existing positive settings are preserved on upgrade. Request timeouts, input-size checks and the bounded capacity of individual operations still apply, even when an admission limit is off. Already active requests finish normally and remain counted if a limit is enabled again.
-
-## Request timeouts
-
-Less common timeout controls are folded under **Network → Outgoing → Proxies → Request timeouts** and **Network → Incoming → Request timeouts**. Outgoing controls bound metadata/debrid HTTP calls and inventory downloads. Incoming controls bound Stremio, Torznab and shared catalog processing and delivery, including public connections. Source timeouts stay in source definitions. See [application settings](CONFIGURATION_REVIEW.md) for defaults, bounds and lease behavior.
+Use the settings search to find a timeout directly. Increasing it can help a slow service, but does not bypass the provider's own limits.

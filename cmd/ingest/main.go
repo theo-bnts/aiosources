@@ -29,7 +29,7 @@ import (
 	webui "github.com/theo-bnts/aiosources/web"
 )
 
-var version = "dev"
+var version = aiosource.Version
 
 type config struct {
 	dataDir      string

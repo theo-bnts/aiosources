@@ -1,34 +1,40 @@
+<p align="center"><img src="web/public/logo.png" alt="AIOSources logo" width="112" height="112"></p>
+
 # AIOSources
 
-**Your sources. One catalog. Ready for Stremio, AIOStreams and Torznab.**
+**Your sources, together. Find a title, choose a version and watch or download it.**
 
-AIOSources brings your own sources together so you can find a film or series, compare available versions and watch or download it through your preferred app. Imports, identification and availability checks run automatically once configured; the web interface lets you search, review results and keep control of what you share.
+AIOSources brings your own source catalogs into one searchable library. Connect it to Stremio, Nuvio, AIOStreams or a Torznab-compatible application, or use its web interface. Once configured, imports, film and series identification, and availability checks can run automatically.
 
-AIOSources is open source and self-hosted. It comes without sources or content: connect services you are authorized to use and share only content you have the right to share.
+AIOSources is open source and self-hosted. It includes no sources or media: connect services you are authorized to use and share only information you have the right to share.
 
-[Get started](#get-started) · [Connect your apps](#connect-your-apps) · [Public access](#offer-public-access) · [Help](#help-and-contributions)
+[Install](#install-your-instance) · [First steps](#first-steps) · [Connect your apps](#connect-your-apps) · [Documentation](#documentation) · [Help](#help-and-support)
 
-## What you get
+## What you can do
 
-- **One place to search.** Find films and series by clean titles, in your browser language when available. Compare releases by size, with filters for year, language and cached availability.
-- **Your choice of sources.** Add compatible sources through a visual editor or your own JSON definitions. Preview their results and choose when they update.
-- **Better identification.** Link releases to film and series information, including seasons and episodes. Review uncertain matches and correct them yourself.
-- **Watch or download.** Use Stremio or AIOStreams, connect Torznab-compatible apps, or download from the web interface with your configured debrid services.
-- **Connections you control.** Create separate app connections with their own filters. Share a selected catalog with another instance, or optionally open a visitor page.
-- **Visibility without guesswork.** See what was imported, what was returned to Stremio, which operations need attention and where storage is used.
-- **Settings within reach.** Find a setting from the search bar on any page, on desktop or mobile. Open the right section directly, including advanced options and individual source or connection settings.
+- **Find the right version.** Search films and series by their familiar titles, choose an episode and compare releases. Filter by year, language, source or cached availability.
+- **Connect your own sources.** Use Torznab, HTML, JSON or UNIT3D templates. Configure them visually or import your own JSON, preview the results and schedule updates.
+- **Watch and download.** Connect your player, download a ready file from the browser or add a release to your debrid account and follow its preparation.
+- **Choose your debrid services.** AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox are supported. Availability features vary by service.
+- **Tailor each connection.** Create several Stremio or Torznab connections with different sources, media types, services, filters and sorting priorities.
+- **Share a catalog or open a public instance.** Exchange catalogs with other instances, or let visitors use their own accounts through Search, Stremio and Torznab.
+- **Keep control.** Review uncertain identifications, see request history, understand storage use and find any setting from the search bar on desktop or mobile.
 
-Already using someone else's public instance? Start with [the visitor guide](docs/PUBLIC_INSTANCES.md#use-a-public-instance). You do not need to host AIOSources or create an administrator account.
+Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INSTANCES.md#use-a-public-instance). You do not need Docker or an AIOSources administrator account.
 
-## Get started
+## Install your instance
 
-You need Docker Compose and a source connection you are authorized to use. TMDB information is needed for film and series identification. A supported debrid account is optional for administrators and required for debrid playback.
+### Requirements
 
-### 1. Start your instance
+- A server or computer running Docker with Docker Compose. Linux `amd64` and `arm64` images are available.
+- Access to compatible sources you are authorized to use. Source configurations are supplied by you.
+- A [TMDB API read access token](https://www.themoviedb.org/settings/api) for film and series identification.
+- Optionally, an account with a supported debrid service for debrid playback and downloads.
+- An HTTPS address for use over the internet. HTTP is suitable for a trusted local network.
 
-Save the following as `compose.yaml`. Replace `XXX.XXX.XXX.XXX` with your server address and `XXX` with an administrator password of 12–72 bytes. Change the example database password in **both** `POSTGRES_PASSWORD` and `DATABASE_URL`.
+### Start with Docker Compose
 
-This example is for a trusted local network. For internet access, use HTTPS, set `PUBLIC_URL` to the external HTTPS address and protect access to administration. See [deployment settings](docs/SETTINGS.md) for other setups.
+Save this as `compose.yaml`. Replace `XXX.XXX.XXX.XXX` with your server address and `XXX` with an administrator password of 12–72 bytes. Change the database password in **both** `POSTGRES_PASSWORD` and `DATABASE_URL`.
 
 ```yaml
 services:
@@ -57,7 +63,7 @@ services:
     ports:
       - 7000:7000
     networks:
-      - aiosources # Also connect AIOStreams to this network.
+      - aiosources # Also connect AIOStreams to this network if needed.
       - aiosources_postgres
     dns:
       - 1.1.1.1
@@ -71,155 +77,100 @@ networks:
   aiosources_postgres:
 ```
 
-Start it:
+Start the application:
 
 ```sh
 docker compose up -d
 ```
 
-Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. Keep both data volumes: they contain your catalog, configuration and encrypted credentials. Images support Linux `amd64` and `arm64`.
+Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. Keep both volumes: they contain your settings, catalog and credentials. For internet access, configure HTTPS and set `PUBLIC_URL` to that external address; changing this value does not enable HTTPS by itself. See [installation settings](docs/SETTINGS.md).
 
-### 2. Add your sources
+## First steps
 
-Open **Sources → Settings → Add source**. Use the visual editor or import your own source JSON. Select any required credential through **Secrets**, check the configuration and save.
+1. **Add a source** in **Sources → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
+2. **Set up film and series information** in **Metadata → Settings** with your TMDB token. Enable automatic information updates and identification. Use **Identification** to review uncertain matches or choose the correct title yourself.
+3. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
+4. **Open Search** to find a title, or create a connection for your preferred application below.
 
-Enable the source, then use **Run manual import → Preview** to check a sample before publishing records. When it looks right, start an import and choose an automatic update in its **Schedules** section. Saving a definition does not contact the source. Connect a Torznab or JSON API, or read a website directly with the **HTML** source template. See [source setup](docs/CONFIGURATION.md), [HTML source setup](docs/HTML_SOURCES.md) and [supported connectors](docs/CONNECTORS.md).
-
-### 3. Set up identification and playback
-
-In **Metadata → Settings**, add your own [TMDB API read access token](https://www.themoviedb.org/settings/api). Enable automatic information updates and torrent identification. Review uncertain results in **Identification**; you can search for the correct title and choose a match.
-
-For debrid playback, add your key in **Debrid → Settings**. Supported services, in alphabetical order: **AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox**. Cache checks depend on what each service can verify; unknown availability is never presented as a cache miss. See [debrid playback](docs/DEBRID.md) for service differences and setup. AllDebrid checks can create temporary account entries; AIOSources only cleans up entries it has confirmed it created.
-
-If a service needs a different outgoing connection, open **Administration → Network**. Add an existing WARP, VPN or other proxy, test it, then select it for that service in **Routing**. You can also route all outgoing connections or individual sources through it. See [proxy setup](docs/NETWORK.md).
-
-### 4. Search and connect an app
-
-Open **Search**, find a title and compare its releases, or [connect Stremio, AIOStreams or a Torznab client](#connect-your-apps).
-
-## Find the version you want
-
-**Search** shows identified films and series, with local titles and aliases. Searching the catalog does not query your sources or TMDB. For a series, choose a season and episode to see corresponding releases and season packs.
-
-Results are largest first, and **Cached results only** is enabled by default. Turn it off to include versions that need preparation. The language filter includes your browser language, MULTI and unknown audio by default; disable it to see every language. An optional year filter also matches a series spanning that year.
-
-Choose **Download** to start a ready file in your browser. Choose **Add to debrid** to prepare an uncached version, then **View operation** to follow progress in **Debrid → History**. Downloads from the web interface use your instance's bandwidth without saving the file on its disk. Stremio uses direct provider playback links.
-
-**Torrents** lists individual imported records, including unidentified releases. Use title fragments, source IDs or complete or partial info hashes. **Identification** uses the same search syntax when reviewing matches. These pages help explain why a release appears, is missing or needs a correction.
+A new source becomes available after its first successful complete import. A paused import can usually resume; its history explains whether it is waiting for a limit, a source response or an action from you.
 
 ## Connect your apps
 
-### Stremio and AIOStreams
+### Stremio, Nuvio and AIOStreams
 
-1. Open **Connections → Stremio → Settings** and create a connection.
-2. Choose any optional **Filters**: media types, sources, playback services, languages and cached-only results. New connections have no optional filter or limit enabled. Use **Sorting** to combine up to three rules, each ascending or descending. **Advanced → Request limits** and **Advanced → Expiration** control access.
-3. Save the generated manifest URL securely and enable the connection.
-4. Install that URL in Stremio or add it as a custom addon in AIOStreams. When AIOSources handles debrid playback, leave AIOStreams' **Service Wrap** and **Reconfigure Service** disabled for this addon.
+1. Open **Connections → Stremio → Settings** and choose **Create access**.
+2. Give the connection a name. Optionally choose **Filters**, up to three **Sorting** priorities, or an expiration date and request limits under **Advanced**.
+3. Save the installation link when shown, then enable the connection.
+4. Install the manifest URL as a custom addon in Stremio or Nuvio, or add it as a custom addon in AIOStreams. Use an address reachable by that application.
 
-**Maximum results** limits both the response and the torrents considered for new availability checks, using your sorting rules and already-known cache information. **Maximum cached results** stops new checks once enough cached torrents are found; other unchecked results remain **Unknown**, and existing local cache observations can supply more without provider calls. When **Cached results only** is enabled, only the cached limit applies and caps the returned results. An optional **Stream response timeout** sets this connection’s availability wait within the instance request deadline. Empty controls use the normal instance behavior.
+When AIOSources provides debrid playback, leave **Service Wrap** and **Reconfigure Service** disabled for this addon in AIOStreams. Keep installation links private: they grant access without your administrator password. You can disable, replace or delete each connection independently.
 
-Create as many connections as you need. Each has independent settings and can be disabled or revoked. Saved filter changes apply to its existing URL without reinstalling. New connections include all sources by default.
+### Torznab-compatible applications
 
-Keep installation URLs private: they grant the access you configured. Private-source uncached playback needs an announce URL; without one, those sources are offered only when the requested video is confirmed cached. **Cached results only** excludes direct torrent playback and administrator announces. See [public access and privacy](docs/PUBLIC_INSTANCES.md) for the visitor rules.
+Open **Connections → Torznab**, create and enable an access, then copy its URL and API key into your client. Configure the sources, media types and optional filters for that connection. Your download client handles downloading. See the [Torznab guide](docs/TORZNAB.md).
 
-### Torznab-compatible apps
+## Search, share and manage
 
-Open **Connections → Torznab → Settings**, create an access and select its filters. Enable it, then copy the Torznab URL and generated API key into your client. In Prowlarr, choose **Generic Torznab**.
+**Search** finds identified films and series. Open a title to compare releases, select a ready download or add one to your debrid service. **Torrents** searches imported source records directly. Both search your local catalog; they do not send your search text to TMDB or your sources.
 
-Torznab offers the same sorting priorities, result caps, optional response timeout and advanced access sections where applicable. Its cached filters read existing observations without contacting debrid services; language sorting is reserved for Stremio and Search. Result caps apply across all pages.
+**Connections → Shared catalogs** lets you grant another instance access to selected data. **Sources → Remote catalogs** imports a catalog shared with you. Optional shared details, film and series information, and reusable cache observations require permission on both sides. Credentials and private announce URLs are never included. See [catalog sharing](docs/SHARING.md).
 
-Torznab searches your imported catalog without contacting your sources or TMDB. Each access can select several sources and media types, and additional URL filters can narrow it for different clients. Private-source magnets do not include the administrator's announce URL; recipients need their own authorized source access. See the [Torznab guide](docs/TORZNAB.md).
+**Administration → Public access** lets you offer Search, Stremio and Torznab independently. Visitors use their own credentials; they cannot open administration. Their keys and optional personal announce URLs are remembered in their browser, without being saved by AIOSources on the server. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
 
-## Exchange catalogs with another instance
-
-**Connections → Shared catalogs** lets you give each recipient a separate, revocable, read-only share. Choose the sources and fields they may receive, save the generated sharing password and enable the share.
-
-**Sources → Remote catalogs** imports a catalog shared with you. Add its URL and sharing password, enable the connection and choose an update interval. **Run manual import** also offers **Sync changes** or **Full resync**. Your current copy stays available until a new import completes successfully.
-
-Transfers always respect the selected sources and fields. The same **Shared data** menu on both sides lets you include torrent identifiers, seasons and episodes, languages, audio/video details and file information, plus film and series information and recent shareable debrid cache observations. Every optional group is off by default. Metadata is deduplicated by TMDB identity, local information stays authoritative, and identification is performed locally. Accounts, credentials, announce URLs, download links and matching decisions are never transferred. See [sharing and remote catalogs](docs/SHARING.md).
-
-## Offer public access
-
-An administrator can enable a visitor homepage in **Administration → Public access**. Visitors choose Stremio or, when allowed, Search and Torznab. Administration stays protected.
-
-For Stremio, visitors supply at least one personal key for a supported debrid service. Their encrypted installation URL contains their configuration; AIOSources does not save visitor keys or announce URLs. Validated keys and optional personal announce URLs are remembered automatically on the visitor’s browser in an encrypted configuration shared by Search, Stremio and Torznab; **Forget saved credentials** clears it. Verified provider-wide availability can be reused across users, independently for each debrid service. Account-only observations stay separate.
-
-The administrator chooses whether to disclose source names and allow visitors to supply their own announce URLs. Administrator keys and announces are never provided to visitors. Public links stop working when public access is disabled.
-
-**Allow public Search** lets visitors find films and series in the local identified catalog and download through their own debrid accounts. It uses the same language, year, version and cache controls as administrator Search, while keeping administrator pages protected. Downloads pass through the instance without being saved to disk.
-
-Set visitor request limits in **Administration → Public access → Request limits** (defaults: 12 link creations and 120 public requests per minute per visitor IP, with 50 simultaneous public requests per process). Each limit can be switched off independently, including the global concurrency limit. Behind Cloudflare or another reverse proxy, configure **Network → Incoming** to recognize visitor IPs securely. See [network setup](docs/NETWORK.md).
-
-Visitors must trust the host processing their keys and keep their installation URL private. Activity histories retain media requests and safe diagnostics for the configured history retention period (seven days by default). Read the [public instance guide](docs/PUBLIC_INSTANCES.md) before enabling this feature, including provider-specific limitations.
-
-## Keep track of your instance
-
-- **Statistics** show imported and identified records, pending work and service availability.
-- **History** follows each import, identification or playback operation. Open a specific run for its details.
-- **Logs** help explain errors and interruptions.
-- **Storage** shows where space is used. **Storage saving**, enabled by default, keeps the fields used by AIOSources and compatible apps instead of unnecessary source details.
-- **Security** manages encrypted secrets, two-step verification and active sessions.
-
-Diagnostic history is cleaned up after seven days by default; its duration and cleanup interval can be adjusted in Storage settings. Published records and saved progress for unfinished imports remain available. A cancelled or paused import may therefore retain preparation data; retained history is not the same as the live catalog. See [storage and operations](docs/OPERATIONS.md).
-
-Use **Interface preferences**, beside About, to choose the page size, date format, time zone and a lighter refresh mode on your browser. Advanced controls stay folded on the relevant page: identification resources and matching reliability in Metadata, retry policies in Sources and Debrid, authentication in Security, and download duration and configuration limits in Network. Defaults are ready to use; see [application settings](docs/CONFIGURATION_REVIEW.md) when you need to adjust them.
-
-Changing the storage mode affects new imports. If you want to import everything again, **Storage → Settings → Maintenance → Reset all source data** removes imported data and history while retaining source definitions, secrets, schedules, TMDB information and debrid caches. Review the confirmation carefully: this cannot be undone.
+Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, two-step verification and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options inside **Advanced**.
 
 ## Update or try a preview
 
-The example follows the **stable** channel:
+The example uses `:stable`, the recommended channel. To update:
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-Keep both volumes and their encryption key. Interrupted work resumes from its saved progress when eligible; manually paused work remains under your control.
+Back up both volumes before updating. Keep them when recreating containers; `docker compose down -v` deletes them.
 
-To test upcoming changes, replace `:stable` with `:preview` in the image name, then run the same commands. Previews may contain bugs. Test against separate data if you need a safe return to an older version: a database upgraded by a preview may not work with an older image. [Releases](https://github.com/theo-bnts/aiosources/releases) include the exact image for each build.
+To test a prerelease, replace `:stable` with `:preview` and run the same commands. Preview builds may contain unfinished changes. A `:sha-FULL_COMMIT_SHA` image pins an exact build. Back up before switching channels: an older image may not accept data already upgraded by a newer version.
 
-**Coming from V1?** Back up your V1 volumes and keep them separately. V2 needs fresh application and database volumes; V1 data is not migrated automatically. See [first deployment and upgrades](docs/SETTINGS.md#first-aiosources-deployment).
+**Moving from V1?** Back up your V1 volume and start V2 with fresh volumes. V1 data cannot be used directly by V2. Keep the original backup until you are satisfied with the migration.
 
-## Optional environment settings
+## Environment settings
 
-Most settings and credentials are managed from the interface. The complete application environment list is below; deployment and development options are documented in [Deployment and settings](docs/SETTINGS.md).
+Most options are configured in the application. These are the supported AIOSources environment variables; source, TMDB and debrid keys belong in **Secrets**.
 
-<details>
-<summary>All supported application environment variables</summary>
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection address; required. |
+| `PUBLIC_URL` | Address used by your apps and shared links, including scheme and port when needed. |
+| `ADMIN_PASSWORD` | Administrator sign-in password. Set one explicitly for a Compose installation. |
+| `DATA_DIR` | Persistent application data; `/data` in the image. |
+| `PROVIDERS_DIR` | Source configuration folder; `/data/providers` in the image. |
+| `BIND` | Listening address; `0.0.0.0:7000` in the image. |
+| `MASTER_KEY` | Optional encryption key for deployments that manage their own key. Preserve the existing key when updating. |
 
-| Variable | Image default | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | Required | PostgreSQL connection URL. |
-| `BIND` | `0.0.0.0:7000` | Address and port on which the application listens. |
-| `PUBLIC_URL` | Unset | Exact external HTTP(S) origin, for example `https://sources.example.com`, also used for link previews. Setting this does not enable HTTPS; HTTPS is required for catalog sharing and public access. |
-| `ADMIN_PASSWORD` | Generated when omitted | Administration password, 12–72 bytes. An omitted password is saved as `/data/admin-password`; it can be read locally with `/aiosource password`. |
-| `DATA_DIR` | `/data` | Private application state, including the encryption key. Preserve this storage when updating. |
-| `PROVIDERS_DIR` | `/data/providers` | Private JSON source definitions. |
-| `MASTER_KEY` | Generated `vault.key` in `DATA_DIR` | Optional existing 32-byte encryption key, encoded in base64 or hexadecimal. Never change the key of an existing installation. |
+See [installation settings](docs/SETTINGS.md) before changing paths, passwords or encryption keys.
 
-Native installations use `.ingest`, `providers` and `127.0.0.1:8080` for the state directory, source directory and listen address. The image uses the defaults above. `PUBLIC_URL` declares an address; it does not enable HTTPS itself.
+## Documentation
 
-TMDB, debrid and source keys belong in **Security → Secrets**. They have no dedicated deployment variables. Import concurrency defaults to **5**, adjustable from **1 to 32** in Sources settings.
+- [Sources and schedules](docs/CONFIGURATION.md) · [HTML source setup](docs/HTML_SOURCES.md)
+- [Search, identification, history and storage](docs/OPERATIONS.md)
+- [Debrid services and downloads](docs/DEBRID.md)
+- [Stremio, Nuvio and public instances](docs/PUBLIC_INSTANCES.md) · [Torznab](docs/TORZNAB.md)
+- [Shared and remote catalogs](docs/SHARING.md)
+- [Network and proxies](docs/NETWORK.md) · [Installation and updates](docs/SETTINGS.md)
 
-For an older deployment using prefixed variables, remove `INGEST_` from those names before updating. Preserve every value, path and volume; `DATABASE_URL` keeps its name. Obsolete deployment names are rejected to prevent accidentally creating different credentials.
+## Help and support
 
-</details>
+- [GitHub issues](https://github.com/theo-bnts/aiosources/issues) for reproducible bugs and suggestions. Remove keys, private links and personal data from reports.
+- [Discord](https://discord.gg/h3sja5XN8b) for community help **in French only**.
+- [GitHub Sponsors](https://github.com/sponsors/theo-bnts) to support the project.
 
-## Help and contributions
-
-- [Discord support — French only](https://discord.gg/h3sja5XN8b)
-- [Report a bug or suggest an improvement](https://github.com/theo-bnts/aiosources/issues)
-- [Source setup](docs/CONFIGURATION.md) · [Connector compatibility](docs/CONNECTORS.md) · [Sharing](docs/SHARING.md) · [Public instances](docs/PUBLIC_INSTANCES.md)
-- [Deployment](docs/SETTINGS.md) · [Proxy setup](docs/NETWORK.md) · [Operations and troubleshooting](docs/OPERATIONS.md)
-- [Contributing](CONTRIBUTING.md) · [Development](docs/DEVELOPMENT.md) · [JSON reference](docs/JSON_REFERENCE.md)
-- [Report a security issue privately](SECURITY.md) · [Content rights and service terms](LEGAL.md)
-- [Support AIOSources on GitHub Sponsors](https://github.com/sponsors/theo-bnts)
+Contributions are welcome: see [Contributing](CONTRIBUTING.md). Report security issues [privately](SECURITY.md).
 
 ## License and acknowledgements
 
-AIOSources is available under the [MIT License](LICENSE). It builds on [Ingest](https://github.com/moodiness/ingest), including its Torznab SDK, with the original copyright and license notices preserved. Included libraries, icons and fonts retain their own licenses; see the [third-party notices](web/public/THIRD-PARTY-NOTICES.txt).
+AIOSources is distributed under the [MIT license](LICENSE). Use it only with content and services you are authorized to access; see [usage and service terms](LEGAL.md).
 
-Film and series information is supplied by [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Its API and data have separate [usage and attribution requirements](https://developer.themoviedb.org/docs/faq), including licensing for commercial use. TMDB attribution and licenses are also accessible from **About AIOSources** in the application.
+Built on [Ingest](https://github.com/moodiness/ingest). Original copyrights and [third-party license notices](web/public/THIRD-PARTY-NOTICES.txt) are preserved.
 
-AIOSources is an independent project. Stremio, AIOStreams, TMDB and debrid service names identify compatible services and do not imply affiliation or endorsement.
+This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq).

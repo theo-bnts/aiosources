@@ -1,66 +1,37 @@
-# Read a website directly
+# Configure an HTML source
 
-[Source setup](CONFIGURATION.md) · [Source compatibility](CONNECTORS.md) · [JSON reference](JSON_REFERENCE.md)
+[Back to README](../README.md) · [Source setup](CONFIGURATION.md)
 
-Choose the **HTML** template in **Sources → Settings → Add source** to import a website without an API or bridge. You configure how to read its pages; AIOSources then uses the usual imports, schedules, histories, identification and app connections.
+Use the **HTML** template for a website whose listings are present in the page HTML. You need permission to collect from the site and enough knowledge of its page structure to select the right elements.
 
-No website definitions are bundled. Use a source you are authorized to access.
+## Build the listing
 
-## Set up a source
+1. In **Sources → Settings → Add source**, choose **HTML** and enter the listing address.
+2. Set the selector for one result row. Choose an element that repeats once per record and excludes headers, adverts and navigation.
+3. Select the record's title and stable identifier. Read the appropriate text or link attribute. If the identifier comes from a URL, ensure it stays the same when the title changes.
+4. Add the fields available on the listing: size, publication date, categories, info hash or magnet link, and other useful details.
+5. Configure pagination, including the next-page link or page number, so the importer recognizes when no further page is available.
 
-1. **Identity:** choose its display name and a stable source identifier.
-2. **Connection:** enter the listing URL. If needed, select an authentication secret. A session cookie belongs in **Secrets**, using **Cookie** authentication; never paste it into the definition. Existing proxy routing and request limits apply.
-3. **Pagination:** choose **Follow next-page links**, or page/offset parameters if the website uses them. Specify the enabled next-link selector. For empty listings, configure a marker displayed only when no records exist.
-4. **Source fields:** identify the listing container, each record, and its stable ID. Map the title and any available hash, size, date, categories or other useful fields.
-5. Select **Check configuration**, save and enable the source, then use **Run manual import → Preview**. Inspect the records before importing or configuring its schedule.
-
-**Check configuration** validates the selectors and settings without contacting the website. **Preview** reads real pages without publishing them. Check more than the first page before rebuilding an existing catalog.
-
-## Find the right selectors
-
-Use your browser’s page inspector to find the listing container, one record and its fields. A CSS selector can use a class (`.title`), ID (`#catalog`), attribute (`a[rel=next]`) or structure (`tbody > tr[data-id]`).
-
-- **Listing container selector:** exactly one element unique to a valid listing. A shared header or generic `body` cannot distinguish a sign-in page from real results.
-- **Record selector:** one element per torrent, relative to that container. Exclude headings, advertisements and pagination.
-- **Native ID:** an attribute such as `data-id`, or an ID extracted from a detail link. Keep it stable between imports. An empty selector reads the current row itself.
-- **Field selector:** relative to one row, or to the detail container for detail fields. An empty attribute reads text; `href`, `datetime` and `data-*` read those attributes instead.
-
-Extraction patterns are optional. For a detail link `/items/123`, `/items/([0-9]+)` extracts `123`. A pattern may have one capture, or none to use its complete match. No match omits an optional field; a missing required field stops the page. A title is required for every imported record, from the listing or details.
-
-## Read hashes, sizes and dates
-
-Choose **Info hash or magnet link** for a hash or magnet. Only the hash is retained; magnet announce addresses are discarded. Choose **Read hash from a torrent file** when a link serves `.torrent` metadata. AIOSources reads the exact info-dictionary hash, not the content described by the torrent. Neither that file nor its announce addresses are saved as fields.
-
-**File size** accepts byte counts and units such as `1.5 GB` or `1,5 GiB`, including `Go` / `Gio` and `octets`. `GB` / `Go` use decimal units; `GiB` / `Gio` use binary units. Prefer an exact byte attribute when available. Approximate displayed sizes are rounded once to bytes.
-
-**Date** accepts ISO and email-style dates. For other displayed dates, enter a custom Go date layout, such as `02/01/2006 15:04`, and a timezone when absent from the page. A `datetime` attribute usually avoids custom formatting. Unix dates can use `options.published_at_unit`, as for other source adapters.
-
-Use **multiple values** for categories or languages. Do not map seeders, peers or leechers: their transient counts are not retained by the application.
+Selectors are CSS selectors. Text and attribute extraction are configured separately. Avoid relying only on a row's position: the page can change when a new record is added.
 
 ## Detail pages
 
-Expand **Source fields → Detail pages** when the listing does not provide all needed fields. Configure its row-relative detail link, one valid detail container and the extra field mappings.
+If a listing does not include an info hash or useful details, configure a detail-page link and selectors for those fields. Detail requests increase the number of calls, so choose a suitable request interval.
 
-AIOSources requests a detail page only when one of its mapped fields is absent from the listing. It keeps values already read from the listing. A missing required detail field or failed detail request stops that listing page; it does not publish a partial page. The requests use the source’s authentication, proxy, pacing and quotas.
+Keep detail links on the expected site and use the authentication method required by that site. Store credentials in **Secrets**. Reuse **Check configuration** and **Preview** after changing selectors or pagination.
 
-If an HTTP 200 detail response temporarily omits its configured container, AIOSources retries that detail up to three times by default, using the source-error policy captured when the run started. Set its count and delays in **Sources → Settings → Advanced → Temporary source errors**. Source pacing and request limits still apply. Successful details already read in the current page are kept in memory during these retries. Persistent failures still stop the page with its previous checkpoint intact; a missing detail is never accepted as an empty record. Authentication errors and ambiguous containers remain actionable errors.
+## Check before collecting
 
-Detail and torrent-file requests stay on the source’s origin. They do not follow a site link to another host or downgrade HTTPS. Only explicitly selected listing, detail and torrent-file requests are made: scripts, images, styles and other embedded resources are not fetched or executed.
+Preview several records and more than one listing page. Check that titles, identifiers and sizes belong to the same record, and that the last page stops correctly. Confirm that missing optional values do not become part of another result.
 
-## Pagination and recovery
+Use unrestricted listings when you want all categories. Some sites expose only recent pages or a fixed number of results; scheduling every 30 minutes cannot guarantee completeness if more records arrive between imports than those pages retain.
 
-For next-link pagination, no matching enabled next link means the valid listing has ended. Select a real next link, not the last-page link. Duplicate top/bottom links to the same next page are supported. Conflicting links, repeated pages and unsafe continuations fail rather than looping.
+## Limits and troubleshooting
 
-For numbered pages, configure the parameter and starting page/offset. Leave the next-link selector empty to continue until a confirmed empty page. A short page alone is not the end. The page-size parameter is optional: many websites have a fixed size and ignore it. Explicit next links are authoritative GET URLs; static query or form values are not reapplied to them.
+- Pages requiring JavaScript rendering cannot be collected by the HTML template alone.
+- Login challenges, CAPTCHA and anti-bot checks may prevent collection. AIOSources does not bypass them.
+- A site redesign can invalidate selectors. Inspect a failed run, update the definition and preview it again.
+- A successful request does not necessarily contain the expected listing: a login or error page may be returned instead.
+- Respect the site's access rules and rate limits. Faster polling does not expand the history made available by the site.
 
-If a site returns an empty response when no user agent is supplied, configure an identifying `User-Agent` in **Connection → Headers**, then check Preview again.
-
-The empty-result selector must match an actual empty-state marker when no rows exist. Missing rows without that marker are an error. This prevents a changed layout, sign-in page or temporary challenge from being treated as an empty catalog. Optional **Response checks** can also verify the current position and total; configured totals must stay consistent during the run.
-
-For several sections with the same layout, add their paths in **Connection → Additional listings**. The source URL is imported first, followed by the additional paths. Each section has its own pagination and Incremental stopping boundary; they share request pacing, secrets, proxy and source identity. A rebuild publishes only after every section completes.
-
-Complete listing pages are committed with their continuation. Details are part of that same atomic page: an interruption retries the current listing and its details, while earlier committed pages remain saved. **Preview**, **Update**, **Rebuild source catalog**, page budgets, quotas and known-page stopping use the ordinary import behavior. A failed or paused rebuild leaves the previous published catalog available.
-
-The connector reads HTML returned by the server. It does not run JavaScript, sign in through interactive forms, solve challenges or import Cardigann definitions. For a supported HTML search form, choose POST and provide its non-secret form values as a JSON object in Connection; the request is sent as a form. Cookies and other credentials still use Secrets.
-
-A successful traversal covers only the listing the website exposes. A recent-only feed, capped search window or omitted next link cannot prove that all historical records are available.
+For import states, pauses and recovery, see [History and troubleshooting](OPERATIONS.md#history-and-troubleshooting).
