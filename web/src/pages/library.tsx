@@ -117,7 +117,7 @@ function BrowseFilters({
             </select>
           </>
         )}
-        <Button variant="outline" type="submit">
+        <Button id={hideProvider ? 'raw-submit' : 'library-submit'} variant="outline" type="submit">
           Search
         </Button>
         <ClearFiltersButton
@@ -218,7 +218,7 @@ export function TorrentsPage() {
                     <ClearFiltersButton onClear={() => applyFilters({})} />
                   ) : (
                     <Button variant="outline" asChild>
-                      <Link to="/providers">Choose a source</Link>
+                      <Link to="/providers/settings">Choose a source</Link>
                     </Button>
                   )
                 }
@@ -291,12 +291,14 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
         provider=""
         q={q}
         hideProvider
-        onClear={() => setSearch(resetListView(search, [qKey, statusKey], offsetKey))}
+        onClear={() =>
+          setSearch(resetListView(search, [qKey, statusKey], offsetKey), { flushSync: true })
+        }
         onFilter={(_provider, nextQ) => {
           const next = new URLSearchParams(search)
           next.delete(offsetKey)
           nextQ ? next.set(qKey, nextQ) : next.delete(qKey)
-          setSearch(next)
+          setSearch(next, { flushSync: true })
         }}
       />
       <div className="space-y-3">
@@ -337,8 +339,8 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
         <p className="help">
           Errors and ignored records explain source import processing. Film and series
           identification is reviewed in{' '}
-          <Link className="data-link" to="/metadata">
-            Metadata
+          <Link className="data-link" to="/metadata/identification">
+            Identification
           </Link>
           .
         </p>

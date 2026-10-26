@@ -100,7 +100,7 @@ export function LogsPage() {
             return
           }
           setFilterError(null)
-          setSearch(next)
+          setSearch(next, { flushSync: true })
         }}
       >
         <fieldset className="flex flex-wrap gap-x-5 gap-y-2">
@@ -164,7 +164,7 @@ export function LogsPage() {
             <DateTimeInput id="log-to" name="to" defaultValue={to} />
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <Button type="submit">
+            <Button id="log-submit" type="submit">
               <MagnifyingGlassIcon />
               Apply filters
             </Button>
@@ -174,6 +174,7 @@ export function LogsPage() {
                 setClearVersion((value) => value + 1)
                 setSearch(
                   resetListView(search, ['level', 'provider', 'service', 'run', 'q', 'from', 'to']),
+                  { flushSync: true },
                 )
               }}
             />

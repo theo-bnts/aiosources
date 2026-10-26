@@ -89,7 +89,7 @@ export function MatchingDiagnostics() {
     next.delete('match_offset')
     for (const [key, value] of Object.entries(patch))
       value ? next.set(key, value) : next.delete(key)
-    setSearch(next)
+    setSearch(next, { flushSync: true })
   }
   return (
     <div className="page" id="matching-results">
@@ -156,9 +156,10 @@ export function MatchingDiagnostics() {
           </div>
         </Disclosure>
         <div className="flex flex-wrap gap-2">
-          <Button type="submit">Search</Button>
+          <Button id="matching-submit" type="submit">
+            Search
+          </Button>
           <ClearFiltersButton
-            active={status !== 'all' || Boolean(provider || q)}
             onClear={() => filter({ match_status: 'all', match_provider: '', match_q: '' })}
           />
         </div>

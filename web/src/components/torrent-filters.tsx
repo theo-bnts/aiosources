@@ -200,7 +200,9 @@ export function TorrentSearchForm({
       <QuerySorting value={sort} onChange={setSort} options={torrentSorting} />
       <input type="hidden" name="sort" value={sort} />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit">Search</Button>
+        <Button id="torrent-submit" type="submit">
+          Search
+        </Button>
         <ClearFiltersButton
           onClear={() => {
             form.current?.reset()

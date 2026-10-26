@@ -89,7 +89,33 @@ export function useViewSearchParams() {
   const [search, setSearch] = useSearchParams()
   const { state } = useLocation()
   const update = useCallback<SetURLSearchParams>(
-    (next, options) => setSearch(next, { state, ...options }),
+    (next, options) => {
+      const focused = options?.flushSync ? document.activeElement : null
+      const selection =
+        (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) &&
+        focused.selectionStart !== null
+          ? ([focused.selectionStart, focused.selectionEnd ?? focused.selectionStart] as const)
+          : undefined
+      setSearch(next, { state, ...options })
+      // Applied query values can replace their fields. Keep keyboard users in
+      // the same control without stealing focus from an explicitly opened view.
+      if (
+        focused instanceof HTMLElement &&
+        focused.id &&
+        !focused.isConnected &&
+        document.activeElement === document.body
+      ) {
+        const replacement = document.getElementById(focused.id)
+        if (replacement?.tagName === focused.tagName) {
+          replacement.focus({ preventScroll: true })
+          if (
+            selection &&
+            (replacement instanceof HTMLInputElement || replacement instanceof HTMLTextAreaElement)
+          )
+            replacement.setSelectionRange(...selection)
+        }
+      }
+    },
     [setSearch, state],
   )
   return [search, update] as const

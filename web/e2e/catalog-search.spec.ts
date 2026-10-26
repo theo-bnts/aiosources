@@ -198,6 +198,19 @@ test('catalog year is a single optional filter and survives opening a title and 
   await page.getByLabel('Type', { exact: true }).selectOption('')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await expect(page).toHaveURL(/\/search$/)
+  await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
+  // Clearing must also discard a draft that has not been submitted yet.
+  await page.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('Unsubmitted title')
+  await page.getByLabel('Year', { exact: true }).fill('2026')
+  await page.getByLabel('Type', { exact: true }).selectOption('movie')
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
 })
 
 for (const [code, status] of [
@@ -344,7 +357,22 @@ test('mobile download controls handle pending and ready responses without keepin
   await expect(page.getByRole('main')).toContainText('Example.Series.S02E03.UPDATED.1080p')
   await expect(link).toHaveCount(0)
   await page.getByLabel('Episode', { exact: true }).fill('4')
-  await page.getByRole('button', { name: 'Show episode', exact: true }).click()
+  const episodeResults = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/api/catalog/${ids.tv}/releases` &&
+      new URL(response.url()).searchParams.get('episode') === '4',
+  )
+  await page.getByLabel('Episode', { exact: true }).evaluate((element) => {
+    const field = element as HTMLInputElement
+    field.form!.requestSubmit()
+    const current = document.getElementById(field.id) as HTMLInputElement
+    current.value = '5'
+    current.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect((await episodeResults).ok()).toBe(true)
+  await expect(page).toHaveURL((url) => url.searchParams.get('episode') === '4')
+  await expect(page.getByLabel('Episode', { exact: true })).toHaveValue('5')
+  await expect(page.getByLabel('Episode', { exact: true })).toBeFocused()
   await expect(link).toHaveCount(0)
 })
 

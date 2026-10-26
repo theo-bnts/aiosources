@@ -85,7 +85,7 @@ function client(url: URL) {
   return connection
 }
 
-async function listen(server: Server): Promise<number> {
+export async function listen(server: Server): Promise<number> {
   // Stay below both reserved live-service ports, rather than trusting the OS's
   // ephemeral range. EADDRINUSE is a retry, never permission to reuse a service.
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -109,7 +109,7 @@ async function listen(server: Server): Promise<number> {
   throw new Error('Could not reserve an unused browser-test port.')
 }
 
-async function closeListener(server: Server) {
+export async function closeListener(server: Server) {
   if (server.listening) {
     await new Promise<void>((resolveClose, reject) =>
       server.close((error) => (error ? reject(error) : resolveClose())),

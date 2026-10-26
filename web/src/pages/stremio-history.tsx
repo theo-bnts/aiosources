@@ -154,7 +154,7 @@ export function StremioHistoryPage() {
     next.delete('offset')
     for (const [key, value] of Object.entries(patch))
       value ? next.set(key, value) : next.delete(key)
-    setSearch(next)
+    setSearch(next, { flushSync: true })
   }
   return (
     <div className="page">
@@ -212,13 +212,16 @@ export function StremioHistoryPage() {
             </select>
           </div>
         ))}
-        <Button variant="outline" type="submit" className="self-end">
+        <Button id="stremio-submit" variant="outline" type="submit" className="self-end">
           Search
         </Button>
         <div className="self-end">
           <ClearFiltersButton
-            active={Boolean(q || status || origin || kind)}
-            onClear={() => setSearch(resetListView(search, ['q', 'status', 'origin', 'kind']))}
+            onClear={() =>
+              setSearch(resetListView(search, ['q', 'status', 'origin', 'kind']), {
+                flushSync: true,
+              })
+            }
           />
         </div>
       </form>

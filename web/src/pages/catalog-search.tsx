@@ -19,7 +19,15 @@ import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
 import type { Page } from '@/lib/types'
 import type { CatalogTitle, CatalogRelease, CatalogSelection } from '@/lib/catalog-search-types'
-import { Empty, ErrorNotice, Loading, PageHeader, Pager, ResultCount } from '@/components/common'
+import {
+  ClearFiltersButton,
+  Empty,
+  ErrorNotice,
+  Loading,
+  PageHeader,
+  Pager,
+  ResultCount,
+} from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,7 +45,7 @@ import {
 function TitleDetails({ title }: { title: CatalogTitle }) {
   return (
     <p className="help">
-      {title.type === 'movie' ? 'Film' : 'Series'}
+      {title.type === 'movie' ? 'Movie' : 'Series'}
       {title.years.length > 0 && ` · ${title.years.join(', ')}`}
       {title.imdb && ` · ${title.imdb}`}
     </p>
@@ -88,7 +96,7 @@ export function CatalogSearchPage() {
           next.set('q', String(data.get('q') || '').trim())
           if (data.get('type')) next.set('type', String(data.get('type')))
           if (data.get('year')) next.set('year', String(data.get('year')))
-          setSearch(next)
+          setSearch(next, { flushSync: true })
         }}
       >
         <div className="field min-w-48 flex-1">
@@ -101,7 +109,7 @@ export function CatalogSearchPage() {
             minLength={2}
             maxLength={500}
             required
-            placeholder="Search films and series"
+            placeholder="Search movies and series"
           />
         </div>
         <Disclosure title="Filters" open>
@@ -114,8 +122,8 @@ export function CatalogSearchPage() {
                 className="native-select w-full"
                 defaultValue={kind}
               >
-                <option value="">Films and series</option>
-                <option value="movie">Films</option>
+                <option value="">Movies and series</option>
+                <option value="movie">Movies</option>
                 <option value="tv">Series</option>
               </select>
             </div>
@@ -134,10 +142,17 @@ export function CatalogSearchPage() {
             </div>
           </div>
         </Disclosure>
-        <Button type="submit">
-          <MagnifyingGlassIcon />
-          Search
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button id="catalog-submit" type="submit">
+            <MagnifyingGlassIcon />
+            Search
+          </Button>
+          <ClearFiltersButton
+            onClear={() => {
+              setSearch(new URLSearchParams(), { flushSync: true })
+            }}
+          />
+        </div>
       </form>
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       {q.trim().length < 2 ? (
@@ -353,7 +368,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                         next.set('season', String(data.get('season')))
                         next.set('episode', String(data.get('episode')))
                         next.delete('offset')
-                        setSearch(next)
+                        setSearch(next, { flushSync: true })
                       }}
                     >
                       <div className="field w-24">
@@ -398,7 +413,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                           defaultValue={selection.episode}
                         />
                       </div>
-                      <Button type="submit" variant="outline">
+                      <Button id="catalog-episode-submit" type="submit" variant="outline">
                         Show episode
                       </Button>
                     </form>

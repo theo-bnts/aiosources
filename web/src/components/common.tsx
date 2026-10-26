@@ -284,7 +284,17 @@ export function ClearFiltersButton({
   onClear: () => void
 }) {
   return (
-    <Button type="button" variant="outline" disabled={!active} onClick={onClear}>
+    <Button
+      type="button"
+      variant="outline"
+      disabled={!active}
+      onClick={(event) => {
+        const form = event.currentTarget.form
+        form?.reset()
+        form?.querySelector<HTMLInputElement>('input[name="q"]')?.focus({ preventScroll: true })
+        onClear()
+      }}
+    >
       <XIcon />
       Clear filters
     </Button>
