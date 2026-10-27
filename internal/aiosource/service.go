@@ -24,6 +24,8 @@ type Service struct {
 	MetadataHTTP              *http.Client
 	BookHTTP                  *http.Client
 	BookExportURL             string
+	BookAPIURL                string
+	bookRate                  metadataRequestLimiter
 	booksRunning              bool
 	booksCancel               context.CancelFunc
 	Network                   *outbound.Router
@@ -63,6 +65,8 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	life, cancel := context.WithCancel(ctx)
 	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}}
 	s.Network = &outbound.Router{Settings: db.NetworkSettings, Secrets: v.Resolve}
+	s.bookRate.setRate(1)
+	s.BookHTTP = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}
 	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
 	s.Providers.Client.Timeout = 0 // Per-request policy supplies the deadline.
 	s.Providers.Timeout = func(ctx context.Context) (time.Duration, error) { return s.outgoingTimeout(ctx, "debrid_seconds") }
@@ -104,6 +108,9 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	return err
 }
 func (s *Service) Close(ctx context.Context) error {
+	if s.BookHTTP != nil {
+		defer s.BookHTTP.CloseIdleConnections()
+	}
 	if s.MetadataHTTP != nil {
 		defer s.MetadataHTTP.CloseIdleConnections()
 	}
@@ -143,7 +150,7 @@ func (s *Service) State() (bool, bool, string) {
 var secretRefRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
-	if c.OpenLibraryDays < 1 || c.OpenLibraryDays > 366 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
+	if c.OpenLibraryMinutes < 5 || c.OpenLibraryMinutes > 1440 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid
 	}
 	refs := c.SecretReferences()

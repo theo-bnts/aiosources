@@ -80,6 +80,56 @@ async function seedBooks(page: Page, server: TestServer) {
   }
 }
 
+export async function exerciseBookSynchronizationControls(page: Page, server: TestServer) {
+  await seedBooks(page, server)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(`UPDATE ingest.ol_import_state SET complete=TRUE,position=3,imported=0,works=1,editions=1,authors=1,snapshot_at='2026-01-01T00:00:00Z',last_sync='2026-01-02T00:00:00Z';
+      UPDATE ingest.ol_changes_state SET needs_dump_after='2026-01-03T00:00:00Z',changes_through='2026-01-02T00:00:00Z',bootstrap_complete=FALSE;
+      INSERT INTO ingest.ol_change_jobs(id,revision,changed_at) VALUES('OL500W',2,'2026-01-03T00:00:00Z');`)
+  } finally {
+    await db.end()
+  }
+  await page.goto('/metadata')
+  await expect(page.getByText('Book synchronization', { exact: true }).locator('..')).toContainText(
+    'Waiting for a newer export',
+  )
+  await expect(
+    page.getByText('Book information pending', { exact: true }).locator('..'),
+  ).toContainText('1')
+  await expect(page.getByText('Book changes applied through', { exact: true })).toBeVisible()
+  await expect(page.getByText('Book export date', { exact: true }).locator('..')).toContainText(
+    '2026-01-01',
+  )
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  )
+  await page.goto('/metadata/settings')
+  const interval = page.getByLabel('Book information update interval (minutes)', { exact: true })
+  await expect(interval).toHaveValue('15')
+  await interval.fill('5')
+  const save = page.locator('main form').first().getByRole('button', { name: 'Save', exact: true })
+  await save.click()
+  await expect(save).toBeDisabled()
+  await page.reload()
+  await expect(interval).toHaveValue('5')
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Advanced$/ })
+    .click()
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Manual actions$/ })
+    .click()
+  await expect(
+    page.getByText(/Enable automatic book updates, or run Update book information/),
+  ).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  )
+}
+
 export async function exerciseBookSearch(page: Page, server: TestServer) {
   const book = await seedBooks(page, server)
   await coverImages(page)

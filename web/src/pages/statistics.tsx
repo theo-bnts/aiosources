@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { number, percentage, useDate } from '@/lib/format'
+import { bookSyncLabel } from '@/lib/book-sync'
 
 export function SourceStatisticsPage() {
   const location = useLocation()
@@ -159,6 +160,14 @@ function MetadataStatisticsPage() {
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const status = query.data
+  const showBookStatistics = Boolean(
+    status?.books &&
+    (status.config.openlibrary_enabled ||
+      status.books.complete ||
+      status.books.position > 0 ||
+      status.books.running ||
+      status.books.error),
+  )
   const identifiedTotal = status
     ? status.status.matched +
       status.status.ambiguous +
@@ -197,53 +206,53 @@ function MetadataStatisticsPage() {
                 />
               ))}
               <Statistic label="Film & series information pending" value={status.status.pending} />
-              {status.books &&
-                (status.config.openlibrary_enabled ||
-                  status.books.imported > 0 ||
-                  status.books.running ||
-                  status.books.error) && (
-                  <>
-                    <Statistic label="Book works" value={status.books.works} />
-                    <Statistic label="Book editions" value={status.books.editions} />
-                    <Statistic label="Book authors" value={status.books.authors} />
-                  </>
-                )}
+              {status.books && showBookStatistics && (
+                <>
+                  <Statistic label="Book works" value={status.books.works} />
+                  <Statistic label="Book editions" value={status.books.editions} />
+                  <Statistic label="Book authors" value={status.books.authors} />
+                  <Statistic label="Book information pending" value={status.books.pending} />
+                </>
+              )}
             </dl>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {status.books &&
-                (status.config.openlibrary_enabled ||
-                  status.books.imported > 0 ||
-                  status.books.running ||
-                  status.books.error) && (
-                  <>
-                    <Statistic
-                      label="Last successful book update"
-                      value={
-                        status.books.last_sync
-                          ? date(status.books.last_sync)
-                          : 'No completed update'
-                      }
-                      size="sm"
-                      to="/metadata/history?service=openlibrary"
-                    />
-                    <Statistic
-                      label="Book import"
-                      value={
-                        status.books.running
-                          ? `Running · ${number(status.books.imported)} records saved`
-                          : status.books.error
-                            ? 'Needs attention'
-                            : status.books.complete
-                              ? 'Completed'
-                              : status.books.position > 0
-                                ? `Interrupted · ${number(status.books.imported)} records saved`
-                                : 'Not started'
-                      }
-                      size="sm"
-                      to="/metadata/settings"
-                    />
-                  </>
-                )}
+              {status.books && showBookStatistics && (
+                <>
+                  <Statistic
+                    label="Last successful book update"
+                    value={
+                      status.books.last_sync ? date(status.books.last_sync) : 'No completed update'
+                    }
+                    size="sm"
+                    to="/metadata/history?service=openlibrary"
+                  />
+                  <Statistic
+                    label="Book synchronization"
+                    value={bookSyncLabel(status.books, status.config.openlibrary_enabled)}
+                    size="sm"
+                    to="/metadata/settings"
+                  />
+                  <Statistic
+                    label="Book changes applied through"
+                    value={
+                      status.books.changes_through
+                        ? date(status.books.changes_through)
+                        : 'Not established'
+                    }
+                    size="sm"
+                    to="/metadata/history?service=openlibrary"
+                  />
+                  <Statistic
+                    label="Book export date"
+                    value={
+                      status.books.snapshot_at
+                        ? status.books.snapshot_at.slice(0, 10)
+                        : 'Not established'
+                    }
+                    size="sm"
+                  />
+                </>
+              )}
               <Statistic
                 label="Last successful film & series update"
                 value={

@@ -11,7 +11,7 @@ export type Config = {
   auto_sync: boolean
   auto_match: boolean
   openlibrary_enabled: boolean
-  openlibrary_days: number
+  openlibrary_minutes: number
   sync_minutes: number
   match_seconds: number
   tmdb_requests_per_second: number
@@ -20,6 +20,12 @@ export type Config = {
   trackers: Record<string, Tracker>
 }
 export type BookStatus = {
+  snapshot_at: string | null
+  last_import: string | null
+  changes_through: string | null
+  pending: number
+  catching_up: boolean
+  needs_export: boolean
   skipped: number
   complete: boolean
   position: number

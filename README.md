@@ -88,7 +88,7 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. 
 ## First steps
 
 1. **Add a source** in **Sources → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
-2. **Set up film and series information** in **Metadata → Settings** with your TMDB token. Enable automatic information updates and identification. For books, enable Open Library updates in the same page; the first full import can take several hours or longer. Use **Identification** to review uncertain matches or choose the correct title yourself.
+2. **Set up film and series information** in **Metadata → Settings** with your TMDB token. Enable automatic information updates and identification. For books, enable Open Library updates in the same page; the first full import can take several hours or longer, then recent changes keep the catalog updated without another full download. Recovery requests a newer export if a gap is detected. Use **Identification** to review uncertain matches or choose the correct title yourself.
 3. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
 4. **Open Search** to find a title, or create a connection for your preferred application below.
 

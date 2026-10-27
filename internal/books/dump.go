@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"golang.org/x/text/language"
@@ -55,6 +56,8 @@ type Author struct {
 	Aliases []string `json:"aliases"`
 }
 type Record struct {
+	Revision int64
+	Modified *time.Time
 	Skipped  bool
 	Redirect *Redirect
 	Work     *model.AIOWork
@@ -74,11 +77,38 @@ func DecodeLine(line []byte) (Record, error) {
 	if len(cols) != 5 {
 		return Record{}, errors.New("invalid Open Library export record")
 	}
-	typ := string(cols[0])
+	revision, err := strconv.ParseInt(string(cols[2]), 10, 64)
+	if err != nil || revision < 1 {
+		return Record{}, errors.New("invalid Open Library export revision")
+	}
+	record, err := decodeRecord(string(cols[0]), string(cols[1]), cols[4])
+	record.Revision = revision
+	if modified, e := ParseTimestamp(string(cols[3])); e == nil {
+		record.Modified = &modified
+	}
+	return record, err
+}
+
+func (r Record) Key() string {
+	switch {
+	case r.Work != nil:
+		return r.Work.OpenLibrary
+	case r.Edition != nil:
+		return r.Edition.ID
+	case r.Author != nil:
+		return r.Author.ID
+	case r.Redirect != nil:
+		return r.Redirect.Source
+	default:
+		return r.Deleted
+	}
+}
+
+func decodeRecord(typ, key string, body []byte) (Record, error) {
 	if typ != "/type/work" && typ != "/type/edition" && typ != "/type/author" && typ != "/type/delete" && typ != "/type/redirect" {
 		return Record{}, nil
 	}
-	id := Key(string(cols[1]))
+	id := Key(key)
 	if id == "" {
 		if typ == "/type/delete" || typ == "/type/redirect" {
 			return Record{}, nil
@@ -86,7 +116,7 @@ func DecodeLine(line []byte) (Record, error) {
 		return Record{}, errors.New("invalid Open Library identifier")
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(cols[4], &fields); err != nil {
+	if err := json.Unmarshal(body, &fields); err != nil {
 		return Record{}, errors.New("invalid Open Library export JSON")
 	}
 	// Optional historical fields are not uniformly typed across all editions.

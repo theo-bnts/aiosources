@@ -192,7 +192,15 @@ func Parse(raw string, hints Hints) Release {
 	if r.Kind == "" {
 		return Release{}
 	}
-	r.Collection = collectionRE.MatchString(text) || volumePackRE.MatchString(text)
+	// An ISBN followed by EPUB is one book, not a thirteen-digit book count.
+	collectionText := isbnRE.ReplaceAllStringFunc(text, func(value string) string {
+		match := isbnRE.FindStringSubmatch(value)
+		if len(match) > 1 && ISBN(match[1]) != "" {
+			return " "
+		}
+		return value
+	})
+	r.Collection = collectionRE.MatchString(collectionText) || volumePackRE.MatchString(collectionText)
 	if years := yearRE.FindAllString(text, -1); len(years) > 0 {
 		r.Year, _ = strconv.Atoi(years[len(years)-1])
 	}

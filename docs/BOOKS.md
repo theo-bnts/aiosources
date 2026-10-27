@@ -11,11 +11,25 @@ AIOSources can identify ebooks, comics and audiobooks already present in your im
 3. Allow the first complete catalog import to finish. It can take several hours or longer and needs substantial additional database storage. The complete export contains many gigabytes even before it is imported; this option is off by default.
 4. Enable automatic identification, or use **Advanced → Manual actions → Identify torrents** after the book information import finishes.
 
-The default book update interval is 30 days, matching Open Library's monthly exports. You can change it. Saved import progress survives interruptions; automatic updates must remain enabled for automatic recovery. You can also retry from **Advanced → Manual actions → Update book information**.
+After the first import, AIOSources follows Open Library's recent changes. The default update interval is **15 minutes**, and you can change it under **Schedules**. Saved progress and pending updates survive interruptions. Automatic updates must remain enabled for automatic recovery. You can also run **Advanced → Manual actions → Update book information** immediately.
 
-An unreadable or abnormally large metadata record is skipped and counted in the update history, so it cannot block the remaining catalog. Interrupted transfers keep their saved progress.
+If an interruption or a busy upstream period makes the change history impossible to cover reliably, AIOSources automatically requests a fresh export. It checks daily while waiting for an export recent enough to cover the missing period. Recent changes continue to be collected and processed; the existing catalog stays available. **Statistics** distinguishes the export date, pending updates and the date through which changes have actually been applied. A catalog awaiting recovery is not reported as up to date.
+
+Recovery updates the existing records. Newer information obtained from the API is protected from older export records. Renamed titles, corrected editions, author changes, merges and deletions update the affected identifications. A complete, readable recovery export also retires records no longer present in that export; an export containing unreadable records is not used to infer absence.
+
+An unreadable or abnormally large metadata record is skipped and counted in the update history, so it cannot block the remaining catalog. Interrupted transfers keep their saved progress. A gzip transfer may need to be downloaded and read again up to the saved line; already committed book records are not duplicated.
 
 Only useful bibliographic information is retained: titles, authors, editions, identifiers, languages, dates and cover references. Full descriptions and image files are not stored. Review the space used in **Administration → Storage** before enabling the full catalog on a small server.
+
+## Freshness and remaining limits
+
+An update interval is a polling schedule, not a promise of instant availability. The first import, a backlog, network failures and provider quotas can delay updates. Open Library requests are paced across the whole instance, including change discovery and document reads. Grouped reads reduce the number of calls; missing or incompatible grouped responses fall back to individual reads. The application identifies itself honestly and does not invent contact details to obtain a higher allowance.
+
+Open Library publishes its [full exports monthly](https://openlibrary.org/developers/dumps). Its [Recent Changes API](https://openlibrary.org/dev/docs/api/recentchanges) has bounded pagination and does not offer an immutable replication cursor. A very busy day or an interruption can make a complete bridge impossible to prove. Recovery then depends on the publication of a newer export, which can take weeks or longer if its publication is delayed. New changes still flow while this warning is present. The API is experimental; a future incompatible response stops the affected progress instead of being silently accepted.
+
+Neither Open Library nor TMDB guarantees complete or error-free information. Missing editions, authors, identifiers, translations or cover references cannot be reconstructed reliably from nothing. Corrections become available after the provider publishes them and a successful local update applies them. Images remain remote and depend on their image services being reachable. Ambiguous identification still needs review.
+
+TMDB has different limits: its [daily exports](https://developer.themoviedb.org/docs/daily-id-exports) provide identifiers rather than complete film and series information, so details still require API calls. Its [change lists](https://developer.themoviedb.org/docs/tracking-content-changes) cover at most 14 days, and its [request limits](https://developer.themoviedb.org/docs/rate-limiting) can change. In the current application, a gap longer than 14 days requires a metadata rebuild from **Metadata → Settings → Advanced → Maintenance**. This manual recovery is an application choice, rather than a TMDB requirement to erase the local catalog. Read the confirmation: **Reset metadata** also removes book information, while keeping source records and manual choices. Saved progress within a valid update window survives restarts.
 
 ## Find and download a book
 

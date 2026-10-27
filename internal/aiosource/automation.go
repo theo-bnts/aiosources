@@ -109,7 +109,7 @@ func (s *Service) runAutomation() time.Duration {
 		poll = min(poll, time.Duration(c.MatchSeconds)*time.Second)
 	}
 	if c.OpenLibraryEnabled && !s.BookState() {
-		if due, e := s.DB.OpenLibraryDue(s.ctx, c.OpenLibraryDays); e == nil && due {
+		if due, e := s.DB.OpenLibraryDue(s.ctx, c.OpenLibraryMinutes); e == nil && due {
 			_ = s.StartBooks("automatic")
 		}
 	}

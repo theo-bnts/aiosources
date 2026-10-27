@@ -15,6 +15,18 @@ func TestISBNValidation(t *testing.T) {
 	}
 }
 
+func TestISBNBeforeTheFileFormatIsNotMistakenForABookCollection(t *testing.T) {
+	for _, title := range []string{"Opaque ISBN 9781861972712 EPUB", "Opaque 978-1-86197-271-2 EPUB", "Opaque 1861972717 EPUB"} {
+		release := Parse(title, Hints{})
+		if release.ISBN != "9781861972712" || release.Collection {
+			t.Fatal("one checksum-verified book was treated as a collection", title, release)
+		}
+	}
+	if release := Parse("2 Books ISBN 9781861972712 EPUB", Hints{}); !release.Collection {
+		t.Fatal("an explicit collection lost its review requirement", release)
+	}
+}
+
 func TestBookReleaseEvidence(t *testing.T) {
 	for _, tc := range []struct {
 		raw                 string

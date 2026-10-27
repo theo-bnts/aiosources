@@ -121,7 +121,7 @@ add(
     ],
     [
       'metadata.book-interval',
-      'Book information update interval (days)',
+      'Book information update interval (minutes)',
       'Open Library schedule frequency cadence',
     ],
     ['metadata.match', 'Automatically identify torrents'],

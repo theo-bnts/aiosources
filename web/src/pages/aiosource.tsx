@@ -187,7 +187,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       | 'tmdb_requests_per_second'
       | 'cache_minutes'
       | 'response_seconds'
-      | 'openlibrary_days',
+      | 'openlibrary_minutes',
     min: number,
     max: number,
   ) => (
@@ -309,11 +309,16 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 </div>
                 <div className="space-y-4">
                   {toggle('Automatically update book information', 'openlibrary_enabled')}
-                  {number('Book information update interval (days)', 'openlibrary_days', 1, 366)}
+                  {number(
+                    'Book information update interval (minutes)',
+                    'openlibrary_minutes',
+                    5,
+                    1440,
+                  )}
                   <p className="help">
-                    Open Library's full monthly export is imported into the local catalog. The first
-                    import can take several hours and requires additional database storage. Only
-                    useful book information is saved; cover images stay remote.
+                    The first catalog import can take hours and needs substantial storage. Later
+                    updates follow recent changes, with a fresh export when recovery is needed.
+                    Cover images stay remote.
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -447,8 +452,17 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               )}
               {status.books?.running && (
                 <p role="status" className="help">
-                  Importing book information. Progress is saved automatically and continues after an
+                  Updating book information. Progress is saved automatically and continues after an
                   interruption.
+                </p>
+              )}
+              {status.books?.needs_export && (
+                <p role="status" className="notice notice-warning">
+                  Change continuity was lost. A newer Open Library export is needed to cover the
+                  missing period. Existing data is retained.{' '}
+                  {status.config.openlibrary_enabled
+                    ? 'Recent updates continue while automatic recovery waits for that export.'
+                    : 'Enable automatic book updates, or run Update book information to retry manually.'}
                 </p>
               )}
               {status.error && (

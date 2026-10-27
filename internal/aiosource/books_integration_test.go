@@ -16,6 +16,20 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
+func serveBookFixtureFeed(w http.ResponseWriter, r *http.Request) bool {
+	if r.URL.Path == "/recentchanges.json" {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"id":"1","timestamp":"2026-01-01T12:00:00","changes":[]}]`)
+		return true
+	}
+	if strings.HasPrefix(r.URL.Path, "/recentchanges/") {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `[{"id":"1","timestamp":"2026-01-01T12:00:00","changes":[]}]`)
+		return true
+	}
+	return false
+}
+
 func TestBookImportResumesCommittedExportWithoutDuplicates(t *testing.T) {
 	ctx, s, _ := testService(t)
 	var buffer bytes.Buffer
@@ -32,6 +46,9 @@ func TestBookImportResumesCommittedExportWithoutDuplicates(t *testing.T) {
 	var broken atomic.Bool
 	broken.Store(true)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveBookFixtureFeed(w, r) {
+			return
+		}
 		if !strings.HasPrefix(r.UserAgent(), "AIOSources/") {
 			t.Error("missing application identification")
 		}
@@ -44,7 +61,8 @@ func TestBookImportResumesCommittedExportWithoutDuplicates(t *testing.T) {
 	}))
 	defer server.Close()
 	s.BookHTTP = server.Client()
-	s.BookExportURL = server.URL
+	s.BookExportURL = server.URL + "/ol_dump_2026-01-01.txt.gz"
+	s.BookAPIURL = server.URL
 	if err := s.SyncBooks(ctx, "manual"); err == nil {
 		t.Fatal("incomplete export was accepted")
 	}
@@ -257,12 +275,16 @@ func TestInterruptedBookRefreshWithdrawsChangedEditionEvidence(t *testing.T) {
 func TestBookImportRespectsExportRetryAfter(t *testing.T) {
 	ctx, s, conn := testService(t)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if serveBookFixtureFeed(w, r) {
+			return
+		}
 		w.Header().Set("Retry-After", "3600")
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer upstream.Close()
 	s.BookHTTP = upstream.Client()
-	s.BookExportURL = upstream.URL
+	s.BookExportURL = upstream.URL + "/ol_dump_2026-01-01.txt.gz"
+	s.BookAPIURL = upstream.URL
 	if err := s.SyncBooks(ctx, "manual"); err == nil {
 		t.Fatal("rate-limited export succeeded")
 	}
@@ -298,6 +320,9 @@ func TestBookImportBoundsHeadersWithoutTimingOutHealthyTransfers(t *testing.T) {
 				t.Fatal(err)
 			}
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if serveBookFixtureFeed(w, r) {
+					return
+				}
 				if !headers {
 					<-r.Context().Done()
 					return
@@ -315,7 +340,8 @@ func TestBookImportBoundsHeadersWithoutTimingOutHealthyTransfers(t *testing.T) {
 			}))
 			defer upstream.Close()
 			s.BookHTTP = upstream.Client()
-			s.BookExportURL = upstream.URL
+			s.BookExportURL = upstream.URL + "/ol_dump_2026-01-01.txt.gz"
+			s.BookAPIURL = upstream.URL
 			started := time.Now()
 			err = s.SyncBooks(ctx, "manual")
 			if headers && err != nil {

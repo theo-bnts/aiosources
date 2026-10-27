@@ -64,38 +64,19 @@ func (s *Service) StopBooks() {
 
 // Bulk export access is intentionally independent of TMDB credentials and API
 // quotas. Only compact bibliographic data is retained, never full dump JSON.
-func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error) {
-	release, locked, err := s.DB.AIOLock(ctx, "openlibrary")
+func (s *Service) syncBookExport(ctx context.Context, h *operationHistory) error {
+	status, err := s.DB.OpenLibraryStatus(ctx)
 	if err != nil {
 		return err
 	}
-	if !locked {
-		return model.ErrBusy
+	if status.DataComplete && !status.Complete {
+		return s.finishBookExport(ctx, h)
 	}
-	defer release()
-	retryDelay := 15 * time.Minute
-	h, err := s.beginOperation(ctx, "metadata", "openlibrary", trigger, "", "openlibrary")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		h.finish(ctx, syncErr)
-		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		_ = s.DB.RecordBookInformationActivity(final, syncErr, h.run.Processed, h.run.Errors)
-		if syncErr != nil {
-			message := "Book information update failed. Saved progress is preserved; retry the update to continue."
-			if errors.Is(syncErr, context.Canceled) {
-				message = "Book information update interrupted. Saved progress is preserved."
-			}
-			_ = s.DB.FailOpenLibrary(final, message, time.Now().Add(retryDelay))
-		}
-	}()
 	prior, etag, _, err := s.DB.OpenLibraryCheckpoint(ctx)
 	if err != nil {
 		return err
 	}
-	status, err := s.DB.OpenLibraryStatus(ctx)
+	status, err = s.DB.OpenLibraryStatus(ctx)
 	if err != nil {
 		return err
 	}
@@ -110,6 +91,9 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	defer requestCancel()
 	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
 	if err != nil {
+		return err
+	}
+	if err = s.bookRate.wait(ctx); err != nil {
 		return err
 	}
 	req.Header.Set("User-Agent", openLibraryAgent)
@@ -142,7 +126,9 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		if response.StatusCode == http.StatusTooManyRequests || response.StatusCode == http.StatusServiceUnavailable {
-			retryDelay = max(retryDelay, metadataRetryAfter(response.Header.Get("Retry-After"), retryDelay, time.Now()))
+			delay := metadataRetryAfter(response.Header.Get("Retry-After"), 15*time.Minute, time.Now())
+			s.bookRate.cooldown(delay)
+			return &bookRequestFailure{delay: delay}
 		}
 		return errors.New("book export request failed")
 	}
@@ -154,8 +140,25 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	if identity == ":" {
 		return errors.New("book export has no stable revision")
 	}
-	if status.Complete && snapshot == prior && identity == etag {
-		return s.DB.OpenLibraryUnchanged(ctx)
+	if err = s.DB.BookExportChecked(ctx); err != nil {
+		return err
+	}
+	snapshotAt, dated := books.ExportDate(snapshot)
+	if !dated {
+		return errors.New("book export has no verifiable snapshot date")
+	}
+	if snapshotAt.After(time.Now().UTC()) {
+		return errors.New("book export snapshot date is in the future")
+	}
+	if status.SnapshotAt != nil && snapshotAt.Before(*status.SnapshotAt) {
+		return errors.New("book export is older than the saved snapshot")
+	}
+	changes, err := s.DB.BookChangesState(ctx)
+	if err != nil {
+		return err
+	}
+	if status.Complete && ((snapshot == prior && identity == etag) || (changes.NeedsDumpAfter != nil && snapshotAt.Before(*changes.NeedsDumpAfter))) {
+		return nil
 	}
 	position, err := s.DB.BeginOpenLibrary(ctx, snapshot, identity)
 	if err != nil {
@@ -238,10 +241,41 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	if completed.Works == 0 || completed.Editions == 0 || completed.Authors == 0 {
 		return errors.New("book export is missing bibliographic record types")
 	}
+	idle.Stop()
+	_ = response.Body.Close()
+	if err = s.DB.BookExportLoaded(ctx); err != nil {
+		return err
+	}
+	return s.finishBookExport(ctx, h)
+}
+
+func (s *Service) finishBookExport(ctx context.Context, h *operationHistory) error {
+	h.checkpoint(ctx, "book_reconciliation")
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		done, err := s.DB.PruneBookSnapshot(ctx)
+		if err != nil {
+			return err
+		}
+		if done {
+			break
+		}
+	}
 	if err := s.DB.FinishOpenLibrary(ctx); err != nil {
 		return err
 	}
-	h.checkpoint(ctx, "identification")
+	state, err := s.DB.OpenLibraryStatus(ctx)
+	if err != nil {
+		return err
+	}
+	if state.SnapshotAt != nil {
+		if err = s.DB.BeginBookCatchup(ctx, *state.SnapshotAt); err != nil {
+			return err
+		}
+	}
+	h.checkpoint(ctx, "book_changes")
 	return nil
 }
 

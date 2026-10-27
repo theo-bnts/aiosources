@@ -29,7 +29,7 @@ func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*mode
 	}
 	rows, err := tx.Query(ctx, `SELECT CASE
 WHEN n.nspname='ingest' AND (`+sourceStorageRelations+` OR c.relname='run_catalog_entities') THEN 'sources'
-WHEN n.nspname='ingest' AND c.relname IN ('ol_redirects','ol_authors','ol_editions','ol_import_state','aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
+WHEN n.nspname='ingest' AND c.relname IN ('ol_redirects','ol_authors','ol_editions','ol_import_state','ol_changes_state','ol_change_jobs','ol_deleted','aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
 WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_preparations','aio_cleanup','aio_incidents') THEN 'debrid'
 WHEN n.nspname='ingest' AND c.relname IN ('stremio_requests','aio_public_access') THEN 'stremio'
 WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','catalog_entity_changes','remote_checkpoints','shares') OR c.relname LIKE 'share_%') THEN 'sharing'
@@ -40,7 +40,7 @@ CASE
  WHEN c.relname='torrents' THEN 'published'
  WHEN c.relname='staged_torrents' OR c.relname LIKE 'run_%' THEN 'imports'
  WHEN c.relname IN ('raw_records','pages','events','torrent_history','torrent_history_baselines','torrent_history_metadata') THEN 'source-history'
- WHEN c.relname IN ('ol_redirects','ol_authors','ol_editions','ol_import_state','aio_works','aio_titles','aio_seasons','aio_episodes') THEN 'information'
+ WHEN c.relname IN ('ol_redirects','ol_authors','ol_editions','ol_import_state','ol_changes_state','ol_change_jobs','ol_deleted','aio_works','aio_titles','aio_seasons','aio_episodes') THEN 'information'
  WHEN c.relname IN ('aio_matches','aio_match_queue','aio_match_reviews') THEN 'identification'
  WHEN c.relname IN ('aio_inventory','aio_metadata_jobs','aio_title_variants','aio_season_requests') THEN 'information-queue'
  WHEN c.relname IN ('aio_availability','aio_shared_availability','aio_resources') THEN 'availability'

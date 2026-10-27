@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, OpenLibraryDays: 30, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)
@@ -637,7 +637,7 @@ func (s *Store) ResetAIOMapping(ctx context.Context) error {
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;SELECT ingest.lock_catalog_entity_writes();TRUNCATE ingest.ol_redirects,ingest.ol_authors,ingest.ol_editions,ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';UPDATE ingest.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,error='',complete=FALSE,retry_at=NULL,checked_at=NULL;UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;SELECT ingest.lock_catalog_entity_writes();TRUNCATE ingest.ol_redirects,ingest.ol_authors,ingest.ol_editions,ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';UPDATE ingest.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,error='',complete=FALSE,retry_at=NULL,checked_at=NULL;UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1;`+resetBookChangesSQL)
 	return databaseError("reset local metadata", err)
 }
 

@@ -1,5 +1,7 @@
 export const providerSteps: Record<string, string> = {
   provider_request: 'Provider request',
+  book_changes: 'Retrieve book changes',
+  book_details: 'Retrieve book information',
   provider_availability: 'Check availability',
   provider_inventory: 'Check account torrents',
   provider_add: 'Prepare torrent',

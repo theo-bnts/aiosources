@@ -16,7 +16,7 @@ type AIOConfig struct {
 	AutoSync              bool                  `json:"auto_sync"`
 	AutoMatch             bool                  `json:"auto_match"`
 	OpenLibraryEnabled    bool                  `json:"openlibrary_enabled"`
-	OpenLibraryDays       int                   `json:"openlibrary_days"`
+	OpenLibraryMinutes    int                   `json:"openlibrary_minutes"`
 	SyncMinutes           int                   `json:"sync_minutes"`
 	MatchSeconds          int                   `json:"match_seconds"`
 	TMDBRequestsPerSecond int                   `json:"tmdb_requests_per_second"`
@@ -117,17 +117,25 @@ type BookInformation struct {
 }
 
 type OpenLibraryStatus struct {
-	Skipped  int64      `json:"skipped"`
-	Complete bool       `json:"complete"`
-	Snapshot string     `json:"snapshot,omitempty"`
-	Position int64      `json:"position"`
-	Imported int64      `json:"imported"`
-	Works    int64      `json:"works"`
-	Editions int64      `json:"editions"`
-	Authors  int64      `json:"authors"`
-	LastSync *time.Time `json:"last_sync"`
-	Error    string     `json:"error,omitempty"`
-	Running  bool       `json:"running"`
+	Generation     int64      `json:"-"`
+	SnapshotAt     *time.Time `json:"snapshot_at"`
+	DataComplete   bool       `json:"-"`
+	ChangesThrough *time.Time `json:"changes_through"`
+	LastImport     *time.Time `json:"last_import"`
+	Pending        int64      `json:"pending"`
+	CatchingUp     bool       `json:"catching_up"`
+	NeedsExport    bool       `json:"needs_export"`
+	Skipped        int64      `json:"skipped"`
+	Complete       bool       `json:"complete"`
+	Snapshot       string     `json:"snapshot,omitempty"`
+	Position       int64      `json:"position"`
+	Imported       int64      `json:"imported"`
+	Works          int64      `json:"works"`
+	Editions       int64      `json:"editions"`
+	Authors        int64      `json:"authors"`
+	LastSync       *time.Time `json:"last_sync"`
+	Error          string     `json:"error,omitempty"`
+	Running        bool       `json:"running"`
 }
 
 type AIOMatchResult struct {
