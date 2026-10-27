@@ -152,8 +152,8 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     )
     await visitor.getByRole('button', { name: 'Start searching', exact: true }).click()
     expect((await connection).status()).toBe(200)
-    await expect(visitor.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toBeVisible()
-    await visitor.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('example film')
+    await expect(visitor.getByLabel('Title, author or identifier', { exact: true })).toBeVisible()
+    await visitor.getByLabel('Title, author or identifier', { exact: true }).fill('example film')
     await visitor.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(visitor.locator('[data-result-count]')).toHaveText('1 title')
     await visitor.getByRole('link', { name: 'Example Film', exact: true }).click()
@@ -187,7 +187,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     expect(storage).not.toContain('synthetic-manifest-configuration')
     const second = await context.newPage()
     await second.goto('/public/search')
-    await expect(second.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toBeVisible()
+    await expect(second.getByLabel('Title, author or identifier', { exact: true })).toBeVisible()
     await visitor.getByRole('button', { name: 'Forget saved credentials', exact: true }).click()
     await expect(second.getByRole('button', { name: 'Start searching', exact: true })).toBeVisible()
     await second.close()
@@ -292,7 +292,7 @@ test('Stremio keys are reused by public Search on mobile and failed requests pre
       true,
     )
     await visitor.goto('/public/search?q=example')
-    await expect(visitor.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue(
+    await expect(visitor.getByLabel('Title, author or identifier', { exact: true })).toHaveValue(
       'example',
     )
     await expect(

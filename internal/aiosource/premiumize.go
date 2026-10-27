@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/url"
 	"time"
@@ -163,7 +162,7 @@ func (p *ProviderHTTP) pmPrepare(ctx context.Context, key, hash, magnet string, 
 	stage = "file_selection"
 	file, ok := SelectFile(files, r)
 	if !ok {
-		return result, errors.New("no unambiguous matching video")
+		return result, fileSelectionError(files, r)
 	}
 	result.URL, result.Files = file.Link, files
 	return result, nil

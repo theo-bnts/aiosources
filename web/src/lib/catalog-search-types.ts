@@ -1,7 +1,10 @@
 import type { DebridService } from '@/lib/debrid'
 export type CatalogTitle = {
   id: number
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
+  cover?: string
+  openlibrary?: string
+  authors?: string[]
   title: string
   years: number[]
   tmdb: string
@@ -11,11 +14,12 @@ export type CatalogTitle = {
   seasons: number[] | null
   selection: CatalogSelection
 }
-export type CatalogSelection = { season?: number; episode?: number }
+export type CatalogSelection = { season?: number; episode?: number; file?: string }
 export type CatalogAvailability = {
   service: DebridService
   state: 'cached' | 'uncached' | 'unknown' | 'unavailable' | 'invalid'
   can_add: boolean
+  file_count?: number
   filename?: string
   size?: number
 }
@@ -32,6 +36,7 @@ export type CatalogRelease = {
   services: CatalogAvailability[]
 }
 export type CatalogDownload = {
+  files?: { path: string; size: number }[]
   url_valid_seconds?: number
   status: 'ready' | 'pending'
   url?: string

@@ -49,16 +49,17 @@ func (q TorznabQuery) WithPreferences(p TorznabPreferences) TorznabQuery {
 type TorznabQuery struct {
 	SearchFilters
 	ResultPreferences
-	SourceNames      map[string]string
-	Mode             string
-	Services         []string
-	CachedOnly       bool
-	Categories       []int
-	MediaTypes       []string
-	IMDb, TMDB, TVDB string
-	Season, Episode  *int
-	Year             int
-	Limit, Offset    int
+	SourceNames             map[string]string
+	Mode                    string
+	Services                []string
+	CachedOnly              bool
+	Categories              []int
+	MediaTypes              []string
+	IMDb, TMDB, TVDB        string
+	BookTitle, Author, ISBN string
+	Season, Episode         *int
+	Year                    int
+	Limit, Offset           int
 }
 
 type TorznabRecord struct {

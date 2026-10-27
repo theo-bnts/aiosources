@@ -16,6 +16,10 @@ func (s *server) aioReviewDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	parsed := aiosource.ParseRelease(detail.Record.Title)
 	detail.SuggestedQuery, detail.SuggestedYear = parsed.Title, parsed.Year
+	if title, year, book := aiosource.BookSuggestion(detail.Record); book {
+		detail.SuggestedQuery, detail.SuggestedYear = title, year
+		detail.BookEvidence = detail.Record.BookHints
+	}
 	writeJSON(w, 200, detail)
 }
 func (s *server) aioReviewCandidates(w http.ResponseWriter, r *http.Request) {

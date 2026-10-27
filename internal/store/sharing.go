@@ -70,7 +70,7 @@ func ValidateShare(input model.ShareInput) error {
 	}
 	types := map[string]bool{}
 	for _, typ := range input.MediaTypes {
-		if (typ != "movie" && typ != "tv" && typ != "other") || types[typ] {
+		if (typ != "movie" && typ != "tv" && typ != "other" && typ != "book" && typ != "ebook" && typ != "audiobook") || types[typ] {
 			return model.ErrInvalid
 		}
 		types[typ] = true

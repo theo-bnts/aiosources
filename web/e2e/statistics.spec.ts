@@ -46,7 +46,7 @@ test('statistics are the first view, settings contain configuration and statuses
 
   for (const [path, heading, statistic] of [
     ['/providers', 'Sources', 'Imported torrents'],
-    ['/metadata', 'Metadata', 'Film & series entries'],
+    ['/metadata', 'Metadata', 'Information catalog entries'],
     ['/debrid', 'Debrid', 'Availability checks'],
   ]) {
     await page.goto(path)

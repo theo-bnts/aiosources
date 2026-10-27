@@ -29,10 +29,17 @@ function WorkSummary({ work }: { work: ReviewWork }) {
     <div className="min-w-0 space-y-1">
       <p className="break-words font-medium">{title}</p>
       <p className="help">
-        {work.type === 'movie' ? 'Movie' : 'Series'} · {work.years.join(', ') || 'Year unknown'}
+        {work.type === 'movie' ? 'Movie' : work.type === 'book' ? 'Book' : 'Series'} ·{' '}
+        {work.years.join(', ') || 'Year unknown'}
       </p>
       <p className="mono break-words text-xs">
-        {work.imdb && `${work.imdb} · `}TMDB {work.tmdb}
+        {work.type === 'book' ? (
+          [work.book?.authors?.join(', '), work.openlibrary].filter(Boolean).join(' · ')
+        ) : (
+          <>
+            {work.imdb && `${work.imdb} · `}TMDB {work.tmdb}
+          </>
+        )}
         {work.tvdb && ` · TVDB ${work.tvdb}`}
       </p>
       {aliases.length > 0 && (
@@ -185,7 +192,7 @@ function ReviewForm({
           {detail.work ? (
             <WorkSummary work={detail.work} />
           ) : (
-            <p className="help">No current film or series selected.</p>
+            <p className="help">No current title selected.</p>
           )}
           <Badge variant={detail.review?.active ? 'info' : 'secondary'}>
             {detail.review?.active ? 'Reviewed' : 'Automatic'}
@@ -203,6 +210,8 @@ function ReviewForm({
               detail.record.imdb,
               detail.record.tmdb && `TMDB ${detail.record.tmdb}`,
               detail.record.tvdb && `TVDB ${detail.record.tvdb}`,
+              detail.book_evidence?.isbn && `ISBN ${detail.book_evidence.isbn}`,
+              detail.book_evidence?.openlibrary,
             ]
               .filter(Boolean)
               .join(' · ') || 'None supplied'}
@@ -220,7 +229,7 @@ function ReviewForm({
         }}
       >
         <div className="field min-w-0 basis-full sm:basis-auto sm:flex-1">
-          <Label htmlFor="review-query">Title, IMDb, TMDB or TVDB ID</Label>
+          <Label htmlFor="review-query">Title, author or identifier</Label>
           <Input
             id="review-query"
             name="q"
@@ -237,9 +246,10 @@ function ReviewForm({
             value={kind}
             onChange={(event) => setKind(event.target.value)}
           >
-            <option value="">Movies & series</option>
+            <option value="">All media</option>
             <option value="movie">Movies</option>
             <option value="tv">Series</option>
+            <option value="book">Books</option>
           </select>
         </div>
         <div className="field w-28">
@@ -268,7 +278,7 @@ function ReviewForm({
       <div
         className="max-h-72 space-y-2 overflow-y-auto"
         role="radiogroup"
-        aria-label="Candidate films and series"
+        aria-label="Candidate titles"
         aria-busy={candidates.isFetching}
       >
         {candidates.data?.items?.map((work) => (

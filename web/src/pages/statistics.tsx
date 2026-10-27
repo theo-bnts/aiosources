@@ -178,7 +178,7 @@ function MetadataStatisticsPage() {
         status && (
           <>
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Statistic label="Film & series entries" value={status.status.works} />
+              <Statistic label="Information catalog entries" value={status.status.works} />
               <Statistic
                 label="Imported torrents"
                 value={identifiedTotal}
@@ -196,11 +196,56 @@ function MetadataStatisticsPage() {
                   to={`/metadata/identification?${params({ match_status: decision })}`}
                 />
               ))}
-              <Statistic label="Information pending" value={status.status.pending} />
+              <Statistic label="Film & series information pending" value={status.status.pending} />
+              {status.books &&
+                (status.config.openlibrary_enabled ||
+                  status.books.imported > 0 ||
+                  status.books.running ||
+                  status.books.error) && (
+                  <>
+                    <Statistic label="Book works" value={status.books.works} />
+                    <Statistic label="Book editions" value={status.books.editions} />
+                    <Statistic label="Book authors" value={status.books.authors} />
+                  </>
+                )}
             </dl>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {status.books &&
+                (status.config.openlibrary_enabled ||
+                  status.books.imported > 0 ||
+                  status.books.running ||
+                  status.books.error) && (
+                  <>
+                    <Statistic
+                      label="Last successful book update"
+                      value={
+                        status.books.last_sync
+                          ? date(status.books.last_sync)
+                          : 'No completed update'
+                      }
+                      size="sm"
+                      to="/metadata/history?service=openlibrary"
+                    />
+                    <Statistic
+                      label="Book import"
+                      value={
+                        status.books.running
+                          ? `Running · ${number(status.books.imported)} records saved`
+                          : status.books.error
+                            ? 'Needs attention'
+                            : status.books.complete
+                              ? 'Completed'
+                              : status.books.position > 0
+                                ? `Interrupted · ${number(status.books.imported)} records saved`
+                                : 'Not started'
+                      }
+                      size="sm"
+                      to="/metadata/settings"
+                    />
+                  </>
+                )}
               <Statistic
-                label="Last successful information update"
+                label="Last successful film & series update"
                 value={
                   status.status.last_sync ? date(status.status.last_sync) : 'No completed update'
                 }
@@ -208,7 +253,7 @@ function MetadataStatisticsPage() {
                 to="/metadata/history?kind=metadata"
               />
               <Statistic
-                label="Next automatic information update"
+                label="Next automatic film & series update"
                 value={
                   status.automation.next_update
                     ? date(status.automation.next_update)

@@ -293,8 +293,8 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
           </p>
         )}
         <p className="help">
-          Errors and ignored records explain source import processing. Film and series
-          identification is reviewed in{' '}
+          Errors and ignored records explain source import processing. Review torrent identification
+          in{' '}
           <Link className="data-link" to="/metadata/identification">
             Identification
           </Link>

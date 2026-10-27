@@ -68,6 +68,9 @@ func (s *Service) drainMatching(ctx context.Context, history *operationHistory) 
 }
 
 func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AIOMatchResult, error) {
+	if book := ParseBookRelease(r); book.Kind != "" {
+		return decideBook(r, book, find)
+	}
 	p := withSourceNumbering(ParseRelease(r.Title), SourceEpisode{r.Season, r.Episode})
 	r.Normalized = p.Normalized
 	if p.InvalidNumbering {

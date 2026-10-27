@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -164,7 +163,7 @@ func (p *ProviderHTTP) dlPrepare(ctx context.Context, key, hash, magnet string, 
 	}
 	selected, ok := SelectFile(all, r)
 	if !ok {
-		return result, errors.New("no unambiguous matching video")
+		return result, fileSelectionError(all, r)
 	}
 	ready, err := dlFiles(item, true)
 	if err != nil {

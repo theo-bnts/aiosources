@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"io/fs"
 	"net/http"
@@ -127,7 +128,7 @@ func New(options Options) (http.Handler, error) {
 	mux.HandleFunc("/api/", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "API route not found")
 	}))
-	mux.Handle("/", staticFrontend(options.Frontend, auth.origin))
+	mux.Handle("/", staticFrontend(options.Frontend, auth.origin, options.Version))
 	return securityHeaders(recoverRequests(mux)), nil
 }
 
@@ -668,7 +669,12 @@ func (s *server) torrents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, normalizedList(result))
 }
 
-func staticFrontend(frontend fs.FS, origins ...string) http.Handler {
+func staticFrontend(frontend fs.FS, origin, version string) http.Handler {
+	origin = sharePreviewOrigin(origin)
+	if version == "" {
+		version = "dev"
+	}
+	version = html.EscapeString(version)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -713,11 +719,8 @@ func staticFrontend(frontend fs.FS, origins ...string) http.Handler {
 				http.Error(w, "Asset read failed", http.StatusInternalServerError)
 				return
 			}
-			origin := ""
-			if len(origins) > 0 {
-				origin = sharePreviewOrigin(origins[0])
-			}
 			data = bytes.ReplaceAll(data, []byte("__AIOSOURCES_PUBLIC_ORIGIN__"), []byte(origin))
+			data = bytes.ReplaceAll(data, []byte("__AIOSOURCES_VERSION__"), []byte(version))
 			http.ServeContent(w, r, name, info.ModTime(), bytes.NewReader(data))
 			return
 		} else if strings.HasPrefix(name, "assets/") {

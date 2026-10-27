@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, OpenLibraryDays: 30, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)
@@ -120,7 +120,7 @@ COALESCE(sum(total) FILTER(WHERE status='ambiguous'),0)::bigint AS ambiguous,
 COALESCE(sum(total) FILTER(WHERE status='unmatched'),0)::bigint AS unmatched,
 COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM grouped
 ) SELECT
-(SELECT count(*) FROM ingest.aio_works),
+(SELECT count(*) FROM ingest.aio_works WHERE media_type IN ('movie','tv'))+(SELECT works FROM ingest.ol_import_state WHERE singleton),
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
 (SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match FROM ingest.aio_state CROSS JOIN counts`
 
@@ -137,20 +137,25 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 	return queueAIOManyAliases(ctx, tx, []int64{workID}, aliases)
 }
 
-const aioWorkColumns = `w.id,w.media_type,w.tmdb_id,w.imdb_id,w.tvdb_id,w.years,w.revision,w.adult,w.display_title,w.localized_titles,
-ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title),
+const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvdb_id,` + bookWorkYears + `,w.revision,w.adult,w.display_title,w.localized_titles,
+ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id UNION SELECT w.display_title WHERE w.media_type='book'),
 COALESCE((SELECT jsonb_object_agg(season,year) FROM ingest.aio_seasons WHERE work_id=w.id),'{}'),
-COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}')`
+COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,
+w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM ingest.ol_authors a WHERE w.media_type='book' AND a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'[]'),
+'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),(SELECT cover FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ingest.ol_aliases(w.openlibrary_id) AND cover>0 ORDER BY id LIMIT 1),0))`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork
-	var seasons, episodes []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes)
+	var seasons, episodes, book []byte
+	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &book)
 	if err != nil {
 		return w, err
 	}
 	if err = json.Unmarshal(seasons, &w.SeasonYears); err == nil {
 		err = json.Unmarshal(episodes, &w.EpisodeYears)
+	}
+	if err == nil && w.Type == "book" {
+		err = json.Unmarshal(book, &w.Book)
 	}
 	return w, err
 }
@@ -162,7 +167,7 @@ const aioCandidatesQuery = `WITH candidate_ids AS (
  UNION SELECT work_id FROM ingest.aio_titles WHERE normalized=$1
  UNION SELECT work_id FROM ingest.aio_titles WHERE NOT $9::boolean AND normalized OPERATOR(public.%) $1 AND public.similarity(normalized,$1)>=0.5
 ) SELECT ` + aioWorkColumns + ` FROM candidate_ids c JOIN ingest.aio_works w ON w.id=c.id
-WHERE NOT w.adult AND ($5='' OR w.media_type=$5) AND ($6::int IS NULL OR $6=ANY(w.years)
+WHERE NOT w.adult AND w.media_type<>'book' AND ($5='' OR w.media_type=$5) AND ($6::int IS NULL OR $6=ANY(w.years)
 OR (w.media_type='tv' AND EXISTS(SELECT 1 FROM ingest.aio_seasons s WHERE s.work_id=w.id AND s.season=ANY($7::int[]) AND s.year=$6))
 OR (w.media_type='tv' AND EXISTS(SELECT 1 FROM ingest.aio_episodes e WHERE e.work_id=w.id AND e.season=ANY($7::int[]) AND e.year=$6 AND ($8::int IS NULL OR (cardinality($7::int[])=1 AND e.episode=$8)))))
 ORDER BY w.id LIMIT 101`
@@ -209,6 +214,7 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 		return ""
 	}
 	r.Title = text("title", "name")
+	r.BookHints = model.BookSourceHints(f)
 	r.Hash = strings.ToLower(text("info_hash", "hash", "infohash"))
 	r.Size, _ = strconv.ParseInt(text("size"), 10, 64)
 	if published, err := time.Parse(time.RFC3339Nano, text("published_at")); err == nil {
@@ -396,13 +402,13 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 }
 func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]model.AIORecord, error) {
 	// The identifier column is selected from a closed allowlist, never user SQL.
-	column := map[string]string{"imdb": "imdb_id", "tmdb": "tmdb_id", "tvdb": "tvdb_id"}[kind]
+	column := map[string]string{"imdb": "imdb_id", "tmdb": "tmdb_id", "tvdb": "tvdb_id", "openlibrary": "openlibrary_id"}[kind]
 	typ := "tv"
-	if mediaType == "movie" {
-		typ = "movie"
+	if mediaType == "movie" || mediaType == "book" {
+		typ = mediaType
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
-	query := `SELECT ` + aioRecordColumns + `,w.imdb_id,w.tmdb_id,w.tvdb_id FROM ingest.torrents t JOIN ingest.aio_matches m USING(provider_id,source_id) JOIN ingest.aio_works w ON w.id=m.work_id WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
+	query := `SELECT ` + aioRecordColumns + `,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM ingest.torrents t JOIN ingest.aio_matches m USING(provider_id,source_id) JOIN ingest.aio_works w ON w.id=m.work_id WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
 	if kind == "mal" {
 		query = `SELECT ` + aioRecordColumns + ` FROM ingest.torrents t WHERE (` + aioMALAssertionPredicate + `) AND ingest.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
 		rows, err := s.pool.Query(ctx, query, id)
@@ -490,7 +496,7 @@ func (s *Store) ReconcileAIOInventory(ctx context.Context, date string) error {
 	for {
 		// An export is a dated snapshot, not the current catalog. Keep works
 		// refreshed since its UTC day began; a subsequent export can reconcile them.
-		rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id FROM ingest.aio_works w WHERE w.updated_at < ($1::text::date::timestamp AT TIME ZONE 'UTC') AND NOT EXISTS(SELECT 1 FROM ingest.aio_inventory i WHERE i.media_type=w.media_type AND i.tmdb_id=w.tmdb_id AND i.export_date=$1) LIMIT 100`, date)
+		rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id FROM ingest.aio_works w WHERE w.media_type IN ('movie','tv') AND w.updated_at < ($1::text::date::timestamp AT TIME ZONE 'UTC') AND NOT EXISTS(SELECT 1 FROM ingest.aio_inventory i WHERE i.media_type=w.media_type AND i.tmdb_id=w.tmdb_id AND i.export_date=$1) LIMIT 100`, date)
 		if err != nil {
 			return databaseError("reconcile metadata inventory", err)
 		}
@@ -631,7 +637,7 @@ func (s *Store) ResetAIOMapping(ctx context.Context) error {
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;SELECT ingest.lock_catalog_entity_writes();TRUNCATE ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;SELECT ingest.lock_catalog_entity_writes();TRUNCATE ingest.ol_redirects,ingest.ol_authors,ingest.ol_editions,ingest.aio_works,ingest.aio_titles,ingest.aio_seasons,ingest.aio_episodes,ingest.aio_matches,ingest.aio_match_queue,ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents;DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';UPDATE ingest.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,error='',complete=FALSE,retry_at=NULL,checked_at=NULL;UPDATE ingest.aio_state SET last_sync=NULL,last_match=NULL,changes_through=NULL,inventory_date='',sync_retry_at=NULL,sync_failures=0,sync_error='',metadata_generation=metadata_generation+1`)
 	return databaseError("reset local metadata", err)
 }
 

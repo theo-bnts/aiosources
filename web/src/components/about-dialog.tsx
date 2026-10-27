@@ -17,6 +17,13 @@ import {
 } from '@/components/ui/dialog'
 
 export function AboutDialog() {
+  const embeddedVersion = document.querySelector<HTMLMetaElement>(
+    'meta[name="application-version"]',
+  )?.content
+  const version =
+    embeddedVersion && embeddedVersion !== '__AIOSOURCES_VERSION__'
+      ? embeddedVersion.slice(0, 200)
+      : 'dev'
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -33,12 +40,15 @@ export function AboutDialog() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex min-w-0 items-center gap-2">
             <DatabaseIcon size={24} className="shrink-0 text-primary" aria-hidden="true" />
-            AIOSources
+            <span className="min-w-0 break-words">
+              AIOSources{' '}
+              <span className="text-sm font-normal text-muted-foreground">({version})</span>
+            </span>
           </DialogTitle>
           <DialogDescription>
-            Your sources, one searchable catalog, ready for Stremio.
+            Bring your sources together for search, playback and downloads.
           </DialogDescription>
         </DialogHeader>
         <section aria-label="Project and support" className="grid gap-3 sm:grid-cols-2">
@@ -89,13 +99,13 @@ export function AboutDialog() {
           Use sources you are authorized to access and content you are entitled to use and share.
           Source definitions and service accounts are configured by you.
         </p>
-        <section aria-label="Credits" className="space-y-4 border-t pt-4">
-          <div className="space-y-2">
+        <section aria-label="Credits" className="space-y-3 border-t pt-4">
+          <div className="flex items-start gap-3">
             <a
               href="https://www.themoviedb.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block"
+              className="mt-1 shrink-0"
             >
               <img src="/tmdb.svg" alt="TMDB" className="h-4 w-auto" />
             </a>
@@ -104,16 +114,16 @@ export function AboutDialog() {
             </p>
           </div>
           <p className="text-sm leading-6 text-muted-foreground">
-            Built on{' '}
+            Book information and covers:{' '}
             <a
-              href="https://github.com/moodiness/ingest"
+              href="https://openlibrary.org"
               target="_blank"
               rel="noopener noreferrer"
               className="data-link"
             >
-              Ingest
+              Open Library
             </a>
-            . Original copyrights and third-party licenses are preserved.
+            .
           </p>
           <a
             href="/THIRD-PARTY-NOTICES.txt"

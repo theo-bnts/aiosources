@@ -26,6 +26,7 @@ type StorageOverview struct {
 // more confident merely because storage saving is enabled.
 var compactTorrentKeys = []string{
 	"title", "name", "info_hash", "infohash", "hash", "size", "published_at", "duration",
+	"isbn", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "author", "authors", "book_title", "book_format", "category_name", "subcategory_name",
 	"category", "categories", "category_id", "subcategory_id", "type", "media_type", "year",
 	"imdb", "imdb_id", "tt_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id",
 	"season", "seasons", "episode", "episodes", "episode_start", "episode_end",
@@ -36,9 +37,10 @@ var compactTorrentKeys = []string{
 	"private", "external_ids", "attributes", "metadata",
 }
 
-var compactIdentifierKeys = []string{"imdb", "imdb_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id"}
+var compactIdentifierKeys = []string{"isbn", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "imdb", "imdb_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id"}
 
 var compactAttributeKeys = []string{
+	"isbn", "isbn10", "isbn13", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "author", "authors", "booktitle", "book_title", "book_format",
 	"imdb", "imdbid", "tmdb", "tmdbid", "tvdb", "tvdbid", "mal", "malid",
 	"season", "seasons", "episode", "episodes", "audiolangs", "languages", "language", "sublangs",
 	"category", "categories", "size", "infohash",

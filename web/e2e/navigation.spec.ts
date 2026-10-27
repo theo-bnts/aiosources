@@ -77,6 +77,18 @@ test('navigation and page tabs remain coherent on every current and legacy route
     await expect(page.getByRole('heading', { name: label, exact: true, level: 1 })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
     await expect(page.locator('#page-description')).toBeVisible()
+    const layout = await page.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      tabOverflow: [...document.querySelectorAll<HTMLElement>('[role="tablist"]')]
+        .filter(
+          (node) =>
+            node.getClientRects().length > 0 &&
+            node.getAttribute('aria-orientation') !== 'vertical',
+        )
+        .map((node) => node.scrollHeight - node.clientHeight),
+    }))
+    expect(layout.overflow, url).toBeLessThanOrEqual(0)
+    for (const overflow of layout.tabOverflow) expect(overflow, url).toBeLessThanOrEqual(1)
   }
   await page.goto('/providers')
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })

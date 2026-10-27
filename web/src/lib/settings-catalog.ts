@@ -114,6 +114,16 @@ add(
       'Information update interval (minutes)',
       'schedule frequency cadence intervalle',
     ],
+    [
+      'metadata.books',
+      'Automatically update book information',
+      'Open Library ebooks audiobooks livres',
+    ],
+    [
+      'metadata.book-interval',
+      'Book information update interval (days)',
+      'Open Library schedule frequency cadence',
+    ],
     ['metadata.match', 'Automatically identify torrents'],
     [
       'metadata.match-interval',
@@ -214,6 +224,7 @@ add(
   [
     ['routing.default', 'Outgoing connections', 'default connection'],
     ['routing.tmdb', 'TMDB'],
+    ['routing.openlibrary', 'Open Library'],
     ...debridProviders.map((p) => [`routing.${providerSettingSuffix(p.id)}`, p.name] as const),
     ['routing.downloads', 'Browser downloads'],
   ],

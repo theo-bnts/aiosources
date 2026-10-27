@@ -120,7 +120,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
 }) => {
   const ids = await seedCatalog(page, server, true)
   await page.goto('/search')
-  await page.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('example new day')
+  await page.getByLabel('Title, author or identifier', { exact: true }).fill('example new day')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('1 title')
   await expect(page.locator('main tbody tr')).toHaveCount(1)
@@ -163,7 +163,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await expect(page).toHaveURL(
     (url) => url.pathname === '/search' && url.searchParams.get('q') === 'example new day',
   )
-  await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue(
+  await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue(
     'example new day',
   )
   await page.goto(`/search/${ids.tv}?cached_only=false`)
@@ -182,7 +182,7 @@ test('catalog year is a single optional filter and survives opening a title and 
 }) => {
   await seedCatalog(page, server)
   await page.goto('/search')
-  await page.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('example')
+  await page.getByLabel('Title, author or identifier', { exact: true }).fill('example')
   await page.getByLabel('Year', { exact: true }).fill('2025')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
@@ -200,15 +200,15 @@ test('catalog year is a single optional filter and survives opening a title and 
   await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(page).toHaveURL(/\/search$/)
-  await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
   // Clearing must also discard a draft that has not been submitted yet.
-  await page.getByLabel('Title or IMDb / TMDB ID', { exact: true }).fill('Unsubmitted title')
+  await page.getByLabel('Title, author or identifier', { exact: true }).fill('Unsubmitted title')
   await page.getByLabel('Year', { exact: true }).fill('2026')
   await page.getByLabel('Type', { exact: true }).selectOption('movie')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
-  await expect(page.getByLabel('Title or IMDb / TMDB ID', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
 })

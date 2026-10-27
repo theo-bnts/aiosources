@@ -18,16 +18,19 @@ type CatalogReleaseFilters struct {
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
-	Selection CatalogSelection `json:"selection"`
-	Seasons   []int            `json:"seasons"`
-	ID        int64            `json:"id"`
-	Type      string           `json:"type"`
-	Title     string           `json:"title"`
-	Years     []int            `json:"years"`
-	TMDB      string           `json:"tmdb"`
-	IMDb      string           `json:"imdb"`
-	Releases  int64            `json:"releases"`
-	Providers []string         `json:"providers"`
+	OpenLibrary string           `json:"openlibrary,omitempty"`
+	Cover       string           `json:"cover,omitempty"`
+	Authors     []string         `json:"authors,omitempty"`
+	Selection   CatalogSelection `json:"selection"`
+	Seasons     []int            `json:"seasons"`
+	ID          int64            `json:"id"`
+	Type        string           `json:"type"`
+	Title       string           `json:"title"`
+	Years       []int            `json:"years"`
+	TMDB        string           `json:"tmdb"`
+	IMDb        string           `json:"imdb"`
+	Releases    int64            `json:"releases"`
+	Providers   []string         `json:"providers"`
 }
 
 type CatalogRelease struct {
@@ -44,16 +47,18 @@ type CatalogRelease struct {
 }
 
 type CatalogAvailability struct {
-	Service  string `json:"service"`
-	State    string `json:"state"`
-	CanAdd   bool   `json:"can_add"`
-	Filename string `json:"filename,omitempty"`
-	Size     int64  `json:"size,omitempty"`
+	FileCount int    `json:"file_count,omitempty"`
+	Service   string `json:"service"`
+	State     string `json:"state"`
+	CanAdd    bool   `json:"can_add"`
+	Filename  string `json:"filename,omitempty"`
+	Size      int64  `json:"size,omitempty"`
 }
 
 type CatalogSelection struct {
-	Season  *int `json:"season,omitempty"`
-	Episode *int `json:"episode,omitempty"`
+	File    string `json:"file,omitempty"`
+	Season  *int   `json:"season,omitempty"`
+	Episode *int   `json:"episode,omitempty"`
 }
 
 type CatalogDownloadInput struct {
@@ -67,12 +72,13 @@ type CatalogDownloadInput struct {
 }
 
 type CatalogDownload struct {
-	Service         string `json:"-"`
-	Status          string `json:"status"`
-	URL             string `json:"url,omitempty"`
-	URLValidSeconds int    `json:"url_valid_seconds,omitempty"`
-	OperationID     string `json:"operation_id"`
-	PreparationID   string `json:"preparation_id,omitempty"`
+	Files           []AIOFile `json:"files,omitempty"`
+	Service         string    `json:"-"`
+	Status          string    `json:"status"`
+	URL             string    `json:"url,omitempty"`
+	URLValidSeconds int       `json:"url_valid_seconds,omitempty"`
+	OperationID     string    `json:"operation_id"`
+	PreparationID   string    `json:"preparation_id,omitempty"`
 }
 
 type OperationDownload struct {

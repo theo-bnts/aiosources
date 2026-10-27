@@ -157,11 +157,17 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	if controls {
 		projection = map[string]any{"has_information": state.Works > 0, "cleanup_pending": state.CleanupPending, "cleanup_failed": state.CleanupFailed, "last_sync": state.LastSync, "last_match": state.LastMatch, "sync_error": state.SyncError}
 	}
-	writeJSON(w, 200, map[string]any{"config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
+	books, err := s.options.Store.OpenLibraryStatus(r.Context())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	books.Running = s.options.AIOSource.BookState()
+	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
-	c := model.AIOConfig{TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
+	c := model.AIOConfig{OpenLibraryDays: defaults.OpenLibraryDays, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
 	if !decodeJSON(w, r, &c) {
 		return
 	}
@@ -174,6 +180,10 @@ func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.PathValue("action") {
+	case "sync-books":
+		err = s.options.AIOSource.StartBooks("manual")
+	case "stop-books":
+		s.options.AIOSource.StopBooks()
 	case "sync":
 		err = s.options.AIOSource.StartSync(r.Context())
 	case "match":
@@ -184,6 +194,8 @@ func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 		s.options.AIOSource.Stop(true, false)
 	case "stop-matching":
 		s.options.AIOSource.Stop(false, true)
+	case "reset-books":
+		err = s.options.AIOSource.Reset(r.Context(), "books")
 	case "reset-metadata":
 		err = s.options.AIOSource.Reset(r.Context(), "metadata")
 	case "reset-mapping":

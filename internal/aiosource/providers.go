@@ -438,7 +438,7 @@ func (p *ProviderHTTP) tbPrepare(ctx context.Context, key, hash, magnet string, 
 	stage = "file_selection"
 	file, ok := SelectFile(files, r)
 	if !ok {
-		return "", prepared, errors.New("no unambiguous matching video")
+		return "", prepared, fileSelectionError(files, r)
 	}
 	q = url.Values{"token": {key}, "torrent_id": {prepared}, "file_id": {itoa64(file.ID)}, "redirect": {"false"}}
 	stage = "unlock"

@@ -3,7 +3,6 @@ package aiosource
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/url"
 
@@ -55,7 +54,7 @@ func (p *ProviderHTTP) dbPrepare(ctx context.Context, key, hash, magnet string, 
 		return result, model.ErrInvalid
 	}
 	stage = "file_list"
-	files, err := p.dbFiles(ctx, key, id)
+	files, err := p.dbFiles(ctx, key, id, r)
 	if err != nil {
 		return result, err
 	}
@@ -68,19 +67,19 @@ func (p *ProviderHTTP) dbPrepare(ctx context.Context, key, hash, magnet string, 
 			}
 		}
 		if candidates > 1 && unknown {
-			return result, errors.New("no unambiguous matching video")
+			return result, fileSelectionError(files, r)
 		}
 	}
 	stage = "file_selection"
 	file, ok := SelectFile(files, r)
 	if !ok {
-		return result, errors.New("no unambiguous matching video")
+		return result, fileSelectionError(files, r)
 	}
 	result.URL, result.Files = file.Link, files
 	return result, nil
 }
 
-func (p *ProviderHTTP) dbFiles(ctx context.Context, key, id string) ([]model.AIOFile, error) {
+func (p *ProviderHTTP) dbFiles(ctx context.Context, key, id string, resources ...Resource) ([]model.AIOFile, error) {
 	if !validPositiveProviderID(id) {
 		return nil, model.ErrInvalid
 	}
@@ -110,9 +109,10 @@ func (p *ProviderHTTP) dbFiles(ctx context.Context, key, id string) ([]model.AIO
 			return nil, err
 		}
 		if len(item.Links) == 1 {
-			// One named video can use the documented account download link.
+			// One supported named file can use the documented account download link.
 			file := model.AIOFile{Path: item.Filename, Link: link}
-			if _, ok := SelectFile([]model.AIOFile{file}, Resource{Type: "movie"}); ok {
+			booksAllowed := len(resources) == 0 || resources[0].Type == "book"
+			if _, ok := SelectFile([]model.AIOFile{file}, Resource{Type: "movie"}); ok || booksAllowed && len(bookFiles([]model.AIOFile{file})) == 1 {
 				files = append(files, file)
 				continue
 			}

@@ -49,7 +49,7 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   await expect
     .poll(() =>
       dialog
-        .getByLabel('Title, IMDb, TMDB or TVDB ID', { exact: true })
+        .getByLabel('Title, author or identifier', { exact: true })
         .evaluate((element) => element.getBoundingClientRect().width),
     )
     .toBeGreaterThan(300)

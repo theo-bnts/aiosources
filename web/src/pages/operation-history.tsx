@@ -51,6 +51,7 @@ const kinds = {
 }
 const services: Record<string, string> = {
   tmdb: 'TMDB',
+  openlibrary: 'Open Library',
   local: 'Local identification',
   ...serviceNames,
 }
@@ -66,6 +67,7 @@ const phases: Record<string, string> = {
   configuration: 'Starting',
   changes: 'Downloading information changes',
   inventory: 'Importing film & series inventory',
+  book_import: 'Importing book information',
   details: 'Updating film & series information',
   identification: 'Identifying torrents',
   availability: 'Verifying cache availability',
@@ -104,7 +106,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   const pagination = useURLPagination()
   const { limit, offset } = pagination
   const kind = search.get('kind') || ''
-  const service = section === 'metadata' ? '' : search.get('service') || ''
+  const service = search.get('service') || ''
   const status = search.get('status') || ''
   const date = useDate()
   const query = useQuery({
@@ -131,11 +133,23 @@ export function OperationHistoryPage({ section }: { section: Section }) {
             <select
               id="operation-type"
               className="native-select min-w-48"
-              value={kind}
-              onChange={(e) => filter('kind', e.target.value)}
+              value={service || kind}
+              onChange={(e) => {
+                const next = new URLSearchParams(search)
+                next.delete('offset')
+                next.delete('service')
+                if (['tmdb', 'openlibrary'].includes(e.target.value)) {
+                  next.set('kind', 'metadata')
+                  next.set('service', e.target.value)
+                } else if (e.target.value) next.set('kind', e.target.value)
+                else next.delete('kind')
+                setSearch(next)
+              }}
             >
               <option value="">All operations</option>
               <option value="metadata">Information updates</option>
+              <option value="tmdb">Film & series information</option>
+              <option value="openlibrary">Book information</option>
               <option value="matching">Torrent identification</option>
             </select>
           ) : (
@@ -398,8 +412,9 @@ export function OperationDetailPage({ section }: { section: Section }) {
             </p>
             {result.kind === 'metadata' && result.errors > 0 && result.status === 'succeeded' && (
               <p className="notice notice-warning" role="status">
-                The pass completed with deferred work. Failed information requests remain available
-                for a later retry.
+                {result.service === 'openlibrary'
+                  ? 'Some book records were invalid or too large to import. Other book information remains available.'
+                  : 'The pass completed with deferred work. Failed information requests remain available for a later retry.'}
               </p>
             )}
             <section className="space-y-4" aria-label="Operation events">

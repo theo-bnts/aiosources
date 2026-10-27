@@ -3,6 +3,7 @@ package aiosource
 
 import (
 	"errors"
+	"github.com/theo-bnts/aiosources/internal/books"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 )
 
 type Resource struct {
+	File            string
 	Kind, ID, Type  string
 	Season, Episode *int
 }
@@ -23,6 +25,14 @@ var resourceRE = regexp.MustCompile(`(?i)^(tt|imdb|tmdb|tvdb|mal|kitsu|anilist)[
 
 func ParseID(id, mediaType string) (Resource, error) {
 	r := Resource{Type: mediaType}
+	if mediaType == "book" {
+		key, ok := strings.CutPrefix(id, "openlibrary:")
+		if !ok || !books.WorkKey(key) {
+			return r, errors.New("invalid book resource")
+		}
+		r.Kind, r.ID = "openlibrary", key
+		return r, nil
+	}
 	m := resourceRE.FindStringSubmatch(strings.TrimSpace(id))
 	if len(m) == 0 || (mediaType != "movie" && mediaType != "series" && mediaType != "anime") {
 		return r, errors.New("unsupported resource")
@@ -339,6 +349,9 @@ func fileNumbering(path string) Release {
 }
 
 func SelectFile(files []model.AIOFile, r Resource) (model.AIOFile, bool) {
+	if r.Type == "book" {
+		return selectBookFile(files, r.File)
+	}
 	var selected model.AIOFile
 	count := 0
 	for _, f := range files {

@@ -239,7 +239,11 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 	return Decision{Status: "matched", Reason: reason, Winner: &winner.c}
 }
 func WorkCandidate(w model.AIOWork) Candidate {
-	return Candidate{EntryID: itoa64(w.ID), WorkID: itoa64(w.ID), Source: "tmdb", SourceID: w.TMDB, Type: w.Type, Titles: w.Titles, Years: w.Years, SeasonYears: w.SeasonYears, EpisodeYears: w.EpisodeYears, IDs: map[string]string{"imdb": w.IMDb, "tvdb": w.TVDB}}
+	source, id := "tmdb", w.TMDB
+	if w.Type == "book" {
+		source, id = "openlibrary", w.OpenLibrary
+	}
+	return Candidate{EntryID: itoa64(w.ID), WorkID: itoa64(w.ID), Source: source, SourceID: id, Type: w.Type, Titles: w.Titles, Years: w.Years, SeasonYears: w.SeasonYears, EpisodeYears: w.EpisodeYears, IDs: map[string]string{"imdb": w.IMDb, "tvdb": w.TVDB}}
 }
 
 func (s *SourceEpisode) UnmarshalJSON(b []byte) error {

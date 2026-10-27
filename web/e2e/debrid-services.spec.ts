@@ -51,8 +51,8 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
   )
   for (const provider of debridProviders)
     await expect(
-      form.getByRole('button', { name: `Add ${provider.name} key`, exact: true }),
-    ).toBeDisabled()
+      form.getByRole('button', { name: `Replace ${provider.name} key`, exact: true }),
+    ).toBeEnabled()
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

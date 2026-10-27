@@ -20,7 +20,7 @@ import {
   PlugsConnectedIcon,
   MagnifyingGlassIcon,
   ListMagnifyingGlassIcon,
-  FilmSlateIcon,
+  StackIcon,
   CloudCheckIcon,
   PlayCircleIcon,
   SignOutIcon,
@@ -138,14 +138,14 @@ const navigationGroups: NavigationGroup[] = [
   {
     id: 'catalog',
     label: 'Metadata',
-    icon: FilmSlateIcon,
+    icon: StackIcon,
     defaultOpen: true,
     items: [
       {
         to: '/metadata',
         label: 'Metadata',
-        description: 'Film and series information and torrent identification.',
-        icon: FilmSlateIcon,
+        description: 'Film, series and book information and torrent identification.',
+        icon: StackIcon,
       },
       {
         to: '/metadata/identification',
@@ -274,7 +274,7 @@ const publicSearchNavigation: NavigationGroup = {
     {
       to: '/public/search',
       label: 'Search',
-      description: 'Find films and series and download through your own debrid accounts.',
+      description: 'Find films, series and books and download through your own debrid accounts.',
       icon: MagnifyingGlassIcon,
     },
   ],

@@ -1,3 +1,4 @@
+import { CatalogCover } from '@/components/catalog-cover'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
 import { readResultSorting } from '@/lib/result-preferences'
@@ -42,10 +43,11 @@ import {
   TableCell,
 } from '@/components/ui/table'
 
-function TitleDetails({ title }: { title: CatalogTitle }) {
+function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?: boolean }) {
   return (
-    <p className="help">
-      {title.type === 'movie' ? 'Movie' : 'Series'}
+    <p className={`help break-words ${compact ? 'line-clamp-3' : ''}`}>
+      {title.type === 'movie' ? 'Movie' : title.type === 'book' ? 'Book' : 'Series'}
+      {!!title.authors?.length && ` · ${title.authors.join(', ')}`}
       {title.years.length > 0 && ` · ${title.years.join(', ')}`}
       {title.imdb && ` · ${title.imdb}`}
     </p>
@@ -100,7 +102,7 @@ export function CatalogSearchPage() {
         }}
       >
         <div className="field min-w-48 flex-1">
-          <Label htmlFor="catalog-query">Title or IMDb / TMDB ID</Label>
+          <Label htmlFor="catalog-query">Title, author or identifier</Label>
           <Input
             id="catalog-query"
             name="q"
@@ -109,7 +111,7 @@ export function CatalogSearchPage() {
             minLength={2}
             maxLength={500}
             required
-            placeholder="Search movies and series"
+            placeholder="Search movies, series and books"
           />
         </div>
         <Disclosure title="Filters" open>
@@ -122,9 +124,12 @@ export function CatalogSearchPage() {
                 className="native-select w-full"
                 defaultValue={kind}
               >
-                <option value="">Movies and series</option>
+                <option value="">All media</option>
                 <option value="movie">Movies</option>
                 <option value="tv">Series</option>
+                <option value="book">Books</option>
+                <option value="ebook">Ebooks</option>
+                <option value="audiobook">Audiobooks</option>
               </select>
             </div>
             <div className="field min-w-0">
@@ -183,14 +188,19 @@ export function CatalogSearchPage() {
                     {query.data.items?.map((title) => (
                       <TableRow key={title.id}>
                         <TableCell className="whitespace-normal">
-                          <Link
-                            to={`${searchPath}/${title.id}?${params({ q })}`}
-                            state={listState}
-                            className="font-medium break-words"
-                          >
-                            {title.title}
-                          </Link>
-                          <TitleDetails title={title} />
+                          <div className="flex min-w-0 items-start gap-3">
+                            <CatalogCover src={title.cover} book={title.type === 'book'} />
+                            <div className="min-w-0">
+                              <Link
+                                to={`${searchPath}/${title.id}?${params({ q })}`}
+                                state={listState}
+                                className="font-medium break-words"
+                              >
+                                {title.title}
+                              </Link>
+                              <TitleDetails title={title} />
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right mono">{number(title.releases)}</TableCell>
                         <TableCell>
@@ -337,7 +347,22 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
       ) : (
         title.data && (
           <>
-            <TitleDetails title={title.data} />
+            <div className="flex min-w-0 items-start gap-4">
+              <CatalogCover src={title.data.cover} book={title.data.type === 'book'} large />
+              <div className="min-w-0 space-y-2">
+                <TitleDetails title={title.data} compact={false} />
+                {title.data.openlibrary && (
+                  <a
+                    className="data-link text-sm"
+                    href={`https://openlibrary.org/${title.data.openlibrary.endsWith('M') ? 'books' : 'works'}/${title.data.openlibrary}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Open Library
+                  </a>
+                )}
+              </div>
+            </div>
             <section aria-label="Source release filters">
               <Disclosure title="Filters" open>
                 <div className="flex max-w-sm items-center justify-between gap-3">

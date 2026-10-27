@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -142,13 +143,13 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, cached)
 		}
 	}
-	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 ELSE 8000 END`
+	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("t") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 ELSE 7020 END ELSE 8000 END`
 	if len(media) > 0 {
 		cats := []int{}
 		for _, pair := range []struct {
 			typ string
 			cat int
-		}{{"movie", 2000}, {"tv", 5000}, {"other", 8000}} {
+		}{{"movie", 2000}, {"tv", 5000}, {"book", 7020}, {"book", 7030}, {"book", 3030}, {"ebook", 7020}, {"ebook", 7030}, {"audiobook", 3030}, {"other", 8000}} {
 			if slices.Contains(media, pair.typ) {
 				cats = append(cats, pair.cat)
 			}
@@ -158,11 +159,23 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	if q.Mode == "movie" {
 		clauses = append(clauses, "w.media_type='movie'")
 	}
+	if q.Mode == "book" {
+		clauses = append(clauses, "w.media_type='book'")
+	}
+	if q.BookTitle != "" {
+		clauses = append(clauses, bookTitleSearchSQL(q.BookTitle, bind))
+	}
+	if q.Author != "" {
+		clauses = append(clauses, "EXISTS(SELECT 1 FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+")")
+	}
+	if q.ISBN != "" {
+		clauses = append(clauses, "EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")
+	}
 	if q.Mode == "tvsearch" {
 		clauses = append(clauses, "w.media_type='tv'")
 	}
 	if q.Categories != nil {
-		clauses = append(clauses, category+"=ANY("+bind(q.Categories)+"::int[])")
+		clauses = append(clauses, category+"=ANY("+bind(expandBookCategories(q.Categories))+"::int[])")
 	}
 	if len(q.MediaTypes) > 0 {
 		types := []int{}
@@ -172,6 +185,12 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 				types = append(types, 2000)
 			case "tv":
 				types = append(types, 5000)
+			case "book":
+				types = append(types, 7020, 7030, 3030)
+			case "ebook":
+				types = append(types, 7020, 7030)
+			case "audiobook":
+				types = append(types, 3030)
 			case "other":
 				types = append(types, 8000)
 			default:
@@ -186,7 +205,8 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		}
 	}
 	if q.Year != 0 {
-		clauses = append(clauses, bind(q.Year)+"::int=ANY(w.years)")
+		year := bind(q.Year) + "::int"
+		clauses = append(clauses, "("+year+"=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.year="+year+")))")
 	}
 	if filters.Query != "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == "" {
 		clauses = append(clauses, torrentTextSearchSQLFor("t", filters.Query, bind))
@@ -212,7 +232,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 	}
 	// Project only fields understood by the shared record decoder. No arbitrary
 	// JSON, source links, announce URLs, raw identities or secrets cross this boundary.
-	columns := `t.provider_id,''::text,jsonb_build_object('title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
+	columns := `t.provider_id,''::text,jsonb_build_object('author',(SELECT string_agg(a.name,', ' ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,
@@ -279,6 +299,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 			return result, e
 		}
 		rec.IMDb, rec.TMDB, rec.TVDB, rec.ReviewedEpisode = imdb, tmdb, tvdb, reviewed
+		rec.BookHints.ISBN = books.ISBN(rec.BookHints.ISBN)
 		item.AIORecord = rec
 		if filtered {
 			if !episodeMatch(rec) {

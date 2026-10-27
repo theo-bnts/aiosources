@@ -73,7 +73,9 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await storeCredential(page, 'Add AllDebrid key', 'AllDebrid API key', 'synthetic-ad-key')
   const ad = await page.getByLabel('AllDebrid API key', { exact: true }).inputValue()
   expect(ad).toMatch(/^alldebrid_[a-f0-9]{32}$/)
-  await expect(page.getByRole('button', { name: 'Add AllDebrid key', exact: true })).toBeDisabled()
+  await expect(
+    page.getByRole('button', { name: 'Replace AllDebrid key', exact: true }),
+  ).toBeEnabled()
   expect(await configuration(page)).toEqual(original)
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
   // The server commits the secret, but its response is lost. Retrying must use
@@ -96,7 +98,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   expect(entriesBeforeRetry.items).toHaveLength(2)
   await dialog.getByRole('button', { name: 'Store and select', exact: true }).click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByRole('button', { name: 'Add TorBox key', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Replace TorBox key', exact: true })).toBeEnabled()
   expect((await (await page.request.get('/api/secrets')).json()).items).toHaveLength(2)
   expect(await configuration(page)).toEqual(original)
   await form.getByRole('button', { name: 'Save', exact: true }).click()
@@ -114,7 +116,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await openDisclosure(page, 'Manual actions')
   await storeCredential(page, 'Add TMDB token', 'TMDB read access token', 'synthetic-tmdb-token')
   await expect(
-    page.getByRole('button', { name: 'Download information updates', exact: true }),
+    page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeDisabled()
   expect((await configuration(page)).tmdb_secret).toBe('')
   const metadata = page.getByRole('form', { name: 'Metadata configuration', exact: true })
@@ -122,9 +124,9 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await expect(metadata.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect((await configuration(page)).tmdb_secret).toMatch(/^tmdb_[a-f0-9]{32}$/)
   await expect(
-    page.getByRole('button', { name: 'Download information updates', exact: true }),
+    page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeEnabled()
-  await expect(page.getByRole('button', { name: 'Add TMDB token', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Replace TMDB token', exact: true })).toBeEnabled()
   await page.getByLabel('TMDB read access token', { exact: true }).selectOption('')
   await expect(page.getByRole('button', { name: 'Add TMDB token', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Add TMDB token', exact: true }).click()
@@ -142,11 +144,12 @@ test('inline credentials stay encrypted, retry one owned reference and require a
     page.getByRole('dialog').getByLabel('TMDB read access token', { exact: true }),
   ).toHaveValue('')
   await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
   expect((await (await page.request.get('/api/secrets')).json()).items).toHaveLength(3)
   await page
     .getByLabel('TMDB read access token', { exact: true })
     .selectOption((await configuration(page)).tmdb_secret)
-  await expect(page.getByRole('button', { name: 'Add TMDB token', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Replace TMDB token', exact: true })).toBeEnabled()
 })
 
 test('full announce URLs added inline keep playback and debrid drafts independent on mobile', async ({

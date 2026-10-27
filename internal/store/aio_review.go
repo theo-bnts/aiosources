@@ -8,14 +8,15 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const reviewColumns = `active,revision,fingerprint,media_type,tmdb_id,season,episode,override_episode,updated_at`
+const reviewColumns = `active,revision,fingerprint,media_type,tmdb_id,season,episode,override_episode,updated_at,openlibrary_id`
 
 func readAIOReview(ctx context.Context, tx pgx.Tx, record model.AIORecord) (*model.AIOMatchReview, error) {
 	var review model.AIOMatchReview
-	err := tx.QueryRow(ctx, `SELECT `+reviewColumns+`,evidence_fingerprint<>md5(ingest.aio_review_evidence(t.fields)::text) FROM ingest.aio_match_reviews r JOIN ingest.torrents t USING(provider_id,source_id) WHERE r.provider_id=$1 AND r.source_id=$2`, record.Provider, record.SourceID).Scan(&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.SourceChanged)
+	err := tx.QueryRow(ctx, `SELECT `+reviewColumns+`,evidence_fingerprint<>md5(ingest.aio_review_evidence(t.fields)::text) FROM ingest.aio_match_reviews r JOIN ingest.torrents t USING(provider_id,source_id) WHERE r.provider_id=$1 AND r.source_id=$2`, record.Provider, record.SourceID).Scan(&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.SourceChanged)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -70,7 +71,10 @@ var reviewNumeric = regexp.MustCompile(`^[0-9]{1,15}$`)
 func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind string, filters ...model.CatalogSearchFilters) ([]model.AIOWork, error) {
 	out := []model.AIOWork{}
 	query = strings.TrimSpace(query)
-	if len(query) > 200 || (kind != "" && kind != "movie" && kind != "tv") {
+	if key := books.Key(query); books.WorkKey(key) {
+		query = key
+	}
+	if len(query) > 200 || (kind != "" && kind != "movie" && kind != "tv" && kind != "book") {
 		return out, model.ErrInvalid
 	}
 	if len([]rune(normalized)) < 3 && !reviewIMDb.MatchString(query) && !reviewNumeric.MatchString(query) {
@@ -83,21 +87,36 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	if filter.Year != 0 && (filter.Year < 1000 || filter.Year > 9999) {
 		return out, model.ErrInvalid
 	}
+	if isbn := books.ISBN(query); isbn != "" {
+		query = isbn
+	}
 	args := []any{query, normalized, kind, filter.Year, filter.Language}
 	terms := []string{}
+	anchor, longest := "", 0
 	for _, word := range strings.Fields(normalized) {
 		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
+		if len(word) > longest {
+			longest = len(word)
+			anchor = fmt.Sprintf("$%d", len(args))
+		}
 		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
 	}
 	matching := "FALSE"
 	if len(terms) > 0 {
 		matching = strings.Join(terms, " AND ")
 	}
-	alias := `(SELECT title FROM ingest.aio_titles WHERE work_id=w.id AND ` + matching + ` ORDER BY public.similarity($2,normalized) DESC,length(normalized),title LIMIT 1)`
+	if len(terms) < 2 || longest < 3 {
+		anchor = ""
+	}
+	bookExtras := ""
+	if kind != "movie" && kind != "tv" {
+		bookExtras = bookCatalogCandidates("$1", "$2", matching, anchor)
+	}
+	alias := catalogQueryAlias(matching, "$2")
 	columns := strings.Replace(aioWorkColumns, "w.display_title", catalogTitleLabel("$5", alias), 1)
 	rows, err := s.pool.Query(ctx, `WITH candidates AS (
  SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR tvdb_id=$1
- UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM ingest.aio_titles WHERE `+matching+`
+ UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM ingest.aio_titles WHERE `+matching+bookExtras+`
 ), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
  SELECT `+columns+` FROM ranked c JOIN ingest.aio_works w ON w.id=c.id
  WHERE NOT w.adult AND ($3='' OR w.media_type=$3) AND ($4::int=0 OR `+catalogYearFilter("$4::int")+`)
@@ -136,7 +155,7 @@ func reviewedAIOResult(ctx context.Context, tx pgx.Tx, record model.AIORecord, r
 		result.Reason = "reviewed source changed"
 		return result, nil
 	}
-	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+aioWorkColumns+` FROM ingest.aio_works w WHERE media_type=$1 AND tmdb_id=$2 AND NOT adult`, review.Type, review.TMDB))
+	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+aioWorkColumns+` FROM ingest.aio_works w WHERE media_type=$1 AND ((media_type='book' AND (openlibrary_id=ingest.ol_resolve($3) OR openlibrary_id=(SELECT ingest.ol_resolve(e.work_keys[1]) FROM ingest.ol_editions e WHERE e.id=ingest.ol_resolve($3) AND cardinality(e.work_keys)=1)) AND openlibrary_id<>'') OR (media_type<>'book' AND tmdb_id=$2)) AND NOT adult`, review.Type, review.TMDB, review.OpenLibrary))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, nil
 	}
@@ -209,9 +228,9 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
 		if w.Type != "tv" && (input.Season != nil || input.Episode != nil) {
 			return model.ErrInvalid
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode)
- SELECT $1,$2,$3,md5(ingest.aio_review_evidence(fields)::text),$4,$5,$6,$7,$8 FROM ingest.torrents WHERE provider_id=$1 AND source_id=$2
- ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=ingest.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode,openlibrary_id)
+ SELECT $1,$2,$3,md5(ingest.aio_review_evidence(fields)::text),$4,$5,$6,$7,$8,$9 FROM ingest.torrents WHERE provider_id=$1 AND source_id=$2
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=ingest.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,openlibrary_id=EXCLUDED.openlibrary_id,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode, w.OpenLibrary); err != nil {
 			return databaseError("save identification review", err)
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)

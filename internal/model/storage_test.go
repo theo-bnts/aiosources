@@ -80,3 +80,29 @@ func TestCompactStorageAlsoProjectsNestedMetadataWithoutChangingEvidence(t *test
 		t.Fatal("nested projection mutated the source or full storage")
 	}
 }
+
+func TestCompactBooksRetainUsefulBibliographicEvidence(t *testing.T) {
+	fields := map[string]any{"title": "Morgan Vale - The Amber Orchard EPUB", "author": "Morgan Vale", "isbn": "9780306406157", "openlibrary": "OL100W", "categories": []int{7020}, "description": "unneeded", "attributes": map[string][]string{"isbn13": {"9780306406157", "9780306406158"}, "booktitle": {"The Amber Orchard"}, "book_format": {"epub"}, "password": {"private"}}}
+	stored := StoredTorrentFields(fields, StorageCompact)
+	if stored["description"] != nil || stored["author"] != fields["author"] || stored["openlibrary"] != fields["openlibrary"] {
+		t.Fatal("book evidence lost in compact storage")
+	}
+	hints := BookSourceHints(stored)
+	if hints.Author != "Morgan Vale" || hints.Title != "The Amber Orchard" || hints.Format != "epub" || len(hints.ISBNs) != 3 || len(hints.Categories) != 1 || hints.Categories[0] != 7020 {
+		t.Fatalf("typed bibliographic hints lost: %+v", hints)
+	}
+	if stored["attributes"].(map[string][]string)["password"] != nil {
+		t.Fatal("unknown attribute retained")
+	}
+}
+
+func TestCoverURLsUseOnlyCanonicalProviderIdentifiers(t *testing.T) {
+	for _, unsafe := range []string{"https://private.invalid/a.jpg", "//private.invalid/a.jpg", "/../secret.jpg", "/a.jpg?key=secret", "/a.jpg#fragment"} {
+		if CoverURL("movie", unsafe, 0) != "" {
+			t.Fatal("untrusted image URL accepted")
+		}
+	}
+	if CoverURL("movie", "/ExamplePoster.jpg", 0) != "https://image.tmdb.org/t/p/w342/ExamplePoster.jpg" || CoverURL("book", "", 123) != "https://covers.openlibrary.org/b/id/123-M.jpg?default=false" || CoverURL("book", "", -1) != "" {
+		t.Fatal("canonical cover URL lost")
+	}
+}

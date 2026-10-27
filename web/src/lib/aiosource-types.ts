@@ -10,6 +10,8 @@ export type Config = {
   realdebrid_secret: string
   auto_sync: boolean
   auto_match: boolean
+  openlibrary_enabled: boolean
+  openlibrary_days: number
   sync_minutes: number
   match_seconds: number
   tmdb_requests_per_second: number
@@ -17,7 +19,20 @@ export type Config = {
   response_seconds: number
   trackers: Record<string, Tracker>
 }
+export type BookStatus = {
+  skipped: number
+  complete: boolean
+  position: number
+  imported: number
+  works: number
+  editions: number
+  authors: number
+  last_sync: string | null
+  error?: string
+  running: boolean
+}
 export type Status = {
+  books?: BookStatus
   config: Config
   status: {
     works: number
@@ -68,7 +83,9 @@ export type MatchDiagnostic = {
 export type ReviewWork = {
   display_title?: string
   id: number
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
+  openlibrary?: string
+  book?: { authors?: string[]; cover?: number }
   tmdb: string
   imdb: string
   tvdb: string
@@ -81,13 +98,16 @@ export type MatchReview = {
   active: boolean
   revision: number
   fingerprint: string
-  type: 'movie' | 'tv'
+  type: 'movie' | 'tv' | 'book'
+  openlibrary?: string
+  book?: { authors?: string[]; cover?: number }
   tmdb: string
   override_episode: boolean
   season: number | null
   episode: number | null
 }
 export type ReviewDetail = {
+  book_evidence?: { isbn?: string; isbns?: string[]; openlibrary?: string; author?: string }
   suggested_query: string
   suggested_year: number | null
   record: {

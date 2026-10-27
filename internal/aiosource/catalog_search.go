@@ -73,6 +73,18 @@ func (s *Service) CatalogTitle(ctx context.Context, workID int64, locales ...str
 }
 
 func catalogResource(title model.CatalogTitle, selection model.CatalogSelection) (Resource, string, error) {
+	if title.Type == "book" {
+		if selection.Season != nil || selection.Episode != nil || len(selection.File) > 4096 {
+			return Resource{}, "", model.ErrInvalid
+		}
+		id := "openlibrary:" + title.OpenLibrary
+		r, err := ParseID(id, "book")
+		r.File = selection.File
+		return r, id, err
+	}
+	if selection.File != "" {
+		return Resource{}, "", model.ErrInvalid
+	}
 	typ := "movie"
 	id := "tmdb:" + title.TMDB
 	if title.Type == "tv" {
@@ -244,9 +256,14 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 				if observed.Cached {
 					file, found := SelectFile(observed.Files, r)
 					state.State = "cached"
+					if r.Type == "book" {
+						state.FileCount = len(bookFiles(observed.Files))
+					}
 					if found {
 						state.Filename = file.Path
 						state.Size = file.Size
+					} else if r.Type == "book" && state.FileCount > 1 {
+						// The recipient chooses a format or audio track before downloading.
 					} else if len(observed.Files) > 0 {
 						state.State = "unavailable"
 						state.CanAdd = false
@@ -420,9 +437,22 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 		}
 	}
 	h.checkpoint(ctx, "download")
-	policy := playbackPolicy{CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID}
+	policy := playbackPolicy{SelectionFile: input.File, CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID}
 	if visitor != nil {
 		policy.Preferences = &visitor.Preferences
+	}
+	if title.Type == "book" && input.File == "" && input.PreparationID == "" && !input.AllowUncached {
+		observed, e := s.DB.SharedAvailability(ctx, input.Service, []string{selected.Hash}, time.Now().Add(-time.Duration(config.CacheMinutes)*time.Minute))
+		if e != nil {
+			return result, e
+		}
+		if len(observed) == 1 && observed[0].Cached {
+			if files := bookFiles(observed[0].Files); len(files) > 1 {
+				result.Files = files
+				result.Status = "pending"
+				return result, ErrPending
+			}
+		}
 	}
 	result.URL, downloadErr = s.playbackWithPolicy(withProviderHistory(ctx, h), input.Service, selected.Provider, selected.SourceID, r.Type, id, visitor, policy)
 	if visitor == nil && result.PreparationID != "" {
@@ -437,6 +467,10 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	result.Status = "ready"
 	if errors.Is(downloadErr, ErrPending) {
 		result.Status = "pending"
+		var choice *bookFileChoice
+		if errors.As(downloadErr, &choice) {
+			result.Files = choice.Files
+		}
 		return result, downloadErr
 	}
 	if downloadErr == nil {
@@ -449,7 +483,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 
 // Following a saved preparation never starts an uncached download. It also
 // cannot reuse an object ID after the administrator changes provider accounts.
-func (s *Service) CheckOperationDownload(ctx context.Context, id string) (result model.CatalogDownload, checkErr error) {
+func (s *Service) CheckOperationDownload(ctx context.Context, id string, selectedFiles ...string) (result model.CatalogDownload, checkErr error) {
 	defer func() {
 		if errors.Is(checkErr, model.ErrNotFound) || errors.Is(checkErr, model.ErrConflict) {
 			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -472,6 +506,12 @@ func (s *Service) CheckOperationDownload(ctx context.Context, id string) (result
 	}
 	if key == "" || fingerprint(key) != saved.Account {
 		return model.CatalogDownload{}, model.ErrConflict
+	}
+	if len(selectedFiles) > 0 {
+		if len(selectedFiles[0]) > 4096 {
+			return model.CatalogDownload{}, model.ErrInvalid
+		}
+		saved.Input.File = selectedFiles[0]
 	}
 	saved.Input.AllowUncached = false
 	return s.catalogDownload(ctx, saved.WorkID, saved.Input, id, saved.Account, nil)

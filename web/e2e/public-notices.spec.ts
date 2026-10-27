@@ -6,7 +6,12 @@ async function openAbout(page: Page) {
   await expect(trigger).toHaveCount(1)
   await trigger.click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('heading', { name: 'AIOSources', exact: true })).toBeVisible()
+  const version = await page.locator('meta[name="application-version"]').getAttribute('content')
+  expect(version).toBeTruthy()
+  expect(version).not.toContain('__AIOSOURCES_VERSION__')
+  await expect(
+    dialog.getByRole('heading', { name: `AIOSources (${version})`, exact: true }),
+  ).toBeVisible()
   for (const [name, href] of [
     ['GitHub Source code and releases', 'https://github.com/theo-bnts/aiosources'],
     ['Discord Help in French only', 'https://discord.gg/h3sja5XN8b'],
@@ -44,6 +49,15 @@ test('credits use bundled assets and licenses without changing the current view 
     await expect(
       credits.getByRole('link', { name: 'Software licenses and notices' }),
     ).toHaveAttribute('href', '/THIRD-PARTY-NOTICES.txt')
+    await expect(credits).not.toContainText('Built on')
+    expect(await credits.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    )
+    if (process.env.QA_DIRECTORY)
+      await page.screenshot({
+        path: `${process.env.QA_DIRECTORY}/about-${width}.png`,
+        animations: 'disabled',
+      })
     await credits.getByRole('button', { name: 'Close', exact: true }).click()
     await expect(page.getByRole('button', { name: 'About AIOSources', exact: true })).toBeFocused()
     await expect(page.getByRole('alertdialog')).toHaveCount(0)

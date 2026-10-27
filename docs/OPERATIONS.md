@@ -6,11 +6,11 @@
 
 | Page | Use it to |
 | --- | --- |
-| Search | Find identified films and series, choose an episode and compare releases. |
+| Search | Find identified films, series and books, choose an episode or file and compare releases. |
 | Torrents | Search records directly as imported from your sources or remote catalogs. |
-| Identification | Find unrecognized or uncertain records and choose the correct film or series. |
+| Identification | Find unrecognized or uncertain records and choose the correct film, series or book. |
 | Sources | Add sources, schedule imports and inspect their history. |
-| Metadata | Update film and series information and control automatic identification. |
+| Metadata | Update film, series and book information and control automatic identification. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |
@@ -19,13 +19,15 @@ The settings search stays available on desktop and mobile. Select a result to op
 
 ## Search and choose a release
 
-Search uses your imported information, including local titles and aliases. It does not contact TMDB or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
+Search uses your imported information, including local titles and aliases. It does not contact TMDB, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
 
 Use type and year filters to narrow titles. A series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
 
 Sorting can prioritize cached status, language, size, publication date, age, name or source. Several priorities apply in order. Optional language and cached-only filters restrict what is shown; leave them off to see all permitted results. Cache checks and downloads may still contact your debrid service.
 
-**Download** opens a ready file in your browser. **Add to debrid** starts preparation, with **View operation** linking to its progress in Debrid history.
+Posters and book covers load directly from their official image services. Your instance does not save the image files.
+
+**Download** opens a ready file in your browser. For a book with several formats or audio tracks, use **Choose file**, then select the file you want. **Add to debrid** starts preparation, with **View operation** linking to its progress in Debrid history.
 
 ## Review identification
 
@@ -53,7 +55,7 @@ Historical error counts include earlier attempts and do not necessarily mean the
 
 ## Storage and retention
 
-**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film and series information and shared caches are counted separately.
+**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series and book information and shared caches are counted separately.
 
 Choose the storage mode in **Storage → Settings**. The compact option keeps information used by search, identification, playback and sharing while avoiding unnecessary source payloads. A mode change applies to new data; it does not automatically rewrite all older records.
 

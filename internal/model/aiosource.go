@@ -15,6 +15,8 @@ type AIOConfig struct {
 	RealDebridSecret      string                `json:"realdebrid_secret"`
 	AutoSync              bool                  `json:"auto_sync"`
 	AutoMatch             bool                  `json:"auto_match"`
+	OpenLibraryEnabled    bool                  `json:"openlibrary_enabled"`
+	OpenLibraryDays       int                   `json:"openlibrary_days"`
 	SyncMinutes           int                   `json:"sync_minutes"`
 	MatchSeconds          int                   `json:"match_seconds"`
 	TMDBRequestsPerSecond int                   `json:"tmdb_requests_per_second"`
@@ -31,6 +33,9 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
+	OpenLibrary     string            `json:"openlibrary,omitempty"`
+	PosterPath      string            `json:"poster_path,omitempty"`
+	Book            BookInformation   `json:"book,omitzero"`
 	LocalizedTitles map[string]string `json:"localized_titles"`
 	DisplayTitle    string            `json:"display_title"`
 	Adult           bool              `json:"adult"`
@@ -46,34 +51,38 @@ type AIOWork struct {
 	Revision        int64             `json:"revision"`
 }
 type AIORecord struct {
-	MatchingPolicy      MatchingPolicy      `json:"-"`
-	Presentation        map[string][]string `json:"-"`
-	SubtitleLanguages   []string            `json:"-"`
-	Bitrate             float64             `json:"-"`
-	ReviewedEpisode     bool                `json:"reviewed_episode,omitempty"`
-	Normalized          string              `json:"-"`
-	QueueVersion        int64               `json:"-"`
-	CandidateGeneration int64               `json:"-"`
-	Provider            string              `json:"provider"`
-	SourceID            string              `json:"source_id"`
-	Title               string              `json:"title"`
-	Hash                string              `json:"hash"`
-	Size                int64               `json:"size"`
-	IMDb                string              `json:"imdb"`
-	TMDB                string              `json:"tmdb"`
-	TVDB                string              `json:"tvdb"`
-	MAL                 string              `json:"mal"`
-	Season              *int                `json:"season"`
-	Episode             *int                `json:"episode"`
-	Languages           []string            `json:"languages"`
-	PublishedAt         *time.Time          `json:"published_at,omitempty"`
-	DurationSeconds     float64             `json:"duration_seconds,omitempty"`
-	Fingerprint         string              `json:"fingerprint"`
+	BookInformationPending bool                `json:"-"`
+	BookHints              BookHints           `json:"-"`
+	MatchingPolicy         MatchingPolicy      `json:"-"`
+	Presentation           map[string][]string `json:"-"`
+	SubtitleLanguages      []string            `json:"-"`
+	Bitrate                float64             `json:"-"`
+	ReviewedEpisode        bool                `json:"reviewed_episode,omitempty"`
+	Normalized             string              `json:"-"`
+	QueueVersion           int64               `json:"-"`
+	CandidateGeneration    int64               `json:"-"`
+	Provider               string              `json:"provider"`
+	SourceID               string              `json:"source_id"`
+	Title                  string              `json:"title"`
+	Hash                   string              `json:"hash"`
+	Size                   int64               `json:"size"`
+	IMDb                   string              `json:"imdb"`
+	TMDB                   string              `json:"tmdb"`
+	TVDB                   string              `json:"tvdb"`
+	MAL                    string              `json:"mal"`
+	Season                 *int                `json:"season"`
+	Episode                *int                `json:"episode"`
+	Languages              []string            `json:"languages"`
+	PublishedAt            *time.Time          `json:"published_at,omitempty"`
+	DurationSeconds        float64             `json:"duration_seconds,omitempty"`
+	Fingerprint            string              `json:"fingerprint"`
 }
 
 // Eligibility belongs in candidate discovery, before the bounded safety cap.
 // Otherwise impossible homonyms can hide the one year-compatible work.
 type AIOCandidateFilter struct {
+	Titles                        []string
+	ISBN, OpenLibrary             string
 	Title, TMDB, IMDb, TVDB, Type string
 	Year                          *int
 	Seasons                       []int
@@ -84,6 +93,41 @@ type AIOCandidateFilter struct {
 type AIOSeasonRequest struct {
 	TMDB   string `json:"tmdb_id"`
 	Season int    `json:"season"`
+}
+
+type BookHints struct {
+	OpenLibrary   string   `json:"openlibrary,omitempty"`
+	ISBNs         []string `json:"isbns,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Kind          string   `json:"kind,omitempty"`
+	Author        string   `json:"author,omitempty"`
+	ISBN          string   `json:"isbn,omitempty"`
+	Format        string   `json:"format,omitempty"`
+	Categories    []int    `json:"categories,omitempty"`
+	CategoryNames []string `json:"category_names,omitempty"`
+}
+
+type BookInformation struct {
+	YearVerified  bool     `json:"-"`
+	AuthorAliases []string `json:"author_aliases,omitempty"`
+	AuthorKeys    []string `json:"author_keys,omitempty"`
+	Authors       []string `json:"authors,omitempty"`
+	Cover         int64    `json:"cover,omitempty"`
+	Languages     []string `json:"languages,omitempty"`
+}
+
+type OpenLibraryStatus struct {
+	Skipped  int64      `json:"skipped"`
+	Complete bool       `json:"complete"`
+	Snapshot string     `json:"snapshot,omitempty"`
+	Position int64      `json:"position"`
+	Imported int64      `json:"imported"`
+	Works    int64      `json:"works"`
+	Editions int64      `json:"editions"`
+	Authors  int64      `json:"authors"`
+	LastSync *time.Time `json:"last_sync"`
+	Error    string     `json:"error,omitempty"`
+	Running  bool       `json:"running"`
 }
 
 type AIOMatchResult struct {

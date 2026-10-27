@@ -28,7 +28,7 @@ test('metadata configuration persists and missing information explains disabled 
   await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
   await openDisclosure(page, 'Manual actions')
   await expect(
-    page.getByRole('button', { name: 'Download information updates', exact: true }),
+    page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeDisabled()
   const configuration = page.getByRole('form', { name: 'Metadata configuration', exact: true })
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
@@ -81,7 +81,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   await expect(page.getByText('Manual actions', { exact: true })).toBeHidden()
   await openDisclosure(page, 'Advanced')
   await expect(
-    page.getByRole('button', { name: 'Download information updates', exact: true }),
+    page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toHaveCount(0)
   const session = await (await page.request.get('/api/session')).json()
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
@@ -147,9 +147,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     ).toBeVisible()
     await expect(page.getByRole('link', { name: 'View history', exact: true })).toBeVisible()
     await page.setViewportSize({ width: 390, height: 844 })
-    await expect(
-      form.getByRole('heading', { name: 'Automatic updates & identification', exact: true }),
-    ).toBeVisible()
+    await expect(form.getByRole('group', { name: 'Schedules', exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   } finally {
     await db.end()

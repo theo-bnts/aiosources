@@ -205,7 +205,7 @@ export function CollectDialog({
                     ? 'Download a fresh snapshot and replace this remote catalog’s local copy only after completion. Other sources are preserved.'
                     : 'Read the whole source and replace its published catalog only after completion. Other sources are preserved.'
                   : mode === 'metadata'
-                    ? 'Fetch missing fields from this source for existing torrents. This does not download TMDB information or identify films and series.'
+                    ? 'Fetch missing fields from this source for existing torrents. This does not update metadata or identify torrents.'
                     : remote
                       ? 'Import changes since the last successful sync. The first sync downloads the complete catalog. Your current copy remains available until completion.'
                       : 'Import new torrents. The first update automatically starts with a complete import (Full); later updates use Incremental.'}

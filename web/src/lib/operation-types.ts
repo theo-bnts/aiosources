@@ -13,7 +13,7 @@ export type OperationRun = {
   }
   id: string
   kind: OperationKind
-  service: 'tmdb' | 'local' | DebridService
+  service: 'tmdb' | 'openlibrary' | 'local' | DebridService
   trigger: 'manual' | 'automatic' | 'playback' | 'public'
   resource?: string
   status: OperationStatus

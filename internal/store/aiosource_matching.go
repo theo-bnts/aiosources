@@ -17,6 +17,9 @@ const aioCandidateLimit = 100
 const AIOMaxMatchBatchSize = 100
 
 func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
+	if filter.Type == "book" {
+		return searchBookCandidates(ctx, tx, filter)
+	}
 	rows, err := tx.Query(ctx, aioCandidatesQuery, filter.Title, filter.TMDB, filter.IMDb, filter.TVDB, filter.Type, filter.Year, filter.Seasons, filter.Episode, filter.ExactOnly)
 	if err != nil {
 		return nil, false, databaseError("find metadata candidates", err)
@@ -53,6 +56,10 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 		return nil, databaseError("lock candidate generation", err)
 	}
 	var policy model.MatchingPolicy
+	var booksPending bool
+	if err = tx.QueryRow(ctx, `SELECT NOT complete AND last_sync IS NULL FROM ingest.ol_import_state WHERE singleton`).Scan(&booksPending); err != nil {
+		return nil, err
+	}
 	if err = tx.QueryRow(ctx, `SELECT (values->>'minimum_similarity')::int,(values->>'ambiguity_margin')::int FROM ingest.runtime_settings WHERE section='matching'`).Scan(&policy.MinimumSimilarity, &policy.AmbiguityMargin); err != nil {
 		return nil, databaseError("read identification policy", err)
 	}
@@ -68,7 +75,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	}
 	rows, err := tx.Query(ctx, `SELECT `+aioRecordColumns+`,q.version,
  r.active IS TRUE,COALESCE(r.revision,0),COALESCE(r.fingerprint,''),COALESCE(r.media_type,''),COALESCE(r.tmdb_id,''),r.season,r.episode,
- COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),
+ COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),
  CASE WHEN r.active THEN r.evidence_fingerprint<>md5(ingest.aio_review_evidence(t.fields)::text) ELSE FALSE END
 FROM ingest.aio_match_queue q JOIN ingest.torrents t USING(provider_id,source_id)
 LEFT JOIN ingest.aio_match_reviews r USING(provider_id,source_id)
@@ -81,13 +88,14 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	reviews := []*model.AIOMatchReview{}
 	for rows.Next() {
 		var review model.AIOMatchReview
-		r, err := scanAIORecordQueue(aioStreamRow{scanner: rows, ids: []any{&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.SourceChanged}}, true)
+		r, err := scanAIORecordQueue(aioStreamRow{scanner: rows, ids: []any{&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.SourceChanged}}, true)
 		if err != nil {
 			rows.Close()
 			return nil, err
 		}
 		r.CandidateGeneration = generation
 		r.MatchingPolicy = policy
+		r.BookInformationPending = booksPending
 		records = append(records, r)
 		reviews = append(reviews, &review)
 	}

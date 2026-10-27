@@ -34,18 +34,33 @@ import {
 } from '@/components/ui/table'
 
 const reasons: Record<string, string> = {
-  'manually reviewed': 'Film or series chosen in a manual review.',
+  'manually reviewed': 'Title chosen in a manual review.',
+  'book information not ready':
+    'Import book information before automatic book identification can finish.',
+  'invalid Open Library identifier': 'The supplied Open Library identifier is invalid.',
+  'verified Open Library identifier': 'The supplied Open Library identifier resolves to this work.',
+  'insufficient bibliographic evidence':
+    'The book title, author or ISBN does not establish a reliable correspondence. Review the book information.',
+  'book collection requires review':
+    'This release may contain several books. Review it before associating it with a single work.',
+  'conflicting or invalid ISBN evidence':
+    'Source ISBNs are invalid or disagree. Review the source information before choosing a book.',
+  'multiple or incomplete book candidates':
+    'Several books are plausible, or candidate discovery is incomplete. Choose the correct book.',
+  'book title corroborated by bibliographic evidence':
+    'The title and its bibliographic information agree.',
+  'verified ISBN': 'A validated ISBN identifies an edition of this work.',
   'reviewed source changed':
     'Source data changed after a manual review. Check and confirm the current identification.',
   'reviewed information unavailable':
-    'The reviewed film or series is no longer available. Choose a current entry.',
+    'The reviewed title is no longer available. Choose a current entry.',
   'multiple plausible works':
     'Several films or series are plausible. Check the title, year and source identifiers; a match will not be forced.',
   'no supported correspondence':
     'No reliable correspondence in the downloaded information. Update it, then check the source title, year and identifiers.',
   'source season conflict': 'The source season disagrees with the release title.',
   'source episode conflict': 'The source episode disagrees with the release title.',
-  'media type conflict': 'Film or series information disagrees with the source.',
+  'media type conflict': 'The media type disagrees with the source.',
   'year conflict': 'The release year disagrees with the downloaded information.',
   'numbered title conflict': 'A number in the title disagrees with the candidate title.',
   'source ID conflict': 'Source identifiers disagree with the downloaded information.',

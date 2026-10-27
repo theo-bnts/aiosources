@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -192,7 +191,7 @@ func (p *ProviderHTTP) rdPrepare(ctx context.Context, key, hash, magnet string, 
 			return result, err
 		}
 		if _, ok := SelectFile(files, r); !ok {
-			return result, errors.New("no unambiguous matching video")
+			return result, fileSelectionError(files, r)
 		}
 		stage = "add"
 		if err := p.providerJSON(ctx, "realdebrid", key, http.MethodPost, "torrents/selectFiles/"+id, url.Values{"files": {"all"}}, nil); err != nil {
@@ -219,7 +218,7 @@ func (p *ProviderHTTP) rdPrepare(ctx context.Context, key, hash, magnet string, 
 	stage = "file_selection"
 	file, ok := SelectFile(files, r)
 	if !ok {
-		return result, errors.New("no unambiguous matching video")
+		return result, fileSelectionError(files, r)
 	}
 	if _, err := HTTPSLink(file.Link); err != nil {
 		return result, err

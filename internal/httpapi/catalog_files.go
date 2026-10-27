@@ -75,7 +75,13 @@ func (s *server) writeCatalogDownload(w http.ResponseWriter, r *http.Request, it
 }
 
 func (s *server) operationDownload(w http.ResponseWriter, r *http.Request) {
-	item, err := s.options.AIOSource.CheckOperationDownload(r.Context(), r.PathValue("id"))
+	var input struct {
+		File string `json:"file"`
+	}
+	if r.ContentLength != 0 && !decodeJSON(w, r, &input) {
+		return
+	}
+	item, err := s.options.AIOSource.CheckOperationDownload(r.Context(), r.PathValue("id"), input.File)
 	s.writeCatalogDownload(w, r, item, err)
 }
 

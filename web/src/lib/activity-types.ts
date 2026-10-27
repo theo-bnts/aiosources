@@ -5,6 +5,7 @@ export const activityLevels: ActivityLevel[] = ['debug', 'info', 'warn', 'error'
 export const activityServices = [
   { id: 'network', name: 'Network', to: '/network' },
   { id: 'tmdb', name: 'TMDB', to: '/metadata' },
+  { id: 'openlibrary', name: 'Open Library', to: '/metadata' },
   ...debridProviders.map((provider) => ({ ...provider, to: '/debrid' })),
 ] as const
 

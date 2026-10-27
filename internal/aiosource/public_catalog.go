@@ -125,7 +125,11 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 		}
 		source = preparation.Source
 		operation, account = preparation.OperationID, preparation.Account
+		chosenFile := input.File
 		input = model.CatalogDownloadInput{CatalogSelection: preparation.Selection, Service: preparation.Service, PreparationID: preparation.PreparedID}
+		if chosenFile != "" {
+			input.File = chosenFile
+		}
 	} else if err := s.openPublicCatalogValue("public-catalog-source-v1", input.DownloadToken, &source); err != nil {
 		return model.CatalogDownload{}, err
 	}

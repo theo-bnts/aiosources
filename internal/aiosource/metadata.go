@@ -113,6 +113,7 @@ type tmdbSeasonDetails struct {
 	} `json:"episodes"`
 }
 type tmdbDetails struct {
+	Poster           string `json:"poster_path"`
 	Adult            *bool  `json:"adult"`
 	ID               int64  `json:"id"`
 	Title            string `json:"title"`
@@ -171,6 +172,7 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 		return w, ErrInvalidResponse
 	}
 	w.Adult = *d.Adult
+	w.PosterPath = d.Poster
 	primary := d.Title
 	date := d.Date
 	original := d.OriginalTitle

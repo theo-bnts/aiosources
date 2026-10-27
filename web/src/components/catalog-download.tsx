@@ -17,6 +17,7 @@ import type {
   CatalogDownload,
 } from '@/lib/catalog-search-types'
 import { ErrorNotice } from '@/components/common'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
@@ -47,6 +48,9 @@ export function DownloadAction({
   const listState = useListViewState()
   const preparation = useRef('')
   const [ready, setReady] = useState<CatalogDownload | null>(null)
+  const [bookFiles, setBookFiles] = useState<Array<{ path: string; size: number }>>([])
+  const [selectedFile, setSelectedFile] = useState(selection.file ?? '')
+  const fileSelection = { ...selection, ...(selectedFile ? { file: selectedFile } : {}) }
   const [waiting, setWaiting] = useState(preparing)
   const [notReady, setNotReady] = useState(false)
   const [operation, setOperation] = useState(operationID ?? '')
@@ -75,9 +79,9 @@ export function DownloadAction({
             signal: controller.current.signal,
             body: JSON.stringify(
               preparation.current && !allowUncached
-                ? { preparation_id: preparation.current }
+                ? { preparation_id: preparation.current, file: selectedFile || undefined }
                 : {
-                    ...selection,
+                    ...fileSelection,
                     download_token: release.download_token,
                     service: service.service,
                     allow_uncached: allowUncached,
@@ -97,9 +101,9 @@ export function DownloadAction({
           signal: controller.current.signal,
           body: JSON.stringify(
             continuation
-              ? {}
+              ? { file: selectedFile || undefined }
               : {
-                  ...selection,
+                  ...fileSelection,
                   occurrence_id: release.occurrence_id,
                   fingerprint: release.fingerprint,
                   service: service.service,
@@ -113,8 +117,10 @@ export function DownloadAction({
       preparation.current = result.preparation_id || ''
       setOperation(result.operation_id)
       const pending = result.status === 'pending'
-      setWaiting(pending && (allowUncached || waiting))
-      setNotReady(pending)
+      const choosing = Boolean(result.files?.length)
+      if (choosing) setBookFiles(result.files!)
+      setWaiting(pending && !choosing && (allowUncached || waiting))
+      setNotReady(pending && !choosing)
       if (!pending) {
         setReady(result)
         const started = result.url && download.current?.start(result.url)
@@ -180,10 +186,35 @@ export function DownloadAction({
   const details = [service.filename, service.size ? bytes(service.size) : null]
     .filter(Boolean)
     .join(' · ')
+  const chooseFile = bookFiles.length > 1
+  const fileID = `book-file-${workID}-${release.occurrence_id}-${service.service}`
   const blocked = service.state === 'invalid' || service.state === 'unavailable'
   const cached = service.state === 'cached' && !notReady
   return (
-    <div className="min-w-48 space-y-2">
+    <div className="w-full min-w-0 space-y-2 sm:min-w-48">
+      {chooseFile && (
+        <div className="field min-w-0">
+          <Label htmlFor={fileID}>File</Label>
+          <select
+            id={fileID}
+            className="native-select w-full max-w-full"
+            value={selectedFile}
+            disabled={mutation.isPending || waiting}
+            onChange={(event) => {
+              setSelectedFile(event.target.value)
+              setReady(null)
+            }}
+          >
+            <option value="">Choose a format or audio track</option>
+            {bookFiles.map((file) => (
+              <option key={file.path} value={file.path}>
+                {file.path}
+                {file.size > 0 ? ` · ${bytes(file.size)}` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium">{serviceNames[service.service]}</span>
         <Badge variant={ready || cached ? 'success' : waiting ? 'info' : 'secondary'}>
@@ -213,6 +244,7 @@ export function DownloadAction({
             variant={cached ? 'default' : 'outline'}
             disabled={
               mutation.isPending ||
+              (chooseFile && !selectedFile) ||
               blocked ||
               (!service.can_add && service.state === 'uncached' && !waiting)
             }
@@ -220,16 +252,24 @@ export function DownloadAction({
               attempts.current = 0
               download.current?.cancel()
               download.current = prepareBrowserDownload()
-              mutation.mutate(!waiting && !cached && service.can_add)
+              mutation.mutate(
+                !waiting && !cached && service.can_add && !preparation.current && !operation,
+              )
             }}
           >
-            {cached || waiting ? <DownloadSimpleIcon /> : <PlusIcon />}
+            {cached || waiting || (chooseFile && selectedFile) ? (
+              <DownloadSimpleIcon />
+            ) : (
+              <PlusIcon />
+            )}
             {mutation.isPending
               ? 'Preparing…'
               : waiting
                 ? 'Check readiness'
-                : cached
-                  ? 'Download'
+                : cached || (chooseFile && selectedFile)
+                  ? service.file_count && service.file_count > 1 && !selectedFile
+                    ? 'Choose file'
+                    : 'Download'
                   : service.can_add
                     ? 'Add to debrid'
                     : 'Check cached file'}

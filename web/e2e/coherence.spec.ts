@@ -152,7 +152,7 @@ test('identification search distinguishes unavailable results from an empty or i
   server,
 }) => {
   const editor = await reviewFixture(page, server)
-  const query = editor.getByLabel('Title, IMDb, TMDB or TVDB ID', { exact: true })
+  const query = editor.getByLabel('Title, author or identifier', { exact: true })
   await query.fill('x'.repeat(201))
   await editor.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(editor.getByRole('alert')).toBeVisible()

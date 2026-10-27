@@ -71,7 +71,7 @@ func (s *server) catalogTitle(w http.ResponseWriter, r *http.Request) {
 }
 func catalogReleaseInput(w http.ResponseWriter, r *http.Request) (model.ListOptions, model.CatalogSelection, model.CatalogReleaseFilters, bool) {
 	opts, ok := listOptions(w, r)
-	selection := model.CatalogSelection{}
+	selection := model.CatalogSelection{File: r.URL.Query().Get("file")}
 	filters := model.CatalogReleaseFilters{}
 	if !ok {
 		return opts, selection, filters, false

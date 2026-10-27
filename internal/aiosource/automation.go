@@ -108,6 +108,11 @@ func (s *Service) runAutomation() time.Duration {
 	if c.AutoMatch && c.MatchSeconds > 0 {
 		poll = min(poll, time.Duration(c.MatchSeconds)*time.Second)
 	}
+	if c.OpenLibraryEnabled && !s.BookState() {
+		if due, e := s.DB.OpenLibraryDue(s.ctx, c.OpenLibraryDays); e == nil && due {
+			_ = s.StartBooks("automatic")
+		}
+	}
 	syncing, matching, _ := s.State()
 	now := time.Now()
 	p := AutomationPlan(c, status, syncing, matching, now)

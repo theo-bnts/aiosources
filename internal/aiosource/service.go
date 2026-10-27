@@ -22,6 +22,10 @@ type Service struct {
 	Providers                 *ProviderHTTP
 	TMDBBase, ExportBase      string
 	MetadataHTTP              *http.Client
+	BookHTTP                  *http.Client
+	BookExportURL             string
+	booksRunning              bool
+	booksCancel               context.CancelFunc
 	Network                   *outbound.Router
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
@@ -139,7 +143,7 @@ func (s *Service) State() (bool, bool, string) {
 var secretRefRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
-	if c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
+	if c.OpenLibraryDays < 1 || c.OpenLibraryDays > 366 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid
 	}
 	refs := c.SecretReferences()
@@ -256,14 +260,17 @@ func (s *Service) Stop(syncJob, matchJob bool) {
 func (s *Service) Reset(ctx context.Context, scope string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || (scope != "cache" && (s.syncRunning || s.matchRunning)) {
+	if s.closed || (scope != "cache" && (s.syncRunning || s.matchRunning || s.booksRunning)) {
 		return model.ErrBusy
 	}
 	var releases []func()
-	if scope == "metadata" || scope == "mapping" {
+	if scope == "metadata" || scope == "mapping" || scope == "books" {
 		names := []string{"matcher"}
+		if scope == "books" {
+			names = append(names, "openlibrary")
+		}
 		if scope == "metadata" {
-			names = append(names, "metadata")
+			names = append(names, "metadata", "openlibrary")
 		}
 		for _, name := range names {
 			release, locked, err := s.DB.AIOLock(ctx, name)
@@ -287,6 +294,8 @@ func (s *Service) Reset(ctx context.Context, scope string) error {
 	switch scope {
 	case "mapping":
 		return s.DB.ResetAIOMapping(ctx)
+	case "books":
+		return s.DB.ResetBookInformation(ctx)
 	case "metadata":
 		return s.DB.ResetAIOMetadata(ctx)
 	case "cache":

@@ -186,7 +186,8 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       | 'match_seconds'
       | 'tmdb_requests_per_second'
       | 'cache_minutes'
-      | 'response_seconds',
+      | 'response_seconds'
+      | 'openlibrary_days',
     min: number,
     max: number,
   ) => (
@@ -204,7 +205,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       />
     </div>
   )
-  const toggle = (label: string, key: 'auto_sync' | 'auto_match') => (
+  const toggle = (label: string, key: 'auto_sync' | 'auto_match' | 'openlibrary_enabled') => (
     <label className="flex items-center gap-3 text-sm">
       <Switch
         aria-label={label}
@@ -228,7 +229,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       </div>
     )
   const status = query.data
-  const busy = status.syncing || status.matching || action.isPending
+  const busy = status.syncing || status.matching || status.books?.running || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
     if (local && !save.isPending && !review.isPending && !conflict(form)) {
@@ -279,9 +280,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       }}
     >
       <fieldset disabled={save.isPending} className="contents">
-        <Panel
-          title={section === 'metadata' ? 'Automatic updates & identification' : 'Debrid settings'}
-        >
+        <Panel title={section === 'metadata' ? 'Metadata & identification' : 'Debrid settings'}>
           <div className="grid gap-5 md:grid-cols-2">
             {section === 'metadata' ? (
               <>
@@ -307,6 +306,15 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 <div className="space-y-4">
                   {toggle('Automatically update film & series information', 'auto_sync')}
                   {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
+                </div>
+                <div className="space-y-4">
+                  {toggle('Automatically update book information', 'openlibrary_enabled')}
+                  {number('Book information update interval (days)', 'openlibrary_days', 1, 366)}
+                  <p className="help">
+                    Open Library's full monthly export is imported into the local catalog. The first
+                    import can take several hours and requires additional database storage. Only
+                    useful book information is saved; cover images stay remote.
+                  </p>
                 </div>
                 <div className="space-y-4">
                   {toggle('Automatically identify torrents', 'auto_match')}
@@ -340,7 +348,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
           <div className="flex flex-wrap gap-3">
             <ConfirmAction
               title="Reset metadata catalog?"
-              description="Downloaded film & series information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
+              description="Downloaded film, series and book information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
               label="Reset metadata"
               variant="destructive"
               action={() => action.mutateAsync('reset-metadata')}
@@ -351,8 +359,20 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               }
             />
             <ConfirmAction
+              title="Reset book information?"
+              description="Open Library information and automatic book matches will be removed. Torrent records, manual choices and film & series information are retained. Automatic book updates can import the catalog again."
+              label="Reset book information"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-books')}
+              trigger={
+                <Button variant="destructive" disabled={busy}>
+                  Reset book information
+                </Button>
+              }
+            />
+            <ConfirmAction
               title="Reset title matches?"
-              description="Automatic correspondences will be recomputed from local film & series information. Manual choices are retained. No TMDB download is needed."
+              description="Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
               label="Reset matches"
               variant="destructive"
               action={() => action.mutateAsync('reset-mapping')}
@@ -408,6 +428,29 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             <RuntimeSettingsPanel section="identification" />
             <RuntimeSettingsPanel section="matching" />
             <Disclosure title="Manual actions">
+              {Boolean(status.books?.skipped) && (
+                <p role="status" className="notice notice-warning">
+                  {status.books!.skipped.toLocaleString()} unreadable or oversized book records were
+                  skipped.{' '}
+                  <Link className="data-link" to="/metadata/history?service=openlibrary">
+                    View history
+                  </Link>
+                </p>
+              )}
+              {status.books?.error && (
+                <p role="status" className="notice notice-warning">
+                  {status.books.error}{' '}
+                  <Link className="data-link" to="/metadata/history?service=openlibrary">
+                    View history
+                  </Link>
+                </p>
+              )}
+              {status.books?.running && (
+                <p role="status" className="help">
+                  Importing book information. Progress is saved automatically and continues after an
+                  interruption.
+                </p>
+              )}
               {status.error && (
                 <p role="status" className="notice notice-warning">
                   {messageText(status.error)}{' '}
@@ -425,8 +468,23 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                   disabled={busy || !status.config.tmdb_secret || status.rebuild_required}
                   onClick={() => action.mutate('sync')}
                 >
-                  Download information updates
+                  Update film & series information
                 </Button>
+                <Button
+                  disabled={Boolean(status.books?.running || action.isPending || draft)}
+                  onClick={() => action.mutate('sync-books')}
+                >
+                  Update book information
+                </Button>
+                {status.books?.running && (
+                  <Button
+                    variant="warning"
+                    disabled={action.isPending}
+                    onClick={() => action.mutate('stop-books')}
+                  >
+                    Stop book information update
+                  </Button>
+                )}
                 {status.syncing && (
                   <Button
                     variant="warning"

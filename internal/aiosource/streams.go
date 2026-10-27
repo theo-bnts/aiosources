@@ -75,6 +75,9 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 	return s.streams(ctx, base, token, mediaType, id, nil)
 }
 func (s *Service) streams(ctx context.Context, base, token, mediaType, id string, visitor *PublicInstallation) (streams []Stream, streamErr error) {
+	if mediaType == "book" {
+		return []Stream{}, model.ErrInvalid
+	}
 	history := newStremioHistory(mediaType, id)
 	if visitor != nil {
 		history.Origin = "public"
@@ -386,6 +389,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 }
 
 type playbackPolicy struct {
+	SelectionFile string
 	Account       string
 	CachedOnly    bool
 	Preferences   *model.StreamPreferences
@@ -399,6 +403,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		return "", model.ErrInvalid
 	}
 	r, err := ParseID(id, mediaType)
+	r.File = policy.SelectionFile
 	if err != nil {
 		return "", model.ErrInvalid
 	}
@@ -494,6 +499,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			if len(items) == 1 && items[0].Cached {
 				observed = items[0]
 				_, cachedOnly = SelectFile(observed.Files, r)
+				if r.Type == "book" && r.File == "" && len(bookFiles(observed.Files)) > 1 {
+					cachedOnly = true
+				}
 				if !cachedOnly && len(observed.Files) > 0 {
 					return "", ErrPending
 				}
@@ -595,7 +603,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			stage = "file_selection"
 			file, ok := SelectFile(files, r)
 			if !ok {
-				return errors.New("no unambiguous matching video")
+				return fileSelectionError(files, r)
 			}
 			stage = "unlock"
 			link, err = s.Providers.ADUnlock(life, key, file.Link)

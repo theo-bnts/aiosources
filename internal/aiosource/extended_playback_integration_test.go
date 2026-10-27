@@ -28,8 +28,16 @@ func setTestDebridSecret(c *model.AIOConfig, service, ref string) {
 
 // These responses follow the providers' documented torrent lifecycles. The
 // state change models an external download finishing, then being deleted.
-func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, deleted *atomic.Bool, adds *atomic.Int32) *httptest.Server {
+func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, deleted *atomic.Bool, adds *atomic.Int32, filenames ...string) *httptest.Server {
 	t.Helper()
+	filename := "Example.Movie.2021.mkv"
+	if len(filenames) > 0 {
+		filename = filenames[0]
+	}
+	fileJSON, _ := json.Marshal(filename)
+	render := func(body string) string {
+		return strings.ReplaceAll(body, "Example.Movie.2021.mkv", string(fileJSON[1:len(fileJSON)-1]))
+	}
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer "+key {
 			t.Error("another account's credential used")
@@ -56,7 +64,7 @@ func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, dele
 				} else if !ready.Load() {
 					fmt.Fprintf(w, `{"id":"17","hash":"%s","status":"magnet_conversion"}`, hash)
 				} else {
-					fmt.Fprintf(w, `{"id":"17","hash":"%s","status":"downloaded","files":[{"id":1,"path":"/Example.Movie.2021.mkv","bytes":100,"selected":1}],"links":["https://provider.example/video"]}`, hash)
+					fmt.Fprintf(w, render(`{"id":"17","hash":"%s","status":"downloaded","files":[{"id":1,"path":"/Example.Movie.2021.mkv","bytes":100,"selected":1}],"links":["https://provider.example/video"]}`), hash)
 				}
 			case "/unrestrict/link":
 				fmt.Fprint(w, `{"download":"https://cdn.example/ready.mkv"}`)
@@ -80,7 +88,7 @@ func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, dele
 					fmt.Fprint(w, `{"status":"success","transfers":[{"id":"17","status":"running"}]}`)
 				}
 			case "/transfer/directdl":
-				fmt.Fprint(w, `{"status":"success","content":[{"path":"Example.Movie.2021.mkv","size":100,"link":"https://cdn.example/ready.mkv"}]}`)
+				fmt.Fprint(w, render(`{"status":"success","content":[{"path":"Example.Movie.2021.mkv","size":100,"link":"https://cdn.example/ready.mkv"}]}`))
 			default:
 				t.Error("unexpected Premiumize operation")
 				w.WriteHeader(400)
@@ -109,7 +117,7 @@ func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, dele
 			}
 			item := fmt.Sprintf(`{"id":"17","hashString":"%s","downloadPercent":0,"isZip":false,"files":[]}`, hash)
 			if ready.Load() {
-				item = fmt.Sprintf(`{"id":"17","hashString":"%s","downloadPercent":100,"isZip":false,"files":[{"name":"Example.Movie.2021.mkv","size":100,"downloadUrl":"https://cdn.example/ready.mkv","downloadPercent":100}]}`, hash)
+				item = fmt.Sprintf(render(`{"id":"17","hashString":"%s","downloadPercent":100,"isZip":false,"files":[{"name":"Example.Movie.2021.mkv","size":100,"downloadUrl":"https://cdn.example/ready.mkv","downloadPercent":100}]}`), hash)
 			}
 			if r.URL.Path == "/seedbox/list" {
 				item = "[" + item + "]"
@@ -131,7 +139,7 @@ func extendedPlaybackServer(t *testing.T, service, hash, key string, ready, dele
 			} else if !ready.Load() {
 				fmt.Fprint(w, `{"error":0,"id":"17","status":"downloading"}`)
 			} else {
-				fmt.Fprint(w, `{"error":0,"id":"17","status":"downloaded","filename":"Example.Movie.2021.mkv","links":["https://cdn.example/ready.mkv"]}`)
+				fmt.Fprint(w, render(`{"error":0,"id":"17","status":"downloaded","filename":"Example.Movie.2021.mkv","links":["https://cdn.example/ready.mkv"]}`))
 			}
 		}
 	}))

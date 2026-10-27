@@ -32,7 +32,7 @@ const labels: Record<string, string> = {
   published: 'Published torrents',
   imports: 'Prepared imports and resume state',
   'source-history': 'Source history',
-  information: 'Film and series information',
+  information: 'Information catalog',
   identification: 'Identification and reviews',
   'information-queue': 'Information inventory and pending updates',
   availability: 'Availability cache',
@@ -51,7 +51,8 @@ const explanations: Record<string, string> = {
     'Unpublished data and checkpoints used to complete or resume imports. Successful publication releases that run’s preparation data.',
   'source-history':
     'Collection diagnostics and published changes. Diagnostic content follows the history retention policy; evidence needed to resume unfinished work can remain.',
-  information: 'Local titles, identifiers and season information used for identification.',
+  information:
+    'Local titles, identifiers, seasons, book editions and authors used for identification.',
   identification: 'Current identification decisions, manual reviews and pending work.',
   'information-queue': 'The information inventory and durable work waiting for an update.',
   availability:

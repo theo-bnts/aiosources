@@ -238,6 +238,7 @@ var migrations = []struct {
 	{75, debridServicesSchema},
 	{76, catalogEntitiesSchema},
 	{77, catalogDetailsSchema},
+	{78, booksSchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.
