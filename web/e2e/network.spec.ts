@@ -90,7 +90,10 @@ test('proxy profiles use Secrets and route services independently without activa
     await secret.getByLabel(`Proxy ${label}`, { exact: true }).fill(value)
     await secret.getByRole('button', { name: 'Store and select', exact: true }).click()
     await expect(secret).toBeHidden()
-    await expect(editor.getByRole('button', { name: `Add ${label}`, exact: true })).toBeDisabled()
+    await expect(
+      editor.getByRole('button', { name: `Replace ${label}`, exact: true }),
+    ).toBeEnabled()
+    await expect(editor.getByRole('button', { name: `Add ${label}`, exact: true })).toHaveCount(0)
   }
   await editor.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(editor).toBeHidden()
