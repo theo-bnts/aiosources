@@ -174,3 +174,13 @@ AIOSources is distributed under the [MIT license](LICENSE). Use it only with con
 Built on [Ingest](https://github.com/moodiness/ingest). Original copyrights and [third-party license notices](web/public/THIRD-PARTY-NOTICES.txt) are preserved.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq).
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=theo-bnts%2Faiosources&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=theo-bnts/aiosources&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=theo-bnts/aiosources&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=theo-bnts/aiosources&type=date&legend=top-left" />
+ </picture>
+</a>
