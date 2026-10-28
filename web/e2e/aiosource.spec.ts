@@ -34,12 +34,14 @@ test('metadata configuration persists and missing information explains disabled 
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
   await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
   await page.getByLabel('TMDB requests per second').fill('20')
-  await page.getByLabel('Information update interval (minutes)').fill('30')
+  await page.getByLabel('Information update interval (minutes)', { exact: true }).fill('30')
   await page.getByLabel('Identification interval (seconds)').fill('90')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await expect(page.getByLabel('Information update interval (minutes)')).toHaveValue('30')
+  await expect(
+    page.getByLabel('Information update interval (minutes)', { exact: true }),
+  ).toHaveValue('30')
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('20')
   await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('90')
   await page.getByLabel('Identification interval (seconds)').fill('4')
