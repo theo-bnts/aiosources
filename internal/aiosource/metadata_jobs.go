@@ -14,6 +14,16 @@ type metadataProgress struct {
 	firstDeferred                error
 }
 
+func (s *Service) nextMetadataJobs(ctx context.Context, recovering bool) ([]store.AIOJob, error) {
+	if recovering {
+		if err := s.DB.QueueAIOMetadataRecovery(ctx); err != nil {
+			return nil, metadataStorageError(err)
+		}
+	}
+	jobs, err := s.DB.AIOMetadataJobs(ctx)
+	return jobs, metadataStorageError(err)
+}
+
 // HTTP requests overlap, while one publisher commits small batches. Neither
 // in-flight requests nor results can grow with the size of the catalog.
 func (s *Service) processMetadataJobs(ctx context.Context, key string, jobs []store.AIOJob, history *operationHistory, progress *metadataProgress, autoMatch bool) error {

@@ -47,7 +47,9 @@ func (s *Service) metadataResponseFailure(ctx context.Context, status int, retry
 		delay := metadataRetryAfter(retryAfter, fallback, time.Now())
 		failure.retryAt = time.Now().Add(delay)
 		s.metadataRate.cooldown(delay)
-		if err := s.DB.RetainAIOMetadataCooldown(ctx, failure.retryAt); err != nil {
+		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := s.DB.RetainAIOMetadataCooldown(final, failure.retryAt); err != nil {
 			return metadataStorageError(err)
 		}
 	}

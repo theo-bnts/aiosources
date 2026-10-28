@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -465,6 +467,8 @@ func (s *Service) inventory(ctx context.Context, typ, date string) error {
 }
 func (s *Service) changes(ctx context.Context, key string, start, end time.Time) error {
 	for _, typ := range []string{"movie", "tv"} {
+		expectedPages := -1
+		seenPages := map[[sha256.Size]byte]bool{}
 		for page := 1; page <= 10000; page++ {
 			q := url.Values{"start_date": {start.UTC().Format("2006-01-02")}, "end_date": {end.UTC().Format("2006-01-02")}, "page": {strconv.Itoa(page)}}
 			var out struct {
@@ -481,12 +485,26 @@ func (s *Service) changes(ctx context.Context, key string, start, end time.Time)
 			if !found || out.Page != page || out.Pages == nil || *out.Pages < 0 || *out.Pages > 10000 || out.Results == nil {
 				return ErrInvalidResponse
 			}
+			if expectedPages == -1 {
+				expectedPages = *out.Pages
+			}
+			if *out.Pages != expectedPages || page > max(1, expectedPages) || expectedPages > 1 && len(out.Results) == 0 || expectedPages == 0 && len(out.Results) != 0 {
+				return ErrInvalidResponse
+			}
 			ids := []string{}
 			for _, r := range out.Results {
 				if r.ID <= 0 {
 					return ErrInvalidResponse
 				}
 				ids = append(ids, itoa64(r.ID))
+			}
+			if len(ids) > 0 {
+				slices.Sort(ids)
+				fingerprint := sha256.Sum256([]byte(strings.Join(ids, ",")))
+				if seenPages[fingerprint] {
+					return ErrInvalidResponse
+				}
+				seenPages[fingerprint] = true
 			}
 			if err = s.DB.QueueAIOMetadata(ctx, typ, ids, true); err != nil {
 				return metadataStorageError(err)
@@ -613,7 +631,28 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 		}
 	}
 	if err = s.changes(ctx, key, start, now); err != nil {
-		return err
+		var provider *metadataError
+		if ctx.Err() != nil || errors.Is(err, ErrAuth) || errors.Is(err, errMetadataStorage) || errors.As(err, &provider) && provider.retryAt.After(time.Now()) {
+			return err
+		}
+		// A feed-only failure must not starve details already saved in the
+		// queue. Apply one bounded batch, retaining the failed feed checkpoint.
+		feedErr := err
+		stage = "storage"
+		jobs, err := s.nextMetadataJobs(ctx, status.RecoveryStartedAt != nil)
+		if err != nil {
+			return err
+		}
+		if len(jobs) > 0 {
+			stage = "details"
+			history.checkpoint(ctx, stage)
+			progress := metadataProgress{}
+			if err = s.processMetadataJobs(ctx, key, jobs, history, &progress, c.AutoMatch); err != nil {
+				return err
+			}
+		}
+		stage = "changes"
+		return feedErr
 	}
 	date := now.Add(-24 * time.Hour).Format("2006-01-02")
 	if status.InventoryDate != date {
@@ -642,12 +681,7 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 			return err
 		}
 		stage = "storage"
-		if status.RecoveryStartedAt != nil {
-			if err = s.DB.QueueAIOMetadataRecovery(ctx); err != nil {
-				return metadataStorageError(err)
-			}
-		}
-		jobs, err := s.DB.AIOMetadataJobs(ctx)
+		jobs, err := s.nextMetadataJobs(ctx, status.RecoveryStartedAt != nil)
 		if err != nil {
 			return err
 		}

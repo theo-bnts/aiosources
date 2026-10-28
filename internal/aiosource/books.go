@@ -125,10 +125,8 @@ func (s *Service) syncBookExport(ctx context.Context, h *operationHistory) error
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		if response.StatusCode == http.StatusTooManyRequests || response.StatusCode == http.StatusServiceUnavailable {
-			delay := metadataRetryAfter(response.Header.Get("Retry-After"), 15*time.Minute, time.Now())
-			s.bookRate.cooldown(delay)
-			return &bookRequestFailure{delay: delay}
+		if response.StatusCode == http.StatusTooManyRequests || response.StatusCode == http.StatusServiceUnavailable && strings.TrimSpace(response.Header.Get("Retry-After")) != "" {
+			return s.bookProviderFailure(ctx, response.Header.Get("Retry-After"))
 		}
 		return errors.New("book export request failed")
 	}

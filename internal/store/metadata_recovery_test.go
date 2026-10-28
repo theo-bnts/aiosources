@@ -156,14 +156,14 @@ func TestBookScheduleAndAdmissionUseTheSameDurableDeadlines(t *testing.T) {
 	if err != nil || time.Until(next) < 4*time.Minute || time.Until(next) > 6*time.Minute {
 		t.Fatal("individual retry does not wake the worker", next, err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET retry_at=now()+interval '30 minutes'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET provider_retry_at=now()+interval '30 minutes'`); err != nil {
 		t.Fatal(err)
 	}
 	next, err = db.NextOpenLibraryUpdate(ctx, 15)
 	if err != nil || time.Until(next) < 29*time.Minute || time.Until(next) > 31*time.Minute {
 		t.Fatal("provider cooldown was hidden by an earlier document retry", next, err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET retry_at=NULL; UPDATE ingest.ol_change_jobs SET next_attempt=now()-interval '1 minute'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET retry_at=NULL,provider_retry_at=NULL; UPDATE ingest.ol_change_jobs SET next_attempt=now()-interval '1 minute'`); err != nil {
 		t.Fatal(err)
 	}
 	if due, err := db.OpenLibraryDue(ctx, 15); err != nil || !due {

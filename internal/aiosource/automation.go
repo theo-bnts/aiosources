@@ -114,8 +114,12 @@ func (s *Service) runAutomation() time.Duration {
 		poll = min(poll, time.Duration(c.MatchSeconds)*time.Second)
 	}
 	if c.OpenLibraryEnabled && !s.BookState() {
-		if due, e := s.DB.OpenLibraryDue(s.ctx, c.OpenLibraryMinutes); e == nil && due {
-			_ = s.StartBooks("automatic")
+		if next, e := s.DB.NextOpenLibraryUpdate(s.ctx, c.OpenLibraryMinutes); e == nil {
+			if !next.After(time.Now()) {
+				_ = s.StartBooks("automatic")
+			} else {
+				poll = min(poll, time.Until(next))
+			}
 		}
 	}
 	syncing, matching, _ := s.State()

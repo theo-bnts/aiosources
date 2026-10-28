@@ -27,6 +27,9 @@ var errBookContinuity = errors.New("Open Library change continuity could not be 
 var errBookRequest = errors.New("Open Library information could not be retrieved")
 
 func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error) {
+	if trigger != "manual" && trigger != "automatic" {
+		return model.ErrInvalid
+	}
 	release, locked, err := s.DB.AIOLock(ctx, "openlibrary")
 	if err != nil {
 		return err
@@ -35,41 +38,56 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 		return model.ErrBusy
 	}
 	defer release()
+	c, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if trigger == "automatic" {
+		if !c.OpenLibraryEnabled {
+			return nil
+		}
+		due, err := s.DB.OpenLibraryDue(ctx, c.OpenLibraryMinutes)
+		if err != nil || !due {
+			return err
+		}
+	}
 	h, err := s.beginOperation(ctx, "metadata", "openlibrary", trigger, "", "openlibrary")
 	if err != nil {
 		return err
 	}
+	attempt := 0
 	defer func() {
 		h.finish(ctx, syncErr)
 		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if syncErr != nil {
-			delay := 15 * time.Minute
+			retryAt := time.Now().Add(s.bookSyncRetryDelay(final, max(attempt, 1)))
 			var retry *bookRequestFailure
 			if errors.As(syncErr, &retry) {
-				delay = max(delay, retry.delay)
-				_ = s.DB.BookFeedFailed(final, time.Now().Add(delay))
+				retryAt = retry.retryAt
 			}
 			message := "Book information update failed. Saved progress is preserved; retry the update to continue."
 			if errors.Is(syncErr, context.Canceled) {
 				message = "Book information update interrupted. Saved progress is preserved."
+			} else if retry != nil {
+				message = "Open Library requested a waiting period. Saved progress is preserved."
 			}
-			_ = s.DB.FailOpenLibrary(final, message, time.Now().Add(delay))
+			_ = s.DB.FailOpenLibrary(final, message, retryAt)
 		}
 		_ = s.DB.RecordBookInformationActivity(final, syncErr, h.run.Processed, h.run.Errors)
 	}()
-	c, err := s.DB.AIOConfig(ctx)
-	if err != nil {
-		return err
-	}
 	priorChanges, err := s.DB.BookChangesState(ctx)
 	if err != nil {
 		return err
 	}
-	if priorChanges.RetryAt != nil && priorChanges.RetryAt.After(time.Now()) {
-		return &bookRequestFailure{delay: time.Until(*priorChanges.RetryAt)}
+	if priorChanges.ProviderRetryAt != nil && priorChanges.ProviderRetryAt.After(time.Now()) {
+		return &bookRequestFailure{retryAt: *priorChanges.ProviderRetryAt}
 	}
-	feedErr := s.collectBookTailIfDue(ctx, h, c.OpenLibraryMinutes)
+	attempt, err = s.DB.BeginBookSync(ctx)
+	if err != nil {
+		return err
+	}
+	feedErr := s.collectBookTailIfDue(ctx, h, c.OpenLibraryMinutes, trigger == "manual")
 	var retry *bookRequestFailure
 	if errors.As(feedErr, &retry) {
 		return feedErr
@@ -122,9 +140,6 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 		return err
 	}
 	stop()
-	if err = s.DB.FinishBookChanges(ctx); err != nil {
-		return err
-	}
 	if feedErr != nil {
 		return feedErr
 	}
@@ -132,13 +147,36 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	if err != nil {
 		return err
 	}
+	if changes.ProviderRetryAt != nil && changes.ProviderRetryAt.After(time.Now()) {
+		return &bookRequestFailure{retryAt: *changes.ProviderRetryAt}
+	}
 	if changes.Error != "" {
 		return errBookRequest
 	}
-	return nil
+	return s.DB.FinishBookChanges(ctx)
 }
 
-type bookRequestFailure struct{ delay time.Duration }
+type bookRequestFailure struct{ retryAt time.Time }
+
+func (s *Service) bookSyncRetryDelay(ctx context.Context, attempt int) time.Duration {
+	policy, err := s.DB.RuntimeValues(ctx, "metadata_retries")
+	if err != nil {
+		return syncRetryDelay(attempt)
+	}
+	return model.RetryBackoff(attempt-1, time.Duration(policy["sync_retry_seconds"])*time.Second, time.Duration(policy["sync_retry_max_seconds"])*time.Second)
+}
+
+func (s *Service) bookProviderFailure(ctx context.Context, retryAfter string) error {
+	delay := metadataRetryAfter(retryAfter, s.bookSyncRetryDelay(ctx, 1), time.Now())
+	until := time.Now().Add(delay)
+	s.bookRate.cooldown(delay)
+	final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := s.DB.RetainBookProviderCooldown(final, until); err != nil {
+		return err
+	}
+	return &bookRequestFailure{retryAt: until}
+}
 
 func (e *bookRequestFailure) Error() string {
 	return "Open Library requested a retry; saved progress is preserved"
@@ -169,8 +207,8 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 	if err != nil {
 		return nil, 0, "", err
 	}
-	if state.RetryAt != nil && state.RetryAt.After(time.Now()) {
-		return nil, 0, "", &bookRequestFailure{delay: time.Until(*state.RetryAt)}
+	if state.ProviderRetryAt != nil && state.ProviderRetryAt.After(time.Now()) {
+		return nil, 0, "", &bookRequestFailure{retryAt: *state.ProviderRetryAt}
 	}
 	timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
 	if err != nil {
@@ -235,10 +273,8 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 		return nil, status, "", errBookRequest
 	}
 	defer response.Body.Close()
-	if status == 429 || status == 503 {
-		delay := metadataRetryAfter(response.Header.Get("Retry-After"), 15*time.Minute, time.Now())
-		s.bookRate.cooldown(delay)
-		return nil, status, "", &bookRequestFailure{delay: delay}
+	if status == 429 || status == 503 && strings.TrimSpace(response.Header.Get("Retry-After")) != "" {
+		return nil, status, "", s.bookProviderFailure(ctx, response.Header.Get("Retry-After"))
 	}
 	if status == http.StatusNotFound || status >= 300 && status < 400 {
 		return nil, status, response.Header.Get("Location"), nil
@@ -368,26 +404,26 @@ func (s *Service) collectBookTail(ctx context.Context, h *operationHistory) erro
 	}
 }
 
-func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory, minutes int) error {
+func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory, minutes int, force bool) error {
 	state, err := s.DB.BookChangesState(ctx)
 	if err != nil {
 		return err
 	}
 	now := time.Now()
-	if state.RetryAt != nil && state.RetryAt.After(now) {
+	if !force && state.RetryAt != nil && state.RetryAt.After(now) {
 		return nil
 	}
-	if state.CheckedAt != nil && state.CheckedAt.Add(time.Duration(minutes)*time.Minute).After(now) {
+	if !force && state.CheckedAt != nil && state.CheckedAt.Add(time.Duration(minutes)*time.Minute).After(now) {
 		return nil
 	}
 	if err = s.collectBookTail(ctx, h); err != nil {
-		delay := 15 * time.Minute
+		retryAt := time.Now().Add(s.bookSyncRetryDelay(ctx, 1))
 		var retry *bookRequestFailure
 		if errors.As(err, &retry) {
-			delay = max(delay, retry.delay)
+			retryAt = retry.retryAt
 		}
 		if ctx.Err() == nil {
-			_ = s.DB.BookFeedFailed(ctx, time.Now().Add(delay))
+			_ = s.DB.BookFeedFailed(ctx, retryAt)
 		}
 	}
 	return err
@@ -408,7 +444,7 @@ func (s *Service) keepBookTail(ctx context.Context, h *operationHistory, minutes
 			case <-life.Done():
 				return
 			case <-ticker.C:
-				_ = s.collectBookTailIfDue(life, h, minutes)
+				_ = s.collectBookTailIfDue(life, h, minutes, false)
 			}
 		}
 	}()
@@ -536,6 +572,10 @@ func (s *Service) readBookDocuments(ctx context.Context, h *operationHistory, jo
 }
 
 func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) error {
+	policy, err := s.DB.RuntimeValues(ctx, "metadata_retries")
+	if err != nil {
+		return err
+	}
 	work, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	failures := 0
@@ -599,20 +639,16 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 				if ctx.Err() != nil {
 					return ctx.Err()
 				}
-				delay := modelBookRetry(job.Attempts)
 				var retry *bookRequestFailure
 				if errors.As(err, &retry) {
-					delay = max(delay, retry.delay)
+					return err
 				}
+				delay := model.RetryBackoff(job.Attempts, time.Duration(policy["detail_retry_seconds"])*time.Second, time.Duration(policy["detail_retry_max_seconds"])*time.Second)
 				if e := s.DB.DeferBookChange(ctx, job, delay); e != nil {
 					return e
 				}
 				h.run.Errors++
 				failures++
-				if retry != nil {
-					_ = s.DB.BookFeedFailed(ctx, time.Now().Add(delay))
-					return err
-				}
 				if failures >= 3 {
 					return err
 				}
@@ -644,8 +680,4 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 		}
 	}
 	return ctx.Err()
-}
-
-func modelBookRetry(attempts int) time.Duration {
-	return time.Duration(1<<min(attempts, 6)) * time.Minute
 }

@@ -14,6 +14,7 @@ type BookChangesState struct {
 	AnchorAt, TailSince, BootstrapDay      *time.Time
 	ChangesThrough, LastSync, CheckedAt    *time.Time
 	RetryAt, NeedsDumpAfter, DumpCheckedAt *time.Time
+	ProviderRetryAt                        *time.Time
 	BootstrapComplete                      bool
 	Error                                  string
 }
@@ -27,7 +28,7 @@ type BookChangeJob struct {
 
 func (s *Store) BookChangesState(ctx context.Context) (BookChangesState, error) {
 	var v BookChangesState
-	err := s.pool.QueryRow(ctx, `SELECT anchor_id,anchor_at,tail_since,bootstrap_day,bootstrap_complete,changes_through,last_sync,checked_at,retry_at,needs_dump_after,dump_checked_at,error,tail_start_id FROM ingest.ol_changes_state WHERE singleton`).Scan(&v.AnchorID, &v.AnchorAt, &v.TailSince, &v.BootstrapDay, &v.BootstrapComplete, &v.ChangesThrough, &v.LastSync, &v.CheckedAt, &v.RetryAt, &v.NeedsDumpAfter, &v.DumpCheckedAt, &v.Error, &v.TailID)
+	err := s.pool.QueryRow(ctx, `SELECT anchor_id,anchor_at,tail_since,bootstrap_day,bootstrap_complete,changes_through,last_sync,checked_at,retry_at,needs_dump_after,dump_checked_at,error,tail_start_id,provider_retry_at FROM ingest.ol_changes_state WHERE singleton`).Scan(&v.AnchorID, &v.AnchorAt, &v.TailSince, &v.BootstrapDay, &v.BootstrapComplete, &v.ChangesThrough, &v.LastSync, &v.CheckedAt, &v.RetryAt, &v.NeedsDumpAfter, &v.DumpCheckedAt, &v.Error, &v.TailID, &v.ProviderRetryAt)
 	return v, databaseError("read book change progress", err)
 }
 
@@ -319,6 +320,7 @@ func (s *Store) FinishBookChanges(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET changes_through=anchor_at,last_sync=now()
  WHERE singleton AND bootstrap_complete AND needs_dump_after IS NULL AND error='' AND anchor_at IS NOT NULL
  AND NOT EXISTS(SELECT 1 FROM ingest.ol_change_jobs);
- UPDATE ingest.ol_import_state SET error='',retry_at=NULL WHERE singleton;`)
+ UPDATE ingest.ol_import_state SET error='',retry_at=NULL,sync_failures=0 WHERE singleton;
+ UPDATE ingest.ol_changes_state SET provider_retry_at=NULL WHERE provider_retry_at<=now();`)
 	return databaseError("finish book change update", err)
 }

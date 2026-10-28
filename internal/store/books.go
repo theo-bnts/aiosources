@@ -75,11 +75,11 @@ func (s *Store) NextOpenLibraryUpdate(ctx context.Context, minutes int) (time.Ti
 		return time.Time{}, model.ErrInvalid
 	}
 	var next time.Time
-	err := s.pool.QueryRow(ctx, `SELECT GREATEST(i.retry_at,c.retry_at,LEAST(
+	err := s.pool.QueryRow(ctx, `SELECT GREATEST(i.retry_at,c.provider_retry_at,LEAST(
  CASE WHEN NOT i.complete THEN now() END,
- COALESCE(c.checked_at+make_interval(mins=>$1),now()),
+ GREATEST(c.retry_at,COALESCE(c.checked_at+make_interval(mins=>$1),now())),
  (SELECT min(next_attempt) FROM ingest.ol_change_jobs),
- CASE WHEN NOT c.bootstrap_complete AND c.needs_dump_after IS NULL THEN now() END,
+ CASE WHEN NOT c.bootstrap_complete AND c.needs_dump_after IS NULL THEN GREATEST(now(),c.retry_at) END,
  CASE WHEN c.needs_dump_after IS NOT NULL THEN COALESCE(c.dump_checked_at+interval '1 day',now()) END
  )) FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`, minutes).Scan(&next)
 	return next, databaseError("read book update schedule", err)

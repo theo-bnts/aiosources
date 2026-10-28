@@ -111,4 +111,4 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, error) {
 
 const resetBookChangesSQL = `TRUNCATE ingest.ol_change_jobs,ingest.ol_deleted;
  UPDATE ingest.ol_changes_state SET anchor_id='',anchor_at=NULL,tail_since=NULL,tail_start_id='',bootstrap_day=NULL,bootstrap_complete=FALSE,changes_through=NULL,last_sync=NULL,checked_at=NULL,retry_at=NULL,needs_dump_after=NULL,dump_checked_at=NULL,error='' WHERE singleton;
- UPDATE ingest.ol_import_state SET generation=0,snapshot_at=NULL,prune_table=0,prune_after='',data_complete=FALSE WHERE singleton;`
+ UPDATE ingest.ol_import_state SET generation=0,snapshot_at=NULL,prune_table=0,prune_after='',data_complete=FALSE,sync_failures=0 WHERE singleton;`
