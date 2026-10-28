@@ -124,6 +124,49 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	}
 }
 
+func TestPublicCatalogCachedOnlyDoesNotOfferUncachedActions(t *testing.T) {
+	ctx, s, conn := testService(t)
+	visitorSourceRegistry(t, s)
+	hash := strings.Repeat("c", 40)
+	for _, provider := range []string{"private-one", "public-one"} {
+		seedMovie(t, ctx, s, conn, provider, "one", hash)
+	}
+	access, _ := s.DB.PublicAccess(ctx)
+	access.Enabled, access.SearchEnabled, access.ExposeSources = true, true, true
+	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	access, _ = s.DB.PublicAccess(ctx)
+	generation, _ := s.DB.AIOCacheGeneration(ctx)
+	if err := s.DB.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{
+		Hash: hash, Cached: true, CheckedAt: time.Now(), Generation: generation,
+		Files: []model.AIOFile{{Path: "Example.Movie.2021.mkv", Size: 100}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var work int64
+	if err := conn.QueryRow(ctx, `SELECT id FROM ingest.aio_works`).Scan(&work); err != nil {
+		t.Fatal(err)
+	}
+	visitor := &PublicInstallation{
+		Generation: access.Generation, Audience: "https://addon.example",
+		Services:  map[string]string{"torbox": "synthetic-cache-only-account"},
+		Announces: map[string]string{"private-one": "https://announce.example.invalid/visitor/announce"},
+	}
+	for _, cachedOnly := range []bool{false, true} {
+		visitor.Preferences.CachedOnly = cachedOnly
+		rows, err := s.PublicCatalogReleases(ctx, visitor, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
+		if err != nil || rows.Total != 2 || len(rows.Items) != 2 {
+			t.Fatal("cached releases changed with the uncached permission", rows, err)
+		}
+		for _, row := range rows.Items {
+			if len(row.Services) != 1 || row.Services[0].State != "cached" || row.Services[0].CanAdd == cachedOnly {
+				t.Fatal("download controls contradict cached-only access", cachedOnly, row.Services)
+			}
+		}
+	}
+}
+
 func TestPublicCatalogDownloadContinuationCannotCrossVisitorAccounts(t *testing.T) {
 	ctx, s, conn := testService(t)
 	hash := strings.Repeat("b", 40)

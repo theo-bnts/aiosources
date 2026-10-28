@@ -5,6 +5,113 @@ import { test, expect } from './fixtures'
 // browser contract without contacting external provider accounts.
 const credential = 'synthetic-sealed-browser-credential-without-secrets-012345'
 
+test('public downloads discard a missing preparation before an explicit retry', async ({
+  page,
+  server,
+  browser,
+}) => {
+  await page.goto('/public-access')
+  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  await access.getByLabel('Enable public access', { exact: true }).check()
+  await access.getByLabel('Allow public Search', { exact: true }).check()
+  await access.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const context = await browser.newContext({ baseURL: server.origin })
+  await context.addInitScript((credential) => {
+    localStorage.setItem(
+      'aiosources.public.credentials',
+      JSON.stringify({ credential, services: ['torbox'] }),
+    )
+  }, credential)
+  const requests: Record<string, unknown>[] = []
+  const privateRequests: string[] = []
+  await context.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    if (url.origin !== server.origin) return route.abort('blockedbyclient')
+    if (url.pathname === '/api/public/catalog/101')
+      return route.fulfill({
+        json: {
+          id: 101,
+          type: 'movie',
+          title: 'Example Film',
+          years: [2026],
+          releases: 1,
+          providers: [],
+          selection: {},
+        },
+      })
+    if (url.pathname === '/api/public/catalog/101/releases')
+      return route.fulfill({
+        json: {
+          total: 1,
+          limit: 50,
+          offset: 0,
+          items: [
+            {
+              occurrence_id: 'synthetic-public-release',
+              download_token: 'synthetic-public-source-capability',
+              title: 'Example.Film.2026',
+              size: 100,
+              languages: [],
+              services: [{ service: 'torbox', state: 'uncached', can_add: true }],
+            },
+          ],
+        },
+      })
+    if (url.pathname === '/api/public/catalog/101/download') {
+      expect(request.headers().authorization).toBe(`Bearer ${credential}`)
+      requests.push(request.postDataJSON())
+      return route.fulfill({
+        status: requests.length === 2 ? 404 : 202,
+        json:
+          requests.length === 2
+            ? { code: 'not_found', error: 'The prepared file no longer exists.' }
+            : {
+                status: 'pending',
+                operation_id: requests.length === 1 ? 'synthetic-old' : 'synthetic-new',
+                preparation_id:
+                  requests.length === 1 ? 'sealed-old-preparation' : 'sealed-new-preparation',
+              },
+      })
+    }
+    if (
+      url.pathname.startsWith('/api/') &&
+      !url.pathname.startsWith('/api/public/') &&
+      !['/api/session', '/api/about'].includes(url.pathname)
+    )
+      privateRequests.push(url.pathname)
+    return route.continue()
+  })
+  const visitor = await context.newPage()
+  try {
+    await visitor.clock.install()
+    await visitor.goto('/public/search/101')
+    await visitor.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+    await expect(visitor.getByText('Preparing', { exact: true })).toBeVisible()
+    await visitor.clock.runFor(15_001)
+    await expect(visitor.getByText('Not ready', { exact: true })).toBeVisible()
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toEqual({ preparation_id: 'sealed-old-preparation' })
+    await visitor.clock.runFor(60_001)
+    expect(requests).toHaveLength(2)
+    await visitor.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+    await expect(visitor.getByText('Preparing', { exact: true })).toBeVisible()
+    expect(requests).toHaveLength(3)
+    expect(requests[2]).toMatchObject({
+      download_token: 'synthetic-public-source-capability',
+      service: 'torbox',
+      allow_uncached: true,
+    })
+    expect(requests[2].preparation_id).toBeUndefined()
+    await expect(visitor.getByRole('link', { name: 'View operation', exact: true })).toHaveCount(0)
+    expect(privateRequests).toEqual([])
+    expect(context.pages()).toHaveLength(1)
+  } finally {
+    await context.close()
+  }
+})
+
 test('Search is opt-in and remembers encrypted services across Stremio, reloads and browser tabs', async ({
   page,
   server,
@@ -19,6 +126,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
   const visitor = await context.newPage()
   let submissions = 0
   const privateRequests: string[] = []
+  const releaseRequests: URL[] = []
   await context.route('**/*', async (route) => {
     const request = route.request(),
       url = new URL(request.url())
@@ -68,7 +176,8 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
             offset: 0,
           },
         })
-      if (url.pathname.endsWith('/releases'))
+      if (url.pathname.endsWith('/releases')) {
+        releaseRequests.push(url)
         return route.fulfill({
           json: {
             items: [
@@ -88,6 +197,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
             offset: 0,
           },
         })
+      }
       if (url.pathname.endsWith('/download')) {
         expect(request.postDataJSON()).toMatchObject({
           download_token: 'synthetic-source-capability',
@@ -168,6 +278,21 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     expect((await download).suggestedFilename()).toBe('example.mkv')
     await expect(visitor.getByRole('link', { name: 'View operation' })).toHaveCount(0)
     expect(context.pages()).toHaveLength(1)
+    const savedSorting = [
+      { field: 'source', direction: 'asc' },
+      { field: 'size', direction: 'desc' },
+    ]
+    await visitor.goto(
+      `/public/search/101?provider=hidden-source&sorting=${encodeURIComponent(JSON.stringify(savedSorting))}`,
+    )
+    await expect(visitor.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
+    await visitor.locator('summary', { hasText: /^Sorting$/ }).click()
+    await expect(visitor.getByLabel('Sort by', { exact: true })).toHaveValue('size')
+    const applied = releaseRequests.at(-1)!
+    expect(applied.searchParams.get('provider')).toBeNull()
+    expect(JSON.parse(applied.searchParams.get('sorting')!)).toEqual([
+      { field: 'size', direction: 'desc' },
+    ])
     await visitor
       .getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Stremio', exact: true })

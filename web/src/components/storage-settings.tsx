@@ -109,7 +109,8 @@ export function StorageSettingsPanel() {
                 <p className="help">
                   Storage saving keeps identifiers and release/playback information used by
                   AIOSources and AIOStreams. Unused source details and successful record diagnostics
-                  are omitted; errors, run history and TMDB matching data are retained.
+                  are omitted; errors, run history and information used for identification are
+                  retained.
                 </p>
                 <p className="help">
                   Applies to imports started after saving. Existing imports keep their mode, and
@@ -155,7 +156,7 @@ export function StorageSettingsPanel() {
             variant="destructive"
             title="Reset all source data?"
             label="Reset source data"
-            description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
+            description="All imported torrents, remote catalog copies, source history, resume points and manual identifications will be removed. Source definitions, secrets, schedules, sharing permissions, film, series and book information, and debrid caches are retained. The next import starts from scratch using the saved storage mode. This cannot be undone."
             action={reset}
             trigger={
               <Button

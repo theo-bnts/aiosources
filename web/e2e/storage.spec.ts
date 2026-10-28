@@ -49,7 +49,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await reset.click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText(
-    'Source definitions, secrets, schedules, sharing permissions, TMDB information and debrid caches are retained.',
+    'Source definitions, secrets, schedules, sharing permissions, film, series and book information, and debrid caches are retained.',
   )
   await expect(dialog).toContainText('This cannot be undone.')
   await dialog.getByRole('button', { name: 'Back', exact: true }).click()

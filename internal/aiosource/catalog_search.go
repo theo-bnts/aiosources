@@ -240,7 +240,7 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 		tracker, configured := c.Trackers[row.Provider]
 		canAdd := configured && (!tracker.Private || tracker.AnnounceSecret != "")
 		if visitor != nil {
-			canAdd = (configured && !tracker.Private) || announces[row.Provider] != ""
+			canAdd = !visitor.Preferences.CachedOnly && ((configured && !tracker.Private) || announces[row.Provider] != "")
 		}
 		for _, service := range model.DebridServices() {
 			states, enabled := availability[service]

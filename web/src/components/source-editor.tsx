@@ -67,7 +67,7 @@ const stages = [
     label: 'Source fields',
     icon: ArrowsLeftRightIcon,
     description:
-      'Read torrent fields from this source. This is separate from film & series identification.',
+      'Read torrent fields from this source. This is separate from identifying films, series and books.',
   },
   {
     id: 'collection',

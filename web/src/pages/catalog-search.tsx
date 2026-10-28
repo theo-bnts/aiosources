@@ -282,18 +282,20 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     !discloseSources && search.get('sort') === 'source'
       ? 'size_desc'
       : search.get('sort') || 'size_desc'
-  const sorting = search.has('sorting')
-    ? readResultSorting(search.get('sorting'))
-    : readResultSorting(
-        search.has('sort') && sort !== 'size_desc'
-          ? JSON.stringify([
-              {
-                field: sort === 'source' ? 'source' : 'published',
-                direction: sort === 'source' ? 'asc' : 'desc',
-              },
-            ])
-          : null,
-      )
+  const sorting = (
+    search.has('sorting')
+      ? readResultSorting(search.get('sorting'))
+      : readResultSorting(
+          search.has('sort') && sort !== 'size_desc'
+            ? JSON.stringify([
+                {
+                  field: sort === 'source' ? 'source' : 'published',
+                  direction: sort === 'source' ? 'asc' : 'desc',
+                },
+              ])
+            : null,
+        )
+  ).filter((rule) => discloseSources || rule.field !== 'source')
   const responseSeconds = Number(search.get('response_seconds')) || undefined
   const cachedOnly = search.get('cached_only') === 'true'
   const provider = discloseSources ? search.get('provider') || '' : ''
@@ -302,7 +304,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     language,
     language_mode: preferences.mode,
     sort,
-    sorting: search.get('sorting') || '',
+    sorting: search.has('sorting') ? JSON.stringify(sorting) : '',
     response_seconds: responseSeconds,
     provider,
     cached_only: String(cachedOnly),

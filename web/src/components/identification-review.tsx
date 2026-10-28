@@ -23,7 +23,10 @@ import {
 import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 
 function WorkSummary({ work }: { work: ReviewWork }) {
-  const title = work.display_title || work.titles[0] || `TMDB ${work.tmdb}`
+  const title =
+    work.display_title ||
+    work.titles[0] ||
+    (work.type === 'book' ? work.openlibrary || 'Untitled book' : `TMDB ${work.tmdb}`)
   const aliases = work.titles.filter((alias) => alias !== title).slice(0, 2)
   return (
     <div className="min-w-0 space-y-1">
@@ -310,7 +313,7 @@ function ReviewForm({
         !candidates.data.items?.length && (
           <Empty
             title="No candidates in this view"
-            description="Try another title or identifier. Only downloaded film and series information is available here."
+            description="Try another title, author or identifier. Only locally imported film, series and book information is available here."
           />
         )}
       {selected && !candidates.data?.items?.some((work) => work.id === selected.id) && (

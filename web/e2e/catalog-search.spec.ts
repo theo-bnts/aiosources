@@ -217,27 +217,31 @@ for (const [code, status] of [
   ['not_cached', 409],
   ['not_found', 404],
 ] as const) {
-  test(`readiness stops when the provider returns ${code} without starting an uncached transfer`, async ({
+  test(`readiness stops on ${code} and an explicit retry starts a new preparation`, async ({
     page,
     server,
   }) => {
     const ids = await seedCatalog(page, server, true)
     await page.clock.install()
     let calls = 0
+    const requests: Array<{ path: string; input: Record<string, unknown> }> = []
     await page.route(
       /\/api\/(?:catalog\/[^/]+\/download|operations\/[^/]+\/download)$/,
       async (route) => {
         calls++
         const input = route.request().postDataJSON()
-        if (calls === 1) expect(input.allow_uncached).toBe(true)
-        else expect(input).toEqual({})
+        requests.push({ path: new URL(route.request().url()).pathname, input })
         await route.fulfill({
-          status: calls === 1 ? 202 : status,
+          status: calls === 2 ? status : 202,
           contentType: 'application/json',
           body: JSON.stringify(
-            calls === 1
-              ? { status: 'pending', operation_id: 'synthetic-preparation', preparation_id: '7' }
-              : { code, error: 'The file is no longer available at the provider.' },
+            calls === 2
+              ? { code, error: 'The file is no longer available at the provider.' }
+              : {
+                  status: 'pending',
+                  operation_id: calls === 1 ? 'synthetic-preparation' : 'synthetic-retry',
+                  preparation_id: calls === 1 ? '7' : '8',
+                },
           ),
         })
       },
@@ -253,8 +257,26 @@ for (const [code, status] of [
     await expect.poll(() => page.context().pages().length).toBe(1)
     await page.clock.runFor(60_001)
     expect(calls).toBe(2)
+    expect(requests[0].input.allow_uncached).toBe(true)
+    expect(requests[1]).toEqual({
+      path: '/api/operations/synthetic-preparation/download',
+      input: {},
+    })
     await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Download file', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'View operation', exact: true })).toHaveAttribute(
+      'href',
+      '/debrid/history/synthetic-preparation',
+    )
+    await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
+    await expect.poll(() => requests.length).toBe(3)
+    expect(requests[2].path).toBe(`/api/catalog/${ids.movie}/download`)
+    expect(requests[2].input.allow_uncached).toBe(true)
+    expect(requests[2].input.preparation_id).toBeUndefined()
+    await expect(page.getByRole('link', { name: 'View operation', exact: true })).toHaveAttribute(
+      'href',
+      '/debrid/history/synthetic-retry',
+    )
   })
 }
 

@@ -37,7 +37,7 @@ func (s *Store) UpdateStorageSettings(ctx context.Context, settings model.Storag
 }
 
 // ResetSourceData retains definitions (managed outside this database), secrets,
-// schedules, sharing permissions, TMDB information and the useful debrid cache.
+// schedules, sharing permissions, metadata catalogs and the useful debrid cache.
 // Running collectors must be paused first. Queued and paused work is removed
 // with its checkpoints; a subsequent Incremental starts with a fresh Full.
 func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {

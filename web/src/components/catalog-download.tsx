@@ -47,6 +47,7 @@ export function DownloadAction({
   const visitor = usePublicSearch()
   const listState = useListViewState()
   const preparation = useRef('')
+  const preparationOperation = useRef(operationID ?? '')
   const [ready, setReady] = useState<CatalogDownload | null>(null)
   const [bookFiles, setBookFiles] = useState<Array<{ path: string; size: number }>>([])
   const [selectedFile, setSelectedFile] = useState(selection.file ?? '')
@@ -91,7 +92,7 @@ export function DownloadAction({
           visitor.credential,
         )
       }
-      const continuation = operationID || (!allowUncached ? operation : '')
+      const continuation = operationID || (!allowUncached ? preparationOperation.current : '')
       return api<CatalogDownload>(
         continuation
           ? `/operations/${encodeURIComponent(continuation)}/download`
@@ -115,6 +116,7 @@ export function DownloadAction({
     },
     onSuccess: (result, allowUncached) => {
       preparation.current = result.preparation_id || ''
+      preparationOperation.current = result.operation_id
       setOperation(result.operation_id)
       const pending = result.status === 'pending'
       const choosing = Boolean(result.files?.length)
@@ -158,6 +160,8 @@ export function DownloadAction({
         setNotReady(true)
         setReady(null)
         preparation.current = ''
+        // Keep the old history link, but never retry a removed preparation.
+        preparationOperation.current = ''
       }
       if (!visitor)
         void queryClient.invalidateQueries({ queryKey: ['operation-history', 'debrid'] })
@@ -253,7 +257,11 @@ export function DownloadAction({
               download.current?.cancel()
               download.current = prepareBrowserDownload()
               mutation.mutate(
-                !waiting && !cached && service.can_add && !preparation.current && !operation,
+                !waiting &&
+                  !cached &&
+                  service.can_add &&
+                  !preparation.current &&
+                  !preparationOperation.current,
               )
             }}
           >
@@ -297,7 +305,9 @@ export function DownloadAction({
           The file is not ready at this debrid service.
           {service.can_add
             ? ' You can add it to debrid.'
-            : ' Only cached files can be downloaded from this private source.'}
+            : operationID
+              ? ' Return to Search to choose an available version.'
+              : ' Only cached files can be downloaded with this access.'}
         </p>
       )}
       <ErrorNotice error={mutation.error} scope="action" />
