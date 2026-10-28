@@ -62,7 +62,10 @@ func (s *Store) OpenLibraryCheckpoint(ctx context.Context) (string, string, int6
 
 func (s *Store) OpenLibraryDue(ctx context.Context, minutes int) (bool, error) {
 	next, err := s.NextOpenLibraryUpdate(ctx, minutes)
-	return !next.After(time.Now()), err
+	if err != nil {
+		return false, err
+	}
+	return !next.After(time.Now()), nil
 }
 
 // Display and admission use the same durable clocks, including an individual

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,15 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
+
+func TestInvalidBookScheduleNeverAdmitsWork(t *testing.T) {
+	db := &Store{}
+	for _, minutes := range []int{0, 4, 1441} {
+		if due, err := db.OpenLibraryDue(context.Background(), minutes); due || err == nil {
+			t.Fatal("an invalid schedule admitted work", minutes, due, err)
+		}
+	}
+}
 
 func TestInformationRecoveryUpgradeKeepsExistingCatalogsAndHonestFreshness(t *testing.T) {
 	for _, pending := range []bool{false, true} {
