@@ -420,12 +420,6 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       <ErrorNotice error={action.error} scope="action" />
       {section === 'metadata' && (
         <>
-          {status.rebuild_required && (
-            <p role="alert" className="notice notice-warning">
-              The change history gap exceeds 14 days. Reset the metadata catalog, then synchronize
-              again.
-            </p>
-          )}
           {settingsForm}
           <AdvancedSettings>
             <RuntimeSettingsPanel section="metadata" />
@@ -433,6 +427,16 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
             <RuntimeSettingsPanel section="identification" />
             <RuntimeSettingsPanel section="matching" />
             <Disclosure title="Manual actions">
+              {status.recovery_required && (
+                <p role="status" className="notice notice-warning">
+                  The TMDB change history could not cover the interruption. Film & series
+                  information will be refreshed progressively. Existing data, books and manual
+                  choices are retained.{' '}
+                  {status.config.auto_sync
+                    ? 'Automatic recovery continues from saved progress.'
+                    : 'Enable automatic film & series updates, or run Update film & series information to continue.'}
+                </p>
+              )}
               {Boolean(status.books?.skipped) && (
                 <p role="status" className="notice notice-warning">
                   {status.books!.skipped.toLocaleString()} unreadable or oversized book records were
@@ -479,7 +483,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button
-                  disabled={busy || !status.config.tmdb_secret || status.rebuild_required}
+                  disabled={busy || !status.config.tmdb_secret}
                   onClick={() => action.mutate('sync')}
                 >
                   Update film & series information
@@ -505,7 +509,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                     onClick={() => action.mutate('stop-sync')}
                     disabled={action.isPending}
                   >
-                    Stop information updates
+                    Stop film & series information update
                   </Button>
                 )}
               </div>

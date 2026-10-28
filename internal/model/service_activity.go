@@ -35,7 +35,7 @@ func (d ServiceDiagnostic) Valid() bool {
 		return false
 	}
 	switch d.FailureCode {
-	case "", "authentication", "network", "timeout", "http", "parse", "storage", "change_gap", "interrupted", "unknown":
+	case "", "authentication", "network", "timeout", "http", "parse", "storage", "change_gap", "cooldown", "interrupted", "unknown":
 	default:
 		return false
 	}
@@ -67,7 +67,8 @@ func (d ServiceDiagnostic) failureDescription() string {
 		"timeout":        "the TMDB request timed out",
 		"parse":          "TMDB returned incomplete or invalid data",
 		"storage":        "the local database or temporary storage operation failed",
-		"change_gap":     "the change history gap exceeds 14 days; reset the metadata catalog before retrying",
+		"change_gap":     "the change history could not cover the interruption; a progressive refresh is required",
+		"cooldown":       "TMDB requested a waiting period before further requests",
 		"unknown":        "the operation could not complete",
 	}[d.FailureCode]
 	if d.FailureCode == "http" {

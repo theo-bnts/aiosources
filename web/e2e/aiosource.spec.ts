@@ -156,6 +156,68 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   }
 })
 
+test('information recovery and schedules stay consistent without asking to erase an existing catalog', async ({
+  page,
+  server,
+}) => {
+  const session = await (await page.request.get('/api/session')).json()
+  const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(`UPDATE ingest.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
+      UPDATE ingest.ol_import_state SET complete=TRUE,data_complete=TRUE,last_sync=now();
+      UPDATE ingest.ol_changes_state SET bootstrap_complete=TRUE,changes_through=now(),checked_at=now(),retry_at=now()+interval '1 hour';`)
+    expect(
+      (
+        await page.request.put('/api/secrets/information_recovery_fixture', {
+          headers,
+          data: { revision: 0, value: 'synthetic-never-sent-token' },
+        })
+      ).status(),
+    ).toBe(204)
+    const current = await (await page.request.get('/api/aiosource/controls')).json()
+    expect(
+      (
+        await page.request.put('/api/aiosource/config', {
+          headers,
+          data: {
+            ...current.config,
+            auto_sync: false,
+            tmdb_secret: 'information_recovery_fixture',
+            openlibrary_enabled: true,
+          },
+        })
+      ).status(),
+    ).toBe(204)
+    await page.goto('/metadata')
+    await expect(page.getByText('Recovery pending', { exact: true })).toBeVisible()
+    await expect(
+      page.getByText('Film & series changes applied through', { exact: true }),
+    ).toBeVisible()
+    await expect(page.getByText('Book changes applied through', { exact: true })).toBeVisible()
+    await expect(page.getByText('Next automatic book update', { exact: true })).toBeVisible()
+    const status = await (await page.request.get('/api/aiosource')).json()
+    expect(status.recovery_required).toBe(true)
+    expect(new Date(status.books.next_update).getTime() - Date.now()).toBeGreaterThan(50 * 60_000)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await page.goto('/metadata/settings')
+    await openDisclosure(page, 'Manual actions')
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: 'Existing data, books and manual choices are retained.' }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole('button', { name: 'Update film & series information', exact: true }),
+    ).toBeEnabled()
+    await page.setViewportSize({ width: 390, height: 844 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } finally {
+    await db.end()
+  }
+})
+
 test('Stremio manifest works without admin cookies and replacement revokes the previous token', async ({
   page,
   server,

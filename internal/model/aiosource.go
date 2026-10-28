@@ -117,6 +117,7 @@ type BookInformation struct {
 }
 
 type OpenLibraryStatus struct {
+	NextUpdate     *time.Time `json:"next_update"`
 	Generation     int64      `json:"-"`
 	SnapshotAt     *time.Time `json:"snapshot_at"`
 	DataComplete   bool       `json:"-"`
@@ -190,22 +191,25 @@ type AIOCleanup struct {
 	Failed  bool
 }
 type AIOStatus struct {
-	MetadataDue     bool       `json:"-"`
-	Works           int64      `json:"works"`
-	Matched         int64      `json:"matched"`
-	Ambiguous       int64      `json:"ambiguous"`
-	Unmatched       int64      `json:"unmatched"`
-	MatchingPending int64      `json:"matching_pending"`
-	Pending         int64      `json:"pending"`
-	CleanupPending  int64      `json:"cleanup_pending"`
-	CleanupFailed   int64      `json:"cleanup_failed"`
-	LastSync        *time.Time `json:"last_sync"`
-	LastMatch       *time.Time `json:"last_match"`
-	ChangesThrough  *time.Time `json:"changes_through"`
-	InventoryDate   string     `json:"inventory_date"`
-	SyncRetryAt     *time.Time `json:"sync_retry_at"`
-	SyncFailures    int        `json:"sync_failures"`
-	SyncError       string     `json:"sync_error"`
+	ProviderRetryAt   *time.Time `json:"-"`
+	RecoveryStartedAt *time.Time `json:"recovery_started_at"`
+	AppliedThrough    *time.Time `json:"applied_through"`
+	MetadataDue       bool       `json:"-"`
+	Works             int64      `json:"works"`
+	Matched           int64      `json:"matched"`
+	Ambiguous         int64      `json:"ambiguous"`
+	Unmatched         int64      `json:"unmatched"`
+	MatchingPending   int64      `json:"matching_pending"`
+	Pending           int64      `json:"pending"`
+	CleanupPending    int64      `json:"cleanup_pending"`
+	CleanupFailed     int64      `json:"cleanup_failed"`
+	LastSync          *time.Time `json:"last_sync"`
+	LastMatch         *time.Time `json:"last_match"`
+	ChangesThrough    *time.Time `json:"changes_through"`
+	InventoryDate     string     `json:"inventory_date"`
+	SyncRetryAt       *time.Time `json:"sync_retry_at"`
+	SyncFailures      int        `json:"sync_failures"`
+	SyncError         string     `json:"sync_error"`
 }
 
 type AIOAutomation struct {

@@ -145,12 +145,15 @@ test('operation errors remain in their history and manual controls without appea
   }
   await page.goto('/metadata')
   await expect(page.getByText(message, { exact: true })).toHaveCount(0)
-  const activity = page.getByRole('link', { name: 'View information update history', exact: true })
+  const activity = page.getByRole('link', {
+    name: 'View film & series update history',
+    exact: true,
+  })
   await expect(
-    activity.getByText('Information update needs attention', { exact: true }),
+    activity.getByText('Film & series update needs attention', { exact: true }),
   ).toHaveAttribute('data-variant', 'warning')
   await activity.click()
-  await expect(page).toHaveURL(/\/metadata\/history\?kind=metadata$/)
+  await expect(page).toHaveURL(/\/metadata\/history\?service=tmdb$/)
   await expect(page.getByRole('row').filter({ hasText: 'Interrupted' })).toContainText(message)
   await page.getByRole('link', { name: 'Open run interrupted-update', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: message })).toBeVisible()

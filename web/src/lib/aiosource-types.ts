@@ -36,6 +36,7 @@ export type BookStatus = {
   last_sync: string | null
   error?: string
   running: boolean
+  next_update?: string | null
 }
 export type Status = {
   books?: BookStatus
@@ -52,18 +53,21 @@ export type Status = {
     last_sync: string | null
     last_match: string | null
     sync_error: string
+    inventory_date: string
+    applied_through: string | null
+    recovery_started_at: string | null
   }
   syncing: boolean
   matching: boolean
   automation: {
-    updates: 'disabled' | 'missing_token' | 'blocked' | 'running' | 'scheduled' | 'retry' | 'due'
+    updates: 'disabled' | 'missing_token' | 'running' | 'scheduled' | 'retry' | 'due'
     next_update: string | null
     identification:
       'disabled' | 'waiting_information' | 'pending' | 'up_to_date' | 'running' | 'scheduled'
     next_identification: string | null
   }
   error: string
-  rebuild_required: boolean
+  recovery_required: boolean
 }
 
 export type Controls = Omit<Status, 'status'> & {

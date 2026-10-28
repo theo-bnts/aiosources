@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 type metadataError struct {
-	code   string
-	status int
-	cause  error
+	code    string
+	status  int
+	cause   error
+	retryAt time.Time
 }
 
 func (e *metadataError) Error() string { return "TMDB request failed (" + e.code + ")" }
@@ -29,13 +32,26 @@ func metadataTransportError(ctx context.Context, err error) error {
 	return &metadataError{code: code, cause: err}
 }
 
-func metadataHTTPError(status int) error {
+func metadataHTTPError(status int) *metadataError {
 	code := "http"
 	var cause error
 	if status == 401 || status == 403 {
 		code, cause = "authentication", ErrAuth
 	}
 	return &metadataError{code: code, status: status, cause: cause}
+}
+
+func (s *Service) metadataResponseFailure(ctx context.Context, status int, retryAfter string, fallback time.Duration) error {
+	failure := metadataHTTPError(status)
+	if status == 429 || status == 503 && strings.TrimSpace(retryAfter) != "" {
+		delay := metadataRetryAfter(retryAfter, fallback, time.Now())
+		failure.retryAt = time.Now().Add(delay)
+		s.metadataRate.cooldown(delay)
+		if err := s.DB.RetainAIOMetadataCooldown(ctx, failure.retryAt); err != nil {
+			return metadataStorageError(err)
+		}
+	}
+	return failure
 }
 
 func metadataDiagnostic(operation string, err error) model.ServiceDiagnostic {
@@ -57,8 +73,6 @@ func metadataDiagnostic(operation string, err error) model.ServiceDiagnostic {
 		d.FailureCode = "timeout"
 	case errors.Is(err, ErrInvalidResponse):
 		d.FailureCode = "parse"
-	case errors.Is(err, errMetadataGap):
-		d.FailureCode = "change_gap"
 	default:
 		d.FailureCode = "unknown"
 	}
@@ -71,5 +85,3 @@ func metadataStorageError(err error) error {
 	}
 	return errMetadataStorage
 }
-
-var errMetadataGap = errors.New("TMDB change gap exceeds 14 days; reset required")

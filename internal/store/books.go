@@ -61,17 +61,25 @@ func (s *Store) OpenLibraryCheckpoint(ctx context.Context) (string, string, int6
 }
 
 func (s *Store) OpenLibraryDue(ctx context.Context, minutes int) (bool, error) {
+	next, err := s.NextOpenLibraryUpdate(ctx, minutes)
+	return !next.After(time.Now()), err
+}
+
+// Display and admission use the same durable clocks, including an individual
+// document retry, unfinished catch-up and the daily recovery-export check.
+func (s *Store) NextOpenLibraryUpdate(ctx context.Context, minutes int) (time.Time, error) {
 	if minutes < 5 || minutes > 1440 {
-		return false, model.ErrInvalid
+		return time.Time{}, model.ErrInvalid
 	}
-	var due bool
-	err := s.pool.QueryRow(ctx, `SELECT (i.retry_at IS NULL OR i.retry_at<=now()) AND (c.retry_at IS NULL OR c.retry_at<=now()) AND (
- NOT i.complete OR c.checked_at IS NULL OR ((c.retry_at IS NULL OR c.retry_at<=now()) AND c.checked_at+make_interval(mins=>$1)<=now())
- OR EXISTS(SELECT 1 FROM ingest.ol_change_jobs WHERE next_attempt<=now())
- OR (NOT c.bootstrap_complete AND c.needs_dump_after IS NULL AND (c.retry_at IS NULL OR c.retry_at<=now()))
- OR (c.needs_dump_after IS NOT NULL AND (c.dump_checked_at IS NULL OR c.dump_checked_at+interval '1 day'<=now())))
- FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`, minutes).Scan(&due)
-	return due, err
+	var next time.Time
+	err := s.pool.QueryRow(ctx, `SELECT GREATEST(i.retry_at,c.retry_at,LEAST(
+ CASE WHEN NOT i.complete THEN now() END,
+ COALESCE(c.checked_at+make_interval(mins=>$1),now()),
+ (SELECT min(next_attempt) FROM ingest.ol_change_jobs),
+ CASE WHEN NOT c.bootstrap_complete AND c.needs_dump_after IS NULL THEN now() END,
+ CASE WHEN c.needs_dump_after IS NOT NULL THEN COALESCE(c.dump_checked_at+interval '1 day',now()) END
+ )) FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`, minutes).Scan(&next)
+	return next, databaseError("read book update schedule", err)
 }
 
 func (s *Store) BeginOpenLibrary(ctx context.Context, snapshot, etag string) (int64, error) {

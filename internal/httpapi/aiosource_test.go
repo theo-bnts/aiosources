@@ -473,7 +473,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one',
 	if full.Code != 200 || light.Code != 200 || json.Unmarshal(full.Body.Bytes(), &a) != nil || json.Unmarshal(light.Body.Bytes(), &b) != nil {
 		t.Fatalf("status projections %d / %d", full.Code, light.Code)
 	}
-	for _, key := range []string{"config", "automation", "syncing", "matching", "error", "rebuild_required"} {
+	for _, key := range []string{"config", "automation", "syncing", "matching", "error", "recovery_required"} {
 		if string(a[key]) != string(b[key]) {
 			t.Fatal("controls diverge from status", key)
 		}

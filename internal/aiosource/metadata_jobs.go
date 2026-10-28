@@ -85,6 +85,13 @@ func (s *Service) processMetadataJobs(ctx context.Context, key string, jobs []st
 		case result := <-output:
 			remaining--
 			if result.err != nil {
+				var provider *metadataError
+				if errors.As(result.err, &provider) && provider.retryAt.After(time.Now()) {
+					if err := flush(); err != nil {
+						return err
+					}
+					return result.err
+				}
 				if errors.Is(result.err, ErrAuth) || errors.Is(result.err, errMetadataStorage) {
 					return result.err
 				}

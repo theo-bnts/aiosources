@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -229,29 +230,92 @@ func TestMetadataFailuresRetainQueueAndPublishedData(t *testing.T) {
 		t.Fatal("old job erased newer change")
 	}
 }
-func TestFourteenDayGapRequiresExplicitReset(t *testing.T) {
-	ctx, s, _ := testService(t)
+func TestFourteenDayGapRecoversWithoutErasingDataAndResumesAfterRestart(t *testing.T) {
+	ctx, s, conn := testService(t)
+	seedMovie(t, ctx, s, conn, "source", "1", strings.Repeat("a", 40))
 	if err := s.Vault.Put(ctx, "tmdb", "synthetic"); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
 	c.TMDBSecret = "tmdb"
-	if err := s.DB.AIOChangesThrough(ctx, time.Now().Add(-15*24*time.Hour)); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
+ UPDATE ingest.aio_works SET updated_at=now()-interval '20 days';
+ INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL900W','Synthetic Almanac','{}');
+ INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
+ SELECT provider_id,source_id,md5(fields::text),md5(ingest.aio_review_evidence(fields)::text),'movie','101' FROM ingest.torrents;`); err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { t.Error("blocked sync contacted TMDB") }))
+	var incomplete atomic.Bool
+	incomplete.Store(true)
+	var movieCalls, seriesCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".json.gz"):
+			g := gzip.NewWriter(w)
+			if strings.Contains(r.URL.Path, "movie_ids") {
+				fmt.Fprintln(g, `{"id":101}`)
+			} else {
+				fmt.Fprintln(g, `{"id":202}`)
+			}
+			_ = g.Close()
+		case strings.HasSuffix(r.URL.Path, "/changes"):
+			start, err := time.Parse("2006-01-02", r.URL.Query().Get("start_date"))
+			if err != nil || time.Since(start) > 3*24*time.Hour {
+				t.Error("recovery requested an expired provider window")
+			}
+			fmt.Fprint(w, `{"page":1,"total_pages":0,"results":[]}`)
+		case r.URL.Path == "/movie/101":
+			movieCalls.Add(1)
+			if incomplete.Load() {
+				fmt.Fprint(w, `{}`)
+			} else {
+				fmt.Fprint(w, strings.ReplaceAll(movieDetail, "Example Movie", "Renamed Synthetic Movie"))
+			}
+		case r.URL.Path == "/tv/202":
+			seriesCalls.Add(1)
+			fmt.Fprint(w, tvDetail)
+		default:
+			t.Errorf("unexpected recovery request %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
 	defer server.Close()
-	s.TMDBBase = server.URL
-	s.MetadataHTTP = server.Client()
-	if err := s.Sync(ctx, c); err == nil {
-		t.Fatal("accepted change gap")
+	s.TMDBBase, s.ExportBase, s.MetadataHTTP = server.URL, server.URL, server.Client()
+	if err := s.Sync(ctx, c); err != nil {
+		t.Fatal("partial recovery failed to retain useful progress", err)
 	}
-	if err := s.Reset(ctx, "metadata"); err != nil {
+	before, err := s.DB.AIOStatus(ctx)
+	if err != nil || before.RecoveryStartedAt == nil || before.Pending != 1 || before.AppliedThrough == nil || time.Since(*before.AppliedThrough) < 19*24*time.Hour || before.LastSync == nil || time.Since(*before.LastSync) < 19*24*time.Hour {
+		t.Fatal("discovery was incorrectly reported as applied information", before, err)
+	}
+	if err := s.Close(ctx); err != nil {
 		t.Fatal(err)
+	}
+	restarted, err := New(ctx, s.DB, s.Vault, s.sources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restarted.Close(ctx) })
+	restarted.TMDBBase, restarted.ExportBase, restarted.MetadataHTTP = server.URL, server.URL, server.Client()
+	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_metadata_jobs SET next_attempt=now()`); err != nil {
+		t.Fatal(err)
+	}
+	incomplete.Store(false)
+	if err := restarted.Sync(ctx, c); err != nil {
+		t.Fatal("saved recovery could not continue", err)
 	}
 	status, err := s.DB.AIOStatus(ctx)
-	if err != nil || status.ChangesThrough != nil {
-		t.Fatal("reset did not clear checkpoint")
+	if err != nil || status.RecoveryStartedAt != nil || status.Pending != 0 || status.AppliedThrough == nil || status.ChangesThrough == nil || !status.AppliedThrough.Equal(*status.ChangesThrough) || status.LastSync == nil || time.Since(*status.LastSync) > time.Minute || movieCalls.Load() != 2 || seriesCalls.Load() != 1 {
+		t.Fatal("recovery lost its boundary or repeated completed details", status, movieCalls.Load(), seriesCalls.Load(), err)
+	}
+	var title, book string
+	var reviews int
+	err = conn.QueryRow(ctx, `SELECT
+ (SELECT display_title FROM ingest.aio_works WHERE media_type='movie' AND tmdb_id='101'),
+ (SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL900W'),
+ (SELECT count(*) FROM ingest.aio_match_reviews WHERE active)`).Scan(&title, &book, &reviews)
+	if err != nil || title != "Renamed Synthetic Movie" || book != "Synthetic Almanac" || reviews != 1 {
+		t.Fatal("recovery did not preserve unrelated data and manual choices", title, book, reviews, err)
 	}
 }
 func TestConfigurationAtomicRevisionAndSecretProtection(t *testing.T) {

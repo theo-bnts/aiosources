@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { number, percentage, useDate } from '@/lib/format'
-import { bookSyncLabel } from '@/lib/book-sync'
+import { bookSyncLabel, metadataSyncLabel } from '@/lib/information-sync'
 
 export function SourceStatisticsPage() {
   const location = useLocation()
@@ -251,6 +251,20 @@ function MetadataStatisticsPage() {
                     }
                     size="sm"
                   />
+                  <Statistic
+                    label="Next automatic book update"
+                    value={
+                      status.books.running
+                        ? 'Running'
+                        : !status.config.openlibrary_enabled
+                          ? 'Disabled'
+                          : status.books.next_update
+                            ? date(status.books.next_update)
+                            : 'Waiting'
+                    }
+                    size="sm"
+                    to="/metadata/settings"
+                  />
                 </>
               )}
               <Statistic
@@ -259,7 +273,33 @@ function MetadataStatisticsPage() {
                   status.status.last_sync ? date(status.status.last_sync) : 'No completed update'
                 }
                 size="sm"
-                to="/metadata/history?kind=metadata"
+                to="/metadata/history?service=tmdb"
+              />
+              <Statistic
+                label="Film & series synchronization"
+                value={metadataSyncLabel(
+                  status.status,
+                  status.syncing,
+                  status.config.auto_sync,
+                  status.recovery_required,
+                )}
+                size="sm"
+                to="/metadata/settings"
+              />
+              <Statistic
+                label="Film & series changes applied through"
+                value={
+                  status.status.applied_through
+                    ? date(status.status.applied_through)
+                    : 'Not established'
+                }
+                size="sm"
+                to="/metadata/history?service=tmdb"
+              />
+              <Statistic
+                label="Film & series export date"
+                value={status.status.inventory_date || 'Not established'}
+                size="sm"
               />
               <Statistic
                 label="Next automatic film & series update"
@@ -294,8 +334,8 @@ function MetadataStatisticsPage() {
             </dl>
             <div className="flex flex-wrap gap-2" aria-label="Current activity">
               <Link
-                to="/metadata/history?kind=metadata"
-                aria-label="View information update history"
+                to="/metadata/history?service=tmdb"
+                aria-label="View film & series update history"
               >
                 <Badge
                   variant={
@@ -303,27 +343,40 @@ function MetadataStatisticsPage() {
                   }
                 >
                   {status.syncing
-                    ? 'Information update running'
+                    ? 'Film & series update running'
                     : status.status.sync_error
-                      ? 'Information update needs attention'
-                      : 'Information update idle'}
+                      ? 'Film & series update needs attention'
+                      : 'Film & series update idle'}
                 </Badge>
               </Link>
+              {status.books && showBookStatistics && (
+                <Link
+                  to="/metadata/history?service=openlibrary"
+                  aria-label="View book update history"
+                >
+                  <Badge
+                    variant={
+                      status.books.running
+                        ? 'info'
+                        : status.books.error || status.books.needs_export
+                          ? 'warning'
+                          : 'secondary'
+                    }
+                  >
+                    {status.books.running
+                      ? 'Book update running'
+                      : status.books.error || status.books.needs_export
+                        ? 'Book update needs attention'
+                        : 'Book update idle'}
+                  </Badge>
+                </Link>
+              )}
               <Link to="/metadata/history?kind=matching" aria-label="View identification history">
                 <Badge variant={status.matching ? 'info' : 'secondary'}>
                   {status.matching ? 'Identification running' : 'Identification idle'}
                 </Badge>
               </Link>
             </div>
-            {status.rebuild_required && (
-              <p role="alert" className="notice notice-warning">
-                The change history gap exceeds 14 days. Reset the metadata catalog in{' '}
-                <Link className="underline" to="/metadata/settings#maintenance">
-                  Settings
-                </Link>
-                .
-              </p>
-            )}
           </>
         )
       )}

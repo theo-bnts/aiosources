@@ -15,24 +15,25 @@ func AutomationPlan(c model.AIOConfig, status model.AIOStatus, syncing, matching
 		switch {
 		case c.TMDBSecret == "":
 			p.Updates = "missing_token"
-		case status.ChangesThrough != nil && now.Sub(*status.ChangesThrough) > 14*24*time.Hour:
-			p.Updates = "blocked"
 		default:
 			next := now
 			if status.LastSync != nil {
 				next = status.LastSync.Add(time.Duration(c.SyncMinutes) * time.Minute)
 			}
-			if status.MetadataDue {
+			if status.MetadataDue || MetadataRecoveryRequired(status, now) {
 				next = now
 			}
 			if status.SyncRetryAt != nil {
 				next = *status.SyncRetryAt
 			}
+			if status.ProviderRetryAt != nil && status.ProviderRetryAt.After(next) {
+				next = *status.ProviderRetryAt
+			}
 			p.NextUpdate = &next
 			p.Updates = "scheduled"
 			if !next.After(now) {
 				p.Updates = "due"
-			} else if status.SyncRetryAt != nil {
+			} else if status.SyncRetryAt != nil || status.ProviderRetryAt != nil && status.ProviderRetryAt.After(now) {
 				p.Updates = "retry"
 			}
 		}
@@ -63,6 +64,10 @@ func AutomationPlan(c model.AIOConfig, status model.AIOStatus, syncing, matching
 		p.NextIdentification = nil
 	}
 	return p
+}
+
+func MetadataRecoveryRequired(status model.AIOStatus, now time.Time) bool {
+	return status.RecoveryStartedAt != nil || status.ChangesThrough != nil && now.Sub(*status.ChangesThrough) > 14*24*time.Hour
 }
 
 func (s *Service) wakeAutomation() {

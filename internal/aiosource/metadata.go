@@ -60,12 +60,12 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 			return false, metadataHTTPError(res.StatusCode)
 		}
 		if res.StatusCode == 429 || res.StatusCode >= 500 {
-			retryErr = metadataHTTPError(res.StatusCode)
 			res.Body.Close()
 			delay := time.Duration(policy["request_retry_seconds"]*(1<<attempt)) * time.Second
 			delay = metadataRetryAfter(res.Header.Get("Retry-After"), delay, time.Now())
-			if res.StatusCode == 429 {
-				s.metadataRate.cooldown(delay)
+			retryErr = s.metadataResponseFailure(ctx, res.StatusCode, res.Header.Get("Retry-After"), delay)
+			if errors.Is(retryErr, errMetadataStorage) || delay > time.Minute {
+				return false, retryErr
 			}
 			if attempt == policy["request_attempts"]-1 {
 				break
@@ -404,7 +404,7 @@ func (s *Service) inventory(ctx context.Context, typ, date string) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return metadataHTTPError(res.StatusCode)
+		return s.metadataResponseFailure(ctx, res.StatusCode, res.Header.Get("Retry-After"), time.Minute)
 	}
 	file, err := os.CreateTemp("", "aiosources-tmdb-*.json.gz")
 	if err != nil {
@@ -580,7 +580,7 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 	}
 	defer func() {
 		code := metadataDiagnostic(stage, syncErr).FailureCode
-		if code != "interrupted" && code != "storage" && code != "change_gap" {
+		if code != "interrupted" && code != "storage" {
 			s.observe("tmdb", syncErr)
 		}
 	}()
@@ -593,11 +593,18 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 	now := time.Now().UTC()
 	stage = "changes"
 	history.checkpoint(ctx, stage)
+	if status.ProviderRetryAt != nil && status.ProviderRetryAt.After(now) {
+		return &metadataError{code: "cooldown", retryAt: *status.ProviderRetryAt}
+	}
 	start := now.Add(-24 * time.Hour)
 	if status.ChangesThrough != nil {
 		start = *status.ChangesThrough
 		if now.Sub(start) > 14*24*time.Hour {
-			return errMetadataGap
+			if err = s.DB.BeginAIOMetadataRecovery(ctx, now); err != nil {
+				return metadataStorageError(err)
+			}
+			status.RecoveryStartedAt = &now
+			start = now.Add(-24 * time.Hour)
 		}
 	}
 	if status.ChangesThrough == nil {
@@ -635,6 +642,11 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 			return err
 		}
 		stage = "storage"
+		if status.RecoveryStartedAt != nil {
+			if err = s.DB.QueueAIOMetadataRecovery(ctx); err != nil {
+				return metadataStorageError(err)
+			}
+		}
 		jobs, err := s.DB.AIOMetadataJobs(ctx)
 		if err != nil {
 			return err
@@ -665,7 +677,7 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 		_ = s.DB.RecordInformationActivity(ctx, metadataDiagnostic("details", progress.firstDeferred), progress.deferred)
 	}
 	stage = "storage"
-	return s.DB.AIOCompletedSync(ctx)
+	return s.DB.AIOCompletedSync(ctx, time.Now().Add(time.Duration(c.SyncMinutes)*time.Minute))
 }
 
 var errMetadataStorage = errors.New("metadata storage unavailable")

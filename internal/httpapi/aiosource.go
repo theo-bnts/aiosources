@@ -151,7 +151,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	if state.SyncError != "" {
 		message = strings.TrimSpace(state.SyncError + " " + message)
 	}
-	rebuild := state.ChangesThrough != nil && time.Since(*state.ChangesThrough) > 14*24*time.Hour
+	recovery := aiosource.MetadataRecoveryRequired(state, time.Now())
 	automation := aiosource.AutomationPlan(c, state, syncing, matching, time.Now())
 	var projection any = state
 	if controls {
@@ -163,7 +163,15 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	books.Running = s.options.AIOSource.BookState()
-	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "rebuild_required": rebuild})
+	if c.OpenLibraryEnabled && !books.Running {
+		next, err := s.options.Store.NextOpenLibraryUpdate(r.Context(), c.OpenLibraryMinutes)
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		books.NextUpdate = &next
+	}
+	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
