@@ -49,7 +49,7 @@ func ExportDate(location string) (time.Time, bool) {
 }
 
 func Path(id string) string {
-	if Key(id) != id {
+	if id == "" || Key(id) != id {
 		return ""
 	}
 	switch id[len(id)-1] {

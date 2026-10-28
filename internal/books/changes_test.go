@@ -30,6 +30,11 @@ func TestBookDocumentsRequireTheObservedRevisionAndIdentity(t *testing.T) {
 			t.Fatal("stale or mismatched document accepted")
 		}
 	}
+	for _, id := range []string{"", "OL0W", "ol100w", "/works/OL100W"} {
+		if _, err := DecodeDocument(id, 2, []byte(body)); err == nil {
+			t.Fatalf("invalid document identity accepted: %q", id)
+		}
+	}
 	if at, ok := ExportDate("https://archive.org/download/ol_dump_2026-01-01/ol_dump_all.txt.gz"); !ok || at.Format("2006-01-02") != "2026-01-01" {
 		t.Fatal("snapshot boundary lost")
 	}
