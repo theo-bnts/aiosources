@@ -7,7 +7,7 @@ test('connection errors stay opaque on desktop and mobile and recover automatica
   await page.clock.install()
   await page.goto('/metadata')
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Metadata', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Videos', level: 1, exact: true })).toBeVisible()
   let unavailable = true
   await page.route('**/api/session', async (route) => {
     if (unavailable) await route.abort('failed')
@@ -48,7 +48,7 @@ test('connection errors stay opaque on desktop and mobile and recover automatica
   unavailable = false
   await page.clock.runFor(30_001)
   await expect(alert).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Metadata', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Videos', level: 1, exact: true })).toBeVisible()
 })
 
 test('lists update without refresh controls and empty pages keep a single create action', async ({

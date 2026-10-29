@@ -24,7 +24,9 @@ test('settings search is local, keyboard accessible and reveals lazy advanced co
   await expect(field).toBeVisible()
   await expect(field).toBeFocused()
   await expect(field).toHaveAttribute('data-setting-highlight', '')
-  await expect(page).toHaveURL(/\/metadata\/settings#setting=runtime.identification.queue_batch$/)
+  await expect(page).toHaveURL(
+    /\/metadata\/identification\/settings#setting=runtime.identification.queue_batch$/,
+  )
   expect(calls.filter((call) => /^(POST|PUT|DELETE) /.test(call))).toEqual([])
   await page.reload()
   await expect(field).toBeVisible()
@@ -88,7 +90,7 @@ test('general settings keep resolvable destinations including disabled controls 
 test('search navigation keeps the ordinary unsaved-changes guard and preferences open on the chosen control', async ({
   page,
 }) => {
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   const rate = page.getByLabel('TMDB requests per second', { exact: true })
   await rate.fill('17')
   await page.getByRole('button', { name: 'Search settings', exact: true }).click()

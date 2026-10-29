@@ -38,6 +38,8 @@ import {
   BroadcastIcon,
   GlobeIcon,
   UsersThreeIcon,
+  FilmStripIcon,
+  BookOpenIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -142,10 +144,16 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/metadata',
-        label: 'Metadata',
-        description: 'Film, series and book information and torrent identification.',
-        icon: StackIcon,
+        to: '/metadata/videos',
+        label: 'Videos',
+        description: 'Film and series information, updates and history.',
+        icon: FilmStripIcon,
+      },
+      {
+        to: '/metadata/books',
+        label: 'Books',
+        description: 'Book and audiobook information, updates and history.',
+        icon: BookOpenIcon,
       },
       {
         to: '/metadata/identification',
@@ -575,7 +583,11 @@ export function AppShell({
           ? '/remotes'
           : location.pathname === '/secrets'
             ? '/security'
-            : location.pathname
+            : location.pathname === '/metadata' ||
+                location.pathname === '/metadata/settings' ||
+                location.pathname.startsWith('/metadata/history')
+              ? '/metadata/videos'
+              : location.pathname
   const activeItem = [...items]
     .sort((a, b) => b.to.length - a.to.length)
     .find(

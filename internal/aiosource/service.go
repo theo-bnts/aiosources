@@ -271,12 +271,12 @@ func (s *Service) Reset(ctx context.Context, scope string) error {
 		return model.ErrBusy
 	}
 	var releases []func()
-	if scope == "metadata" || scope == "mapping" || scope == "books" {
+	if scope == "metadata" || scope == "mapping" || scope == "books" || scope == "videos" {
 		names := []string{"matcher"}
 		if scope == "books" {
 			names = append(names, "openlibrary")
 		}
-		if scope == "metadata" {
+		if scope == "metadata" || scope == "videos" {
 			names = append(names, "metadata", "openlibrary")
 		}
 		for _, name := range names {
@@ -303,6 +303,8 @@ func (s *Service) Reset(ctx context.Context, scope string) error {
 		return s.DB.ResetAIOMapping(ctx)
 	case "books":
 		return s.DB.ResetBookInformation(ctx)
+	case "videos":
+		return s.DB.ResetVideoInformation(ctx)
 	case "metadata":
 		return s.DB.ResetAIOMetadata(ctx)
 	case "cache":

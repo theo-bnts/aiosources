@@ -46,7 +46,8 @@ test('statistics are the first view, settings contain configuration and statuses
 
   for (const [path, heading, statistic] of [
     ['/providers', 'Sources', 'Imported torrents'],
-    ['/metadata', 'Metadata', 'Information catalog entries'],
+    ['/metadata/videos', 'Videos', 'Catalog entries'],
+    ['/metadata/books', 'Books', 'Catalog entries'],
     ['/debrid', 'Debrid', 'Availability checks'],
   ]) {
     await page.goto(path)
@@ -99,7 +100,7 @@ test('statistics are the first view, settings contain configuration and statuses
 test('the Statistics tab preserves unsaved settings until an explicit discard', async ({
   page,
 }) => {
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   const interval = page.getByLabel('Information update interval (minutes)', { exact: true })
   const original = await interval.inputValue()
   const changed = original === '30' ? '45' : '30'
@@ -110,7 +111,7 @@ test('the Statistics tab preserves unsaved settings until an explicit discard', 
   await expect(interval).toHaveValue(changed)
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   await prompt.getByRole('button', { name: 'Discard changes', exact: true }).click()
-  await expect(page).toHaveURL(/\/metadata$/)
+  await expect(page).toHaveURL(/\/metadata\/videos$/)
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await expect(interval).toHaveValue(original)
 })

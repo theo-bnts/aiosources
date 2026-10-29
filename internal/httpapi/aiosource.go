@@ -148,6 +148,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	syncing, matching, message := s.options.AIOSource.State()
+	matchingError := message
 	if state.SyncError != "" {
 		message = strings.TrimSpace(state.SyncError + " " + message)
 	}
@@ -171,7 +172,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		books.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "recovery_required": recovery})
+	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
@@ -204,6 +205,8 @@ func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 		s.options.AIOSource.Stop(false, true)
 	case "reset-books":
 		err = s.options.AIOSource.Reset(r.Context(), "books")
+	case "reset-videos":
+		err = s.options.AIOSource.Reset(r.Context(), "videos")
 	case "reset-metadata":
 		err = s.options.AIOSource.Reset(r.Context(), "metadata")
 	case "reset-mapping":

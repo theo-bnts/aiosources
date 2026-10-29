@@ -235,7 +235,7 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'pending';`)
   await page.goto('/providers/settings')
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Metadata', exact: true })
+    .getByRole('link', { name: 'Identification', exact: true })
     .click()
   const formatted = await page.evaluate(() =>
     new Intl.DateTimeFormat(undefined, {
@@ -244,7 +244,9 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'pending';`)
     }).format(new Date('2026-01-02T03:04:00Z')),
   )
   const results = page.locator('#matching-results')
-  await expect(results.locator('table')).toHaveCount(0)
+  await expect(
+    page.getByRole('region', { name: 'Identification statistics', exact: true }),
+  ).toBeVisible()
   await page.getByRole('link', { name: 'View needs review', exact: true }).click()
   await expect(results.getByRole('link', { name: 'Ambiguous release', exact: true })).toBeVisible()
   await expect(results).toContainText(formatted)

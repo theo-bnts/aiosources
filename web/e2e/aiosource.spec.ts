@@ -21,21 +21,19 @@ test('metadata configuration persists and missing information explains disabled 
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/aiosource') statisticsRequests.push(request.url())
   })
-  await page.goto('/metadata/settings')
-  await expect(page.getByRole('heading', { name: 'Metadata', exact: true, level: 1 })).toBeVisible()
+  await page.goto('/metadata/videos/settings')
+  await expect(page.getByRole('heading', { name: 'Videos', exact: true, level: 1 })).toBeVisible()
   await expectMaintenanceFooter(page)
   await expect(page.getByLabel('Automatically update film & series information')).toBeChecked()
-  await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
+  await expect(page.getByLabel('Automatically identify torrents')).toHaveCount(0)
   await openDisclosure(page, 'Manual actions')
   await expect(
     page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeDisabled()
-  const configuration = page.getByRole('form', { name: 'Metadata configuration', exact: true })
+  const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
-  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
   await page.getByLabel('TMDB requests per second').fill('20')
   await page.getByLabel('Information update interval (minutes)', { exact: true }).fill('30')
-  await page.getByLabel('Identification interval (seconds)').fill('90')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
@@ -43,17 +41,28 @@ test('metadata configuration persists and missing information explains disabled 
     page.getByLabel('Information update interval (minutes)', { exact: true }),
   ).toHaveValue('30')
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('20')
+  await page.goto('/metadata/identification/settings')
+  await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
+  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
+  await page.getByLabel('Identification interval (seconds)').fill('90')
+  const identification = page.getByRole('form', {
+    name: 'Identification configuration',
+    exact: true,
+  })
+  await identification.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await page.reload()
   await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('90')
   await page.getByLabel('Identification interval (seconds)').fill('4')
-  await configuration.getByRole('button', { name: 'Save', exact: true }).click()
+  await identification.getByRole('button', { name: 'Save', exact: true }).click()
   expect(
     await page
       .getByLabel('Identification interval (seconds)')
       .evaluate((field) => (field as HTMLInputElement).validity.rangeUnderflow),
   ).toBe(true)
   await page.getByLabel('Identification interval (seconds)').fill('5')
-  await configuration.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await identification.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(
     (await (await page.request.get('/api/aiosource/controls')).json()).config.match_seconds,
   ).toBe(5)
@@ -79,7 +88,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   page,
   server,
 }) => {
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   await expect(page.getByText('Manual actions', { exact: true })).toBeHidden()
   await openDisclosure(page, 'Advanced')
   await expect(
@@ -120,9 +129,8 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     await expect(
       page.getByRole('heading', { name: 'Torrent identification', exact: true }),
     ).toHaveCount(0)
-    const form = page.getByRole('form', { name: 'Metadata configuration', exact: true })
+    const form = page.getByRole('form', { name: 'Videos configuration', exact: true })
     await page.getByLabel('Automatically update film & series information').uncheck()
-    await page.getByLabel('Automatically identify torrents').uncheck()
     await form.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     expect((await (await page.request.get('/api/aiosource')).json()).automation.updates).toBe(
@@ -133,7 +141,6 @@ test('metadata automation persists schedules, retry dates and manual choices wit
       page.getByLabel('Automatically update film & series information'),
     ).not.toBeChecked()
     await page.getByLabel('Automatically update film & series information').check()
-    await page.getByLabel('Automatically identify torrents').check()
     await form.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await db.query(
@@ -192,16 +199,16 @@ test('information recovery and schedules stay consistent without asking to erase
     ).toBe(204)
     await page.goto('/metadata')
     await expect(page.getByText('Recovery pending', { exact: true })).toBeVisible()
-    await expect(
-      page.getByText('Film & series changes applied through', { exact: true }),
-    ).toBeVisible()
-    await expect(page.getByText('Book changes applied through', { exact: true })).toBeVisible()
-    await expect(page.getByText('Next automatic book update', { exact: true })).toBeVisible()
+    await expect(page.getByText('Changes applied through', { exact: true })).toBeVisible()
+    await expect(page.getByText('Authors', { exact: true })).toHaveCount(0)
+    await page.goto('/metadata/books')
+    await expect(page.getByText('Changes applied through', { exact: true })).toBeVisible()
+    await expect(page.getByText('Next automatic update', { exact: true })).toBeVisible()
     const status = await (await page.request.get('/api/aiosource')).json()
     expect(status.recovery_required).toBe(true)
     expect(new Date(status.books.next_update).getTime() - Date.now()).toBeGreaterThan(50 * 60_000)
     await expect(page.getByRole('alert')).toHaveCount(0)
-    await page.goto('/metadata/settings')
+    await page.goto('/metadata/videos/settings')
     await openDisclosure(page, 'Manual actions')
     await expect(
       page
@@ -398,9 +405,10 @@ test('private playback saves independently and fields have space below their lab
   await page.setViewportSize({ width: 390, height: 844 })
   await assertSpacing('announce-private-playback')
   await assertPlaybackFooter()
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   await assertSpacing('tmdb_secret')
   await assertSpacing('sync_minutes')
+  await page.goto('/metadata/identification/settings')
   await assertSpacing('match_seconds')
   await page.goto('/addon/settings')
   await page.getByRole('button', { name: 'Create access', exact: true }).click()

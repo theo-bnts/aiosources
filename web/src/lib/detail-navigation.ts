@@ -17,6 +17,9 @@ const viewLabels: Record<string, string> = {
   '/sharing/remotes': 'Remote catalogs',
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',
+  '/metadata/videos/history': 'Video history',
+  '/metadata/books/history': 'Book history',
+  '/metadata/identification/history': 'Identification history',
   '/debrid/history': 'Debrid history',
 }
 type ListView = { pathname: string; search: string; returnView?: ListView }

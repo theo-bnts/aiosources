@@ -13,7 +13,13 @@ import { Disclosure } from '@/components/ui/disclosure'
 type Settings = { revision: number; values: Record<string, number>; automatic_workers?: number }
 type Draft = { base: Settings; values: Record<string, string> }
 
-export function RuntimeSettingsPanel({ section }: { section: RuntimeSection }) {
+export function RuntimeSettingsPanel({
+  section,
+  scopeHelp,
+}: {
+  section: RuntimeSection
+  scopeHelp?: string
+}) {
   const definition = runtimeSections[section]
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -99,7 +105,10 @@ export function RuntimeSettingsPanel({ section }: { section: RuntimeSection }) {
                   })
               }}
             >
-              <p className="help">{definition.help}</p>
+              <p className="help">
+                {definition.help}
+                {scopeHelp && ` ${scopeHelp}`}
+              </p>
               {section === 'identification' && query.data.automatic_workers !== undefined && (
                 <p className="help">
                   Automatic currently uses {query.data.automatic_workers} workers on this process.

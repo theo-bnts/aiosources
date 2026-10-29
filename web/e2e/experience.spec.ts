@@ -7,8 +7,8 @@ test('save feedback distinguishes reverted controls from committed changes', asy
   page.on('request', (request) => {
     if (request.method() === 'PUT') writes.push(new URL(request.url()).pathname)
   })
-  await page.goto('/metadata/settings')
-  const configuration = page.getByRole('form', { name: 'Metadata configuration', exact: true })
+  await page.goto('/metadata/videos/settings')
+  const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
   const interval = configuration.getByLabel('Information update interval (minutes)', {
     exact: true,
   })

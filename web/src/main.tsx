@@ -20,6 +20,7 @@ import {
   GlobeIcon,
   PathIcon,
   GaugeIcon,
+  ListChecksIcon,
 } from '@phosphor-icons/react'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
@@ -29,6 +30,8 @@ import { Button } from '@/components/ui/button'
 import { InterfacePreferences } from '@/components/interface-preferences'
 import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
+import { settingFromHash } from '@/lib/settings-catalog'
+import { legacyMetadataHistory, metadataSections } from '@/lib/metadata-navigation'
 import './index.css'
 
 const SourceStatisticsPage = lazy(() =>
@@ -147,6 +150,24 @@ function LegacyRawHistory() {
   )
 }
 
+function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' }) {
+  const location = useLocation()
+  const search = new URLSearchParams(location.search)
+  const identification = search.has('match_status') || location.hash === '#matching-results'
+  const settingRoute = settingFromHash(location.hash)?.route
+  const settingsPath = settingRoute?.startsWith('/metadata/')
+    ? settingRoute
+    : '/metadata/videos/settings'
+  const to = identification
+    ? `/metadata/identification${location.search}`
+    : view === 'history'
+      ? legacyMetadataHistory(location.search)
+      : view === 'settings'
+        ? `${settingsPath}${location.search}${location.hash}`
+        : `/metadata/videos${location.search}${location.hash}`
+  return <Navigate to={to} state={location.state} replace />
+}
+
 const AIOSourcePage = lazy(() => import('@/pages/aiosource'))
 const CatalogSearchPage = lazy(() =>
   import('@/pages/catalog-search').then((m) => ({ default: m.CatalogSearchPage })),
@@ -218,30 +239,72 @@ const router = createBrowserRouter(
           <Route path="raw/:id" element={<RawDetailPage />} />
           <Route path="pages/:id" element={<RawPageView />} />
         </Route>
+        <Route path="metadata" element={<LegacyMetadata view="statistics" />} />
+        <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
+        <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
+        <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
+        {(['videos', 'books'] as const).map((section) => {
+          const { path, label } = metadataSections[section]
+          return (
+            <Route
+              key={section}
+              element={
+                <WorkspaceLayout
+                  title={label}
+                  tabs={[
+                    { path, label: 'Statistics', icon: ChartBarIcon },
+                    { path: `${path}/settings`, label: 'Settings', icon: GearSixIcon },
+                    { path: `${path}/history`, label: 'History', icon: ClockCounterClockwiseIcon },
+                  ]}
+                />
+              }
+            >
+              <Route path={path} element={<AIOStatisticsPage section={section} />} />
+              <Route
+                path={`${path}/settings`}
+                element={<AIOSourcePage key={section} section={section} />}
+              />
+              <Route
+                path={`${path}/history`}
+                element={<OperationHistoryPage section="metadata" metadataSection={section} />}
+              />
+              <Route
+                path={`${path}/history/:id`}
+                element={<OperationDetailPage section="metadata" metadataSection={section} />}
+              />
+            </Route>
+          )
+        })}
         <Route
           element={
             <WorkspaceLayout
-              title="Metadata"
+              title="Identification"
               tabs={[
-                { path: '/metadata', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/metadata/settings', label: 'Settings', icon: GearSixIcon },
-                { path: '/metadata/history', label: 'History', icon: ClockCounterClockwiseIcon },
+                { path: '/metadata/identification', label: 'Results', icon: ListChecksIcon },
+                { path: '/metadata/identification/settings', label: 'Settings', icon: GearSixIcon },
+                {
+                  path: '/metadata/identification/history',
+                  label: 'History',
+                  icon: ClockCounterClockwiseIcon,
+                },
               ]}
             />
           }
         >
-          <Route path="metadata" element={<AIOStatisticsPage section="metadata" />} />
+          <Route path="metadata/identification" element={<MatchingDiagnostics />} />
           <Route
-            path="metadata/settings"
-            element={<AIOSourcePage key="metadata" section="metadata" />}
+            path="metadata/identification/settings"
+            element={<AIOSourcePage key="identification" section="identification" />}
           />
           <Route
-            path="metadata/history"
-            element={<OperationHistoryPage key="metadata-history" section="metadata" />}
+            path="metadata/identification/history"
+            element={<OperationHistoryPage section="metadata" metadataSection="identification" />}
           />
-          <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
+          <Route
+            path="metadata/identification/history/:id"
+            element={<OperationDetailPage section="metadata" metadataSection="identification" />}
+          />
         </Route>
-        <Route path="metadata/identification" element={<MatchingDiagnostics />} />
         <Route
           element={
             <WorkspaceLayout

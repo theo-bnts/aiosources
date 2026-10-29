@@ -87,7 +87,7 @@ test.describe('history order and shared pagination', () => {
     for (const [path, first, last] of [
       ['/runs?provider=pagination&status=succeeded', 'pagination-run-0001', 'pagination-run-0103'],
       [
-        '/metadata/history?kind=matching&status=succeeded',
+        '/metadata/identification/history?status=succeeded',
         'pagination-metadata-0001',
         'pagination-metadata-0103',
       ],
@@ -146,18 +146,19 @@ test('operation errors remain in their history and manual controls without appea
   await page.goto('/metadata')
   await expect(page.getByText(message, { exact: true })).toHaveCount(0)
   const activity = page.getByRole('link', {
-    name: 'View film & series update history',
+    name: 'View update history',
     exact: true,
   })
-  await expect(
-    activity.getByText('Film & series update needs attention', { exact: true }),
-  ).toHaveAttribute('data-variant', 'warning')
+  await expect(activity.getByText('Update needs attention', { exact: true })).toHaveAttribute(
+    'data-variant',
+    'warning',
+  )
   await activity.click()
-  await expect(page).toHaveURL(/\/metadata\/history\?service=tmdb$/)
+  await expect(page).toHaveURL(/\/metadata\/videos\/history$/)
   await expect(page.getByRole('row').filter({ hasText: 'Interrupted' })).toContainText(message)
   await page.getByRole('link', { name: 'Open run interrupted-update', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: message })).toBeVisible()
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   const manual = page
     .locator('details')
     .filter({ has: page.locator(':scope > summary', { hasText: /^Manual actions$/ }) })

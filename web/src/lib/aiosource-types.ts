@@ -43,6 +43,7 @@ export type Status = {
   config: Config
   status: {
     works: number
+    video_works: number
     matched: number
     ambiguous: number
     unmatched: number
@@ -67,6 +68,7 @@ export type Status = {
     next_identification: string | null
   }
   error: string
+  matching_error?: string
   recovery_required: boolean
 }
 

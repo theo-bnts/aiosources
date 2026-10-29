@@ -88,9 +88,11 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. 
 ## First steps
 
 1. **Add a source** in **Sources → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
-2. **Set up film and series information** in **Metadata → Settings** with your TMDB token. Enable automatic information updates and identification. For books, enable Open Library updates in the same page; the first full import can take several hours or longer, then recent changes keep the catalog updated without another full download. Recovery requests a newer export if a gap is detected. Use **Identification** to review uncertain matches or choose the correct title yourself.
-3. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
-4. **Open Search** to find a title, or create a connection for your preferred application below.
+2. **Set up film and series information** in **Metadata → Videos → Settings** with your TMDB token and enable automatic updates.
+3. **For books**, enable Open Library updates in **Metadata → Books → Settings**. No API key is required. The first full import can take hours or longer and needs substantial storage; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
+4. **Review identification** in **Metadata → Identification** for both videos and books. Adjust automatic identification in its **Settings** tab. Videos, Books and Identification each keep their own history.
+5. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
+6. **Open Search** to find a title, or create a connection for your preferred application below.
 
 A new source becomes available after its first successful complete import. A paused import can usually resume; its history explains whether it is waiting for a limit, a source response or an action from you.
 

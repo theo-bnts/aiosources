@@ -6,7 +6,7 @@ import { test, expect } from './fixtures'
 test('advanced settings stay grouped, persist, and reject contradictory values', async ({
   page,
 }) => {
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/identification/settings')
   const advanced = page
     .locator('details')
     .filter({ has: page.locator('summary', { hasText: /^Advanced$/ }) })
@@ -167,8 +167,10 @@ test('settings and shared controls fit desktop and mobile', async ({ page }) => 
     '/providers/settings',
     '/remotes/settings',
     '/torrents',
-    '/metadata/settings',
+    '/metadata/videos/settings',
+    '/metadata/books/settings',
     '/metadata/identification',
+    '/metadata/identification/settings',
     '/debrid/settings',
     '/search',
     '/addon/settings',

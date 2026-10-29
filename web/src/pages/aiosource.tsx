@@ -18,8 +18,9 @@ import { SecretPicker } from '@/components/secret-picker'
 import { FormStatus } from '@/components/form-status'
 import type { Config, Controls, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
+import { metadataSections, type MetadataSection } from '@/lib/metadata-navigation'
 
-type FormScope = 'metadata' | 'debrid' | 'trackers'
+type FormScope = MetadataSection | 'debrid' | 'trackers'
 type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
   trackers?: Record<string, Partial<Tracker>>
 }
@@ -44,8 +45,14 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
     </section>
   )
 }
-export default function AIOSourcePage({ section }: { section: 'metadata' | 'debrid' | 'stremio' }) {
+export default function AIOSourcePage({
+  section,
+}: {
+  section: MetadataSection | 'debrid' | 'stremio'
+}) {
   const location = useLocation()
+  const usesSecrets = section === 'videos' || section === 'debrid'
+  const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
     queryKey: ['aiosource', 'controls'],
@@ -55,16 +62,19 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   const secrets = useQuery({
     queryKey: ['secrets'],
     queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
+    enabled: usesSecrets,
   })
   const providers = useQuery({
     queryKey: ['providers'],
     queryFn: ({ signal }) => api<Items<ProviderSummary>>('/providers', { signal }),
+    enabled: usesProviders,
   })
   const [drafts, setDrafts] = useState<Partial<Record<FormScope, Draft>>>({})
   const [feedback, setFeedback] = useState<
     Partial<Record<FormScope, { error?: unknown; saved?: boolean }>>
   >({})
-  const scope = section === 'metadata' ? 'metadata' : 'debrid'
+  const metadata = section === 'videos' || section === 'books' || section === 'identification'
+  const scope = section === 'stremio' ? 'debrid' : section
   const draft = drafts[scope]
   const config = draft ? applyChanges(draft.base, draft.changes) : query.data?.config
   const trackersDraft = drafts.trackers
@@ -119,7 +129,7 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       draft &&
       JSON.stringify(applyChanges(draft.base, draft.changes)) !== JSON.stringify(draft.base),
     ),
-    section === 'metadata' ? 'metadata settings' : 'debrid settings',
+    metadata ? `${metadataSections[section].label.toLowerCase()} settings` : 'debrid settings',
     save.isPending && save.variables?.scope === scope,
   )
   useUnsavedChanges(
@@ -273,63 +283,83 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   )
   const settingsForm = (
     <form
-      aria-label={section === 'metadata' ? 'Metadata configuration' : 'Debrid configuration'}
+      aria-label={
+        metadata ? `${metadataSections[section].label} configuration` : 'Debrid configuration'
+      }
       onSubmit={(e) => {
         e.preventDefault()
         submit(scope)
       }}
     >
       <fieldset disabled={save.isPending} className="contents">
-        <Panel title={section === 'metadata' ? 'Metadata & identification' : 'Debrid settings'}>
-          <div className="grid gap-5 md:grid-cols-2">
-            {section === 'metadata' ? (
-              <>
-                {secret('TMDB read access token', 'tmdb_secret')}
-                {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
-              </>
-            ) : (
-              <>
-                {debridProviders.map((provider) => (
-                  <div key={provider.id} className="min-w-0 space-y-2">
-                    {secret(`${provider.name} API key`, provider.secret)}
-                    {'hint' in provider && <p className="help">{provider.hint}</p>}
-                  </div>
-                ))}
-                {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
-              </>
-            )}
-          </div>
-          {section === 'metadata' && (
+        <Panel
+          title={
+            metadata
+              ? section === 'identification'
+                ? 'Automatic identification'
+                : 'Information settings'
+              : 'Debrid settings'
+          }
+        >
+          {section === 'videos' && (
+            <div className="grid gap-5 md:grid-cols-2">
+              {secret('TMDB read access token', 'tmdb_secret')}
+              {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
+            </div>
+          )}
+          {section === 'books' && (
+            <p className="help">
+              Open Library supplies book and audiobook information without an API key. The first
+              catalog import can take hours and needs substantial storage. Later updates follow
+              recent changes, with a fresh export when recovery is needed. Cover images stay remote.
+            </p>
+          )}
+          {section === 'debrid' && (
+            <div className="grid gap-5 md:grid-cols-2">
+              {debridProviders.map((provider) => (
+                <div key={provider.id} className="min-w-0 space-y-2">
+                  {secret(`${provider.name} API key`, provider.secret)}
+                  {'hint' in provider && <p className="help">{provider.hint}</p>}
+                </div>
+              ))}
+              {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
+            </div>
+          )}
+          {metadata && (
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
               <legend className="pr-3 text-sm font-medium">Schedules</legend>
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-4">
-                  {toggle('Automatically update film & series information', 'auto_sync')}
-                  {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
-                </div>
-                <div className="space-y-4">
-                  {toggle('Automatically update book information', 'openlibrary_enabled')}
-                  {number(
-                    'Book information update interval (minutes)',
-                    'openlibrary_minutes',
-                    5,
-                    1440,
-                  )}
-                  <p className="help">
-                    The first catalog import can take hours and needs substantial storage. Later
-                    updates follow recent changes, with a fresh export when recovery is needed.
-                    Cover images stay remote.
-                  </p>
-                </div>
-                <div className="space-y-4">
-                  {toggle('Automatically identify torrents', 'auto_match')}
-                  {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
-                </div>
+                {section === 'videos' && (
+                  <div className="space-y-4">
+                    {toggle('Automatically update film & series information', 'auto_sync')}
+                    {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
+                  </div>
+                )}
+                {section === 'books' && (
+                  <div className="space-y-4">
+                    {toggle('Automatically update book information', 'openlibrary_enabled')}
+                    {number(
+                      'Book information update interval (minutes)',
+                      'openlibrary_minutes',
+                      5,
+                      1440,
+                    )}
+                  </div>
+                )}
+                {section === 'identification' && (
+                  <div className="space-y-4">
+                    {toggle('Automatically identify torrents', 'auto_match')}
+                    {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
+                  </div>
+                )}
               </div>
-              <p className="help">
-                Identification waits for this interval after each attempt. Pending work and timing
-                survive restarts. Manual actions run immediately.
-              </p>
+              {section === 'identification' && (
+                <p className="help">
+                  Identification waits for this interval after each attempt. Pending work and timing
+                  survive restarts. These settings apply to videos and books. Manual actions run
+                  immediately.
+                </p>
+              )}
             </fieldset>
           )}
           {footer(scope)}
@@ -344,49 +374,55 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
       open={maintenanceOpen}
       onOpenChange={setMaintenanceOpen}
     >
-      {section === 'metadata' && (
+      {metadata && (
         <>
           <p className="help">
             Rebuild information or identification results when needed. Each action explains what it
             removes before confirmation.
           </p>
           <div className="flex flex-wrap gap-3">
-            <ConfirmAction
-              title="Reset metadata catalog?"
-              description="Downloaded film, series and book information, pending imports and title matches will be removed. Collected torrents and manual choices are retained; reviewed information must become available again before playback."
-              label="Reset metadata"
-              variant="destructive"
-              action={() => action.mutateAsync('reset-metadata')}
-              trigger={
-                <Button variant="destructive" disabled={busy}>
-                  Reset metadata
-                </Button>
-              }
-            />
-            <ConfirmAction
-              title="Reset book information?"
-              description="Open Library information and automatic book matches will be removed. Torrent records, manual choices and film & series information are retained. Automatic book updates can import the catalog again."
-              label="Reset book information"
-              variant="destructive"
-              action={() => action.mutateAsync('reset-books')}
-              trigger={
-                <Button variant="destructive" disabled={busy}>
-                  Reset book information
-                </Button>
-              }
-            />
-            <ConfirmAction
-              title="Reset title matches?"
-              description="Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
-              label="Reset matches"
-              variant="destructive"
-              action={() => action.mutateAsync('reset-mapping')}
-              trigger={
-                <Button variant="destructive" disabled={busy}>
-                  Reset matches
-                </Button>
-              }
-            />
+            {section === 'videos' && (
+              <ConfirmAction
+                title="Reset video information?"
+                description="Film and series information, pending video updates and automatic video matches will be removed. Torrent records, manual choices and book information are retained. Automatic video updates can import the catalog again."
+                label="Reset video information"
+                variant="destructive"
+                action={() => action.mutateAsync('reset-videos')}
+                trigger={
+                  <Button variant="destructive" disabled={busy}>
+                    Reset video information
+                  </Button>
+                }
+              />
+            )}
+            {section === 'books' && (
+              <ConfirmAction
+                title="Reset book information?"
+                description="Open Library information and automatic book matches will be removed. Torrent records, manual choices and film & series information are retained. Automatic book updates can import the catalog again."
+                label="Reset book information"
+                variant="destructive"
+                action={() => action.mutateAsync('reset-books')}
+                trigger={
+                  <Button variant="destructive" disabled={busy}>
+                    Reset book information
+                  </Button>
+                }
+              />
+            )}
+            {section === 'identification' && (
+              <ConfirmAction
+                title="Reset title matches?"
+                description="Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
+                label="Reset matches"
+                variant="destructive"
+                action={() => action.mutateAsync('reset-mapping')}
+                trigger={
+                  <Button variant="destructive" disabled={busy}>
+                    Reset matches
+                  </Button>
+                }
+              />
+            )}
           </div>
         </>
       )}
@@ -416,51 +452,58 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
   )
   return (
     <div className="page">
-      <ErrorNotice error={query.error ?? secrets.error ?? providers.error} />
+      <ErrorNotice
+        error={
+          query.error ??
+          (usesSecrets ? secrets.error : null) ??
+          (usesProviders ? providers.error : null)
+        }
+      />
       <ErrorNotice error={action.error} scope="action" />
-      {section === 'metadata' && (
+      {metadata && (
         <>
           {settingsForm}
           <AdvancedSettings>
-            <RuntimeSettingsPanel section="metadata" />
-            <RuntimeSettingsPanel section="metadata_retries" />
-            <RuntimeSettingsPanel section="identification" />
-            <RuntimeSettingsPanel section="matching" />
+            {section === 'videos' && <RuntimeSettingsPanel section="metadata" />}
+            {(section === 'videos' || section === 'books') && (
+              <RuntimeSettingsPanel
+                section="metadata_retries"
+                scopeHelp="These settings apply to both video and book information updates."
+              />
+            )}
+            {section === 'identification' && (
+              <>
+                <RuntimeSettingsPanel section="identification" />
+                <RuntimeSettingsPanel section="matching" />
+              </>
+            )}
             <Disclosure title="Manual actions">
-              {status.recovery_required && (
+              {section === 'videos' && status.recovery_required && (
                 <p role="status" className="notice notice-warning">
                   The TMDB change history could not cover the interruption. Film & series
                   information will be refreshed progressively. Existing data, books and manual
                   choices are retained.{' '}
                   {status.config.auto_sync
                     ? 'Automatic recovery continues from saved progress.'
-                    : 'Enable automatic film & series updates, or run Update film & series information to continue.'}
+                    : 'Enable automatic video updates, or run Update film & series information to continue.'}
                 </p>
               )}
-              {Boolean(status.books?.skipped) && (
+              {section === 'books' && Boolean(status.books?.skipped) && (
                 <p role="status" className="notice notice-warning">
                   {status.books!.skipped.toLocaleString()} unreadable or oversized book records were
                   skipped.{' '}
-                  <Link className="data-link" to="/metadata/history?service=openlibrary">
+                  <Link className="data-link" to="/metadata/books/history">
                     View history
                   </Link>
                 </p>
               )}
-              {status.books?.error && (
-                <p role="status" className="notice notice-warning">
-                  {status.books.error}{' '}
-                  <Link className="data-link" to="/metadata/history?service=openlibrary">
-                    View history
-                  </Link>
-                </p>
-              )}
-              {status.books?.running && (
+              {section === 'books' && status.books?.running && (
                 <p role="status" className="help">
                   Updating book information. Progress is saved automatically and continues after an
                   interruption.
                 </p>
               )}
-              {status.books?.needs_export && (
+              {section === 'books' && status.books?.needs_export && (
                 <p role="status" className="notice notice-warning">
                   Change continuity was lost. A newer Open Library export is needed to cover the
                   missing period. Existing data is retained.{' '}
@@ -469,10 +512,22 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                     : 'Enable automatic book updates, or run Update book information to retry manually.'}
                 </p>
               )}
-              {status.error && (
+              {Boolean(
+                section === 'videos'
+                  ? status.status.sync_error
+                  : section === 'books'
+                    ? status.books?.error
+                    : status.matching_error,
+              ) && (
                 <p role="status" className="notice notice-warning">
-                  {messageText(status.error)}{' '}
-                  <Link className="data-link" to="/metadata/history">
+                  {messageText(
+                    section === 'videos'
+                      ? status.status.sync_error
+                      : section === 'books'
+                        ? status.books?.error || ''
+                        : status.matching_error || '',
+                  )}{' '}
+                  <Link className="data-link" to={`${metadataSections[section].path}/history`}>
                     View history
                   </Link>
                 </p>
@@ -481,53 +536,71 @@ export default function AIOSourcePage({ section }: { section: 'metadata' | 'debr
                 Run a task now without changing its automatic settings. Stopping the current task
                 preserves committed progress; disable its automatic option to stop future runs.
               </p>
+              {draft && <p className="help">Save your changes before starting a run.</p>}
               <div className="flex flex-wrap gap-3">
-                <Button
-                  disabled={busy || !status.config.tmdb_secret}
-                  onClick={() => action.mutate('sync')}
-                >
-                  Update film & series information
-                </Button>
-                <Button
-                  disabled={Boolean(status.books?.running || action.isPending || draft)}
-                  onClick={() => action.mutate('sync-books')}
-                >
-                  Update book information
-                </Button>
-                {status.books?.running && (
-                  <Button
-                    variant="warning"
-                    disabled={action.isPending}
-                    onClick={() => action.mutate('stop-books')}
-                  >
-                    Stop book information update
-                  </Button>
+                {section === 'videos' && (
+                  <>
+                    <Button
+                      disabled={Boolean(
+                        status.syncing || action.isPending || draft || !status.config.tmdb_secret,
+                      )}
+                      onClick={() => action.mutate('sync')}
+                    >
+                      Update film & series information
+                    </Button>
+                    {status.syncing && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-sync')}
+                      >
+                        Stop film & series information update
+                      </Button>
+                    )}
+                  </>
                 )}
-                {status.syncing && (
-                  <Button
-                    variant="warning"
-                    onClick={() => action.mutate('stop-sync')}
-                    disabled={action.isPending}
-                  >
-                    Stop film & series information update
-                  </Button>
+                {section === 'books' && (
+                  <>
+                    <Button
+                      disabled={Boolean(status.books?.running || action.isPending || draft)}
+                      onClick={() => action.mutate('sync-books')}
+                    >
+                      Update book information
+                    </Button>
+                    {status.books?.running && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-books')}
+                      >
+                        Stop book information update
+                      </Button>
+                    )}
+                  </>
                 )}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  disabled={busy || !status.status.has_information}
-                  onClick={() => action.mutate('match')}
-                >
-                  Identify torrents
-                </Button>
-                {status.matching && (
-                  <Button
-                    variant="warning"
-                    onClick={() => action.mutate('stop-matching')}
-                    disabled={action.isPending}
-                  >
-                    Stop identification
-                  </Button>
+                {section === 'identification' && (
+                  <>
+                    <Button
+                      disabled={Boolean(
+                        status.matching ||
+                        action.isPending ||
+                        draft ||
+                        !status.status.has_information,
+                      )}
+                      onClick={() => action.mutate('match')}
+                    >
+                      Identify torrents
+                    </Button>
+                    {status.matching && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-matching')}
+                      >
+                        Stop identification
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </Disclosure>

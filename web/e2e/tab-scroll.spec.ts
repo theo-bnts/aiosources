@@ -111,9 +111,9 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toBeFocused()
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
-    .getByRole('link', { name: 'Metadata', exact: true })
+    .getByRole('link', { name: 'Videos', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/metadata$/)
+  await expect(page).toHaveURL(/\/metadata\/videos$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
   await expect(page.locator('#main-content')).toBeFocused()
@@ -121,7 +121,7 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
 
 test('history tabs keep scroll and their selected view', async ({ page }) => {
   for (const [url, tab, target] of [
-    ['/metadata', 'History', /\/metadata\/history$/],
+    ['/metadata/videos', 'History', /\/metadata\/videos\/history$/],
     ['/addon', 'History', /\/addon\/history$/],
     ['/debrid', 'History', /\/debrid\/history$/],
     ['/providers', 'History', /\/runs$/],

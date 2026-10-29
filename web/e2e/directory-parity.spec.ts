@@ -263,7 +263,7 @@ test('history filters keep visible labels and align their clear action with the 
     for (const [path, ids] of [
       ['/runs?status=failed', ['run-provider', 'run-status']],
       ['/remotes/history?status=failed', ['run-provider', 'run-status']],
-      ['/metadata/history?status=failed', ['operation-type', 'operation-status']],
+      ['/metadata/videos/history?status=failed', ['operation-status']],
       [
         '/debrid/history?status=failed',
         ['operation-type', 'debrid-operation-kind', 'operation-status'],

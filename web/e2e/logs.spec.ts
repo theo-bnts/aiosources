@@ -54,7 +54,10 @@ test('logs preserve alert context, include debug on demand and filter services i
       await expect(page.getByText('Source fixture: tmdb', { exact: true })).toHaveCount(0)
       const link = page.locator('.table-frame').getByRole('link')
       await expect(link).toHaveCount(1)
-      await expect(link).toHaveAttribute('href', service === 'tmdb' ? '/metadata' : '/debrid')
+      await expect(link).toHaveAttribute(
+        'href',
+        service === 'tmdb' ? '/metadata/videos' : '/debrid',
+      )
       await page.reload()
       await expect(scope).toHaveValue(`service:${service}`)
     }

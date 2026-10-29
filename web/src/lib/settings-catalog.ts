@@ -55,10 +55,10 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   history: ['/health/settings', 'Administration / Storage'],
   security: ['/security/settings', 'Administration / Security'],
   source_retries: ['/providers/settings?settings=advanced', 'Sources / Sources'],
-  identification: ['/metadata/settings', 'Metadata / Metadata'],
-  matching: ['/metadata/settings', 'Metadata / Metadata'],
-  metadata: ['/metadata/settings', 'Metadata / Metadata'],
-  metadata_retries: ['/metadata/settings', 'Metadata / Metadata'],
+  identification: ['/metadata/identification/settings', 'Metadata / Identification'],
+  matching: ['/metadata/identification/settings', 'Metadata / Identification'],
+  metadata: ['/metadata/videos/settings', 'Metadata / Videos'],
+  metadata_retries: ['/metadata/videos/settings', 'Metadata / Videos & Books'],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
   const definition = runtimeSections[section]
@@ -101,9 +101,9 @@ add(
 )
 add(
   {
-    route: '/metadata/settings',
-    group: 'Metadata / Metadata / Settings',
-    keywords: 'TMDB metadata identification metadonnees',
+    route: '/metadata/videos/settings',
+    group: 'Metadata / Videos / Settings',
+    keywords: 'TMDB films movies series video metadonnees',
   },
   [
     ['metadata.key', 'TMDB read access token', 'API key token cle'],
@@ -114,6 +114,15 @@ add(
       'Information update interval (minutes)',
       'schedule frequency cadence intervalle',
     ],
+  ],
+)
+add(
+  {
+    route: '/metadata/books/settings',
+    group: 'Metadata / Books / Settings',
+    keywords: 'Open Library books ebooks audiobooks livres metadonnees',
+  },
+  [
     [
       'metadata.books',
       'Automatically update book information',
@@ -124,6 +133,15 @@ add(
       'Book information update interval (minutes)',
       'Open Library schedule frequency cadence',
     ],
+  ],
+)
+add(
+  {
+    route: '/metadata/identification/settings',
+    group: 'Metadata / Identification / Settings',
+    keywords: 'matching films series books automatic identification',
+  },
+  [
     ['metadata.match', 'Automatically identify torrents'],
     [
       'metadata.match-interval',

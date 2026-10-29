@@ -18,11 +18,19 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Sources', '/pages/999999'],
     ['Sources', 'Sources', '/runs/missing'],
     ['Sources', 'Torrents', '/torrents'],
-    ['Metadata', 'Metadata', '/metadata'],
-    ['Metadata', 'Metadata', '/metadata/settings'],
+    ['Metadata', 'Videos', '/metadata'],
+    ['Metadata', 'Videos', '/metadata/settings'],
+    ['Metadata', 'Videos', '/metadata/videos'],
+    ['Metadata', 'Videos', '/metadata/videos/settings'],
+    ['Metadata', 'Videos', '/metadata/videos/history'],
+    ['Metadata', 'Books', '/metadata/books'],
+    ['Metadata', 'Books', '/metadata/books/settings'],
+    ['Metadata', 'Books', '/metadata/books/history'],
     ['Metadata', 'Identification', '/metadata/identification'],
-    ['Metadata', 'Metadata', '/metadata/history'],
-    ['Metadata', 'Metadata', '/metadata/history/missing'],
+    ['Metadata', 'Identification', '/metadata/identification/settings'],
+    ['Metadata', 'Identification', '/metadata/identification/history'],
+    ['Metadata', 'Videos', '/metadata/history'],
+    ['Metadata', 'Videos', '/metadata/history/missing'],
     ['Debrid', 'Debrid', '/debrid'],
     ['Debrid', 'Debrid', '/debrid/settings'],
     ['Debrid', 'Debrid', '/debrid/history'],
@@ -105,7 +113,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Sources',
     'Remote catalogs',
     'Torrents',
-    'Metadata',
+    'Videos',
+    'Books',
     'Identification',
     'Debrid',
     'Search',
@@ -155,7 +164,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     'aria-expanded',
     'false',
   )
-  await navigation.getByRole('link', { name: 'Metadata', exact: true }).click()
+  await navigation.getByRole('link', { name: 'Videos', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   await page.reload()
@@ -163,7 +172,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     'aria-selected',
     'true',
   )
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Metadata'])
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Videos'])
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await expect(navigation.getByRole('button', { name: 'Sources', exact: true })).toHaveAttribute(

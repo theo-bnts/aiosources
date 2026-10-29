@@ -53,7 +53,8 @@ Keep a backup of the V1 data and start V2 with fresh volumes. V1 volumes are not
 Use the settings search at the top of the application to find a control directly.
 
 - **Sources → Settings → Advanced:** import concurrency, retry and recovery preferences.
-- **Metadata → Settings:** information updates and identification intervals, with manual actions and maintenance under **Advanced**.
+- **Metadata → Videos / Books → Settings:** update schedules and provider settings, with manual actions and maintenance under **Advanced**. Each workspace has its own statistics and history.
+- **Metadata → Identification → Settings:** automatic identification for both videos and books, including processing, reliability and maintenance controls under **Advanced**. Its **Results** and **History** tabs keep review and identification activity together.
 - **Debrid → Settings:** service accounts, availability checks, operation limits and cleanup.
 - **Storage → Settings:** storage mode, history retention and maintenance.
 - **Security:** Secrets, two-step verification and signed-in sessions.

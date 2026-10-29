@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { IdentificationReview } from '@/components/identification-review'
+import { IdentificationStatistics } from '@/components/identification-statistics'
 import {
   Table,
   TableHeader,
@@ -108,6 +109,7 @@ export function MatchingDiagnostics() {
   }
   return (
     <div className="page" id="matching-results">
+      <IdentificationStatistics />
       <form
         key={`${status}:${provider}:${q}`}
         className="space-y-4 rounded-md border border-border p-4"

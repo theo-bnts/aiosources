@@ -105,7 +105,7 @@ test('manual action failures use notifications without replaying a rejected oper
       body: JSON.stringify({ error: 'Synthetic task is already running.' }),
     })
   })
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/identification/settings')
   await openDisclosure(page, 'Manual actions')
   await page.getByRole('button', { name: 'Identify torrents', exact: true }).click()
   const notice = page.locator('[data-request-notice]')

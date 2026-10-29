@@ -10,7 +10,7 @@ import {
   RunStatusBadge,
 } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { messageText, number, statusLabels, useDate } from '@/lib/format'
@@ -21,6 +21,12 @@ import type { Page } from '@/lib/types'
 import type { OperationRun, OperationEvent, OperationStatus } from '@/lib/operation-types'
 import { providerSteps, providerErrors } from '@/lib/provider-call'
 import { DownloadAction } from '@/components/catalog-download'
+import {
+  metadataHistoryPath,
+  metadataOperationSection,
+  metadataSections,
+  type MetadataSection,
+} from '@/lib/metadata-navigation'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -103,14 +109,30 @@ function OperationBadge({ run }: { run: OperationRun }) {
   )
 }
 
-export function OperationHistoryPage({ section }: { section: Section }) {
+export function OperationHistoryPage({
+  section,
+  metadataSection,
+}:
+  | { section: 'metadata'; metadataSection: MetadataSection }
+  | {
+      section: 'debrid'
+      metadataSection?: never
+    }) {
   const listState = useListViewState()
   const [search, setSearch] = useViewSearchParams()
   const pagination = useURLPagination()
   const { limit, offset } = pagination
-  const kind = search.get('kind') || ''
-  const service = search.get('service') || ''
+  const kind = metadataSection
+    ? metadataSection === 'identification'
+      ? 'matching'
+      : 'metadata'
+    : search.get('kind') || ''
+  const service = metadataSection
+    ? metadataSections[metadataSection].service
+    : search.get('service') || ''
   const status = search.get('status') || ''
+  const historyPath = metadataSection ? metadataHistoryPath(metadataSection) : `/${section}/history`
+  const filtered = Boolean(status || (!metadataSection && (kind || service)))
   const date = useDate()
   const query = useQuery({
     queryKey: ['operation-history', section, kind, service, status, offset, limit],
@@ -130,32 +152,9 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   return (
     <div className="page">
       <div className="toolbar items-end rounded-md border border-border p-4">
-        <div className="field">
-          <Label htmlFor="operation-type">{section === 'metadata' ? 'Operation' : 'Service'}</Label>
-          {section === 'metadata' ? (
-            <select
-              id="operation-type"
-              className="native-select min-w-48"
-              value={service || kind}
-              onChange={(e) => {
-                const next = new URLSearchParams(search)
-                next.delete('offset')
-                next.delete('service')
-                if (['tmdb', 'openlibrary'].includes(e.target.value)) {
-                  next.set('kind', 'metadata')
-                  next.set('service', e.target.value)
-                } else if (e.target.value) next.set('kind', e.target.value)
-                else next.delete('kind')
-                setSearch(next)
-              }}
-            >
-              <option value="">All operations</option>
-              <option value="metadata">Information updates</option>
-              <option value="tmdb">Film & series information</option>
-              <option value="openlibrary">Book information</option>
-              <option value="matching">Torrent identification</option>
-            </select>
-          ) : (
+        {!metadataSection && (
+          <div className="field">
+            <Label htmlFor="operation-type">Service</Label>
             <select
               id="operation-type"
               className="native-select min-w-48"
@@ -169,8 +168,8 @@ export function OperationHistoryPage({ section }: { section: Section }) {
                 </option>
               ))}
             </select>
-          )}
-        </div>
+          </div>
+        )}
         {section === 'debrid' && (
           <div className="field">
             <Label htmlFor="debrid-operation-kind">Operation</Label>
@@ -204,7 +203,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
           </select>
         </div>
         <ClearFiltersButton
-          active={Boolean(kind || service || status)}
+          active={filtered}
           onClear={() => setSearch(resetListView(search, ['kind', 'service', 'status']))}
         />
       </div>
@@ -237,7 +236,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
                         <TableCell>
                           <Link
                             className="data-link font-medium"
-                            to={`/${section}/history/${encodeURIComponent(run.id)}`}
+                            to={`${historyPath}/${encodeURIComponent(run.id)}`}
                             state={listState}
                           >
                             {kinds[run.kind]}
@@ -273,7 +272,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
                         <TableCell>
                           <Button variant="ghost" size="icon-sm" asChild>
                             <Link
-                              to={`/${section}/history/${encodeURIComponent(run.id)}`}
+                              to={`${historyPath}/${encodeURIComponent(run.id)}`}
                               state={listState}
                               aria-label={`Open run ${run.id}`}
                             >
@@ -290,7 +289,7 @@ export function OperationHistoryPage({ section }: { section: Section }) {
               <ListEmpty
                 title="No runs in this view"
                 description="New operations will appear here. History starts when this version is installed; earlier activity remains in Logs."
-                filtered={Boolean(kind || service || status)}
+                filtered={filtered}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}
               />
@@ -309,8 +308,16 @@ export function OperationHistoryPage({ section }: { section: Section }) {
   )
 }
 
-export function OperationDetailPage({ section }: { section: Section }) {
+export function OperationDetailPage({
+  section,
+  metadataSection,
+}: {
+  section: Section
+  metadataSection?: MetadataSection
+}) {
   const { id } = useParams()
+  const location = useLocation()
+  const historyPath = metadataSection ? metadataHistoryPath(metadataSection) : `/${section}/history`
   const pagination = useURLPagination()
   const { limit, offset } = pagination
   const date = useDate()
@@ -320,6 +327,11 @@ export function OperationDetailPage({ section }: { section: Section }) {
       api<OperationRun>(`/operations/${encodeURIComponent(id!)}`, { signal }),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
+  const targetHistory = run.data
+    ? run.data.kind === 'metadata' || run.data.kind === 'matching'
+      ? metadataHistoryPath(metadataOperationSection(run.data.kind, run.data.service))
+      : '/debrid/history'
+    : historyPath
   const events = useQuery({
     queryKey: ['operation-events', id, offset, limit],
     queryFn: ({ signal }) =>
@@ -328,13 +340,22 @@ export function OperationDetailPage({ section }: { section: Section }) {
         { signal },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
+    enabled: Boolean(run.data && targetHistory === historyPath),
   })
   const result = run.data
+  if (result && targetHistory !== historyPath)
+    return (
+      <Navigate
+        to={`${targetHistory}/${encodeURIComponent(result.id)}${location.search}${location.hash}`}
+        state={location.state}
+        replace
+      />
+    )
   return (
     <div className="page">
       <PageHeader
         title={result ? kinds[result.kind] : 'Operation'}
-        back={{ to: `/${section}/history`, label: 'History' }}
+        back={{ to: historyPath, label: 'History' }}
         description="Inspect the status, saved progress and events for this operation."
       />
       <ErrorNotice error={run.error} retry={() => void run.refetch()} />

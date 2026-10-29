@@ -8,9 +8,9 @@
 | --- | --- |
 | Search | Find identified films, series and books, choose an episode or file and compare releases. |
 | Torrents | Search records directly as imported from your sources or remote catalogs. |
-| Identification | Find unrecognized or uncertain records and choose the correct film, series or book. |
+| Metadata → Identification | Review uncertain records, choose the correct film, series or book, and manage automatic identification and its history. |
 | Sources | Add sources, schedule imports and inspect their history. |
-| Metadata | Update film, series and book information and control automatic identification. |
+| Metadata → Videos / Books | Each has its own statistics, update settings and history. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |

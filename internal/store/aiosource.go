@@ -119,14 +119,16 @@ SELECT COALESCE(sum(total) FILTER(WHERE status='matched'),0)::bigint AS matched,
 COALESCE(sum(total) FILTER(WHERE status='ambiguous'),0)::bigint AS ambiguous,
 COALESCE(sum(total) FILTER(WHERE status='unmatched'),0)::bigint AS unmatched,
 COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM grouped
+), video_counts AS MATERIALIZED (
+SELECT count(*) AS total FROM ingest.aio_works WHERE media_type IN ('movie','tv')
 ) SELECT
-(SELECT count(*) FROM ingest.aio_works WHERE media_type IN ('movie','tv'))+(SELECT works FROM ingest.ol_import_state WHERE singleton),
+video_counts.total+(SELECT works FROM ingest.ol_import_state WHERE singleton),video_counts.total,
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
-(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM ingest.aio_state CROSS JOIN counts`
+(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM ingest.aio_state CROSS JOIN counts CROSS JOIN video_counts`
 
 func (s *Store) AIOStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
-	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(&v.Works, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
+	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
 	return v, databaseError("read AIOSources status", err)
 }
 func (s *Store) SaveAIOWork(ctx context.Context, w model.AIOWork, normalized []string) error {

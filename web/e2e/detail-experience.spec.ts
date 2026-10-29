@@ -221,7 +221,7 @@ test('empty identification and operation event pages recover without discarding 
   await expect.poll(() => new URL(page.url()).searchParams.has('offset')).toBe(false)
   await expect(events.getByRole('cell', { name: '5', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'History', exact: true }).last().click()
-  await expect(page).toHaveURL(server.origin + '/metadata/history')
+  await expect(page).toHaveURL(server.origin + '/metadata/videos/history')
 })
 
 test('sharing forms use common draft feedback and do not write reverted edits', async ({

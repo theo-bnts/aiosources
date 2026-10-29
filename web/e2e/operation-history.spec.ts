@@ -22,16 +22,20 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   } finally {
     await db.end()
   }
-  await page.goto('/metadata')
-  await page.getByRole('tab', { name: 'History', exact: true }).click()
-  await expect(page).toHaveURL(/\/metadata\/history$/)
-  const breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb', exact: true })
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Metadata'])
-  await expect(page.getByRole('link', { name: 'Cache verification', exact: true })).toHaveCount(0)
+  await page.goto('/metadata/identification/history')
+  await expect(page.getByRole('link', { name: 'Torrent identification', exact: true })).toHaveCount(
+    50,
+  )
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await expect(page).toHaveURL(/offset=50/)
-  await page.getByLabel('Operation', { exact: true }).selectOption('metadata')
-  await expect(page).not.toHaveURL(/offset=/)
+  await expect(page.getByRole('link', { name: 'Torrent identification', exact: true })).toHaveCount(
+    5,
+  )
+  await page.goto('/metadata/videos/history')
+  const breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb', exact: true })
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Videos'])
+  await expect(page.getByRole('link', { name: 'Cache verification', exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Operation', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Information update', exact: true })).toHaveCount(1)
   await page.getByLabel('Status', { exact: true }).selectOption('succeeded')
   await expect(page.getByText('No runs in this view', { exact: true })).toBeVisible()
@@ -47,7 +51,7 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   )
   await page.reload()
   await expect(page.getByText('metadata-failed', { exact: true })).toBeVisible()
-  await page.getByRole('link', { name: 'Metadata history', exact: true }).click()
+  await page.getByRole('link', { name: 'Video history', exact: true }).click()
   await expect(page).toHaveURL(metadataView)
   await page.goto('/debrid')
   await page.getByRole('tab', { name: 'History', exact: true }).click()
@@ -101,7 +105,7 @@ test('a real manual identification appears in metadata history without mixing so
   } finally {
     await db.end()
   }
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/identification/settings')
   await openDisclosure(page, 'Manual actions')
   await page.getByRole('button', { name: 'Identify torrents', exact: true }).click()
   await expect

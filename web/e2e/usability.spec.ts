@@ -110,7 +110,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   expect(JSON.stringify(await (await page.request.get('/api/secrets')).json())).not.toContain(
     'synthetic-',
   )
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/videos/settings')
   // A synthetic credential must never initiate a real TMDB download.
   await page.getByLabel('Automatically update film & series information').uncheck()
   await openDisclosure(page, 'Manual actions')
@@ -119,7 +119,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
     page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeDisabled()
   expect((await configuration(page)).tmdb_secret).toBe('')
-  const metadata = page.getByRole('form', { name: 'Metadata configuration', exact: true })
+  const metadata = page.getByRole('form', { name: 'Videos configuration', exact: true })
   await metadata.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(metadata.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect((await configuration(page)).tmdb_secret).toMatch(/^tmdb_[a-f0-9]{32}$/)

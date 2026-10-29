@@ -7,11 +7,11 @@ AIOSources can identify ebooks, comics and audiobooks already present in your im
 ## Set up book information
 
 1. Import your authorized sources as usual. Keep useful fields such as the title, categories, author and ISBN when your source supplies them. Existing imported titles do not need to be downloaded again.
-2. Open **Metadata → Settings → Schedules** and enable **Automatically update book information**. No Open Library account or API key is required.
+2. Open **Metadata → Books → Settings → Schedules** and enable **Automatically update book information**. No Open Library account or API key is required.
 3. Allow the first complete catalog import to finish. It can take several hours or longer and needs substantial additional database storage. The complete export contains many gigabytes even before it is imported; this option is off by default.
-4. Enable automatic identification, or use **Advanced → Manual actions → Identify torrents** after the book information import finishes.
+4. Open **Metadata → Identification → Settings** to enable automatic identification, or use **Advanced → Manual actions → Identify torrents** there after the book information import finishes.
 
-After the first import, AIOSources follows Open Library's recent changes. The default update interval is **15 minutes**, and you can change it under **Schedules**. Saved progress and pending updates survive interruptions. Automatic updates must remain enabled for automatic recovery. **Advanced → Manual actions → Update book information** checks for changes immediately, while still respecting provider-requested waits.
+After the first import, AIOSources follows Open Library's recent changes. The default update interval is **15 minutes**, and you can change it under **Schedules**. Saved progress and pending updates survive interruptions. Automatic updates must remain enabled for automatic recovery. **Metadata → Books → Settings → Advanced → Manual actions → Update book information** checks for changes immediately, while still respecting provider-requested waits.
 
 If an interruption or a busy upstream period makes the change history impossible to cover reliably, AIOSources automatically requests a fresh export. It checks daily while waiting for an export recent enough to cover the missing period. Recent changes continue to be collected and processed; the existing catalog stays available. **Statistics** distinguishes the export date, pending updates and the date through which changes have actually been applied. A catalog awaiting recovery is not reported as up to date.
 
@@ -53,4 +53,4 @@ A collection is not automatically assigned to every book it may contain. A manua
 
 Create a **Torznab** access and choose its book media types as needed. Compatible clients can use book search and the standard book and audiobook categories. Stremio, Nuvio and AIOStreams installations remain for video playback.
 
-To remove only the book information, use **Metadata → Settings → Advanced → Maintenance → Reset book information**. Read the confirmation first. This keeps your source records, manual choices and film and series information; book information must be imported again before those book matches are available.
+To remove only the book information, use **Metadata → Books → Settings → Advanced → Maintenance → Reset book information**. Read the confirmation first. This keeps your source records, manual choices and film and series information; book information must be imported again before those book matches are available.

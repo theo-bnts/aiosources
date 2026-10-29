@@ -74,7 +74,9 @@ test('advanced groups keep actions inside their section and preserve maintenance
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     for (const route of [
-      '/metadata/settings',
+      '/metadata/videos/settings',
+      '/metadata/books/settings',
+      '/metadata/identification/settings',
       '/debrid/settings',
       '/health/settings',
       '/security/settings',
@@ -88,12 +90,15 @@ test('advanced groups keep actions inside their section and preserve maintenance
       await advanced.locator(':scope > summary').click()
       // Parent categories expose choices, not controls or a misleading Save.
       await expect(advanced.locator('input:visible, select:visible, button:visible')).toHaveCount(0)
-      if (route === '/metadata/settings' || route === '/debrid/settings') {
+      if (route.startsWith('/metadata/') || route === '/debrid/settings') {
         await openDisclosure(page, 'Manual actions')
         await expect(advanced.getByRole('button').first()).toBeVisible()
         await expectControlsWithinGroups(advanced)
       }
-      if (process.env.QA_DIRECTORY && ['/metadata/settings', '/debrid/settings'].includes(route)) {
+      if (
+        process.env.QA_DIRECTORY &&
+        ['/metadata/videos/settings', '/debrid/settings'].includes(route)
+      ) {
         await page.evaluate(() => window.scrollTo(0, 0))
         await page.screenshot({
           path: join(process.env.QA_DIRECTORY, `advanced-${route.split('/')[1]}-${width}.png`),
@@ -105,7 +110,13 @@ test('advanced groups keep actions inside their section and preserve maintenance
         true,
       )
     }
-    for (const route of ['/metadata/settings', '/debrid/settings', '/health/settings']) {
+    for (const route of [
+      '/metadata/videos/settings',
+      '/metadata/books/settings',
+      '/metadata/identification/settings',
+      '/debrid/settings',
+      '/health/settings',
+    ]) {
       await page.goto(`${route}#maintenance`)
       const maintenance = page.locator('details#maintenance')
       await expect(maintenance).toHaveAttribute('open', '')

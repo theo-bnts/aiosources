@@ -196,6 +196,7 @@ type AIOStatus struct {
 	AppliedThrough    *time.Time `json:"applied_through"`
 	MetadataDue       bool       `json:"-"`
 	Works             int64      `json:"works"`
+	VideoWorks        int64      `json:"video_works"`
 	Matched           int64      `json:"matched"`
 	Ambiguous         int64      `json:"ambiguous"`
 	Unmatched         int64      `json:"unmatched"`

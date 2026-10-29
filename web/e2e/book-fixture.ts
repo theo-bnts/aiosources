@@ -91,21 +91,21 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
   } finally {
     await db.end()
   }
-  await page.goto('/metadata')
-  await expect(page.getByText('Book synchronization', { exact: true }).locator('..')).toContainText(
+  await page.goto('/metadata/books')
+  await expect(page.getByText('Synchronization', { exact: true }).locator('..')).toContainText(
     'Waiting for a newer export',
   )
-  await expect(
-    page.getByText('Book information pending', { exact: true }).locator('..'),
-  ).toContainText('1')
-  await expect(page.getByText('Book changes applied through', { exact: true })).toBeVisible()
-  await expect(page.getByText('Book export date', { exact: true }).locator('..')).toContainText(
+  await expect(page.getByText('Information pending', { exact: true }).locator('..')).toContainText(
+    '1',
+  )
+  await expect(page.getByText('Changes applied through', { exact: true })).toBeVisible()
+  await expect(page.getByText('Export date', { exact: true }).locator('..')).toContainText(
     '2026-01-01',
   )
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )
-  await page.goto('/metadata/settings')
+  await page.goto('/metadata/books/settings')
   const interval = page.getByLabel('Book information update interval (minutes)', { exact: true })
   await expect(interval).toHaveValue('15')
   await interval.fill('5')
@@ -195,10 +195,10 @@ export async function exerciseBookSearch(page: Page, server: TestServer) {
     'https://image.tmdb.org/t/p/w342/syntheticPoster.jpg',
   )
   await page.goto('/metadata/history?service=openlibrary')
-  await expect(page.getByLabel('Operation', { exact: true })).toHaveValue('openlibrary')
+  await expect(page).toHaveURL(/\/metadata\/books\/history$/)
   await expect(page.locator('main tbody tr')).toHaveCount(1)
   await expect(page.locator('main tbody tr')).toContainText('Open Library')
-  await page.getByLabel('Operation', { exact: true }).selectOption('tmdb')
+  await page.goto('/metadata/videos/history')
   await expect(page.locator('main tbody tr')).toHaveCount(1)
   await expect(page.locator('main tbody tr')).toContainText('TMDB')
 }

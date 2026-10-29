@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { api, params, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
+import { api, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
 import type { Controls, Status } from '@/lib/aiosource-types'
-import { identificationResults, identificationStatuses } from '@/lib/identification'
 import { Empty, ErrorNotice, Loading, PageHeader, ResultCount } from '@/components/common'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
@@ -14,7 +13,7 @@ import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-t
 import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { DebridStatistics } from '@/components/debrid-statistics'
-import { number, percentage, useDate } from '@/lib/format'
+import { useDate } from '@/lib/format'
 import { bookSyncLabel, metadataSyncLabel } from '@/lib/information-sync'
 
 export function SourceStatisticsPage() {
@@ -144,40 +143,38 @@ export function SourceStatisticsPage() {
   )
 }
 
-export function AIOStatisticsPage({ section }: { section: 'metadata' | 'debrid' }) {
-  return section === 'metadata' ? <MetadataStatisticsPage /> : <DebridStatisticsPage />
+export function AIOStatisticsPage({ section }: { section: 'videos' | 'books' | 'debrid' }) {
+  return section === 'debrid' ? (
+    <DebridStatisticsPage />
+  ) : (
+    <MetadataStatisticsPage section={section} />
+  )
 }
 
-function MetadataStatisticsPage() {
+function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
   const date = useDate()
-  const location = useLocation()
-  const legacyMatches =
-    new URLSearchParams(location.search).has('match_status') ||
-    location.hash === '#matching-results'
   const query = useQuery({
     queryKey: ['aiosource'],
     queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const status = query.data
-  const showBookStatistics = Boolean(
-    status?.books &&
-    (status.config.openlibrary_enabled ||
-      status.books.complete ||
-      status.books.position > 0 ||
-      status.books.running ||
-      status.books.error),
-  )
-  const identifiedTotal = status
-    ? status.status.matched +
-      status.status.ambiguous +
-      status.status.unmatched +
-      status.status.matching_pending
-    : 0
-  if (legacyMatches)
-    return (
-      <Navigate to={`/metadata/identification${location.search}`} replace state={location.state} />
-    )
+  const books = status?.books
+  const book = section === 'books'
+  const path = `/metadata/${section}`
+  const running = book ? Boolean(books?.running) : Boolean(status?.syncing)
+  const automatic = book ? status?.config.openlibrary_enabled : status?.config.auto_sync
+  const lastSync = book ? books?.last_sync : status?.status.last_sync
+  const appliedThrough = book ? books?.changes_through : status?.status.applied_through
+  const snapshot = book ? books?.snapshot_at?.slice(0, 10) : status?.status.inventory_date
+  const next = book ? books?.next_update : status?.automation.next_update
+  const needsAttention = book
+    ? Boolean(books?.error || books?.needs_export)
+    : Boolean(
+        status?.status.sync_error ||
+        status?.recovery_required ||
+        status?.status.recovery_started_at,
+      )
   return (
     <div className="page">
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
@@ -186,194 +183,66 @@ function MetadataStatisticsPage() {
       ) : (
         status && (
           <>
-            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Statistic label="Information catalog entries" value={status.status.works} />
+            <dl className={`grid grid-cols-2 gap-3 ${book ? 'lg:grid-cols-4' : ''}`}>
               <Statistic
-                label="Imported torrents"
-                value={identifiedTotal}
-                to="/metadata/identification"
+                label="Catalog entries"
+                value={book ? (books?.works ?? 0) : status.status.video_works}
               />
-              {identificationStatuses.map((decision) => (
-                <Statistic
-                  key={decision}
-                  label={
-                    decision === 'matched'
-                      ? 'Identified torrents'
-                      : identificationResults[decision].label
-                  }
-                  value={`${number(status.status[decision === 'pending' ? 'matching_pending' : decision])} (${percentage(status.status[decision === 'pending' ? 'matching_pending' : decision], identifiedTotal)})`}
-                  to={`/metadata/identification?${params({ match_status: decision })}`}
-                />
-              ))}
-              <Statistic label="Film & series information pending" value={status.status.pending} />
-              {status.books && showBookStatistics && (
+              {book && (
                 <>
-                  <Statistic label="Book works" value={status.books.works} />
-                  <Statistic label="Book editions" value={status.books.editions} />
-                  <Statistic label="Book authors" value={status.books.authors} />
-                  <Statistic label="Book information pending" value={status.books.pending} />
+                  <Statistic label="Editions" value={books?.editions ?? 0} />
+                  <Statistic label="Authors" value={books?.authors ?? 0} />
                 </>
               )}
+              <Statistic
+                label="Information pending"
+                value={book ? (books?.pending ?? 0) : status.status.pending}
+                to={`${path}/history`}
+              />
             </dl>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {status.books && showBookStatistics && (
-                <>
-                  <Statistic
-                    label="Last successful book update"
-                    value={
-                      status.books.last_sync ? date(status.books.last_sync) : 'No completed update'
-                    }
-                    size="sm"
-                    to="/metadata/history?service=openlibrary"
-                  />
-                  <Statistic
-                    label="Book synchronization"
-                    value={bookSyncLabel(status.books, status.config.openlibrary_enabled)}
-                    size="sm"
-                    to="/metadata/settings"
-                  />
-                  <Statistic
-                    label="Book changes applied through"
-                    value={
-                      status.books.changes_through
-                        ? date(status.books.changes_through)
-                        : 'Not established'
-                    }
-                    size="sm"
-                    to="/metadata/history?service=openlibrary"
-                  />
-                  <Statistic
-                    label="Book export date"
-                    value={
-                      status.books.snapshot_at
-                        ? status.books.snapshot_at.slice(0, 10)
-                        : 'Not established'
-                    }
-                    size="sm"
-                  />
-                  <Statistic
-                    label="Next automatic book update"
-                    value={
-                      status.books.running
-                        ? 'Running'
-                        : !status.config.openlibrary_enabled
-                          ? 'Disabled'
-                          : status.books.next_update
-                            ? date(status.books.next_update)
-                            : 'Waiting'
-                    }
-                    size="sm"
-                    to="/metadata/settings"
-                  />
-                </>
-              )}
               <Statistic
-                label="Last successful film & series update"
+                label="Synchronization"
                 value={
-                  status.status.last_sync ? date(status.status.last_sync) : 'No completed update'
+                  book
+                    ? books
+                      ? bookSyncLabel(books, automatic)
+                      : 'Not started'
+                    : metadataSyncLabel(status.status, running, automatic, status.recovery_required)
                 }
                 size="sm"
-                to="/metadata/history?service=tmdb"
+                to={`${path}/settings`}
               />
               <Statistic
-                label="Film & series synchronization"
-                value={metadataSyncLabel(
-                  status.status,
-                  status.syncing,
-                  status.config.auto_sync,
-                  status.recovery_required,
-                )}
+                label="Last successful update"
+                value={lastSync ? date(lastSync) : 'No completed update'}
                 size="sm"
-                to="/metadata/settings"
+                to={`${path}/history`}
               />
               <Statistic
-                label="Film & series changes applied through"
+                label="Changes applied through"
+                value={appliedThrough ? date(appliedThrough) : 'Not established'}
+                size="sm"
+                to={`${path}/history`}
+              />
+              <Statistic label="Export date" value={snapshot || 'Not established'} size="sm" />
+              <Statistic
+                label="Next automatic update"
                 value={
-                  status.status.applied_through
-                    ? date(status.status.applied_through)
-                    : 'Not established'
+                  running ? 'Running' : !automatic ? 'Disabled' : next ? date(next) : 'Waiting'
                 }
                 size="sm"
-                to="/metadata/history?service=tmdb"
-              />
-              <Statistic
-                label="Film & series export date"
-                value={status.status.inventory_date || 'Not established'}
-                size="sm"
-              />
-              <Statistic
-                label="Next automatic film & series update"
-                value={
-                  status.automation.next_update
-                    ? date(status.automation.next_update)
-                    : status.automation.updates === 'running'
-                      ? 'Running'
-                      : status.automation.updates === 'disabled'
-                        ? 'Disabled'
-                        : 'Waiting'
-                }
-                size="sm"
-                to="/metadata/settings"
-              />
-              <Statistic
-                label="Next automatic identification"
-                value={
-                  status.automation.next_identification
-                    ? date(status.automation.next_identification)
-                    : status.automation.identification === 'running'
-                      ? 'Running'
-                      : status.automation.identification === 'disabled'
-                        ? 'Disabled'
-                        : status.automation.identification === 'up_to_date'
-                          ? 'Up to date'
-                          : 'Waiting for information'
-                }
-                size="sm"
-                to="/metadata/settings"
+                to={`${path}/settings`}
               />
             </dl>
             <div className="flex flex-wrap gap-2" aria-label="Current activity">
-              <Link
-                to="/metadata/history?service=tmdb"
-                aria-label="View film & series update history"
-              >
-                <Badge
-                  variant={
-                    status.syncing ? 'info' : status.status.sync_error ? 'warning' : 'secondary'
-                  }
-                >
-                  {status.syncing
-                    ? 'Film & series update running'
-                    : status.status.sync_error
-                      ? 'Film & series update needs attention'
-                      : 'Film & series update idle'}
-                </Badge>
-              </Link>
-              {status.books && showBookStatistics && (
-                <Link
-                  to="/metadata/history?service=openlibrary"
-                  aria-label="View book update history"
-                >
-                  <Badge
-                    variant={
-                      status.books.running
-                        ? 'info'
-                        : status.books.error || status.books.needs_export
-                          ? 'warning'
-                          : 'secondary'
-                    }
-                  >
-                    {status.books.running
-                      ? 'Book update running'
-                      : status.books.error || status.books.needs_export
-                        ? 'Book update needs attention'
-                        : 'Book update idle'}
-                  </Badge>
-                </Link>
-              )}
-              <Link to="/metadata/history?kind=matching" aria-label="View identification history">
-                <Badge variant={status.matching ? 'info' : 'secondary'}>
-                  {status.matching ? 'Identification running' : 'Identification idle'}
+              <Link to={`${path}/history`} aria-label="View update history">
+                <Badge variant={running ? 'info' : needsAttention ? 'warning' : 'secondary'}>
+                  {running
+                    ? 'Update running'
+                    : needsAttention
+                      ? 'Update needs attention'
+                      : 'Update idle'}
                 </Badge>
               </Link>
             </div>
