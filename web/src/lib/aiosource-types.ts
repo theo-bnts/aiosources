@@ -81,6 +81,20 @@ export type Controls = Omit<Status, 'status'> & {
   }
 }
 
+export type InformationStatus = Omit<Status, 'status' | 'automation'> & {
+  status: Pick<
+    Status['status'],
+    | 'video_works'
+    | 'pending'
+    | 'last_sync'
+    | 'sync_error'
+    | 'inventory_date'
+    | 'applied_through'
+    | 'recovery_started_at'
+  >
+  automation: Pick<Status['automation'], 'updates' | 'next_update'>
+}
+
 export type MatchDiagnostic = {
   occurrence_id: string
   provider_id: string

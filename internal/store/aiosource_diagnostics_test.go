@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -91,5 +92,40 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 	}
 	if counts.Totals.Imported != 9 {
 		t.Fatalf("filtering source cards changed the global denominator: %+v", counts.Totals)
+	}
+}
+
+func TestAmbiguousReviewFilterKeepsCurrentProofsAndPagination(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years,revision) VALUES('movie','101',ARRAY[2024],2);
+INSERT INTO ingest.torrents(provider_id,source_id,fields)
+SELECT 'example',id,jsonb_build_object('title','Example review '||id) FROM unnest(ARRAY['current-a','current-b','changed','queued']) id;
+INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT provider_id,source_id,CASE WHEN source_id='changed' THEN 'old' ELSE fields_fingerprint END,
+(SELECT id FROM ingest.aio_works),1,'ambiguous','multiple plausible works' FROM ingest.torrents;
+DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
+		t.Fatal(err)
+	}
+	all, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var expected []model.AIOMatchDiagnostic
+	for _, item := range all.Items {
+		if item.Status == "ambiguous" {
+			expected = append(expected, item)
+		}
+	}
+	if len(expected) != 2 {
+		t.Fatal("fixture did not keep exactly the two current ambiguous decisions", all)
+	}
+	for offset := 0; offset <= 2; offset++ {
+		page, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Status: "ambiguous", ProviderID: "example", Query: "Example review", Limit: 1, Offset: offset})
+		if err != nil || page.Total != 2 {
+			t.Fatal("review filter changed its current count", page, err)
+		}
+		if offset < 2 && (len(page.Items) != 1 || !reflect.DeepEqual(page.Items[0], expected[offset])) || offset == 2 && len(page.Items) != 0 {
+			t.Fatal("review pagination diverged from unfiltered decisions", page)
+		}
 	}
 }

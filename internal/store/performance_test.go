@@ -49,6 +49,12 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 	ctx, db := sharingDatabase(b)
 	_, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
  SELECT 'movie',n::text,'tt'||(10000000+n)::text,ARRAY[2026] FROM generate_series(1,1000) n;
+ INSERT INTO ingest.aio_titles(work_id,title,normalized)
+ SELECT id,'Synthetic Documentary '||tmdb_id,'synthetic documentary '||tmdb_id FROM ingest.aio_works;
+ INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years)
+ SELECT 'book','OL'||n||'W','Synthetic Book '||n,ARRAY[2026] FROM generate_series(1,20000) n;
+ INSERT INTO ingest.ol_editions(id,work_keys,title,normalized)
+ SELECT 'OL'||n||'M',ARRAY['OL'||n||'W'],'Synthetic Book Edition '||n,'synthetic book edition '||n FROM generate_series(1,20000) n;
  INSERT INTO ingest.torrents(provider_id,source_id,fields)
  SELECT 'synthetic-'||(n%3)::text,n::text,jsonb_build_object('title','Synthetic.Documentary.'||n||'.2026.1080p','info_hash',md5(n::text)||'12345678','size',123456789) FROM generate_series(1,120000) n;
  INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
@@ -62,7 +68,7 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	for _, name := range []string{"source-statistics", "metadata-statistics", "metadata-controls", "identification", "identification-filtered", "search", "stremio", "shared-cache", "storage"} {
+	for _, name := range []string{"source-statistics", "metadata-statistics", "information-statistics", "metadata-controls", "identification", "identification-filtered", "search", "title-search", "review-search", "stremio", "shared-cache", "storage"} {
 		b.Run(name, func(b *testing.B) {
 			for b.Loop() {
 				switch name {
@@ -70,6 +76,8 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 					_, err = db.SourceTorrentStats(ctx, []string{"synthetic-0", "synthetic-1", "synthetic-2"})
 				case "metadata-statistics":
 					_, err = db.AIOStatus(ctx)
+				case "information-statistics":
+					_, err = db.AIOInformationStatus(ctx)
 				case "metadata-controls":
 					_, err = db.AIOControlStatus(ctx)
 				case "identification", "identification-filtered":
@@ -80,6 +88,10 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 					_, err = db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Status: status, Limit: 50})
 				case "search":
 					_, err = db.ListTorrents(ctx, model.ListOptions{Query: "Documentary.1234", Limit: 50})
+				case "title-search":
+					_, err = db.CatalogTitles(ctx, model.ListOptions{Query: "Synthetic Documentary", Limit: 50}, "synthetic documentary", model.CatalogSearchFilters{})
+				case "review-search":
+					_, err = db.AIOReviewCandidates(ctx, "Synthetic Documentary", "synthetic documentary", "")
 				case "stremio":
 					_, err = db.AIOStreams(ctx, "imdb", "tt10000001", "movie")
 				case "shared-cache":

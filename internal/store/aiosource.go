@@ -110,6 +110,10 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 	return databaseError("commit AIOSources configuration", tx.Commit(ctx))
 }
 
+const aioUpdateStatusColumns = `(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at`
+
+const aioVideoCount = `SELECT count(*) AS total FROM ingest.aio_works WHERE media_type IN ('movie','tv')`
+
 // One aggregate consumes current decisions once. Referencing a large CTE from
 // four separate counts forces PostgreSQL to spool and reread the whole catalog.
 const aioStatusQuery = `WITH decisions AS (SELECT ` + aioDiagnosticStatus + ` AS status` + aioDiagnosticSource + `), grouped AS (
@@ -120,16 +124,33 @@ COALESCE(sum(total) FILTER(WHERE status='ambiguous'),0)::bigint AS ambiguous,
 COALESCE(sum(total) FILTER(WHERE status='unmatched'),0)::bigint AS unmatched,
 COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM grouped
 ), video_counts AS MATERIALIZED (
-SELECT count(*) AS total FROM ingest.aio_works WHERE media_type IN ('movie','tv')
+` + aioVideoCount + `
 ) SELECT
 video_counts.total+(SELECT works FROM ingest.ol_import_state WHERE singleton),video_counts.total,
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
-(SELECT count(*) FROM ingest.aio_metadata_jobs),EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),(SELECT count(*) FROM ingest.aio_cleanup WHERE NOT failed),(SELECT count(*) FROM ingest.aio_cleanup WHERE failed),last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM ingest.aio_state CROSS JOIN counts CROSS JOIN video_counts`
+` + aioUpdateStatusColumns + ` FROM ingest.aio_state CROSS JOIN counts CROSS JOIN video_counts`
+
+func aioUpdateStatusTargets(v *model.AIOStatus) []any {
+	return []any{&v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt}
+}
 
 func (s *Store) AIOStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
-	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
+	targets := append([]any{&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending}, aioUpdateStatusTargets(&v)...)
+	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(targets...)
 	return v, databaseError("read AIOSources status", err)
+}
+
+// Information pages need exact metadata counts and checkpoints, without deriving
+// identification decisions for every imported torrent. Keep those scans scoped
+// to Identification, which actually displays their results.
+func (s *Store) AIOInformationStatus(ctx context.Context) (model.AIOStatus, error) {
+	var v model.AIOStatus
+	targets := append([]any{&v.Works, &v.VideoWorks}, aioUpdateStatusTargets(&v)...)
+	err := s.pool.QueryRow(ctx, `WITH video_counts AS (`+aioVideoCount+`)
+SELECT video_counts.total+(SELECT works FROM ingest.ol_import_state WHERE singleton),video_counts.total,`+aioUpdateStatusColumns+`
+FROM ingest.aio_state CROSS JOIN video_counts`).Scan(targets...)
+	return v, databaseError("read information statistics", err)
 }
 func (s *Store) SaveAIOWork(ctx context.Context, w model.AIOWork, normalized []string) error {
 	return s.SaveAIOMetadataBatch(ctx, []AIOMetadataPublication{{Work: w, Normalized: normalized}})

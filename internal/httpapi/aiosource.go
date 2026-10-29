@@ -25,6 +25,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/catalog/{id}/download", s.auth.protect(s.catalogDownload))
 	mux.HandleFunc("GET /api/aiosource", s.auth.protect(s.aioStatus))
 	mux.HandleFunc("GET /api/aiosource/controls", s.auth.protect(s.aioStatus))
+	mux.HandleFunc("GET /api/aiosource/information", s.auth.protect(s.aioStatus))
 	mux.HandleFunc("GET /api/debrid/statistics", s.auth.protect(s.cacheStatistics))
 	mux.HandleFunc("GET /api/operations", s.auth.protect(s.operationHistory))
 	mux.HandleFunc("GET /api/operations/{id}", s.auth.protect(s.operationDetail))
@@ -137,9 +138,12 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	controls := r.URL.Path == "/api/aiosource/controls"
+	information := r.URL.Path == "/api/aiosource/information"
 	var state model.AIOStatus
 	if controls {
 		state, err = s.options.Store.AIOControlStatus(r.Context())
+	} else if information {
+		state, err = s.options.Store.AIOInformationStatus(r.Context())
 	} else {
 		state, err = s.options.Store.AIOStatus(r.Context())
 	}
@@ -155,8 +159,14 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	recovery := aiosource.MetadataRecoveryRequired(state, time.Now())
 	automation := aiosource.AutomationPlan(c, state, syncing, matching, time.Now())
 	var projection any = state
+	var automationProjection any = automation
 	if controls {
 		projection = map[string]any{"has_information": state.Works > 0, "cleanup_pending": state.CleanupPending, "cleanup_failed": state.CleanupFailed, "last_sync": state.LastSync, "last_match": state.LastMatch, "sync_error": state.SyncError}
+	} else if information {
+		projection = map[string]any{"video_works": state.VideoWorks, "pending": state.Pending, "last_sync": state.LastSync, "sync_error": state.SyncError, "inventory_date": state.InventoryDate, "applied_through": state.AppliedThrough, "recovery_started_at": state.RecoveryStartedAt}
+		// No substitute identification counters or automation flags: these have
+		// deliberately not been calculated by the information-only read.
+		automationProjection = map[string]any{"updates": automation.Updates, "next_update": automation.NextUpdate}
 	}
 	books, err := s.options.Store.OpenLibraryStatus(r.Context())
 	if err != nil {
@@ -172,7 +182,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		books.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automation, "syncing": syncing, "matching": matching, "error": message, "matching_error": matchingError, "recovery_required": recovery})
+	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()

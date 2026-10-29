@@ -47,6 +47,11 @@ test('video and book workspaces keep separate counts and histories under one Met
   server,
 }) => {
   await seedInformation(page, server)
+  const fullStatisticsReads: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/aiosource')
+      fullStatisticsReads.push(request.url())
+  })
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 })
     for (const [section, label, entries, operation] of [
@@ -94,6 +99,9 @@ test('video and book workspaces keep separate counts and histories under one Met
     }
   }
   await page.goto('/metadata/identification/history')
+  expect(fullStatisticsReads, 'Information and history pages must not scan identification').toEqual(
+    [],
+  )
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
     'Results',
     'Settings',

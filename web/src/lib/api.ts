@@ -205,7 +205,8 @@ async function invalidateData(cancelRefetch: boolean) {
             const heavy =
               key === 'source-torrent-stats' ||
               key === 'debrid-statistics' ||
-              (key === 'aiosource' && query.queryKey.length === 1)
+              (key === 'aiosource' &&
+                (query.queryKey.length === 1 || query.queryKey[1] === 'information'))
             // Progress events must not turn a slower statistics read into a five-second scan.
             // Explicit writes still refresh immediately; settings and controls stay live.
             return (

@@ -5,7 +5,7 @@ import { useListViewState } from '@/lib/detail-navigation'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
-import type { Controls, Status } from '@/lib/aiosource-types'
+import type { Controls, InformationStatus } from '@/lib/aiosource-types'
 import { Empty, ErrorNotice, Loading, PageHeader, ResultCount } from '@/components/common'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
@@ -154,8 +154,8 @@ export function AIOStatisticsPage({ section }: { section: 'videos' | 'books' | '
 function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
   const date = useDate()
   const query = useQuery({
-    queryKey: ['aiosource'],
-    queryFn: ({ signal }) => api<Status>('/aiosource', { signal }),
+    queryKey: ['aiosource', 'information'],
+    queryFn: ({ signal }) => api<InformationStatus>('/aiosource/information', { signal }),
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const status = query.data

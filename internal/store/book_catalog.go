@@ -18,6 +18,20 @@ func bookEditionTitle(locale string) string {
 	return `(SELECT e.title FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.languages && ` + bookLanguageSQL(locale) + ` ORDER BY e.id LIMIT 1)`
 }
 
+// Start with the edition's small set of work identifiers, then follow the same
+// eight-key, cycle-safe redirect paths as ol_aliases in the opposite direction.
+// Keeping intermediate keys preserves editions while a redirect is being
+// applied. Indexed work lookups avoid evaluating reverse aliases for every
+// metadata entry, including videos, for each candidate edition.
+const bookEditionWorks = `JOIN LATERAL (
+ WITH RECURSIVE targets(id,seen) AS (
+ SELECT key,ARRAY[key] FROM unnest(e.work_keys) key
+ UNION ALL SELECT r.target,t.seen||r.target FROM targets t JOIN ingest.ol_redirects r ON r.source=t.id
+ WHERE cardinality(t.seen)<8 AND NOT r.target=ANY(t.seen)
+ ) SELECT DISTINCT id FROM targets
+) edition_work ON TRUE
+JOIN ingest.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=edition_work.id`
+
 func expandBookCategories(cats []int) []int {
 	out := append([]int{}, cats...)
 	for _, c := range cats {
@@ -58,9 +72,9 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 	}
 	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized) FROM ingest.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
  UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=ingest.ol_resolve(` + query + `)
- UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM ingest.ol_editions e JOIN ingest.aio_works w ON e.work_keys && ingest.ol_aliases(w.openlibrary_id) WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=ingest.ol_resolve(` + query + `)
+ UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=ingest.ol_resolve(` + query + `)
  UNION ALL SELECT w.id,CASE WHEN e.normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,e.normalized)
- FROM ingest.ol_editions e JOIN ingest.aio_works w ON e.work_keys && ingest.ol_aliases(w.openlibrary_id) WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
+ FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
  UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM ingest.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(ingest.ol_aliases(id)) FROM ingest.ol_authors WHERE ` + matching + `)` + combined
 	if len(anchors) > 1 && anchors[1] != "" {
 		sql = strings.ReplaceAll(sql, "ingest.aio_works", anchors[1])
@@ -78,7 +92,7 @@ func bookCombinedCandidates(normalized, matching, anchor string) string {
  aliases AS (
  SELECT id,book_normalized AS title FROM ingest.aio_works WHERE media_type='book' AND book_normalized LIKE ` + anchor + `
  UNION SELECT id,book_normalized FROM author_works
- UNION SELECT w.id,e.normalized FROM ingest.ol_editions e JOIN ingest.aio_works w ON e.work_keys && ingest.ol_aliases(w.openlibrary_id) WHERE e.normalized LIKE ` + anchor + `
+ UNION SELECT w.id,e.normalized FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + `
  UNION SELECT w.id,e.normalized FROM author_works w JOIN ingest.ol_editions e ON e.work_keys && ingest.ol_aliases(w.openlibrary_id)
  ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'') AS normalized
  FROM aliases JOIN ingest.aio_works w ON w.id=aliases.id

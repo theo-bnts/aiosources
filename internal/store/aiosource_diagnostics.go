@@ -49,6 +49,19 @@ CASE WHEN status='matched' THEN COALESCE(imdb_id,'') ELSE '' END,
 CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics` + filter + `
 ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(countArgs)+1, len(countArgs)+2)
 	listArgs := append(append([]any{}, countArgs...), opts.Limit, opts.Offset)
+	if opts.Status == "ambiguous" {
+		// Count current ambiguous decisions without deriving every other status.
+		// Their validity depends on the source fingerprint and queue, not on a
+		// work revision. Keep the ordered listing's original plan: restricting
+		// its joins here can make PostgreSQL sort all ambiguous rows before LIMIT.
+		current := ` FROM selected t
+JOIN ingest.aio_matches m USING(provider_id,source_id)
+LEFT JOIN ingest.aio_match_queue q USING(provider_id,source_id)
+WHERE m.status='ambiguous' AND m.fingerprint=t.fields_fingerprint AND q.provider_id IS NULL`
+		prefix := `WITH selected AS (` + selected + `)`
+		countSQL = prefix + ` SELECT count(*)` + current
+		countArgs = args
+	}
 	if opts.Status == "" {
 		// Without a decision filter, count only the catalog and join decisions
 		// after selecting the visible page. Otherwise even an ordinary list

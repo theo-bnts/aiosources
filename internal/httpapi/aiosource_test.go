@@ -441,8 +441,10 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 
 func TestIdentificationIntervalValidationAndLightweightControls(t *testing.T) {
 	f, _, conn := addonAPI(t)
-	if response := f.request("GET", "/api/aiosource/controls", "", false, ""); response.Code != 401 {
-		t.Fatal("controls lack authentication", response.Code)
+	for _, path := range []string{"/api/aiosource/controls", "/api/aiosource/information"} {
+		if response := f.request("GET", path, "", false, ""); response.Code != 401 {
+			t.Fatal("status projection lacks authentication", path, response.Code)
+		}
 	}
 	c, _ := f.db.AIOConfig(f.ctx)
 	for _, seconds := range []int{0, 4, 86401} {
@@ -481,5 +483,38 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one',
 	var flags map[string]any
 	if json.Unmarshal(b["status"], &flags) != nil || flags["has_information"] != true || flags["works"] != nil || flags["matching_pending"] != nil {
 		t.Fatal("controls exposed substitute catalog counts", string(b["status"]))
+	}
+	information := f.request("GET", "/api/aiosource/information", "", true, "")
+	var info map[string]json.RawMessage
+	if information.Code != 200 || json.Unmarshal(information.Body.Bytes(), &info) != nil {
+		t.Fatal("information statistics unavailable", information.Code)
+	}
+	for _, key := range []string{"config", "books", "syncing", "matching", "error", "recovery_required"} {
+		if string(a[key]) != string(info[key]) {
+			t.Fatal("information statistics diverge from full status", key)
+		}
+	}
+	var fullCounts, infoCounts map[string]json.RawMessage
+	if json.Unmarshal(a["status"], &fullCounts) != nil || json.Unmarshal(info["status"], &infoCounts) != nil {
+		t.Fatal("invalid information counters")
+	}
+	for key, value := range infoCounts {
+		if string(value) != string(fullCounts[key]) {
+			t.Fatal("information count or checkpoint changed", key)
+		}
+	}
+	for _, key := range []string{"matched", "ambiguous", "unmatched", "matching_pending"} {
+		if _, exists := infoCounts[key]; exists {
+			t.Fatal("uncalculated identification counter exposed", key)
+		}
+	}
+	var fullAutomation, infoAutomation map[string]json.RawMessage
+	if json.Unmarshal(a["automation"], &fullAutomation) != nil || json.Unmarshal(info["automation"], &infoAutomation) != nil || len(infoAutomation) != 2 {
+		t.Fatal("invalid information automation")
+	}
+	for _, key := range []string{"updates", "next_update"} {
+		if string(infoAutomation[key]) != string(fullAutomation[key]) {
+			t.Fatal("information automation changed", key)
+		}
 	}
 }

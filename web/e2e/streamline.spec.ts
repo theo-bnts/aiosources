@@ -13,7 +13,7 @@ test('connection errors stay opaque on desktop and mobile and recover automatica
     if (unavailable) await route.abort('failed')
     else await route.continue()
   })
-  await page.route('**/api/aiosource', async (route) => {
+  await page.route('**/api/aiosource/information', async (route) => {
     if (unavailable) await route.abort('failed')
     else await route.continue()
   })
