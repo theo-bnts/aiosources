@@ -22,15 +22,7 @@ jobs:
         run: python3 -m unittest discover -s tools -p 'test_release_channels.py'
       - name: Prepare image names
         id: images
-        env:
-          CODEBERG_ORGANIZATION: ${{ vars.CODEBERG_ORGANIZATION }}
-          CODEBERG_IMAGE: ${{ vars.CODEBERG_IMAGE }}
-        run: |
-          codeberg=''
-          if [[ -n "$CODEBERG_ORGANIZATION" || -n "$CODEBERG_IMAGE" ]]; then
-            codeberg="codeberg.org/$CODEBERG_ORGANIZATION/$CODEBERG_IMAGE"
-          fi
-          python3 tools/release_channels.py images --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --codeberg "$codeberg" --output "$GITHUB_OUTPUT"
+        run: python3 tools/release_channels.py images --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --output "$GITHUB_OUTPUT"
       - name: Login to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v4
@@ -38,13 +30,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Login to Codeberg
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.images.outputs.codeberg != ''
-        uses: docker/login-action@v4
-        with:
-          registry: codeberg.org
-          username: ${{ secrets.CODEBERG_USERNAME }}
-          password: ${{ secrets.CODEBERG_TOKEN }}
       - name: Build and publish preview
         id: build
         uses: docker/build-push-action@v7
@@ -66,9 +51,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
-          CODEBERG_IMAGE: ${{ steps.images.outputs.codeberg }}
         run: |
-          python3 tools/release_channels.py preview --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --digest "$IMAGE_DIGEST" --codeberg "$CODEBERG_IMAGE" --body "$RUNNER_TEMP/release-notes.md" --output "$GITHUB_OUTPUT"
+          python3 tools/release_channels.py preview --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --digest "$IMAGE_DIGEST" --body "$RUNNER_TEMP/release-notes.md" --output "$GITHUB_OUTPUT"
           tag="build-${GITHUB_SHA:0:12}"
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "AIOSources ${GITHUB_SHA:0:12}" --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease
