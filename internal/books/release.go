@@ -104,6 +104,20 @@ var volumePackRE = regexp.MustCompile(`(?i)\bT\d{1,3}(?:[ ._-]+T?\d{1,3})+\b`)
 var formatTailRE = regexp.MustCompile(`(?i)^[\s._()\[\]+/-]*(?:(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|fr|en|eng|fre|fra|french|english|multi|retail|ocr|scan|v\d+|[12]\d{3})[\s._()\[\]+/-]*)*(?:-[A-Za-z0-9_-]{2,40})?$`)
 var bookTailFormatRE = regexp.MustCompile(`(?i)\b(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|zip|rar|7z|txt|rtf|docx?)\b`)
 
+// ParseRecord shares bibliographic classification between identification and
+// maintenance without introducing a second set of source/category heuristics.
+func ParseRecord(record model.AIORecord) Release {
+	h := record.BookHints
+	if h.Title != "" && h.Kind == "" {
+		h.Kind = "book"
+	}
+	p := Parse(record.Title, Hints{OpenLibrary: h.OpenLibrary, ISBNs: h.ISBNs, Kind: h.Kind, Author: h.Author, ISBN: h.ISBN, Format: h.Format, Categories: h.Categories, CategoryNames: h.CategoryNames})
+	if p.Kind != "" && h.Title != "" {
+		p.Title, p.Alternatives, p.Variants, p.StrippedYear = h.Title, nil, nil, false
+	}
+	return p
+}
+
 func Parse(raw string, hints Hints) Release {
 	// Video releases dominate existing catalogs. The same exclusion used at
 	// the end of parsing can reject them before bibliographic allocations.

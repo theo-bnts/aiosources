@@ -6,7 +6,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
-import { api, ApiError, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
+import { api, ApiError, queryClient, refreshData, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import type { Items, SecretInfo, ProviderSummary } from '@/lib/types'
 import { Loading, ErrorNotice, ConfirmAction } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -144,7 +144,7 @@ export default function AIOSourcePage({
   const action = useMutation({
     mutationFn: (name: string) => api(`/aiosource/${name}`, { method: 'POST' }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['aiosource'] })
+      await refreshData()
     },
   })
   const update = (form: FormScope, patch: Changes) => {
@@ -384,7 +384,7 @@ export default function AIOSourcePage({
             {section === 'videos' && (
               <ConfirmAction
                 title="Reset video information?"
-                description="Film and series information, pending video updates and automatic video matches will be removed. Torrent records, manual choices and book information are retained. Automatic video updates can import the catalog again."
+                description="Film and series information, related automatic and manual identifications, availability observations and video operation history will be removed. Torrent records, book information, settings and files in your debrid accounts are retained. Automatic video updates can import the catalog again."
                 label="Reset video information"
                 variant="destructive"
                 action={() => action.mutateAsync('reset-videos')}
@@ -398,7 +398,7 @@ export default function AIOSourcePage({
             {section === 'books' && (
               <ConfirmAction
                 title="Reset book information?"
-                description="Open Library information and automatic book matches will be removed. Torrent records, manual choices and film & series information are retained. Automatic book updates can import the catalog again."
+                description="Open Library information, related automatic and manual identifications, availability observations and book operation history will be removed. Torrent records, film & series information, settings and files in your debrid accounts are retained. Automatic book updates can import the catalog again."
                 label="Reset book information"
                 variant="destructive"
                 action={() => action.mutateAsync('reset-books')}

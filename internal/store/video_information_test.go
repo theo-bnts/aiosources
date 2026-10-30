@@ -48,7 +48,7 @@ UPDATE ingest.aio_state SET provider_retry_at=now()+interval '1 hour',last_sync=
 	err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_match_reviews WHERE active),
  (SELECT count(*) FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE w.media_type='book' AND m.status='matched'),
  (SELECT count(*) FROM ingest.aio_match_queue),(SELECT count(*) FROM ingest.torrents),(SELECT count(*) FROM ingest.ol_change_jobs)`).Scan(&reviews, &bookMatches, &queued, &sources, &bookJobs)
-	if err != nil || reviews != 3 || bookMatches != 1 || queued != 2 || sources != 3 || bookJobs != 1 {
+	if err != nil || reviews != 1 || bookMatches != 1 || queued != 2 || sources != 3 || bookJobs != 1 {
 		t.Fatal("video reset changed books, manual choices or source data", reviews, bookMatches, queued, sources, bookJobs, err)
 	}
 }

@@ -10,18 +10,7 @@ import (
 )
 
 func ParseBookRelease(r model.AIORecord) books.Release {
-	h := r.BookHints
-	if h.Title != "" && h.Kind == "" {
-		h.Kind = "book"
-	}
-	p := books.Parse(r.Title, books.Hints{OpenLibrary: h.OpenLibrary, ISBNs: h.ISBNs, Kind: h.Kind, Author: h.Author, ISBN: h.ISBN, Format: h.Format, Categories: h.Categories, CategoryNames: h.CategoryNames})
-	if p.Kind != "" && h.Title != "" {
-		p.Title = h.Title
-		p.Alternatives = nil
-		p.Variants = nil
-		p.StrippedYear = false
-	}
-	return p
+	return books.ParseRecord(r)
 }
 
 func authorSignature(s string) string {

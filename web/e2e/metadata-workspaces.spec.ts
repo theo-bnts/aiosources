@@ -177,33 +177,38 @@ test('workspace saves preserve other provider settings and protect drafts betwee
   expect((await (await page.request.get('/api/aiosource/controls')).json()).config).toEqual(saved)
 })
 
-test('video maintenance resets only the video catalog through the ordinary confirmation', async ({
-  page,
-  server,
-}) => {
-  await seedInformation(page, server)
-  await page.goto('/metadata/videos/settings#maintenance')
-  await expect(
-    page.getByRole('button', { name: 'Reset book information', exact: true }),
-  ).toHaveCount(0)
-  await page.getByRole('button', { name: 'Reset video information', exact: true }).click()
-  const confirmation = page.getByRole('alertdialog', {
-    name: 'Reset video information?',
-    exact: true,
+for (const section of ['videos', 'books'] as const) {
+  test(`${section} maintenance clears its catalog and history through the ordinary confirmation`, async ({
+    page,
+    server,
+  }) => {
+    await seedInformation(page, server)
+    const books = section === 'books'
+    if (books) await page.setViewportSize({ width: 390, height: 844 })
+    const label = books ? 'Reset book information' : 'Reset video information'
+    const otherLabel = books ? 'Reset video information' : 'Reset book information'
+    await page.goto(`/metadata/${section}/settings#maintenance`)
+    await expect(page.getByRole('button', { name: otherLabel, exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: label, exact: true }).click()
+    const confirmation = page.getByRole('alertdialog', { name: `${label}?`, exact: true })
+    await expect(confirmation).toContainText('related automatic and manual identifications')
+    await expect(confirmation).toContainText('availability observations')
+    await expect(confirmation).toContainText('files in your debrid accounts are retained')
+    await confirmation.getByRole('button', { name: label, exact: true }).click()
+    await expect(confirmation).toBeHidden()
+    const data = await (await page.request.get('/api/aiosource')).json()
+    expect(data.status.video_works).toBe(books ? 2 : 0)
+    expect(data.status.works).toBe(books ? 2 : 1)
+    expect(data.books).toMatchObject(
+      books
+        ? { works: 0, editions: 0, authors: 0, position: 0 }
+        : { works: 1, editions: 1, authors: 1, position: 1234 },
+    )
+    await page.getByRole('tab', { name: 'History', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`/metadata/${section}/history$`))
+    await expect(page.getByText('No runs in this view', { exact: true })).toBeVisible()
+    await page.goto(`/metadata/${books ? 'videos' : 'books'}/settings#maintenance`)
+    await expect(page.getByRole('button', { name: otherLabel, exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0)
   })
-  await expect(confirmation).toContainText('book information are retained')
-  await confirmation.getByRole('button', { name: 'Reset video information', exact: true }).click()
-  await expect(confirmation).toBeHidden()
-  const data = await (await page.request.get('/api/aiosource')).json()
-  expect(data.status.video_works).toBe(0)
-  expect(data.status.works).toBe(1)
-  expect(data.books).toMatchObject({ works: 1, editions: 1, authors: 1, position: 1234 })
-  await page.goto('/metadata/books/settings')
-  await openDisclosure(page, 'Maintenance')
-  await expect(
-    page.getByRole('button', { name: 'Reset book information', exact: true }),
-  ).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Reset video information', exact: true }),
-  ).toHaveCount(0)
-})
+}

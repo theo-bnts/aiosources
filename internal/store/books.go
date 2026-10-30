@@ -391,11 +391,5 @@ func bookReleaseKindSQL(alias string) string {
 }
 
 func (s *Store) ResetBookInformation(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE w.media_type='book' ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
-DELETE FROM ingest.aio_works WHERE media_type='book';
-TRUNCATE ingest.ol_authors,ingest.ol_editions,ingest.ol_redirects;
-UPDATE ingest.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,checked_at=NULL,retry_at=NULL,error='',complete=FALSE WHERE singleton;
-UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1;`+resetBookChangesSQL)
-	return databaseError("reset book information", err)
+	return s.resetInformation(ctx, "books")
 }
