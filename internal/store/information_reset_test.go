@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -197,10 +200,27 @@ func TestInformationResetRollsBackEveryDependentDeletion(t *testing.T) {
 
 func TestCacheGenerationFenceRejectsConcurrentPreResetWriters(t *testing.T) {
 	ctx, db := sharingDatabase(t)
+	config := db.pool.Config()
+	db.pool.Close()
+	config.MaxConns, config.MinConns, config.MinIdleConns = 4, 0, 0
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.pool = pool
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	generation, err := db.AIOCacheGeneration(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The reset transaction and three cache writers occupy the smallest
+	// supported pool. Inspect their waits without needing a fifth pooled slot.
+	control, err := pgx.ConnectConfig(ctx, config.ConnConfig.Copy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeConnection(control)
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -219,7 +239,7 @@ func TestCacheGenerationFenceRejectsConcurrentPreResetWriters(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		var waiting int
-		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'WITH generation AS MATERIALIZED%'`).Scan(&waiting); err != nil {
+		if err := control.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'WITH generation AS MATERIALIZED%'`).Scan(&waiting); err != nil {
 			t.Fatal(err)
 		}
 		if waiting == 3 {
