@@ -55,6 +55,10 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	if err != nil {
 		return err
 	}
+	if err = s.DB.PrepareBookImport(ctx, c); err != nil {
+		h.finish(ctx, err)
+		return err
+	}
 	attempt := 0
 	defer func() {
 		h.finish(ctx, syncErr)
@@ -654,6 +658,23 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 				}
 				continue
 			}
+			relevant, err := s.DB.BookChangeRelevant(work, record)
+			if err != nil {
+				return err
+			}
+			if !relevant {
+				if err = s.DB.ExcludeBookChange(work, job, record); err != nil {
+					return err
+				}
+				h.run.Processed++
+				failures = 0
+				s.queueAutomaticMatching(ctx)
+				if time.Since(lastHistory) >= 5*time.Second {
+					h.checkpoint(ctx, "book_details")
+					lastHistory = time.Now()
+				}
+				continue
+			}
 			dependencies, err := s.DB.BookDependencies(work, record)
 			if err != nil {
 				return err
@@ -663,7 +684,7 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 				keys = append(keys, books.ChangeKey{ID: id, At: job.ChangedAt})
 			}
 			if len(keys) > 0 {
-				if err = s.DB.QueueBookChanges(work, keys); err != nil {
+				if err = s.DB.QueueBookDependencies(work, keys); err != nil {
 					return err
 				}
 			}

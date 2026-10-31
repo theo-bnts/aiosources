@@ -182,11 +182,11 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		books.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "error": message, "matching_error": matchingError, "recovery_required": recovery})
+	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
-	c := model.AIOConfig{OpenLibraryMinutes: defaults.OpenLibraryMinutes, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
+	c := model.AIOConfig{OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
 	if !decodeJSON(w, r, &c) {
 		return
 	}
@@ -214,15 +214,15 @@ func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 	case "stop-matching":
 		s.options.AIOSource.Stop(false, true)
 	case "reset-books":
-		err = s.options.AIOSource.Reset(r.Context(), "books")
+		err = s.options.AIOSource.StartReset("books")
 	case "reset-videos":
-		err = s.options.AIOSource.Reset(r.Context(), "videos")
+		err = s.options.AIOSource.StartReset("videos")
 	case "reset-metadata":
-		err = s.options.AIOSource.Reset(r.Context(), "metadata")
+		err = s.options.AIOSource.StartReset("metadata")
 	case "reset-mapping":
-		err = s.options.AIOSource.Reset(r.Context(), "mapping")
+		err = s.options.AIOSource.StartReset("mapping")
 	case "reset-cache":
-		err = s.options.AIOSource.Reset(r.Context(), "cache")
+		err = s.options.AIOSource.StartReset("cache")
 	case "retry-cleanup":
 		c, e := s.options.Store.AIOConfig(r.Context())
 		if e != nil {

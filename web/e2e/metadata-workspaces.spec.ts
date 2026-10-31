@@ -177,6 +177,56 @@ test('workspace saves preserve other provider settings and protect drafts betwee
   expect((await (await page.request.get('/api/aiosource/controls')).json()).config).toEqual(saved)
 })
 
+test('book reset stays visible across pages without tying its lifetime to the browser', async ({
+  page,
+  server,
+}) => {
+  await seedInformation(page, server)
+  await page.setViewportSize({ width: 390, height: 844 })
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query('BEGIN')
+    await db.query('SELECT pg_advisory_xact_lock(1768843109,4)')
+    await page.goto('/metadata/books/settings#maintenance')
+    const reset = page.getByRole('button', { name: 'Reset book information', exact: true })
+    await reset.click()
+    const confirmation = page.getByRole('alertdialog', {
+      name: 'Reset book information?',
+      exact: true,
+    })
+    await confirmation.getByRole('button', { name: 'Reset book information', exact: true }).click()
+    await expect(confirmation).toBeHidden()
+    await expect(page.getByLabel('Maintenance status')).toContainText('being reset')
+    await expect(reset).toBeDisabled()
+    await expect(
+      page.getByRole('switch', { name: 'Relevant editions only', exact: true }),
+    ).toBeDisabled()
+    if (process.env.QA_DIRECTORY) {
+      await mkdir(process.env.QA_DIRECTORY, { recursive: true })
+      await page.screenshot({
+        path: join(process.env.QA_DIRECTORY, 'book-reset-mobile.png'),
+        fullPage: true,
+      })
+    }
+    await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+    await expect(page.getByText('Reset in progress', { exact: true })).toBeVisible()
+    await db.query('ROLLBACK')
+    await expect
+      .poll(
+        async () =>
+          (await (await page.request.get('/api/aiosource/controls')).json()).maintenance?.status,
+      )
+      .toBe('succeeded')
+    await expect(
+      page.getByText('Catalog entries', { exact: true }).locator('..').locator('dd'),
+    ).toHaveText('0')
+  } finally {
+    await db.query('ROLLBACK')
+    await db.end()
+  }
+})
+
 for (const section of ['videos', 'books'] as const) {
   test(`${section} maintenance clears its catalog and history through the ordinary confirmation`, async ({
     page,
@@ -196,6 +246,13 @@ for (const section of ['videos', 'books'] as const) {
     await expect(confirmation).toContainText('files in your debrid accounts are retained')
     await confirmation.getByRole('button', { name: label, exact: true }).click()
     await expect(confirmation).toBeHidden()
+    await expect
+      .poll(async () => {
+        const state = await (await page.request.get('/api/aiosource/controls')).json()
+        return state.maintenance?.status
+      })
+      .toBe('succeeded')
+    await expect(page.getByLabel('Maintenance status')).toContainText('reset completed.')
     const data = await (await page.request.get('/api/aiosource')).json()
     expect(data.status.video_works).toBe(books ? 2 : 0)
     expect(data.status.works).toBe(books ? 2 : 1)

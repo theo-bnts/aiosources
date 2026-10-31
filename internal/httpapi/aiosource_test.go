@@ -416,6 +416,8 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 	}
 	delete(legacy, "tmdb_requests_per_second")
 	delete(legacy, "match_seconds")
+	delete(legacy, "openlibrary_relevant_only")
+	delete(legacy, "openlibrary_languages")
 	body, _ = json.Marshal(legacy)
 	if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 204 {
 		t.Fatalf("previous client could not save its configuration: %d", response.Code)
@@ -426,6 +428,9 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 	}
 	if c.MatchSeconds != 30 {
 		t.Fatal("previous client did not receive the identification interval", c.MatchSeconds)
+	}
+	if !c.OpenLibraryRelevantOnly || len(c.OpenLibraryLanguages) != 0 {
+		t.Fatal("previous client did not receive the book selection defaults", c.OpenLibraryRelevantOnly, c.OpenLibraryLanguages)
 	}
 	for _, rate := range []int{0, 4, 41} {
 		c.TMDBRequestsPerSecond = rate

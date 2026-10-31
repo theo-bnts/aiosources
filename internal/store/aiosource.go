@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, OpenLibraryRelevantOnly: true, OpenLibraryLanguages: []string{}, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)
@@ -44,6 +44,9 @@ func readAIOConfig(ctx context.Context, reader aioConfigReader) (model.AIOConfig
 	if c.Trackers == nil {
 		c.Trackers = map[string]model.AIOTracker{}
 	}
+	if c.OpenLibraryLanguages == nil {
+		c.OpenLibraryLanguages = []string{}
+	}
 	return c, nil
 }
 func (s *Store) SetAIOConfig(ctx context.Context, c model.AIOConfig) error {
@@ -67,6 +70,10 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 		return err
 	}
 	defer rollback(tx)
+	old, err := readAIOConfig(ctx, tx)
+	if err != nil {
+		return err
+	}
 	refs := c.SecretReferences()
 	for _, t := range c.Trackers {
 		refs = append(refs, t.AnnounceSecret, t.PasskeySecret)
@@ -106,6 +113,11 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 	}
 	if tag.RowsAffected() == 0 {
 		return model.ErrConflict
+	}
+	if BookSelectionKey(old) != BookSelectionKey(c) {
+		if err = prepareBookImport(ctx, tx, c); err != nil {
+			return err
+		}
 	}
 	return databaseError("commit AIOSources configuration", tx.Commit(ctx))
 }

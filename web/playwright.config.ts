@@ -9,7 +9,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   timeout: 45_000,
   // Each serial scenario includes its own real database and backend setup.
-  globalTimeout: 15 * 60_000,
+  globalTimeout: 20 * 60_000,
   expect: { timeout: 10_000 },
   reporter: 'list',
   outputDir: './test-results',

@@ -92,6 +92,22 @@ INSERT INTO ingest.activity_logs(event_id,level,kind,message,service) VALUES
 	return ctx, db
 }
 
+func TestInformationResetForeignKeyLookupIsIndexedWithoutAStatusFilter(t *testing.T) {
+	ctx, db := informationResetFixture(t)
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rollback(tx)
+	if _, err = tx.Exec(ctx, `SET LOCAL enable_seqscan=off`); err != nil {
+		t.Fatal(err)
+	}
+	var plan string
+	if err = tx.QueryRow(ctx, `EXPLAIN(FORMAT JSON) UPDATE ingest.aio_matches SET work_id=NULL WHERE work_id=1`).Scan(&plan); err != nil || !strings.Contains(plan, "aio_matches_work") {
+		t.Fatal("foreign-key cleanup would scan every identification per deleted work", plan, err)
+	}
+}
+
 func TestInformationResetRemovesOnlyItsDependentData(t *testing.T) {
 	for _, scope := range []string{"books", "videos", "metadata"} {
 		t.Run(scope, func(t *testing.T) {

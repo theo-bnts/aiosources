@@ -20,6 +20,9 @@ func (s *Service) cacheFlightTriggered(service, key, resource string, hashes []s
 	if s.closed {
 		return nil, model.ErrConflict
 	}
+	if s.reset.Status == "running" {
+		return nil, model.ErrBusy
+	}
 	previous := s.flights[identity]
 	if previous != nil && (warm || !previous.warm) {
 		return previous, nil

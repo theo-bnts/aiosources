@@ -133,6 +133,16 @@ add(
       'Book information update interval (minutes)',
       'Open Library schedule frequency cadence',
     ],
+    [
+      'metadata.book-selection',
+      'Relevant editions only',
+      'digital audio ebook scanned selection catalog filters',
+    ],
+    [
+      'metadata.book-languages',
+      'Filter book languages',
+      'language edition translation catalog filters',
+    ],
   ],
 )
 add(

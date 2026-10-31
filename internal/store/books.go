@@ -48,8 +48,9 @@ func (s *Store) RecordBookInformationActivity(ctx context.Context, updateErr err
 func (s *Store) OpenLibraryStatus(ctx context.Context) (model.OpenLibraryStatus, error) {
 	var out model.OpenLibraryStatus
 	err := s.pool.QueryRow(ctx, `SELECT i.snapshot,i.position,i.imported,i.works,i.editions,i.authors,COALESCE(c.last_sync,i.last_sync),COALESCE(NULLIF(i.error,''),c.error),i.complete,i.skipped,
- i.generation,i.snapshot_at,i.data_complete,i.last_sync,c.changes_through,(SELECT count(*) FROM ingest.ol_change_jobs),NOT c.bootstrap_complete,c.needs_dump_after IS NOT NULL
- FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`).Scan(&out.Snapshot, &out.Position, &out.Imported, &out.Works, &out.Editions, &out.Authors, &out.LastSync, &out.Error, &out.Complete, &out.Skipped, &out.Generation, &out.SnapshotAt, &out.DataComplete, &out.LastImport, &out.ChangesThrough, &out.Pending, &out.CatchingUp, &out.NeedsExport)
+ i.generation,i.snapshot_at,i.data_complete,i.last_sync,c.changes_through,(SELECT count(*) FROM ingest.ol_change_jobs),NOT c.bootstrap_complete,c.needs_dump_after IS NOT NULL,
+ i.selection,i.export_phase,i.phase_snapshot,i.phase_etag,i.phase_position,i.filtered
+ FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`).Scan(&out.Snapshot, &out.Position, &out.Imported, &out.Works, &out.Editions, &out.Authors, &out.LastSync, &out.Error, &out.Complete, &out.Skipped, &out.Generation, &out.SnapshotAt, &out.DataComplete, &out.LastImport, &out.ChangesThrough, &out.Pending, &out.CatchingUp, &out.NeedsExport, &out.Selection, &out.ExportPhase, &out.PhaseSnapshot, &out.PhaseETag, &out.PhasePosition, &out.Filtered)
 	return out, databaseError("read book information progress", err)
 }
 
@@ -106,7 +107,22 @@ func (s *Store) BeginOpenLibrary(ctx context.Context, snapshot, etag string) (in
 // A batch and its checkpoint commit together. Replaying an export after a
 // restart cannot skip uncommitted rows or create duplicate works/editions.
 func (s *Store) SaveOpenLibraryBatch(ctx context.Context, snapshot string, expected, position int64, records []books.Record) error {
-	if len(records) > 250 || position <= expected {
+	return s.saveOpenLibraryBatch(ctx, snapshot, expected, position, records, 0, 0, 0)
+}
+
+func (s *Store) SaveBookExportPartBatch(ctx context.Context, snapshot string, expected, position int64, records []books.Record, phase int, phasePosition, filtered int64) error {
+	if phase < 1 || phase > 4 || phasePosition < 1 || filtered < 0 {
+		return model.ErrInvalid
+	}
+	return s.saveOpenLibraryBatch(ctx, snapshot, expected, position, records, phase, phasePosition, filtered)
+}
+
+func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expected, position int64, records []books.Record, phase int, phasePosition, filtered int64) error {
+	limit := 250
+	if phase > 0 {
+		limit = 1000
+	}
+	if len(records) > limit || position <= expected {
 		return model.ErrInvalid
 	}
 	tx, err := s.pool.Begin(ctx)
@@ -126,6 +142,15 @@ func (s *Store) SaveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 	if source != snapshot || current != expected {
 		return model.ErrConflict
 	}
+	if phase > 0 {
+		var actual int
+		if err = tx.QueryRow(ctx, `SELECT export_phase FROM ingest.ol_import_state WHERE singleton`).Scan(&actual); err != nil {
+			return err
+		}
+		if actual != phase {
+			return model.ErrConflict
+		}
+	}
 	var generation int64
 	if err = tx.QueryRow(ctx, `SELECT generation FROM ingest.ol_import_state WHERE singleton`).Scan(&generation); err != nil {
 		return err
@@ -137,6 +162,51 @@ func (s *Store) SaveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 	_, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET position=$1,imported=imported+$2,works=works+$3,editions=editions+$4,authors=authors+$5,skipped=skipped+$6 WHERE singleton`, position, imported, delta[0], delta[1], delta[2], skipped)
 	if err != nil {
 		return err
+	}
+	if phase > 0 {
+		if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET phase_position=$1,filtered=filtered+$2 WHERE singleton`, phasePosition, filtered); err != nil {
+			return err
+		}
+		keys := []string{}
+		preserved := []string{}
+		for _, r := range records {
+			if r.PreserveKey != "" {
+				preserved = append(preserved, r.PreserveKey)
+			}
+			switch {
+			case r.Edition != nil:
+				keys = append(keys, r.Edition.Works...)
+				keys = append(keys, r.Edition.Authors...)
+			case r.Work != nil:
+				keys = append(keys, r.Work.Book.AuthorKeys...)
+			case r.Redirect != nil:
+				keys = append(keys, r.Redirect.Target)
+			}
+		}
+		if len(keys) > 0 {
+			if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_import_references SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`, keys); err != nil {
+				return err
+			}
+		}
+		if len(preserved) > 0 {
+			for _, table := range []string{"aio_works", "ol_authors", "ol_redirects"} {
+				key := "id"
+				if table == "aio_works" {
+					key = "openlibrary_id"
+				}
+				if table == "ol_redirects" {
+					key = "source"
+				}
+				if _, err = tx.Exec(ctx, `UPDATE ingest.`+table+` SET ol_seen=$1 WHERE `+key+`=ANY($2::text[])`, generation, preserved); err != nil {
+					return err
+				}
+			}
+			if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_import_references
+ SELECT jsonb_array_elements_text(book_data->'author_keys') FROM ingest.aio_works WHERE openlibrary_id=ANY($1::text[]) AND media_type='book'
+ ON CONFLICT DO NOTHING`, preserved); err != nil {
+				return err
+			}
+		}
 	}
 	return databaseError("commit book information batch", tx.Commit(ctx))
 }
@@ -178,7 +248,7 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			return
 		}
 		batch.Queue(`WITH changed AS (`+statement+` RETURNING `+columns+`),affected AS (
-       UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND EXISTS(SELECT 1 FROM changed) AND (`+related+`) RETURNING w.id
+       UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND EXISTS(SELECT 1 FROM changed) AND (`+related+`) RETURNING w.id
       ) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, args...)
 	}
 	invalidate := func(key string) {
@@ -186,9 +256,9 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			return
 		}
 		batch.Queue(`WITH affected AS (
-     UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND (
+     UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND (
       w.openlibrary_id=$1 OR w.openlibrary_id=ingest.ol_resolve($1) OR (w.book_data->'author_keys') ?| ingest.ol_aliases($1)
-      OR EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.id=$1 AND e.work_keys && ingest.ol_aliases(w.openlibrary_id))
+      OR w.openlibrary_id IN(SELECT ingest.ol_resolve(unnest(e.work_keys)) FROM ingest.ol_editions e WHERE e.id=$1)
      ) RETURNING id
     ) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, key)
 	}
@@ -249,7 +319,7 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			saveEntity(`INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn,author_keys,languages,year,format,cover,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
  ON CONFLICT(id) DO UPDATE SET work_keys=EXCLUDED.work_keys,title=EXCLUDED.title,normalized=EXCLUDED.normalized,isbn=EXCLUDED.isbn,author_keys=EXCLUDED.author_keys,languages=EXCLUDED.languages,year=EXCLUDED.year,format=EXCLUDED.format,cover=EXCLUDED.cover,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at
  WHERE ingest.ol_editions.ol_revision<EXCLUDED.ol_revision OR (ingest.ol_editions.work_keys,ingest.ol_editions.title,ingest.ol_editions.isbn,ingest.ol_editions.author_keys,ingest.ol_editions.languages,ingest.ol_editions.year,ingest.ol_editions.format,ingest.ol_editions.cover)
- IS DISTINCT FROM (EXCLUDED.work_keys,EXCLUDED.title,EXCLUDED.isbn,EXCLUDED.author_keys,EXCLUDED.languages,EXCLUDED.year,EXCLUDED.format,EXCLUDED.cover)`, "work_keys", `EXISTS(SELECT 1 FROM changed c WHERE c.work_keys && ingest.ol_aliases(w.openlibrary_id)) OR EXISTS(SELECT 1 FROM ingest.ol_editions old WHERE old.id=$1 AND old.work_keys && ingest.ol_aliases(w.openlibrary_id))`, e.ID, e.Works, e.Title, e.Normalized, e.ISBN, e.Authors, e.Languages, e.Year, e.Format, e.Cover, r.Revision, generation, r.Modified)
+ IS DISTINCT FROM (EXCLUDED.work_keys,EXCLUDED.title,EXCLUDED.isbn,EXCLUDED.author_keys,EXCLUDED.languages,EXCLUDED.year,EXCLUDED.format,EXCLUDED.cover)`, "work_keys", `w.openlibrary_id IN(SELECT ingest.ol_resolve(unnest(c.work_keys)) FROM changed c UNION SELECT ingest.ol_resolve(unnest(old.work_keys)) FROM ingest.ol_editions old WHERE old.id=$1)`, e.ID, e.Works, e.Title, e.Normalized, e.ISBN, e.Authors, e.Languages, e.Year, e.Format, e.Cover, r.Revision, generation, r.Modified)
 			if len(e.Works) == 1 && e.Works[0] == e.ID {
 				data, _ := json.Marshal(model.BookInformation{AuthorKeys: e.Authors, Cover: e.Cover, Languages: e.Languages})
 				years := []int{}
@@ -304,7 +374,7 @@ SELECT t.provider_id,t.source_id FROM ingest.torrents t LEFT JOIN ingest.aio_mat
 WHERE w.media_type='book' OR COALESCE(t.fields->>'media_type',t.fields->>'type','') IN ('book','ebook','audiobook') OR COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m(70[0-9]{2}|3030)\M' OR COALESCE(t.fields->>'category_name','') ~* '\m(books?|livres?|ebooks?|comics?|mangas?)\M' OR t.fields ?| ARRAY['isbn','isbn_10','isbn_13','author','authors'] OR t.fields->>'title' ~* '\m(epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|audiobook|ebook|livre audio)\M'
 ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
 UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1;
-UPDATE ingest.ol_import_state SET complete=TRUE,last_sync=now(),checked_at=now(),retry_at=NULL,error='' WHERE singleton;`)
+UPDATE ingest.ol_import_state SET complete=TRUE,last_sync=now(),checked_at=now(),retry_at=NULL,error='',selection_rebuild=FALSE WHERE singleton;`)
 	return databaseError("finish book information import", err)
 }
 

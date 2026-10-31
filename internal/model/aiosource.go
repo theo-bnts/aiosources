@@ -5,24 +5,26 @@ import "time"
 // Credential values never enter configuration or API responses. References
 // resolve through the same encrypted vault as collection credentials.
 type AIOConfig struct {
-	Revision              int64                 `json:"revision"`
-	TMDBSecret            string                `json:"tmdb_secret"`
-	AllDebridSecret       string                `json:"alldebrid_secret"`
-	TorBoxSecret          string                `json:"torbox_secret"`
-	DebridLinkSecret      string                `json:"debridlink_secret"`
-	DeepbridSecret        string                `json:"deepbrid_secret"`
-	PremiumizeSecret      string                `json:"premiumize_secret"`
-	RealDebridSecret      string                `json:"realdebrid_secret"`
-	AutoSync              bool                  `json:"auto_sync"`
-	AutoMatch             bool                  `json:"auto_match"`
-	OpenLibraryEnabled    bool                  `json:"openlibrary_enabled"`
-	OpenLibraryMinutes    int                   `json:"openlibrary_minutes"`
-	SyncMinutes           int                   `json:"sync_minutes"`
-	MatchSeconds          int                   `json:"match_seconds"`
-	TMDBRequestsPerSecond int                   `json:"tmdb_requests_per_second"`
-	CacheMinutes          int                   `json:"cache_minutes"`
-	ResponseSeconds       int                   `json:"response_seconds"`
-	Trackers              map[string]AIOTracker `json:"trackers"`
+	Revision                int64                 `json:"revision"`
+	TMDBSecret              string                `json:"tmdb_secret"`
+	AllDebridSecret         string                `json:"alldebrid_secret"`
+	TorBoxSecret            string                `json:"torbox_secret"`
+	DebridLinkSecret        string                `json:"debridlink_secret"`
+	DeepbridSecret          string                `json:"deepbrid_secret"`
+	PremiumizeSecret        string                `json:"premiumize_secret"`
+	RealDebridSecret        string                `json:"realdebrid_secret"`
+	AutoSync                bool                  `json:"auto_sync"`
+	AutoMatch               bool                  `json:"auto_match"`
+	OpenLibraryEnabled      bool                  `json:"openlibrary_enabled"`
+	OpenLibraryMinutes      int                   `json:"openlibrary_minutes"`
+	OpenLibraryRelevantOnly bool                  `json:"openlibrary_relevant_only"`
+	OpenLibraryLanguages    []string              `json:"openlibrary_languages"`
+	SyncMinutes             int                   `json:"sync_minutes"`
+	MatchSeconds            int                   `json:"match_seconds"`
+	TMDBRequestsPerSecond   int                   `json:"tmdb_requests_per_second"`
+	CacheMinutes            int                   `json:"cache_minutes"`
+	ResponseSeconds         int                   `json:"response_seconds"`
+	Trackers                map[string]AIOTracker `json:"trackers"`
 }
 type AIOTracker struct {
 	Private        bool   `json:"private"`
@@ -117,6 +119,12 @@ type BookInformation struct {
 }
 
 type OpenLibraryStatus struct {
+	Selection      string     `json:"-"`
+	ExportPhase    int        `json:"-"`
+	PhaseSnapshot  string     `json:"-"`
+	PhaseETag      string     `json:"-"`
+	PhasePosition  int64      `json:"-"`
+	Filtered       int64      `json:"filtered"`
 	NextUpdate     *time.Time `json:"next_update"`
 	Generation     int64      `json:"-"`
 	SnapshotAt     *time.Time `json:"snapshot_at"`

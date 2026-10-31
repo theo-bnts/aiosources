@@ -12,6 +12,52 @@ export function defaultLanguagePreferences(): LanguagePreferences {
 export function browserLanguage() {
   return (navigator.languages?.[0] || navigator.language || 'en').split(/[-_]/)[0].toLowerCase()
 }
+export function languageChoices(selected: string[] = []) {
+  const names = new Intl.DisplayNames(['en'], { type: 'language' })
+  return [
+    ...new Set(
+      [
+        'ar',
+        'bg',
+        'cs',
+        'da',
+        'de',
+        'el',
+        'en',
+        'es',
+        'fi',
+        'fr',
+        'he',
+        'hi',
+        'hr',
+        'hu',
+        'id',
+        'it',
+        'ja',
+        'ko',
+        'nl',
+        'no',
+        'pl',
+        'pt',
+        'ro',
+        'ru',
+        'sk',
+        'sl',
+        'sr',
+        'sv',
+        'th',
+        'tr',
+        'uk',
+        'vi',
+        'zh',
+        browserLanguage(),
+        ...selected,
+      ].filter(Boolean),
+    ),
+  ]
+    .map((value) => ({ value, label: names.of(value) || value }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+}
 export function resolvedLanguage(value: LanguagePreferences) {
   return value.language || browserLanguage()
 }

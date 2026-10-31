@@ -1,4 +1,6 @@
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
+import { BookImportFilters } from '@/components/book-import-filters'
+import { MaintenanceStatus } from '@/components/maintenance-status'
 import { AdvancedSettings } from '@/components/advanced-settings'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
@@ -239,7 +241,9 @@ export default function AIOSourcePage({
       </div>
     )
   const status = query.data
-  const busy = status.syncing || status.matching || status.books?.running || action.isPending
+  const resetting = status.maintenance?.status === 'running'
+  const busy =
+    status.syncing || status.matching || status.books?.running || resetting || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
     if (local && !save.isPending && !review.isPending && !conflict(form)) {
@@ -308,11 +312,18 @@ export default function AIOSourcePage({
             </div>
           )}
           {section === 'books' && (
-            <p className="help">
-              Open Library supplies book and audiobook information without an API key. The first
-              catalog import can take hours and needs substantial storage. Later updates follow
-              recent changes, with a fresh export when recovery is needed. Cover images stay remote.
-            </p>
+            <div className="space-y-5">
+              <p className="help">
+                Open Library supplies book and audiobook information without an API key. The first
+                import can take hours; later updates follow recent changes. Cover images stay
+                remote.
+              </p>
+              <BookImportFilters
+                value={config}
+                onChange={(patch) => update(scope, patch)}
+                busy={Boolean(status.books?.running) || resetting}
+              />
+            </div>
           )}
           {section === 'debrid' && (
             <div className="grid gap-5 md:grid-cols-2">
@@ -374,6 +385,16 @@ export default function AIOSourcePage({
       open={maintenanceOpen}
       onOpenChange={setMaintenanceOpen}
     >
+      <MaintenanceStatus
+        value={status.maintenance}
+        scope={
+          section === 'identification'
+            ? 'mapping'
+            : section === 'debrid' || section === 'stremio'
+              ? 'cache'
+              : section
+        }
+      />
       {metadata && (
         <>
           <p className="help">
@@ -440,7 +461,7 @@ export default function AIOSourcePage({
               variant="destructive"
               action={() => action.mutateAsync('reset-cache')}
               trigger={
-                <Button variant="destructive" disabled={action.isPending}>
+                <Button variant="destructive" disabled={action.isPending || resetting}>
                   Reset cache
                 </Button>
               }
@@ -542,7 +563,11 @@ export default function AIOSourcePage({
                   <>
                     <Button
                       disabled={Boolean(
-                        status.syncing || action.isPending || draft || !status.config.tmdb_secret,
+                        status.syncing ||
+                        resetting ||
+                        action.isPending ||
+                        draft ||
+                        !status.config.tmdb_secret,
                       )}
                       onClick={() => action.mutate('sync')}
                     >
@@ -562,7 +587,9 @@ export default function AIOSourcePage({
                 {section === 'books' && (
                   <>
                     <Button
-                      disabled={Boolean(status.books?.running || action.isPending || draft)}
+                      disabled={Boolean(
+                        status.books?.running || resetting || action.isPending || draft,
+                      )}
                       onClick={() => action.mutate('sync-books')}
                     >
                       Update book information
@@ -583,6 +610,7 @@ export default function AIOSourcePage({
                     <Button
                       disabled={Boolean(
                         status.matching ||
+                        resetting ||
                         action.isPending ||
                         draft ||
                         !status.status.has_information,

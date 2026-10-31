@@ -102,6 +102,11 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		return model.ErrInvalid
 	}
 	switch kind {
+	case "maintenance.books_completed", "maintenance.books_failed", "maintenance.books_interrupted",
+		"maintenance.videos_completed", "maintenance.videos_failed", "maintenance.videos_interrupted",
+		"maintenance.metadata_completed", "maintenance.metadata_failed", "maintenance.metadata_interrupted",
+		"maintenance.mapping_completed", "maintenance.mapping_failed", "maintenance.mapping_interrupted",
+		"maintenance.cache_completed", "maintenance.cache_failed", "maintenance.cache_interrupted":
 	case "network.settings_changed", "network.test_completed", "network.test_failed":
 	case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 		"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset":
@@ -137,6 +142,10 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	query := `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6))`
 	if strings.HasPrefix(kind, "network.") {
 		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'network')`
+	} else if strings.HasPrefix(kind, "maintenance.books_") {
+		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'openlibrary')`
+	} else if strings.HasPrefix(kind, "maintenance.videos_") {
+		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'tmdb')`
 	}
 	_, err = tx.Exec(ctx, query, "activity-"+id, level, kind, providerID, runID, encoded)
 	if err != nil {

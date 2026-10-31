@@ -12,6 +12,8 @@ export type Config = {
   auto_match: boolean
   openlibrary_enabled: boolean
   openlibrary_minutes: number
+  openlibrary_relevant_only: boolean
+  openlibrary_languages: string[]
   sync_minutes: number
   match_seconds: number
   tmdb_requests_per_second: number
@@ -27,6 +29,7 @@ export type BookStatus = {
   catching_up: boolean
   needs_export: boolean
   skipped: number
+  filtered: number
   complete: boolean
   position: number
   imported: number
@@ -40,6 +43,11 @@ export type BookStatus = {
 }
 export type Status = {
   books?: BookStatus
+  maintenance?: {
+    scope: 'books' | 'videos' | 'metadata' | 'mapping' | 'cache' | ''
+    status: 'running' | 'succeeded' | 'failed' | ''
+    error?: string
+  }
   config: Config
   status: {
     works: number

@@ -7,19 +7,26 @@ AIOSources can identify ebooks, comics and audiobooks already present in your im
 ## Set up book information
 
 1. Import your authorized sources as usual. Keep useful fields such as the title, categories, author and ISBN when your source supplies them. Existing imported titles do not need to be downloaded again.
-2. Open **Metadata → Books → Settings → Schedules** and enable **Automatically update book information**. No Open Library account or API key is required.
-3. Allow the first complete catalog import to finish. It can take several hours or longer and needs substantial additional database storage. The complete export contains many gigabytes even before it is imported; this option is off by default.
-4. Open **Metadata → Identification → Settings** to enable automatic identification, or use **Advanced → Manual actions → Identify torrents** there after the book information import finishes.
+2. Open **Metadata → Books → Settings → Catalog filters**. **Relevant editions only** is on by default: it keeps editions with digital or audiobook evidence, including scans, and editions whose title or identifier matches books already imported when the catalog import starts. Turn it off to include print-only editions without this evidence.
+3. Optionally enable **Filter by language** and select one or more edition languages. This filter starts **disabled**. Enabling it selects your browser language initially; the saved selection applies to the instance. Translations count. Unknown languages do not pass an active language filter.
+4. In **Schedules**, enable **Automatically update book information**. No Open Library account or API key is required. Allow the first import to finish; it can take hours. Only selected editions and their related books and authors are stored. The exports still need to be read, so connection speed and server capacity affect the duration.
+5. Open **Metadata → Identification → Settings** to enable automatic identification, or use **Advanced → Manual actions → Identify torrents** there after the book information import finishes.
+
+Catalog filters are checked before saving bibliographic information and also apply to later updates. A book is included if at least one edition passes all enabled filters. Digital evidence is not a guarantee that a source offers that edition; some useful editions have no such evidence and can be excluded. All source records remain available in **Torrents**.
+
+Stop any running book update before changing the filters. Saving a different selection starts a new resumable import. Existing entries outside the new selection are removed after it finishes; source records and film and series information are kept. **Statistics → Import details** distinguishes records excluded by filters from unreadable records.
 
 After the first import, AIOSources follows Open Library's recent changes. The default update interval is **15 minutes**, and you can change it under **Schedules**. Saved progress and pending updates survive interruptions. Automatic updates must remain enabled for automatic recovery. **Metadata → Books → Settings → Advanced → Manual actions → Update book information** checks for changes immediately, while still respecting provider-requested waits.
 
 If an interruption or a busy upstream period makes the change history impossible to cover reliably, AIOSources automatically requests a fresh export. It checks daily while waiting for an export recent enough to cover the missing period. Recent changes continue to be collected and processed; the existing catalog stays available. **Statistics** distinguishes the export date, pending updates and the date through which changes have actually been applied. A catalog awaiting recovery is not reported as up to date.
 
-Recovery updates the existing records. Newer information obtained from the API is protected from older export records. Renamed titles, corrected editions, author changes, merges and deletions update the affected identifications. A complete, readable recovery export also retires records no longer present in that export; an export containing unreadable records is not used to infer absence.
+Recovery updates the existing records. Newer information obtained from the API is protected from older export records. Renamed titles, corrected editions, author changes, merges and deletions update the affected identifications. A complete recovery export also retires records outside the selection. Without catalog filters, an export containing unreadable records is not used to infer absence. With filters, entries must have a selected edition; readable information needed by selected editions is retained when an associated record cannot be decoded.
 
 An unreadable or abnormally large metadata record is skipped and counted in the update history, so it cannot block the remaining catalog. Interrupted transfers keep their saved progress. A gzip transfer may need to be downloaded and read again up to the saved line; already committed book records are not duplicated.
 
-Only useful bibliographic information is retained: titles, authors, editions, identifiers, languages, dates and cover references. Full descriptions and image files are not stored. Review the space used in **Administration → Storage** before enabling the full catalog on a small server.
+Only useful bibliographic information is retained: titles, authors, editions, identifiers, languages, dates and cover references. Full descriptions, image files and the downloaded export files are not stored. Review the space used in **Administration → Storage** before enabling the complete, unfiltered catalog on a small server.
+
+When filters remove existing rows, PostgreSQL can reuse their space. Allocated database files do not necessarily shrink immediately, so a smaller retained catalog may not immediately reduce the size reported by the operating system.
 
 ## Freshness and remaining limits
 
@@ -53,4 +60,6 @@ A collection is not automatically assigned to every book it may contain. A manua
 
 Create a **Torznab** access and choose its book media types as needed. Compatible clients can use book search and the standard book and audiobook categories. Stremio, Nuvio and AIOStreams installations remain for video playback.
 
-To remove only the book information, use **Metadata → Books → Settings → Advanced → Maintenance → Reset book information**. Read the confirmation first. This keeps your source records, manual choices and film and series information; book information must be imported again before those book matches are available.
+To remove book information and its related identifications, history and availability observations, use **Metadata → Books → Settings → Advanced → Maintenance → Reset book information**. Read the confirmation first. This keeps your source records, film and series information and files in your debrid accounts. Book information must be imported again before book identifications become available.
+
+Resets run in the background, so you can leave the page without interrupting them. **Maintenance** shows their status and **Logs** records the outcome. On a large catalog, removing related identifications and history can still take several minutes. A server shutdown interrupts the transaction rather than committing a partial reset; check its outcome before trying again. Automatic updates can import information again after a completed reset.

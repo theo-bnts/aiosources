@@ -53,6 +53,9 @@ func testService(t testing.TB) (context.Context, *Service, *pgx.Conn) {
 	}
 	c := store.DefaultAIOConfig()
 	c.AutoSync, c.AutoMatch = false, false
+	// Existing fixtures exercise the complete catalog; selection scenarios opt
+	// into the production default and supply edition evidence explicitly.
+	c.OpenLibraryRelevantOnly = false
 	if err := db.SetAIOConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}

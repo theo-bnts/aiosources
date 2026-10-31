@@ -60,7 +60,19 @@ UNION SELECT provider_id,source_id FROM ingest.aio_matches WHERE work_id IS NULL
 ON CONFLICT DO NOTHING`); err != nil {
 		return databaseError("select related cache observations", err)
 	}
+	// Typed decisions were handled above. Only unresolved source records need
+	// bibliographic parsing; do not reread every already identified video when
+	// removing books (or every identified book when removing videos).
+	if _, err = tx.Exec(ctx, `DELETE FROM reset_information_candidates c WHERE
+ EXISTS(SELECT 1 FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.provider_id=c.provider_id AND m.source_id=c.source_id)
+ OR EXISTS(SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=c.provider_id AND r.source_id=c.source_id AND r.active AND r.media_type<>'');
+ ANALYZE reset_information_candidates;`); err != nil {
+		return databaseError("prepare unresolved information records", err)
+	}
 	if err = selectResetInformationRecords(ctx, tx, types); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `ANALYZE reset_information_records;`); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_hashes
@@ -68,6 +80,9 @@ SELECT hash FROM reset_information_records WHERE hash IS NOT NULL
 UNION SELECT unnest(hashes) FROM ingest.aio_resources WHERE split_part(resource,':',1)=ANY($1::text[])
 ON CONFLICT DO NOTHING`, resources); err != nil {
 		return databaseError("select related cache hashes", err)
+	}
+	if _, err = tx.Exec(ctx, `ANALYZE reset_information_hashes;`); err != nil {
+		return err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_operations
 SELECT r.id FROM ingest.operation_runs r WHERE (r.kind='metadata' AND r.service=ANY($1::text[]))
@@ -165,13 +180,20 @@ UPDATE ingest.aio_state SET last_match=NULL;`); err != nil {
 }
 
 func selectResetInformationRecords(ctx context.Context, tx pgx.Tx, types []string) error {
-	provider, source := "", ""
-	for {
-		rows, err := tx.Query(ctx, `SELECT `+aioRecordColumns+`,COALESCE(CASE WHEN r.active THEN NULLIF(r.media_type,'') END,w.media_type,''),m.provider_id IS NOT NULL
+	// Execute the joins once, then fetch a bounded batch from the cursor.
+	// Replanning and rescanning the source/match tables for every keyset page
+	// made maintenance quadratic on large catalogs. No source payloads are
+	// retained between batches and the surrounding transaction owns the fence.
+	if _, err := tx.Exec(ctx, `SET LOCAL cursor_tuple_fraction=1.0;
+DECLARE reset_information_cursor NO SCROLL CURSOR FOR
+SELECT `+aioRecordColumns+`,COALESCE(CASE WHEN r.active THEN NULLIF(r.media_type,'') END,w.media_type,''),m.provider_id IS NOT NULL
 FROM reset_information_candidates c JOIN ingest.torrents t USING(provider_id,source_id)
 LEFT JOIN ingest.aio_match_reviews r USING(provider_id,source_id) LEFT JOIN ingest.aio_matches m USING(provider_id,source_id)
-LEFT JOIN ingest.aio_works w ON w.id=m.work_id
-WHERE (t.provider_id,t.source_id)>($1,$2) ORDER BY t.provider_id,t.source_id LIMIT 1000`, provider, source)
+LEFT JOIN ingest.aio_works w ON w.id=m.work_id`); err != nil {
+		return databaseError("prepare related cache records", err)
+	}
+	for {
+		rows, err := tx.Query(ctx, `FETCH FORWARD 1000 FROM reset_information_cursor`)
 		if err != nil {
 			return databaseError("read related cache records", err)
 		}
@@ -186,7 +208,6 @@ WHERE (t.provider_id,t.source_id)>($1,$2) ORDER BY t.provider_id,t.source_id LIM
 				return err
 			}
 			count++
-			provider, source = record.Provider, record.SourceID
 			if kind == "" {
 				if books.ParseRecord(record).Kind != "" {
 					kind = "book"
@@ -211,7 +232,8 @@ WHERE (provider_id,source_id) IN(SELECT * FROM unnest($1::text[],$2::text[])) ON
 			}
 		}
 		if count < 1000 {
-			return nil
+			_, err = tx.Exec(ctx, `CLOSE reset_information_cursor`)
+			return databaseError("close related cache records", err)
 		}
 	}
 }

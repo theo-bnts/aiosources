@@ -9,7 +9,7 @@ import (
 )
 
 var ErrChanges = errors.New("invalid Open Library change response")
-var exportDateRE = regexp.MustCompile(`(?:ol_dump_|ol_dump/)([0-9]{4}-[0-9]{2}-[0-9]{2})(?:[/_.]|$)`)
+var exportDateRE = regexp.MustCompile(`(?:ol_dump_(?:(?:editions|works|authors|redirects)_)?|ol_dump/)([0-9]{4}-[0-9]{2}-[0-9]{2})(?:[/_.]|$)`)
 var changeIDRE = regexp.MustCompile(`^[0-9]{1,20}$`)
 
 // Only identifiers, revisions and clocks are retained. Editor names, IPs,

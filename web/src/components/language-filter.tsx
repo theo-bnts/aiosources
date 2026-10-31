@@ -1,7 +1,11 @@
 import { useId, useRef } from 'react'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { browserLanguage, type LanguagePreferences } from '@/lib/language-preferences'
+import {
+  browserLanguage,
+  languageChoices,
+  type LanguagePreferences,
+} from '@/lib/language-preferences'
 
 export function LanguageFilter({
   value,
@@ -20,47 +24,7 @@ export function LanguageFilter({
   )
   if (value.mode !== 'all') last.current = value.mode
   const names = new Intl.DisplayNames(['en'], { type: 'language' })
-  const languages = [
-    ...new Set(
-      [
-        'ar',
-        'bg',
-        'cs',
-        'da',
-        'de',
-        'el',
-        'en',
-        'es',
-        'fi',
-        'fr',
-        'he',
-        'hi',
-        'hr',
-        'hu',
-        'id',
-        'it',
-        'ja',
-        'ko',
-        'nl',
-        'no',
-        'pl',
-        'pt',
-        'ro',
-        'ru',
-        'sk',
-        'sl',
-        'sr',
-        'sv',
-        'th',
-        'tr',
-        'uk',
-        'vi',
-        'zh',
-        browserLanguage(),
-        value.language,
-      ].filter(Boolean),
-    ),
-  ].sort((a, b) => (names.of(a) || a).localeCompare(names.of(b) || b))
+  const languages = languageChoices([value.language]).map((option) => option.value)
   return (
     <div
       className={

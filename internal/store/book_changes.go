@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -106,6 +107,12 @@ func queueOpenLibraryAliases(ctx context.Context, tx pgx.Tx, records []books.Rec
 // Queue pages durably before advancing the feed anchor. Replayed pages only
 // replace a job when they contain a newer revision of the same document.
 func (s *Store) QueueBookChanges(ctx context.Context, keys []books.ChangeKey) error {
+	return s.queueBookChanges(ctx, keys, false)
+}
+func (s *Store) QueueBookDependencies(ctx context.Context, keys []books.ChangeKey) error {
+	return s.queueBookChanges(ctx, keys, true)
+}
+func (s *Store) queueBookChanges(ctx context.Context, keys []books.ChangeKey, dependencies bool) error {
 	if len(keys) > 250 {
 		return model.ErrInvalid
 	}
@@ -126,12 +133,41 @@ func (s *Store) QueueBookChanges(ctx context.Context, keys []books.ChangeKey) er
 	if err != nil {
 		return err
 	}
+	wanted := map[string]bool{}
+	config, err := readAIOConfig(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if !dependencies && (config.OpenLibraryRelevantOnly || len(config.OpenLibraryLanguages) > 0) {
+		rows, err := tx.Query(ctx, `SELECT id FROM ingest.ol_import_references WHERE id=ANY($1::text[])`, ids)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id string
+			if err = rows.Scan(&id); err != nil {
+				rows.Close()
+				return err
+			}
+			wanted[id] = true
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+	}
 	for _, key := range keys {
 		if books.Path(key.ID) == "" || key.Revision < 0 || key.At.IsZero() {
 			return model.ErrInvalid
 		}
 		if revision, exists := versions[key.ID]; exists && revision >= key.Revision {
 			continue
+		}
+		if !dependencies && (config.OpenLibraryRelevantOnly || len(config.OpenLibraryLanguages) > 0) && !strings.HasSuffix(key.ID, "M") {
+			if _, known := versions[key.ID]; !known && !wanted[key.ID] {
+				continue
+			}
 		}
 		batch.Queue(`INSERT INTO ingest.ol_change_jobs(id,revision,changed_at) VALUES($1,$2,$3)
  ON CONFLICT(id) DO UPDATE SET revision=GREATEST(ingest.ol_change_jobs.revision,EXCLUDED.revision),changed_at=GREATEST(ingest.ol_change_jobs.changed_at,EXCLUDED.changed_at),version=ingest.ol_change_jobs.version+1,attempts=0,next_attempt=now()
@@ -272,6 +308,11 @@ func (s *Store) ApplyBookChange(ctx context.Context, job BookChangeJob, record b
 	delta, _, _, err := saveOpenLibraryRecords(ctx, tx, []books.Record{record}, true, generation)
 	if err != nil {
 		return err
+	}
+	if keys := bookRecordReferences(record); len(keys) > 0 {
+		if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_import_references SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`, keys); err != nil {
+			return err
+		}
 	}
 	if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET works=works+$1,editions=editions+$2,authors=authors+$3 WHERE singleton`, delta[0], delta[1], delta[2]); err != nil {
 		return err

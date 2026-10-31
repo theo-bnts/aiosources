@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"golang.org/x/text/language"
 )
 
 var publicationYearRE = regexp.MustCompile(`(?i)\b(?:ca?\.?\s*)?((?:1[0-9]{3}|20[0-9]{2}|21[0-9]{2}))\b`)
@@ -39,6 +38,7 @@ func WorkKey(s string) bool {
 }
 
 type Edition struct {
+	Digital    bool     `json:"-"`
 	ID         string   `json:"id"`
 	Works      []string `json:"works"`
 	Title      string   `json:"title"`
@@ -56,14 +56,15 @@ type Author struct {
 	Aliases []string `json:"aliases"`
 }
 type Record struct {
-	Revision int64
-	Modified *time.Time
-	Skipped  bool
-	Redirect *Redirect
-	Work     *model.AIOWork
-	Edition  *Edition
-	Author   *Author
-	Deleted  string
+	PreserveKey string
+	Revision    int64
+	Modified    *time.Time
+	Skipped     bool
+	Redirect    *Redirect
+	Work        *model.AIOWork
+	Edition     *Edition
+	Author      *Author
+	Deleted     string
 }
 type Redirect struct{ Source, Target string }
 type reference struct {
@@ -239,17 +240,14 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 			}
 		}
 		for _, l := range references("languages") {
-			lang := strings.TrimPrefix(l.Key, "/languages/")
-			if tag, e := language.Parse(lang); e == nil {
-				base, _ := tag.Base()
-				lang = base.String()
-			}
-			if (len(lang) == 2 || len(lang) == 3) && !slices.Contains(e.Languages, lang) && len(e.Languages) < 30 {
+			lang := editionLanguage(l.Key)
+			if lang != "" && !slices.Contains(e.Languages, lang) && len(e.Languages) < 30 {
 				e.Languages = append(e.Languages, lang)
 			}
 		}
 		e.Year = publicationYear(text("publish_date"))
 		e.Format = clean(text("physical_format"))
+		e.Digital = digitalEvidence(e.Format, text("ocaid"), stringsFor("source_records"))
 		if len(e.Works) == 0 {
 			e.Works = []string{id}
 		}

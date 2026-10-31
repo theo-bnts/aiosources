@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,7 @@ type bookAPIFixture struct {
 	retryAfter     string
 	ignoreOffsets  bool
 	dumpCalls      int
+	brokenDumpPart string
 	requests       map[string]int
 }
 
@@ -112,14 +114,39 @@ func newBookAPIFixture(t *testing.T, s *Service) *bookAPIFixture {
 			w.Header().Set("ETag", `"`+f.day.Format("2006-01-02")+`"`)
 			var b bytes.Buffer
 			gz := gzip.NewWriter(&b)
-			for _, id := range []string{"OL100W", "OL200A", "OL300M"} {
+			ids := []string{}
+			for id := range f.dumpDocuments {
+				ids = append(ids, id)
+			}
+			sort.Strings(ids)
+			for _, id := range ids {
 				data := f.dumpDocuments[id]
 				body, _ := json.Marshal(data)
 				kind := data["type"].(map[string]any)["key"]
+				part := ""
+				switch kind {
+				case "/type/edition":
+					part = "editions"
+				case "/type/work":
+					part = "works"
+				case "/type/author":
+					part = "authors"
+				case "/type/redirect":
+					part = "redirects"
+				}
+				if strings.Contains(r.URL.Path, "_editions_") || strings.Contains(r.URL.Path, "_works_") || strings.Contains(r.URL.Path, "_authors_") || strings.Contains(r.URL.Path, "_redirects_") {
+					if !strings.Contains(r.URL.Path, "_"+part+"_") {
+						continue
+					}
+				}
 				fmt.Fprintf(gz, "%s\t%s\t%v\t%s\t%s\n", kind, books.Path(id), data["revision"], f.day.Format("2006-01-02"), body)
 			}
 			_ = gz.Close()
-			_, _ = w.Write(b.Bytes())
+			body := b.Bytes()
+			if f.brokenDumpPart != "" && strings.Contains(r.URL.Path, "_"+f.brokenDumpPart+"_") {
+				body = body[:len(body)-8]
+			}
+			_, _ = w.Write(body)
 			return
 		}
 		if r.URL.Path == "/api/get_many" {

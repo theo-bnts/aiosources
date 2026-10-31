@@ -11,6 +11,7 @@ import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Badge } from '@/components/ui/badge'
+import { Disclosure } from '@/components/ui/disclosure'
 import { Statistic } from '@/components/statistic'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { useDate } from '@/lib/format'
@@ -156,13 +157,21 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
   const query = useQuery({
     queryKey: ['aiosource', 'information'],
     queryFn: ({ signal }) => api<InformationStatus>('/aiosource/information', { signal }),
-    refetchInterval: COLLECTION_REFRESH_INTERVAL,
+    // A reset can finish between ordinary statistics refreshes. Follow it at
+    // the control cadence, then return to the normal statistics interval.
+    refetchInterval: (query) =>
+      query.state.data?.maintenance?.status === 'running'
+        ? LIVE_REFRESH_INTERVAL()
+        : COLLECTION_REFRESH_INTERVAL(),
   })
   const status = query.data
   const books = status?.books
   const book = section === 'books'
   const path = `/metadata/${section}`
   const running = book ? Boolean(books?.running) : Boolean(status?.syncing)
+  const resetting =
+    status?.maintenance?.status === 'running' &&
+    (status.maintenance.scope === section || status.maintenance.scope === 'metadata')
   const automatic = book ? status?.config.openlibrary_enabled : status?.config.auto_sync
   const lastSync = book ? books?.last_sync : status?.status.last_sync
   const appliedThrough = book ? books?.changes_through : status?.status.applied_through
@@ -204,11 +213,18 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
               <Statistic
                 label="Synchronization"
                 value={
-                  book
-                    ? books
-                      ? bookSyncLabel(books, automatic)
-                      : 'Not started'
-                    : metadataSyncLabel(status.status, running, automatic, status.recovery_required)
+                  resetting
+                    ? 'Resetting information'
+                    : book
+                      ? books
+                        ? bookSyncLabel(books, automatic)
+                        : 'Not started'
+                      : metadataSyncLabel(
+                          status.status,
+                          running,
+                          automatic,
+                          status.recovery_required,
+                        )
                 }
                 size="sm"
                 to={`${path}/settings`}
@@ -229,7 +245,15 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
               <Statistic
                 label="Next automatic update"
                 value={
-                  running ? 'Running' : !automatic ? 'Disabled' : next ? date(next) : 'Waiting'
+                  resetting
+                    ? 'Waiting for reset'
+                    : running
+                      ? 'Running'
+                      : !automatic
+                        ? 'Disabled'
+                        : next
+                          ? date(next)
+                          : 'Waiting'
                 }
                 size="sm"
                 to={`${path}/settings`}
@@ -237,15 +261,43 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
             </dl>
             <div className="flex flex-wrap gap-2" aria-label="Current activity">
               <Link to={`${path}/history`} aria-label="View update history">
-                <Badge variant={running ? 'info' : needsAttention ? 'warning' : 'secondary'}>
-                  {running
-                    ? 'Update running'
-                    : needsAttention
-                      ? 'Update needs attention'
-                      : 'Update idle'}
+                <Badge
+                  variant={running || resetting ? 'info' : needsAttention ? 'warning' : 'secondary'}
+                >
+                  {resetting
+                    ? 'Reset in progress'
+                    : running
+                      ? 'Update running'
+                      : needsAttention
+                        ? 'Update needs attention'
+                        : 'Update idle'}
                 </Badge>
               </Link>
             </div>
+            {book && books && books.position > 0 && (
+              <Disclosure title="Import details">
+                <dl className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-sm text-muted-foreground">Records read from exports</dt>
+                    <dd className="mt-1 font-medium tabular-nums">
+                      {books.position.toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm text-muted-foreground">Excluded by catalog filters</dt>
+                    <dd className="mt-1 font-medium tabular-nums">
+                      {(books.filtered ?? 0).toLocaleString()}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm text-muted-foreground">Unreadable records</dt>
+                    <dd className="mt-1 font-medium tabular-nums">
+                      {books.skipped.toLocaleString()}
+                    </dd>
+                  </div>
+                </dl>
+              </Disclosure>
+            )}
           </>
         )
       )}

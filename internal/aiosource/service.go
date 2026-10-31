@@ -3,6 +3,7 @@ package aiosource
 import (
 	"context"
 	"errors"
+	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
@@ -38,6 +39,7 @@ type Service struct {
 	syncCancel, matchCancel   context.CancelFunc
 	syncRunning, matchRunning bool
 	lastError                 string
+	reset                     ResetState
 	flights                   map[string]*flight
 	probes                    map[string]*adProbe
 	visitorPreparations       map[string]visitorPreparation
@@ -150,6 +152,25 @@ func (s *Service) State() (bool, bool, string) {
 var secretRefRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
 func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
+	languages, valid := books.ImportLanguages(c.OpenLibraryLanguages)
+	if !valid {
+		return model.ErrInvalid
+	}
+	c.OpenLibraryLanguages = languages
+	current, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		return err
+	}
+	if store.BookSelectionKey(current) != store.BookSelectionKey(c) {
+		release, locked, err := s.DB.AIOLock(ctx, "openlibrary")
+		if err != nil {
+			return err
+		}
+		if !locked {
+			return model.ErrBusy
+		}
+		defer release()
+	}
 	if c.OpenLibraryMinutes < 5 || c.OpenLibraryMinutes > 1440 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid
 	}
@@ -216,7 +237,7 @@ func (s *Service) startJob(syncJob bool, run func(context.Context) error) error 
 	if s.closed {
 		return model.ErrConflict
 	}
-	if (syncJob && s.syncRunning) || (!syncJob && s.matchRunning) {
+	if s.reset.Status == "running" || (syncJob && s.syncRunning) || (!syncJob && s.matchRunning) {
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
@@ -262,58 +283,6 @@ func (s *Service) Stop(syncJob, matchJob bool) {
 	}
 	if matchJob && s.matchCancel != nil {
 		s.matchCancel()
-	}
-}
-func (s *Service) Reset(ctx context.Context, scope string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closed || (scope != "cache" && (s.syncRunning || s.matchRunning || s.booksRunning)) {
-		return model.ErrBusy
-	}
-	var releases []func()
-	if scope == "metadata" || scope == "mapping" || scope == "books" || scope == "videos" {
-		names := []string{"matcher"}
-		if scope == "books" {
-			names = append(names, "openlibrary")
-		}
-		if scope == "metadata" || scope == "videos" {
-			names = append(names, "metadata", "openlibrary")
-		}
-		for _, name := range names {
-			release, locked, err := s.DB.AIOLock(ctx, name)
-			if err != nil || !locked {
-				for _, release := range releases {
-					release()
-				}
-				if err != nil {
-					return err
-				}
-				return model.ErrBusy
-			}
-			releases = append(releases, release)
-		}
-		defer func() {
-			for _, release := range releases {
-				release()
-			}
-		}()
-	}
-	switch scope {
-	case "mapping":
-		return s.DB.ResetAIOMapping(ctx)
-	case "books":
-		return s.DB.ResetBookInformation(ctx)
-	case "videos":
-		return s.DB.ResetVideoInformation(ctx)
-	case "metadata":
-		return s.DB.ResetAIOMetadata(ctx)
-	case "cache":
-		for _, f := range s.flights {
-			f.cancel()
-		}
-		return s.DB.ResetAIOCache(ctx)
-	default:
-		return model.ErrInvalid
 	}
 }
 func (s *Service) Match(ctx context.Context) error {
