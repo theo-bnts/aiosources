@@ -111,7 +111,7 @@ export function SourceStatisticsPage() {
       {providers.isPending ? (
         <Loading />
       ) : visible.length ? (
-        <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((source) => (
             <section key={source.id} className="section-card">
               <h2 className="section-title">

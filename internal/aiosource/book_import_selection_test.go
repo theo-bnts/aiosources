@@ -8,6 +8,46 @@ import (
 	"time"
 )
 
+func TestSelectedBookChangesImportAnEditionThatBecomesDigitalAfterExclusion(t *testing.T) {
+	ctx, s, conn := testService(t)
+	f := selectedBookFixture(t, s)
+	c, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.OpenLibraryRelevantOnly = true
+	if err = s.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.SyncBooks(ctx, "manual"); err != nil {
+		t.Fatal(err)
+	}
+	var excluded bool
+	if err = conn.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM ingest.ol_editions WHERE id='OL900M')`).Scan(&excluded); err != nil || !excluded {
+		t.Fatal("print-only edition was not initially excluded", err)
+	}
+	f.mu.Lock()
+	initialExports := f.dumpCalls
+	f.documents["OL900M"] = bookAPIRecord("OL900M", 2, map[string]any{"title": "Unrelated Printed Work", "physical_format": "EPUB", "works": []any{map[string]any{"key": "/works/OL800W"}}})
+	f.documents["OL800W"] = f.dumpDocuments["OL800W"]
+	f.rows = append([]bookAPIEvent{{ID: "103", Timestamp: f.time.Add(time.Hour).Format(time.RFC3339Nano), Changes: []map[string]any{{"key": "/books/OL900M", "revision": 2}}}}, f.rows...)
+	f.mu.Unlock()
+	bookFeedDue(t, ctx, conn)
+	if err = s.SyncBooks(ctx, "manual"); err != nil {
+		t.Fatal(err)
+	}
+	state, err := s.DB.OpenLibraryStatus(ctx)
+	if err != nil || state.Works != 2 || state.Editions != 3 || state.Pending != 0 {
+		t.Fatal("change feed did not admit the newly digital edition and its book", state, err)
+	}
+	f.mu.Lock()
+	exports := f.dumpCalls
+	f.mu.Unlock()
+	if exports != initialExports {
+		t.Fatal("newly digital edition required another catalog export", initialExports, exports)
+	}
+}
+
 func TestSelectedBookChangesRemoveExcludedEditionsAndDiscoverNewDependencies(t *testing.T) {
 	ctx, s, conn := testService(t)
 	f := selectedBookFixture(t, s)

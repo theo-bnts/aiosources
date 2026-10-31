@@ -132,7 +132,7 @@ export function RemoteStatisticsPage() {
               <ResultCount total={0} label="remote catalogs" />
             )}
             {visible.length ? (
-              <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {visible.map((remote) => (
                   <section
                     key={remote.id}
