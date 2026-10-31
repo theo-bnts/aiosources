@@ -93,11 +93,23 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(changed)
-  await page.goto('/import-settings')
+  await page.goto('/import-settings?q=Original')
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(changed)
-  await expect(page).toHaveURL(/\/providers\/settings\?settings=advanced#advanced-import-settings$/)
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === '/providers/settings' &&
+      url.searchParams.get('settings') === 'advanced' &&
+      url.searchParams.get('q') === 'Original' &&
+      url.hash === '#advanced-import-settings',
+  )
+  await toggle.click()
+  await expect(section).not.toHaveAttribute('open', '')
+  await page.getByLabel('Find a source', { exact: true }).fill('Bookmarked source filter')
+  await expect(page).toHaveURL((url) => url.searchParams.get('q') === 'Bookmarked source filter')
+  await expect(section).not.toHaveAttribute('open', '')
+  await expect(form).toBeHidden()
 })
 
 test('moved import settings preserve validation, persisted policies and concurrent-edit drafts', async ({

@@ -14,21 +14,21 @@ export function SourceImportSettings() {
   const container = useRef<HTMLDetailsElement>(null)
   const [open, setOpen] = useState(false)
   const [visited, setVisited] = useState(false)
+  const legacyBookmark =
+    location.hash === '#advanced-import-settings' ||
+    (!location.hash && new URLSearchParams(location.search).get('settings') === 'advanced')
   useEffect(() => {
     if (open) setVisited(true)
   }, [open])
   useEffect(() => {
     // Older bookmarks still lead to the import controls. Ordinary visits and
     // field-level settings-search links start with every optional section closed.
-    if (
-      location.hash === '#advanced-import-settings' ||
-      (!location.hash && new URLSearchParams(location.search).get('settings') === 'advanced')
-    ) {
+    if (legacyBookmark) {
       setOpen(true)
       container.current?.scrollIntoView({ block: 'start' })
       container.current?.querySelector('summary')?.focus({ preventScroll: true })
     }
-  }, [location.hash, location.search])
+  }, [legacyBookmark])
   return (
     <SettingsSections>
       <Disclosure
