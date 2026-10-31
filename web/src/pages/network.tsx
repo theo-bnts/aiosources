@@ -2,7 +2,7 @@ import { debridProviders } from '@/lib/debrid'
 import { randomID } from '@/lib/random-id'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
-import { AdvancedSettings } from '@/components/advanced-settings'
+import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
@@ -231,9 +231,9 @@ export function NetworkPage() {
           />
         ))
       )}
-      <AdvancedSettings>
+      <SettingsSections>
         <RuntimeSettingsPanel section="outgoing" />
-      </AdvancedSettings>
+      </SettingsSections>
       {editing && (
         <ProxyEditor
           key={editing.proxy.id}
@@ -335,7 +335,7 @@ function ProxyEditor({
               Use an address reachable from AIOSources. Keep credentials in Secrets.
             </p>
           </div>
-          <Disclosure title="Advanced">
+          <Disclosure title="Authentication">
             <SecretPicker
               label="Username"
               value={draft.username_ref ?? ''}

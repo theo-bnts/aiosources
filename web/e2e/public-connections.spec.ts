@@ -90,10 +90,10 @@ test('public connections share the shell and encrypted Torznab filters without v
     expect(await visitor.locator('summary').allTextContents()).toEqual([
       'Filters',
       'Sorting',
-      'Advanced',
+      'Private source playback',
       'Full endpoint URL',
     ])
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     const own = 'https://announce.example.invalid/visitor-private-passkey/announce'
     const announceField = visitor.getByLabel('Example Library announce URL', { exact: true })
     await announceField.fill(own)
@@ -124,7 +124,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     // Announce-only Torznab setup is remembered too, without inventing a debrid
     // key or requiring the visitor to re-enter the URL on another public page.
     await visitor.reload()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(announceField).toHaveAttribute('placeholder', /Saved on this browser/)
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
     await expect(key).not.toHaveValue('')
@@ -134,14 +134,14 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(
       visitor.getByRole('button', { name: 'Create installation link', exact: true }),
     ).toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(announceField).toHaveAttribute('placeholder', /Saved on this browser/)
     await expect(visitor.getByLabel('TorBox API key', { exact: true })).toHaveValue('')
     await navigation.getByRole('link', { name: 'Torznab', exact: true }).click()
     await expect(
       visitor.getByRole('button', { name: 'Create connection link', exact: true }),
     ).toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await visitor.getByRole('button', { name: 'Remove announce', exact: true }).click()
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
     await expect(key).not.toHaveValue('')

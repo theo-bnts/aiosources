@@ -964,10 +964,8 @@ function ShareForm({
             }
           />
         )}
-        <Disclosure title="Advanced">
-          <Disclosure title="Request limits">{requestLimits}</Disclosure>
-          <Disclosure title="Expiration">{expiration}</Disclosure>
-        </Disclosure>
+        <Disclosure title="Request limits">{requestLimits}</Disclosure>
+        <Disclosure title="Expiration">{expiration}</Disclosure>
       </fieldset>
       <p className="help">
         {original

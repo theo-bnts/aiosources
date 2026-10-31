@@ -117,7 +117,7 @@ for (const connection of ['stremio', 'search', 'torznab'] as const) {
         await expect(removed).toBeFocused()
         await expect(retained).toHaveValue('synthetic-retained-torbox-replacement')
       }
-      await visitor.locator('summary', { hasText: /^Advanced$/ }).click()
+      await visitor.locator('summary', { hasText: /^Private source playback$/ }).click()
       const removed = visitor.getByLabel('First library announce URL', { exact: true })
       const retained = visitor.getByLabel(`${secondLibrary} announce URL`, { exact: true })
       expect(

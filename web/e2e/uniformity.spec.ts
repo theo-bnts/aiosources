@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import { test, expect, addRemotePassword } from './fixtures'
 
@@ -167,7 +168,7 @@ test('source, schedule and remote editors disable no-op saves and clear reverted
   await expect(save).toBeDisabled()
   await page.getByRole('tab', { name: 'Schedules', exact: true }).click()
   await expect(save).toBeDisabled()
-  await page.getByText('Advanced', { exact: true }).click()
+  await openDisclosure(page, 'Collection policy')
   const budget = page.getByLabel('Page budget per tick', { exact: true })
   await budget.fill('12')
   await expect(save).toBeEnabled()

@@ -7,14 +7,12 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
   page,
 }) => {
   await page.goto('/metadata/identification/settings')
-  const advanced = page
-    .locator('details')
-    .filter({ has: page.locator('summary', { hasText: /^Advanced$/ }) })
-  await advanced.locator(':scope > summary').click()
-  const processing = advanced
-    .locator('details')
-    .filter({ has: page.locator('summary', { hasText: /^Identification processing$/ }) })
-  await processing.locator('summary').click()
+  const processing = page.locator('details').filter({
+    has: page.locator(':scope > summary', { hasText: /^Identification processing$/ }),
+  })
+  await expect(processing).not.toHaveAttribute('open', '')
+  await expect(processing.locator('xpath=ancestor::details')).toHaveCount(0)
+  await openDisclosure(page, 'Identification processing')
   const form = processing.getByRole('form', { name: 'Identification processing' })
   await form.getByLabel('Queued torrents per pass', { exact: true }).fill('10')
   await expect(form).toContainText('The saved batch cannot exceed the queued batch.')

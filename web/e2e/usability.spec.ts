@@ -312,7 +312,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await expect(save).toBeDisabled()
   await page.getByLabel('Daily time', { exact: true }).fill('02:30')
   await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue('Europe/Paris')
-  await page.getByText('Advanced', { exact: true }).click()
+  await page.getByText('Collection policy', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('12')
   await save.click()
   await expect(save).toBeDisabled()
@@ -335,7 +335,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await expect(save).toBeDisabled()
   await page.reload()
   await expect(page.getByLabel('Cron expression', { exact: true })).toHaveValue(custom)
-  await page.getByText('Advanced', { exact: true }).click()
+  await page.getByText('Collection policy', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('13')
   await save.click()
   await expect(save).toBeDisabled()
@@ -370,7 +370,7 @@ test('source schedule conflicts merge untouched controls while preserving local 
   })
   const original = await source(page, 'schedule-conflict')
   await page.goto('/providers/schedule-conflict#schedules')
-  await page.getByText('Advanced', { exact: true }).click()
+  await page.getByText('Collection policy', { exact: true }).click()
   await page.getByLabel('Page budget per tick').fill('12')
   const session = await (await page.request.get('/api/session')).json()
   expect(
@@ -590,7 +590,7 @@ test.describe('real local imports', () => {
         await expect(
           dialog.getByText('The first update automatically', { exact: false }),
         ).toBeVisible()
-        await dialog.getByText('Advanced', { exact: true }).click()
+        await dialog.getByText('Import limits', { exact: true }).click()
         await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('1')
         await dialog.getByLabel('Duration budget per attempt (seconds)', { exact: true }).fill('30')
         await dialog.getByLabel('Known pages (X)', { exact: true }).fill('1')

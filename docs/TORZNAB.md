@@ -8,7 +8,7 @@ Torznab lets applications such as Prowlarr search the torrent records already im
 
 1. Open **Connections → Torznab** and choose **Create access**.
 2. Give the connection a name. Leave **Filters → Sources** on all sources, or select the sources and media types you want.
-3. Optionally set cache-service, language and result filters or sorting priorities. **Advanced** contains request limits and expiration.
+3. Optionally set cache-service, language and result filters or sorting priorities. **Request limits** and **Expiration** are optional, separate sections.
 4. Create the access and save the generated API key when shown. Enable the connection.
 5. Add a generic Torznab indexer in your client, using the supplied Torznab URL and API key.
 
@@ -28,7 +28,7 @@ Private-source downloads need an authorized announce URL. Treat a private Torzna
 
 If an instance offers public Torznab, open **Connections → Torznab** on its visitor page and generate your configuration. The connection options are carried in the generated access; visitor API keys are not saved in the server database.
 
-When the administrator allows source exposure, optional private-source announce URLs are entered under **Advanced**. The administrator's announces are never supplied to visitors. Public Torznab accepts no debrid account keys; see the [public-instance guide](PUBLIC_INSTANCES.md).
+When the administrator allows source exposure, optional private-source announce URLs are entered under **Private source playback**. The administrator's announces are never supplied to visitors. Public Torznab accepts no debrid account keys; see the [public-instance guide](PUBLIC_INSTANCES.md).
 
 ## Troubleshooting
 

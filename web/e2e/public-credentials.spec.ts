@@ -89,7 +89,7 @@ test('personal announces follow encrypted services across public Search, Stremio
     await expect(
       visitor.getByRole('button', { name: 'Start searching', exact: true }),
     ).toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await visitor.getByLabel('TorBox API key', { exact: true }).fill(key)
     const field = visitor.getByLabel('Example Library announce URL', { exact: true })
     await field.fill(announce)
@@ -98,7 +98,7 @@ test('personal announces follow encrypted services across public Search, Stremio
     await visitor.reload()
     await expect(visitor.getByLabel('Title, author or identifier', { exact: true })).toBeVisible()
     await visitor.locator('summary', { hasText: 'Debrid services' }).click()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(field).toHaveValue('')
     await expect(field).toHaveAttribute('placeholder', /Saved on this browser/)
     const nav = visitor.getByRole('navigation', { name: 'Main navigation' })
@@ -106,7 +106,7 @@ test('personal announces follow encrypted services across public Search, Stremio
     await expect(
       visitor.getByRole('button', { name: 'Create installation link', exact: true }),
     ).toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(field).toHaveAttribute('placeholder', /Saved on this browser/)
     await visitor.getByRole('button', { name: 'Create installation link', exact: true }).click()
     await expect(visitor.getByLabel('Manifest URL', { exact: true })).not.toHaveValue('')
@@ -114,7 +114,7 @@ test('personal announces follow encrypted services across public Search, Stremio
     await expect(
       visitor.getByRole('button', { name: 'Create connection link', exact: true }),
     ).toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(field).toHaveAttribute('placeholder', /Saved on this browser/)
     await visitor.getByRole('button', { name: 'Create connection link', exact: true }).click()
     await expect(visitor.getByLabel('API key', { exact: true })).not.toHaveValue('')

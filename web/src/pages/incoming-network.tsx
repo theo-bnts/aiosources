@@ -1,5 +1,5 @@
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
-import { AdvancedSettings } from '@/components/advanced-settings'
+import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
@@ -316,11 +316,11 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
         )
       )}
       {proxy && (
-        <AdvancedSettings>
+        <SettingsSections>
           <RuntimeSettingsPanel section="connections" />
           <RuntimeSettingsPanel section="downloads" />
           <RuntimeSettingsPanel section="payloads" />
-        </AdvancedSettings>
+        </SettingsSections>
       )}
     </div>
   )

@@ -54,7 +54,7 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   payloads: ['/network/incoming', 'Administration / Network / Incoming'],
   history: ['/health/settings', 'Administration / Storage'],
   security: ['/security/settings', 'Administration / Security'],
-  source_retries: ['/providers/settings?settings=advanced', 'Sources / Sources'],
+  source_retries: ['/providers/settings', 'Sources / Sources'],
   identification: ['/metadata/identification/settings', 'Metadata / Identification'],
   matching: ['/metadata/identification/settings', 'Metadata / Identification'],
   metadata: ['/metadata/videos/settings', 'Metadata / Videos'],
@@ -70,7 +70,7 @@ for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
       route,
       group: `${group} / ${definition.title}`,
       control: `runtime-${section}-${key}`,
-      reveal: ['Advanced', definition.title],
+      reveal: [definition.title],
       keywords: `${section.replaceAll('_', ' ')} ${key.replaceAll('_', ' ')} ${definition.help}`,
     })
 }
@@ -78,17 +78,17 @@ for (const [key, field] of Object.entries(importNumberFields))
   settings.push({
     id: `imports.${key}`,
     title: field.label,
-    route: '/providers/settings?settings=advanced',
+    route: '/providers/settings',
     group: `Sources / Sources / Import execution / ${importCategory(key)}`,
     control: `collection-${key}`,
-    reveal: ['Advanced', 'Import execution', importCategory(key)],
+    reveal: ['Import execution', importCategory(key)],
     keywords: field.help,
   })
 add(
   {
-    route: '/providers/settings?settings=advanced',
+    route: '/providers/settings',
     group: 'Sources / Sources / Import execution',
-    reveal: ['Advanced', 'Import execution'],
+    reveal: ['Import execution'],
   },
   [
     ['imports.progress', 'At the no-progress threshold', 'pause stop no progress'],
@@ -176,7 +176,7 @@ add(
     route: '/debrid/settings',
     group: 'Debrid / Private source playback',
     entity: 'tracker',
-    reveal: ['Advanced', 'Private source playback'],
+    reveal: ['Private source playback'],
   },
   [
     ['tracker.private', 'Private source', 'private tracker privee'],
@@ -197,7 +197,7 @@ settings.push({
   route: '/health/settings',
   group: 'Administration / Storage / Maintenance',
   label: 'Reset all source data',
-  reveal: ['Advanced', 'Maintenance'],
+  reveal: ['Maintenance'],
   keywords: 'reset delete reinitialiser supprimer maintenance',
 })
 add(
@@ -282,14 +282,14 @@ add(
 for (const setting of settings.filter(
   (entry) => entry.entity === 'proxy' && ['Username', 'Password'].includes(entry.title),
 ))
-  setting.reveal = ['Advanced']
+  setting.reveal = ['Authentication']
 settings.push({
   id: 'security.secret-references',
   title: 'Using references in JSON',
-  group: 'Administration / Security / Advanced',
+  group: 'Administration / Security / Settings',
   route: '/security/settings',
   control: 'secret-reference-help',
-  reveal: ['Advanced', 'Using references in JSON'],
+  reveal: ['Using references in JSON'],
   keywords: 'secrets auth.secret_ref auth.username_ref auth.password_ref http.secret_headers',
 })
 settings.push(
@@ -449,10 +449,10 @@ for (const [entity, route, name] of [
       id: `${entity}.${key}`,
       title,
       route,
-      group: `${group} / Advanced`,
+      group: `${group} / ${key === 'expires' ? 'Expiration' : 'Request limits'}`,
       entity,
       control,
-      reveal: ['Advanced', key === 'expires' ? 'Expiration' : 'Request limits'],
+      reveal: [key === 'expires' ? 'Expiration' : 'Request limits'],
       keywords: 'expiration expiry rate limits expiration limites',
     })
 }
@@ -703,11 +703,14 @@ for (const [area, route] of [
     title: 'Private source announce URLs',
     group:
       area === 'search'
-        ? 'Search / Advanced'
-        : `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'} / Advanced`,
+        ? 'Search / Private source playback'
+        : `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'} / Private source playback`,
     route,
     control: 'public-announce-settings',
-    reveal: area === 'search' ? ['Debrid services', 'Advanced'] : ['Advanced'],
+    reveal:
+      area === 'search'
+        ? ['Debrid services', 'Private source playback']
+        : ['Private source playback'],
     public: area,
     keywords: 'private tracker passkey annonce sources',
   })
@@ -764,7 +767,7 @@ for (const [area, route] of [
 for (const setting of settings) {
   if (setting.id === 'imports.progress' || setting.id === 'imports.recovery') {
     const category = setting.id === 'imports.recovery' ? 'Recovery' : 'Useful progress'
-    setting.reveal = ['Advanced', 'Import execution', category]
+    setting.reveal = ['Import execution', category]
     setting.group += ` / ${category}`
   }
 }

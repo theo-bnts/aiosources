@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { test, expect } from './fixtures'
 
 test('Stremio saves independent sorting priorities, optional limits and a timeout, keeping the disabled limit', async ({
@@ -29,7 +30,6 @@ test('Stremio saves independent sorting priorities, optional limits and a timeou
   await editor.getByLabel('Then by (3)', { exact: true }).selectOption('size')
   await editor.getByRole('button', { name: 'Sort 3 direction: descending', exact: true }).click()
   await expect(editor.getByLabel('Preferred language', { exact: true })).toBeEnabled()
-  await editor.locator('summary', { hasText: /^Advanced$/ }).click()
   await expect(
     editor.locator('summary').filter({ hasText: /^(Request limits|Expiration)$/ }),
   ).toHaveText(['Request limits', 'Expiration'])
@@ -121,7 +121,7 @@ test('public Stremio and Torznab use the same optional controls without creating
 test('source execution has grouped disclosures and one save, while torrent sorting keeps a normal query URL', async ({
   page,
 }) => {
-  await page.goto('/providers/settings?settings=advanced')
+  await page.goto('/providers/settings')
   await page.locator('summary', { hasText: /^Import execution$/ }).click()
   const form = page.getByRole('form', { name: 'Import execution', exact: true })
   await expect(form.locator('summary')).toHaveText([
@@ -138,6 +138,7 @@ test('source execution has grouped disclosures and one save, while torrent sorti
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.goto('/torrents')
+  await openDisclosure(page, 'Sorting')
   await page.getByLabel('Sort by', { exact: true }).selectOption('size_desc')
   await page.getByRole('button', { name: 'Sort direction: descending', exact: true }).click()
   await page.getByRole('button', { name: 'Search', exact: true }).click()

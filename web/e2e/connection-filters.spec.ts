@@ -247,7 +247,7 @@ test('saved service selections remain editable without widening access after a k
 })
 
 for (const format of ['stremio', 'torznab'] as const) {
-  test(`${format} defaults to all sources without limits and keeps optional policies in Advanced`, async ({
+  test(`${format} defaults to all sources without limits and keeps optional policies in separate sections`, async ({
     page,
     server,
   }) => {
@@ -292,15 +292,15 @@ for (const format of ['stremio', 'torznab'] as const) {
     expect(await editor.locator('summary').allTextContents()).toEqual([
       'Filters',
       'Sorting',
-      'Advanced',
       'Request limits',
       'Expiration',
     ])
+    await expect(editor.locator('details[open]')).toHaveCount(0)
+    await expect(editor.locator('details details')).toHaveCount(0)
     await editor.locator('summary', { hasText: /^Filters$/ }).click()
     await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
       'All sources',
     )
-    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
     await editor.locator('summary', { hasText: /^Request limits$/ }).click()
     await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await expect(editor.getByLabel('Requests per minute', { exact: true })).toHaveValue('')
@@ -355,7 +355,6 @@ for (const format of ['stremio', 'torznab'] as const) {
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitemcheckbox', { name: 'Alpha library', exact: true }).click()
     await page.keyboard.press('Escape')
-    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
     await editor.locator('summary', { hasText: /^Request limits$/ }).click()
     await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await editor.getByLabel('Requests per minute', { exact: true }).fill('9')
@@ -380,7 +379,6 @@ for (const format of ['stremio', 'torznab'] as const) {
     )
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitem', { name: 'All sources', exact: true }).click()
-    await editor.locator('summary', { hasText: /^Advanced$/ }).click()
     await editor.locator('summary', { hasText: /^Request limits$/ }).click()
     await editor.locator('summary', { hasText: /^Expiration$/ }).click()
     await editor.getByLabel('Requests per minute', { exact: true }).fill('')

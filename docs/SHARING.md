@@ -9,7 +9,7 @@ Share selected catalog information with another AIOSources instance, or keep a s
 1. Configure an external HTTPS address in `PUBLIC_URL`.
 2. Open **Connections → Shared catalogs → Settings → Create share** and give the recipient a recognizable name.
 3. In **Filters**, keep all sources or select specific ones.
-4. Choose the published torrent fields and optional groups under **Shared data**. Expand **Advanced** if you need expiration or request limits.
+4. Choose the published torrent fields and optional groups under **Shared data**. Expand **Request limits** or **Expiration** when needed.
 5. Create the share, save its generated password and enable it. Send its URL and password privately to the recipient.
 
 New shares start disabled. Replacing a password or disabling a share stops future access; it cannot erase copies a recipient has already downloaded. Give separate recipients separate shares.

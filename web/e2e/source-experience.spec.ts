@@ -64,6 +64,7 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   await dialog.getByRole('button', { name: 'Confirm identification', exact: true }).click()
   expect((await saving).status()).toBe(204)
   await expect(dialog).toBeHidden()
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
   await page
     .getByRole('form', { name: 'Identification filters', exact: true })

@@ -1,15 +1,14 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { revealSettingParents } from '@/lib/settings-navigation'
-import { Disclosure } from '@/components/ui/disclosure'
 
 // Independent forms and actions belong in sibling disclosures. This container
 // only groups them; it never owns a Save button or unmounts a folded draft.
-export function AdvancedSettings({ children }: { children: ReactNode }) {
+export function SettingsSections({ children }: { children: ReactNode }) {
   const { hash, key } = useLocation()
-  const container = useRef<HTMLDetailsElement>(null)
+  const container = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    // Preserve existing links such as #maintenance after nesting their section.
+    // Preserve direct section links such as #maintenance.
     // Settings-search links have their own field-level navigation.
     const anchor = /^#([a-z][a-z0-9-]*)$/.exec(hash)?.[1]
     const target = anchor ? document.getElementById(anchor) : null
@@ -24,8 +23,8 @@ export function AdvancedSettings({ children }: { children: ReactNode }) {
     return () => cancelAnimationFrame(frame)
   }, [hash, key])
   return (
-    <Disclosure ref={container} title="Advanced">
+    <div ref={container} className="space-y-6">
       {children}
-    </Disclosure>
+    </div>
   )
 }

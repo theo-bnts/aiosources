@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { test, expect } from './fixtures'
 
 test('public books use the same title and file controls without administration or hidden source names', async ({
@@ -112,6 +113,7 @@ test('public books use the same title and file controls without administration o
     await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-book-visitor-key')
     await visitor.getByRole('button', { name: 'Start searching', exact: true }).click()
     await visitor.getByLabel('Title, author or identifier', { exact: true }).fill('Morgan Orchard')
+    await openDisclosure(visitor, 'Filters')
     await visitor.getByLabel('Type', { exact: true }).selectOption('ebook')
     await visitor.getByRole('button', { name: 'Search', exact: true }).click()
     await visitor.getByRole('link', { name: 'Le Verger Ambré', exact: true }).click()

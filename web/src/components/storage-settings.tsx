@@ -1,5 +1,5 @@
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
-import { AdvancedSettings } from '@/components/advanced-settings'
+import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -144,7 +144,7 @@ export function StorageSettingsPanel() {
           )
         )}
       </section>
-      <AdvancedSettings>
+      <SettingsSections>
         <RuntimeSettingsPanel section="history" />
         <Disclosure
           id="maintenance"
@@ -183,7 +183,7 @@ export function StorageSettingsPanel() {
             {resetUnavailableReason}
           </p>
         </Disclosure>
-      </AdvancedSettings>
+      </SettingsSections>
     </>
   )
 }

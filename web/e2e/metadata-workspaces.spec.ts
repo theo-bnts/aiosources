@@ -199,6 +199,7 @@ test('book reset stays visible across pages without tying its lifetime to the br
     await expect(confirmation).toBeHidden()
     await expect(page.getByLabel('Maintenance status')).toContainText('being reset')
     await expect(reset).toBeDisabled()
+    await openDisclosure(page, 'Catalog filters')
     await expect(
       page.getByRole('switch', { name: 'Relevant editions only', exact: true }),
     ).toBeDisabled()

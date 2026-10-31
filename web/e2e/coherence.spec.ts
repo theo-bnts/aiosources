@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 import type { Page } from '@playwright/test'
@@ -93,6 +94,7 @@ test('reviewing changed metadata clears the old choice and refreshes candidate r
   await editor.getByRole('button', { name: 'Confirm identification', exact: true }).click()
   expect((await saved).status()).toBe(204)
   await expect(editor).toHaveCount(0)
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
   await page
     .getByRole('form', { name: 'Identification filters', exact: true })

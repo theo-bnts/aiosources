@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
-import { AdvancedSettings } from '@/components/advanced-settings'
+import { SettingsSections } from '@/components/settings-sections'
 import {
   Dialog,
   DialogClose,
@@ -159,10 +159,10 @@ export function SecuritySettingsPage() {
         <div id="sessions" className="min-w-0 scroll-mt-20">
           <SecurityPage view="sessions" />
         </div>
-        <AdvancedSettings>
+        <SettingsSections>
           <RuntimeSettingsPanel section="security" />
           <SecretReferencesHelp />
-        </AdvancedSettings>
+        </SettingsSections>
       </PageHeaderVisibility.Provider>
     </div>
   )

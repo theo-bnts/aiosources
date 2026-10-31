@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  AdvancedSection,
+  OptionalSection,
   BooleanField,
   FieldGrid,
   FieldSection,
@@ -219,7 +219,7 @@ function HTMLFieldSettings({
       {optionsInline ? (
         extractionOptions
       ) : (
-        <AdvancedSection
+        <OptionalSection
           title={`${label} extraction options`}
           configuredPaths={[
             [...path, 'pattern'],
@@ -228,7 +228,7 @@ function HTMLFieldSettings({
           ]}
         >
           {extractionOptions}
-        </AdvancedSection>
+        </OptionalSection>
       )}
     </div>
   )
@@ -335,14 +335,14 @@ export function HTMLDetailSettings() {
   const { document, change } = useSourceEditor()
   const details = document.kindIn(['html', 'details']) !== undefined
   return (
-    <AdvancedSection
+    <OptionalSection
       title="Detail pages"
       configuredPaths={[['html', 'details']]}
       description="Fetch missing fields from each record’s detail page. Existing listing values are kept. These extra requests use the same authentication, proxy and request limits."
     >
       {details ? (
         <>
-          <AdvancedSection title="Page selection">
+          <OptionalSection title="Page selection">
             <HTMLFieldSettings
               path={['html', 'details', 'url']}
               label="Detail link"
@@ -363,10 +363,10 @@ export function HTMLDetailSettings() {
               action={async () => change((next) => next.deleteIn(['html', 'details']))}
               variant="warning"
             />
-          </AdvancedSection>
-          <AdvancedSection title="Detail field mappings">
+          </OptionalSection>
+          <OptionalSection title="Detail field mappings">
             <HTMLFieldMap path={['html', 'details', 'fields']} detail />
-          </AdvancedSection>
+          </OptionalSection>
         </>
       ) : (
         <Button
@@ -391,7 +391,7 @@ export function HTMLDetailSettings() {
           <PlusIcon /> Configure detail pages
         </Button>
       )}
-    </AdvancedSection>
+    </OptionalSection>
   )
 }
 
@@ -445,63 +445,62 @@ export function HTMLPaginationSettings() {
           help="A marker shown only when no torrents exist. Without a matching marker, a page with no records fails safely instead of replacing your catalog."
         />
       </FieldSection>
-      <AdvancedSection title="Advanced">
-        <AdvancedSection title="Request parameters">
-          <FieldGrid>
-            <JSONField path={['page_size']} label="Page size" integer placeholder="100" />
-            <TextField
-              path={['pagination', 'size_param']}
-              label="Page-size parameter"
-              placeholder="Leave empty for the website’s fixed size"
-            />
-          </FieldGrid>
-          {strategy === 'page' || strategy === 'offset' ? (
-            <SelectField
-              path={['pagination', 'in']}
-              label="Parameter location"
-              choices={['query', 'body']}
-              fallback="URL query (default)"
-              labels={{ query: 'URL query', body: 'POST form' }}
-              help="Form parameters require HTTP method POST."
-            />
-          ) : null}
-        </AdvancedSection>
-        <AdvancedSection
-          title="Response checks"
-          configuredPaths={[
-            ['html', 'total'],
-            ['html', 'current'],
-          ]}
-        >
-          {(['total', 'current'] as const).map((key) => {
-            const label = key === 'total' ? 'Total records' : 'Current position'
-            return document.kindIn(['html', key]) !== undefined ? (
-              <div key={key} className="space-y-4">
-                <h4 className="font-medium">{label}</h4>
-                <HTMLFieldSettings path={['html', key]} label={label} count optionsInline />
-                <Button
-                  variant="warning"
-                  size="sm"
-                  onClick={() => change((next) => next.deleteIn(['html', key]))}
-                >
-                  Remove {label.toLowerCase()} check
-                </Button>
-              </div>
-            ) : (
+
+      <OptionalSection title="Request parameters">
+        <FieldGrid>
+          <JSONField path={['page_size']} label="Page size" integer placeholder="100" />
+          <TextField
+            path={['pagination', 'size_param']}
+            label="Page-size parameter"
+            placeholder="Leave empty for the website’s fixed size"
+          />
+        </FieldGrid>
+        {strategy === 'page' || strategy === 'offset' ? (
+          <SelectField
+            path={['pagination', 'in']}
+            label="Parameter location"
+            choices={['query', 'body']}
+            fallback="URL query (default)"
+            labels={{ query: 'URL query', body: 'POST form' }}
+            help="Form parameters require HTTP method POST."
+          />
+        ) : null}
+      </OptionalSection>
+      <OptionalSection
+        title="Response checks"
+        configuredPaths={[
+          ['html', 'total'],
+          ['html', 'current'],
+        ]}
+      >
+        {(['total', 'current'] as const).map((key) => {
+          const label = key === 'total' ? 'Total records' : 'Current position'
+          return document.kindIn(['html', key]) !== undefined ? (
+            <div key={key} className="space-y-4">
+              <h4 className="font-medium">{label}</h4>
+              <HTMLFieldSettings path={['html', key]} label={label} count optionsInline />
               <Button
-                key={key}
-                variant="outline"
+                variant="warning"
                 size="sm"
-                onClick={() =>
-                  change((next) => next.setIn(['html', key], { selector: '', format: 'integer' }))
-                }
+                onClick={() => change((next) => next.deleteIn(['html', key]))}
               >
-                <PlusIcon /> Add {label.toLowerCase()} check
+                Remove {label.toLowerCase()} check
               </Button>
-            )
-          })}
-        </AdvancedSection>
-      </AdvancedSection>
+            </div>
+          ) : (
+            <Button
+              key={key}
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                change((next) => next.setIn(['html', key], { selector: '', format: 'integer' }))
+              }
+            >
+              <PlusIcon /> Add {label.toLowerCase()} check
+            </Button>
+          )
+        })}
+      </OptionalSection>
     </>
   )
 }

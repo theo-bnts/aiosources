@@ -62,18 +62,18 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     await expect(
       visitor.getByRole('heading', { name: 'Connect your debrid services' }),
     ).toBeVisible()
-    await expect(visitor.locator('summary', { hasText: 'Advanced' })).toHaveCount(0)
+    await expect(visitor.locator('summary', { hasText: 'Private source playback' })).toHaveCount(0)
     const permission = access.getByLabel('Expose source names and filters', { exact: true })
     await expect(permission).not.toBeChecked()
     await permission.check()
     await expect(access).toContainText('Applies to Search, Stremio and Torznab')
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-    await expect(visitor.locator('summary', { hasText: 'Advanced' })).toBeVisible()
+    await expect(visitor.locator('summary', { hasText: 'Private source playback' })).toBeVisible()
     expect(await visitor.locator('summary').allTextContents()).toEqual([
       'Filters',
       'Sorting',
-      'Advanced',
+      'Private source playback',
     ])
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeHidden()
     await visitor.locator('summary', { hasText: 'Filters' }).click()
@@ -82,7 +82,7 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeVisible()
     const announce = visitor.getByLabel('Example Library announce URL', { exact: true })
     await expect(announce).not.toBeVisible()
-    await visitor.locator('summary', { hasText: 'Advanced' }).click()
+    await visitor.locator('summary', { hasText: 'Private source playback' }).click()
     await expect(announce).toHaveAttribute('type', 'password')
     await expect(announce).toHaveAttribute('autocomplete', 'off')
     await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-visitor-key')

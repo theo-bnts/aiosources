@@ -83,7 +83,7 @@ test('entity destinations encode identifiers and keep configuration selection se
   assert.equal(settingURL(source, 'new'), '/providers/id/new?configure=new#setting=source.timeout')
   assert.equal(
     settingURL(settingByID('imports.workers')!),
-    '/providers/settings?settings=advanced#setting=imports.workers',
+    '/providers/settings#setting=imports.workers',
   )
   assert.equal(
     settingURL(settingByID('torznab.rate')!, 'new'),

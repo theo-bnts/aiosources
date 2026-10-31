@@ -23,11 +23,10 @@ async function expectControlsWithinGroups(section: Locator) {
   expect(escaped).toEqual([])
 }
 
-test('advanced source forms save independently and folding preserves both drafts', async ({
+test('source setting sections save independently and folding preserves both drafts', async ({
   page,
 }) => {
   const initial = await (await page.request.get('/api/settings/collections')).json()
-  await openDisclosure(page, 'Advanced')
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
   const imports = page.getByRole('form', { name: 'Import execution', exact: true })
@@ -53,7 +52,7 @@ test('advanced source forms save independently and folding preserves both drafts
       .initial_seconds,
   ).toBe(3)
   await delay.fill('4')
-  await page.locator('#advanced-import-settings > summary').click()
+  await page.locator('summary', { hasText: /^Temporary source errors$/ }).click()
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   const guard = page.getByRole('alertdialog')
   await expect(guard).toContainText('temporary source errors')
@@ -62,7 +61,7 @@ test('advanced source forms save independently and folding preserves both drafts
   await expect(delay).toHaveValue('4')
 })
 
-test('advanced groups keep actions inside their section and preserve maintenance bookmarks on mobile', async ({
+test('optional sections start closed at the same level and maintenance bookmarks work on mobile', async ({
   page,
 }) => {
   test.setTimeout(120_000)
@@ -84,16 +83,17 @@ test('advanced groups keep actions inside their section and preserve maintenance
       '/network/outgoing',
     ]) {
       await page.goto(route)
-      const advanced = page.locator('main summary', { hasText: /^Advanced$/ }).locator('..')
-      await expect(advanced).toHaveCount(1)
-      await expect(advanced).not.toHaveAttribute('open', '')
-      await advanced.locator(':scope > summary').click()
-      // Parent categories expose choices, not controls or a misleading Save.
-      await expect(advanced.locator('input:visible, select:visible, button:visible')).toHaveCount(0)
+      await expect(page.locator('main summary', { hasText: /^Advanced$/ })).toHaveCount(0)
+      await expect(page.locator('main details').first()).toBeAttached()
+      await expect(page.locator('main details[open]')).toHaveCount(0)
       if (route.startsWith('/metadata/') || route === '/debrid/settings') {
+        const manual = page.locator('details').filter({
+          has: page.locator(':scope > summary', { hasText: /^Manual actions$/ }),
+        })
+        await expect(manual.locator('xpath=ancestor::details')).toHaveCount(0)
         await openDisclosure(page, 'Manual actions')
-        await expect(advanced.getByRole('button').first()).toBeVisible()
-        await expectControlsWithinGroups(advanced)
+        await expect(manual.getByRole('button').first()).toBeVisible()
+        await expectControlsWithinGroups(manual)
       }
       if (
         process.env.QA_DIRECTORY &&
@@ -127,6 +127,53 @@ test('advanced groups keep actions inside their section and preserve maintenance
     }
   }
   expect(writes).toEqual([])
+})
+
+test('search pages start with closed optional panels and no implicit result restrictions', async ({
+  page,
+}) => {
+  const statuses: string[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === '/api/aiosource/matches')
+      statuses.push(url.searchParams.get('status') ?? '')
+  })
+  for (const width of [320, 1440]) {
+    await page.setViewportSize({ width, height: 1000 })
+    for (const route of ['/search', '/torrents', '/metadata/identification']) {
+      await page.goto(route)
+      await expect(page.locator('main details[open]')).toHaveCount(0)
+      await expect(page.locator('main summary', { hasText: /^Filters$/ })).toBeVisible()
+      if (route === '/search') {
+        await expect(page.locator('#catalog-type')).toHaveValue('')
+        await expect(page.locator('#catalog-year')).toHaveValue('')
+      } else if (route === '/torrents') {
+        await expect(
+          page
+            .getByRole('form', { name: 'Torrents', exact: true })
+            .getByRole('button', { name: 'Sources', exact: true }),
+        ).toBeHidden()
+        await expect(page.getByLabel('Minimum size (bytes)', { exact: true })).toHaveValue('')
+        await expect(page.getByLabel('Maximum size (bytes)', { exact: true })).toHaveValue('')
+      } else {
+        await expect(page.locator('#matching-status')).toHaveValue('all')
+        await expect(page.locator('#matching-source')).toHaveValue('')
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+    }
+  }
+  expect(statuses.length).toBeGreaterThan(0)
+  expect(statuses.every((status) => status === '')).toBe(true)
+  await page.goto('/metadata/identification?match_status=unmatched&match_provider=example')
+  await expect(page.locator('#matching-status')).toHaveValue('unmatched')
+  await expect(page.locator('#matching-source')).toHaveValue('example')
+  await expect(page.locator('main details[open]')).toHaveCount(0)
+  await openDisclosure(page, 'Filters')
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await expect(page.locator('#matching-status')).toHaveValue('all')
+  await expect(page.locator('#matching-source')).toHaveValue('')
 })
 
 test('nested source options stay organized and retain their exact configuration when folded', async ({

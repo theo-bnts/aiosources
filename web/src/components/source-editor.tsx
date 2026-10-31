@@ -29,7 +29,7 @@ import {
   SourceHTMLCompatibility,
 } from '@/components/source-html-fields'
 import {
-  AdvancedSection,
+  OptionalSection,
   ArrayField,
   BooleanField,
   FieldGrid,
@@ -116,14 +116,14 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
         />
       </FieldGrid>
       <SourceHTMLCompatibility />
-      <AdvancedSection title="Advanced">
+      <OptionalSection title="Definition format">
         <JSONField
           path={['version']}
           label="Definition version"
           integer
           help="Current definition version: 1."
         />
-      </AdvancedSection>
+      </OptionalSection>
     </FieldSection>
   )
 }
@@ -148,7 +148,7 @@ function SourceSecretField({ path, label }: { path: string[]; label: string }) {
   )
 }
 
-function AuthenticationSettings({ advanced = false }: { advanced?: boolean }) {
+function AuthenticationSettings({ other = false }: { other?: boolean }) {
   const { document, change } = useSourceEditor()
   const type = document.getIn(['auth', 'type']) || 'none'
   const fields = [
@@ -182,9 +182,9 @@ function AuthenticationSettings({ advanced = false }: { advanced?: boolean }) {
   )
     incompatible.push('in')
   if (!named && document.getIn(['auth', 'name'])) incompatible.push('name')
-  if (advanced)
+  if (other)
     return (
-      <AdvancedSection
+      <OptionalSection
         title="Other authentication settings"
         description="Settings for other authentication types are retained. Editing the type never clears these values."
       >
@@ -197,7 +197,7 @@ function AuthenticationSettings({ advanced = false }: { advanced?: boolean }) {
           {type !== 'api_key' && placement}
           {!named && name}
         </FieldGrid>
-      </AdvancedSection>
+      </OptionalSection>
     )
   return (
     <FieldSection
@@ -348,87 +348,81 @@ function ConnectionSettings() {
           </ArrayField>
         </FieldSection>
       )}
-      <AdvancedSection title="Advanced">
-        {!torznab && (
-          <AdvancedSection
-            title="Additional listings"
-            configuredPaths={[['http', 'listing_paths']]}
+
+      {!torznab && (
+        <OptionalSection title="Additional listings" configuredPaths={[['http', 'listing_paths']]}>
+          <StringArrayField
+            path={['http', 'listing_paths']}
+            label="Additional listing paths"
+            help="Paths on the same source, such as /catalog/audio. Imported after Source URL with the same fields and request settings. Each listing keeps its own pagination and update boundary."
+          />
+        </OptionalSection>
+      )}
+      <AuthenticationSettings other />
+      {!torznab && (
+        <>
+          <OptionalSection
+            title="Incremental ordering"
+            configuredPaths={[['http', 'incremental_query']]}
           >
-            <StringArrayField
-              path={['http', 'listing_paths']}
-              label="Additional listing paths"
-              help="Paths on the same source, such as /catalog/audio. Imported after Source URL with the same fields and request settings. Each listing keeps its own pagination and update boundary."
+            <MapField
+              path={['http', 'incremental_query']}
+              label="Incremental query overrides"
+              help="Applied only during Incremental collection. Configure newest-first ordering independently from Full here."
             />
-          </AdvancedSection>
-        )}
-        <AuthenticationSettings advanced />
-        {!torznab && (
-          <>
-            <AdvancedSection
-              title="Incremental ordering"
-              configuredPaths={[['http', 'incremental_query']]}
-            >
-              <MapField
-                path={['http', 'incremental_query']}
-                label="Incremental query overrides"
-                help="Applied only during Incremental collection. Configure newest-first ordering independently from Full here."
+          </OptionalSection>
+          {document.getIn(['http', 'method']) !== 'POST' && (
+            <OptionalSection title="Request body">
+              <JSONField
+                path={['http', 'body']}
+                label="Request body · JSON"
+                multiline
+                help="Used for POST requests. Existing values are retained when the HTTP method changes."
               />
-            </AdvancedSection>
-            {document.getIn(['http', 'method']) !== 'POST' && (
-              <AdvancedSection title="Request body">
-                <JSONField
-                  path={['http', 'body']}
-                  label="Request body · JSON"
-                  multiline
-                  help="Used for POST requests. Existing values are retained when the HTTP method changes."
-                />
-              </AdvancedSection>
-            )}
-          </>
-        )}
-        <AdvancedSection
-          title={html ? 'Headers' : 'Headers & search'}
-          configuredPaths={[
-            ['http', 'headers'],
-            ['http', 'secret_headers'],
-            ...(!torznab && !html ? [['search']] : []),
-          ]}
-          description="Ordinary headers contain non-secret values. Secret headers map a header name to a vault reference."
-        >
-          <MapField path={['http', 'headers']} label="HTTP headers" strings />
-          <MapField path={['http', 'secret_headers']} label="Secret header references" strings />
-          {!torznab && !html && <TextField path={['search', 'query']} label="Search query" />}
-          {!torznab && !html && (
-            <ArrayField path={['search', 'categories']} label="Categories" initial={0}>
-              {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
-            </ArrayField>
+            </OptionalSection>
           )}
-        </AdvancedSection>
-        {!html && (
-          <AdvancedSection title="Adapter compatibility">
-            {torznab && (
-              <SelectField
-                path={['http', 'method']}
-                label="HTTP method"
-                choices={['GET', 'POST']}
-                fallback="Default · GET"
-              />
-            )}
-            <BooleanField
-              path={['http', 'catalog']}
-              label="Normalized catalog"
-              help="Enable only for a compatible catalog endpoint."
-            />
-            {torznab && (
-              <MapField path={['http', 'query']} label="Base query · Full and all modes" />
-            )}
-            {torznab && (
-              <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
-            )}
-            {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
-          </AdvancedSection>
+        </>
+      )}
+      <OptionalSection
+        title={html ? 'Headers' : 'Headers & search'}
+        configuredPaths={[
+          ['http', 'headers'],
+          ['http', 'secret_headers'],
+          ...(!torznab && !html ? [['search']] : []),
+        ]}
+        description="Ordinary headers contain non-secret values. Secret headers map a header name to a vault reference."
+      >
+        <MapField path={['http', 'headers']} label="HTTP headers" strings />
+        <MapField path={['http', 'secret_headers']} label="Secret header references" strings />
+        {!torznab && !html && <TextField path={['search', 'query']} label="Search query" />}
+        {!torznab && !html && (
+          <ArrayField path={['search', 'categories']} label="Categories" initial={0}>
+            {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
+          </ArrayField>
         )}
-      </AdvancedSection>
+      </OptionalSection>
+      {!html && (
+        <OptionalSection title="Adapter compatibility">
+          {torznab && (
+            <SelectField
+              path={['http', 'method']}
+              label="HTTP method"
+              choices={['GET', 'POST']}
+              fallback="Default · GET"
+            />
+          )}
+          <BooleanField
+            path={['http', 'catalog']}
+            label="Normalized catalog"
+            help="Enable only for a compatible catalog endpoint."
+          />
+          {torznab && <MapField path={['http', 'query']} label="Base query · Full and all modes" />}
+          {torznab && (
+            <MapField path={['http', 'incremental_query']} label="Incremental query overrides" />
+          )}
+          {torznab && <JSONField path={['http', 'body']} label="Request body · JSON" multiline />}
+        </OptionalSection>
+      )}
     </>
   )
 }
@@ -464,9 +458,9 @@ function PaginationSettings() {
       active: strategy !== 'none',
     },
   ]
-  const advanced = (
+  const optionalSettings = (
     <>
-      <AdvancedSection
+      <OptionalSection
         title="Other pagination parameters"
         description="Changing strategy keeps these settings; it never removes fields from the definition."
       >
@@ -492,8 +486,8 @@ function PaginationSettings() {
               />
             ))}
         </FieldGrid>
-      </AdvancedSection>
-      <AdvancedSection
+      </OptionalSection>
+      <OptionalSection
         title="Response checks"
         configuredPaths={[
           ['pagination', 'current_path'],
@@ -512,7 +506,7 @@ function PaginationSettings() {
             placeholder="/meta/current_page"
           />
         </FieldGrid>
-      </AdvancedSection>
+      </OptionalSection>
     </>
   )
   const fields = (
@@ -580,15 +574,14 @@ function PaginationSettings() {
       {torznab ? (
         <>
           <p className="notice">Torznab reads pagination from its RSS response.</p>
-          <AdvancedSection title="Advanced">
-            <AdvancedSection title="Pagination settings">{fields}</AdvancedSection>
-            {advanced}
-          </AdvancedSection>
+
+          <OptionalSection title="Pagination settings">{fields}</OptionalSection>
+          {optionalSettings}
         </>
       ) : (
         <>
           {fields}
-          <AdvancedSection title="Advanced">{advanced}</AdvancedSection>
+          {optionalSettings}
         </>
       )}
     </>
@@ -659,47 +652,46 @@ function MappingSettings() {
           {!torznab && recordSelection}
         </>
       )}
-      <AdvancedSection title="Advanced">
-        {torznab && (
-          <AdvancedSection
-            title="Native identity"
-            configuredPaths={[
-              ['options', 'id_source'],
-              ['options', 'id_pattern'],
-            ]}
-          >
-            <FieldGrid>
-              <SelectField
-                path={['options', 'id_source']}
-                label="Native ID from"
-                choices={['guid', 'link']}
-                fallback="RSS identifier (default)"
-                labels={{ guid: 'RSS identifier', link: 'Item link' }}
-                help="Choose the field containing the source’s stable item identifier."
-              />
-              <TextField
-                path={['options', 'id_pattern']}
-                label="Native ID pattern"
-                placeholder="/items/([0-9]+)"
-                help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
-              />
-            </FieldGrid>
-          </AdvancedSection>
-        )}
-        {torznab && <AdvancedSection title="Record selection">{recordSelection}</AdvancedSection>}
-        {html && <HTMLDetailSettings />}
-        <AdvancedSection
-          title="Output selection"
-          configuredPaths={[['output', 'fields']]}
-          description="Output fields control presentation. Storage → Settings → Data retention controls which mapped fields and processing details are retained. Leave empty for the default output."
+
+      {torznab && (
+        <OptionalSection
+          title="Native identity"
+          configuredPaths={[
+            ['options', 'id_source'],
+            ['options', 'id_pattern'],
+          ]}
         >
-          <StringArrayField
-            path={['output', 'fields']}
-            label="Output fields"
-            help="Use field names or attributes.NAME selectors."
-          />
-        </AdvancedSection>
-      </AdvancedSection>
+          <FieldGrid>
+            <SelectField
+              path={['options', 'id_source']}
+              label="Native ID from"
+              choices={['guid', 'link']}
+              fallback="RSS identifier (default)"
+              labels={{ guid: 'RSS identifier', link: 'Item link' }}
+              help="Choose the field containing the source’s stable item identifier."
+            />
+            <TextField
+              path={['options', 'id_pattern']}
+              label="Native ID pattern"
+              placeholder="/items/([0-9]+)"
+              help="Optional regular expression with one capture group for the native ID. Requires an explicit ID field."
+            />
+          </FieldGrid>
+        </OptionalSection>
+      )}
+      {torznab && <OptionalSection title="Record selection">{recordSelection}</OptionalSection>}
+      {html && <HTMLDetailSettings />}
+      <OptionalSection
+        title="Output selection"
+        configuredPaths={[['output', 'fields']]}
+        description="Output fields control presentation. Storage → Settings → Data retention controls which mapped fields and processing details are retained. Leave empty for the default output."
+      >
+        <StringArrayField
+          path={['output', 'fields']}
+          label="Output fields"
+          help="Use field names or attributes.NAME selectors."
+        />
+      </OptionalSection>
     </>
   )
 }
@@ -714,14 +706,14 @@ function TraversalSettings() {
     document.kindIn(['traversal', 'id_recovery']) === 'object' &&
     document.lengthIn(['traversal', 'enrich_fields']) > 0
   return (
-    <AdvancedSection
+    <OptionalSection
       title="Bounded traversal"
       configuredPaths={[['traversal']]}
-      description="Advanced JSON collection across overlapping search windows. Configure only when a source has a bounded listing and advertised coverage totals."
+      description="JSON collection across overlapping search windows. Configure only when a source has a bounded listing and advertised coverage totals."
     >
       {configured ? (
         <>
-          <AdvancedSection title="Coverage & ordering">
+          <OptionalSection title="Coverage & ordering">
             <FieldGrid>
               <JSONField path={['traversal', 'window_pages']} label="Window pages" integer />
               <JSONField
@@ -773,8 +765,8 @@ function TraversalSettings() {
             >
               Remove traversal configuration
             </Button>
-          </AdvancedSection>
-          <AdvancedSection title="Query partitions">
+          </OptionalSection>
+          <OptionalSection title="Query partitions">
             <ArrayField
               path={['traversal', 'partitions']}
               label="Partitions"
@@ -803,8 +795,8 @@ function TraversalSettings() {
             <ArrayField path={['traversal', 'query_variants']} label="Query variants" initial={{}}>
               {(path) => <MapField path={path} label="Variant parameters" />}
             </ArrayField>
-          </AdvancedSection>
-          <AdvancedSection title="Field enrichment">
+          </OptionalSection>
+          <OptionalSection title="Field enrichment">
             <StringArrayField
               path={['traversal', 'enrich_fields']}
               label="Source detail fields"
@@ -820,7 +812,7 @@ function TraversalSettings() {
                   : 'Unavailable: requires a JSON source, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
               }
             />
-          </AdvancedSection>
+          </OptionalSection>
           <TraversalOptions />
           <RecoverySettings />
         </>
@@ -837,7 +829,7 @@ function TraversalSettings() {
           Configure bounded traversal
         </Button>
       )}
-    </AdvancedSection>
+    </OptionalSection>
   )
 }
 
@@ -847,7 +839,7 @@ function TraversalOptions() {
     document.kindIn(['traversal', 'options']) !== undefined &&
     document.kindIn(['traversal', 'options']) !== 'null'
   return (
-    <AdvancedSection
+    <OptionalSection
       title="Discovered filter options"
       description="Read available filters from an endpoint and use them to refine bounded queries. URL placeholders may reference scope query names."
     >
@@ -888,7 +880,7 @@ function TraversalOptions() {
           Configure discovered options
         </Button>
       )}
-    </AdvancedSection>
+    </OptionalSection>
   )
 }
 
@@ -899,7 +891,7 @@ function RecoverySettings() {
     document.kindIn(['traversal', 'id_recovery']) !== 'null'
   const base = ['traversal', 'id_recovery']
   return (
-    <AdvancedSection
+    <OptionalSection
       title="ID recovery & detail mapping"
       description="Recover finite native-ID ranges and resolve same-origin detail URLs. These settings configure the existing recovery engine; no custom code is executed."
     >
@@ -948,14 +940,14 @@ function RecoverySettings() {
           Configure ID recovery
         </Button>
       )}
-    </AdvancedSection>
+    </OptionalSection>
   )
 }
 
 function RequestLimitsSettings() {
   const { document, change } = useSourceEditor()
   return (
-    <AdvancedSection
+    <OptionalSection
       title="Rolling request budgets"
       configuredPaths={[['request_limits']]}
       description="Optional limits shared by all runs of this source, including retries. Each rolling window counts recent requests, not calendar resets. Request spacing still applies."
@@ -992,7 +984,7 @@ function RequestLimitsSettings() {
           Remove all request budgets
         </Button>
       )}
-    </AdvancedSection>
+    </OptionalSection>
   )
 }
 
@@ -1053,31 +1045,28 @@ function CollectionSettings() {
           />
         </FieldGrid>
       </FieldSection>
-      <AdvancedSection title="Advanced">
-        <AdvancedSection title="Rate-limit headers" configuredPaths={[['rate_limit_reset']]}>
-          <SelectField
-            path={['rate_limit_reset']}
-            label="Rate-limit reset interpretation"
-            choices={['epoch', 'relative']}
-            fallback="Default · epoch"
-          />
-        </AdvancedSection>
-        <RequestLimitsSettings />
-        <AdvancedSection
-          title="Adapter options"
-          configuredPaths={[['options']]}
-          description="Adapter-specific options are preserved as arbitrary JSON. Configure only options supported by the selected adapter."
-        >
-          <MapField
-            path={['options']}
-            label="Options"
-            excludeKeys={
-              torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []
-            }
-          />
-        </AdvancedSection>
-        {document.get('adapter') !== 'html' && <TraversalSettings />}
-      </AdvancedSection>
+
+      <OptionalSection title="Rate-limit headers" configuredPaths={[['rate_limit_reset']]}>
+        <SelectField
+          path={['rate_limit_reset']}
+          label="Rate-limit reset interpretation"
+          choices={['epoch', 'relative']}
+          fallback="Default · epoch"
+        />
+      </OptionalSection>
+      <RequestLimitsSettings />
+      <OptionalSection
+        title="Adapter options"
+        configuredPaths={[['options']]}
+        description="Adapter-specific options are preserved as arbitrary JSON. Configure only options supported by the selected adapter."
+      >
+        <MapField
+          path={['options']}
+          label="Options"
+          excludeKeys={torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []}
+        />
+      </OptionalSection>
+      {document.get('adapter') !== 'html' && <TraversalSettings />}
     </>
   )
 }
@@ -1169,12 +1158,12 @@ function SourceScheduleSettings() {
         {invalidPolicy && (
           <p className="help text-destructive" role="alert">
             Source details require configured metadata enrichment. A periodic rebuild requires an
-            automatic Update schedule. Review the collection mode and Advanced options before
+            automatic Update schedule. Review the collection mode and Collection policy before
             saving.
           </p>
         )}
       </FieldSection>
-      <AdvancedSection title="Advanced">
+      <OptionalSection title="Collection policy">
         <DurationSelect
           label="Rebuild whole source periodically"
           value={fullEvery}
@@ -1201,7 +1190,7 @@ function SourceScheduleSettings() {
             help="Update only: stop after this many consecutive entirely known pages per scope. 0 = off."
           />
         </FieldGrid>
-      </AdvancedSection>
+      </OptionalSection>
       <p className="help">
         Existing runs keep their original settings and committed checkpoint. Editing a paused
         scheduled source can require resuming or cancelling its old run in History. Missed ticks do

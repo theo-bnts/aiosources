@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test, expect } from './fixtures'
@@ -7,6 +8,9 @@ test('book catalog filters keep their defaults, save one coherent scope and fit 
 }) => {
   await page.goto('/metadata/books/settings')
   const form = page.getByRole('form', { name: 'Books configuration', exact: true })
+  const filters = form.locator('details')
+  await expect(filters).not.toHaveAttribute('open', '')
+  await openDisclosure(page, 'Catalog filters')
   const relevance = page.getByRole('switch', { name: 'Relevant editions only', exact: true })
   const languages = page.getByRole('switch', { name: 'Filter book languages', exact: true })
   const selection = page.getByRole('button', { name: 'Edition languages', exact: true })
@@ -25,6 +29,8 @@ test('book catalog filters keep their defaults, save one coherent scope and fit 
     openlibrary_languages: ['en', 'fr'],
   })
   await page.reload()
+  await expect(filters).not.toHaveAttribute('open', '')
+  await openDisclosure(page, 'Catalog filters')
   await expect(selection).toContainText('French')
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 })

@@ -4,14 +4,12 @@ import pg from 'pg'
 import type { Page } from '@playwright/test'
 
 async function expectMaintenanceFooter(page: Page) {
-  const advanced = page.locator('.page > details').filter({
-    has: page.locator(':scope > summary', { hasText: /^Advanced$/ }),
-  })
-  await expect(advanced).toHaveCount(1)
-  await expect(advanced.locator(':scope > div > :last-child > summary')).toHaveText('Maintenance')
-  await expect(page.locator('.page > details > summary', { hasText: /^Maintenance$/ })).toHaveCount(
-    0,
-  )
+  const maintenance = page.locator('details#maintenance')
+  await expect(maintenance).toHaveCount(1)
+  await expect(maintenance.locator('xpath=ancestor::details')).toHaveCount(0)
+  await expect(
+    maintenance.locator('xpath=..').locator(':scope > :last-child > summary'),
+  ).toHaveText('Maintenance')
 }
 
 test('metadata configuration persists and missing information explains disabled actions', async ({
@@ -89,8 +87,8 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   server,
 }) => {
   await page.goto('/metadata/videos/settings')
-  await expect(page.getByText('Manual actions', { exact: true })).toBeHidden()
-  await openDisclosure(page, 'Advanced')
+  await expect(page.getByText('Manual actions', { exact: true })).toBeVisible()
+  await expect(page.locator('summary', { hasText: /^Advanced$/ })).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toHaveCount(0)

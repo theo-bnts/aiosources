@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -69,6 +70,8 @@ test('torrents combines title and ID fragments, filters and URL state through th
   await expect(results.locator('td:nth-child(2) a')).toHaveCount(0)
   await expect(searchButton).toHaveCount(1)
   await expect(page.getByText('Combined filters', { exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('Minimum size (bytes)', { exact: true })).toBeHidden()
+  await openDisclosure(page, 'Filters')
   await expect(page.getByLabel('Minimum size (bytes)', { exact: true })).toBeVisible()
   await expect(page.getByLabel(/seeders/i)).toHaveCount(0)
   await expect(page.getByLabel('Info hash', { exact: true })).toHaveCount(0)
@@ -94,6 +97,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
     expect(new URL(page.url()).searchParams.get('q')).toBe(query)
   }
   await search.fill('gain -cam')
+  await openDisclosure(page, 'Sorting')
   await page.getByLabel('Sort by', { exact: true }).selectOption('relevance')
   await searchButton.click()
   await expect(results).toHaveCount(1)
@@ -101,6 +105,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
   await page.reload()
   await expect(search).toHaveValue('gain -cam')
   await expect(results).toHaveCount(1)
+  await openDisclosure(page, 'Filters')
   await sourceFilter.click()
   await page.getByRole('menuitemcheckbox', { name: 'remote-example', exact: true }).click()
   await page.keyboard.press('Escape')
@@ -117,6 +122,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
   )
   expect(new URL(page.url()).searchParams.getAll('provider')).toEqual(['remote-example'])
   await page.setViewportSize({ width: 390, height: 844 })
+  await openDisclosure(page, 'Filters')
   await sourceFilter.click()
   await expect(
     page.getByRole('menuitemcheckbox', { name: 'remote-example', exact: true }),
@@ -131,6 +137,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(results).toHaveCount(6)
+  await openDisclosure(page, 'Filters')
   await expect(sourceFilter).toHaveText('All sources')
   const legacy = new URLSearchParams({
     q: 'gain OR blue',
@@ -139,6 +146,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
   await page.goto(`/torrents?${legacy}`)
   await expect(results).toHaveCount(1)
   await expect(search).toHaveValue('gain OR blue 00112233445566778899aabbccddeeff00112233')
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Minimum size (bytes)', { exact: true }).fill('1')
   await searchButton.click()
   await expect(page).toHaveURL((url) => url.searchParams.get('min_size') === '1')

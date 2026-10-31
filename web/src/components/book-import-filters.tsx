@@ -17,7 +17,7 @@ export function BookImportFilters({
   onChange: (patch: Partial<Selection>) => void
   busy: boolean
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const previous = useRef(
     value.openlibrary_languages.length ? value.openlibrary_languages : [browserLanguage()],
   )

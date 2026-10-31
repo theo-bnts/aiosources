@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
 
@@ -81,6 +82,7 @@ test('invalid search ranges keep the applied results and the editable draft with
     if (url.pathname === '/api/torrents' && url.searchParams.get('q') === 'edited') requests++
   })
   const query = form.getByLabel('Search text', { exact: true })
+  await openDisclosure(page, 'Filters')
   const minimum = form.getByLabel('Minimum size (bytes)', { exact: true })
   const maximum = form.getByLabel('Maximum size (bytes)', { exact: true })
   await query.fill('edited')
@@ -112,6 +114,7 @@ test('invalid search ranges keep the applied results and the editable draft with
   await form.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(form.getByRole('alert')).toHaveCount(0)
   await expect(query).toHaveValue('')
+  await openDisclosure(page, 'Filters')
   await minimum.fill('0009007199254740992')
   await maximum.fill('9007199254740993')
   const applied = page.waitForResponse(
@@ -180,6 +183,7 @@ test('long source names never stretch filter fields beyond small-screen layouts'
       ['/logs', 'Source or service', 'source:mobile-example'],
     ]) {
       await page.goto(path)
+      if (path === '/metadata/identification') await openDisclosure(page, 'Filters')
       const control = page.getByLabel(field, { exact: true })
       await expect(control.locator(`option[value="${value}"]`)).toHaveText(
         'Example source with a descriptive display name for imported records',

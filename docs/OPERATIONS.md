@@ -15,13 +15,13 @@
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |
 
-The settings search stays available on desktop and mobile. Select a result to open the relevant control, including a section inside **Advanced**.
+The settings search stays available on desktop and mobile. Select a result to open the relevant control, even inside a collapsed section.
 
 ## Search and choose a release
 
 Search uses your imported information, including local titles and aliases. It does not contact TMDB, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
 
-Use type and year filters to narrow titles. A series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
+Optional **Filters** and **Sorting** start closed. New searches include all results unless you choose a restriction. Use type and year filters to narrow titles; a series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
 
 Sorting can prioritize cached status, language, size, publication date, age, name or source. Several priorities apply in order. Optional language and cached-only filters restrict what is shown; leave them off to see all permitted results. Cache checks and downloads may still contact your debrid service.
 
@@ -61,6 +61,6 @@ Choose the storage mode in **Storage → Settings**. The compact option keeps in
 
 History retention defaults to seven days and is configurable. It cleans up eligible diagnostic history, not your published catalog. Some saved work for resumable imports can remain longer. Removing rows can free reusable space without immediately shrinking the PostgreSQL volume.
 
-**Advanced → Maintenance → Reset all source data** clears collected source data so it can be imported again. Read the confirmation carefully and expect sources to need another import. Source definitions and reusable Secrets are kept. Other resets are scoped to the page where they appear, such as matching or debrid caches.
+**Maintenance → Reset all source data** clears collected source data so it can be imported again. Read the confirmation carefully and expect sources to need another import. Source definitions and reusable Secrets are kept. Other resets are scoped to the page where they appear, such as matching or debrid caches.
 
 Back up before resetting or deleting data you may need. See [installation and backups](SETTINGS.md#preserve-your-data).

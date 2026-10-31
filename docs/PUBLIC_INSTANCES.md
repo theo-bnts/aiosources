@@ -33,7 +33,7 @@ Disabled pages do not appear in the public menu. Disabling a public connection b
 
 ## Private sources
 
-With source exposure enabled, visitors can see the permitted source controls. **Advanced** can accept their personal announce URLs for private sources when that option is available. The URLs are remembered with their browser configuration.
+With source exposure enabled, visitors can see the permitted source controls. **Private source playback** accepts their personal announce URLs for private sources when that option is available. The URLs are remembered with their browser configuration.
 
 Without a visitor announce URL, private-source results are restricted to cached playback. The administrator's announce URL is never substituted. Public-source uncached results can be offered when the connection permits them; hiding source names does not make public-source torrents private.
 
@@ -41,6 +41,6 @@ Stremio visitors receive playback information for their own debrid accounts. Tor
 
 ## Filters and limits
 
-Visitors can choose the options allowed by the instance, including media types, services, languages, sorting and result limits. Source-specific controls appear only when source exposure is enabled. **Filters** contains optional result restrictions; **Advanced** contains less common options.
+Visitors can choose the options allowed by the instance, including media types, services, languages, sorting and result limits. Source-specific controls appear only when source exposure is enabled. **Filters** contains optional result restrictions; **Sorting** sets the result order. These sections start closed, with no optional restrictions selected for new connections.
 
 Public request limits can be enabled or disabled independently. If a visitor is repeatedly rate-limited, check the instance's trusted proxy configuration so different visitors are recognized separately. Service account limits and request timeouts still apply.

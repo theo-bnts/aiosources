@@ -114,7 +114,7 @@ export function CatalogSearchPage() {
             placeholder="Search movies, series and books"
           />
         </div>
-        <Disclosure title="Filters" open>
+        <Disclosure title="Filters">
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <div className="field">
               <Label htmlFor="catalog-type">Type</Label>
@@ -365,8 +365,70 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                 )}
               </div>
             </div>
-            <section aria-label="Source release filters">
-              <Disclosure title="Filters" open>
+            <section aria-label="Source release filters" className="space-y-4">
+              {title.data.type === 'tv' && (
+                <form
+                  key={`${selection.season}:${selection.episode}`}
+                  className="flex flex-wrap items-end gap-3"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    const data = new FormData(event.currentTarget)
+                    const next = new URLSearchParams(search)
+                    next.set('season', String(data.get('season')))
+                    next.set('episode', String(data.get('episode')))
+                    next.delete('offset')
+                    setSearch(next, { flushSync: true })
+                  }}
+                >
+                  <div className="field w-24">
+                    <Label htmlFor="catalog-season">Season</Label>
+                    {title.data.seasons?.length ? (
+                      <select
+                        id="catalog-season"
+                        name="season"
+                        className="native-select"
+                        defaultValue={selection.season}
+                      >
+                        {!title.data.seasons.includes(selection.season ?? 1) && (
+                          <option value={selection.season}>{selection.season}</option>
+                        )}
+                        {title.data.seasons.map((season) => (
+                          <option key={season} value={season}>
+                            {season}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        id="catalog-season"
+                        name="season"
+                        type="number"
+                        min={0}
+                        max={999}
+                        required
+                        defaultValue={selection.season}
+                      />
+                    )}
+                  </div>
+                  <div className="field w-24">
+                    <Label htmlFor="catalog-episode">Episode</Label>
+                    <Input
+                      id="catalog-episode"
+                      name="episode"
+                      type="number"
+                      min={1}
+                      max={9999}
+                      required
+                      defaultValue={selection.episode}
+                    />
+                  </div>
+                  <Button id="catalog-episode-submit" type="submit" variant="outline">
+                    Show episode
+                  </Button>
+                </form>
+              )}
+
+              <Disclosure title="Filters">
                 <div className="flex max-w-sm items-center justify-between gap-3">
                   <Label htmlFor="catalog-cached">Cached results only</Label>
                   <Switch
@@ -384,67 +446,6 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                   }}
                 />
                 <div className="flex flex-wrap items-end gap-3">
-                  {title.data.type === 'tv' && (
-                    <form
-                      key={`${selection.season}:${selection.episode}`}
-                      className="flex flex-wrap items-end gap-3"
-                      onSubmit={(event) => {
-                        event.preventDefault()
-                        const data = new FormData(event.currentTarget)
-                        const next = new URLSearchParams(search)
-                        next.set('season', String(data.get('season')))
-                        next.set('episode', String(data.get('episode')))
-                        next.delete('offset')
-                        setSearch(next, { flushSync: true })
-                      }}
-                    >
-                      <div className="field w-24">
-                        <Label htmlFor="catalog-season">Season</Label>
-                        {title.data.seasons?.length ? (
-                          <select
-                            id="catalog-season"
-                            name="season"
-                            className="native-select"
-                            defaultValue={selection.season}
-                          >
-                            {!title.data.seasons.includes(selection.season ?? 1) && (
-                              <option value={selection.season}>{selection.season}</option>
-                            )}
-                            {title.data.seasons.map((season) => (
-                              <option key={season} value={season}>
-                                {season}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <Input
-                            id="catalog-season"
-                            name="season"
-                            type="number"
-                            min={0}
-                            max={999}
-                            required
-                            defaultValue={selection.season}
-                          />
-                        )}
-                      </div>
-                      <div className="field w-24">
-                        <Label htmlFor="catalog-episode">Episode</Label>
-                        <Input
-                          id="catalog-episode"
-                          name="episode"
-                          type="number"
-                          min={1}
-                          max={9999}
-                          required
-                          defaultValue={selection.episode}
-                        />
-                      </div>
-                      <Button id="catalog-episode-submit" type="submit" variant="outline">
-                        Show episode
-                      </Button>
-                    </form>
-                  )}
                   {discloseSources && (
                     <div className="field">
                       <Label htmlFor="release-source">Source</Label>

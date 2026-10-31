@@ -80,7 +80,7 @@ test('remote manual imports share the source action dialog and open remote histo
     await expect(action).toHaveValue('incremental')
     await expect(action.getByRole('option')).toHaveText(['Preview', 'Sync changes', 'Full resync'])
     await action.selectOption(mode)
-    await dialog.getByText('Advanced', { exact: true }).click()
+    await dialog.getByText('Import limits', { exact: true }).click()
     await expect(dialog.getByLabel('Known pages (X)', { exact: true })).toHaveCount(0)
     await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('0')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -277,7 +277,7 @@ test.describe('remote catalog history and ownership', () => {
   })
 })
 
-test('catalog sharing starts with all sources and keeps optional controls in Filters and Advanced', async ({
+test('catalog sharing starts with all sources and keeps optional controls in separate collapsed sections', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
@@ -299,7 +299,6 @@ test('catalog sharing starts with all sources and keeps optional controls in Fil
     dialog.getByLabel('I authorize access to all current and future sources.'),
   ).toHaveCount(0)
   await expect(dialog.getByText('leechers', { exact: true })).toHaveCount(0)
-  await dialog.getByText('Advanced', { exact: true }).click()
   await dialog.getByText('Expiration', { exact: true }).click()
   await expect(dialog.getByLabel('Expires at (browser local time)', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

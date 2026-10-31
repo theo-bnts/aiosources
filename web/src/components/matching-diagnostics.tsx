@@ -81,7 +81,7 @@ export function MatchingDiagnostics() {
   const sourceName = useSourceNames()
   const [reviewing, setReviewing] = useState<MatchDiagnostic | null>(null)
   const [search, setSearch] = useViewSearchParams()
-  const status = search.get('match_status') ?? 'ambiguous'
+  const status = search.get('match_status') ?? 'all'
   const provider = search.get('match_provider') ?? ''
   const q = search.get('match_q') ?? ''
   const pagination = useURLPagination({ limitKey: 'match_limit', offsetKey: 'match_offset' })
@@ -133,7 +133,7 @@ export function MatchingDiagnostics() {
             placeholder="Search title fragments, source IDs or info hashes"
           />
         </div>
-        <Disclosure title="Filters" open>
+        <Disclosure title="Filters">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field min-w-0">
               <Label htmlFor="matching-status">Identification result</Label>

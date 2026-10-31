@@ -289,7 +289,7 @@ test('history filters keep visible labels and align their clear action with the 
   }
 })
 
-test('secret JSON help belongs to Advanced and settings search reveals it without changing credentials', async ({
+test('secret JSON help has its own collapsed section and settings search reveals it without changing credentials', async ({
   page,
 }) => {
   const writes: string[] = []
@@ -299,8 +299,9 @@ test('secret JSON help belongs to Advanced and settings search reveals it withou
   })
   await page.goto('/security/settings')
   const help = page.locator('#secret-reference-help')
-  await expect(help.locator('xpath=ancestor::details')).toHaveCount(1)
-  await expect(help.locator(':scope > summary')).toBeHidden()
+  await expect(help.locator('xpath=ancestor::details')).toHaveCount(0)
+  await expect(help.locator(':scope > summary')).toBeVisible()
+  await expect(help).not.toHaveAttribute('open', '')
   await page.getByRole('button', { name: 'Search settings', exact: true }).click()
   const search = page.getByRole('dialog', { name: 'Search settings', exact: true })
   await search.getByRole('combobox').fill('auth.secret_ref')

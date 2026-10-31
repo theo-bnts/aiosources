@@ -145,7 +145,7 @@ export function QuerySorting({
     options.find((option) => option.asc === value || option.desc === value) ?? options[0]
   const ascending = selected.asc === value
   return (
-    <Disclosure title="Sorting" open>
+    <Disclosure title="Sorting">
       <div className="field min-w-0">
         <Label htmlFor={id}>Sort by</Label>
         <div className="flex min-w-0 items-center gap-2">

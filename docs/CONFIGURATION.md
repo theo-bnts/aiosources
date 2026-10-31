@@ -56,4 +56,4 @@ Saving a changed source does not alter a run already in progress. Start a new ru
 
 Source cards show its schedule and recent run, with **View imported data** opening its records in **Torrents**. Use **History** to inspect a particular import and its related events.
 
-**Sources → Settings → Advanced** contains less common import and recovery controls. **Delete** removes the source and its associated imported data and history; reusable Secrets remain available. Pause or finish active work before deleting.
+**Sources → Settings → Import execution** contains less common import and recovery controls. **Delete** removes the source and its associated imported data and history; reusable Secrets remain available. Pause or finish active work before deleting.

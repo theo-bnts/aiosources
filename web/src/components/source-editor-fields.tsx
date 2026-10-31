@@ -271,7 +271,7 @@ export function FieldSection({
   )
 }
 
-export function AdvancedSection({
+export function OptionalSection({
   title,
   description,
   children,

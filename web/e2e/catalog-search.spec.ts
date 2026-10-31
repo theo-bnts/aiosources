@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import pg from 'pg'
 import { test, expect } from './fixtures'
@@ -94,7 +95,9 @@ test('all three searches accept spaced and dotted title fragments and show total
     await page.goto(`/torrents?q=${encodeURIComponent(q)}`)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
-    await page.goto('/metadata/identification?match_status=all')
+    await page.goto('/metadata/identification')
+    await expect(page.locator('#matching-status')).toHaveValue('all')
+    await expect(page.locator('main details[open]')).toHaveCount(0)
     const input = page.getByLabel('Title, source ID or info hash', { exact: true })
     await expect(input).toHaveAttribute(
       'placeholder',
@@ -105,6 +108,7 @@ test('all three searches accept spaced and dotted title fragments and show total
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
   }
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
   await page
     .getByLabel('Title, source ID or info hash', { exact: true })
@@ -129,6 +133,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
     (url) =>
       url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
   )
+  await openDisclosure(page, 'Filters')
   await expect(
     page.getByRole('switch', { name: 'Cached results only', exact: true }),
   ).not.toBeChecked()
@@ -138,6 +143,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await page.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
   await page.reload()
+  await openDisclosure(page, 'Filters')
   await expect(
     page.getByRole('switch', { name: 'Cached results only', exact: true }),
   ).not.toBeChecked()
@@ -183,9 +189,11 @@ test('catalog year is a single optional filter and survives opening a title and 
   await seedCatalog(page, server)
   await page.goto('/search')
   await page.getByLabel('Title, author or identifier', { exact: true }).fill('example')
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('2025')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('2026')
   await page.getByLabel('Type', { exact: true }).selectOption('tv')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
@@ -194,6 +202,7 @@ test('catalog year is a single optional filter and survives opening a title and 
   await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('2026')
   await expect(page.getByLabel('Type', { exact: true })).toHaveValue('tv')
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('')
   await page.getByLabel('Type', { exact: true }).selectOption('')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
@@ -205,6 +214,7 @@ test('catalog year is a single optional filter and survives opening a title and 
   await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
   // Clearing must also discard a draft that has not been submitted yet.
   await page.getByLabel('Title, author or identifier', { exact: true }).fill('Unsubmitted title')
+  await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('2026')
   await page.getByLabel('Type', { exact: true }).selectOption('movie')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
@@ -695,6 +705,7 @@ test.describe('browser language preferences', () => {
     await page.goto('/search?q=example')
     await expect(page.getByRole('link', { name: 'Film Exemple', exact: true })).toBeVisible()
     await page.goto(`/search/${ids.movie}?cached_only=false`)
+    await openDisclosure(page, 'Filters')
     await expect(
       page.getByRole('switch', { name: 'Filter languages', exact: true }),
     ).not.toBeChecked()

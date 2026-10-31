@@ -126,7 +126,7 @@ export function TorrentSearchForm({
         </div>
       </div>
       <p className="help">Combine fragments, "exact phrases", -exclusions or OR alternatives.</p>
-      <Disclosure title="Filters" open>
+      <Disclosure title="Filters">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="field sm:col-span-2">
             <Label htmlFor="torrent-sources">Sources</Label>

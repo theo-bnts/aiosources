@@ -49,7 +49,7 @@ test('every operational search target opens its field without changing saved set
     await expect(field).toBeVisible()
     await expect(field).toBeFocused()
   }
-  await page.goto('/providers/settings?settings=advanced#setting=imports.workers')
+  await page.goto('/providers/settings#setting=imports.workers')
   await expect(page.getByLabel('Simultaneous imports', { exact: true })).toBeFocused()
 })
 

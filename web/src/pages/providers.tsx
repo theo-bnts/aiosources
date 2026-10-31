@@ -56,7 +56,7 @@ import { CollectDialog } from '@/components/collect-dialog'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
-import { AdvancedImportSettings } from '@/components/advanced-import-settings'
+import { SourceImportSettings } from '@/components/source-import-settings'
 import { useDetailBackLink, useListViewState } from '@/lib/detail-navigation'
 
 export function ProvidersPage() {
@@ -155,7 +155,7 @@ export function ProvidersPage() {
           />
         )
       )}
-      <AdvancedImportSettings />
+      <SourceImportSettings />
     </div>
   )
 }

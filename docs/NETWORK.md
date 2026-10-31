@@ -22,7 +22,7 @@ AIOSources uses an existing proxy; it does not install or start WARP or a VPN. S
 
 1. Open **Network → Outgoing → Proxies → Add proxy**.
 2. Name the connection and enter an address reachable from AIOSources, such as `socks5://warp:40000`.
-3. If needed, add its username and password through **Secrets**, under **Advanced**.
+3. If needed, add its username and password through **Secrets**, under **Authentication**.
 4. Save and choose **Test connection**. This checks the exit address and reports WARP status when available; it does not enable the profile.
 5. Enable the proxy, open **Routing** and select the requests that should use it.
 
@@ -42,6 +42,6 @@ Routing controls requests made by AIOSources, including imports, metadata and de
 
 ## Timeouts
 
-Less common outgoing request timeouts are in **Network → Outgoing → Proxies → Advanced**. Incoming request and download limits are in **Network → Incoming → Advanced**. Individual sources keep their timeout in their source definition, and connections can have their own response timeout in **Filters**.
+Less common outgoing request timeouts are in **Network → Outgoing → Proxies → Request timeouts**. Incoming request and download limits are in their respective sections under **Network → Incoming**. Individual sources keep their timeout in their source definition, and connections can have their own response timeout in **Filters**.
 
 Use the settings search to find a timeout directly. Increasing it can help a slow service, but does not bypass the provider's own limits.

@@ -75,7 +75,7 @@ function ProcessedRecordFilters({
           placeholder="Search record data…"
         />
       </div>
-      <Disclosure title="Filters" open>
+      <Disclosure title="Filters">
         <div className="field max-w-sm">
           <Label htmlFor="run-raw-processing">Processing result</Label>
           <select

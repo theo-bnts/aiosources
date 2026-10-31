@@ -1,7 +1,7 @@
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { BookImportFilters } from '@/components/book-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
-import { AdvancedSettings } from '@/components/advanced-settings'
+import { SettingsSections } from '@/components/settings-sections'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -484,7 +484,7 @@ export default function AIOSourcePage({
       {metadata && (
         <>
           {settingsForm}
-          <AdvancedSettings>
+          <SettingsSections>
             {section === 'videos' && <RuntimeSettingsPanel section="metadata" />}
             {(section === 'videos' || section === 'books') && (
               <RuntimeSettingsPanel
@@ -633,7 +633,7 @@ export default function AIOSourcePage({
               </div>
             </Disclosure>
             {maintenance}
-          </AdvancedSettings>
+          </SettingsSections>
         </>
       )}
       {section === 'stremio' && (
@@ -650,7 +650,7 @@ export default function AIOSourcePage({
       {section === 'debrid' && (
         <>
           {settingsForm}
-          <AdvancedSettings>
+          <SettingsSections>
             <Disclosure title="Private source playback">
               <form
                 aria-label="Private source playback"
@@ -720,7 +720,7 @@ export default function AIOSourcePage({
               </Button>
             </Disclosure>
             {maintenance}
-          </AdvancedSettings>
+          </SettingsSections>
         </>
       )}
     </div>

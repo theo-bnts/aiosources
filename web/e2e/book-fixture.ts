@@ -116,10 +116,6 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
   await expect(interval).toHaveValue('5')
   await page
     .locator('summary')
-    .filter({ hasText: /^Advanced$/ })
-    .click()
-  await page
-    .locator('summary')
     .filter({ hasText: /^Manual actions$/ })
     .click()
   await expect(

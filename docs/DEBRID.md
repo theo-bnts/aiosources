@@ -8,7 +8,7 @@ A debrid service can prepare a torrent and provide a playable or downloadable fi
 
 1. Open **Debrid → Settings** and choose the service.
 2. Add its API key through **Secrets**, select that secret and save.
-3. Choose your availability-check and cleanup preferences. Less common options are in **Advanced**.
+3. Choose your availability-check and cleanup preferences. Optional controls, including **Private source playback** and **Operation capacity**, have their own collapsible sections.
 4. Select the services you want when creating a Stremio or Torznab connection. You can use several services together.
 
 Only configured services appear as download choices for the administrator. Public visitors use their own keys. Use accounts and access methods permitted by each service.
