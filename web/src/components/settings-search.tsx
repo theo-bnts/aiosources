@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeftIcon, ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api } from '@/lib/api'
+import { catalogEntitiesKey } from '@/lib/catalog-types'
 import { randomID } from '@/lib/random-id'
 import { useDiscardChanges } from '@/lib/unsaved-changes'
 import {
@@ -81,6 +82,8 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
       visibility.search,
       visibility.stremio,
       visibility.torznab,
+      visibility.catalog,
+      catalogEntitiesKey(visibility.catalogEntities),
       visibility.sources,
       visibility.announces,
       visibility.services?.join(','),

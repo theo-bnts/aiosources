@@ -16,6 +16,7 @@ import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
 import { PublicAnnounceFields, type PublicInfo } from '@/components/public-connection-fields'
+import { PublicSharedCatalogEntry } from '@/components/public-shared-catalog-entry'
 import { PublicTorznabEntry } from '@/components/public-torznab-entry'
 import { PublicCredentialsForm } from '@/components/public-credentials-form'
 import { PublicSearchEntry } from '@/components/public-search-entry'
@@ -53,11 +54,14 @@ export function PublicEntry({
     ? 'search'
     : location.pathname === '/public/torznab'
       ? 'torznab'
-      : 'stremio'
+      : location.pathname === '/public/sharing'
+        ? 'catalog'
+        : 'stremio'
   const available = {
     search: info.data.search_enabled,
     stremio: info.data.stremio_enabled,
     torznab: info.data.torznab_enabled,
+    catalog: info.data.catalog_enabled,
   }
   if (!available[section]) {
     const target = available.stremio
@@ -66,10 +70,14 @@ export function PublicEntry({
         ? '/public/search'
         : available.torznab
           ? '/public/torznab'
-          : ''
+          : available.catalog
+            ? '/public/sharing'
+            : ''
     return target ? <Navigate to={target} replace /> : <Login />
   }
   if (section === 'search') return layout(<PublicSearchEntry info={info.data} />)
+  if (section === 'catalog')
+    return layout(<PublicSharedCatalogEntry key={info.data.catalog_revision} info={info.data} />)
   if (section === 'torznab') return layout(<PublicTorznabEntry info={info.data} />)
   return layout(<PublicStremioEntry info={info.data} />)
 }

@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ func (s *server) publicOriginAllowed() bool {
 func (s *server) registerPublicInstance(mux *http.ServeMux) {
 	s.registerPublicTorznab(mux)
 	s.registerPublicCatalog(mux)
+	s.registerPublicSharing(mux)
 	mux.HandleFunc("GET /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		value, err := s.options.Store.PublicAccess(r.Context())
 		if err != nil {
@@ -39,6 +41,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		var input struct {
 			model.PublicAccess
 			StremioEnabled *bool `json:"stremio_enabled"`
+			CatalogEnabled *bool `json:"catalog_enabled"`
 		}
 		if !decodeJSON(w, r, &input) {
 			return
@@ -55,6 +58,16 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				return
 			}
 			value.StremioEnabled = current.StremioEnabled
+		}
+		if input.CatalogEnabled != nil {
+			value.CatalogEnabled = *input.CatalogEnabled
+		} else {
+			current, err := s.options.Store.PublicAccess(r.Context())
+			if err != nil {
+				respondError(w, err)
+				return
+			}
+			value.CatalogEnabled = current.CatalogEnabled
 		}
 		if value.Enabled && !s.publicOriginAllowed() {
 			writeError(w, 400, "Set PUBLIC_URL to the external HTTPS origin before enabling public access.")
@@ -83,7 +96,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled}
+		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled && value.ExposeSources}
 		if enabled && value.ExposeSources {
 			allSources, e := s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
@@ -99,6 +112,28 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			if len(sources) > 0 {
 				info["private_sources"] = sources
 			}
+		}
+		if enabled && value.ExposeSources && value.CatalogEnabled {
+			policy, e := s.options.Store.PublicCatalogPolicy(ctx)
+			if e != nil {
+				respondError(w, e)
+				return
+			}
+			info["catalog_fields"] = policy.Fields
+			info["catalog_revision"] = policy.Revision
+			info["catalog_entities"] = policy.CatalogEntities
+			all, e := s.options.AIOSource.PublicSources(ctx)
+			if e != nil {
+				respondError(w, e)
+				return
+			}
+			permitted := []aiosource.PublicPrivateSource{}
+			for _, source := range all {
+				if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
+					permitted = append(permitted, source)
+				}
+			}
+			info["catalog_sources"] = permitted
 		}
 		writeJSON(w, 200, info)
 	})

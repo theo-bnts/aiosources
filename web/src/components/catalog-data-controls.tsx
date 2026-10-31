@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import type { CatalogEntities } from '@/lib/catalog-types'
+import { catalogFieldLabel } from '@/lib/catalog-display'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { Switch } from '@/components/ui/switch'
 
 const torrentOptions = [
@@ -34,6 +36,7 @@ export function CatalogDataControls({
   receiving = false,
   allowAvailability = true,
   publishedFields,
+  allowed,
 }: {
   id: string
   value: CatalogEntities
@@ -41,6 +44,7 @@ export function CatalogDataControls({
   receiving?: boolean
   allowAvailability?: boolean
   publishedFields?: ReactNode
+  allowed?: CatalogEntities
 }) {
   const control = (
     key: keyof CatalogEntities,
@@ -69,28 +73,34 @@ export function CatalogDataControls({
         {receiving && (
           <p className="help">The owner chooses which basic torrent fields are available.</p>
         )}
-        {torrentOptions.map(([key, label, description]) => control(key, label, description))}
+        {torrentOptions
+          .filter(([key]) => !allowed || allowed[key])
+          .map(([key, label, description]) => control(key, label, description))}
         <p className="help">
           {receiving
             ? 'Changing these choices refreshes the local torrent copy at the next sync. It does not contact the original sources.'
             : 'Only selected source facts are included. Keys, announce URLs, source definitions and raw payloads are excluded.'}
         </p>
       </Disclosure>
-      <Disclosure title="Metadata">
-        {control(
-          'metadata',
-          'Film and series information',
-          'Titles, translations, identifiers and season information. Duplicates use the same TMDB identity; identification and reviews stay local.',
-        )}
-      </Disclosure>
-      <Disclosure title="Debrid">
-        {control(
-          'availability',
-          'Debrid cache observations',
-          'Recent, shareable cache checks and file information. Personal libraries are excluded. Observations expire normally and playback still uses your own account.',
-          !allowAvailability,
-        )}
-      </Disclosure>
+      {(!allowed || allowed.metadata) && (
+        <Disclosure title="Metadata">
+          {control(
+            'metadata',
+            'Film and series information',
+            'Titles, translations, identifiers and season information. Duplicates use the same TMDB identity; identification and reviews stay local.',
+          )}
+        </Disclosure>
+      )}
+      {(!allowed || allowed.availability) && (
+        <Disclosure title="Debrid">
+          {control(
+            'availability',
+            'Debrid cache observations',
+            'Recent, shareable cache checks and file information. Personal libraries are excluded. Observations expire normally and playback still uses your own account.',
+            !allowAvailability,
+          )}
+        </Disclosure>
+      )}
       {receiving && (
         <p className="help">
           Choices apply when the owner permits them. Local metadata and fresh local cache checks
@@ -98,6 +108,34 @@ export function CatalogDataControls({
         </p>
       )}
     </Disclosure>
+  )
+}
+
+export function CatalogPublishedFields({
+  id,
+  value,
+  fields,
+  onChange,
+}: {
+  id: string
+  value: string[]
+  fields: string[]
+  onChange: (value: string[]) => void
+}) {
+  return (
+    <div className="field">
+      <Label htmlFor={id}>Published fields</Label>
+      <MultiSelect
+        id={id}
+        label="Published fields"
+        allLabel="All published fields"
+        value={value}
+        options={fields.map((field) => ({ value: field, label: catalogFieldLabel(field) }))}
+        onChange={(selection) =>
+          onChange(selection.length ? fields.filter((field) => selection.includes(field)) : fields)
+        }
+      />
+    </div>
   )
 }
 

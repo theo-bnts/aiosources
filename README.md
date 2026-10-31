@@ -17,7 +17,7 @@ AIOSources is open source and self-hosted. It includes no sources or media: conn
 - **Watch and download.** Connect your player, download a ready file from the browser or add a release to your debrid account and follow its preparation.
 - **Choose your debrid services.** AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox are supported. Availability features vary by service.
 - **Tailor each connection.** Create several Stremio or Torznab connections with different sources, media types, services, filters and sorting priorities.
-- **Share a catalog or open a public instance.** Exchange catalogs with other instances, or let visitors use their own accounts through Search, Stremio and Torznab.
+- **Share a catalog or open a public instance.** Exchange catalogs with other instances, or offer public Search, Stremio, Torznab and read-only catalog sharing.
 - **Keep control.** Review uncertain identifications, see request history, understand storage use and find any setting from the search bar on desktop or mobile.
 
 Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INSTANCES.md#use-a-public-instance). You do not need Docker or an AIOSources administrator account.
@@ -117,7 +117,7 @@ Open **Connections → Torznab**, create and enable an access, then copy its URL
 
 **Connections → Shared catalogs** lets you grant another instance access to selected data. **Sources → Remote catalogs** imports a catalog shared with you. Optional shared details, film and series information, and reusable cache observations require permission on both sides. Credentials and private announce URLs are never included. See [catalog sharing](docs/SHARING.md).
 
-**Administration → Public access** lets you offer Search, Stremio and Torznab independently. Visitors use their own credentials; they cannot open administration. Their keys and optional personal announce URLs are remembered in their browser, without being saved by AIOSources on the server. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
+**Administration → Public access** lets you offer Search, Stremio, Torznab and Shared catalogs independently. Visitors cannot open administration. Playback uses their own credentials; keys and optional personal announce URLs are remembered in their browser, without being saved by AIOSources on the server. Public catalog sharing requires source exposure and includes only the data you allow. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
 
 Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, two-step verification and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options inside **Advanced**.
 

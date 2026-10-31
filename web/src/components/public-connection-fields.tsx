@@ -1,3 +1,4 @@
+import type { CatalogEntities } from '@/lib/catalog-types'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,11 @@ export type PublicInfo = {
   stremio_enabled?: boolean
   torznab_enabled?: boolean
   search_enabled?: boolean
+  catalog_enabled?: boolean
+  catalog_revision?: number
+  catalog_fields?: string[]
+  catalog_entities?: CatalogEntities
+  catalog_sources?: { id: string; name: string }[]
   sources?: { id: string; name: string }[]
   enabled: boolean
   providers: { id: string; name: string }[]

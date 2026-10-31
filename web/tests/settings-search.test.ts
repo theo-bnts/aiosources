@@ -91,6 +91,32 @@ test('entity destinations encode identifiers and keep configuration selection se
   )
 })
 
+test('public shared catalog settings expose only enabled data choices', () => {
+  const visible = visibleSettings({
+    admin: false,
+    catalog: true,
+    catalogEntities: { languages: true },
+  })
+  assert.deepEqual(
+    visible
+      .filter((setting) => setting.public === 'catalog')
+      .map((setting) => setting.id)
+      .sort(),
+    ['visitor.catalog.fields', 'visitor.catalog.languages', 'visitor.catalog.sources'],
+  )
+  assert.equal(
+    settingURL(settingByID('visitor.catalog.languages')!),
+    '/public/sharing#setting=visitor.catalog.languages',
+  )
+  assert.deepEqual(settingByID('visitor.catalog.languages')?.reveal, ['Shared data', 'Torrents'])
+  assert.deepEqual(settingByID('public.catalog-languages')?.reveal, [
+    'Shared catalog data',
+    'Shared data',
+    'Torrents',
+  ])
+  assert.ok(!visible.some((setting) => setting.entity || setting.id === 'public.catalog'))
+})
+
 test('catalog sharing and reception expose the same data menu and exact searchable leaf controls', () => {
   for (const entity of ['share', 'remote']) {
     for (const key of ['identifiers', 'languages', 'technical', 'files'])

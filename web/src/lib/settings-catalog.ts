@@ -1,3 +1,4 @@
+import type { CatalogEntities } from './catalog-types'
 import { debridProviders } from './debrid.ts'
 import { runtimeSections, type RuntimeSection } from './runtime-settings-definitions.ts'
 import { importNumberFields } from './import-settings-definitions.ts'
@@ -19,7 +20,7 @@ export type Setting = {
   entity?: SettingsEntity
   stage?: string
   adapters?: string[]
-  public?: 'search' | 'stremio' | 'torznab' | 'interface'
+  public?: 'search' | 'stremio' | 'torznab' | 'catalog' | 'interface'
 }
 
 const settings: Setting[] = []
@@ -236,6 +237,7 @@ add(
     ['public.search', 'Allow public Search'],
     ['public.stremio', 'Allow public Stremio connections'],
     ['public.torznab', 'Allow public Torznab connections'],
+    ['public.catalog', 'Allow public shared catalogs'],
     [
       'public.sources',
       'Expose source names and filters',
@@ -243,6 +245,53 @@ add(
     ],
   ],
 )
+add(
+  {
+    route: '/public-access',
+    group: 'Administration / Public access / Shared catalog data',
+    reveal: ['Shared catalog data', 'Filters'],
+    keywords: 'public sharing catalog permissions',
+  },
+  [['public.catalog-sources', 'Sources']],
+)
+for (const [id, title, category] of [
+  ['fields', 'Published fields', 'Torrents'],
+  ['identifiers', 'Identifiers and episodes', 'Torrents'],
+  ['languages', 'Audio and subtitle languages', 'Torrents'],
+  ['technical', 'Audio and video information', 'Torrents'],
+  ['files', 'File information', 'Torrents'],
+  ['metadata', 'Film and series information', 'Metadata'],
+  ['availability', 'Debrid cache observations', 'Debrid'],
+] as const) {
+  settings.push({
+    id: `public.catalog-${id}`,
+    title,
+    label: title,
+    route: '/public-access',
+    group: `Administration / Public access / Shared catalog data / ${category}`,
+    reveal: ['Shared catalog data', 'Shared data', category],
+    keywords: 'public sharing permissions',
+  })
+  settings.push({
+    id: `visitor.catalog.${id}`,
+    title,
+    label: title,
+    route: '/public/sharing',
+    group: `Connections / Shared catalogs / Shared data / ${category}`,
+    reveal: ['Shared data', category],
+    public: 'catalog',
+  })
+}
+settings.push({
+  id: 'visitor.catalog.sources',
+  title: 'Sources',
+  label: 'Sources',
+  route: '/public/sharing',
+  group: 'Connections / Shared catalogs / Filters',
+  reveal: ['Filters'],
+  public: 'catalog',
+})
+
 add(
   {
     route: '/network/outgoing/routing',
@@ -802,6 +851,8 @@ export type SettingsVisibility = {
   search?: boolean
   stremio?: boolean
   torznab?: boolean
+  catalog?: boolean
+  catalogEntities?: CatalogEntities
   sources?: boolean
   announces?: boolean
   services?: readonly string[]
@@ -811,7 +862,15 @@ export function visibleSettings(visibility: SettingsVisibility) {
     if (setting.public === 'interface') return true
     if (visibility.admin) return !setting.public
     if (!setting.public || !visibility[setting.public]) return false
-    if (setting.title === 'Sources' && !visibility.sources) return false
+    if (
+      setting.public === 'catalog' &&
+      !setting.id.endsWith('.fields') &&
+      !setting.id.endsWith('.sources') &&
+      !visibility.catalogEntities?.[setting.id.split('.').at(-1) as keyof CatalogEntities]
+    )
+      return false
+    if (setting.public !== 'catalog' && setting.title === 'Sources' && !visibility.sources)
+      return false
     if (setting.id.endsWith('.announces') && !visibility.announces) return false
     const provider = debridProviders.find(
       (provider) => setting.title === `${provider.name} API key`,

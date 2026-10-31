@@ -306,6 +306,12 @@ const publicNavigationGroups: NavigationGroup[] = [
         description: 'Connect a Torznab client with your own optional announce URLs.',
         icon: BroadcastIcon,
       },
+      {
+        to: '/public/sharing',
+        label: 'Shared catalogs',
+        description: 'Keep a read-only catalog copy on another AIOSources instance.',
+        icon: ShareNetworkIcon,
+      },
     ],
   },
 ]
@@ -556,7 +562,9 @@ export function AppShell({
             items: group.items.filter((item) =>
               item.to === '/public'
                 ? publicInfo.data?.stremio_enabled
-                : publicInfo.data?.torznab_enabled,
+                : item.to === '/public/torznab'
+                  ? publicInfo.data?.torznab_enabled
+                  : publicInfo.data?.catalog_enabled,
             ),
           }))
           .filter((group) => group.items.length > 0),
@@ -572,7 +580,9 @@ export function AppShell({
       ? '/public/search'
       : location.pathname === '/public/torznab'
         ? '/public/torznab'
-        : '/public'
+        : location.pathname === '/public/sharing'
+          ? '/public/sharing'
+          : '/public'
     : ['/runs', '/raw', '/pages'].some(
           (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
         ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
@@ -822,6 +832,8 @@ export function AppShell({
                   search: publicInfo.data?.search_enabled,
                   stremio: publicInfo.data?.stremio_enabled,
                   torznab: publicInfo.data?.torznab_enabled,
+                  catalog: publicInfo.data?.catalog_enabled,
+                  catalogEntities: publicInfo.data?.catalog_entities,
                   sources: Boolean(publicInfo.data?.sources?.length),
                   announces: Boolean(publicInfo.data?.private_sources?.length),
                   services: publicInfo.data?.providers.map((service) => service.id),

@@ -31,7 +31,7 @@ ALTER TABLE ingest.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT 
 
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
-	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration)
+	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration)
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
@@ -40,15 +40,20 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		return databaseError("begin public access change", err)
 	}
 	defer rollback(tx)
-	var previous, previousDownloads, previousTorznab, previousSearch, previousStremio bool
-	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled,search_enabled,stremio_enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab, &previousSearch, &previousStremio)
+	// Match named catalog policy changes: publication and metadata fences precede
+	// the policy row, including when enabling or revoking public access.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+		return databaseError("lock public catalog publication policy", err)
+	}
+	var previous, previousDownloads, previousTorznab, previousSearch, previousStremio, previousCatalog bool
+	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled,search_enabled,stremio_enabled,catalog_enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab, &previousSearch, &previousStremio, &previousCatalog)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
 	if err != nil {
 		return databaseError("lock public access", err)
 	}
-	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END,search_enabled=$5,stremio_enabled=$6,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$6 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled)
+	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END,search_enabled=$5,stremio_enabled=$6,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$6 THEN 1 ELSE 0 END  ,catalog_enabled=$7,catalog_generation=catalog_generation+CASE WHEN catalog_enabled<>$7 OR expose_sources<>$3 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled, value.CatalogEnabled)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
@@ -95,6 +100,15 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		kind := "security.public_stremio_disabled"
 		if value.StremioEnabled {
 			kind = "security.public_stremio_enabled"
+		}
+		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
+			return err
+		}
+	}
+	if previousCatalog != value.CatalogEnabled {
+		kind := "security.public_catalog_disabled"
+		if value.CatalogEnabled {
+			kind = "security.public_catalog_enabled"
 		}
 		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
 			return err

@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Debrid services](DEBRID.md) · [Torznab](TORZNAB.md)
 
-An administrator can offer Search, Stremio and Torznab to visitors without giving them access to administration. Available pages and options depend on that instance's settings.
+An administrator can offer Search, Stremio, Torznab and Shared catalogs to visitors without giving them access to administration. Available pages and options depend on that instance's settings.
 
 ## Use a public instance
 
@@ -12,6 +12,12 @@ An administrator can offer Search, Stremio and Torznab to visitors without givin
 4. Install a Stremio manifest in Stremio or Nuvio, or add it to AIOStreams as a custom addon. If AIOSources provides playback, leave AIOStreams **Service Wrap** and **Reconfigure Service** disabled.
 
 No AIOSources administrator account is needed. Torznab clients use the generated URL and API key; their download client handles the files.
+
+### Copy a public catalog
+
+Open **Connections → Shared catalogs**, choose any optional **Filters** or **Shared data**, and select **Create connection link**. No debrid key or announce URL is needed. On your own AIOSources instance, add the URL under **Sources → Remote catalogs → Settings**, save the supplied sharing password in Secrets, and enable the connection.
+
+The receiving instance keeps a local copy and syncs changes automatically. Only the owner's permitted data is included. Torrent records can include private-source or uncached releases, but never the owner's announce URLs or download credentials: playback still needs your own setup. Each receiving instance identifies its torrents locally. See [catalog sharing](SHARING.md).
 
 ### Your keys and browser
 
@@ -25,17 +31,19 @@ The instance keeps request history and safe diagnostics for its configured reten
 
 1. Configure the external HTTPS address in `PUBLIC_URL`. See [installation settings](SETTINGS.md).
 2. Open **Administration → Public access → Settings** and enable public access.
-3. In **Search** and **Connections**, enable each page you want to offer: Search, Stremio and Torznab are independent.
+3. In **Search** and **Connections**, enable each page you want to offer: Search, Stremio, Torznab and Shared catalogs are independent.
 4. Choose whether to expose source names and source filters. Leave that switch off if you want source names kept private.
 5. Review **Public access → Request limits**, and [trusted incoming proxies](NETWORK.md#incoming-proxies) if you are behind Cloudflare, a tunnel or another reverse proxy.
 
 Disabled pages do not appear in the public menu. Disabling a public connection blocks its requests and revokes its existing public access; turning it on again does not restore revoked links. Private administrator-created connections are managed separately.
 
+Public **Shared catalogs** also requires **Expose source names and filters**, because copies preserve source identity to avoid duplicates. In **Shared catalog data**, restrict the sources, published fields and optional information visitors may copy. Visitors may narrow these choices further. Optional data groups start off on the visitor page and must also be enabled by the receiving instance. Disabling source exposure revokes public catalog links too. No visitor configuration or sharing password is saved on the hosting instance; safe request diagnostics follow the normal log retention.
+
 ## Private sources
 
 With source exposure enabled, visitors can see the permitted source controls. **Private source playback** accepts their personal announce URLs for private sources when that option is available. The URLs are remembered with their browser configuration.
 
-Without a visitor announce URL, private-source results are restricted to cached playback. The administrator's announce URL is never substituted. Public-source uncached results can be offered when the connection permits them; hiding source names does not make public-source torrents private.
+In Search, Stremio and Torznab, without a visitor announce URL, private-source results are restricted to cached playback. The administrator's announce URL is never substituted. Public-source uncached results can be offered when the connection permits them; hiding source names does not make public-source torrents private.
 
 Stremio visitors receive playback information for their own debrid accounts. Torznab returns permitted torrent results for their download client. Neither connection grants access to administration, your Secrets or your personal announce URLs.
 

@@ -307,37 +307,11 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "Catalogue delivery is unavailable")
 		return
 	}
-	query, err := url.ParseQuery(r.URL.RawQuery)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid catalogue query")
+	request, ok := catalogPageInput(w, r)
+	if !ok {
 		return
 	}
-	for key, values := range query {
-		if len(values) != 1 || (key != "limit" && key != "cursor" && key != "checkpoint") {
-			writeError(w, http.StatusBadRequest, "Only limit, cursor, or checkpoint catalogue parameters are allowed")
-			return
-		}
-	}
-	if query.Has("cursor") && query.Has("checkpoint") {
-		writeError(w, http.StatusBadRequest, "Use either cursor or checkpoint, never both")
-		return
-	}
-	requestedEntities, validEntities := model.ParseCatalogEntities(r.Header.Get(model.CatalogEntitiesHeader))
-	requestedDetails, validDetails := model.ParseCatalogDetails(r.Header.Get(model.CatalogDetailsHeader))
-	if !validEntities || !validDetails || len(r.Header.Values(model.CatalogEntitiesHeader)) > 1 || len(r.Header.Values(model.CatalogDetailsHeader)) > 1 {
-		writeError(w, 400, "Invalid catalog data selection")
-		return
-	}
-	requestedEntities.Identifiers, requestedEntities.Languages = requestedDetails.Identifiers, requestedDetails.Languages
-	requestedEntities.Technical, requestedEntities.Files = requestedDetails.Technical, requestedDetails.Files
-	request := store.CatalogPageRequest{Entities: requestedEntities, Cursor: query.Get("cursor"), Checkpoint: query.Get("checkpoint"), Head: r.Method == http.MethodHead}
-	if query.Has("limit") {
-		request.Limit, err = strconv.Atoi(query.Get("limit"))
-		if err != nil || request.Limit < 1 || request.Limit > 1000 {
-			writeError(w, http.StatusBadRequest, "Limit must be between 1 and 1000")
-			return
-		}
-	}
+
 	download, err := s.options.Store.BeginCatalogDownload(ctx, r.PathValue("id"), parts[1])
 	if err != nil {
 		catalogFeedError(w, err)
@@ -395,4 +369,39 @@ func catalogFeedError(w http.ResponseWriter, err error) {
 	default:
 		respondError(w, err)
 	}
+}
+
+func catalogPageInput(w http.ResponseWriter, r *http.Request) (store.CatalogPageRequest, bool) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid catalogue query")
+		return store.CatalogPageRequest{}, false
+	}
+	for key, values := range query {
+		if len(values) != 1 || (key != "limit" && key != "cursor" && key != "checkpoint") {
+			writeError(w, http.StatusBadRequest, "Only limit, cursor, or checkpoint catalogue parameters are allowed")
+			return store.CatalogPageRequest{}, false
+		}
+	}
+	if query.Has("cursor") && query.Has("checkpoint") {
+		writeError(w, http.StatusBadRequest, "Use either cursor or checkpoint, never both")
+		return store.CatalogPageRequest{}, false
+	}
+	requestedEntities, validEntities := model.ParseCatalogEntities(r.Header.Get(model.CatalogEntitiesHeader))
+	requestedDetails, validDetails := model.ParseCatalogDetails(r.Header.Get(model.CatalogDetailsHeader))
+	if !validEntities || !validDetails || len(r.Header.Values(model.CatalogEntitiesHeader)) > 1 || len(r.Header.Values(model.CatalogDetailsHeader)) > 1 {
+		writeError(w, 400, "Invalid catalog data selection")
+		return store.CatalogPageRequest{}, false
+	}
+	requestedEntities.Identifiers, requestedEntities.Languages = requestedDetails.Identifiers, requestedDetails.Languages
+	requestedEntities.Technical, requestedEntities.Files = requestedDetails.Technical, requestedDetails.Files
+	request := store.CatalogPageRequest{Entities: requestedEntities, Cursor: query.Get("cursor"), Checkpoint: query.Get("checkpoint"), Head: r.Method == http.MethodHead}
+	if query.Has("limit") {
+		request.Limit, err = strconv.Atoi(query.Get("limit"))
+		if err != nil || request.Limit < 1 || request.Limit > 1000 {
+			writeError(w, http.StatusBadRequest, "Limit must be between 1 and 1000")
+			return store.CatalogPageRequest{}, false
+		}
+	}
+	return request, true
 }

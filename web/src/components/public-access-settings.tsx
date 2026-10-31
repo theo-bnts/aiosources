@@ -15,6 +15,7 @@ type Access = {
   stremio_enabled: boolean
   expose_sources: boolean
   torznab_enabled: boolean
+  catalog_enabled: boolean
 }
 type Draft = { base: Access; value: Access }
 export function PublicAccessSettings() {
@@ -31,6 +32,7 @@ export function PublicAccessSettings() {
       draft.value.search_enabled !== query.data?.search_enabled ||
       draft.value.stremio_enabled !== query.data?.stremio_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
+      draft.value.catalog_enabled !== query.data?.catalog_enabled ||
       draft.value.expose_sources !== query.data?.expose_sources),
   )
   function change(value: Partial<Omit<Access, 'revision'>>) {
@@ -48,6 +50,7 @@ export function PublicAccessSettings() {
       setDraft(undefined)
       await queryClient.invalidateQueries({ queryKey: ['public-access'] })
       await queryClient.invalidateQueries({ queryKey: ['public-config'] })
+      await queryClient.invalidateQueries({ queryKey: ['public-catalog-policy'] })
     },
   })
   const review = useMutation({
@@ -75,6 +78,10 @@ export function PublicAccessSettings() {
                   draft.value.torznab_enabled !== draft.base.torznab_enabled
                     ? draft.value.torznab_enabled
                     : latest.torznab_enabled,
+                catalog_enabled:
+                  draft.value.catalog_enabled !== draft.base.catalog_enabled
+                    ? draft.value.catalog_enabled
+                    : latest.catalog_enabled,
                 expose_sources:
                   draft.value.expose_sources !== draft.base.expose_sources
                     ? draft.value.expose_sources
@@ -119,9 +126,10 @@ export function PublicAccessSettings() {
                 <Label htmlFor="public-access-enabled">Enable public access</Label>
               </div>
               <p className="help">
-                Visitors use the connections enabled below with their own keys. The server does not
-                save these keys, and administration stays protected. Turning this off revokes public
-                links. AllDebrid uses your configured account to check missing cache availability.
+                Visitors use the features enabled below. Playback uses their own keys. The server
+                does not save these keys, and administration stays protected. Turning this off
+                revokes public links. AllDebrid uses your configured account to check missing cache
+                availability.
               </p>
             </div>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
@@ -157,7 +165,7 @@ export function PublicAccessSettings() {
                 </div>
                 <p className="help">
                   Visitors can create installation links for Stremio and AIOStreams. Disabling this
-                  option revokes those links without affecting Search or Torznab.
+                  option revokes those links without affecting other public features.
                 </p>
               </div>
               <div className="space-y-2">
@@ -175,6 +183,22 @@ export function PublicAccessSettings() {
                   this option revokes those links.
                 </p>
               </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-catalog-enabled"
+                    checked={current.catalog_enabled}
+                    disabled={busy || !current.enabled || !current.expose_sources}
+                    onCheckedChange={(catalog_enabled) => change({ catalog_enabled })}
+                  />
+                  <Label htmlFor="public-catalog-enabled">Allow public shared catalogs</Label>
+                </div>
+                <p className="help">
+                  Visitors can sync a read-only catalog to another AIOSources instance. Choose the
+                  allowed data in Shared catalog data below. Expose source names and filters must be
+                  enabled. Disabling either option revokes public catalog links.
+                </p>
+              </div>
             </fieldset>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
               <legend className="pr-3 text-sm font-medium">Sources and privacy</legend>
@@ -189,10 +213,10 @@ export function PublicAccessSettings() {
                   <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
                 </div>
                 <p className="help">
-                  Applies to Search, Stremio and Torznab. Visitors can select sources and supply
-                  their own announce URLs for private sources. Your source definitions and announce
-                  URLs stay private. When off, source names and source filters are hidden and
-                  private sources require known cached availability.
+                  Applies to all public features, including Shared catalogs. Visitors can select
+                  sources and supply their own announce URLs for private sources. Your source
+                  definitions and announce URLs stay private. When off, source names and source
+                  filters are hidden and private sources require known cached availability.
                 </p>
               </div>
             </fieldset>

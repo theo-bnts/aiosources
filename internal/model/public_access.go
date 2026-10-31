@@ -10,6 +10,8 @@ type PublicAccess struct {
 	ExposeSources     bool  `json:"expose_sources"`
 	TorznabEnabled    bool  `json:"torznab_enabled"`
 	TorznabGeneration int64 `json:"-"`
+	CatalogEnabled    bool  `json:"catalog_enabled"`
+	CatalogGeneration int64 `json:"-"`
 	Generation        int64 `json:"-"`
 }
 

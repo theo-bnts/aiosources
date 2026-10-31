@@ -23,6 +23,12 @@ New shares start disabled. Replacing a password or disabling a share stops futur
 
 The first sync imports the available catalog; later syncs fetch changes. **Full resync** is available in the same manual-import menu when needed. Your existing published copy stays available until the new import succeeds.
 
+## Offer a public catalog
+
+In **Administration → Public access → Settings**, enable public access, **Expose source names and filters**, and **Allow public shared catalogs**. Choose what may be copied under **Shared catalog data**. Visitors use **Connections → Shared catalogs** to generate a URL and sharing password, then follow the same remote-import steps above on their own instance. No visitor account, debrid key or announce URL is needed.
+
+Public exports use the same source identities as named shares, so copying through either route does not create new identities. Your permissions apply to every page and sync. Turning off public sharing or source exposure revokes public links while leaving named shares unaffected. Copies already received remain with their recipients.
+
 ## What can be shared?
 
 | Data | What you receive |

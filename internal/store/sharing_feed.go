@@ -207,6 +207,31 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	if err = json.Unmarshal(entities, &share.CatalogEntities); err != nil {
 		return result, err
 	}
+	result, err = catalogExportPage(ctx, tx, share, shareID, request)
+	if err != nil {
+		return result, err
+	}
+	more := result.NextCursor != ""
+	if _, err := tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp(),last_sync_at=CASE WHEN $2 THEN clock_timestamp() ELSE last_sync_at END WHERE id=$1`, shareID, !more && !request.Head); err != nil {
+		return result, databaseError("record catalogue access", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return result, databaseError("finish catalogue export", err)
+	}
+	if err := d.Validate(ctx); err != nil {
+		return model.CatalogEnvelope{}, err
+	}
+	return result, nil
+}
+
+// One projection and continuation contract serves named and public catalogs.
+// Authentication and admission remain the caller's responsibility.
+func catalogExportPage(ctx context.Context, tx pgx.Tx, share model.Share, shareID string, request CatalogPageRequest) (model.CatalogEnvelope, error) {
+	result := model.CatalogEnvelope{Version: 1, Items: []model.CatalogItem{}}
+	if request.Limit < 0 || request.Limit > 1000 || (request.Cursor != "" && request.Checkpoint != "") {
+		return result, ErrCatalogCursor
+	}
+	var err error
 	if !request.Entities.Empty() {
 		result.Version = 2
 		if request.Entities.HasTorrentDetails() {
@@ -306,6 +331,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 			return result, databaseError("read catalogue page", err)
 		}
 		var keys []catalogLocalKey
+		pageBytes := 0
 		for rows.Next() {
 			if len(result.Items) == limit {
 				more = true
@@ -314,6 +340,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 			var item model.CatalogItem
 			var origin, fields []byte
 			var key catalogLocalKey
+			previousAfter := state.After
 			if err := rows.Scan(&origin, &fields, &item.Deleted, &state.After, &key.provider, &key.source); err != nil {
 				rows.Close()
 				return result, databaseError("read catalogue item", err)
@@ -330,6 +357,21 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 					return result, err
 				}
 			}
+			encoded, encodeErr := json.Marshal(item)
+			if encodeErr != nil {
+				rows.Close()
+				return result, encodeErr
+			}
+			if len(encoded) > 6<<20 {
+				rows.Close()
+				return result, errors.New("catalog entry exceeds the page size limit")
+			}
+			if pageBytes+len(encoded) > 6<<20 && len(result.Items) > 0 {
+				state.After = previousAfter
+				more = true
+				break
+			}
+			pageBytes += len(encoded)
 			result.Items = append(result.Items, item)
 			keys = append(keys, key)
 		}
@@ -353,15 +395,6 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	}
 	if err != nil {
 		return result, err
-	}
-	if _, err := tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp(),last_sync_at=CASE WHEN $2 THEN clock_timestamp() ELSE last_sync_at END WHERE id=$1`, shareID, !more && !request.Head); err != nil {
-		return result, databaseError("record catalogue access", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return result, databaseError("finish catalogue export", err)
-	}
-	if err := d.Validate(ctx); err != nil {
-		return model.CatalogEnvelope{}, err
 	}
 	return result, nil
 }

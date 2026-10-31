@@ -80,6 +80,7 @@ func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {
 	// before clearing that boundary so an in-flight export cannot deadlock reset.
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3);
 	SELECT id FROM ingest.shares ORDER BY id FOR UPDATE;
+ SELECT revision FROM ingest.public_catalog_policy WHERE singleton FOR UPDATE;
  SELECT ingest.clear_catalog_tracking();
  SELECT set_config('ingest.storage_reset','on',TRUE);
  SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;
@@ -96,6 +97,7 @@ func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {
  UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1;
  UPDATE ingest.storage_settings SET revision=revision+1;
  UPDATE ingest.shares SET revision=revision+1,updated_at=now();
+ UPDATE ingest.public_catalog_policy SET revision=revision+1 WHERE singleton;
  SELECT set_config('ingest.storage_reset','off',TRUE);`); err != nil {
 		return databaseError("reset source data", err)
 	}

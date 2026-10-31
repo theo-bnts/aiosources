@@ -76,6 +76,9 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 	// Match publication/reset lock order. Exporters hold their recipient before
 	// reading the retention boundary, so lock recipients before changing it.
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3);
+ SELECT pg_advisory_xact_lock(1768843109,9);
+ SELECT revision FROM ingest.aio_public_access WHERE singleton FOR UPDATE;
+ SELECT revision FROM ingest.public_catalog_policy WHERE singleton FOR UPDATE;
  SELECT id FROM ingest.shares ORDER BY id FOR UPDATE;
  SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;
  SELECT set_config('ingest.history_retention','on',TRUE);
@@ -83,7 +86,19 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 		return databaseError("lock source publication", err)
 	}
 
+	// Removing the final explicit source revokes public catalog access before
+	// clearing its selection. Empty must never become an unrestricted grant.
+	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,catalog_enabled=FALSE,catalog_generation=catalog_generation+1 WHERE singleton AND catalog_enabled AND EXISTS(SELECT 1 FROM ingest.public_catalog_policy WHERE singleton AND source_ids=ARRAY[$1]::text[])`, providerID)
+	if err != nil {
+		return databaseError("revoke removed public catalog source", err)
+	}
+	if tag.RowsAffected() > 0 {
+		if err = recordAccessActivityTx(ctx, tx, "security.public_catalog_disabled", "public"); err != nil {
+			return err
+		}
+	}
 	queries := []string{
+		`UPDATE ingest.public_catalog_policy SET source_ids=array_remove(source_ids,$1),revision=revision+1 WHERE singleton AND $1=ANY(source_ids)`,
 
 		`DELETE FROM ingest.activity_logs WHERE run_id IN (` + downloads + `)`,
 		`DELETE FROM ingest.operation_events WHERE run_id IN (` + downloads + `)`,

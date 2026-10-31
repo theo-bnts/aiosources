@@ -66,10 +66,14 @@ test('general settings keep resolvable destinations including disabled controls 
     (setting) => !setting.public && !setting.entity && !setting.id.startsWith('runtime.'),
   )) {
     await page.goto(`${setting.route}${settingsHash(setting.id)}`)
+    const content = page.locator('#main-content')
     const target = setting.control
       ? page.locator(`[id="${setting.control}"]`)
-      : page.getByLabel(setting.label ?? setting.title, { exact: true })
-    const button = page.getByRole('button', { name: setting.label ?? setting.title, exact: true })
+      : content.getByLabel(setting.label ?? setting.title, { exact: true })
+    const button = content.getByRole('button', {
+      name: setting.label ?? setting.title,
+      exact: true,
+    })
     await expect(target.or(button)).toBeVisible()
     if (await target.count()) {
       await expect(target).toBeVisible()

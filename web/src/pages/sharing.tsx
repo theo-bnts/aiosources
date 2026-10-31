@@ -1,6 +1,9 @@
 import { catalogEntitiesKey, type CatalogEntities } from '@/lib/catalog-types'
-import { MultiSelect } from '@/components/ui/multi-select'
-import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
+import {
+  CatalogDataControls,
+  CatalogPublishedFields,
+  catalogEntitiesSummary,
+} from '@/components/catalog-data-controls'
 import { ResultSorting } from '@/components/result-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
@@ -27,12 +30,7 @@ import { torznabCachePreferences } from '@/lib/torznab-preferences'
 import { ResultCount, ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
-import {
-  catalogFieldLabel,
-  catalogFieldsSummary,
-  catalogShareState,
-  connectionSummary,
-} from '@/lib/catalog-display'
+import { catalogFieldsSummary, catalogShareState, connectionSummary } from '@/lib/catalog-display'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
@@ -940,27 +938,16 @@ function ShareForm({
             onChange={setCatalogEntities}
             allowAvailability={fields.includes('info_hash')}
             publishedFields={
-              <div className="field">
-                <Label htmlFor="share-fields">Published fields</Label>
-                <MultiSelect
-                  id="share-fields"
-                  label="Published fields"
-                  allLabel="All published fields"
-                  value={fields}
-                  options={data.fields.map((field) => ({
-                    value: field,
-                    label: catalogFieldLabel(field),
-                  }))}
-                  onChange={(selection) => {
-                    const next = selection.length
-                      ? data.fields.filter((field) => selection.includes(field))
-                      : data.fields
-                    setFields(next)
-                    if (!next.includes('info_hash'))
-                      setCatalogEntities((current) => ({ ...current, availability: false }))
-                  }}
-                />
-              </div>
+              <CatalogPublishedFields
+                id="share-fields"
+                value={fields}
+                fields={data.fields}
+                onChange={(next) => {
+                  setFields(next)
+                  if (!next.includes('info_hash'))
+                    setCatalogEntities((current) => ({ ...current, availability: false }))
+                }}
+              />
             }
           />
         )}
