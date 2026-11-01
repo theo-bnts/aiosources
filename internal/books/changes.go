@@ -65,7 +65,7 @@ func Path(id string) string {
 
 func DecodeChanges(body []byte, now time.Time) ([]Change, error) {
 	var rows []struct {
-		ID        string          `json:"id"`
+		ID        json.Number     `json:"id"`
 		Timestamp string          `json:"timestamp"`
 		Changes   json.RawMessage `json:"changes"`
 	}
@@ -76,11 +76,14 @@ func DecodeChanges(body []byte, now time.Time) ([]Change, error) {
 	seen := map[string]bool{}
 	var prior time.Time
 	for _, row := range rows {
+		// Open Library serves numeric changeset IDs; older responses and
+		// fixtures also use quoted numbers. Keep both exact, without float64.
+		id := row.ID.String()
 		at, err := ParseTimestamp(row.Timestamp)
-		if err != nil || at.After(now.Add(5*time.Minute)) || !changeIDRE.MatchString(row.ID) || seen[row.ID] || (!prior.IsZero() && at.After(prior)) || len(row.Changes) == 0 {
+		if err != nil || at.After(now.Add(5*time.Minute)) || !changeIDRE.MatchString(id) || seen[id] || (!prior.IsZero() && at.After(prior)) || len(row.Changes) == 0 {
 			return nil, ErrChanges
 		}
-		prior, seen[row.ID] = at, true
+		prior, seen[id] = at, true
 		var keys []struct {
 			Key      string `json:"key"`
 			Revision int64  `json:"revision"`
@@ -88,7 +91,7 @@ func DecodeChanges(body []byte, now time.Time) ([]Change, error) {
 		if json.Unmarshal(row.Changes, &keys) != nil || len(keys) > 100000 {
 			return nil, ErrChanges
 		}
-		change := Change{ID: row.ID, At: at}
+		change := Change{ID: id, At: at}
 		for _, key := range keys {
 			id := Key(key.Key)
 			if !(strings.HasPrefix(key.Key, "/works/") || strings.HasPrefix(key.Key, "/books/") || strings.HasPrefix(key.Key, "/authors/")) {

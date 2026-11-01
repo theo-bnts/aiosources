@@ -455,6 +455,9 @@ for (const [entity, route, name] of [
           [`${entity}.media`, 'Media types'],
           [`${entity}.sources`, 'Sources'],
           [`${entity}.cached`, 'Cached results only'],
+          ...(entity === 'stremio'
+            ? ([[`${entity}.saved-cache`, 'Use saved cache checks only']] as const)
+            : []),
           [`${entity}.services`, 'Services'],
         ],
   )
@@ -775,6 +778,9 @@ for (const [area, route] of [
         [`visitor.${area}.media`, 'Media types'],
         [`visitor.${area}.sources`, 'Sources'],
         [`visitor.${area}.cached`, 'Cached results only'],
+        ...(area === 'stremio'
+          ? ([[`visitor.${area}.saved-cache`, 'Use saved cache checks only']] as const)
+          : []),
         [`visitor.${area}.services`, 'Services'],
         [`visitor.${area}.max-results`, 'Maximum results'],
         [`visitor.${area}.max-cached`, 'Maximum cached results'],

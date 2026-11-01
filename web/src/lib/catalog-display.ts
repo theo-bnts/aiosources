@@ -58,13 +58,15 @@ export function connectionSummary(
     )
   }
   if (value?.cached_only) filters.push('Cached only')
+  if (stremio && language?.skip_cache_check) filters.push('Saved cache checks only')
 
   const limits: string[] = []
   if (value?.cached_only) {
     if (value.max_cached) limits.push(`Up to ${number(value.max_cached)} cached results`)
   } else {
     if (value?.max_results) limits.push(`Up to ${number(value.max_results)} results`)
-    if (stremio && value?.max_cached) limits.push(`Cache target: ${number(value.max_cached)}`)
+    if (stremio && !language?.skip_cache_check && value?.max_cached)
+      limits.push(`Cache target: ${number(value.max_cached)}`)
   }
   return {
     filters: filters.join(' · ') || 'All results',
@@ -75,8 +77,9 @@ export function connectionSummary(
       )
       .join(' → '),
     limits: limits.join(' · '),
-    response: value?.response_seconds
-      ? `${number(value.response_seconds)} ${value.response_seconds === 1 ? 'second' : 'seconds'}`
-      : undefined,
+    response:
+      !(stremio && language?.skip_cache_check) && value?.response_seconds
+        ? `${number(value.response_seconds)} ${value.response_seconds === 1 ? 'second' : 'seconds'}`
+        : undefined,
   }
 }

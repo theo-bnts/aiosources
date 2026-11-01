@@ -58,6 +58,22 @@ test('oversized connection selections cannot produce an installable link', () =>
   assert.equal(preferenceManifestError('/stremio/token~fr~all/manifest.json', {}), null)
 })
 
+test('saved-only cache checks survive an otherwise unrestricted public Stremio URL', () => {
+  const path = preferenceManifest(
+    '/public/stremio/synthetic/manifest.json',
+    { language: '', mode: 'all' },
+    { skip_cache_check: true },
+  )
+  const options = JSON.parse(
+    Buffer.from(path.split('~v1~')[1].split('/')[0], 'base64url').toString(),
+  )
+  assert.equal(options.skip_cache_check, true)
+  assert.match(
+    preferenceManifest(path, { language: '', mode: 'all' }, {}),
+    /synthetic~[^/~]*~all\/manifest\.json$/,
+  )
+})
+
 test('new language filters are disabled without changing the browser locale fallback', () => {
   assert.deepEqual(defaultLanguagePreferences(), { language: '', mode: 'all' })
   const first = defaultLanguagePreferences()

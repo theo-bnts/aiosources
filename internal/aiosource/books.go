@@ -454,14 +454,24 @@ func (s *Service) finishBookExport(ctx context.Context, h *operationHistory) err
 	if err != nil {
 		return err
 	}
+	h.run.Processed = max(h.run.Processed, state.Position)
 	h.checkpoint(ctx, "book_reconciliation")
+	lastHistory := time.Now()
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		done, err := s.DB.PruneBookSnapshot(ctx)
+		done, inspected, err := s.DB.PruneBookSnapshot(ctx)
 		if err != nil {
 			return err
+		}
+		if h.run.Results == nil {
+			h.run.Results = map[string]int64{}
+		}
+		h.run.Results["snapshot_checked"] += inspected
+		if done || time.Since(lastHistory) >= 5*time.Second {
+			h.checkpoint(ctx, "book_reconciliation")
+			lastHistory = time.Now()
 		}
 		if done {
 			break

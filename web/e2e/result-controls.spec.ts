@@ -22,6 +22,13 @@ test('Stremio saves independent sorting priorities, optional limits and a timeou
   await editor.getByLabel('Maximum cached results', { exact: true }).fill('20')
   await editor.getByLabel('Stream response timeout (seconds)', { exact: true }).fill('12')
   await editor.getByRole('switch', { name: 'Cached results only', exact: true }).check()
+  await expect(
+    editor.getByRole('switch', { name: 'Use saved cache checks only', exact: true }),
+  ).not.toBeChecked()
+  await editor.getByRole('switch', { name: 'Use saved cache checks only', exact: true }).check()
+  await expect(
+    editor.getByLabel('Stream response timeout (seconds)', { exact: true }),
+  ).toBeDisabled()
   await expect(editor.getByLabel('Maximum results', { exact: true })).toBeDisabled()
   await expect(editor.getByLabel('Maximum results', { exact: true })).toHaveValue('80')
   await editor.locator('summary', { hasText: /^Sorting$/ }).click()
@@ -57,6 +64,7 @@ test('Stremio saves independent sorting priorities, optional limits and a timeou
     mode: 'all',
     language: 'en',
     cached_only: true,
+    skip_cache_check: true,
     max_results: 80,
     max_cached: 20,
     response_seconds: 12,
@@ -69,6 +77,12 @@ test('Stremio saves independent sorting priorities, optional limits and a timeou
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await editor.locator('summary', { hasText: /^Filters$/ }).click()
   await editor.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
+  await expect(editor.getByLabel('Maximum cached results', { exact: true })).toBeDisabled()
+  await editor.getByRole('switch', { name: 'Use saved cache checks only', exact: true }).uncheck()
+  await expect(
+    editor.getByLabel('Stream response timeout (seconds)', { exact: true }),
+  ).toBeEnabled()
+  await expect(editor.getByLabel('Maximum cached results', { exact: true })).toBeEnabled()
   await expect(editor.getByLabel('Maximum results', { exact: true })).toBeEnabled()
   await expect(editor.getByLabel('Maximum results', { exact: true })).toHaveValue('80')
 })
@@ -94,6 +108,17 @@ test('public Stremio and Torznab use the same optional controls without creating
     for (const path of ['/public', '/public/torznab']) {
       await visitor.goto(path)
       await visitor.locator('summary', { hasText: /^Filters$/ }).click()
+      if (path === '/public') {
+        await expect(
+          visitor.getByRole('switch', { name: 'Use saved cache checks only', exact: true }),
+        ).not.toBeChecked()
+        await visitor
+          .getByRole('switch', { name: 'Use saved cache checks only', exact: true })
+          .check()
+      } else
+        await expect(
+          visitor.getByRole('switch', { name: 'Use saved cache checks only', exact: true }),
+        ).toHaveCount(0)
       await expect(visitor.getByLabel('Maximum results', { exact: true })).toHaveValue('')
       await visitor.getByRole('switch', { name: 'Cached results only', exact: true }).check()
       await expect(visitor.getByLabel('Maximum results', { exact: true })).toBeDisabled()

@@ -12,12 +12,13 @@ import (
 // An empty mode preserves older installations which did not select a language.
 type StreamPreferences struct {
 	ResultPreferences
-	Language   string   `json:"language"`
-	Mode       string   `json:"mode"`
-	Sources    []string `json:"sources,omitempty"`
-	Services   []string `json:"services,omitempty"`
-	Types      []string `json:"types,omitempty"`
-	CachedOnly bool     `json:"cached_only,omitempty"`
+	Language       string   `json:"language"`
+	Mode           string   `json:"mode"`
+	Sources        []string `json:"sources,omitempty"`
+	Services       []string `json:"services,omitempty"`
+	Types          []string `json:"types,omitempty"`
+	CachedOnly     bool     `json:"cached_only,omitempty"`
+	SkipCacheCheck bool     `json:"skip_cache_check,omitempty"`
 }
 
 var sourceIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)

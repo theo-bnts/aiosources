@@ -3,6 +3,8 @@ import type { InstallationOptions } from '@/lib/language-preferences'
 import { ConnectionFilterFields, stremioMediaTypes } from '@/components/connection-filter-fields'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultLimits } from '@/components/result-controls'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useId, useRef, type ReactNode } from 'react'
 
 export function InstallationFilters({
@@ -53,8 +55,22 @@ export function InstallationFilters({
         onCachedChange={(cached_only) => onChange({ ...value, cached_only })}
         showSources={showSources}
       />
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <Label htmlFor={`${id}-saved-cache`}>Use saved cache checks only</Label>
+          <p className="help mt-1">
+            Listing results does not contact debrid services. Missing or expired checks stay
+            Unknown. Playback still contacts your selected service.
+          </p>
+        </div>
+        <Switch
+          id={`${id}-saved-cache`}
+          checked={value.skip_cache_check ?? false}
+          onCheckedChange={(skip_cache_check) => onChange({ ...value, skip_cache_check })}
+        />
+      </div>
       {children}
-      <ResultLimits value={value} onChange={onChange} cache />
+      <ResultLimits value={value} onChange={onChange} cache localOnly={value.skip_cache_check} />
       {showHelp && (
         <p className="help">
           Filters belong to this link. Copy or install a separate link for each configuration;

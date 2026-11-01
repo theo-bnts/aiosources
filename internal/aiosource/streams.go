@@ -206,7 +206,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 		exposeNames = access.ExposeSources
 	}
 	var plan *availabilityPlan
-	if preferences.MaxResults > 0 || preferences.MaxCached > 0 || slices.ContainsFunc(preferences.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" }) {
+	if preferences.SkipCacheCheck || preferences.MaxResults > 0 || preferences.MaxCached > 0 || slices.ContainsFunc(preferences.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" }) {
 		plan, err = s.planAvailability(ctx, c, hashes, filtered)
 		if err != nil {
 			return nil, err
@@ -237,7 +237,11 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	for _, rec := range eligible {
 		hashes = append(hashes, rec.Hash)
 	}
-	if preferences.MaxCached > 0 {
+	if preferences.SkipCacheCheck {
+		// Listing results is strictly local. Unknown or expired observations stay
+		// unknown; playback resolves the chosen file through its own service.
+		availability = plan.states
+	} else if preferences.MaxCached > 0 {
 		allowNoFiles := map[string]bool{}
 		for _, rec := range eligible {
 			tracker, configured := c.Trackers[rec.Provider]

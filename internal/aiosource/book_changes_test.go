@@ -27,7 +27,7 @@ type bookAPIEvent struct {
 }
 
 func (e bookAPIEvent) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]any{"id": e.ID, "timestamp": e.Timestamp, "changes": e.Changes})
+	return json.Marshal(map[string]any{"id": json.Number(e.ID), "timestamp": e.Timestamp, "changes": e.Changes})
 }
 
 type bookAPIFixture struct {
@@ -341,7 +341,7 @@ func TestBookSnapshotKeepsNewerAPIDataAndPrunesMissingEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	for {
-		done, err := s.DB.PruneBookSnapshot(ctx)
+		done, _, err := s.DB.PruneBookSnapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

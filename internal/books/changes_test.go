@@ -1,10 +1,26 @@
 package books
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 )
+
+func TestBookChangesAcceptExactNumericAndQuotedIDs(t *testing.T) {
+	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	for _, id := range []string{`123`, `"123"`, `9007199254740993`, `"9007199254740993"`} {
+		rows, err := DecodeChanges([]byte(fmt.Sprintf(`[{"id":%s,"timestamp":"2026-01-02T11:00:00","changes":[]}]`, id)), now)
+		if err != nil || len(rows) != 1 || rows[0].ID != strings.Trim(id, `"`) {
+			t.Fatal("changeset identifier changed or was rejected", id, err)
+		}
+	}
+	for _, id := range []string{`null`, `true`, `-1`, `1.2`, `1e3`, `"invalid"`, `123456789012345678901`} {
+		if _, err := DecodeChanges([]byte(fmt.Sprintf(`[{"id":%s,"timestamp":"2026-01-02T11:00:00","changes":[]}]`, id)), now); err == nil {
+			t.Fatal("invalid changeset identifier accepted", id)
+		}
+	}
+}
 
 func TestBookChangeFeedKeepsOnlyBibliographicEvidence(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)

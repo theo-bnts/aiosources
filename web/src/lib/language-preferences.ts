@@ -92,6 +92,7 @@ export type InstallationOptions = ResultPreferences & {
   services?: string[]
   types?: string[]
   cached_only?: boolean
+  skip_cache_check?: boolean
   max_cached?: number
 }
 
@@ -128,6 +129,7 @@ export function preferenceManifest(
       options.services?.length ||
       options.types?.length ||
       options.cached_only ||
+      options.skip_cache_check ||
       options.max_cached ||
       Object.keys(resultPreferences(options)).length)
   ) {

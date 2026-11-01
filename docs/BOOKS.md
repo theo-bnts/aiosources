@@ -42,6 +42,10 @@ For both providers, **Statistics** shows the synchronization state, export date,
 
 ## Find and download a book
 
+During the first import, **Records processed** counts export lines read, including excluded records. It can stay fixed while the final cleanup runs; **Cleanup records checked** shows that separate phase's progress. A stopped update resumes from its saved checkpoint. Finishing the initial import queues book identification again.
+
+Search shows published source records with a current identification. It does not wait for every metadata update to finish, and existing identified results remain available during updates. A source's first full import must finish successfully before its new catalog is published. Records still awaiting publication remain separate from searchable records.
+
 Use **Search** with a title, author or ISBN. **Type** can narrow results to Books, Ebooks or Audiobooks. A year can match an edition's publication year. Search stays local; your queries are not sent to Open Library.
 
 Open a title to compare its source releases and debrid availability. When several formats or audio tracks are available, **Choose file** shows the files offered by the debrid service. Select the format or track you want, then choose **Download**. Uncached releases can be added to debrid when your account and source permissions allow it.

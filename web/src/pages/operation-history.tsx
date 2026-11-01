@@ -101,6 +101,7 @@ const resultLabels: Record<string, string> = {
   cached: 'Cached',
   uncached: 'Not cached',
   cleaned: 'Cleaned up',
+  snapshot_checked: 'Cleanup records checked',
 }
 
 function OperationBadge({ run }: { run: OperationRun }) {

@@ -94,6 +94,17 @@ test('connection summaries use the same media, service and language labels as th
   )
 })
 
+test('saved-only Stremio summaries hide inactive check budgets but retain their saved values', () => {
+  const record = access('stremio')
+  record.stream_preferences!.skip_cache_check = true
+  assert.match(connectionSummary(record)?.filters ?? '', /Saved cache checks only/)
+  assert.equal(connectionSummary(record)?.limits, 'Up to 80 results')
+  assert.equal(connectionSummary(record)?.response, undefined)
+  assert.equal(record.stream_preferences!.response_seconds, 12)
+  record.stream_preferences!.cached_only = true
+  assert.equal(connectionSummary(record)?.limits, 'Up to 20 cached results')
+})
+
 test('catalog field labels stay readable while unrecognized future fields remain distinguishable', () => {
   assert.equal(
     catalogFieldsSummary(['title', 'info_hash', 'published_at']),

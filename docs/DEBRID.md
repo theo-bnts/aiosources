@@ -42,6 +42,8 @@ Connection **Filters** can restrict results to cached files or set result and ca
 
 **Stream response timeout** controls how long to wait for availability results. Leave it empty to use **Instance default**, which is five seconds on a new instance, or set a different value for that connection.
 
+In Stremio connection **Filters**, enable **Use saved cache checks only** to list results without starting debrid availability requests. This works for private and public connections. Fresh saved checks are reused; missing or expired observations remain **Unknown**. Combine it with **Cached results only** to return only verified cached results. The cached limit then controls how many results are returned; otherwise it is inactive while saved-only checks are selected. Account validation when submitting a new public key, playback and independent automatic checks still use their normal service requests.
+
 AIOSources cleans up only temporary items it can confirm it created and that are eligible under your cleanup settings. It does not remove unrelated personal library items. Use **Debrid → Statistics** and **History** to review availability, preparation and cleanup.
 
 If a service blocks your server's address, configure an existing WARP or compatible outgoing proxy in [Network](NETWORK.md).

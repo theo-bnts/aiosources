@@ -104,10 +104,12 @@ export function ResponseTimeout({
   value,
   onChange,
   stream = true,
+  disabled = false,
 }: {
   value?: number
   onChange: (value?: number) => void
   stream?: boolean
+  disabled?: boolean
 }) {
   const id = useId()
   return (
@@ -122,6 +124,7 @@ export function ResponseTimeout({
         max={stream ? 60 : 600}
         step={1}
         placeholder="Instance default"
+        disabled={disabled}
         value={value || ''}
         onChange={(event) => onChange(Number(event.target.value) || undefined)}
       />
@@ -181,10 +184,12 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
   value,
   onChange,
   cache = false,
+  localOnly = false,
 }: {
   value: T
   onChange: (value: T) => void
   cache?: boolean
+  localOnly?: boolean
 }) {
   const id = useId()
   return (
@@ -215,7 +220,7 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
             max={10000}
             step={1}
             placeholder="No limit"
-            disabled={!cache && !value.cached_only}
+            disabled={(!cache || localOnly) && !value.cached_only}
             value={value.max_cached || ''}
             onChange={(event) =>
               onChange({ ...value, max_cached: Number(event.target.value) || undefined })
@@ -226,17 +231,22 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
           value={value.response_seconds}
           onChange={(response_seconds) => onChange({ ...value, response_seconds })}
           stream={cache}
+          disabled={localOnly}
         />
       </div>
       <p className="help">
         {value.cached_only
           ? 'Only the cached limit applies. The general limit is kept for later.'
+          : localOnly
+            ? 'Only saved checks are used. Maximum results applies; the cached limit is kept for use with Cached results only.'
+            : cache
+              ? 'The cached limit stops new checks; local observations are reused and unchecked results stay Unknown. Maximum results also limits candidates for new checks.'
+              : 'Limits apply across all pages. The cached limit applies only with Cached results only.'}{' '}
+        {localOnly
+          ? 'The availability timeout is kept for later. The instance request deadline still applies.'
           : cache
-            ? 'The cached limit stops new checks; local observations are reused and unchecked results stay Unknown. Maximum results also limits candidates for new checks.'
-            : 'Limits apply across all pages. The cached limit applies only with Cached results only.'}{' '}
-        {cache
-          ? 'The timeout limits availability checks, within the instance request deadline.'
-          : 'The timeout can shorten the instance request deadline for this connection.'}
+            ? 'The timeout limits availability checks, within the instance request deadline.'
+            : 'The timeout can shorten the instance request deadline for this connection.'}
       </p>
     </div>
   )

@@ -16,6 +16,7 @@ export function stremioPreferencesKey(value: StremioPreferences) {
     ...(value.services?.length ? { services: value.services } : {}),
     ...(value.types?.length ? { types: value.types } : {}),
     ...(value.cached_only ? { cached_only: true } : {}),
+    ...(value.skip_cache_check ? { skip_cache_check: true } : {}),
     ...resultPreferences(value),
   })
 }
