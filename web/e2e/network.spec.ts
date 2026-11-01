@@ -12,7 +12,13 @@ test('Public access separates Search and connection settings, while Network expa
   await expect(
     search.getByRole('switch', { name: 'Allow public Search', exact: true }),
   ).toBeVisible()
-  await expect(connections.getByRole('switch')).toHaveCount(2)
+  await expect(connections.getByRole('switch')).toHaveCount(3)
+  for (const name of [
+    'Allow public Stremio connections',
+    'Allow public Torznab connections',
+    'Allow public shared catalogs',
+  ])
+    await expect(connections.getByRole('switch', { name, exact: true })).toBeVisible()
   await expect(connections.getByText('Allow public Search', { exact: true })).toHaveCount(0)
   if (process.env.QA_DIRECTORY)
     await page.screenshot({
