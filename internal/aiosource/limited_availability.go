@@ -137,26 +137,13 @@ func (s *Service) limitedAvailability(ctx context.Context, c model.AIOConfig, re
 			todo = todo[:min(len(todo), target-count())]
 			key := p.keys[service]
 			var err error
-			if p.public && service != "alldebrid" {
+			if p.public {
 				var items []model.AIOAvailability
 				items, err = s.checkPublicService(check, service, key, resource, todo)
 				for _, item := range items {
 					p.states[service][item.Hash] = item
 				}
 			} else {
-				// Public AllDebrid checks retain only the administrator's own
-				// recoverable probes, never a visitor's key or account objects.
-				if p.public {
-					if c.AllDebridSecret == "" {
-						stopped[service] = true
-						continue
-					}
-					key, err = s.key(check, c.AllDebridSecret)
-					if err != nil {
-						stopped[service] = true
-						continue
-					}
-				}
 				if err = s.acquireCapacity(check, &s.slots, "cache_jobs", true); err == nil {
 					batchResource := resource + ":limited:" + fingerprint(strings.Join(todo, ","))
 					err = s.checkResourceTriggered(check, service, key, batchResource, todo, c, "playback")

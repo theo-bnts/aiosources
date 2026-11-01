@@ -129,8 +129,8 @@ func TestPublicAllDebridPlaybackUsesGuestAccountAndHandlesCacheRace(t *testing.T
 	}
 }
 
-func TestPublicAllDebridAdministratorProbesRetainActualCleanupCalls(t *testing.T) {
-	ctx, s, _ := testService(t)
+func TestPublicAllDebridVisitorProbesRetainSharedEvidenceAndActualCleanupCalls(t *testing.T) {
+	ctx, s, conn := testService(t)
 	hash := strings.Repeat("f", 40)
 	c, _ := s.DB.AIOConfig(ctx)
 	c.AllDebridSecret, c.ResponseSeconds = "adminAD", 2
@@ -138,8 +138,8 @@ func TestPublicAllDebridAdministratorProbesRetainActualCleanupCalls(t *testing.T
 		t.Fatal(err)
 	}
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer administrator-probe-key" {
-			t.Error("guest key used in recoverable background work")
+		if r.Header.Get("Authorization") != "Bearer visitor-probe-key" {
+			t.Error("administrator key used for public availability")
 			w.WriteHeader(401)
 			return
 		}
@@ -158,16 +158,16 @@ func TestPublicAllDebridAdministratorProbesRetainActualCleanupCalls(t *testing.T
 	}))
 	defer upstream.Close()
 	s.Providers.ADBase = upstream.URL
-	states, err := s.publicAvailability(ctx, c, "movie:imdb:1234567", []string{hash}, &PublicInstallation{Services: map[string]string{"alldebrid": "visitor-unused-key"}})
+	states, err := s.publicAvailability(ctx, c, "movie:imdb:1234567", []string{hash}, &PublicInstallation{Services: map[string]string{"alldebrid": "visitor-probe-key"}})
 	if err != nil || !states["alldebrid"][hash].Cached {
-		t.Fatal("administrator probe did not fill common availability", err)
+		t.Fatal("visitor probe did not fill common availability", err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for s.cleanupDispatch.count() > 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("owned cleanup did not complete")
-		}
-		time.Sleep(10 * time.Millisecond)
+	var accountRows int
+	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_resources)+(SELECT count(*) FROM ingest.aio_cleanup)+(SELECT count(*) FROM ingest.aio_availability)`).Scan(&accountRows); err != nil || accountRows != 0 {
+		t.Fatal("visitor account entered restartable background state", accountRows, err)
+	}
+	if states["alldebrid"][hash].Files[0].Link != "" {
+		t.Fatal("account download link entered shared availability")
 	}
 	runs, _ := s.DB.ListOperations(ctx, model.OperationFilter{Kind: "cache"})
 	if len(runs.Items) != 1 {
@@ -182,7 +182,7 @@ func TestPublicAllDebridAdministratorProbesRetainActualCleanupCalls(t *testing.T
 			return
 		}
 	}
-	t.Fatal("actual background deletion absent from history")
+	t.Fatal("actual visitor deletion absent from history")
 }
 
 func TestPublicProvidersCheckIndependentlyWithoutBackgroundVisitorKeys(t *testing.T) {
@@ -198,8 +198,8 @@ func TestPublicProvidersCheckIndependentlyWithoutBackgroundVisitorKeys(t *testin
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v4.1/magnet/status":
-			if r.Header.Get("Authorization") != "Bearer admin-key-for-probe" {
-				t.Error("visitor key entered restartable AllDebrid probe")
+			if r.Header.Get("Authorization") != "Bearer visitor-ad-key" {
+				t.Error("administrator key used for public availability")
 			}
 			select {
 			case <-checked:

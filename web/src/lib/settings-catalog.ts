@@ -171,6 +171,11 @@ add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
       ] as const,
   ),
   ['debrid.cache', 'Cache validity (minutes)', 'availability expiration cache'],
+  [
+    'debrid.rechecks',
+    'Automatically recheck availability',
+    'automatic retry background cache reverification',
+  ],
 ])
 add(
   {

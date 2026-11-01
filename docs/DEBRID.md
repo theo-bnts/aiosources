@@ -38,6 +38,8 @@ An uncached private-source release requires an announce URL authorized for that 
 
 ## Control checks and cleanup
 
+In **Debrid → Settings**, **Automatically recheck availability** starts enabled for administrator accounts. While a requested title's cache window is valid, it retries incomplete checks with increasing delays. Disable it to stop automatic rechecks; explicit searches, playback and temporary-item cleanup still work. Public visitor requests always have automatic rechecks disabled: they use the visitor's own credentials only for the current request, never the administrator's account.
+
 Connection **Filters** can restrict results to cached files or set result and cache-check limits. With a maximum cached-results target, existing local observations are reused; new checks stop after reaching the target. Unchecked releases remain **Unknown**. These settings do not guarantee that a provider will return a particular number of files.
 
 **Stream response timeout** controls how long to wait for availability results. Leave it empty to use **Instance default**, which is five seconds on a new instance, or set a different value for that connection.
@@ -45,5 +47,7 @@ Connection **Filters** can restrict results to cached files or set result and ca
 In Stremio connection **Filters**, enable **Use saved cache checks only** to list results without starting debrid availability requests. This works for private and public connections. Fresh saved checks are reused; missing or expired observations remain **Unknown**. Combine it with **Cached results only** to return only verified cached results. The cached limit then controls how many results are returned; otherwise it is inactive while saved-only checks are selected. Account validation when submitting a new public key, playback and independent automatic checks still use their normal service requests.
 
 AIOSources cleans up only temporary items it can confirm it created and that are eligible under your cleanup settings. It does not remove unrelated personal library items. Use **Debrid → Statistics** and **History** to review availability, preparation and cleanup.
+
+Public AllDebrid and Debrid-Link availability probes attempt to remove their confirmed temporary additions before finishing, including after cancellation. Verified, account-independent observations remain in the shared cache without keys or personal download links. An explicit playback or download preparation can retain the item it needs. Visitor cleanup cannot be resumed after a server crash because visitor credentials are not saved. Failed cleanup remains visible in History.
 
 If a service blocks your server's address, configure an existing WARP or compatible outgoing proxy in [Network](NETWORK.md).

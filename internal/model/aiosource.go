@@ -15,6 +15,7 @@ type AIOConfig struct {
 	RealDebridSecret        string                `json:"realdebrid_secret"`
 	AutoSync                bool                  `json:"auto_sync"`
 	AutoMatch               bool                  `json:"auto_match"`
+	AutoCache               bool                  `json:"auto_cache"`
 	OpenLibraryEnabled      bool                  `json:"openlibrary_enabled"`
 	OpenLibraryMinutes      int                   `json:"openlibrary_minutes"`
 	OpenLibraryRelevantOnly bool                  `json:"openlibrary_relevant_only"`

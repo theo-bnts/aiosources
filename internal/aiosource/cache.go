@@ -31,7 +31,7 @@ func (s *Service) cacheFlightTriggered(service, key, resource string, hashes []s
 		return nil, model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
-	f := &flight{done: make(chan struct{}), cancel: cancel, warm: warm}
+	f := &flight{done: make(chan struct{}), cancel: cancel, warm: warm, automatic: trigger == "automatic"}
 	s.flights[identity] = f
 	s.wg.Add(1)
 	go func() {
@@ -89,6 +89,15 @@ func (s *Service) checkResource(ctx context.Context, service, key, resource stri
 	return s.checkResourceTriggered(ctx, service, key, resource, hashes, c, "playback")
 }
 func (s *Service) checkResourceTriggered(ctx context.Context, service, key, resource string, hashes []string, c model.AIOConfig, trigger string) (checkResult error) {
+	if trigger == "automatic" {
+		current, err := s.DB.AIOConfig(ctx)
+		if err != nil {
+			return err
+		}
+		if !current.AutoCache {
+			return nil
+		}
+	}
 	account := fingerprint(key)
 	release, locked, err := s.DB.AIOLock(ctx, "resource:"+service+":"+account+":"+resource)
 	if err != nil {

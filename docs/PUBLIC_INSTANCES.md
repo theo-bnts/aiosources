@@ -27,6 +27,8 @@ Keep generated links and Torznab keys private: they grant access using your conf
 
 The instance keeps request history and safe diagnostics for its configured retention period. It may reuse account-independent cached-availability observations. Account keys, announce URLs, personal playback links and account-library identifiers are not shared as those observations.
 
+Availability checks use your own service keys. They never fall back to administrator keys and do not schedule automatic rechecks after your request. For checks that create temporary account items, AIOSources attempts to remove only additions it can confirm it created. A server crash or failed provider request can prevent cleanup; no visitor key is stored to retry it later. Items needed for playback or a download you requested are handled separately.
+
 ## Host a public instance
 
 1. Configure the external HTTPS address in `PUBLIC_URL`. See [installation settings](SETTINGS.md).

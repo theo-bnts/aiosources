@@ -48,16 +48,15 @@ type Service struct {
 	cleanupSlots              capacityGate
 	cleanupDispatch           capacityGate
 	// Public probes have their own capacity, preserving room for administrator work.
-	publicProbe    capacityGate
-	publicADMu     sync.Mutex
-	publicADFlight *flight
+	publicProbes   map[string]*capacityGate
 	automationWake chan struct{}
 }
 type flight struct {
-	warm   bool // Immutable admission state, shared by callers joining this check.
-	done   chan struct{}
-	err    error
-	cancel context.CancelFunc
+	warm      bool // Immutable admission state, shared by callers joining this check.
+	automatic bool
+	done      chan struct{}
+	err       error
+	cancel    context.CancelFunc
 }
 
 func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *providers.Registry) (*Service, error) {
@@ -201,6 +200,15 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 	if err := s.saveTrackerSecrets(ctx, c); err != nil {
 		return err
 	}
+	if !c.AutoCache {
+		s.mu.Lock()
+		for _, f := range s.flights {
+			if f.automatic {
+				f.cancel()
+			}
+		}
+		s.mu.Unlock()
+	}
 	s.wakeAutomation()
 	return nil
 }
@@ -336,28 +344,35 @@ func (s *Service) maintenance() {
 			continue
 		}
 		_ = s.DB.RecoverOperations(s.ctx)
-		if c.AllDebridSecret != "" {
-			key, e := s.key(s.ctx, c.AllDebridSecret)
-			if e == nil {
-				_ = s.RecoverCleanup(s.ctx, key, false)
-			}
+		s.maintainDebrid(s.ctx, c)
+	}
+}
+
+func (s *Service) maintainDebrid(ctx context.Context, c model.AIOConfig) {
+	if c.AllDebridSecret != "" {
+		key, e := s.key(ctx, c.AllDebridSecret)
+		if e == nil {
+			_ = s.RecoverCleanup(ctx, key, false)
 		}
-		for service, name := range c.DebridSecrets() {
-			if name == "" || service == "deepbrid" {
-				continue
-			}
-			key, e := s.key(s.ctx, name)
-			if e != nil {
-				continue
-			}
-			resources, e := s.DB.AIOResources(s.ctx, service, fingerprint(key), time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
-			if e != nil {
-				continue
-			}
-			for _, r := range resources {
-				warm := freshResource(r, r.Hashes, time.Now(), time.Duration(c.CacheMinutes)*time.Minute)
-				_, _ = s.cacheFlightTriggered(service, key, r.Key, r.Hashes, c, "automatic", warm)
-			}
+	}
+	if !c.AutoCache {
+		return
+	}
+	for service, name := range c.DebridSecrets() {
+		if name == "" || service == "deepbrid" {
+			continue
+		}
+		key, e := s.key(ctx, name)
+		if e != nil {
+			continue
+		}
+		resources, e := s.DB.AIOResources(ctx, service, fingerprint(key), time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))
+		if e != nil {
+			continue
+		}
+		for _, r := range resources {
+			warm := freshResource(r, r.Hashes, time.Now(), time.Duration(c.CacheMinutes)*time.Minute)
+			_, _ = s.cacheFlightTriggered(service, key, r.Key, r.Hashes, c, "automatic", warm)
 		}
 	}
 }

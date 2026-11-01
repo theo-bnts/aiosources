@@ -67,6 +67,9 @@ func recordProviderCall(ctx context.Context, path string, status int, started ti
 	if strings.HasPrefix(path, "torrents/selectFiles/") {
 		phase = "provider_add"
 	}
+	if strings.HasPrefix(path, "seedbox/") && strings.HasSuffix(path, "/remove") {
+		phase = "provider_cleanup"
+	}
 	code := providerFailureCode(err)
 	h.recordCall(ctx, model.ProviderCall{Phase: phase, HTTPStatus: status, DurationMS: time.Since(started).Milliseconds(), ErrorCode: code})
 }

@@ -23,6 +23,9 @@ func validProviderFiles(files []model.AIOFile) bool {
 }
 
 func (s *Service) checkProviderAvailability(ctx context.Context, service, key string, hashes []string, public bool) ([]model.AIOAvailability, error) {
+	if service == "alldebrid" && public {
+		return s.checkPublicAD(ctx, key, hashes)
+	}
 	if service == "deepbrid" {
 		ids := map[string]string{}
 		if public {
@@ -59,7 +62,13 @@ func (s *Service) checkProviderAvailability(ctx context.Context, service, key st
 		items := []model.AIOAvailability{}
 		for _, hash := range hashes {
 			err := s.withHash(ctx, service+":"+fingerprint(key), hash, func() error {
-				observed, err := s.Providers.DLCheck(ctx, key, []string{hash})
+				var observed []model.AIOAvailability
+				var err error
+				if public {
+					observed, err = s.Providers.dlPublicCheck(ctx, key, hash)
+				} else {
+					observed, err = s.Providers.DLCheck(ctx, key, []string{hash})
+				}
 				items = append(items, observed...)
 				return err
 			})
@@ -90,10 +99,23 @@ func (p *ProviderHTTP) Check(ctx context.Context, service, key string, hashes []
 }
 
 func (s *Service) checkPublicService(ctx context.Context, service, key, resource string, hashes []string) (observed []model.AIOAvailability, checkErr error) {
-	if err := s.acquireCapacity(ctx, &s.publicProbe, "public_checks", true); err != nil {
+	if !model.IsDebridService(service) {
+		return nil, model.ErrInvalid
+	}
+	s.mu.Lock()
+	if s.publicProbes == nil {
+		s.publicProbes = map[string]*capacityGate{}
+	}
+	gate := s.publicProbes[service]
+	if gate == nil {
+		gate = &capacityGate{}
+		s.publicProbes[service] = gate
+	}
+	s.mu.Unlock()
+	if err := s.acquireCapacity(ctx, gate, "public_checks", true); err != nil {
 		return nil, err
 	}
-	defer s.publicProbe.release()
+	defer gate.release()
 	lock := "public-cache:" + service + ":" + resource
 	if service == "realdebrid" {
 		lock += ":" + fingerprint(key)

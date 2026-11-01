@@ -444,23 +444,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 	if len(missing) == 0 {
 		return states, nil
 	}
-	if service == "alldebrid" {
-		// Visitor credentials never enter restartable probes or cleanup jobs.
-		if c.AllDebridSecret != "" {
-			adminKey, e := s.key(ctx, c.AllDebridSecret)
-			if e == nil {
-				f, e := s.publicAllDebridFlight(adminKey, resource, missing, c)
-				if e == nil {
-					wait, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
-					select {
-					case <-f.done:
-					case <-wait.Done():
-					}
-					cancel()
-				}
-			}
-		}
-	} else if service == "deepbrid" {
+	if service == "deepbrid" {
 		generation, e := s.DB.AIOCacheGeneration(ctx)
 		if e != nil {
 			return nil, e
@@ -501,25 +485,6 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 	return states, nil
 }
 
-func (s *Service) publicAllDebridFlight(key, resource string, hashes []string, c model.AIOConfig) (*flight, error) {
-	s.publicADMu.Lock()
-	defer s.publicADMu.Unlock()
-	if f := s.publicADFlight; f != nil {
-		select {
-		case <-f.done:
-			s.publicADFlight = nil
-		default:
-			// Public traffic can join the existing recoverable probe, but cannot
-			// fill the administrator's background queue with different resources.
-			return f, nil
-		}
-	}
-	f, err := s.cacheFlightTriggered("alldebrid", key, resource, hashes, c, "playback", false)
-	if err == nil {
-		s.publicADFlight = f
-	}
-	return f, err
-}
 func (s *Service) checkPublicTorBox(ctx context.Context, key, resource string, hashes []string) error {
 	_, err := s.checkPublicService(ctx, "torbox", key, resource, hashes)
 	return err
@@ -618,14 +583,21 @@ func publicMagnet(rec model.AIORecord, announce string) string {
 	return magnet
 }
 
-func (s *Service) cleanupCachedOnlyMagnet(ctx context.Context, key, hash string, item adMagnet, inventory []adMagnet, administrator bool) {
+func createdADMagnet(hash string, item adMagnet, inventory []adMagnet) bool {
 	if item.ID <= 0 || !strings.EqualFold(item.Hash, hash) {
-		return
+		return false
 	}
 	for _, prior := range inventory {
 		if prior.ID == item.ID {
-			return
+			return false
 		}
+	}
+	return true
+}
+
+func (s *Service) cleanupCachedOnlyMagnet(ctx context.Context, key, hash string, item adMagnet, inventory []adMagnet, administrator bool) error {
+	if !createdADMagnet(hash, item, inventory) {
+		return nil
 	}
 	// Even an incomplete readiness response can return a confirmed new ID.
 	// The administrator's configured account can recover cleanup after restart.
@@ -637,12 +609,14 @@ func (s *Service) cleanupCachedOnlyMagnet(ctx context.Context, key, hash string,
 			if err = s.cleanupHash(cleanup, key, hash, false); err != nil {
 				s.recordPlaybackFailure("alldebrid", &playbackError{stage: "cleanup", cause: err})
 			}
-			return
+			return err
 		}
 		// If ownership could not be saved, still compensate directly while its
 		// identity is confirmed, as for an ephemeral visitor request.
 	}
 	if err := s.Providers.ADDelete(cleanup, key, item.ID); err != nil {
 		s.recordPlaybackFailure("alldebrid", &playbackError{stage: "cleanup", cause: err})
+		return err
 	}
+	return nil
 }

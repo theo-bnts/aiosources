@@ -217,7 +217,10 @@ export default function AIOSourcePage({
       />
     </div>
   )
-  const toggle = (label: string, key: 'auto_sync' | 'auto_match' | 'openlibrary_enabled') => (
+  const toggle = (
+    label: string,
+    key: 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
+  ) => (
     <label className="flex items-center gap-3 text-sm">
       <Switch
         aria-label={label}
@@ -334,6 +337,14 @@ export default function AIOSourcePage({
                 </div>
               ))}
               {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
+              <div className="space-y-2 md:col-span-2">
+                {toggle('Automatically recheck availability', 'auto_cache')}
+                <p className="help">
+                  Retry incomplete checks made with your configured accounts while their cache
+                  window remains valid. Public visitors are never rechecked in the background.
+                  Temporary-item cleanup remains active.
+                </p>
+              </div>
             </div>
           )}
           {metadata && (

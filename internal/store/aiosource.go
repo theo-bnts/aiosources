@@ -16,7 +16,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, OpenLibraryRelevantOnly: true, OpenLibraryLanguages: []string{}, AutoSync: true, AutoMatch: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, OpenLibraryRelevantOnly: true, OpenLibraryLanguages: []string{}, AutoSync: true, AutoMatch: true, AutoCache: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)

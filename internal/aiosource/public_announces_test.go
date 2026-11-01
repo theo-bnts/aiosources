@@ -214,6 +214,7 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 			var ready, expectAnnounce atomic.Bool
 			expectAnnounce.Store(true)
 			var adds, deletes atomic.Int64
+			var probes, probeDeletes atomic.Int64
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Header.Get("Authorization") != "Bearer "+key {
 					t.Error("administrator service credential used for visitor")
@@ -239,6 +240,11 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 					fmt.Fprint(w, `{"status":"success","data":{"magnets":[]}}`)
 				case "/v4/magnet/upload":
 					_ = r.ParseForm()
+					if value := r.Form.Get("magnets[]"); value == hash || value == otherHash {
+						probes.Add(1)
+						fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":88,"hash":"%s","ready":false}]}}`, value)
+						return
+					}
 					checkMagnet(r.Form.Get("magnets[]"))
 					adds.Add(1)
 					fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":77,"hash":"%s","ready":%t}]}}`, hash, ready.Load())
@@ -247,7 +253,12 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 				case "/v4/link/unlock":
 					fmt.Fprint(w, `{"status":"success","data":{"link":"https://video.example/visitor-download"}}`)
 				case "/v4/magnet/delete":
-					deletes.Add(1)
+					_ = r.ParseForm()
+					if r.Form.Get("id") == "88" {
+						probeDeletes.Add(1)
+					} else {
+						deletes.Add(1)
+					}
 					fmt.Fprint(w, `{"status":"success","data":{"message":"deleted"}}`)
 				case "/torrents/createtorrent":
 					_ = r.ParseMultipartForm(1 << 20)
@@ -289,6 +300,9 @@ func TestVisitorUncachedPlaybackUsesOnlyOwnAnnounceAndLivePermission(t *testing.
 			streams, err := s.PublicStreams(ctx, "https://public.example", configuration, "movie", "tt1234567", visitor)
 			if err != nil || len(streams) != 1 || streams[0].Hints.Indexer != "Example Library" || streams[0].InfoHash != "" || len(streams[0].Sources) != 0 || (streams[0].Hints.Cached != nil && *streams[0].Hints.Cached) {
 				t.Fatal("own announce did not unlock only its uncached source safely", streams, err)
+			}
+			if service == "alldebrid" && (probes.Load() != 2 || probeDeletes.Load() != 2) {
+				t.Fatal("listing did not clean its bare-hash probes separately from requested downloads", probes.Load(), probeDeletes.Load())
 			}
 			encoded, _ := json.Marshal(streams)
 			if strings.Contains(string(encoded), own) || strings.Contains(string(encoded), "visitor-own-passkey") || strings.Contains(string(encoded), "administrator") {

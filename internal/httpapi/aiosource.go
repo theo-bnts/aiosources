@@ -186,7 +186,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
-	c := model.AIOConfig{OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
+	c := model.AIOConfig{AutoCache: defaults.AutoCache, OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
 	if !decodeJSON(w, r, &c) {
 		return
 	}

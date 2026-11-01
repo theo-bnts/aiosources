@@ -10,6 +10,7 @@ export type Config = {
   realdebrid_secret: string
   auto_sync: boolean
   auto_match: boolean
+  auto_cache: boolean
   openlibrary_enabled: boolean
   openlibrary_minutes: number
   openlibrary_relevant_only: boolean
