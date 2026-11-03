@@ -292,10 +292,13 @@ type Record struct {
 	ContentType string         `json:"content_type"`
 	Fields      map[string]any `json:"fields"`
 	Error       string         `json:"error,omitempty"`
-	Ignored     bool           `json:"ignored,omitempty"`
-	Auxiliary   bool           `json:"auxiliary,omitempty"`
-	Deleted     bool           `json:"deleted,omitempty"`
-	Origin      *CatalogOrigin `json:"origin,omitempty"`
+	// Rejected is an explicit adapter decision, never an upstream field. Only
+	// the configured HTML policy may advance past a rejected primary record.
+	Rejected  bool           `json:"-"`
+	Ignored   bool           `json:"ignored,omitempty"`
+	Auxiliary bool           `json:"auxiliary,omitempty"`
+	Deleted   bool           `json:"deleted,omitempty"`
+	Origin    *CatalogOrigin `json:"origin,omitempty"`
 	// Complete latest memberships, not an additive history of earlier matches.
 	// Nil means the adapter does not provide coverage for this observation.
 	// A valid explicit empty set retires prior derived coverage, even when

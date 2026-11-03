@@ -1,4 +1,5 @@
 import { debridProviders, serviceNames } from '@/lib/debrid'
+import { FilterSelect } from '@/components/filter-select'
 import {
   ResultCount,
   ClearFiltersButton,
@@ -152,7 +153,7 @@ export function OperationHistoryPage({
     const next = new URLSearchParams(search)
     value ? next.set(key, value) : next.delete(key)
     if (key !== 'offset') next.delete('offset')
-    setSearch(next)
+    setSearch(next, { flushSync: true, preventScrollReset: true })
   }
   return (
     <div className="page">
@@ -160,52 +161,46 @@ export function OperationHistoryPage({
         {!metadataSection && (
           <div className="field">
             <Label htmlFor="operation-type">Service</Label>
-            <select
+            <FilterSelect
               id="operation-type"
-              className="native-select min-w-48"
+              label="Service"
+              allLabel="All services"
               value={service}
-              onChange={(e) => filter('service', e.target.value)}
-            >
-              <option value="">All services</option>
-              {debridProviders.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => filter('service', value)}
+              options={debridProviders.map((provider) => ({
+                value: provider.id,
+                label: provider.name,
+              }))}
+            />
           </div>
         )}
         {section === 'debrid' && (
           <div className="field">
             <Label htmlFor="debrid-operation-kind">Operation</Label>
-            <select
+            <FilterSelect
               id="debrid-operation-kind"
-              className="native-select"
+              label="Operation"
+              allLabel="All operations"
               value={kind}
-              onChange={(event) => filter('kind', event.target.value)}
-            >
-              <option value="">All operations</option>
-              <option value="cache">Cache verifications</option>
-              <option value="download">Download preparations</option>
-              <option value="cleanup">Temporary magnet cleanup</option>
-            </select>
+              onChange={(value) => filter('kind', value)}
+              options={[
+                { value: 'cache', label: 'Cache verifications' },
+                { value: 'download', label: 'Download preparations' },
+                { value: 'cleanup', label: 'Temporary magnet cleanup' },
+              ]}
+            />
           </div>
         )}
         <div className="field">
           <Label htmlFor="operation-status">Status</Label>
-          <select
+          <FilterSelect
             id="operation-status"
-            className="native-select"
+            label="Status"
+            allLabel="All statuses"
             value={status}
-            onChange={(e) => filter('status', e.target.value)}
-          >
-            <option value="">All statuses</option>
-            {Object.entries(statuses).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => filter('status', value)}
+            options={Object.entries(statuses).map(([value, label]) => ({ value, label }))}
+          />
         </div>
         <ClearFiltersButton
           active={filtered}

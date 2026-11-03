@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -50,7 +51,9 @@ func scanRaw(row scanner, includeBytes bool) (model.RawRecord, error) {
 func (s *Store) ListRaw(ctx context.Context, opts model.ListOptions) (model.RawListing, error) {
 	opts = pageOptions(opts)
 	result := model.RawListing{List: model.List[model.RawRecord]{Items: []model.RawRecord{}, Limit: opts.Limit, Offset: opts.Offset}}
-	if opts.Status != "" && opts.Status != "accepted" && opts.Status != "error" && opts.Status != "ignored" && opts.Status != "enrichment" {
+	if !model.ValidSelection(opts.Status, func(value string) bool {
+		return value == "accepted" || value == "error" || value == "ignored" || value == "enrichment"
+	}) {
 		return result, model.ErrInvalid
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -63,22 +66,15 @@ func (s *Store) ListRaw(ctx context.Context, opts model.ListOptions) (model.RawL
 	if err := tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE `+processing+`='accepted'),count(*) FILTER(WHERE `+processing+`='error'),count(*) FILTER(WHERE `+processing+`='ignored'),count(*) FILTER(WHERE `+processing+`='enrichment') FROM (`+selection+`) AS record`, args...).Scan(&result.Counts.Accepted, &result.Counts.Errors, &result.Counts.Ignored, &result.Counts.Enrichment); err != nil {
 		return result, databaseError("count raw records", err)
 	}
-	switch opts.Status {
-	case "accepted":
-		result.Total = result.Counts.Accepted
-	case "error":
-		result.Total = result.Counts.Errors
-	case "ignored":
-		result.Total = result.Counts.Ignored
-	case "enrichment":
-		result.Total = result.Counts.Enrichment
-	default:
-		result.Total = result.Counts.Accepted + result.Counts.Errors + result.Counts.Ignored + result.Counts.Enrichment
+	for status, count := range map[string]int64{"accepted": result.Counts.Accepted, "error": result.Counts.Errors, "ignored": result.Counts.Ignored, "enrichment": result.Counts.Enrichment} {
+		if opts.Status == "" || slices.Contains(model.SelectionValues(opts.Status), status) {
+			result.Total += count
+		}
 	}
 	statusFilter := ""
 	if opts.Status != "" {
 		args = append(args, opts.Status)
-		statusFilter = " WHERE " + processing + "=$" + strconv.Itoa(len(args))
+		statusFilter = " WHERE " + processing + "=ANY(string_to_array($" + strconv.Itoa(len(args)) + ",','))"
 	}
 	args = append(args, opts.Limit, opts.Offset)
 	page := "SELECT id FROM (" + selection + ") AS record" + statusFilter + " ORDER BY id DESC LIMIT $" + strconv.Itoa(len(args)-1) + " OFFSET $" + strconv.Itoa(len(args))
@@ -113,7 +109,7 @@ func rawSelection(opts model.ListOptions) (string, []any) {
 	}
 	var filters []string
 	if opts.ProviderID != "" {
-		filters = append(filters, "record.provider_id="+bind(opts.ProviderID))
+		filters = append(filters, "record.provider_id=ANY(string_to_array("+bind(opts.ProviderID)+",','))")
 	}
 	if opts.RunID != "" {
 		filters = append(filters, "record.run_id="+bind(opts.RunID))

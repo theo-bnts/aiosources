@@ -145,7 +145,7 @@ test('search pages start with closed optional panels and no implicit result rest
       await expect(page.locator('main details[open]')).toHaveCount(0)
       await expect(page.locator('main summary', { hasText: /^Filters$/ })).toBeVisible()
       if (route === '/search') {
-        await expect(page.locator('#catalog-type')).toHaveValue('')
+        await expect(page.locator('#catalog-type')).toHaveText('All media')
         await expect(page.locator('#catalog-year')).toHaveValue('')
       } else if (route === '/torrents') {
         await expect(
@@ -156,8 +156,8 @@ test('search pages start with closed optional panels and no implicit result rest
         await expect(page.getByLabel('Minimum size (bytes)', { exact: true })).toHaveValue('')
         await expect(page.getByLabel('Maximum size (bytes)', { exact: true })).toHaveValue('')
       } else {
-        await expect(page.locator('#matching-status')).toHaveValue('all')
-        await expect(page.locator('#matching-source')).toHaveValue('')
+        await expect(page.locator('#matching-status')).toHaveText('All results')
+        await expect(page.locator('#matching-source')).toHaveText('All sources')
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
@@ -167,13 +167,13 @@ test('search pages start with closed optional panels and no implicit result rest
   expect(statuses.length).toBeGreaterThan(0)
   expect(statuses.every((status) => status === '')).toBe(true)
   await page.goto('/metadata/identification?match_status=unmatched&match_provider=example')
-  await expect(page.locator('#matching-status')).toHaveValue('unmatched')
-  await expect(page.locator('#matching-source')).toHaveValue('example')
+  await expect(page.locator('#matching-status')).toHaveText('Not identified')
+  await expect(page.locator('#matching-source')).toHaveText('example')
   await expect(page.locator('main details[open]')).toHaveCount(0)
   await openDisclosure(page, 'Filters')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
-  await expect(page.locator('#matching-status')).toHaveValue('all')
-  await expect(page.locator('#matching-source')).toHaveValue('')
+  await expect(page.locator('#matching-status')).toHaveText('All results')
+  await expect(page.locator('#matching-source')).toHaveText('All sources')
 })
 
 test('nested source options stay organized and retain their exact configuration when folded', async ({

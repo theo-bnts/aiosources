@@ -24,6 +24,10 @@ Keep detail links on the expected site and use the authentication method require
 
 Preview several records and more than one listing page. Check that titles, identifiers and sizes belong to the same record, and that the last page stops correctly. Confirm that missing optional values do not become part of another result.
 
+Under **Invalid records**, the default is to stop a page when a required field is missing or invalid. If a site keeps individual entries without usable download information, choose **Reject the invalid record and continue**. These entries appear as errors in the run’s processed records; valid entries continue importing. Missing identities, connection failures, unrecognized layouts and pages with no valid records still stop safely. Check rejected records before relying on the imported catalog.
+
+Changes apply to new runs. Resuming an older run keeps its saved source definition.
+
 Use unrestricted listings when you want all categories. Some sites expose only recent pages or a fixed number of results; scheduling every 30 minutes cannot guarantee completeness if more records arrive between imports than those pages retain.
 
 ## Limits and troubleshooting

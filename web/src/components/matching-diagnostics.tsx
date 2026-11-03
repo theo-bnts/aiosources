@@ -1,4 +1,5 @@
 import { Disclosure } from '@/components/ui/disclosure'
+import { FilterSelect } from '@/components/filter-select'
 import { compareListNames } from '@/lib/list-view'
 import {
   ResultCount,
@@ -137,38 +138,30 @@ export function MatchingDiagnostics() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field min-w-0">
               <Label htmlFor="matching-status">Identification result</Label>
-              <select
+              <FilterSelect
                 id="matching-status"
                 name="status"
-                className="native-select w-full"
-                defaultValue={status}
-              >
-                <option value="all">All results</option>
-                {Object.entries(identificationResults).map(([key, { label }]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                label="Identification result"
+                allLabel="All results"
+                defaultValue={status === 'all' ? '' : status}
+                options={Object.entries(identificationResults).map(([value, { label }]) => ({
+                  value,
+                  label,
+                }))}
+              />
             </div>
             <div className="field min-w-0">
               <Label htmlFor="matching-source">Source</Label>
-              <select
+              <FilterSelect
                 id="matching-source"
                 name="provider"
-                className="native-select w-full"
+                label="Source"
+                allLabel="All sources"
                 defaultValue={provider}
-              >
-                <option value="">All sources</option>
-                {provider && !providers.data?.items?.some((item) => item.id === provider) && (
-                  <option value={provider}>{provider}</option>
-                )}
-                {[...(providers.data?.items ?? [])].sort(compareListNames).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name || item.id}
-                  </option>
-                ))}
-              </select>
+                options={[...(providers.data?.items ?? [])]
+                  .sort(compareListNames)
+                  .map((item) => ({ value: item.id, label: item.name || item.id }))}
+              />
             </div>
           </div>
         </Disclosure>

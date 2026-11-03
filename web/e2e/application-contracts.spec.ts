@@ -267,6 +267,7 @@ test('debrid drafts require review before adopting another writer after a separa
   // this form's tracker map and never publishes the separate debrid draft.
   const privateSource = playback.getByRole('switch', { name: 'Private source' })
   await expect(privateSource).toHaveCount(1)
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await privateSource.uncheck()
   let changed = false

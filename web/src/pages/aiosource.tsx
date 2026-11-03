@@ -336,14 +336,18 @@ export default function AIOSourcePage({
                   {'hint' in provider && <p className="help">{provider.hint}</p>}
                 </div>
               ))}
-              {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
-              <div className="space-y-2 md:col-span-2">
-                {toggle('Automatically recheck availability', 'auto_cache')}
-                <p className="help">
-                  Retry incomplete checks made with your configured accounts while their cache
-                  window remains valid. Public visitors are never rechecked in the background.
-                  Temporary-item cleanup remains active.
-                </p>
+              <div className="md:col-span-2">
+                <Disclosure title="Cache availability">
+                  {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
+                  <div className="space-y-2">
+                    {toggle('Automatically recheck availability', 'auto_cache')}
+                    <p className="help">
+                      Retry incomplete checks made with your configured accounts while their cache
+                      window remains valid. Public visitors are never rechecked in the background.
+                      Temporary-item cleanup remains active.
+                    </p>
+                  </div>
+                </Disclosure>
               </div>
             </div>
           )}

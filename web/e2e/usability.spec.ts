@@ -69,6 +69,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await page.goto('/debrid/settings')
   const original = await configuration(page)
   const form = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await storeCredential(page, 'Add AllDebrid key', 'AllDebrid API key', 'synthetic-ad-key')
   const ad = await page.getByLabel('AllDebrid API key', { exact: true }).inputValue()
@@ -161,6 +162,7 @@ test('full announce URLs added inline keep playback and debrid drafts independen
   await page.goto('/debrid/settings')
   await openDisclosure(page, 'Private source playback')
   const original = await configuration(page)
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await storeCredential(
     page,

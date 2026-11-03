@@ -48,6 +48,13 @@ func TestServiceActivityFiltersSeparateServicesFromIdenticallyNamedSources(t *te
 	if _, err := db.Logs(ctx, model.LogOptions{ListOptions: model.ListOptions{Limit: 100}, Service: "untrusted"}); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("unknown service filter was accepted", err)
 	}
+	mixed, err := db.Logs(ctx, model.LogOptions{ListOptions: model.ListOptions{Limit: 100}, Scopes: []string{"source:tmdb", "service:tmdb"}})
+	if err != nil || mixed.Total != 3 {
+		t.Fatal("mixed activity scopes did not preserve separate source/service identities", mixed.Total, err)
+	}
+	if _, err := db.Logs(ctx, model.LogOptions{ListOptions: model.ListOptions{Limit: 100}, Scopes: []string{"service:untrusted"}}); !errors.Is(err, model.ErrInvalid) {
+		t.Fatal("unknown activity scope accepted", err)
+	}
 }
 
 func TestInformationActivityRejectsUntrustedDiagnosticText(t *testing.T) {

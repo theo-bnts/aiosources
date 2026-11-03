@@ -80,6 +80,9 @@ func validateHTML(p model.Provider) error {
 	if config == nil {
 		return errors.New("HTML sources require html settings")
 	}
+	if config.InvalidRecordPolicy != "" && config.InvalidRecordPolicy != "fail" && config.InvalidRecordPolicy != "reject" {
+		return errors.New("HTML invalid record policy must be fail or reject")
+	}
 	if p.HTTP.ItemsPath != "" || p.Mapping.ID != "" || len(p.Mapping.Fields) > 0 || p.Traversal != nil {
 		return errors.New("HTML sources use CSS selectors in html, not JSON mappings or traversal")
 	}

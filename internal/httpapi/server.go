@@ -207,7 +207,7 @@ func listOptions(w http.ResponseWriter, r *http.Request, repeated ...string) (mo
 		return options, false
 	}
 	options.ProviderID, options.RunID, options.Status, options.Query = query.Get("provider"), query.Get("run"), query.Get("status"), query.Get("q")
-	if len(options.ProviderID) > 128 || len(options.RunID) > 128 || len(options.Query) > 500 || len(options.Status) > 32 {
+	if !model.ValidSelection(options.ProviderID, func(value string) bool { return len(value) <= 128 }) || len(options.RunID) > 128 || len(options.Query) > 500 || !model.ValidSelection(options.Status, func(value string) bool { return len(value) <= 32 }) {
 		writeError(w, http.StatusBadRequest, "Filter is too long")
 		return options, false
 	}
@@ -577,7 +577,7 @@ func (s *server) listRaw(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Select an import run to view its processed records")
 		return
 	}
-	if options.Status != "" && options.Status != "accepted" && options.Status != "error" && options.Status != "ignored" && options.Status != "enrichment" {
+	if !model.ValidSelection(options.Status, func(value string) bool { return value == "accepted" || value == "error" || value == "ignored" || value == "enrichment" }) {
 		writeError(w, http.StatusBadRequest, "Unknown processing result")
 		return
 	}

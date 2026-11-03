@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 import pg from 'pg'
 
 test('logs preserve alert context, include debug on demand and filter services independently', async ({
@@ -43,11 +43,14 @@ test('logs preserve alert context, include debug on demand and filter services i
     await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
     await expect(page.getByText('Detailed request fixture', { exact: true })).toHaveCount(0)
     const scope = page.getByLabel('Source or service', { exact: true })
-    await expect(scope.getByRole('option', { name: 'TMDB', exact: true })).toHaveCount(1)
-    await expect(scope.getByRole('option', { name: 'AllDebrid', exact: true })).toHaveCount(1)
-    await expect(scope.getByRole('option', { name: 'TorBox', exact: true })).toHaveCount(1)
+    await scope.click()
+    for (const service of ['tmdb', 'alldebrid', 'torbox'])
+      await expect(
+        page.locator(`[role="menuitemcheckbox"][data-value="service:${service}"]`),
+      ).toHaveCount(1)
+    await page.keyboard.press('Escape')
     for (const service of ['tmdb', 'alldebrid', 'torbox']) {
-      await scope.selectOption(`service:${service}`)
+      await selectMultiple(page, 'Source or service', [`service:${service}`])
       await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
       await expect(page).toHaveURL(new RegExp(`/logs\\?service=${service}$`))
       await expect(page.getByText(`Failure fixture: ${service}`, { exact: true })).toBeVisible()
@@ -59,14 +62,16 @@ test('logs preserve alert context, include debug on demand and filter services i
         service === 'tmdb' ? '/metadata/videos' : '/debrid',
       )
       await page.reload()
-      await expect(scope).toHaveValue(`service:${service}`)
+      await expect(scope).toHaveText(
+        { tmdb: 'TMDB', alldebrid: 'AllDebrid', torbox: 'TorBox' }[service]!,
+      )
     }
     await page.goto('/logs?provider=tmdb')
-    await expect(scope).toHaveValue('source:tmdb')
+    await expect(scope).toHaveText('tmdb')
     await expect(page.getByText('Source fixture: tmdb', { exact: true })).toBeVisible()
     await expect(page.getByText(/^Failure fixture:/)).toHaveCount(0)
     await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
-    await expect(scope).toHaveValue('')
+    await expect(scope).toHaveText('All sources and service activity')
     await expect(page.getByText(/^Failure fixture:/)).toHaveCount(3)
     await expect(page.getByText('Source fixture: tmdb', { exact: true })).toBeVisible()
   } finally {

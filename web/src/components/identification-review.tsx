@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FilterSelect } from '@/components/filter-select'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, params, queryClient, refreshData } from '@/lib/api'
 import { browserLanguage } from '@/lib/language-preferences'
@@ -243,17 +244,18 @@ function ReviewForm({
         </div>
         <div className="field basis-full sm:basis-auto">
           <Label htmlFor="review-kind">Media type</Label>
-          <select
+          <FilterSelect
             id="review-kind"
-            className="native-select w-full"
+            label="Media type"
+            allLabel="All media"
             value={kind}
-            onChange={(event) => setKind(event.target.value)}
-          >
-            <option value="">All media</option>
-            <option value="movie">Movies</option>
-            <option value="tv">Series</option>
-            <option value="book">Books</option>
-          </select>
+            onChange={setKind}
+            options={[
+              { value: 'movie', label: 'Movies' },
+              { value: 'tv', label: 'Series' },
+              { value: 'book', label: 'Books' },
+            ]}
+          />
         </div>
         <div className="field w-28">
           <Label htmlFor="review-year">Year</Label>

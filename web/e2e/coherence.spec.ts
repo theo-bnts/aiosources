@@ -1,6 +1,6 @@
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 import type { Page } from '@playwright/test'
 import type { TestServer } from './server'
 
@@ -95,7 +95,7 @@ test('reviewing changed metadata clears the old choice and refreshes candidate r
   expect((await saved).status()).toBe(204)
   await expect(editor).toHaveCount(0)
   await openDisclosure(page, 'Filters')
-  await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await selectMultiple(page, 'Identification result', ['matched'])
   await page
     .getByRole('form', { name: 'Identification filters', exact: true })
     .getByRole('button', { name: 'Search', exact: true })
@@ -273,7 +273,7 @@ test.describe('browser local dates', () => {
     await expect(page.getByLabel('To (browser local time)', { exact: true })).toHaveValue(
       '2026-10-25T02:30',
     )
-    await page.getByLabel('Source or service', { exact: true }).selectOption('service:tmdb')
+    await selectMultiple(page, 'Source or service', ['service:tmdb'])
     const applied = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return url.pathname === '/api/logs' && url.searchParams.get('service') === 'tmdb'

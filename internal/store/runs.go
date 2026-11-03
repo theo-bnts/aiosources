@@ -185,7 +185,7 @@ func (s *Store) ListRuns(ctx context.Context, opts model.ListOptions) (model.Lis
 		return result, databaseError("begin collection listing", err)
 	}
 	defer rollback(tx)
-	filter := ` FROM ingest.runs WHERE ($1='' OR provider_id=$1) AND ($2='' OR status=$2) AND ($3='' OR id=$3)`
+	filter := ` FROM ingest.runs WHERE ($1='' OR provider_id=ANY(string_to_array($1,','))) AND ($2='' OR status=ANY(string_to_array($2,','))) AND ($3='' OR id=$3)`
 	if opts.SourceKind == "remote" {
 		filter += " AND remote_catalog"
 	} else if opts.SourceKind == "source" {

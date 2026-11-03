@@ -1,4 +1,5 @@
 import { serviceNames } from '@/lib/debrid'
+import { FilterSelect } from '@/components/filter-select'
 import {
   ResultCount,
   ClearFiltersButton,
@@ -177,19 +178,14 @@ export function StremioHistoryPage() {
         </div>
         <div className="field">
           <Label htmlFor="stremio-outcome">Result</Label>
-          <select
-            className="native-select"
+          <FilterSelect
             id="stremio-outcome"
+            label="Result"
+            allLabel="All results"
             value={status}
-            onChange={(event) => filter({ status: event.target.value })}
-          >
-            <option value="">All results</option>
-            {Object.entries(outcomes).map(([value, label]) => (
-              <option value={value} key={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => filter({ status: value })}
+            options={Object.entries(outcomes).map(([value, label]) => ({ value, label }))}
+          />
         </div>
         {[
           { name: 'origin', label: 'Installation', value: origin, choices: origins },
@@ -197,19 +193,14 @@ export function StremioHistoryPage() {
         ].map((item) => (
           <div className="field" key={item.name}>
             <Label htmlFor={`stremio-${item.name}`}>{item.label}</Label>
-            <select
+            <FilterSelect
               id={`stremio-${item.name}`}
-              className="native-select"
+              label={item.label}
+              allLabel="All"
               value={item.value}
-              onChange={(e) => filter({ [item.name]: e.target.value })}
-            >
-              <option value="">All</option>
-              {Object.entries(item.choices).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => filter({ [item.name]: value })}
+              options={Object.entries(item.choices).map(([value, label]) => ({ value, label }))}
+            />
           </div>
         ))}
         <Button id="stremio-submit" variant="outline" type="submit" className="self-end">

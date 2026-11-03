@@ -16,6 +16,14 @@ test('public shared catalogs follow administrator permissions without saving vis
   await access.getByRole('switch', { name: 'Expose source names and filters', exact: true }).check()
   await catalog.check()
   await access
+    .getByRole('switch', { name: 'Expose source names and filters', exact: true })
+    .uncheck()
+  await expect(catalog).not.toBeChecked()
+  await expect(catalog).toBeDisabled()
+  await access.getByRole('switch', { name: 'Expose source names and filters', exact: true }).check()
+  await expect(catalog).not.toBeChecked()
+  await catalog.check()
+  await access
     .getByRole('switch', { name: 'Allow public Stremio connections', exact: true })
     .uncheck()
   await access.getByRole('button', { name: 'Save', exact: true }).click()

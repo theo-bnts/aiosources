@@ -1,4 +1,5 @@
 import { test, expect, selectMultiple } from './fixtures'
+import { openDisclosure } from './disclosures'
 import { debridProviders } from '../src/lib/debrid'
 import type { Page } from '@playwright/test'
 
@@ -50,11 +51,14 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
     name: 'Automatically recheck availability',
     exact: true,
   })
+  await expect(rechecks).toBeHidden()
+  await openDisclosure(page, 'Cache availability')
   await expect(rechecks).toBeChecked()
   await rechecks.uncheck()
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
+  await openDisclosure(page, 'Cache availability')
   await expect(rechecks).not.toBeChecked()
   await rechecks.check()
   await form.getByRole('button', { name: 'Save', exact: true }).click()

@@ -159,7 +159,8 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	}
 	rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !AllowsLanguage(rec.AIORecord, prefs) })
 	if opts.ProviderID != "" {
-		rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return rec.Provider != opts.ProviderID })
+		providers := model.SelectionValues(opts.ProviderID)
+		rows = slices.DeleteFunc(rows, func(rec store.CatalogRecord) bool { return !slices.Contains(providers, rec.Provider) })
 	}
 	rules := prefs.Sorting
 	if len(rules) == 0 {

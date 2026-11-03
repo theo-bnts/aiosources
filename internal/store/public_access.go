@@ -35,6 +35,9 @@ func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
+	// Source identities are required by the catalog sync protocol. Revoking
+	// exposure also disables sharing, which must be enabled explicitly again.
+	value.CatalogEnabled = value.CatalogEnabled && value.ExposeSources
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return databaseError("begin public access change", err)

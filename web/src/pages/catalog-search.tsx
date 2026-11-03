@@ -1,4 +1,5 @@
 import { CatalogCover } from '@/components/catalog-cover'
+import { FilterSelect } from '@/components/filter-select'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
 import { readResultSorting } from '@/lib/result-preferences'
@@ -118,19 +119,20 @@ export function CatalogSearchPage() {
           <div className="grid items-start gap-4 sm:grid-cols-2">
             <div className="field">
               <Label htmlFor="catalog-type">Type</Label>
-              <select
+              <FilterSelect
                 id="catalog-type"
                 name="type"
-                className="native-select w-full"
+                label="Type"
+                allLabel="All media"
                 defaultValue={kind}
-              >
-                <option value="">All media</option>
-                <option value="movie">Movies</option>
-                <option value="tv">Series</option>
-                <option value="book">Books</option>
-                <option value="ebook">Ebooks</option>
-                <option value="audiobook">Audiobooks</option>
-              </select>
+                options={[
+                  { value: 'movie', label: 'Movies' },
+                  { value: 'tv', label: 'Series' },
+                  { value: 'book', label: 'Books' },
+                  { value: 'ebook', label: 'Ebooks' },
+                  { value: 'audiobook', label: 'Audiobooks' },
+                ]}
+              />
             </div>
             <div className="field min-w-0">
               <Label htmlFor="catalog-year">Year</Label>
@@ -449,19 +451,17 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                   {discloseSources && (
                     <div className="field">
                       <Label htmlFor="release-source">Source</Label>
-                      <select
+                      <FilterSelect
                         id="release-source"
-                        className="native-select"
+                        label="Source"
+                        allLabel="All sources"
                         value={provider}
-                        onChange={(event) => filter('provider', event.target.value)}
-                      >
-                        <option value="">All sources</option>
-                        {sourceOptions.map((value) => (
-                          <option key={value} value={value}>
-                            {sourceName(value)}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(value) => filter('provider', value)}
+                        options={sourceOptions.map((value) => ({
+                          value,
+                          label: sourceName(value),
+                        }))}
+                      />
                     </div>
                   )}
                 </div>

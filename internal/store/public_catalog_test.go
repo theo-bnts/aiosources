@@ -36,6 +36,7 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 	}
 	access, _ = db.PublicAccess(ctx)
 	access.ExposeSources = true
+	access.CatalogEnabled = true
 	if err = db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}

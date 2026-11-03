@@ -1,6 +1,6 @@
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('confirmation wording and its action stay on the same revision until the dialog is reopened', async ({
   page,
@@ -185,17 +185,21 @@ test('long source names never stretch filter fields beyond small-screen layouts'
       await page.goto(path)
       if (path === '/metadata/identification') await openDisclosure(page, 'Filters')
       const control = page.getByLabel(field, { exact: true })
-      await expect(control.locator(`option[value="${value}"]`)).toHaveText(
+      await control.click()
+      await expect(page.locator(`[role="menuitemcheckbox"][data-value="${value}"]`)).toHaveText(
         'Example source with a descriptive display name for imported records',
       )
+      await page.keyboard.press('Escape')
       await expect
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), {
           message: `${path} at ${width}px`,
         })
         .toBe(true)
       await expect(control).toBeVisible()
-      await control.selectOption(value)
-      await expect(control).toHaveValue(value)
+      await selectMultiple(page, field, [value])
+      await expect(control).toHaveText(
+        'Example source with a descriptive display name for imported records',
+      )
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       )

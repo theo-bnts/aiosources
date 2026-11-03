@@ -177,7 +177,7 @@ ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id UNION SELECT w.disp
 COALESCE((SELECT jsonb_object_agg(season,year) FROM ingest.aio_seasons WHERE work_id=w.id),'{}'),
 COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,
 w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM ingest.ol_authors a WHERE w.media_type='book' AND a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'[]'),
-'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),(SELECT cover FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ingest.ol_aliases(w.openlibrary_id) AND cover>0 ORDER BY id LIMIT 1),0))`
+'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0))`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork

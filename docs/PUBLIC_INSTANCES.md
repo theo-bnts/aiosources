@@ -39,7 +39,7 @@ Availability checks use your own service keys. They never fall back to administr
 
 Disabled pages do not appear in the public menu. Disabling a public connection blocks its requests and revokes its existing public access; turning it on again does not restore revoked links. Private administrator-created connections are managed separately.
 
-Public **Shared catalogs** also requires **Expose source names and filters**, because copies preserve source identity to avoid duplicates. In **Shared catalog data**, restrict the sources, published fields and optional information visitors may copy. Visitors may narrow these choices further. Optional data groups start off on the visitor page and must also be enabled by the receiving instance. Disabling source exposure revokes public catalog links too. No visitor configuration or sharing password is saved on the hosting instance; safe request diagnostics follow the normal log retention.
+Public **Shared catalogs** also requires **Expose source names and filters**, because copies preserve source identity to avoid duplicates. In **Shared catalog data**, restrict the sources, published fields and optional information visitors may copy. Visitors may narrow these choices further. Optional data groups start off on the visitor page and must also be enabled by the receiving instance. Disabling source exposure also turns off public sharing and revokes its links. Sharing must be enabled explicitly again after restoring source exposure. No visitor configuration or sharing password is saved on the hosting instance; safe request diagnostics follow the normal log retention.
 
 ## Private sources
 

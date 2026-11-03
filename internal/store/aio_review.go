@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -74,7 +75,7 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	if key := books.Key(query); books.WorkKey(key) {
 		query = key
 	}
-	if len(query) > 200 || (kind != "" && kind != "movie" && kind != "tv" && kind != "book") {
+	if len(query) > 200 || !model.ValidSelection(kind, func(value string) bool { return value == "movie" || value == "tv" || value == "book" }) {
 		return out, model.ErrInvalid
 	}
 	if len([]rune(normalized)) < 3 && !reviewIMDb.MatchString(query) && !reviewNumeric.MatchString(query) {
@@ -109,7 +110,7 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 		anchor = ""
 	}
 	bookExtras := ""
-	if kind != "movie" && kind != "tv" {
+	if kind == "" || slices.Contains(model.SelectionValues(kind), "book") {
 		bookExtras = bookCatalogCandidates("$1", "$2", matching, anchor)
 	}
 	alias := catalogQueryAlias(matching, "$2")
@@ -119,7 +120,7 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
  UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM ingest.aio_titles WHERE `+matching+bookExtras+`
 ), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
  SELECT `+columns+` FROM ranked c JOIN ingest.aio_works w ON w.id=c.id
- WHERE NOT w.adult AND ($3='' OR w.media_type=$3) AND ($4::int=0 OR `+catalogYearFilter("$4::int")+`)
+ WHERE NOT w.adult AND ($3='' OR w.media_type=ANY(string_to_array($3,','))) AND ($4::int=0 OR `+catalogYearFilter("$4::int")+`)
  ORDER BY c.precision DESC,c.relevance DESC,w.id LIMIT 40`, args...)
 	if err != nil {
 		return out, databaseError("search review candidates", err)

@@ -1,7 +1,7 @@
 import { remoteDraft, remoteJSON } from '../src/lib/remote-config'
 import type { Page } from '@playwright/test'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 async function seedDirectories(page: Page, origin: string, sourceURL: string, longNames = false) {
   const session = await (await page.request.get('/api/session')).json()
@@ -129,8 +129,7 @@ test('directories share query, status, counts, clearing and reload behavior with
     await expect(controls.getByRole('status')).toHaveText(`Showing 2 of 2 ${plural}`)
     await controls.getByLabel(queryLabel, { exact: true }).fill('ALPHA')
     await expect(controls.getByRole('status')).toHaveText(`Showing 1 of 2 ${plural}`)
-    if (plural !== 'secrets')
-      await controls.getByLabel('Status', { exact: true }).selectOption('disabled')
+    if (plural !== 'secrets') await selectMultiple(controls, 'Status', ['disabled'])
     await page.reload()
     await expect(controls.getByLabel(queryLabel, { exact: true })).toHaveValue('ALPHA')
     await expect(controls.getByRole('status')).toHaveText(`Showing 1 of 2 ${plural}`)

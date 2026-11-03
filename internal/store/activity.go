@@ -14,7 +14,7 @@ import (
 var activityIdentity = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 
 func validateActivityPage(options model.ListOptions) error {
-	if options.Limit < 1 || options.Limit > 200 || options.Offset < 0 || options.Offset > 1000000 || len(options.Query) > 500 || len(options.ProviderID) > 128 || len(options.RunID) > 128 {
+	if options.Limit < 1 || options.Limit > 200 || options.Offset < 0 || options.Offset > 1000000 || len(options.Query) > 500 || !model.ValidSelection(options.ProviderID, func(value string) bool { return len(value) <= 128 }) || len(options.RunID) > 128 {
 		return model.ErrInvalid
 	}
 	return nil
@@ -28,6 +28,15 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	if options.Service != "" && options.Service != "tmdb" && options.Service != "openlibrary" && !model.IsDebridService(options.Service) && options.Service != "network" {
 		return result, model.ErrInvalid
 	}
+	if len(options.Scopes) > 100 {
+		return result, model.ErrInvalid
+	}
+	for _, scope := range options.Scopes {
+		prefix, id, ok := strings.Cut(scope, ":")
+		if !ok || !activityIdentity.MatchString(id) || (prefix != "source" && (prefix != "service" || (id != "tmdb" && id != "openlibrary" && id != "network" && !model.IsDebridService(id)))) {
+			return result, model.ErrInvalid
+		}
+	}
 	for _, level := range options.Levels {
 		if !model.IsActivityLevel(level) {
 			return result, model.ErrInvalid
@@ -40,11 +49,12 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	if len(levels) == 0 {
 		levels = []string{"debug", "info", "warn", "error"}
 	}
-	args := []any{levels, options.ProviderID, options.RunID, options.Query, options.From, options.To, options.Service}
-	where := ` WHERE level=ANY($1::text[]) AND ($2='' OR provider_id=$2) AND ($3='' OR run_id=$3)
+	args := []any{levels, options.ProviderID, options.RunID, options.Query, options.From, options.To, options.Service, options.Scopes}
+	where := ` WHERE level=ANY($1::text[]) AND ($2='' OR provider_id=ANY(string_to_array($2,','))) AND ($3='' OR run_id=$3)
  AND ($4='' OR strpos(lower(message||' '||title||' '||kind||' '||provider_id||' '||run_id||' '||service),lower($4))>0)
  AND ($5::timestamptz IS NULL OR created_at >= $5) AND ($6::timestamptz IS NULL OR created_at <= $6)
- AND ($7='' OR service=$7)`
+ AND ($7='' OR service=$7)
+ AND (COALESCE(cardinality($8::text[]),0)=0 OR ('source:'||provider_id)=ANY($8) OR ('service:'||service)=ANY($8))`
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return result, databaseError("begin activity query", err)
@@ -54,7 +64,7 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 		return result, databaseError("count activity logs", err)
 	}
 	args = append(args, options.Limit, options.Offset)
-	rows, err := tx.Query(ctx, "SELECT id,level,kind,message,provider_id,run_id,created_at,data,service,title FROM ingest.activity_logs"+where+" ORDER BY created_at DESC,id DESC LIMIT $8 OFFSET $9", args...)
+	rows, err := tx.Query(ctx, "SELECT id,level,kind,message,provider_id,run_id,created_at,data,service,title FROM ingest.activity_logs"+where+" ORDER BY created_at DESC,id DESC LIMIT $9 OFFSET $10", args...)
 	if err != nil {
 		return result, databaseError("list activity logs", err)
 	}

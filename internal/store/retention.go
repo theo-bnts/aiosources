@@ -211,7 +211,8 @@ $8,$9,$10,FALSE) RETURNING id`
 			}
 		}
 		if record.Error != "" && !record.Auxiliary {
-			rejectedPrimary = true
+			explicitRejection := run.Config.RejectsInvalidHTMLRecords() && record.Rejected && record.Error == model.HTMLRejectedRecordError && record.SourceID != "" && len(record.Fields) == 0
+			rejectedPrimary = rejectedPrimary || !explicitRejection
 			errorCount++
 		}
 		if page.Error != "" || record.Error != "" || record.Auxiliary || record.SourceID == "" {
@@ -271,7 +272,7 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 	if page.Error == "" && primaryCount > 0 {
 		pages = 1
 	}
-	if (remote || run.Mode == model.ModeFull || run.Mode == model.ModeMetadata) && page.Error == "" && errorCount > 0 {
+	if (remote || run.Mode == model.ModeFull || run.Mode == model.ModeMetadata) && page.Error == "" && rejectedPrimary {
 		// Keep error observations without certifying an incomplete page.
 		cursor, err = jsonCursor(run.Cursor)
 		if err != nil {

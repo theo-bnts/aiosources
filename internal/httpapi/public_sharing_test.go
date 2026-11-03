@@ -39,6 +39,7 @@ func TestPublicSharingRoutesRequireTheirOwnCredentialAndPreservePrivateData(t *t
 	}
 	access, _ = f.db.PublicAccess(f.ctx)
 	access.ExposeSources = true
+	access.CatalogEnabled = true
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}

@@ -23,12 +23,16 @@ func TestOperationHistoryAPIAuthenticationFiltersAndMissingRuns(t *testing.T) {
 		t.Fatalf("history contract %d %s", response.Code, response.Body.String())
 	}
 	id := page.Items[0].ID
+	multi := f.request("GET", "/api/operations?group=metadata&kind=matching,cache&service=local,torbox&status=succeeded,failed", "", true, "")
+	if multi.Code != 200 || json.Unmarshal(multi.Body.Bytes(), &page) != nil || page.Total != 1 {
+		t.Fatal("combined history filters", multi.Code, multi.Body.String())
+	}
 	for _, route := range []string{"/api/operations/" + id, "/api/operations/" + id + "/events?limit=1"} {
 		if response := f.request("GET", route, "", true, ""); response.Code != 200 {
 			t.Fatalf("details %s: %d", route, response.Code)
 		}
 	}
-	for _, query := range []string{"kind=unknown", "service=unknown", "status=unknown", "group=unknown", "limit=NaN", "offset=-1", "kind=metadata&kind=cache"} {
+	for _, query := range []string{"kind=unknown", "service=unknown", "status=unknown", "status=succeeded,unknown", "service=local,", "group=unknown", "limit=NaN", "offset=-1", "kind=metadata&kind=cache"} {
 		if response := f.request("GET", "/api/operations?"+query, "", true, ""); response.Code != 400 {
 			t.Fatalf("accepted invalid history filter %s: %d", query, response.Code)
 		}

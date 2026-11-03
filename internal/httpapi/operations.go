@@ -12,7 +12,13 @@ func (s *server) operationHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filter := model.OperationFilter{ListOptions: opts, Kind: r.URL.Query().Get("kind"), Service: r.URL.Query().Get("service"), Group: r.URL.Query().Get("group")}
-	if (filter.Group != "" && filter.Group != "metadata" && filter.Group != "debrid") || (filter.Kind != "" && filter.Kind != "metadata" && filter.Kind != "matching" && filter.Kind != "cache" && filter.Kind != "cleanup" && filter.Kind != "download") || (filter.Service != "" && filter.Service != "tmdb" && filter.Service != "openlibrary" && filter.Service != "local" && !model.IsDebridService(filter.Service)) || (opts.Status != "" && opts.Status != "running" && opts.Status != "succeeded" && opts.Status != "failed" && opts.Status != "cancelled" && opts.Status != "interrupted") {
+	if (filter.Group != "" && filter.Group != "metadata" && filter.Group != "debrid") || !model.ValidSelection(filter.Kind, func(value string) bool {
+		return value == "metadata" || value == "matching" || value == "cache" || value == "cleanup" || value == "download"
+	}) || !model.ValidSelection(filter.Service, func(value string) bool {
+		return value == "tmdb" || value == "openlibrary" || value == "local" || model.IsDebridService(value)
+	}) || !model.ValidSelection(opts.Status, func(value string) bool {
+		return value == "running" || value == "succeeded" || value == "failed" || value == "cancelled" || value == "interrupted"
+	}) {
 		writeError(w, http.StatusBadRequest, "Unknown operation history filter")
 		return
 	}

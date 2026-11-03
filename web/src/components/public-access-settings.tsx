@@ -18,10 +18,13 @@ type Access = {
   catalog_enabled: boolean
 }
 type Draft = { base: Access; value: Access }
+function normalizeAccess(value: Access): Access {
+  return { ...value, catalog_enabled: value.catalog_enabled && value.expose_sources }
+}
 export function PublicAccessSettings() {
   const query = useQuery({
     queryKey: ['public-access'],
-    queryFn: ({ signal }) => api<Access>('/public-access', { signal }),
+    queryFn: async ({ signal }) => normalizeAccess(await api<Access>('/public-access', { signal })),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const [draft, setDraft] = useState<Draft>()
@@ -38,7 +41,7 @@ export function PublicAccessSettings() {
   function change(value: Partial<Omit<Access, 'revision'>>) {
     setDraft((draft) => ({
       base: draft?.base || query.data!,
-      value: { ...(draft?.value || query.data!), ...value },
+      value: normalizeAccess({ ...(draft?.value || query.data!), ...value }),
     }))
     save.reset()
     review.reset()
@@ -54,7 +57,7 @@ export function PublicAccessSettings() {
     },
   })
   const review = useMutation({
-    mutationFn: () => api<Access>('/public-access'),
+    mutationFn: async () => normalizeAccess(await api<Access>('/public-access')),
     onSuccess: async (latest) => {
       await queryClient.cancelQueries({ queryKey: ['public-access'] })
       queryClient.setQueryData(['public-access'], latest)
@@ -62,7 +65,7 @@ export function PublicAccessSettings() {
         draft
           ? {
               base: latest,
-              value: {
+              value: normalizeAccess({
                 ...latest,
                 enabled:
                   draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
@@ -86,7 +89,7 @@ export function PublicAccessSettings() {
                   draft.value.expose_sources !== draft.base.expose_sources
                     ? draft.value.expose_sources
                     : latest.expose_sources,
-              },
+              }),
             }
           : undefined,
       )
@@ -128,8 +131,8 @@ export function PublicAccessSettings() {
               <p className="help">
                 Visitors use the features enabled below. Playback uses their own keys. The server
                 does not save these keys, and administration stays protected. Turning this off
-                revokes public links. AllDebrid uses your configured account to check missing cache
-                availability.
+                revokes public links. Availability checks use visitors’ own keys and reuse the
+                shared cache.
               </p>
             </div>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">

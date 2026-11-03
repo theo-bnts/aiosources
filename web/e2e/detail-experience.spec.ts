@@ -195,15 +195,17 @@ test('empty identification and operation event pages recover without discarding 
   await results.getByRole('button', { name: 'Return to first page', exact: true }).click()
   await expect.poll(() => new URL(page.url()).searchParams.has('match_offset')).toBe(false)
   expect(new URL(page.url()).searchParams.has('match_limit')).toBe(false)
-  await expect(results.getByLabel('Identification result', { exact: true })).toHaveValue(
-    'unmatched',
+  await expect(results.getByLabel('Identification result', { exact: true })).toHaveText(
+    'Not identified',
   )
   await expect(results.getByLabel('Title, source ID or info hash', { exact: true })).toHaveValue(
     'missing',
   )
   await results.getByRole('button', { name: 'Clear filters', exact: true }).click()
-  await expect(results.getByLabel('Identification result', { exact: true })).toHaveValue('all')
-  await expect(results.getByLabel('Source', { exact: true })).toHaveValue('')
+  await expect(results.getByLabel('Identification result', { exact: true })).toHaveText(
+    'All results',
+  )
+  await expect(results.getByLabel('Source', { exact: true })).toHaveText('All sources')
   await expect(results.getByLabel('Title, source ID or info hash', { exact: true })).toHaveValue('')
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()

@@ -1,6 +1,6 @@
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
-import { test, expect, createStremioAccess } from './fixtures'
+import { test, expect, createStremioAccess, selectMultiple } from './fixtures'
 
 test('manual review selects a local work, protects drafts, publishes it and supports undo', async ({
   page,
@@ -65,7 +65,7 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   expect((await saving).status()).toBe(204)
   await expect(dialog).toBeHidden()
   await openDisclosure(page, 'Filters')
-  await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await selectMultiple(page, 'Identification result', ['matched'])
   await page
     .getByRole('form', { name: 'Identification filters', exact: true })
     .getByRole('button', { name: 'Search', exact: true })

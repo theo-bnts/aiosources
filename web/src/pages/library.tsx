@@ -1,4 +1,5 @@
 import { ResultCount } from '@/components/common'
+import { FilterSelect } from '@/components/filter-select'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -78,18 +79,19 @@ function ProcessedRecordFilters({
       <Disclosure title="Filters">
         <div className="field max-w-sm">
           <Label htmlFor="run-raw-processing">Processing result</Label>
-          <select
+          <FilterSelect
             id="run-raw-processing"
-            className="native-select w-full"
+            label="Processing result"
+            allLabel="All results"
             value={processing}
-            onChange={(event) => onProcessingChange(event.target.value)}
-          >
-            <option value="">All results</option>
-            <option value="error">Errors</option>
-            <option value="ignored">Ignored</option>
-            <option value="enrichment">Enrichment</option>
-            <option value="accepted">Accepted</option>
-          </select>
+            onChange={onProcessingChange}
+            options={[
+              { value: 'error', label: 'Errors' },
+              { value: 'ignored', label: 'Ignored' },
+              { value: 'enrichment', label: 'Enrichment' },
+              { value: 'accepted', label: 'Accepted' },
+            ]}
+          />
         </div>
       </Disclosure>
       <div className="flex flex-wrap gap-2">

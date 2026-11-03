@@ -49,6 +49,12 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 	if err != nil || page.Total != 0 {
 		t.Fatal("media filter bypassed", err)
 	}
+	for _, kinds := range []string{"movie,tv", "movie,ebook", "movie,book", "movie,movie"} {
+		page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "example"}, "example", model.CatalogSearchFilters{Type: kinds})
+		if err != nil || page.Total != 1 || len(page.Items) != 1 {
+			t.Fatal("combined media selection lost or duplicated a title", kinds, err)
+		}
+	}
 	page, err = db.CatalogTitles(ctx, model.ListOptions{Query: "private value"}, "private value", model.CatalogSearchFilters{})
 	if err != nil || page.Total != 0 {
 		t.Fatal("private fields were searchable", err)

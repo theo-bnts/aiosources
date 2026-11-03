@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -24,19 +25,19 @@ func catalogTitleLabel(locale, alias string) string {
 func catalogQueryAlias(matching, normalized string) string {
 	return `(SELECT title FROM (
  SELECT title,normalized FROM ingest.aio_titles WHERE work_id=w.id
- UNION ALL SELECT title,normalized FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ingest.ol_aliases(w.openlibrary_id)
+ UNION ALL SELECT title,normalized FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id)))
  ) local_titles WHERE ` + matching + ` ORDER BY public.similarity(` + normalized + `,normalized) DESC,length(normalized),title LIMIT 1)`
 }
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),(SELECT cover FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ingest.ol_aliases(w.openlibrary_id) AND cover>0 ORDER BY id LIMIT 1),0),ARRAY(SELECT a.name FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) ORDER BY a.id)`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) ORDER BY a.id)`
 }
 
 func catalogYearFilter(year string) string {
 	// Film years are alternatives. A series spans all locally known work,
 	// season and episode years, including gaps between seasons.
-	return `(` + year + `=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.year=` + year + `)) OR (w.media_type='tv' AND EXISTS(
+	return `(` + year + `=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.year=` + year + `)) OR (w.media_type='tv' AND EXISTS(
  SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM ingest.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM ingest.aio_episodes WHERE work_id=w.id) known_years
  HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
 }
@@ -53,7 +54,7 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
-	if !validSearchText(opts.Query, 500) || len([]rune(normalized)) < 2 || !validBookQueryType(filters.Type) || (filters.Year != 0 && (filters.Year < 1000 || filters.Year > 9999)) {
+	if !validSearchText(opts.Query, 500) || len([]rune(normalized)) < 2 || !model.ValidSelection(filters.Type, validBookQueryType) || (filters.Year != 0 && (filters.Year < 1000 || filters.Year > 9999)) {
 		return result, model.ErrInvalid
 	}
 	locale := "en"
@@ -67,11 +68,19 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	if isbn := books.ISBN(identity); isbn != "" {
 		identity = isbn
 	}
-	kind := filters.Type
-	if books.IsType(kind) {
-		kind = "book"
+	kinds := model.SelectionValues(filters.Type)
+	media := []string{}
+	formats := []string{}
+	for _, kind := range kinds {
+		if kind == "ebook" || kind == "audiobook" {
+			formats = append(formats, kind)
+			kind = "book"
+		}
+		if !slices.Contains(media, kind) {
+			media = append(media, kind)
+		}
 	}
-	args := []any{identity, kind, normalized}
+	args := []any{identity, media, normalized}
 	terms := []string{}
 	anchor, longest := "", 0
 	for _, word := range strings.Fields(normalized) {
@@ -88,22 +97,26 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	}
 	bookExtras := ""
 	bookScope := ""
-	if kind != "movie" && kind != "tv" {
+	if len(media) == 0 || slices.Contains(media, "book") {
 		// Discovery only needs works represented in the imported catalog.
 		// Inline this scope before candidate aggregation; a common word must
 		// not materialize millions of unrelated Open Library works/editions.
-		bookScope = `WITH catalog_books AS NOT MATERIALIZED(SELECT w.* FROM ingest.aio_works w WHERE w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.aio_matches m WHERE m.work_id=w.id AND m.status='matched')) `
-		bookExtras = bookCatalogCandidates("$1", "$3", matching, anchor, "catalog_books")
+		bookScope = `WITH catalog_book_ids AS MATERIALIZED(SELECT DISTINCT m.work_id AS id FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.status='matched' AND w.media_type='book'),
+catalog_books AS NOT MATERIALIZED(SELECT w.* FROM ingest.aio_works w JOIN catalog_book_ids b ON b.id=w.id) `
+		// Reuse the small set of represented books in every title/edition/author
+		// branch. An unfinished first identification must not search millions of
+		// unrelated entries merely to discover that this set is still empty.
+		bookExtras = ` UNION ALL SELECT * FROM (` + strings.TrimPrefix(bookCatalogCandidates("$1", "$3", matching, anchor, "catalog_books"), " UNION ALL ") + `) book_matches WHERE EXISTS(SELECT 1 FROM catalog_book_ids)`
 	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
  SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
  public.similarity($3,normalized) FROM ingest.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
- JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND ($2='' OR w.media_type=$2)
+ JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
-	if filters.Type == "ebook" || filters.Type == "audiobook" {
-		args = append(args, filters.Type)
-		filter += " AND EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("t") + fmt.Sprintf("=$%d)", len(args))
+	if len(formats) > 0 && !slices.Contains(kinds, "book") {
+		args = append(args, formats)
+		filter += " AND (w.media_type<>'book' OR EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("t") + fmt.Sprintf("=ANY($%d::text[])))", len(args))
 	}
 	if filters.Year != 0 {
 		args = append(args, filters.Year)

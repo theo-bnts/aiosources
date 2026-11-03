@@ -18,6 +18,7 @@ type LogEntry struct {
 type LogOptions struct {
 	ListOptions
 	Service string
+	Scopes  []string
 	Levels  []string
 	From    *time.Time
 	To      *time.Time

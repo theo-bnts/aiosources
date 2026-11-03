@@ -29,6 +29,14 @@ func (s *server) activityLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	options := model.LogOptions{ListOptions: page, Service: r.URL.Query().Get("service")}
+	scopes := r.URL.Query().Get("scope")
+	if !model.ValidSelection(scopes, func(value string) bool {
+		return strings.HasPrefix(value, "source:") || strings.HasPrefix(value, "service:")
+	}) {
+		writeError(w, http.StatusBadRequest, "Invalid activity scope filter")
+		return
+	}
+	options.Scopes = model.SelectionValues(scopes)
 	options.Levels = []string{"info", "warn", "error"}
 	if raw := r.URL.Query().Get("level"); raw != "" {
 		if len(raw) > 32 {

@@ -12,6 +12,7 @@ import {
   ListEmpty,
 } from '@/components/common'
 import { useRef } from 'react'
+import { FilterSelect } from '@/components/filter-select'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { ArrowRightIcon, PauseIcon, PlayIcon, StopIcon } from '@phosphor-icons/react'
@@ -137,7 +138,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
     const next = new URLSearchParams(search)
     value ? next.set(key, value) : next.delete(key)
     next.delete('offset')
-    setSearch(next)
+    setSearch(next, { flushSync: true, preventScrollReset: true })
   }
   return (
     <div className="page">
@@ -145,38 +146,28 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
       <div className="toolbar items-end rounded-md border border-border p-4">
         <div className="field">
           <Label htmlFor="run-provider">{remote ? 'Remote catalog' : 'Source'}</Label>
-          <select
+          <FilterSelect
             id="run-provider"
-            className="native-select min-w-48"
+            label={remote ? 'Remote catalog' : 'Source'}
+            allLabel={remote ? 'All remote catalogs' : 'All sources'}
             value={provider}
-            onChange={(event) => filter('provider', event.target.value)}
-          >
-            <option value="">{remote ? 'All remote catalogs' : 'All sources'}</option>
-            {provider && !sources?.some((item) => item.id === provider) && (
-              <option value={provider}>{provider}</option>
-            )}
-            {sources?.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name || item.id}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => filter('provider', value)}
+            options={(sources ?? []).map((item) => ({
+              value: item.id,
+              label: item.name || item.id,
+            }))}
+          />
         </div>
         <div className="field">
           <Label htmlFor="run-status">Status</Label>
-          <select
+          <FilterSelect
             id="run-status"
-            className="native-select"
+            label="Status"
+            allLabel="All statuses"
             value={status}
-            onChange={(event) => filter('status', event.target.value)}
-          >
-            <option value="">All statuses</option>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => filter('status', value)}
+            options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
+          />
         </div>
         <ClearFiltersButton
           active={Boolean(provider || status)}

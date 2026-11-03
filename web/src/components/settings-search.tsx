@@ -205,7 +205,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
       <Button
         ref={trigger}
         variant="outline"
-        className="h-11 w-full min-w-0 justify-start gap-2 bg-background text-muted-foreground lg:h-9 lg:w-60 xl:w-72"
+        className="w-full min-w-0 justify-start gap-2 bg-background text-base font-normal text-muted-foreground md:text-sm lg:w-60 xl:w-72"
         onClick={show}
         aria-label="Search settings"
         aria-haspopup="dialog"

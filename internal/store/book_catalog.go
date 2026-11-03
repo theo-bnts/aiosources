@@ -9,14 +9,21 @@ import (
 // Work dates are often absent from the export. A known edition can supply
 // the first locally known publication year without rewriting every work.
 const bookWorkYears = `CASE WHEN w.media_type='book' AND cardinality(w.years)=0 THEN
- ARRAY(SELECT min(year) FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND year>0 HAVING min(year) IS NOT NULL)
+ ARRAY(SELECT min(year) FROM ingest.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND year>0 HAVING min(year) IS NOT NULL)
  ELSE w.years END`
 
 func bookLanguageSQL(locale string) string { return `ARRAY[split_part(` + locale + `,'-',1)]` }
 
 func bookEditionTitle(locale string) string {
-	return `(SELECT e.title FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.languages && ` + bookLanguageSQL(locale) + ` ORDER BY e.id LIMIT 1)`
+	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.title FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.languages && ` + bookLanguageSQL(locale) + `)
+ SELECT title FROM editions ORDER BY id LIMIT 1)`
 }
+
+// Resolve aliases once and select the work's editions before ordering. With a
+// global ORDER BY/LIMIT, a selective lookup can otherwise walk the edition
+// primary key and evaluate recursive redirects for millions of unrelated rows.
+const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.cover>0)
+ SELECT cover FROM editions ORDER BY id LIMIT 1)`
 
 // Start with the edition's small set of work identifiers, then follow the same
 // eight-key, cycle-safe redirect paths as ol_aliases in the opposite direction.

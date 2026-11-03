@@ -633,6 +633,11 @@ source(
       'HTML total records current position selector attribute format required',
     ],
     ['html-request', 'Request parameters', 'HTML form query parameter location page size'],
+    [
+      'html-invalid',
+      'Invalid records',
+      'HTML invalid-record policy reject missing required field stop page',
+    ],
   ],
   ['html'],
 )

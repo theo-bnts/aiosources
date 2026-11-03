@@ -280,6 +280,17 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 	page.Items = make([]model.Record, 0, len(rows))
 	page.RequireUniqueIDs = c.total != nil
 	identities := make(map[string]bool, len(rows))
+	validRecords := 0
+	rejectField := func(id string, err error) bool {
+		var invalid *htmlFieldValueError
+		if !c.provider.RejectsInvalidHTMLRecords() || !errors.As(err, &invalid) {
+			return false
+		}
+		// Keep the identity and a fixed diagnostic, never partial fields or the
+		// invalid upstream value. Ordinary record errors remain visible in history.
+		page.Items = append(page.Items, model.Record{SourceID: id, Fields: map[string]any{}, ContentType: "text/html", Error: model.HTMLRejectedRecordError, Rejected: true})
+		return true
+	}
 	for index, row := range rows {
 		if err := ctx.Err(); err != nil {
 			return page, err
@@ -303,6 +314,9 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 		identities[id] = true
 		fields := make(map[string]any, len(c.fields)+len(c.detailFields))
 		if err := operation.fields(ctx, row, base, c.fields, fields, index); err != nil {
+			if rejectField(id, err) {
+				continue
+			}
 			return failHTMLFields(page, err)
 		}
 		missingDetails := false
@@ -326,21 +340,37 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 				return page, err
 			}
 			if err := operation.fields(ctx, detail, detailBase, c.detailFields, fields, index); err != nil {
+				if rejectField(id, err) {
+					continue
+				}
 				return failHTMLFields(page, err)
 			}
 		}
 		if strings.TrimSpace(FieldString(fields["title"])) == "" {
+			if rejectField(id, &htmlFieldValueError{}) {
+				continue
+			}
 			page.Metadata["field_name"] = "title"
 			return fail("html_field_invalid")
 		}
 		supplementExternalIDs(fields)
 		fields = model.WithoutSwarmCounts(fields)
 		page.Items = append(page.Items, model.Record{SourceID: id, Fields: fields, ContentType: "text/html", Ignored: !matchesLocalCategories(c.localCategories, fields)})
+		validRecords++
+	}
+	if len(rows) > 0 && validRecords == 0 {
+		// A changed selector or challenge must never publish an empty catalog.
+		return fail("html_field_invalid")
 	}
 	delete(page.Metadata, "record_index")
+	delete(operation.metadata, "field_name")
 	page.Next, err = json.Marshal(next)
 	return page, err
 }
+
+type htmlFieldValueError struct{}
+
+func (e *htmlFieldValueError) Error() string { return "Source HTML field is missing or invalid" }
 
 func (operation *htmlFetch) detailDocument(ctx context.Context, target *url.URL, index int) (*html.Node, *url.URL, error) {
 	c := operation.connector
@@ -405,7 +435,10 @@ func (operation *htmlFetch) fields(ctx context.Context, root *html.Node, base *u
 		field := plan[name]
 		values, err := field.read(root)
 		if err != nil {
-			return err
+			if errors.Is(err, errHTMLFieldLimit) {
+				return err
+			}
+			return &htmlFieldValueError{}
 		}
 		if len(values) == 0 {
 			continue
@@ -437,7 +470,7 @@ func (operation *htmlFetch) fields(ctx context.Context, root *html.Node, base *u
 				}
 				result, err = field.convert(value, base, c.unit)
 				if err != nil {
-					return err
+					return &htmlFieldValueError{}
 				}
 				if field.config.Format == "info_hash" && c.containsSecret(FieldString(result)) {
 					return errors.New("HTML hash field contains a source credential")
@@ -457,7 +490,7 @@ func (operation *htmlFetch) fields(ctx context.Context, root *html.Node, base *u
 		}
 		value, err = normalizeField(name, value, c.unit)
 		if err != nil {
-			return err
+			return &htmlFieldValueError{}
 		}
 		fields[name] = value
 	}

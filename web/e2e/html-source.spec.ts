@@ -66,12 +66,16 @@ test('HTML uses the source stages, validates selectors without requests and keep
     '#item-details',
   )
   await expect(page.getByLabel('Detail Info hash format', { exact: true })).toHaveValue('info_hash')
+  await page.getByRole('tab', { name: 'Pagination', exact: true }).click()
+  await openDisclosure(page, 'Invalid records')
+  await page.getByLabel('Invalid-record policy', { exact: true }).selectOption('reject')
   expect((await checkConfiguration(page)).valid).toBe(true)
   expect(server.sourceRequests()).toBe(0)
   await saveHTMLSource(page)
   const saved = await (await page.request.get('/api/providers/html_example')).json()
   expect(JSON.parse(saved.json).html.details.fields.info_hash.required).toBe(true)
   expect(JSON.parse(saved.json).http.listing_paths).toEqual(['/catalog/audio'])
+  expect(JSON.parse(saved.json).html.invalid_record_policy).toBe('reject')
   await page.reload()
   for (const width of [320, 390, 1440]) {
     await page.setViewportSize({ width, height: 1000 })

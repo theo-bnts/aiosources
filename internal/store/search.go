@@ -142,7 +142,7 @@ func NormalizeSearchFilters(input model.SearchFilters) (model.SearchFilters, err
 func torrentSearchOptions(options model.ListOptions) (model.ListOptions, error) {
 	providers := options.Providers
 	if options.ProviderID != "" {
-		providers = append(append([]string{}, providers...), options.ProviderID)
+		providers = append(append([]string{}, providers...), model.SelectionValues(options.ProviderID)...)
 	}
 	filters, err := NormalizeSearchFilters(model.SearchFilters{Query: options.Query, Providers: providers,
 		Category: options.Category, MinSize: options.MinSize, MaxSize: options.MaxSize,

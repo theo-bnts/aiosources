@@ -130,7 +130,7 @@ function HTMLFieldSettings({
             <BooleanField
               path={[...path, 'required']}
               label={`${label} required`}
-              help="A missing value stops the page. Optional fields are omitted when no value matches."
+              help="Missing required values follow the invalid-record policy. Optional fields are omitted when no value matches."
             />
           )}
           {!hash && !title && !size && !date && (
@@ -445,6 +445,20 @@ export function HTMLPaginationSettings() {
           help="A marker shown only when no torrents exist. Without a matching marker, a page with no records fails safely instead of replacing your catalog."
         />
       </FieldSection>
+
+      <OptionalSection
+        title="Invalid records"
+        configuredPaths={[['html', 'invalid_record_policy']]}
+      >
+        <SelectField
+          path={['html', 'invalid_record_policy']}
+          label="Invalid-record policy"
+          choices={['fail', 'reject']}
+          fallback="Stop the page (default)"
+          labels={{ fail: 'Stop the page', reject: 'Reject the invalid record and continue' }}
+          help="Reject records with missing or invalid fields and report them in processed records. Pages with no valid records, missing identities, connection errors or unrecognized layouts still stop safely."
+        />
+      </OptionalSection>
 
       <OptionalSection title="Request parameters">
         <FieldGrid>

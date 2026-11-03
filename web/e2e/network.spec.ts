@@ -175,7 +175,7 @@ test('proxy profiles use Secrets and route services independently without activa
   await expect(card).toBeHidden()
   expect((await (await page.request.get('/api/secrets')).json()).items).toHaveLength(2)
   await page.goto('/logs?service=network')
-  await expect(page.getByLabel('Source or service', { exact: true })).toHaveValue('service:network')
+  await expect(page.getByLabel('Source or service', { exact: true })).toHaveText('Network')
   await expect(page.getByText('Proxy connection test failed', { exact: true })).toBeVisible()
   expect(await page.locator('main').innerText()).not.toContain('synthetic-proxy-')
 })

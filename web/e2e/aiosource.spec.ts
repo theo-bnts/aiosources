@@ -260,6 +260,7 @@ test('debrid settings validate, persist and expose no default trackers', async (
   await expect(page.getByLabel('AllDebrid API key')).toHaveValue('')
   await expect(page.getByLabel('TorBox API key')).toHaveValue('')
   const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1440')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -323,13 +324,16 @@ test('private playback saves independently and fields have space below their lab
   const stored = await (await page.request.get('/api/aiosource')).json()
   // Invalid fields in the separate configuration form cannot prevent saving
   // playback settings, and its draft must never be published by that save.
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('0')
   await selector.selectOption('invalid_announce_url')
   await playback.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(playback.getByRole('alert')).toHaveCount(1)
   await expect(configuration.getByRole('alert')).toHaveCount(0)
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1')
   await expect(playback.getByRole('alert')).toHaveCount(1)
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('0')
   await expect(selector).toHaveValue('invalid_announce_url')
   await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
@@ -346,6 +350,7 @@ test('private playback saves independently and fields have space below their lab
     stored.config.cache_minutes,
   )
   // Saving the other form keeps a pending source edit intact and unpublished.
+  await openDisclosure(page, 'Cache availability')
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await source.getByRole('switch', { name: 'Private source' }).uncheck()
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()

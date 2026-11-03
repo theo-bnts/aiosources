@@ -64,7 +64,7 @@ func (s *server) stremioRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	origin, kind := r.URL.Query().Get("origin"), r.URL.Query().Get("kind")
-	if (origin != "" && origin != "private" && origin != "public") || (kind != "" && kind != "stream" && kind != "manifest" && kind != "playback") {
+	if !model.ValidSelection(origin, func(value string) bool { return value == "private" || value == "public" }) || !model.ValidSelection(kind, func(value string) bool { return value == "stream" || value == "manifest" || value == "playback" }) {
 		writeError(w, http.StatusBadRequest, "Invalid request filters")
 		return
 	}

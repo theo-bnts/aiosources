@@ -2,6 +2,8 @@ import { DropdownMenu } from 'radix-ui'
 import { CheckIcon, CaretDownIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 
+export type MultiSelectOption = { value: string; label: string; group?: string }
+
 // An empty selection deliberately means all, including future options.
 export function MultiSelect({
   id,
@@ -16,13 +18,14 @@ export function MultiSelect({
   label: string
   allLabel: string
   value: string[]
-  options: { value: string; label: string }[]
+  options: MultiSelectOption[]
   onChange: (value: string[]) => void
   name?: string
 }) {
   const selected = value.length
     ? value.map((item) => options.find((option) => option.value === item)?.label ?? item).join(', ')
     : allLabel
+  const groups = [...new Set(options.map((option) => option.group ?? ''))]
   return (
     <>
       {name && value.map((item) => <input key={item} type="hidden" name={name} value={item} />)}
@@ -55,25 +58,37 @@ export function MultiSelect({
               {allLabel}
             </DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
-            {options.map((option) => (
-              <DropdownMenu.CheckboxItem
-                key={option.value}
-                checked={value.includes(option.value)}
-                onCheckedChange={(checked) =>
-                  onChange(
-                    checked
-                      ? [...new Set([...value, option.value])]
-                      : value.filter((item) => item !== option.value),
-                  )
-                }
-                onSelect={(event) => event.preventDefault()}
-                className="relative cursor-pointer rounded-sm py-2 pr-3 pl-8 text-sm outline-none data-[highlighted]:bg-accent"
-              >
-                <DropdownMenu.ItemIndicator className="absolute left-2 top-2.5">
-                  <CheckIcon aria-hidden="true" />
-                </DropdownMenu.ItemIndicator>
-                <span className="break-words">{option.label}</span>
-              </DropdownMenu.CheckboxItem>
+            {groups.map((group) => (
+              <DropdownMenu.Group key={group} aria-label={group || undefined}>
+                {group && (
+                  <DropdownMenu.Label className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                    {group}
+                  </DropdownMenu.Label>
+                )}
+                {options
+                  .filter((option) => (option.group ?? '') === group)
+                  .map((option) => (
+                    <DropdownMenu.CheckboxItem
+                      key={option.value}
+                      data-value={option.value}
+                      checked={value.includes(option.value)}
+                      onCheckedChange={(checked) =>
+                        onChange(
+                          checked
+                            ? [...new Set([...value, option.value])]
+                            : value.filter((item) => item !== option.value),
+                        )
+                      }
+                      onSelect={(event) => event.preventDefault()}
+                      className="relative cursor-pointer rounded-sm py-2 pr-3 pl-8 text-sm outline-none data-[highlighted]:bg-accent"
+                    >
+                      <DropdownMenu.ItemIndicator className="absolute left-2 top-2.5">
+                        <CheckIcon aria-hidden="true" />
+                      </DropdownMenu.ItemIndicator>
+                      <span className="break-words">{option.label}</span>
+                    </DropdownMenu.CheckboxItem>
+                  ))}
+              </DropdownMenu.Group>
             ))}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

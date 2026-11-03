@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('public access preserves the access proxy cookie without an administrator session', async ({
   page,
@@ -176,8 +176,8 @@ test('Stremio history distinguishes public streams, manifests and playback with 
     await db.end()
   }
   await page.goto('/addon/history')
-  await page.getByLabel('Installation', { exact: true }).selectOption('public')
-  await page.getByLabel('Request type', { exact: true }).selectOption('playback')
+  await selectMultiple(page, 'Installation', ['public'])
+  await selectMultiple(page, 'Request type', ['playback'])
   await expect(page.getByRole('link', { name: 'imdb:tt1234567', exact: true })).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'Manifest', exact: true })).toHaveCount(0)
   const listURL = page.url()
@@ -190,7 +190,7 @@ test('Stremio history distinguishes public streams, manifests and playback with 
   await expect(page.getByText('Completed', { exact: true })).toHaveCount(2)
   await page.getByRole('link', { name: 'Stremio history', exact: true }).click()
   await expect(page).toHaveURL(listURL)
-  await page.getByLabel('Request type', { exact: true }).selectOption('manifest')
+  await selectMultiple(page, 'Request type', ['manifest'])
   await page.getByRole('link', { name: 'Manifest', exact: true }).click()
   await expect(page.getByText('Manifest returned.', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Provider calls' })).toHaveCount(0)

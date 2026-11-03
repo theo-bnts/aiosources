@@ -122,7 +122,7 @@ func (s *Store) Operation(ctx context.Context, id string) (model.OperationRun, e
 func (s *Store) ListOperations(ctx context.Context, opts model.OperationFilter) (model.List[model.OperationRun], error) {
 	opts.ListOptions = pageOptions(opts.ListOptions)
 	result := model.List[model.OperationRun]{Items: []model.OperationRun{}, Limit: opts.Limit, Offset: opts.Offset}
-	where := ` WHERE ($1='' OR kind=$1) AND ($2='' OR service=$2) AND ($3='' OR status=$3) AND ($4<>'metadata' OR kind IN ('metadata','matching')) AND ($4<>'debrid' OR kind IN ('cache','cleanup','download'))`
+	where := ` WHERE ($1='' OR kind=ANY(string_to_array($1,','))) AND ($2='' OR service=ANY(string_to_array($2,','))) AND ($3='' OR status=ANY(string_to_array($3,','))) AND ($4<>'metadata' OR kind IN ('metadata','matching')) AND ($4<>'debrid' OR kind IN ('cache','cleanup','download'))`
 	args := []any{opts.Kind, opts.Service, opts.Status, opts.Group}
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_runs`+where, args...).Scan(&result.Total); err != nil {
 		return result, databaseError("count operation history", err)

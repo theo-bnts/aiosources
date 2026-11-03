@@ -1,4 +1,6 @@
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
+import { FilterSelect } from '@/components/filter-select'
+import { selectionValues } from '@/lib/filter-values'
 import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
@@ -44,11 +46,18 @@ export function LogsPage() {
   const level = search.get('level') ?? 'info,warn,error'
   const provider = search.get('provider') ?? ''
   const service = search.get('service') ?? ''
+  const scope = search.get('scope') ?? ''
+  const selectedScopes =
+    scope ||
+    [
+      ...selectionValues(service).map((id) => `service:${id}`),
+      ...selectionValues(provider).map((id) => `source:${id}`),
+    ].join(',')
   const run = search.get('run') ?? ''
   const q = search.get('q') ?? ''
   const from = search.get('from') ?? ''
   const to = search.get('to') ?? ''
-  const query = params({ level, provider, service, run, q, from, to, limit, offset })
+  const query = params({ level, provider, service, scope, run, q, from, to, limit, offset })
   const logs = useQuery({
     queryKey: ['logs', query],
     queryFn: ({ signal }) => api<Page<LogEntry>>(`/logs?${query}`, { signal }),
@@ -69,6 +78,7 @@ export function LogsPage() {
             'level',
             'provider',
             'service',
+            'scope',
             'run',
             'q',
             'from',
@@ -81,7 +91,8 @@ export function LogsPage() {
           }
           if (selected.join(',') !== 'info,warn,error') next.set('level', selected.join(','))
           const scope = String(form.get('scope') ?? '')
-          if (scope.startsWith('service:')) next.set('service', scope.slice(8))
+          if (scope.includes(',')) next.set('scope', scope)
+          else if (scope.startsWith('service:')) next.set('service', scope.slice(8))
           else if (scope.startsWith('source:')) next.set('provider', scope.slice(7))
           for (const key of ['run', 'q']) {
             const value = String(form.get(key) ?? '').trim()
@@ -121,31 +132,32 @@ export function LogsPage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <div className="field">
             <Label htmlFor="log-provider">Source or service</Label>
-            <select
+            <FilterSelect
               id="log-provider"
               name="scope"
-              className="native-select"
-              defaultValue={service ? `service:${service}` : provider ? `source:${provider}` : ''}
-            >
-              <option value="">All sources and service activity</option>
-              {provider && !providers.data?.items?.some((item) => item.id === provider) && (
-                <option value={`source:${provider}`}>{provider}</option>
-              )}
-              <optgroup label="Services">
-                {activityServices.map((item) => (
-                  <option key={item.id} value={`service:${item.id}`}>
-                    {item.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Sources">
-                {providers.data?.items?.map((item) => (
-                  <option key={item.id} value={`source:${item.id}`}>
-                    {item.name || item.id}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
+              label="Source or service"
+              allLabel="All sources and service activity"
+              defaultValue={selectedScopes}
+              options={[
+                ...activityServices.map((item) => ({
+                  value: `service:${item.id}`,
+                  label: item.name,
+                  group: 'Services',
+                })),
+                ...(providers.data?.items ?? []).map((item) => ({
+                  value: `source:${item.id}`,
+                  label: item.name || item.id,
+                  group: 'Sources',
+                })),
+                ...selectionValues(selectedScopes)
+                  .filter(
+                    (value) =>
+                      value.startsWith('source:') &&
+                      !providers.data?.items?.some((item) => `source:${item.id}` === value),
+                  )
+                  .map((value) => ({ value, label: value.slice(7), group: 'Sources' })),
+              ]}
+            />
           </div>
           <div className="field">
             <Label htmlFor="log-run">Run ID</Label>
@@ -173,7 +185,16 @@ export function LogsPage() {
                 setFilterError(null)
                 setClearVersion((value) => value + 1)
                 setSearch(
-                  resetListView(search, ['level', 'provider', 'service', 'run', 'q', 'from', 'to']),
+                  resetListView(search, [
+                    'level',
+                    'provider',
+                    'service',
+                    'scope',
+                    'run',
+                    'q',
+                    'from',
+                    'to',
+                  ]),
                   { flushSync: true },
                 )
               }}
@@ -249,7 +270,7 @@ export function LogsPage() {
                 title="No logs match these filters"
                 description="Source and service activity will appear here."
                 filtered={Boolean(
-                  search.has('level') || provider || service || run || q || from || to,
+                  search.has('level') || provider || service || scope || run || q || from || to,
                 )}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}

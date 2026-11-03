@@ -1,7 +1,6 @@
 import { test as base, expect, type Page, type Locator } from '@playwright/test'
 import type { SharePassword } from '../src/lib/catalog-types'
 import { startServer, type TestServer } from './server'
-import { debridProviders } from '../src/lib/debrid'
 
 export const test = base.extend<{ server: TestServer; collectionSource: boolean }>({
   collectionSource: [false, { option: true }],
@@ -87,20 +86,12 @@ export async function selectMultiple(scope: Page | Locator, label: string, value
   const page = 'page' in scope ? scope.page() : scope
   const control = scope.getByRole('button', { name: label, exact: true })
   await control.click()
-  await page.getByRole('menuitem', { name: /^All / }).click()
+  await page.getByRole('menuitem', { name: /^All(?: |$)/ }).click()
+  values = values.filter(Boolean)
   if (!values.length) return
   await control.click()
-  const names: Record<string, string> = {
-    movie: 'Movies',
-    series: 'Series',
-    tv: 'Series',
-    anime: 'Anime',
-    other: 'Other / not identified',
-    ...Object.fromEntries(debridProviders.map(({ id, name }) => [id, name])),
-    direct: 'Direct torrents',
-  }
   for (const value of values)
-    await page.getByRole('menuitemcheckbox', { name: names[value] ?? value, exact: true }).check()
+    await page.locator(`[role="menuitemcheckbox"][data-value=${JSON.stringify(value)}]`).check()
   await page.keyboard.press('Escape')
 }
 

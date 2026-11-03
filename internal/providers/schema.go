@@ -100,6 +100,9 @@ func buildJSONSchema() json.RawMessage {
 	set("traversal.metadata_after_incremental", "description", "After a successful Incremental, queue Metadata only for newly added native IDs with missing enrich_fields. Requires Metadata support; disabled by default. Existing run snapshots are unchanged.")
 	set("html", "description", "HTML adapter only. CSS selectors read server-rendered pages; no scripts, styles, images or embedded resources are executed or fetched. Empty pages require an explicit empty_selector match.")
 	set("html", "required", []string{"page_selector", "rows_selector", "id", "fields"})
+	set("html.invalid_record_policy", "enum", []string{"", "fail", "reject"})
+	set("html.invalid_record_policy", "default", "fail")
+	set("html.invalid_record_policy", "description", "Stop the page by default, or explicitly reject individual records with missing or invalid fields. Unrecognized pages and connection errors always stop the collection.")
 	for _, path := range []string{"html.page_selector", "html.rows_selector", "html.empty_selector", "html.next_selector"} {
 		set(path, "maxLength", 2048)
 	}

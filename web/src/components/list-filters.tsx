@@ -3,6 +3,8 @@ import { resetListView } from '@/lib/list-view'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ClearFiltersButton, ResultCount } from '@/components/common'
+import { FilterSelect } from '@/components/filter-select'
+import { selectionMatches } from '@/lib/filter-values'
 
 const directories = {
   source: ['Source filters', 'Find a source', 'sources', 'Name or identifier'],
@@ -23,13 +25,19 @@ export function useListFilters() {
   return {
     query: search.get('q') ?? '',
     state: search.get('state') ?? '',
+    matchesState: (...states: string[]) =>
+      states.some((state) => selectionMatches(search.get('state') ?? '', state)),
     change(key: 'q' | 'state', value: string) {
       const next = resetListView(search)
       value ? next.set(key, value) : next.delete(key)
-      setSearch(next, { replace: true })
+      setSearch(next, { replace: true, flushSync: true, preventScrollReset: true })
     },
     clear() {
-      setSearch(resetListView(search, ['q', 'state']), { replace: true })
+      setSearch(resetListView(search, ['q', 'state']), {
+        replace: true,
+        flushSync: true,
+        preventScrollReset: true,
+      })
     },
   }
 }
@@ -64,22 +72,14 @@ export function ListFilters({
         {states.length > 0 && (
           <div className="field min-w-44">
             <Label htmlFor={`${kind}-state`}>Status</Label>
-            <select
+            <FilterSelect
               id={`${kind}-state`}
-              className="native-select"
+              label="Status"
+              allLabel="All statuses"
               value={filters.state}
-              onChange={(event) => filters.change('state', event.target.value)}
-            >
-              <option value="">All statuses</option>
-              {filters.state && !states.some((state) => state.value === filters.state) && (
-                <option value={filters.state}>Unknown status</option>
-              )}
-              {states.map((state) => (
-                <option key={state.value} value={state.value}>
-                  {state.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => filters.change('state', value)}
+              options={[...states]}
+            />
           </div>
         )}
         <ClearFiltersButton

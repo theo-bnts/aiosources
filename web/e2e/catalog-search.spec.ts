@@ -1,7 +1,7 @@
 import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 import type { TestServer } from './server'
 
 async function seedCatalog(page: Page, server: TestServer, debrid = false) {
@@ -78,6 +78,58 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
   }
 }
 
+test('search and settings inputs match on mobile and combined filters stay usable at every width', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('/search?q=example')
+    const appearance = (element: HTMLElement) => {
+      const style = getComputedStyle(element)
+      return {
+        height: element.getBoundingClientRect().height,
+        font: style.fontFamily,
+        size: style.fontSize,
+        weight: style.fontWeight,
+      }
+    }
+    expect(
+      await page.getByLabel('Title, author or identifier', { exact: true }).evaluate(appearance),
+    ).toEqual(
+      await page.getByRole('button', { name: 'Search settings', exact: true }).evaluate(appearance),
+    )
+    await openDisclosure(page, 'Filters')
+    await selectMultiple(page, 'Type', ['movie', 'tv'])
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
+    await page.reload()
+    await expect(page.getByLabel('Type', { exact: true })).toHaveText('Movies, Series')
+    await page.goto(`/search/${ids.movie}`)
+    await openDisclosure(page, 'Filters')
+    await selectMultiple(page, 'Source', ['alpha', 'zulu'])
+    await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
+    await page.goto('/metadata/identification')
+    await openDisclosure(page, 'Filters')
+    await selectMultiple(page, 'Identification result', ['matched', 'pending'])
+    await selectMultiple(page, 'Source', ['alpha', 'zulu'])
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
+    await expect(page.locator('[data-result-count]')).toHaveText('3 torrents')
+    await page.goto('/runs')
+    await selectMultiple(page, 'Source', ['alpha', 'zulu'])
+    await selectMultiple(page, 'Status', [
+      'queued',
+      'running',
+      'paused',
+      'succeeded',
+      'failed',
+      'cancelled',
+    ])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+})
+
 test('all three searches accept spaced and dotted title fragments and show totals', async ({
   page,
   server,
@@ -96,7 +148,7 @@ test('all three searches accept spaced and dotted title fragments and show total
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
     await page.goto('/metadata/identification')
-    await expect(page.locator('#matching-status')).toHaveValue('all')
+    await expect(page.locator('#matching-status')).toHaveText('All results')
     await expect(page.locator('main details[open]')).toHaveCount(0)
     const input = page.getByLabel('Title, source ID or info hash', { exact: true })
     await expect(input).toHaveAttribute(
@@ -109,7 +161,7 @@ test('all three searches accept spaced and dotted title fragments and show total
     await expect(page.locator('main tbody tr')).toHaveCount(2)
   }
   await openDisclosure(page, 'Filters')
-  await page.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await selectMultiple(page, 'Identification result', ['matched'])
   await page
     .getByLabel('Title, source ID or info hash', { exact: true })
     .fill('example film new day')
@@ -158,13 +210,11 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toBeVisible()
   await page.getByLabel('Sort by', { exact: true }).selectOption('size')
   await expect(page.locator('main tbody tr').first()).toContainText('2160p')
-  await page.getByLabel('Source', { exact: true }).selectOption('alpha')
+  await selectMultiple(page, 'Source', ['alpha'])
   await expect(page.locator('[data-result-count]')).toHaveText('1 source release')
-  await expect(page.getByLabel('Source', { exact: true }).getByRole('option')).toHaveText([
-    'All sources',
-    'Alpha source',
-    'Zulu source',
-  ])
+  await page.getByLabel('Source', { exact: true }).click()
+  await expect(page.getByRole('menuitemcheckbox')).toHaveText(['Alpha source', 'Zulu source'])
+  await page.keyboard.press('Escape')
   await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
   await expect(page).toHaveURL(
     (url) => url.pathname === '/search' && url.searchParams.get('q') === 'example new day',
@@ -195,32 +245,32 @@ test('catalog year is a single optional filter and survives opening a title and 
   await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
   await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('2026')
-  await page.getByLabel('Type', { exact: true }).selectOption('tv')
+  await selectMultiple(page, 'Type', ['tv'])
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('1 title')
   await page.getByRole('link', { name: 'Example Series', exact: true }).click()
   await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('2026')
-  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('tv')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveText('Series')
   await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('')
-  await page.getByLabel('Type', { exact: true }).selectOption('')
+  await selectMultiple(page, 'Type', [''])
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(page).toHaveURL(/\/search$/)
   await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
-  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveText('All media')
   // Clearing must also discard a draft that has not been submitted yet.
   await page.getByLabel('Title, author or identifier', { exact: true }).fill('Unsubmitted title')
   await openDisclosure(page, 'Filters')
   await page.getByLabel('Year', { exact: true }).fill('2026')
-  await page.getByLabel('Type', { exact: true }).selectOption('movie')
+  await selectMultiple(page, 'Type', ['movie'])
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
   await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
-  await expect(page.getByLabel('Type', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Type', { exact: true })).toHaveText('All media')
 })
 
 for (const [code, status] of [

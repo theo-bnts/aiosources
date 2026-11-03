@@ -129,10 +129,12 @@ func (s *Store) ListStremioRequests(ctx context.Context, opts model.ListOptions)
 func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.ListOptions, origin, kind string) (model.List[model.StremioRequest], error) {
 	opts = pageOptions(opts)
 	out := model.List[model.StremioRequest]{Items: []model.StremioRequest{}, Limit: opts.Limit, Offset: opts.Offset}
-	if (origin != "" && origin != "private" && origin != "public") || (kind != "" && kind != "stream" && kind != "manifest" && kind != "playback") {
+	if !model.ValidSelection(origin, func(value string) bool { return value == "private" || value == "public" }) || !model.ValidSelection(kind, func(value string) bool { return value == "stream" || value == "manifest" || value == "playback" }) {
 		return out, model.ErrInvalid
 	}
-	if len(opts.Query) > 160 || (opts.Status != "" && opts.Status != "results" && opts.Status != "empty" && opts.Status != "failed" && opts.Status != "cancelled" && opts.Status != "invalid" && opts.Status != "busy" && opts.Status != "pending") {
+	if len(opts.Query) > 160 || !model.ValidSelection(opts.Status, func(value string) bool {
+		return value == "results" || value == "empty" || value == "failed" || value == "cancelled" || value == "invalid" || value == "busy" || value == "pending"
+	}) {
 		return out, model.ErrInvalid
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -140,7 +142,7 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 		return out, databaseError("begin Stremio request list", err)
 	}
 	defer rollback(tx)
-	const filter = ` WHERE created_at>=now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history')) AND ($1='' OR outcome=$1) AND ($2='' OR strpos(lower(resource),lower($2))>0) AND ($3='' OR origin=$3) AND ($4='' OR kind=$4)`
+	const filter = ` WHERE created_at>=now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history')) AND ($1='' OR outcome=ANY(string_to_array($1,','))) AND ($2='' OR strpos(lower(resource),lower($2))>0) AND ($3='' OR origin=ANY(string_to_array($3,','))) AND ($4='' OR kind=ANY(string_to_array($4,',')))`
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM ingest.stremio_requests`+filter, opts.Status, opts.Query, origin, kind).Scan(&out.Total); err != nil {
 		return out, databaseError("count Stremio requests", err)
 	}

@@ -1,6 +1,6 @@
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('metadata and debrid histories have consistent filters, pagination and retained details', async ({
   page,
@@ -37,9 +37,9 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   await expect(page.getByRole('link', { name: 'Cache verification', exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Operation', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Information update', exact: true })).toHaveCount(1)
-  await page.getByLabel('Status', { exact: true }).selectOption('succeeded')
+  await selectMultiple(page, 'Status', ['succeeded'])
   await expect(page.getByText('No runs in this view', { exact: true })).toBeVisible()
-  await page.getByLabel('Status', { exact: true }).selectOption('failed')
+  await selectMultiple(page, 'Status', ['failed'])
   const metadataView = page.url()
   await page.getByRole('link', { name: 'Information update', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Information update', exact: true })).toBeVisible()
@@ -61,7 +61,7 @@ test('metadata and debrid histories have consistent filters, pagination and reta
     page.getByRole('link', { name: 'Temporary magnet cleanup', exact: true }),
   ).toHaveCount(1)
   await expect(page.getByRole('link', { name: 'Information update', exact: true })).toHaveCount(0)
-  await page.getByLabel('Service', { exact: true }).selectOption('torbox')
+  await selectMultiple(page, 'Service', ['torbox'])
   const debridView = page.url()
   await expect(page.getByRole('link', { name: 'Cache verification', exact: true })).toHaveCount(1)
   await expect(

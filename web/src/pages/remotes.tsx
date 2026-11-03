@@ -181,10 +181,10 @@ const remoteStates = [
 function matchesRemoteFilters(remote: RemoteCatalog, filters: ReturnType<typeof useListFilters>) {
   return (
     matchesListQuery(filters.query, remote.name, remote.id) &&
-    (!filters.state ||
-      (filters.state === 'enabled' && remote.enabled) ||
-      (filters.state === 'disabled' && !remote.enabled) ||
-      (filters.state === 'invalid' && !remote.valid))
+    filters.matchesState(
+      remote.enabled ? 'enabled' : 'disabled',
+      ...(!remote.valid ? ['invalid'] : []),
+    )
   )
 }
 

@@ -98,7 +98,7 @@ const accessStates = [
 function matchesShareFilters(share: CatalogShare, filters: ReturnType<typeof useListFilters>) {
   return (
     matchesListQuery(filters.query, share.name, share.id) &&
-    (!filters.state || filters.state === catalogShareState(share))
+    filters.matchesState(catalogShareState(share))
   )
 }
 

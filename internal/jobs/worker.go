@@ -510,7 +510,7 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 		if run.Config.HTTP.Catalog && committed.Errors > run.Errors {
 			return model.StatusFailed, "Remote catalogue records could not be retained faithfully", ""
 		}
-		if run.Mode == model.ModeFull && committed.Errors > run.Errors {
+		if run.Mode == model.ModeFull && committed.Errors > run.Errors && (!run.Config.RejectsInvalidHTMLRecords() || committed.Pages == run.Pages) {
 			return model.StatusFailed, "Full catalogue records could not be retained faithfully; correct the source data before resuming", ""
 		}
 		attemptPages += committed.Pages - run.Pages

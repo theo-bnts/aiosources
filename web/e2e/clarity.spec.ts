@@ -1,6 +1,6 @@
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('navigation waits for an explicit save to finish without offering to discard pending writes', async ({
   page,
@@ -250,17 +250,17 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'pending';`)
   await expect(results).toContainText(formatted)
   await expect(results).toContainText('Several films or series are plausible')
   await openDisclosure(page, 'Filters')
-  await results.getByLabel('Identification result', { exact: true }).selectOption('unmatched')
+  await selectMultiple(results, 'Identification result', ['unmatched'])
   await results.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(results.getByRole('link', { name: 'Wrong year release', exact: true })).toBeVisible()
   await expect(results).toContainText('The release year disagrees')
   await openDisclosure(page, 'Filters')
-  await results.getByLabel('Identification result', { exact: true }).selectOption('pending')
+  await selectMultiple(results, 'Identification result', ['pending'])
   await results.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(results.getByRole('link', { name: 'Pending release', exact: true })).toBeVisible()
   await expect(results).not.toContainText('tt1234567')
   await openDisclosure(page, 'Filters')
-  await results.getByLabel('Identification result', { exact: true }).selectOption('matched')
+  await selectMultiple(results, 'Identification result', ['matched'])
   await results.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(results).toContainText('tt1234567')
   await results.getByRole('link', { name: 'Identified release', exact: true }).click()
@@ -331,18 +331,15 @@ SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title
       page.getByText('1 error · 0 ignored · 0 enrichment · 1 accepted', { exact: false }),
     ).toBeVisible()
     await openDisclosure(page, 'Filters')
-    await page
-      .getByRole('form', { name: 'Processed record filters', exact: true })
-      .getByLabel('Processing result', { exact: true })
-      .selectOption('error')
+    await selectMultiple(page, 'Processing result', ['error'])
     await expect(page.getByRole('link', { name: 'Rejected sample', exact: true })).toBeVisible()
     await expect(page.getByText('Missing source identifier', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Rejected sample', exact: true }).click()
     await expect(page.getByText('Raw payload not stored', { exact: false }).first()).toBeVisible()
     await page.goBack()
-    await expect(page.getByLabel('Processing result', { exact: true })).toHaveValue('error')
+    await expect(page.getByLabel('Processing result', { exact: true })).toHaveText('Errors')
     await openDisclosure(page, 'Filters')
-    await page.getByLabel('Processing result', { exact: true }).selectOption('accepted')
+    await selectMultiple(page, 'Processing result', ['accepted'])
     await expect(page.getByRole('link', { name: 'Rejected sample', exact: true })).toHaveCount(0)
     await expect(page.getByRole('table')).toContainText('Accepted')
     expect(server.sourceRequests()).toBe(1)

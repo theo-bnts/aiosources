@@ -27,7 +27,9 @@ func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOpti
 	if err != nil {
 		return result, err
 	}
-	if opts.Status != "" && opts.Status != "pending" && opts.Status != "matched" && opts.Status != "ambiguous" && opts.Status != "unmatched" {
+	if !model.ValidSelection(opts.Status, func(value string) bool {
+		return value == "pending" || value == "matched" || value == "ambiguous" || value == "unmatched"
+	}) {
 		return result, model.ErrInvalid
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -40,7 +42,7 @@ func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOpti
 	projection := `WITH selected AS (` + selected + `), diagnostics AS (SELECT t.occurrence_id,t.provider_id,t.source_id,
 COALESCE(t.fields->>'title','') AS title,` + aioDiagnosticStatus + ` AS status,
 m.reason, w.imdb_id, m.updated_at FROM selected t` + aioDiagnosticJoins + `)`
-	filter := fmt.Sprintf(` WHERE status=$%d`, len(args)+1)
+	filter := fmt.Sprintf(` WHERE status=ANY(string_to_array($%d,','))`, len(args)+1)
 	countSQL := projection + ` SELECT count(*) FROM diagnostics` + filter
 	countArgs := append(append([]any{}, args...), opts.Status)
 	listSQL := projection + ` SELECT occurrence_id,provider_id,source_id,title,status,

@@ -78,10 +78,10 @@ export function ProvidersPage() {
   const visible = items.filter(
     (source) =>
       matchesListQuery(filters.query, source.name, source.id, source.adapter) &&
-      (!filters.state ||
-        (filters.state === 'enabled' && source.enabled) ||
-        (filters.state === 'disabled' && !source.enabled) ||
-        (filters.state === 'invalid' && !source.valid)),
+      filters.matchesState(
+        source.enabled ? 'enabled' : 'disabled',
+        ...(!source.valid ? ['invalid'] : []),
+      ),
   )
   const filtered = Boolean(filters.query || filters.state)
   const toggle = useMutation({

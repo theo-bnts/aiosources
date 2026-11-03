@@ -72,6 +72,10 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 	if err != nil || filtered.Total != 1 || filtered.Items[0].ProviderID != "two" {
 		t.Fatalf("literal provider search: %+v %v", filtered, err)
 	}
+	combined, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{ProviderID: "one,two", Status: "matched,pending", Limit: 100})
+	if err != nil || combined.Total != 7 || len(combined.Items) != 7 {
+		t.Fatal("combined source/status selections did not use union within each filter", combined.Total, err)
+	}
 	page, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Status: "pending", Limit: 2, Offset: 5})
 	if err != nil || page.Total != 6 || len(page.Items) != 1 {
 		t.Fatalf("pagination: %+v %v", page, err)

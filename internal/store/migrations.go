@@ -246,6 +246,7 @@ var migrations = []struct {
 	{83, informationResetIndexSchema},
 	{84, publicCatalogSchema},
 	{85, publicVisitorProbesSchema},
+	{86, publicCatalogDependencySchema},
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.

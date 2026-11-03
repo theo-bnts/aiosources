@@ -72,7 +72,9 @@ func (s *server) aioMatches(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if opts.Status != "" && opts.Status != "matched" && opts.Status != "ambiguous" && opts.Status != "unmatched" && opts.Status != "pending" {
+	if !model.ValidSelection(opts.Status, func(value string) bool {
+		return value == "matched" || value == "ambiguous" || value == "unmatched" || value == "pending"
+	}) {
 		writeError(w, http.StatusBadRequest, "Unknown identification result")
 		return
 	}

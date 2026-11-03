@@ -1,5 +1,5 @@
 import { openDisclosure } from './disclosures'
-import { test, expect } from './fixtures'
+import { test, expect, selectMultiple } from './fixtures'
 
 test('public books use the same title and file controls without administration or hidden source names', async ({
   page,
@@ -114,7 +114,7 @@ test('public books use the same title and file controls without administration o
     await visitor.getByRole('button', { name: 'Start searching', exact: true }).click()
     await visitor.getByLabel('Title, author or identifier', { exact: true }).fill('Morgan Orchard')
     await openDisclosure(visitor, 'Filters')
-    await visitor.getByLabel('Type', { exact: true }).selectOption('ebook')
+    await selectMultiple(visitor, 'Type', ['ebook'])
     await visitor.getByRole('button', { name: 'Search', exact: true }).click()
     await visitor.getByRole('link', { name: 'Le Verger Ambré', exact: true }).click()
     await expect(visitor.getByLabel('Source', { exact: true })).toHaveCount(0)

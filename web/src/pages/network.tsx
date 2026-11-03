@@ -64,9 +64,7 @@ export function NetworkPage() {
   const visible = items.filter(
     (proxy) =>
       matchesListQuery(filters.query, proxy.name, proxy.id, proxy.url) &&
-      (!filters.state ||
-        (filters.state === 'enabled' && proxy.enabled) ||
-        (filters.state === 'disabled' && !proxy.enabled)),
+      filters.matchesState(proxy.enabled ? 'enabled' : 'disabled'),
   )
   const filtered = Boolean(filters.query || filters.state)
   useSettingsEditor(

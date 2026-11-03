@@ -42,4 +42,17 @@ INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) VALUES
 	if len(want) == 0 || !reflect.DeepEqual(want, got) {
 		t.Fatalf("indexed edition lookups changed redirect membership: got %v, want %v", got, want)
 	}
+	if _, err := db.pool.Exec(ctx, `UPDATE ingest.ol_editions SET languages=ARRAY['fr'],year=2001,cover=123;
+UPDATE ingest.ol_editions SET languages=ARRAY['en'],year=1999,cover=456 WHERE id='OL201M';
+UPDATE ingest.aio_works SET years='{}' WHERE media_type='book'`); err != nil {
+		t.Fatal(err)
+	}
+	oldTitle := `(SELECT e.title FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.languages && ARRAY['fr'] ORDER BY e.id LIMIT 1)`
+	oldCover := `(SELECT e.cover FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.cover>0 ORDER BY e.id LIMIT 1)`
+	oldYears := `CASE WHEN w.media_type='book' AND cardinality(w.years)=0 THEN ARRAY(SELECT min(year) FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND year>0 HAVING min(year) IS NOT NULL) ELSE w.years END`
+	want = read(`SELECT w.id,` + oldTitle + `,` + oldCover + `,` + oldYears + ` FROM ingest.aio_works w ORDER BY w.id`)
+	got = read(`SELECT w.id,` + bookEditionTitle("'fr'") + `,` + bookEditionCover + `,` + bookWorkYears + ` FROM ingest.aio_works w ORDER BY w.id`)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatal("edition lookup optimization changed title, cover, date or redirect resolution")
+	}
 }
