@@ -97,3 +97,14 @@ func TestEditionProbeToleratesHistoricalOptionalTypesLikeTheFullDecoder(t *testi
 		t.Fatal("historical optional fields changed selection", probe, full.Edition)
 	}
 }
+
+func TestLocalBookSelectionKeepsOriginalNumberedTitleVariants(t *testing.T) {
+	selection := ImportSelection{RelevantOnly: true}
+	selection.Include(Parse("Morgan Vale - Annual Review 2024 FR EPUB", Hints{}))
+	if !selection.Allows(Edition{Normalized: Normalize("Annual Review 2024")}) {
+		t.Fatal("a publication year inside a local title excluded its edition")
+	}
+	if selection.Allows(Edition{Normalized: Normalize("An Unrelated Printed Book")}) {
+		t.Fatal("local title evidence disabled the relevance filter")
+	}
+}

@@ -35,7 +35,16 @@ func TestBookReleaseEvidence(t *testing.T) {
 	}{
 		{"Morgan Vale - The Amber Orchard.epub", Hints{}, "ebook", "The Amber Orchard", "Morgan Vale"},
 		{"Morgan.Vale.-.The.Amber.Orchard.2024.EPUB", Hints{}, "ebook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan.Vale.-.The.Amber.Orchard.2024.FRENCH.EPUB", Hints{}, "ebook", "The Amber Orchard", "Morgan Vale"},
+		{"The Amber Orchard - Morgan Vale EPUB", Hints{Author: "Morgan Vale"}, "ebook", "The Amber Orchard", "Morgan Vale"},
 		{"The Amber Orchard - Morgan Vale [Audiobook] [MP3]", Hints{}, "audiobook", "Morgan Vale", "The Amber Orchard"},
+		{"Morgan Vale - The Amber Orchard [mp3.128]", Hints{Categories: []int{7020}}, "audiobook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan Vale - The Amber Orchard [MP3 128 CBR]", Hints{Kind: "book"}, "audiobook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan Vale - The Amber Orchard EPUB", Hints{Kind: "book"}, "ebook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan Vale - The Amber Orchard EPUB", Hints{Categories: []int{3030}}, "ebook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan Vale - The Amber Orchard", Hints{Kind: "book", Format: "mp3"}, "audiobook", "The Amber Orchard", "Morgan Vale"},
+		{"Morgan.Vale.The.Amber.Orchard.2024.retail.eBOOK", Hints{}, "ebook", "Morgan Vale The Amber Orchard", ""},
+		{"Morgan.Vale.The.Amber.Orchard.2024.FRENCH.Epub-noTag.epub", Hints{}, "ebook", "Morgan Vale The Amber Orchard", ""},
 		{"Morgan Vale - 1984 EPUB", Hints{}, "ebook", "1984", "Morgan Vale"},
 		{"The Amber Orchard", Hints{Categories: []int{7020}, Author: "Morgan Vale"}, "ebook", "The Amber Orchard", "Morgan Vale"},
 		{"Morgan Vale - The Amber Orchard.m4b", Hints{}, "audiobook", "The Amber Orchard", "Morgan Vale"},
@@ -60,6 +69,9 @@ func TestBookCollectionAndNumbers(t *testing.T) {
 	if p := Parse("Morgan Vale - The Amber Orchard Volume 2 EPUB", Hints{}); p.Title != "The Amber Orchard Volume 2" {
 		t.Fatalf("volume evidence lost: %+v", p)
 	}
+	if p := Parse("Amber Tales - T12 & T13 - CBR", Hints{}); !p.Collection {
+		t.Fatal("joined volume numbers were treated as one book", p)
+	}
 }
 
 func BenchmarkBookRelease(b *testing.B) {
@@ -75,6 +87,12 @@ func TestBookTitleWordsAndSoftwareAreNotDiscarded(t *testing.T) {
 			t.Fatalf("book title lost: %+v", p)
 		}
 	}
+	if p := Parse("Morgan Vale - Understanding PDF EPUB", Hints{}); p.Title != "Understanding PDF" {
+		t.Fatal("a format word inside the title was removed", p)
+	}
+	if p := Parse("Morgan Vale - Understanding MP3 101 EPUB", Hints{}); p.Kind != "ebook" {
+		t.Fatal("an audio format word inside a book title changed its media type", p)
+	}
 	for _, raw := range []string{"Example PDF Editor 2024 Windows x64", "Example.Movie.2024.1080p.WEB.mkv", "Example.Game.v1.2.34567890"} {
 		if p := Parse(raw, Hints{}); p.Kind != "" {
 			t.Fatalf("non-book classified as a book: %+v", p)
@@ -82,6 +100,19 @@ func TestBookTitleWordsAndSoftwareAreNotDiscarded(t *testing.T) {
 	}
 	if p := Parse("Example Software v1.234.567.890 PDF", Hints{}); p.ISBN != "" {
 		t.Fatal("version number became an ISBN")
+	}
+}
+
+func TestBookLanguageNamesRequireASeparateReleaseAnnotation(t *testing.T) {
+	for _, title := range []string{"Learning French", "Complete Guide to English", "French", "The English"} {
+		p := Parse("Morgan Vale - "+title+" EPUB", Hints{})
+		if p.Title != title || p.StrippedYear {
+			t.Fatal("a language word inside a real title was removed", p)
+		}
+	}
+	p := Parse("Morgan Vale - The Amber Orchard 2024 FRENCH EPUB", Hints{})
+	if p.Title != "The Amber Orchard" || !p.StrippedYear || p.Year != 2024 || len(p.Variants) == 0 {
+		t.Fatal("technical annotation lost its year or original-title evidence", p)
 	}
 }
 

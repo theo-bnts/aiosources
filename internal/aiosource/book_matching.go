@@ -14,9 +14,7 @@ func ParseBookRelease(r model.AIORecord) books.Release {
 }
 
 func authorSignature(s string) string {
-	v := strings.Fields(Normalize(s))
-	slices.Sort(v)
-	return strings.Join(v, " ")
+	return books.AuthorSignature(s)
 }
 
 func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearch) (model.AIOMatchResult, error) {
@@ -57,16 +55,17 @@ func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearc
 			versions = append(versions, n)
 		}
 	}
-	titles := append([]string{}, versions...)
+	parts := []model.BookTitlePart{}
 	for _, title := range versions {
 		words := strings.Fields(title)
 		if len(words) > 30 {
 			continue
 		}
 		for i := 1; i < len(words); i++ {
-			for _, part := range []string{strings.Join(words[:i], " "), strings.Join(words[i:], " ")} {
-				if len([]rune(part)) >= 3 && !slices.Contains([]string{"the", "and", "les", "des", "une", "der", "die", "das"}, part) && !slices.Contains(titles, part) {
-					titles = append(titles, part)
+			left, right := strings.Join(words[:i], " "), strings.Join(words[i:], " ")
+			for _, part := range []model.BookTitlePart{{Title: left, Author: right}, {Title: right, Author: left}} {
+				if len([]rune(part.Title)) >= 3 && !slices.Contains([]string{"the", "and", "les", "des", "une", "der", "die", "das"}, part.Title) && !slices.Contains(parts, part) {
+					parts = append(parts, part)
 				}
 			}
 		}
@@ -75,7 +74,11 @@ func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearc
 	if p.StrippedYear && p.Year > 0 {
 		year = &p.Year
 	}
-	works, overflow, err := find(model.AIOCandidateFilter{Type: "book", Title: r.Normalized, Titles: titles, ISBN: p.ISBN, OpenLibrary: p.OpenLibrary, Year: year, ExactOnly: len([]rune(r.Normalized)) < 5})
+	threshold := minimum - margin
+	if p.Author == "" {
+		threshold = 1 - margin
+	}
+	works, overflow, err := find(model.AIOCandidateFilter{Type: "book", Title: r.Normalized, Titles: versions, BookTitleParts: parts, BookAuthor: p.Author, BookMinimumScore: max(0, threshold), ISBN: p.ISBN, OpenLibrary: p.OpenLibrary, Year: year, ExactOnly: len([]rune(r.Normalized)) < 5})
 	if err != nil {
 		return result, err
 	}
@@ -83,7 +86,7 @@ func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearc
 		if p.ISBN != "" || p.OpenLibrary != "" {
 			break
 		}
-		more, full, e := find(model.AIOCandidateFilter{Type: "book", Title: Normalize(title), Year: year})
+		more, full, e := find(model.AIOCandidateFilter{Type: "book", Title: Normalize(title), BookAuthor: p.Title, BookMinimumScore: max(0, minimum-margin), Year: year})
 		if e != nil {
 			return result, e
 		}
@@ -119,15 +122,14 @@ func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearc
 			exact, score, joined := false, 0.0, false
 			for _, alias := range w.Titles {
 				n := Normalize(alias)
-				if len(strings.Fields(title)) == len(strings.Fields(n)) && strings.Join(numberRE.FindAllString(title, -1), ",") == strings.Join(numberRE.FindAllString(n, -1), ",") {
-					score = max(score, similarity(title, n))
-				}
+				score = max(score, books.TitleScore(title, n))
 				exact = exact || title == n
 				for _, a := range authorNames {
 					na := Normalize(a)
 					joined = joined || title == n+" "+na || title == na+" "+n
 				}
 			}
+			joined = joined && author
 			if joined || exact && author {
 				strengths[w.ID] = 1
 			}
@@ -145,7 +147,7 @@ func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearc
 				}
 				for _, alt := range p.Alternatives {
 					for _, title := range w.Titles {
-						if Normalize(title) == Normalize(alt) {
+						if Normalize(title) == Normalize(alt) && Normalize(p.Author) == Normalize(alt) {
 							eligible = true
 							strengths[w.ID] = 1
 						}

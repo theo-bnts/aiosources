@@ -85,12 +85,22 @@ type AIORecord struct {
 // Otherwise impossible homonyms can hide the one year-compatible work.
 type AIOCandidateFilter struct {
 	Titles                        []string
+	BookTitleParts                []BookTitlePart
+	BookAuthor                    string
+	BookMinimumScore              float64
 	ISBN, OpenLibrary             string
 	Title, TMDB, IMDb, TVDB, Type string
 	Year                          *int
 	Seasons                       []int
 	Episode                       *int
 	ExactOnly                     bool
+}
+
+// A split title is usable only when its remaining words are corroborated by
+// the same book's author. Fragments alone must not fill the candidate limit.
+type BookTitlePart struct {
+	Title  string
+	Author string
 }
 
 type AIOSeasonRequest struct {

@@ -176,7 +176,7 @@ const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvd
 ARRAY(SELECT title FROM ingest.aio_titles WHERE work_id=w.id UNION SELECT w.display_title WHERE w.media_type='book'),
 COALESCE((SELECT jsonb_object_agg(season,year) FROM ingest.aio_seasons WHERE work_id=w.id),'{}'),
 COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM ingest.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,
-w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM ingest.ol_authors a WHERE w.media_type='book' AND a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'[]'),
+w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM ingest.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
 'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0))`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
@@ -426,7 +426,7 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized)
+	_, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized, matchedBookKind(r, work))
 	if err != nil {
 		return databaseError("save correspondence", err)
 	}

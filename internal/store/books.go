@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -383,73 +382,6 @@ func (s *Store) FailOpenLibrary(ctx context.Context, message string, retryAt tim
 	return err
 }
 
-func searchBookCandidates(ctx context.Context, tx pgx.Tx, f model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
-	q := `WITH keys AS (
- SELECT openlibrary_id AS key FROM ingest.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=ingest.ol_resolve($3)
- UNION SELECT unnest(work_keys) FROM ingest.ol_editions WHERE id=ingest.ol_resolve($3)
- UNION SELECT unnest(work_keys) FROM ingest.ol_editions WHERE $2<>'' AND isbn @> ARRAY[$2::text]
- UNION SELECT openlibrary_id FROM ingest.aio_works WHERE $2='' AND $3='' AND media_type='book' AND (book_normalized=ANY($5::text[]) OR (NOT $4 AND book_normalized OPERATOR(public.%) $1))
- UNION SELECT unnest(work_keys) FROM ingest.ol_editions WHERE $2='' AND $3='' AND (normalized=ANY($5::text[]) OR (NOT $4 AND normalized OPERATOR(public.%) $1))
-) SELECT ` + aioWorkColumns + ` FROM ingest.aio_works w WHERE w.openlibrary_id IN(SELECT ingest.ol_resolve(key) FROM keys) AND NOT w.adult
- AND ($2='' OR EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY[$2::text]))
- AND ($3='' OR w.openlibrary_id=ingest.ol_resolve($3) OR EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.id=ingest.ol_resolve($3) AND e.work_keys && ingest.ol_aliases(w.openlibrary_id)))
- ORDER BY w.id LIMIT 101`
-	rows, err := tx.Query(ctx, q, f.Title, f.ISBN, f.OpenLibrary, f.ExactOnly, append(f.Titles, f.Title))
-	if err != nil {
-		return nil, false, err
-	}
-	out := []model.AIOWork{}
-	for rows.Next() {
-		w, e := scanAIOWork(rows)
-		if e != nil {
-			return nil, false, e
-		}
-		out = append(out, w)
-	}
-	rows.Close()
-	if rows.Err() != nil {
-		return nil, false, databaseError("find book candidates", rows.Err())
-	}
-	// Fetch aliases relevant to this query rather than an arbitrary first set
-	// of editions. A frequently translated work may have thousands of editions.
-	for i := range out {
-		w := &out[i]
-		w.Book.YearVerified = f.Year != nil && slices.Contains(w.Years, *f.Year)
-		aliases, err := tx.Query(ctx, `SELECT e.title,e.year,ARRAY(SELECT name FROM ingest.ol_authors WHERE id=ANY(ARRAY(SELECT ingest.ol_resolve(key) FROM unnest(e.author_keys) key)))
-FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases($1)
-AND (e.normalized=ANY($2::text[]) OR e.normalized OPERATOR(public.%) $3 OR ($4::int IS NOT NULL AND e.year=$4))
-ORDER BY (e.normalized=ANY($2::text[])) DESC,e.id LIMIT 101`, w.OpenLibrary, append(f.Titles, f.Title), f.Title, f.Year)
-		if err != nil {
-			return nil, false, err
-		}
-		for aliases.Next() {
-			var title string
-			var year int
-			var authors []string
-			if err = aliases.Scan(&title, &year, &authors); err != nil {
-				aliases.Close()
-				return nil, false, err
-			}
-			if !slices.Contains(w.Titles, title) {
-				w.Titles = append(w.Titles, title)
-			}
-			if f.Year != nil && year == *f.Year {
-				w.Book.YearVerified = true
-			}
-			for _, a := range authors {
-				if !slices.Contains(w.Book.Authors, a) {
-					w.Book.Authors = append(w.Book.Authors, a)
-				}
-			}
-		}
-		aliases.Close()
-		if aliases.Err() != nil {
-			return nil, false, aliases.Err()
-		}
-	}
-	return out, len(out) > aioCandidateLimit, nil
-}
-
 // Metadata identifiers stay in their own namespace. In particular, an OL ID
 // can never be returned to a client in an IMDb or TMDB field.
 func validBookQueryType(s string) bool {
@@ -457,7 +389,7 @@ func validBookQueryType(s string) bool {
 }
 
 func bookReleaseKindSQL(alias string) string {
-	return `CASE WHEN COALESCE(` + alias + `.fields->>'media_type',` + alias + `.fields->>'type','')='audiobook' OR COALESCE(` + alias + `.fields->'categories',` + alias + `.fields->'category','null')::text ~ '\m3030\M' OR COALESCE(` + alias + `.fields->>'category_name','') ~* '\m(audiobooks?|livres?[ ._-]?audio)\M' OR ` + alias + `.fields->>'title' ~* '\m(audiobook|audio[ ._-]?book|livre[ ._-]?audio|m4b|aax)\M' THEN 'audiobook' ELSE 'ebook' END`
+	return `COALESCE(NULLIF(` + alias + `.book_kind,''),'book')`
 }
 
 func (s *Store) ResetBookInformation(ctx context.Context) error {

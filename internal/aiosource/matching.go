@@ -54,28 +54,7 @@ func canonicalIMDb(s string) string {
 	return ""
 }
 func similarity(a, b string) float64 {
-	if a == b {
-		return 1
-	}
-	grams := func(s string) map[string]bool {
-		r := []rune(s)
-		out := map[string]bool{}
-		for i := 0; i+2 < len(r); i++ {
-			out[string(r[i:i+3])] = true
-		}
-		return out
-	}
-	x, y := grams(a), grams(b)
-	if len(x)+len(y) == 0 {
-		return 0
-	}
-	n := 0
-	for g := range x {
-		if y[g] {
-			n++
-		}
-	}
-	return 2 * float64(n) / float64(len(x)+len(y))
+	return model.TitleSimilarity(a, b)
 }
 func ChooseMatch(p Release, candidates []Candidate, ids SourceIDs, overflow bool, observed SourceEpisode) Decision {
 	return ChooseMatchWithPolicy(p, candidates, ids, overflow, observed, model.DefaultMatchingPolicy())

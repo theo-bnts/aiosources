@@ -95,14 +95,22 @@ func ISBN(raw string) string {
 	return s
 }
 
-var technicalBookGroupRE = regexp.MustCompile(`(?i)^(?:(?:ebooks?|books?|audiobooks?|pdf|epub|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|fr|en|eng|fre|fra|french|english|multi|retail|ocr|scan|unabridged|abridged|vbr|cbr|\d{2,3}kbps)[ ._+/-]*)+$`)
+var technicalBookGroupRE = regexp.MustCompile(`(?i)^(?:(?:ebooks?|books?|audiobooks?|pdf|epub|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|fr|en|eng|fre|fra|french|english|multi|retail|ocr|scan|unabridged|abridged|vbr|cbr|\d{2,3}(?:kbps)?)[ ._+/-]*)+$`)
 
 // Full language names can be part of a real title (for example a language
 // guide). Only abbreviations or explicit bracketed groups are decorations.
 var languageSuffixRE = regexp.MustCompile(`(?i)(?:\s+(?:fr|en|eng|fre|fra|multi|vf|vff|vfq))+\s*$`)
-var volumePackRE = regexp.MustCompile(`(?i)\bT\d{1,3}(?:[ ._-]+T?\d{1,3})+\b`)
-var formatTailRE = regexp.MustCompile(`(?i)^[\s._()\[\]+/-]*(?:(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|fr|en|eng|fre|fra|french|english|multi|retail|ocr|scan|v\d+|[12]\d{3})[\s._()\[\]+/-]*)*(?:-[A-Za-z0-9_-]{2,40})?$`)
-var bookTailFormatRE = regexp.MustCompile(`(?i)\b(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|zip|rar|7z|txt|rtf|docx?)\b`)
+
+// A language name on its own can belong to a title. Following a release-year
+// annotation it is technical metadata; keep the original title as an alias.
+var yearLanguageSuffixRE = regexp.MustCompile(`(?i)(\b(?:18|19|20|21)\d{2})\s+(?:(?:french|english|german|spanish|italian|portuguese|dutch|russian|japanese|chinese|korean|arabic|polish|swedish|danish|norwegian|finnish)\s*)+$`)
+var volumePackRE = regexp.MustCompile(`(?i)\bT\d{1,3}(?:(?:[ ._-]+|\s*[&,/+]+\s*)T?\d{1,3})+\b`)
+var formatTailRE = regexp.MustCompile(`(?i)^[\s._()\[\]+/-]*(?:(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|e[ ._-]?books?|audio[ ._-]?books?|fr|en|eng|fre|fra|french|english|multi|retail|ocr|scan|vbr|cbr|\d{2,3}(?:kbps)?|v\d+|[12]\d{3})[\s._()\[\]+/-]*)*(?:-[A-Za-z0-9_-]{2,40})?$`)
+var bookTailFormatRE = regexp.MustCompile(`(?i)\b(?:epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|mp3|flac|aac|m4a|ogg|opus|wav|zip|rar|7z|txt|rtf|docx?|e[ ._-]?books?|audio[ ._-]?books?)\b`)
+var bookLabelSuffixRE = regexp.MustCompile(`(?i)\be[ ._-]?books?\s*$`)
+var audioFileRE = regexp.MustCompile(`(?i)\b(?:mp3|flac|aac|m4a|ogg|opus|wav)\b`)
+var retailYearSuffixRE = regexp.MustCompile(`(?i)(\b(?:18|19|20|21)\d{2})\s+(?:retail|ocr|scan)\s*$`)
+var duplicateBookTagRE = regexp.MustCompile(`(?i)[ ._-]+(?:epub|pdf|mobi|azw3?|fb2)-notag[ ._]*$`)
 
 // ParseRecord shares bibliographic classification between identification and
 // maintenance without introducing a second set of source/category heuristics.
@@ -183,28 +191,39 @@ func Parse(raw string, hints Hints) Release {
 		format := strings.ToLower(raw[match[2]:match[3]])
 		if formatTailRE.MatchString(raw[match[1]:]) {
 			r.Format = format
-			if r.Kind == "" {
-				r.Kind = "ebook"
-			}
-			if r.Format == "m4b" || r.Format == "aax" || r.Format == "aaxc" {
-				r.Kind = "audiobook"
-			}
+			r.Kind = bookFormatKind(format)
 		}
 	}
 	if hints.Format != "" {
 		r.Format = strings.ToLower(strings.TrimPrefix(hints.Format, "."))
-		if formatRE.MatchString(r.Format) && r.Kind == "" {
-			r.Kind = "ebook"
-		}
-		if r.Format == "m4b" || r.Format == "aax" || r.Format == "aaxc" {
-			r.Kind = "audiobook"
+		if kind := bookFormatKind(r.Format); kind != "" {
+			r.Kind = kind
 		}
 	}
 	if r.Kind == "" && (r.ISBN != "" || r.OpenLibrary != "" || r.InvalidReference) {
 		r.Kind = "book"
 	}
+	if r.Kind == "" && bookLabelSuffixRE.MatchString(text) {
+		r.Kind = "ebook"
+	}
 	if r.Kind == "" {
 		return Release{}
+	}
+	// Audio codecs alone do not classify music as books. Once bibliographic
+	// evidence exists, a technical audio suffix identifies the book's format.
+	for _, at := range groupRE.FindAllStringIndex(raw, -1) {
+		group := strings.Trim(raw[at[0]:at[1]], "[] ")
+		if hints.Format == "" && technicalBookGroupRE.MatchString(group) && !formatRE.MatchString(raw[at[1]:]) {
+			if format := audioFileRE.FindString(group); format != "" {
+				r.Kind, r.Format = "audiobook", strings.ToLower(format)
+			}
+		}
+	}
+	for _, at := range audioFileRE.FindAllStringIndex(raw, -1) {
+		if hints.Format == "" && !formatRE.MatchString(raw[at[1]:]) && formatTailRE.MatchString(raw[at[1]:]) {
+			r.Kind, r.Format = "audiobook", strings.ToLower(raw[at[0]:at[1]])
+			break
+		}
 	}
 	// An ISBN followed by EPUB is one book, not a thirteen-digit book count.
 	collectionText := isbnRE.ReplaceAllStringFunc(text, func(value string) string {
@@ -218,7 +237,9 @@ func Parse(raw string, hints Hints) Release {
 	if years := yearRE.FindAllString(text, -1); len(years) > 0 {
 		r.Year, _ = strconv.Atoi(years[len(years)-1])
 	}
-	for _, at := range bookTailFormatRE.FindAllStringIndex(raw, -1) {
+	formats := bookTailFormatRE.FindAllStringIndex(raw, -1)
+	for i := len(formats) - 1; i >= 0; i-- {
+		at := formats[i]
 		if !formatTailRE.MatchString(raw[at[1]:]) {
 			continue
 		}
@@ -230,6 +251,7 @@ func Parse(raw string, hints Hints) Release {
 			cut = bracket
 		}
 		raw = raw[:cut]
+		raw = duplicateBookTagRE.ReplaceAllString(raw, "")
 		break
 	}
 	text = strings.ReplaceAll(strings.ReplaceAll(raw, "_", " "), ".", " ")
@@ -249,12 +271,18 @@ func Parse(raw string, hints Hints) Release {
 	text = strings.Trim(strings.Join(strings.Fields(text), " "), " -()[]")
 	originalText := text
 	text = languageSuffixRE.ReplaceAllString(text, "")
+	text = yearLanguageSuffixRE.ReplaceAllString(text, "$1")
+	text = retailYearSuffixRE.ReplaceAllString(text, "$1")
+	reversedHint := false
 	if a, b, ok := strings.Cut(text, " - "); ok && a != "" && b != "" {
 		if r.Author == "" {
 			r.Author = strings.TrimSpace(a)
 		}
 		r.Title = strings.TrimSpace(b)
 		r.Alternatives = []string{strings.TrimSpace(a)}
+		if hints.Author != "" && AuthorSignature(b) == AuthorSignature(hints.Author) {
+			r.Title, r.Alternatives, reversedHint = strings.TrimSpace(a), nil, true
+		}
 	} else {
 		r.Title = text
 	}
@@ -271,8 +299,11 @@ func Parse(raw string, hints Hints) Release {
 	}
 	r.Title = withoutYear
 	originalTitle := originalText
-	if _, after, ok := strings.Cut(originalText, " - "); ok {
+	if before, after, ok := strings.Cut(originalText, " - "); ok {
 		originalTitle = strings.TrimSpace(after)
+		if reversedHint {
+			originalTitle = strings.TrimSpace(before)
+		}
 	}
 	if originalTitle != "" && originalTitle != r.Title {
 		r.Variants = append(r.Variants, originalTitle)
@@ -294,5 +325,15 @@ func stripBookYear(s string) string {
 }
 
 func Normalize(s string) string { return model.NormalizeTitle(s) }
+
+func bookFormatKind(format string) string {
+	switch format {
+	case "m4b", "aax", "aaxc", "mp3", "flac", "aac", "m4a", "ogg", "opus", "wav":
+		return "audiobook"
+	case "epub", "pdf", "mobi", "azw", "azw3", "fb2", "djvu", "cbr", "cbz", "cb7", "cba", "cbt":
+		return "ebook"
+	}
+	return ""
+}
 
 func IsType(s string) bool { return s == "book" || s == "ebook" || s == "audiobook" }

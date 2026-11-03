@@ -31,9 +31,13 @@ func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *
  INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn,year) VALUES('OL300M',ARRAY['OL100W'],'The Amber Orchard','the amber orchard',ARRAY['9780306406157'],2025);
  INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) VALUES('OL301M',ARRAY['OL100W'],'Le Verger Ambré','le verger ambre');
  INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('book-fixture','one','{"title":"Morgan Vale - The Amber Orchard EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","isbn":"9780306406157","size":1024}');
- INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','verified ISBN' FROM ingest.torrents t CROSS JOIN ingest.aio_works w;
- DELETE FROM ingest.aio_match_queue;
  INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[{"path":"The Amber Orchard.epub","size":1024}]');`); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.FinishOpenLibrary(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := addon.Match(f.ctx); err != nil {
 		t.Fatal(err)
 	}
 	var credential model.ShareCredential

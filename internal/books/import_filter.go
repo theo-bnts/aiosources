@@ -204,7 +204,7 @@ func (s *ImportSelection) Include(record Release) {
 	if s.Identifiers == nil {
 		s.Identifiers = map[string]bool{}
 	}
-	for _, title := range append([]string{record.Title}, record.Alternatives...) {
+	for _, title := range append(append([]string{record.Title}, record.Alternatives...), record.Variants...) {
 		if normalized := Normalize(title); normalized != "" {
 			s.Titles[normalized] = true
 		}

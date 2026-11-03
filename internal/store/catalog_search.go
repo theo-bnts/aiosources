@@ -31,7 +31,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))) ORDER BY a.id)`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
 }
 
 func catalogYearFilter(year string) string {
@@ -116,7 +116,7 @@ catalog_books AS NOT MATERIALIZED(SELECT w.* FROM ingest.aio_works w JOIN catalo
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	if len(formats) > 0 && !slices.Contains(kinds, "book") {
 		args = append(args, formats)
-		filter += " AND (w.media_type<>'book' OR EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("t") + fmt.Sprintf("=ANY($%d::text[])))", len(args))
+		filter += " AND (w.media_type<>'book' OR EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("m") + fmt.Sprintf("=ANY($%d::text[])))", len(args))
 	}
 	if filters.Year != 0 {
 		args = append(args, filters.Year)

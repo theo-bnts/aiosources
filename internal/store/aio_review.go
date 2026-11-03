@@ -234,8 +234,8 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
  ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=ingest.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,openlibrary_id=EXCLUDED.openlibrary_id,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode, w.OpenLibrary); err != nil {
 			return databaseError("save identification review", err)
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
- VALUES($1,$2,$3,$4,$5,'matched','manually reviewed') ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status='matched',reason='manually reviewed',updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.ID, w.Revision); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind)
+ VALUES($1,$2,$3,$4,$5,'matched','manually reviewed',$6) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status='matched',reason='manually reviewed',book_kind=EXCLUDED.book_kind,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.ID, w.Revision, matchedBookKind(record, &w)); err != nil {
 			return databaseError("publish reviewed identification", err)
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM ingest.aio_match_queue WHERE provider_id=$1 AND source_id=$2`, record.Provider, record.SourceID); err != nil {

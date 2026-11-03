@@ -65,7 +65,7 @@ async function seedBooks(page: Page, server: TestServer) {
     ('book-fixture','ebook','{"title":"Morgan Vale - The Amber Orchard EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"categories":[7020]}'),
     ('book-fixture','audio','{"title":"Morgan Vale - The Amber Orchard M4B","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200,"categories":[3030]}'),
     ('book-fixture','film','{"title":"Example.Film.2026.1080p","info_hash":"cccccccccccccccccccccccccccccccccccccccc","size":300}');
-    INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.media_type=CASE WHEN t.source_id='film' THEN 'movie' ELSE 'book' END;
+    INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture',CASE t.source_id WHEN 'audio' THEN 'audiobook' WHEN 'ebook' THEN 'ebook' ELSE '' END FROM ingest.torrents t JOIN ingest.aio_works w ON w.media_type=CASE WHEN t.source_id='film' THEN 'movie' ELSE 'book' END;
     DELETE FROM ingest.aio_match_queue;
     INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finished_at) VALUES
     ('00000000-0000-4000-8000-000000000101','metadata','openlibrary','automatic',1,'succeeded',now()),

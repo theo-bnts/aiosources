@@ -101,7 +101,9 @@ func bookCombinedCandidates(normalized, matching, anchor string) string {
  UNION SELECT id,book_normalized FROM author_works
  UNION SELECT w.id,e.normalized FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + `
  UNION SELECT w.id,e.normalized FROM author_works w JOIN ingest.ol_editions e ON e.work_keys && ingest.ol_aliases(w.openlibrary_id)
- ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM ingest.ol_authors a WHERE a.id IN(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))),'') AS normalized
+ ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM ingest.ol_authors a WHERE a.id=ANY(
+ ARRAY(SELECT ingest.ol_resolve(key) FROM jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')) key)
+ )),'') AS normalized
  FROM aliases JOIN ingest.aio_works w ON w.id=aliases.id
  ) combined_books WHERE ` + matching
 }
