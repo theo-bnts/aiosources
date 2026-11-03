@@ -183,9 +183,12 @@ test.describe('remote catalog history and ownership', () => {
       await expect(page.locator('main tbody')).toContainText('Remote copy')
       await expect(page.locator('main tbody')).not.toContainText('Native source')
       await expect(page.locator('main tbody')).toContainText('Full sync')
+      await page.getByRole('button', { name: 'Remote catalog', exact: true }).click()
       await expect(
-        page.getByLabel('Remote catalog', { exact: true }).getByRole('option'),
-      ).toHaveText(['All remote catalogs', 'Remote copy'])
+        page.getByRole('menuitem', { name: 'All remote catalogs', exact: true }),
+      ).toBeVisible()
+      await expect(page.getByRole('menuitemcheckbox')).toHaveText(['Remote copy'])
+      await page.keyboard.press('Escape')
       await page.getByRole('link', { name: 'Open run remote-copy-run', exact: true }).click()
       await expect(page).toHaveURL(/\/remotes\/history\/remote-copy-run$/)
       await expect(page.getByRole('tab', { name: 'History', exact: true })).toHaveAttribute(
