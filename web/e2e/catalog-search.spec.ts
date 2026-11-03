@@ -1,7 +1,7 @@
 import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import pg from 'pg'
-import { test, expect, selectMultiple } from './fixtures'
+import { test, expect, selectMultiple, createStremioAccess } from './fixtures'
 import type { TestServer } from './server'
 
 async function seedCatalog(page: Page, server: TestServer, debrid = false) {
@@ -77,6 +77,56 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
     await db.end()
   }
 }
+
+test('Search displays the same release details as Stremio at desktop and mobile widths', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(`UPDATE ingest.torrents SET fields=fields||'{
+      "title":"Example-Film.New.Day.2026.FRENCH.2160p.WEB-DL.H265.HDR10+.DTS.5.1.EXTENDED",
+      "languages":["fra","eng"],"sublangs":["fra"],"duration":5400,
+      "release_group":"ExampleGroup","published_at":"2026-10-09T12:00:00Z"
+    }' WHERE provider_id='zulu' AND source_id='film-two';
+    UPDATE ingest.aio_matches m SET fingerprint=t.fields_fingerprint
+    FROM ingest.torrents t WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id;
+    DELETE FROM ingest.aio_match_queue;`)
+  } finally {
+    await db.end()
+  }
+  const access = await createStremioAccess(page)
+  const response = await page.request.get(
+    access.manifestPath.replace('/manifest.json', '/stream/movie/tt1234567.json'),
+  )
+  expect(response.status()).toBe(200)
+  const streams = (await response.json()).streams
+  const stream = streams.find(
+    (item: { behaviorHints: { indexer: string } }) => item.behaviorHints.indexer === 'Zulu source',
+  )
+  expect(stream).toBeDefined()
+  const releases = await (await page.request.get(`/api/catalog/${ids.movie}/releases`)).json()
+  const release = releases.items.find((item: { provider: string }) => item.provider === 'zulu')
+  expect(stream.description).toBe([release.title, ...release.presentation.details].join('\n'))
+  expect(stream.name).toBe(`AIOSources\n${release.presentation.language}`)
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto(`/search/${ids.movie}`)
+    const presentation = page
+      .locator('[data-slot="release-presentation"]')
+      .filter({ hasText: release.title })
+    await expect(presentation.getByText(release.title, { exact: true })).toHaveCount(1)
+    await expect(
+      presentation.getByText(release.presentation.language, { exact: true }),
+    ).toBeVisible()
+    for (const detail of release.presentation.details) {
+      await expect(presentation.getByText(detail, { exact: true })).toHaveCount(1)
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+})
 
 test('search and settings inputs match on mobile and combined filters stay usable at every width', async ({
   page,

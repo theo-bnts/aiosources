@@ -1,4 +1,5 @@
 import { CatalogCover } from '@/components/catalog-cover'
+import { ReleasePresentation } from '@/components/release-presentation'
 import { FilterSelect } from '@/components/filter-select'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
@@ -13,7 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
-import { bytes, number, useDate } from '@/lib/format'
+import { number } from '@/lib/format'
 import { usePublicSearch } from '@/lib/public-search'
 import { publicAPI } from '@/lib/public-credentials'
 import { useSourceNames } from '@/lib/source-names'
@@ -260,7 +261,6 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     visitor
       ? visitor.info.sources?.find((source) => source.id === id)?.name || savedName || id || ''
       : privateSourceName(id, savedName)
-  const date = useDate()
   const title = useQuery({
     queryKey: visitor
       ? ['public-catalog', visitor.scope, 'title', id, titleLanguage, search.get('q')]
@@ -512,17 +512,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                           {releases.data.items?.map((release) => (
                             <TableRow key={release.occurrence_id}>
                               <TableCell className="max-w-xl align-top whitespace-normal">
-                                <p className="break-words font-medium">{release.title}</p>
-                                <p className="help mt-1">
-                                  {release.provider &&
-                                    `${sourceName(release.provider, release.provider_name)} · `}
-                                  {release.size > 0 ? bytes(release.size) : 'Size unknown'}
-                                  {release.languages.length > 0 &&
-                                    ` · ${release.languages.join(', ')}`}
-                                </p>
-                                {release.published_at && (
-                                  <p className="help">{date(release.published_at)}</p>
-                                )}
+                                <ReleasePresentation release={release} />
                               </TableCell>
                               <TableCell className="align-top whitespace-normal">
                                 {release.services.length ? (

@@ -287,13 +287,17 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 				return result, err
 			}
 			item.Fingerprint = ""
-			if access.ExposeSources {
-				item.ProviderName = names[row.Provider]
-			}
 			if !access.ExposeSources {
 				item.Provider = ""
 			}
 		}
+		if visitor == nil || access.ExposeSources {
+			item.ProviderName = names[row.Provider]
+			if item.ProviderName == "" {
+				item.ProviderName = row.Provider
+			}
+		}
+		item.Presentation = formatReleasePresentation(row.AIORecord, releaseBehavior(row.AIORecord, item.ProviderName))
 		rank := ranks[row.OccurrenceID]
 		rank.cached = 0
 		for _, service := range item.Services {

@@ -23,6 +23,8 @@
   --color-accent: #2c3436;
   --color-accent-foreground: var(--foreground);
   --color-destructive: #f5a29b;
+  --color-warning: var(--color-amber-300);
+  --color-warning-foreground: var(--color-amber-200);
   --color-border: #343c40;
   --color-input: #3c4549;
   --color-ring: var(--primary);
@@ -128,7 +130,7 @@
     @apply rounded-md border border-border bg-muted/50 px-4 py-3 text-sm leading-6;
   }
   .notice-warning {
-    @apply border-amber-600/30 bg-amber-500/10 text-amber-800 dark:text-amber-300;
+    @apply border-warning/30 bg-warning/10 text-warning-foreground;
   }
   .notice-error {
     @apply border-destructive/40 bg-destructive/10 text-destructive;

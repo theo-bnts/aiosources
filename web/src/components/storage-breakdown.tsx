@@ -194,7 +194,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
         ) : (report.retained_import_count ?? 0) > 0 ? (
           <>
             {(report.cancelled_import_count ?? 0) > 0 && (
-              <p className="help text-amber-300">
+              <p className="help text-warning-foreground">
                 {number(report.cancelled_import_count ?? 0)} cancelled import
                 {report.cancelled_import_count === 1 ? ' keeps' : 's keep'} prepared data for
                 resuming. This data is preserved while needed for recovery.

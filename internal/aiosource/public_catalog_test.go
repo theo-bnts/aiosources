@@ -59,6 +59,9 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	if err != nil || rows.Total != 1 || rows.Items[0].ProviderName != "Example Library" || !rows.Items[0].Services[0].CanAdd {
 		t.Fatal("Own announce did not authorize an uncached version", err)
 	}
+	if !strings.Contains(strings.Join(rows.Items[0].Presentation.Details, "\n"), "🧭 Example Library") {
+		t.Fatal("permitted source display name was omitted from the shared formatter")
+	}
 	browser, err := s.PublicBrowserCredential(ctx, "https://addon.example", visitor)
 	if err != nil || len(browser.Services) != 1 || len(browser.Announces) != 1 {
 		t.Fatal(err)
@@ -92,6 +95,10 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	rows, err = s.PublicCatalogReleases(ctx, visitor, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
 	if err != nil || rows.Total != 1 || rows.Items[0].Provider != "" || rows.Items[0].ProviderName != "" {
 		t.Fatal("Cached private release lost or identity revealed", err)
+	}
+	formatted := strings.Join(rows.Items[0].Presentation.Details, "\n")
+	if strings.Contains(formatted, "Example Library") || strings.Contains(formatted, "private-one") || strings.Contains(formatted, "🧭") {
+		t.Fatal("the shared formatter revealed a source while source disclosure was disabled")
 	}
 	for _, files := range [][]model.AIOFile{nil, {{Path: "readme.txt", Size: 100}}} {
 		if err = s.DB.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{Hash: hash, Cached: true, CheckedAt: time.Now(), Generation: generation, Files: files}); err != nil {

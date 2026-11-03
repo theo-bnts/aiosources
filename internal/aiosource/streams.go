@@ -65,10 +65,9 @@ func baseStream(rec model.AIORecord, r Resource, sourceName string) Stream {
 	}
 	q := quality(rec.Title)
 	languages := streamLanguages(rec)
-	hints := Behavior{BingeGroup: streamBingeGroup(rec, r, q, languages), Size: max(0, rec.Size), Filename: rec.Title, NotWebReady: true, Indexer: sourceName, Duration: rec.DurationSeconds}
-	if rec.PublishedAt != nil {
-		hints.PublishDate = rec.PublishedAt.UTC().Format(time.RFC3339Nano)
-	}
+	hints := releaseBehavior(rec, sourceName)
+	hints.BingeGroup = streamBingeGroup(rec, r, q, languages)
+	hints.NotWebReady = true
 	return formatStream(Stream{InfoHash: rec.Hash, Hints: hints}, rec)
 }
 func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string) (streams []Stream, streamErr error) {

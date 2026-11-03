@@ -50,12 +50,24 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 		}
 		name = prefix + name + "\n" + status + " · " + service
 	}
-	lines := []string{rec.Title}
+	presentation := formatReleasePresentation(rec, stream.Hints)
+	if presentation.Language != "" {
+		name += "\n" + presentation.Language
+	}
+	stream.Name = name
+	stream.Title = strings.Join(append([]string{rec.Title}, presentation.Details...), "\n")
+	return stream
+}
+
+// Search and Stremio share these labels. The caller chooses which source name
+// may be shown; this formatter never falls back to a private source identity.
+func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.ReleasePresentation {
+	lines := []string{}
 	// Prefer the selected file for episode-specific tags; the folder supplies
 	// release metadata absent from otherwise bare episode filenames.
 	technical := rec.Title[presentationMetadataStart(rec.Title):]
-	if stream.Hints.Filename != "" && stream.Hints.Filename != rec.Title {
-		technical += " " + stream.Hints.Filename[presentationMetadataStart(stream.Hints.Filename):]
+	if hints.Filename != "" && hints.Filename != rec.Title {
+		technical += " " + hints.Filename[presentationMetadataStart(hints.Filename):]
 	}
 	groups := []string{"resolution", "video", "visual", "audio", "edition"}
 	for i, re := range compiledPresentationTags {
@@ -84,8 +96,9 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 			lines = append(lines, presentationTags[i].icon+" "+strings.Join(values, " • "))
 		}
 	}
+	language := ""
 	if label := streamLanguageLabel(streamLanguages(rec)); label != "" {
-		name += "\n🌐 " + label
+		language = "🌐 " + label
 	}
 	subtitles := []string{}
 	for _, lang := range streamLanguages(model.AIORecord{Languages: rec.SubtitleLanguages}) {
@@ -97,14 +110,14 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 	if len(subtitles) > 0 {
 		lines = append(lines, "💬 "+strings.Join(subtitles, "/")+" subtitles")
 	}
-	size := stream.Hints.Size
+	size := hints.Size
 	if size > 0 {
 		label := "📦 " + streamSize(size)
-		if ParseRelease(rec.Title).Pack && stream.Hints.FolderName == "" {
+		if ParseRelease(rec.Title).Pack && hints.FolderName == "" {
 			label += " · Season pack"
 		}
-		if stream.Hints.Duration > 0 {
-			label += fmt.Sprintf(" • %.1f Mbps", float64(size)*8/stream.Hints.Duration/1e6)
+		if hints.Duration > 0 {
+			label += fmt.Sprintf(" • %.1f Mbps", float64(size)*8/hints.Duration/1e6)
 		} else if rec.Bitrate > 0 && !ParseRelease(rec.Title).Pack {
 			label += fmt.Sprintf(" • %.1f Mbps", rec.Bitrate/1e6)
 		}
@@ -113,12 +126,12 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 	if size <= 0 && rec.Bitrate > 0 && !ParseRelease(rec.Title).Pack {
 		lines = append(lines, fmt.Sprintf("📶 %.1f Mbps", rec.Bitrate/1e6))
 	}
-	if stream.Hints.Duration > 0 {
-		seconds := int64(stream.Hints.Duration)
+	if hints.Duration > 0 {
+		seconds := int64(hints.Duration)
 		lines = append(lines, fmt.Sprintf("⏱️ %dh %02dm", seconds/3600, seconds%3600/60))
 	}
-	if stream.Hints.Indexer != "" {
-		lines = append(lines, "🧭 "+stream.Hints.Indexer)
+	if hints.Indexer != "" {
+		lines = append(lines, "🧭 "+hints.Indexer)
 	}
 	for _, group := range rec.Presentation["group"] {
 		if presentationGroup.MatchString(group) {
@@ -126,10 +139,8 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 			break
 		}
 	}
-	if stream.Hints.PublishDate != "" {
-		lines = append(lines, "📅 "+strings.Split(stream.Hints.PublishDate, "T")[0])
+	if hints.PublishDate != "" {
+		lines = append(lines, "📅 "+strings.Split(hints.PublishDate, "T")[0])
 	}
-	stream.Name = name
-	stream.Title = strings.Join(lines, "\n")
-	return stream
+	return model.ReleasePresentation{Language: language, Details: lines}
 }

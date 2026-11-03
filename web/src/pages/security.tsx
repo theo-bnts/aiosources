@@ -103,7 +103,7 @@ export function SecurityStatisticsPage() {
           valueClassName={
             status.data?.mfa_enabled
               ? status.data.recovery_codes_remaining === 0
-                ? 'text-amber-800 dark:text-amber-300'
+                ? 'text-warning-foreground'
                 : undefined
               : 'text-muted-foreground'
           }

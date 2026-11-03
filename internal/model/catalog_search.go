@@ -43,7 +43,15 @@ type CatalogRelease struct {
 	Size          int64                 `json:"size"`
 	PublishedAt   *time.Time            `json:"published_at,omitempty"`
 	Languages     []string              `json:"languages"`
+	Presentation  ReleasePresentation   `json:"presentation"`
 	Services      []CatalogAvailability `json:"services"`
+}
+
+// ReleasePresentation contains only formatted public release information.
+// Playback URLs, tracker addresses and provider credentials are never included.
+type ReleasePresentation struct {
+	Language string   `json:"language,omitempty"`
+	Details  []string `json:"details"`
 }
 
 type CatalogAvailability struct {

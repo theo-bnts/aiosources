@@ -92,7 +92,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               >
                 <Icon
                   aria-hidden="true"
-                  className={`mt-0.5 size-5 shrink-0 ${notice.warning ? 'text-amber-300' : 'text-primary'}`}
+                  className={`mt-0.5 size-5 shrink-0 ${notice.warning ? 'text-warning-foreground' : 'text-primary'}`}
                 />
                 <Toast.Description className="min-w-0 break-words text-sm leading-6">
                   {messageText(notice.message)}

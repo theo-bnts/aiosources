@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"golang.org/x/text/language"
@@ -153,6 +154,14 @@ func streamSize(bytes int64) string {
 		precision = 1
 	}
 	return fmt.Sprintf("%.*f %s", precision, size, units[unit])
+}
+
+func releaseBehavior(rec model.AIORecord, sourceName string) Behavior {
+	hints := Behavior{Size: max(0, rec.Size), Filename: rec.Title, Indexer: sourceName, Duration: rec.DurationSeconds}
+	if rec.PublishedAt != nil {
+		hints.PublishDate = rec.PublishedAt.UTC().Format(time.RFC3339Nano)
+	}
+	return hints
 }
 
 // Stremio selects URL playback before infoHash. Its ordinary fields and the

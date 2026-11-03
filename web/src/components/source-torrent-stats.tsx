@@ -88,7 +88,7 @@ export function SourceTorrentStats({
         ))}
       </dl>
       {unavailable && (
-        <p role="status" className="help text-amber-300">
+        <p role="status" className="help text-warning-foreground">
           Last available counts.
         </p>
       )}

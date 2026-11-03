@@ -36,7 +36,7 @@ export function ImportLastRun({
       </dd>
       {error && (
         <p
-          className={`help mt-1 break-words ${run?.status === 'failed' ? 'text-destructive' : 'text-amber-800 dark:text-amber-300'}`}
+          className={`help mt-1 break-words ${run?.status === 'failed' ? 'text-destructive' : 'text-warning-foreground'}`}
         >
           {messageText(error)}
         </p>

@@ -240,9 +240,7 @@ function SourceCard({
                 <span className="ml-2 text-muted-foreground">Automatic imports disabled</span>
               )}
           </dd>
-          {scheduleState && (
-            <p className="help mt-1 text-amber-800 dark:text-amber-300">{scheduleState}</p>
-          )}
+          {scheduleState && <p className="help mt-1 text-warning-foreground">{scheduleState}</p>}
           {scheduleError &&
             scheduleError !== scheduleState &&
             (!run ||

@@ -254,7 +254,7 @@ export function OperationHistoryPage({
                           <OperationBadge run={run} />
                           {run.error && (
                             <p
-                              className={`mt-2 max-w-sm text-xs leading-5 ${run.status === 'failed' ? 'text-destructive' : 'text-amber-300'}`}
+                              className={`mt-2 max-w-sm text-xs leading-5 ${run.status === 'failed' ? 'text-destructive' : 'text-warning-foreground'}`}
                             >
                               {messageText(run.error)}
                             </p>

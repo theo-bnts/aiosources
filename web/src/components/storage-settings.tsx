@@ -173,9 +173,7 @@ export function StorageSettingsPanel() {
             paused imports are removed with their data.
           </p>
           <p
-            className={
-              resetUnavailableReason ? 'help text-amber-800 dark:text-amber-300' : 'sr-only'
-            }
+            className={resetUnavailableReason ? 'help text-warning-foreground' : 'sr-only'}
             id="source-data-reset-status"
             role="status"
             aria-live="polite"
