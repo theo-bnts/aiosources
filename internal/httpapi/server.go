@@ -577,7 +577,9 @@ func (s *server) listRaw(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Select an import run to view its processed records")
 		return
 	}
-	if !model.ValidSelection(options.Status, func(value string) bool { return value == "accepted" || value == "error" || value == "ignored" || value == "enrichment" }) {
+	if !model.ValidSelection(options.Status, func(value string) bool {
+		return value == "accepted" || value == "error" || value == "ignored" || value == "enrichment"
+	}) {
 		writeError(w, http.StatusBadRequest, "Unknown processing result")
 		return
 	}
