@@ -4,7 +4,9 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.ts',
   fullyParallel: false,
-  workers: 1,
+  // Every scenario owns its database, backend and browser context. Run two
+  // files together in CI, while keeping individual file scenarios serial.
+  workers: process.env.CI ? 2 : 1,
   retries: 0,
   forbidOnly: Boolean(process.env.CI),
   timeout: 45_000,
