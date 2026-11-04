@@ -332,10 +332,25 @@ SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title
     ).toBeVisible()
     await openDisclosure(page, 'Filters')
     await selectMultiple(page, 'Processing result', ['error'])
+    await expect(page.locator('[data-result-count]')).toHaveText('1 processed record')
     await expect(page.getByRole('link', { name: 'Rejected sample', exact: true })).toBeVisible()
     await expect(page.getByText('Missing source identifier', { exact: true })).toBeVisible()
+    const rejected = page.getByRole('row').filter({
+      has: page.getByRole('link', { name: 'Rejected sample', exact: true }),
+    })
+    await expect(rejected.getByText('Raw payload not stored', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Rejected sample', exact: true }).click()
-    await expect(page.getByText('Raw payload not stored', { exact: false }).first()).toBeVisible()
+    await expect(page).toHaveURL(/\/raw\/\d+$/)
+    await expect(page.getByRole('heading', { name: /^Processed record #\d+$/ })).toBeVisible()
+    await expect(
+      page.getByText('Original content was not retained.', { exact: false }),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Download original', exact: true })).toHaveCount(
+      0,
+    )
+    await expect(
+      page.getByRole('tab', { name: 'Interpreted fields', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true')
     await page.goBack()
     await expect(page.getByLabel('Processing result', { exact: true })).toHaveText('Errors')
     await openDisclosure(page, 'Filters')
