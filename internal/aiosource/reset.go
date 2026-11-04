@@ -14,6 +14,7 @@ import (
 type ResetState struct {
 	Scope  string `json:"scope"`
 	Status string `json:"status"`
+	Phase  string `json:"phase,omitempty"`
 	Error  string `json:"error,omitempty"`
 }
 
@@ -23,29 +24,54 @@ func (s *Service) ResetState() ResetState {
 	return s.reset
 }
 
-func (s *Service) reserveReset(scope string) error {
+func (s *Service) reserveReset(scope string) ([]<-chan struct{}, error) {
 	switch scope {
 	case "books", "videos", "metadata", "mapping", "cache":
 	default:
-		return model.ErrInvalid
+		return nil, model.ErrInvalid
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.reset.Status == "running" || (scope != "cache" && (s.syncRunning || s.matchRunning || s.booksRunning)) {
-		return model.ErrBusy
+	if s.closed || s.reset.Status == "running" {
+		return nil, model.ErrBusy
 	}
-	s.reset = ResetState{Scope: scope, Status: "running"}
+	// Reserve maintenance before cancelling workers so automation cannot take
+	// their place. Join their complete lifetimes, including final checkpoints
+	// and advisory-lock release, before removing information they could write.
+	s.reset = ResetState{Scope: scope, Status: "running", Phase: "resetting"}
+	var waiting []<-chan struct{}
+	if scope != "cache" {
+		for _, worker := range []struct {
+			cancel context.CancelFunc
+			done   <-chan struct{}
+		}{
+			{s.syncCancel, s.syncDone},
+			{s.matchCancel, s.matchDone},
+			{s.booksCancel, s.booksDone},
+		} {
+			if worker.cancel != nil {
+				worker.cancel()
+			}
+			if worker.done != nil {
+				waiting = append(waiting, worker.done)
+			}
+		}
+	}
+	if len(waiting) > 0 {
+		s.reset.Phase = "stopping"
+	}
 	s.wg.Add(1)
-	return nil
+	return waiting, nil
 }
 
 // StartReset acknowledges admission immediately. The transaction belongs to
 // the service lifetime, not to a browser/proxy request that may time out.
 func (s *Service) StartReset(scope string) error {
-	if err := s.reserveReset(scope); err != nil {
+	waiting, err := s.reserveReset(scope)
+	if err != nil {
 		return err
 	}
-	go func() { s.finishReset(scope, s.runReset(s.ctx, scope)) }()
+	go func() { s.finishReset(scope, s.runReset(s.ctx, scope, waiting)) }()
 	return nil
 }
 
@@ -53,19 +79,36 @@ func (s *Service) StartReset(scope string) error {
 // identical admission, fencing and rollback behavior; neither holds s.mu while
 // waiting for PostgreSQL or prevents status reads and shutdown cancellation.
 func (s *Service) Reset(ctx context.Context, scope string) error {
-	if err := s.reserveReset(scope); err != nil {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	waiting, err := s.reserveReset(scope)
+	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(s.ctx, cancel)
 	defer stop()
 	defer cancel()
-	err := s.runReset(ctx, scope)
+	err = s.runReset(ctx, scope, waiting)
 	s.finishReset(scope, err)
 	return err
 }
 
-func (s *Service) runReset(ctx context.Context, scope string) error {
+func (s *Service) runReset(ctx context.Context, scope string, waiting []<-chan struct{}) error {
+	for _, done := range waiting {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.reset.Phase = "resetting"
+	s.mu.Unlock()
 	var releases []func()
 	defer func() {
 		for _, release := range releases {

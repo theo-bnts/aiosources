@@ -228,6 +228,116 @@ test('book reset stays visible across pages without tying its lifetime to the br
   }
 })
 
+test('maintenance remains available during identification and acknowledges reset before a slow refresh', async ({
+  page,
+  server,
+}) => {
+  await seedInformation(page, server)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  let resumeStatus = () => {}
+  let statusResumed = Promise.resolve()
+  let holdStatus = false
+  let heldReads = 0
+  const pauseStatus = () => {
+    holdStatus = true
+    heldReads = 0
+    statusResumed = new Promise<void>((resolve) => {
+      resumeStatus = resolve
+    })
+  }
+  await page.route('**/api/aiosource/controls', async (route) => {
+    if (holdStatus) {
+      heldReads++
+      await statusResumed
+    }
+    await route.continue()
+  })
+  try {
+    await db.query(`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+      ('example','book','{"title":"Example Book EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
+      INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('example','book') ON CONFLICT DO NOTHING`)
+    await db.query('BEGIN')
+    // Matching takes a shared snapshot of this row. Keep its transaction
+    // waiting so the real worker cannot finish before we inspect maintenance.
+    await db.query('SELECT metadata_generation FROM ingest.aio_state FOR UPDATE')
+    await page.goto('/metadata/identification/settings#maintenance')
+    await openDisclosure(page, 'Manual actions')
+    pauseStatus()
+    const identify = page.getByRole('button', { name: 'Identify torrents', exact: true })
+    await identify.click()
+    await expect(identify).toBeDisabled()
+    await expect(
+      page.getByRole('button', { name: 'Stop identification', exact: true }),
+    ).toBeVisible()
+    await expect.poll(() => heldReads).toBeGreaterThan(0)
+    holdStatus = false
+    resumeStatus()
+    await expect
+      .poll(async () => (await (await page.request.get('/api/aiosource/controls')).json()).matching)
+      .toBe(true)
+    for (const [section, label] of [
+      ['videos', 'Reset video information'],
+      ['identification', 'Reset matches'],
+      ['books', 'Reset book information'],
+    ]) {
+      await page.goto(`/metadata/${section}/settings#maintenance`)
+      await expect(page.getByRole('button', { name: label, exact: true })).toBeEnabled()
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
+    const reset = page.getByRole('button', { name: 'Reset book information', exact: true })
+    await reset.click()
+    const confirmation = page.getByRole('alertdialog', {
+      name: 'Reset book information?',
+      exact: true,
+    })
+    await expect(confirmation).toContainText(
+      'Information updates and identification will be stopped first.',
+    )
+    pauseStatus()
+    await confirmation.getByRole('button', { name: 'Reset book information', exact: true }).click()
+    // The write has already been admitted. A status read must not hold the
+    // confirmation open, even when that refresh cannot return yet.
+    await expect(confirmation).toBeHidden()
+    await expect.poll(() => heldReads).toBeGreaterThan(0)
+    await expect(reset).toBeDisabled()
+    await expect(page.getByLabel('Maintenance status')).toContainText(
+      'Stopping information updates and identification',
+    )
+    if (process.env.QA_DIRECTORY) {
+      await mkdir(process.env.QA_DIRECTORY, { recursive: true })
+      await page.screenshot({
+        path: join(process.env.QA_DIRECTORY, 'reset-stopping-mobile.png'),
+        fullPage: true,
+      })
+    }
+    await expect
+      .poll(async () => (await (await page.request.get('/api/aiosource/controls')).json()).matching)
+      .toBe(false)
+    expect(
+      (
+        await db.query(
+          "SELECT count(*)::int AS count FROM ingest.aio_works WHERE media_type='book'",
+        )
+      ).rows[0].count,
+    ).toBe(1)
+    holdStatus = false
+    resumeStatus()
+    await expect(page.getByLabel('Maintenance status')).toContainText('being reset')
+    await db.query('ROLLBACK')
+    await expect(page.getByLabel('Maintenance status')).toContainText('reset completed.')
+    await expect(reset).toBeEnabled()
+    const data = await (await page.request.get('/api/aiosource')).json()
+    expect(data.status.video_works).toBe(2)
+    expect(data.books.works).toBe(0)
+  } finally {
+    holdStatus = false
+    resumeStatus()
+    await db.query('ROLLBACK')
+    await db.end()
+  }
+})
+
 for (const section of ['videos', 'books'] as const) {
   test(`${section} maintenance clears its catalog and history through the ordinary confirmation`, async ({
     page,

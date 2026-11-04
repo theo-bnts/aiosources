@@ -29,6 +29,7 @@ type Service struct {
 	bookRate                  metadataRequestLimiter
 	booksRunning              bool
 	booksCancel               context.CancelFunc
+	booksDone                 <-chan struct{}
 	Network                   *outbound.Router
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
@@ -37,6 +38,7 @@ type Service struct {
 	wg                        sync.WaitGroup
 	closed                    bool
 	syncCancel, matchCancel   context.CancelFunc
+	syncDone, matchDone       <-chan struct{}
 	syncRunning, matchRunning bool
 	lastError                 string
 	reset                     ResetState
@@ -249,12 +251,15 @@ func (s *Service) startJob(syncJob bool, run func(context.Context) error) error 
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
+	done := make(chan struct{})
 	if syncJob {
 		s.syncRunning = true
 		s.syncCancel = cancel
+		s.syncDone = done
 	} else {
 		s.matchRunning = true
 		s.matchCancel = cancel
+		s.matchDone = done
 	}
 	s.wg.Add(1)
 	go func() {
@@ -265,9 +270,11 @@ func (s *Service) startJob(syncJob bool, run func(context.Context) error) error 
 		if syncJob {
 			s.syncRunning = false
 			s.syncCancel = nil
+			s.syncDone = nil
 		} else {
 			s.matchRunning = false
 			s.matchCancel = nil
+			s.matchDone = nil
 		}
 		// Information failures are retained in PostgreSQL. A successful local
 		// identification pass must never erase an unrelated TMDB failure.
@@ -276,6 +283,7 @@ func (s *Service) startJob(syncJob bool, run func(context.Context) error) error 
 		} else if !syncJob && err == nil {
 			s.lastError = ""
 		}
+		close(done)
 		s.mu.Unlock()
 		if err == nil {
 			s.wakeAutomation()

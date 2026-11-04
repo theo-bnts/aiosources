@@ -41,8 +41,10 @@ func (s *Service) StartBooks(trigger string) error {
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
+	done := make(chan struct{})
 	s.booksRunning = true
 	s.booksCancel = cancel
+	s.booksDone = done
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
@@ -51,6 +53,8 @@ func (s *Service) StartBooks(trigger string) error {
 		s.mu.Lock()
 		s.booksRunning = false
 		s.booksCancel = nil
+		s.booksDone = nil
+		close(done)
 		s.mu.Unlock()
 		s.wakeAutomation()
 	}()

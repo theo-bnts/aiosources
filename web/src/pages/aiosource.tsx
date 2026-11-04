@@ -27,6 +27,13 @@ type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
   trackers?: Record<string, Partial<Tracker>>
 }
 type Draft = { base: Config; changes: Changes }
+const resetScopes = {
+  'reset-books': 'books',
+  'reset-videos': 'videos',
+  'reset-metadata': 'metadata',
+  'reset-mapping': 'mapping',
+  'reset-cache': 'cache',
+} as const
 
 function applyChanges(base: Config, changes: Changes): Config {
   const { trackers, ...settings } = changes
@@ -145,8 +152,35 @@ export default function AIOSourcePage({
   )
   const action = useMutation({
     mutationFn: (name: string) => api(`/aiosource/${name}`, { method: 'POST' }),
-    onSuccess: async () => {
-      await refreshData()
+    onSuccess: async (_, name) => {
+      const resetScope = resetScopes[name as keyof typeof resetScopes]
+      if (resetScope || name === 'sync' || name === 'match' || name === 'sync-books') {
+        await queryClient.cancelQueries({ queryKey: ['aiosource', 'controls'], exact: true })
+        queryClient.setQueryData<Controls>(['aiosource', 'controls'], (current) => {
+          if (!current) return current
+          if (resetScope)
+            return {
+              ...current,
+              maintenance: {
+                scope: resetScope,
+                status: 'running',
+                phase:
+                  resetScope !== 'cache' &&
+                  (current.syncing || current.matching || current.books?.running)
+                    ? 'stopping'
+                    : 'resetting',
+              },
+            }
+          if (name === 'sync') return { ...current, syncing: true }
+          if (name === 'match') return { ...current, matching: true }
+          return current.books
+            ? { ...current, books: { ...current.books, running: true } }
+            : current
+        })
+      }
+      // Admission is acknowledged by the write. A slow status/statistics read
+      // must not keep Stop pending or keep the reset confirmation open.
+      void refreshData()
     },
   })
   const update = (form: FormScope, patch: Changes) => {
@@ -245,8 +279,7 @@ export default function AIOSourcePage({
     )
   const status = query.data
   const resetting = status.maintenance?.status === 'running'
-  const busy =
-    status.syncing || status.matching || status.books?.running || resetting || action.isPending
+  const maintenanceBusy = resetting || action.isPending
   const submit = (form: FormScope) => {
     const local = drafts[form]
     if (local && !save.isPending && !review.isPending && !conflict(form)) {
@@ -420,12 +453,12 @@ export default function AIOSourcePage({
             {section === 'videos' && (
               <ConfirmAction
                 title="Reset video information?"
-                description="Film and series information, related automatic and manual identifications, availability observations and video operation history will be removed. Torrent records, book information, settings and files in your debrid accounts are retained. Automatic video updates can import the catalog again."
+                description="Information updates and identification will be stopped first. Film and series information, related automatic and manual identifications, availability observations and video operation history will be removed. Torrent records, book information, settings and files in your debrid accounts are retained. Automatic video updates can import the catalog again."
                 label="Reset video information"
                 variant="destructive"
                 action={() => action.mutateAsync('reset-videos')}
                 trigger={
-                  <Button variant="destructive" disabled={busy}>
+                  <Button variant="destructive" disabled={maintenanceBusy}>
                     Reset video information
                   </Button>
                 }
@@ -434,12 +467,12 @@ export default function AIOSourcePage({
             {section === 'books' && (
               <ConfirmAction
                 title="Reset book information?"
-                description="Open Library information, related automatic and manual identifications, availability observations and book operation history will be removed. Torrent records, film & series information, settings and files in your debrid accounts are retained. Automatic book updates can import the catalog again."
+                description="Information updates and identification will be stopped first. Open Library information, related automatic and manual identifications, availability observations and book operation history will be removed. Torrent records, film & series information, settings and files in your debrid accounts are retained. Automatic book updates can import the catalog again."
                 label="Reset book information"
                 variant="destructive"
                 action={() => action.mutateAsync('reset-books')}
                 trigger={
-                  <Button variant="destructive" disabled={busy}>
+                  <Button variant="destructive" disabled={maintenanceBusy}>
                     Reset book information
                   </Button>
                 }
@@ -448,12 +481,12 @@ export default function AIOSourcePage({
             {section === 'identification' && (
               <ConfirmAction
                 title="Reset title matches?"
-                description="Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
+                description="Information updates and identification will be stopped first. Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
                 label="Reset matches"
                 variant="destructive"
                 action={() => action.mutateAsync('reset-mapping')}
                 trigger={
-                  <Button variant="destructive" disabled={busy}>
+                  <Button variant="destructive" disabled={maintenanceBusy}>
                     Reset matches
                   </Button>
                 }

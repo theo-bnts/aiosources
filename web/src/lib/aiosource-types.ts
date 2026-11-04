@@ -47,6 +47,7 @@ export type Status = {
   maintenance?: {
     scope: 'books' | 'videos' | 'metadata' | 'mapping' | 'cache' | ''
     status: 'running' | 'succeeded' | 'failed' | ''
+    phase?: 'stopping' | 'resetting'
     error?: string
   }
   config: Config
