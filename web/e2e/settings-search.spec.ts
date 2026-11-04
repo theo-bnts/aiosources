@@ -1,8 +1,30 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import { test, expect, createStremioAccess } from './fixtures'
 import { runtimeSections } from '../src/lib/runtime-settings-definitions'
 import { settingsCatalog, settingsHash } from '../src/lib/settings-catalog'
+
+async function expectHeaderControlsSeparated(page: Page, name: string) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate((name) => {
+          const buttons = [...document.querySelectorAll<HTMLButtonElement>('button[aria-label]')]
+          const search = buttons
+            .find((button) => button.getAttribute('aria-label') === 'Search settings')
+            ?.getBoundingClientRect()
+          const tool = buttons
+            .find((button) => button.getAttribute('aria-label') === name)
+            ?.getBoundingClientRect()
+          if (!search?.width || !search.height || !tool?.width || !tool.height) return false
+          // Read both controls in the same layout, after responsive transitions.
+          return search.right <= tool.left || search.top >= tool.bottom || search.bottom <= tool.top
+        }, name),
+      { message: `Header search and ${name} must not overlap at ${page.viewportSize()?.width}px` },
+    )
+    .toBe(true)
+}
 
 test('settings search is local, keyboard accessible and reveals lazy advanced controls', async ({
   page,
@@ -146,13 +168,7 @@ test('settings search remains reachable on narrow screens and does not overflow'
     const trigger = page.getByRole('button', { name: 'Search settings', exact: true })
     await expect(trigger).toBeInViewport()
     for (const name of ['Interface preferences', 'About AIOSources']) {
-      const searchBox = (await trigger.boundingBox())!
-      const toolBox = (await page.getByRole('button', { name, exact: true }).boundingBox())!
-      expect(
-        searchBox.x + searchBox.width <= toolBox.x ||
-          searchBox.y >= toolBox.y + toolBox.height ||
-          searchBox.y + searchBox.height <= toolBox.y,
-      ).toBe(true)
+      await expectHeaderControlsSeparated(page, name)
     }
     await trigger.click()
     const dialog = page.getByRole('dialog', { name: 'Search settings', exact: true })
@@ -335,23 +351,14 @@ test('mobile section links remain visible below the responsive sticky header', a
     const section = page.locator('#verification')
     await expect(section).toBeInViewport()
     await expect
-      .poll(async () => {
-        const header = await page.locator('[data-app-shell] header').first().boundingBox()
-        const target = await section.boundingBox()
-        return target!.y >= header!.y + header!.height - 1
-      })
+      .poll(() =>
+        section.evaluate((element) => {
+          const header = document.querySelector('[data-app-shell] header')?.getBoundingClientRect()
+          return Boolean(header && element.getBoundingClientRect().top >= header.bottom - 1)
+        }),
+      )
       .toBe(true)
-    const search = (await page
-      .getByRole('button', { name: 'Search settings', exact: true })
-      .boundingBox())!
-    const preferences = (await page
-      .getByRole('button', { name: 'Interface preferences', exact: true })
-      .boundingBox())!
-    expect(
-      search.x + search.width <= preferences.x ||
-        search.y >= preferences.y + preferences.height ||
-        search.y + search.height <= preferences.y,
-    ).toBe(true)
+    await expectHeaderControlsSeparated(page, 'Interface preferences')
   }
 })
 
