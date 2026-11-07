@@ -241,7 +241,8 @@ test('catalog search groups clean titles, sorts source versions and retains the 
     (url) =>
       url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
   )
-  await openDisclosure(page, 'Filters')
+  const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
+  await openDisclosure(filters, 'Filters')
   await expect(
     page.getByRole('switch', { name: 'Cached results only', exact: true }),
   ).not.toBeChecked()
@@ -251,12 +252,11 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await page.getByRole('switch', { name: 'Cached results only', exact: true }).uncheck()
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
   await page.reload()
-  await openDisclosure(page, 'Filters')
+  await openDisclosure(filters, 'Filters')
   await expect(
     page.getByRole('switch', { name: 'Cached results only', exact: true }),
   ).not.toBeChecked()
   await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
-  const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
   await page.locator('summary', { hasText: /^Sorting$/ }).click()
   await expect(page.getByLabel('Sort by', { exact: true })).toHaveValue('')
   await expect(

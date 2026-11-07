@@ -1,8 +1,8 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 // Follow the visible hierarchy by clicking each parent before its child. This
 // also works for controlled disclosures and lazily loaded settings forms.
-export async function openDisclosure(page: Page, title: string) {
+export async function openDisclosure(page: Page | Locator, title: string) {
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const summary = page.locator('summary').filter({
     hasText: new RegExp(`^${escaped}\\s*(?:Configured)?$`),

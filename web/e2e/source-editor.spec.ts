@@ -129,27 +129,40 @@ test('source actions stay aligned when the unsaved run hint appears on desktop a
       page.getByRole('button', { name: 'Run manual import', exact: true }),
       page.getByRole('button', { name: 'Delete source', exact: true }),
     ]
-    const before = await Promise.all(buttons.map((button) => button.boundingBox()))
-    await name.fill('Changed example name')
-    await expect(
-      page.getByText('Save your changes before starting a run.', { exact: true }),
-    ).toBeVisible()
-    for (let i = 0; i < buttons.length; i++) {
-      const after = await buttons[i].boundingBox()
-      expect(before[i]).not.toBeNull()
-      expect(after).not.toBeNull()
-      expect(Math.abs(before[i]!.x - after!.x)).toBeLessThanOrEqual(1)
+    await page.evaluate(() => document.fonts.ready)
+    for (const font of ['', 'Arial', 'monospace']) {
+      await page.locator('main footer').evaluate((element, family) => {
+        element.style.fontFamily = family
+        element.getBoundingClientRect()
+      }, font)
+      await page.evaluate(() => document.fonts.ready)
+      const before = await Promise.all(buttons.map((button) => button.boundingBox()))
+      await name.fill('Changed example name')
+      await expect(
+        page.getByText('Save your changes before starting a run.', { exact: true }),
+      ).toBeVisible()
+      for (let i = 0; i < buttons.length; i++) {
+        const after = await buttons[i].boundingBox()
+        expect(before[i]).not.toBeNull()
+        expect(after).not.toBeNull()
+        expect(
+          Math.abs(before[i]!.x - after!.x),
+          `${width}px, ${font || 'application font'}, action ${i}: ${JSON.stringify({ before: before[i], after })}`,
+        ).toBeLessThanOrEqual(1)
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+      if (width === 390)
+        await page.screenshot({
+          path: testInfo.outputPath('source-actions-mobile.png'),
+          fullPage: true,
+        })
+      await name.fill('Synthetic editor source')
+      await expect(
+        page.getByText('Save your changes before starting a run.', { exact: true }),
+      ).toHaveCount(0)
     }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    if (width === 390)
-      await page.screenshot({
-        path: testInfo.outputPath('source-actions-mobile.png'),
-        fullPage: true,
-      })
-    await name.fill('Synthetic editor source')
-    await expect(
-      page.getByText('Save your changes before starting a run.', { exact: true }),
-    ).toHaveCount(0)
   }
 })
 

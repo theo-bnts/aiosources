@@ -843,7 +843,7 @@ function ProviderForm({
           runs use the saved definition.
         </p>
         {sourceID && (
-          <div className="ml-auto grid justify-items-end gap-2">
+          <div className="ml-auto grid min-w-0 max-w-full justify-items-end gap-2">
             <div className="flex flex-wrap justify-end gap-2">
               <CollectDialog
                 providerId={sourceID}
@@ -885,7 +885,9 @@ function ProviderForm({
               />
             </div>
             {dirty && (
-              <p className="help w-full text-right">Save your changes before starting a run.</p>
+              <p className="help w-full text-right break-words [contain:inline-size]">
+                Save your changes before starting a run.
+              </p>
             )}
           </div>
         )}
