@@ -38,6 +38,11 @@ func BenchmarkProviderAccountValidation(b *testing.B) {
 			p.ADBase, p.TBBase, p.RDBase, p.PMBase, p.DLBase, p.DBBase = server.URL, server.URL, server.URL, server.URL, server.URL, server.URL
 			b.ResetTimer()
 			for b.Loop() {
+				// This loopback fixture measures validation work, not deliberate
+				// provider pacing. Each call has an immediately available slot.
+				p.mu.Lock()
+				p.next[service] = time.Time{}
+				p.mu.Unlock()
 				if err := p.ValidateKey(b.Context(), service, "synthetic-performance-key"); err != nil {
 					b.Fatal("Synthetic account validation failed", err)
 				}

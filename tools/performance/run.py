@@ -109,12 +109,25 @@ def go_benchmarks(database, samples):
     # One parse is too small to amortize regexp/sync.Pool initialization after
     # Go's benchmark GC. Keep expensive complete operations at one iteration.
     micro = invoke(database, [*common, "-benchtime=100x", "./internal/books"], "synthetic-books", env, timeout=120, check=False)
+    accounts = invoke(database, [*common, "-bench=^BenchmarkProviderAccountValidation$", "-benchtime=100x", "./internal/aiosource"], "synthetic-accounts", env, timeout=120, check=False)
     code = invoke(database, [*common, "-benchtime=1x", "./internal/connectors", "./internal/jobs", "./internal/store", "./internal/aiosource", "./internal/httpapi"], "synthetic", env, timeout=900, check=False)
-    if code or micro:
+    if code or micro or accounts:
         return [{"id": "synthetic.execution", "budget_ms": 1, "samples_ms": [0], "error": "operation_failed"}]
-    output = (database.root / "synthetic-books.log").read_text() + "\n" + (database.root / "synthetic.log").read_text()
-    groups, allocations = parse_go_benchmarks(output)
-    if not REQUIRED_BENCHMARKS.issubset(groups) or any(len(values) != samples for values in groups.values()):
+    groups, allocations = parse_go_benchmarks((database.root / "synthetic.log").read_text())
+    # The complete-operation log also includes cold account checks. Use the
+    # independent warm profile for these stateless requests, whose HTTP buffer
+    # pools would otherwise dominate a single call's allocation count.
+    profiles = {
+        "synthetic-books": {"synthetic.books.BenchmarkBookRelease"},
+        "synthetic-accounts": {name for name in REQUIRED_BENCHMARKS if ".BenchmarkProviderAccountValidation/" in name},
+    }
+    for name, required in profiles.items():
+        measured, memory = parse_go_benchmarks((database.root / (name + ".log")).read_text())
+        if not required.issubset(measured):
+            raise RuntimeError("Warm benchmark profile is incomplete")
+        groups.update(measured)
+        allocations.update(memory)
+    if not REQUIRED_BENCHMARKS.issubset(groups) or any(len(values) != samples or len(allocations[name]) != samples for name, values in groups.items()):
         raise RuntimeError("Synthetic benchmark coverage or repetition count is incomplete")
     result = []
     for name, values in groups.items():
@@ -230,7 +243,7 @@ def measure_application(database, binary, samples):
 
 def environment_identity(samples):
     # No hostname, paths, user name, connection URI or credential enters a report.
-    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "operation_iterations": 1, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
+    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "account_iterations": 100, "operation_iterations": 1, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
 
 
 def main():
