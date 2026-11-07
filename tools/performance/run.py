@@ -112,7 +112,7 @@ def go_benchmarks(database, samples):
     accounts = invoke(database, [*common, "-bench=^BenchmarkProviderAccountValidation$", "-benchtime=100x", "./internal/aiosource"], "synthetic-accounts", env, timeout=120, check=False)
     code = invoke(database, [*common, "-benchtime=1x", "./internal/connectors", "./internal/jobs", "./internal/store", "./internal/aiosource", "./internal/httpapi"], "synthetic", env, timeout=900, check=False)
     if code or micro or accounts:
-        return [{"id": "synthetic.execution", "budget_ms": 1, "samples_ms": [0], "error": "operation_failed"}]
+        raise RuntimeError("Synthetic operation checks failed; private logs retained")
     groups, allocations = parse_go_benchmarks((database.root / "synthetic.log").read_text())
     # The complete-operation log also includes cold account checks. Use the
     # independent warm profile for these stateless requests, whose HTTP buffer
@@ -246,7 +246,7 @@ def measure_application(database, binary, samples):
 
 def environment_identity(samples):
     # No hostname, paths, user name, connection URI or credential enters a report.
-    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "account_iterations": 100, "operation_iterations": 1, "operation_allocation_noise_bytes": 32768, "relative_tail_samples": 2, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
+    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "account_iterations": 100, "operation_iterations": 1, "operation_allocation_noise_bytes": 32768, "relative_tail_samples": 2, "browser_context": "per-page", "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
 
 
 def main():

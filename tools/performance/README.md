@@ -24,6 +24,8 @@ The suite covers source HTTP/HTML/Torznab parsing and complete publication, meta
 
 Reports record warm repetitions, median and p95, Go allocations, startup time and sampled application/PostgreSQL memory and CPU. Application pages share their route inventory with browser regressions so additions stay visible. Every complete run must retain the same cases and result contracts. Five repetitions are the default; `--samples` accepts 3–20.
 
+Each page and its optional sections use a separate browser context, with the same synthetic administrator session. Context setup is outside the page timer; the warm-up still loads the complete document. Closing the context releases its requests and live-event connections before the next page. A functional failure or measured deadline miss stops the browser run immediately and retains a private diagnostic; partial coverage cannot become a reference.
+
 Each book-parser and account-validation measurement averages 100 iterations so regexp or HTTP buffer pools cannot dominate a single tiny call. Account fixtures make the pacing slot immediately available on each call to measure validation work rather than deliberate provider waiting. Complete imports, matching batches and other HTTP flows use one iteration per measured repetition. The iteration profile is part of baseline compatibility.
 
 Browser navigation has a 350 ms noise allowance, and opening controls has a 150 ms allowance. Repeated runs of the same production build show React lazy-route commits and Playwright frame/actionability waits varying by about 300 ms and 130 ms respectively. API timings retain a 50 ms allowance and Go operations 20 ms. These allowances complement the 20% comparison; hard page deadlines and result checks still apply to every repetition.

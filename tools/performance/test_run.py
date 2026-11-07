@@ -8,6 +8,13 @@ from run import go_benchmarks, parse_go_benchmarks, REQUIRED_BENCHMARKS
 
 
 class GoBenchmarkOutput(unittest.TestCase):
+    def test_failed_operation_stops_before_missing_measurements_can_be_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = SimpleNamespace(root=Path(directory), uri=lambda *args: "synthetic-uri")
+            with patch("run.invoke", return_value=1):
+                with self.assertRaisesRegex(RuntimeError, "Synthetic operation checks failed"):
+                    go_benchmarks(database, 3)
+
     def test_warm_profile_is_mandatory_and_replaces_cold_account_samples(self):
         with tempfile.TemporaryDirectory() as directory:
             database = SimpleNamespace(root=Path(directory), uri=lambda *args: "synthetic-uri")

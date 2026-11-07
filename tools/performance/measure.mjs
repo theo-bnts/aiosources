@@ -23,7 +23,7 @@ const output = []
 const diagnostics = []
 const digest = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const finiteError = (error) =>
-  /^(http_\d{3}|empty_result|wrong_result|readiness|browser_error|rendering_error|request_failed|missing_fixture)$/.test(
+  /^(http_\d{3}|empty_result|wrong_result|readiness|browser_error|rendering_error|request_failed|missing_fixture|time_budget)$/.test(
     error?.message ?? '',
   )
     ? error.message
@@ -51,6 +51,7 @@ async function measure(id, budget, action, contract = () => 'ok', count = sample
       if (expected !== undefined && current !== expected) throw new Error('wrong_result')
       expected = current
       if (i >= 0) values.push(Math.round(elapsed * 1000) / 1000)
+      if (i >= 0 && elapsed > budget) throw new Error('time_budget')
     }
     output.push({
       id,
@@ -68,7 +69,12 @@ async function measure(id, budget, action, contract = () => 'ok', count = sample
       error: finiteError(error),
     })
   }
-  console.log(JSON.stringify({ case: id, passed: !output.at(-1).error }))
+  const error = output.at(-1).error
+  console.log(JSON.stringify({ case: id, passed: !error, ...(error ? { error } : {}) }))
+  // Do not spend minutes opening children of an unavailable parent page.
+  // The finally block retains the original diagnostic and partial coverage;
+  // an incomplete run can never replace the complete reference.
+  if (error) throw new Error(error)
 }
 
 function listContract(body) {
@@ -451,7 +457,8 @@ try {
   const storageState = await api.storageState()
   browser = await chromium.launch({ headless: true })
   for (const width of [390, 1440]) {
-    const context = await browser.newContext({
+    let context, page
+    const contextOptions = {
       baseURL: origin,
       storageState,
       viewport: { width, height: 1100 },
@@ -459,41 +466,55 @@ try {
       timezoneId: 'UTC',
       serviceWorkers: 'block',
       acceptDownloads: false,
-    })
-    await context.route('**/*', (route) => {
-      const url = new URL(route.request().url())
-      return url.origin === origin || ['data:', 'blob:'].includes(url.protocol)
-        ? route.continue()
-        : route.abort('blockedbyclient')
-    })
-    const page = await context.newPage()
-    const pending = new Set()
+    }
+    let pending = new Set()
     let changed = 0,
       requestFailure = false,
       pageFailure = false,
       badResponse = false
-    page.on('pageerror', () => {
-      pageFailure = true
-    })
-    page.on('request', (r) => {
-      if (r.url().startsWith(origin + '/api/') && r.resourceType() !== 'eventsource') {
-        pending.add(r)
-        changed = performance.now()
-      }
-    })
-    page.on('requestfinished', (r) => {
-      if (pending.delete(r)) changed = performance.now()
-    })
-    page.on('requestfailed', (r) => {
-      if (pending.delete(r)) {
-        changed = performance.now()
-        if (!r.failure()?.errorText.includes('ERR_ABORTED')) requestFailure = true
-      }
-    })
-    page.on('response', (response) => {
-      if (response.url().startsWith(origin + '/api/') && response.status() >= 400)
-        badResponse = true
-    })
+    async function resetPage() {
+      // Keep a page and its optional sections together, then release its
+      // cookies' browser context, requests and live-event connections before
+      // measuring another route. Hundreds of full document reloads in one
+      // intercepted context can otherwise exhaust its HTTP connection pool.
+      await context?.close()
+      pending = new Set()
+      requestFailure = pageFailure = badResponse = false
+      context = await browser.newContext(contextOptions)
+      await context.route('**/*', (route) => {
+        const url = new URL(route.request().url())
+        return url.origin === origin || ['data:', 'blob:'].includes(url.protocol)
+          ? route.continue()
+          : route.abort('blockedbyclient')
+      })
+      page = await context.newPage()
+      page.on('pageerror', () => {
+        pageFailure = true
+      })
+      page.on('request', (r) => {
+        if (
+          r.url().startsWith(origin + '/api/') &&
+          r.resourceType() !== 'eventsource' &&
+          new URL(r.url()).pathname !== '/api/events'
+        ) {
+          pending.add(r)
+          changed = performance.now()
+        }
+      })
+      page.on('requestfinished', (r) => {
+        if (pending.delete(r)) changed = performance.now()
+      })
+      page.on('requestfailed', (r) => {
+        if (pending.delete(r)) {
+          changed = performance.now()
+          if (!r.failure()?.errorText.includes('ERR_ABORTED')) requestFailure = true
+        }
+      })
+      page.on('response', (response) => {
+        // Ignore replies from the document that a navigation just replaced.
+        if (pending.has(response.request()) && response.status() >= 400) badResponse = true
+      })
+    }
     async function ready() {
       const until = performance.now() + 12_000
       for (;;) {
@@ -504,7 +525,18 @@ try {
           .locator('main [data-slot="skeleton"]:visible,main [aria-busy="true"]:visible')
           .count()
         if (!loading && pending.size === 0 && performance.now() - changed > 100) break
-        if (performance.now() > until) throw new Error('readiness')
+        if (performance.now() > until) {
+          diagnostics.push({
+            case: 'browser.readiness',
+            loading,
+            pending: [...pending].map((r) => ({
+              path: new URL(r.url()).pathname,
+              type: r.resourceType(),
+              timing: r.timing(),
+            })),
+          })
+          throw new Error('readiness')
+        }
         await page.waitForTimeout(30)
       }
       if ((await page.getByRole('heading', { level: 1, includeHidden: true }).count()) !== 1)
@@ -561,6 +593,7 @@ try {
       ]),
     ]
     for (const [id, route] of pages) {
+      await resetPage()
       await measure(
         `browser.${width}.${id}`,
         ['sources.statistics', 'identification.results'].includes(id) ? 10_000 : 5000,
@@ -617,6 +650,7 @@ try {
       ['network.create', '/network/outgoing', 'Add proxy'],
       ['security.create', '/security/secrets', 'Create secret'],
     ]) {
+      await resetPage()
       await navigate(route)
       await measure(
         `browser.${width}.${id}`,
@@ -640,24 +674,24 @@ try {
       await page.keyboard.press('Escape')
     }
     await context.close()
-    const visitor = await browser.newContext({
-      baseURL: origin,
-      viewport: { width, height: 1100 },
-      locale: 'en-US',
-      serviceWorkers: 'block',
-    })
-    await visitor.route('**/*', (route) =>
-      new URL(route.request().url()).origin === origin
-        ? route.continue()
-        : route.abort('blockedbyclient'),
-    )
-    const publicPage = await visitor.newPage()
     for (const [id, route] of [
       ['stremio', '/public'],
       ['torznab', '/public/torznab'],
       ['sharing', '/public/sharing'],
       ['search', '/public/search'],
     ]) {
+      const visitor = await browser.newContext({
+        baseURL: origin,
+        viewport: { width, height: 1100 },
+        locale: 'en-US',
+        serviceWorkers: 'block',
+      })
+      await visitor.route('**/*', (route) =>
+        new URL(route.request().url()).origin === origin
+          ? route.continue()
+          : route.abort('blockedbyclient'),
+      )
+      const publicPage = await visitor.newPage()
       await measure(
         `browser.${width}.public.${id}`,
         4000,
@@ -673,8 +707,8 @@ try {
         () => 'ready',
         3,
       )
+      await visitor.close()
     }
-    await visitor.close()
   }
 } catch (error) {
   diagnostics.push({
