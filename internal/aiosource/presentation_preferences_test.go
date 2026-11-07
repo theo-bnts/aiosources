@@ -48,7 +48,7 @@ func TestFormatterPreservesStructuredMetadataAndOmitsMissingFields(t *testing.T)
 	yes := true
 	out := playbackStream(base, r, "alldebrid", &yes, &model.AIOFile{Path: r.Title + ".mkv", Size: 9_000_000_000}, "https://files.example/video")
 	for _, value := range []string{"2160P", "WEB-DL", "H265", "HDR10", "DV", "TRUEHD", "ATMOS", "7.1", "EXTENDED", "Mbps", "Example source"} {
-		if !strings.Contains(out.Title, value) {
+		if !strings.Contains(out.Title+out.Name, value) {
 			t.Fatal("display metadata missing", value, out.Title)
 		}
 	}
@@ -145,8 +145,8 @@ func TestNativePresentationUsesWhitelistedFieldsWithoutSubtitleURLs(t *testing.T
 		t.Fatal(err)
 	}
 	out := baseStream(rec, Resource{Type: "movie"}, "Example source")
-	for _, field := range []string{"2160P", "HEVC", "REPACK", "TRUEHD", "7.1", "HDR10+", "FR/EN subtitles", "ExampleGroup"} {
-		if !strings.Contains(out.Title, field) {
+	for _, field := range []string{"2160P", "HEVC", "REPACK", "TRUEHD", "7.1", "HDR10+", "French / English subtitles", "ExampleGroup"} {
+		if !strings.Contains(out.Title+out.Name, field) {
 			t.Fatal("missing native presentation", field, out.Title)
 		}
 	}

@@ -83,9 +83,6 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
  UNION ALL SELECT w.id,CASE WHEN e.normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,e.normalized)
  FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
  UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM ingest.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(ingest.ol_aliases(id)) FROM ingest.ol_authors WHERE ` + matching + `)` + combined
-	if len(anchors) > 1 && anchors[1] != "" {
-		sql = strings.ReplaceAll(sql, "ingest.aio_works", anchors[1])
-	}
 	return sql
 }
 

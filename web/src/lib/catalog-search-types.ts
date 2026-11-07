@@ -33,7 +33,7 @@ export type CatalogRelease = {
   size: number
   published_at?: string
   languages: string[]
-  presentation?: { language?: string; details: string[] }
+  presentation?: { highlights?: string[]; language?: string; details: string[] }
   services: CatalogAvailability[]
 }
 export type CatalogDownload = {

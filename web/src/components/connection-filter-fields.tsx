@@ -78,7 +78,7 @@ export function ConnectionFilterFields({
         />
       )}
       <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
-        <div className="flex min-h-9 items-center justify-between gap-3">
+        <div className="flex min-h-(--control-height) items-center justify-between gap-3">
           <Label htmlFor={`${id}-cached`}>Cached results only</Label>
           <Switch id={`${id}-cached`} checked={cachedOnly} onCheckedChange={onCachedChange} />
         </div>

@@ -27,11 +27,14 @@ var compiledPresentationTags = func() []*regexp.Regexp {
 }()
 var presentationGroup = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$`)
 var subtitleMarker = regexp.MustCompile(`(?i)\b(?:VOSTFR|SUBFRENCH)\b`)
+var presentationEncode = regexp.MustCompile(`(?i)^(?:AV1|HEVC|[HX][ .]?26[45]|MPEG[ .-]?[24]|XVID)$`)
+var presentationChannels = regexp.MustCompile(`^(?:[257]\.1(?:\.\d)?|2\.0|MONO|STEREO)$`)
+var presentationStereo = regexp.MustCompile(`^(?:3D|H[- .]?(?:SBS|OU))$`)
 
 func formatStream(stream Stream, rec model.AIORecord) Stream {
-	name := "AIOSources"
+	name := []string{}
 	if stream.Hints.Service != "" {
-		service, marker := model.ServiceName(stream.Hints.Service), ""
+		marker := ""
 		for _, provider := range model.DebridProviders() {
 			if provider.ID == stream.Hints.Service {
 				marker = provider.Marker
@@ -48,21 +51,25 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 				prefix = "[" + marker + " download] "
 			}
 		}
-		name = prefix + name + "\n" + status + " · " + service
+		name = append(name, prefix+status)
 	}
 	presentation := formatReleasePresentation(rec, stream.Hints)
+	name = append(name, presentation.Highlights...)
 	if presentation.Language != "" {
-		name += "\n" + presentation.Language
+		name = append(name, presentation.Language)
 	}
-	stream.Name = name
-	stream.Title = strings.Join(append([]string{rec.Title}, presentation.Details...), "\n")
+	if len(name) == 0 {
+		name = append(name, "AIOSources")
+	}
+	stream.Name = strings.Join(name, "\n")
+	stream.Title = strings.Join(presentation.Details, "\n")
 	return stream
 }
 
 // Search and Stremio share these labels. The caller chooses which source name
 // may be shown; this formatter never falls back to a private source identity.
 func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.ReleasePresentation {
-	lines := []string{}
+	presentation := model.ReleasePresentation{Details: []string{}}
 	// Prefer the selected file for episode-specific tags; the folder supplies
 	// release metadata absent from otherwise bare episode filenames.
 	technical := rec.Title[presentationMetadataStart(rec.Title):]
@@ -70,6 +77,7 @@ func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.Releas
 		technical += " " + hints.Filename[presentationMetadataStart(hints.Filename):]
 	}
 	groups := []string{"resolution", "video", "visual", "audio", "edition"}
+	tags := map[string][]string{}
 	for i, re := range compiledPresentationTags {
 		native := strings.Join(rec.Presentation[groups[i]], " ")
 		native = strings.ReplaceAll(native, "_", "-")
@@ -92,55 +100,118 @@ func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.Releas
 				values = append(values, value)
 			}
 		}
-		if len(values) > 0 {
-			lines = append(lines, presentationTags[i].icon+" "+strings.Join(values, " • "))
+		tags[groups[i]] = values
+	}
+	if slices.ContainsFunc(tags["visual"], presentationStereo.MatchString) {
+		presentation.Highlights = append(presentation.Highlights, "🕶️ 3D")
+	}
+	duration := presentationDuration(hints.Duration)
+	if len(tags["edition"]) > 0 {
+		edition := "✨ " + strings.Join(tags["edition"], " • ")
+		if duration != "" {
+			edition += " (" + duration + ")"
 		}
+		presentation.Highlights = append(presentation.Highlights, edition)
+	} else if duration != "" {
+		presentation.Highlights = append(presentation.Highlights, "⏱️ "+duration)
 	}
-	language := ""
 	if label := streamLanguageLabel(streamLanguages(rec)); label != "" {
-		language = "🌐 " + label
+		presentation.Language = "🌍 " + label
 	}
-	subtitles := []string{}
-	for _, lang := range streamLanguages(model.AIORecord{Languages: rec.SubtitleLanguages}) {
-		subtitles = append(subtitles, strings.ToUpper(lang.code))
-	}
-	if subtitleMarker.MatchString(rec.Title) && !slices.Contains(subtitles, "FR") {
-		subtitles = append(subtitles, "FR")
+	subtitles := streamLanguages(model.AIORecord{Languages: rec.SubtitleLanguages})
+	if subtitleMarker.MatchString(rec.Title) && !slices.ContainsFunc(subtitles, func(value streamLanguage) bool { return value.code == "fr" }) {
+		subtitles = append(subtitles, streamLanguage{code: "fr"})
 	}
 	if len(subtitles) > 0 {
-		lines = append(lines, "💬 "+strings.Join(subtitles, "/")+" subtitles")
+		if presentation.Language != "" {
+			presentation.Language += " • "
+		}
+		// Subtitle flags in the name would be mistaken for audio languages by
+		// generic addon parsers. Full language names also avoid service aliases.
+		presentation.Language += "💬 " + streamLanguageNames(subtitles) + " subtitles"
 	}
+	add := func(icon string, values []string) {
+		if len(values) > 0 {
+			presentation.Details = append(presentation.Details, icon+" "+strings.Join(values, " • "))
+		}
+	}
+	add("🖼️", tags["resolution"])
+	qualities, encodes, repairs := []string{}, []string{}, []string{}
+	for _, value := range tags["video"] {
+		switch {
+		case presentationEncode.MatchString(value):
+			encodes = append(encodes, value)
+		case value == "REPACK" || value == "PROPER":
+			repairs = append(repairs, value)
+		default:
+			qualities = append(qualities, value)
+		}
+	}
+	add("🎞️", append(append(qualities, encodes...), repairs...))
+	add("🎨", slices.DeleteFunc(tags["visual"], func(value string) bool { return value == "3D" }))
+	audio, channels := []string{}, []string{}
+	for _, value := range tags["audio"] {
+		if presentationChannels.MatchString(value) {
+			channels = append(channels, value)
+		} else {
+			audio = append(audio, value)
+		}
+	}
+	add("🔊", append(audio, channels...))
 	size := hints.Size
+	pack := false
+	if size > 0 || rec.Bitrate > 0 {
+		pack = ParseRelease(rec.Title).Pack
+	}
 	if size > 0 {
 		label := "📦 " + streamSize(size)
-		if ParseRelease(rec.Title).Pack && hints.FolderName == "" {
+		if pack && hints.FolderName == "" {
 			label += " · Season pack"
 		}
 		if hints.Duration > 0 {
 			label += fmt.Sprintf(" • %.1f Mbps", float64(size)*8/hints.Duration/1e6)
-		} else if rec.Bitrate > 0 && !ParseRelease(rec.Title).Pack {
+		} else if rec.Bitrate > 0 && !pack {
 			label += fmt.Sprintf(" • %.1f Mbps", rec.Bitrate/1e6)
 		}
-		lines = append(lines, label)
+		presentation.Details = append(presentation.Details, label)
 	}
-	if size <= 0 && rec.Bitrate > 0 && !ParseRelease(rec.Title).Pack {
-		lines = append(lines, fmt.Sprintf("📶 %.1f Mbps", rec.Bitrate/1e6))
+	if size <= 0 && rec.Bitrate > 0 && !pack {
+		presentation.Details = append(presentation.Details, fmt.Sprintf("📦 %.1f Mbps", rec.Bitrate/1e6))
 	}
-	if hints.Duration > 0 {
-		seconds := int64(hints.Duration)
-		lines = append(lines, fmt.Sprintf("⏱️ %dh %02dm", seconds/3600, seconds%3600/60))
-	}
-	if hints.Indexer != "" {
-		lines = append(lines, "🧭 "+hints.Indexer)
-	}
+	extra := []string{}
 	for _, group := range rec.Presentation["group"] {
 		if presentationGroup.MatchString(group) {
-			lines = append(lines, "🧩 "+group)
+			extra = append(extra, "🧩 "+group)
 			break
 		}
 	}
 	if hints.PublishDate != "" {
-		lines = append(lines, "📅 "+strings.Split(hints.PublishDate, "T")[0])
+		extra = append(extra, "📅 "+strings.Split(hints.PublishDate, "T")[0])
 	}
-	return model.ReleasePresentation{Language: language, Details: lines}
+	if len(extra) > 0 {
+		presentation.Details = append(presentation.Details, strings.Join(extra, " • "))
+	}
+	footer := []string{"🔍 AIOSources"}
+	if hints.Indexer != "" {
+		footer = append(footer, "🧭 "+hints.Indexer)
+	}
+	if hints.Service != "" {
+		footer = append(footer, "🌐 "+model.ServiceName(hints.Service))
+	}
+	presentation.Details = append(presentation.Details, strings.Join(footer, " • "))
+	return presentation
+}
+
+func presentationDuration(seconds float64) string {
+	if seconds <= 0 {
+		return ""
+	}
+	minutes := int64(seconds) / 60
+	if minutes == 0 {
+		return fmt.Sprintf("%ds", int64(seconds))
+	}
+	if minutes < 60 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+	return fmt.Sprintf("%dh %02dm", minutes/60, minutes%60)
 }

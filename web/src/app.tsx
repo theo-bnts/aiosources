@@ -40,6 +40,9 @@ import {
   UsersThreeIcon,
   FilmStripIcon,
   BookOpenIcon,
+  KeyIcon,
+  ChartBarIcon,
+  DevicesIcon,
 } from '@phosphor-icons/react'
 import {
   api,
@@ -230,6 +233,32 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Security',
         description: 'Encrypted secrets, sign-in protection and active sessions.',
         icon: ShieldCheckIcon,
+        children: [
+          {
+            to: '/security',
+            label: 'Statistics',
+            description: 'Secrets, verification and signed-in devices.',
+            icon: ChartBarIcon,
+          },
+          {
+            to: '/security/secrets',
+            label: 'Secrets',
+            description: 'Manage encrypted credentials.',
+            icon: KeyIcon,
+          },
+          {
+            to: '/security/verification',
+            label: 'Sign-in protection',
+            description: 'Protect administrator sign-in and manage recovery codes.',
+            icon: ShieldCheckIcon,
+          },
+          {
+            to: '/security/sessions',
+            label: 'Active sessions',
+            description: 'Review and revoke signed-in devices.',
+            icon: DevicesIcon,
+          },
+        ],
       },
       {
         to: '/network',
@@ -317,7 +346,7 @@ const publicNavigationGroups: NavigationGroup[] = [
 ]
 const navigationStorageKey = 'ingest.navigation.groups'
 const navigationLinkClassName =
-  'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary lg:min-h-9'
+  'flex min-h-(--control-height) items-center gap-3 rounded-md px-3 py-2 text-base text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary md:text-sm'
 
 function AppNavigation({
   groups = navigationGroups,
@@ -417,7 +446,7 @@ function AppNavigation({
                   aria-expanded={openGroups[group.id] ?? group.defaultOpen}
                   aria-controls={`${id}-${group.id}`}
                   onClick={() => onToggle(group.id)}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground lg:min-h-9"
+                  className="flex min-h-(--control-height) w-full items-center gap-3 rounded-md px-3 py-2 text-left text-base font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground md:text-sm"
                 >
                   <group.icon size={19} aria-hidden="true" className="shrink-0" />
                   <span className="min-w-0 flex-1">{group.label}</span>
@@ -602,7 +631,9 @@ export function AppShell({
     .sort((a, b) => b.to.length - a.to.length)
     .find(
       (item) =>
-        navigationPath === item.to || (item.to !== '/' && navigationPath.startsWith(`${item.to}/`)),
+        !item.children?.length &&
+        (navigationPath === item.to ||
+          (item.to !== '/' && navigationPath.startsWith(`${item.to}/`))),
     )
   const activeGroup = groups.find((group) => navigationItems(group.items).includes(activeItem!))
   const activeSections = navigationSections(groups).filter((item) =>
@@ -730,7 +761,7 @@ export function AppShell({
   )
   const footer = publicMode ? (
     <div className="shrink-0 border-t border-border p-3">
-      <Button variant="outline" className="min-h-11 w-full lg:min-h-9" asChild>
+      <Button variant="outline" className="w-full" asChild>
         <Link to={authenticated ? '/providers' : '/login'}>
           {authenticated ? 'Administration' : 'Admin login'}
         </Link>
@@ -741,7 +772,7 @@ export function AppShell({
       <ErrorNotice error={logout.error} scope="action" />
       <Button
         variant="warning"
-        className="min-h-11 w-full justify-center lg:min-h-9"
+        className="w-full justify-center"
         disabled={logout.isPending}
         onClick={() => discard(() => logout.mutate())}
       >
@@ -781,7 +812,7 @@ export function AppShell({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-11 lg:hidden"
+                  className="lg:hidden"
                   aria-label="Open navigation"
                   aria-controls="mobile-navigation"
                 >
@@ -899,7 +930,7 @@ export function AppShell({
               <Button
                 variant="ghost"
                 size="icon"
-                className="ml-auto size-11 shrink-0"
+                className="ml-auto shrink-0"
                 aria-label="Close navigation"
               >
                 <XIcon />

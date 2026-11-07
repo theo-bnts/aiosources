@@ -30,7 +30,7 @@ export function AboutDialog() {
         <Button
           variant="outline"
           size="sm"
-          className="size-11 bg-background sm:w-auto lg:h-9 dark:bg-background"
+          className="w-(--control-height) bg-background sm:w-auto dark:bg-background"
           aria-label="About AIOSources"
           title="About AIOSources"
         >

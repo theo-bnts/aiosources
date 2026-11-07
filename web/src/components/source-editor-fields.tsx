@@ -121,7 +121,7 @@ export function BooleanField({
   const value = document.getIn(path)
   return (
     <div className="field">
-      <div className="flex min-h-9 items-center justify-between gap-3">
+      <div className="flex min-h-(--control-height) items-center justify-between gap-3">
         <Label htmlFor={id}>{label}</Label>
         <Switch
           id={id}

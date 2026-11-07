@@ -47,7 +47,7 @@ export function InterfacePreferences() {
         <Button
           variant="outline"
           size="icon"
-          className="size-11 bg-background lg:size-9 dark:bg-background"
+          className="bg-background dark:bg-background"
           aria-label="Interface preferences"
           title="Interface preferences"
         >

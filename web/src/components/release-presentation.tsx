@@ -9,6 +9,9 @@ export function ReleasePresentation({ release }: { release: CatalogRelease }) {
       className="min-w-0 space-y-1 text-sm leading-6 wrap-anywhere"
     >
       <p className="font-medium">{release.title}</p>
+      {release.presentation?.highlights?.map((line) => (
+        <p key={line}>{line}</p>
+      ))}
       {release.presentation?.language && <p>{release.presentation.language}</p>}
       {release.presentation?.details.map((line) => (
         <p key={line}>{line}</p>

@@ -40,7 +40,10 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   await expect(card.getByLabel('Additional parameters (optional)', { exact: true })).toHaveCount(0)
   await expect(card.getByRole('switch')).toBeVisible()
   expect(
-    await card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+    await card
+      .getByRole('switch')
+      .locator('[data-slot="switch-track"]')
+      .evaluate((element) => getComputedStyle(element).backgroundColor),
   ).not.toBe('rgba(0, 0, 0, 0)')
   await card.getByRole('button', { name: 'Edit', exact: true }).click()
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
@@ -101,6 +104,7 @@ test('saved Stremio access updates the same manifest and can be independently re
   await expect(card.getByRole('switch')).not.toBeChecked()
   const switchOffColor = await card
     .getByRole('switch')
+    .locator('[data-slot="switch-track"]')
     .evaluate((element) => getComputedStyle(element).backgroundColor)
   expect(switchOffColor).not.toBe('rgba(0, 0, 0, 0)')
   await card.getByRole('switch', { name: 'Enable Living room', exact: true }).click()
@@ -111,11 +115,17 @@ test('saved Stremio access updates the same manifest and can be independently re
   await expect(card.getByRole('switch')).toBeChecked()
   await expect
     .poll(() =>
-      card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+      card
+        .getByRole('switch')
+        .locator('[data-slot="switch-track"]')
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
     )
     .not.toBe(switchOffColor)
   expect(
-    await card.getByRole('switch').evaluate((element) => getComputedStyle(element).backgroundColor),
+    await card
+      .getByRole('switch')
+      .locator('[data-slot="switch-track"]')
+      .evaluate((element) => getComputedStyle(element).backgroundColor),
   ).not.toBe('rgba(0, 0, 0, 0)')
   const switchBox = await card.getByRole('switch').boundingBox()
   const headingBox = await card

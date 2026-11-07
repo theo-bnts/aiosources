@@ -81,14 +81,14 @@ test('source directories share filters and a stale activation is reloaded withou
   await addSource(page, server.origin, server.sourceURL, 'beta', 'Beta local')
   await addRemote(page)
   const views = [
-    ['/providers', 'beta', 'disabled', 'Showing 1 of 2 sources', 'Source filters', 'Find a source'],
+    ['/providers', 'beta', 'disabled', 'Showing 1 of 2 sources', 'Source filters', 'Source'],
     [
       '/remotes/settings',
       'remote',
       'disabled',
       'Showing 1 of 1 remote catalog',
       'Remote catalog filters',
-      'Find a remote catalog',
+      'Remote catalog',
     ],
   ]
   for (const [route, query, state, count, region, label] of views) {
@@ -96,11 +96,14 @@ test('source directories share filters and a stale activation is reloaded withou
     const filters = page.getByRole('region', { name: region, exact: true })
     await expect(filters.getByRole('status')).toHaveText(count)
     await page.reload()
-    await expect(filters.getByLabel(label, { exact: true })).toHaveValue(query)
-    await filters.getByLabel(label, { exact: true }).fill('missing source')
+    await expect(filters).toContainText(`Matching “${query}”`)
+    const url = new URL(page.url())
+    url.searchParams.delete('q')
+    url.searchParams.set('selection', 'missing-source')
+    await page.goto(url.toString())
     await expect(filters.getByRole('status')).toHaveText(count.replace('Showing 1', 'Showing 0'))
     await filters.getByRole('button', { name: 'Clear filters', exact: true }).click()
-    await expect(filters.getByLabel(label, { exact: true })).toHaveValue('')
+    await expect(filters.getByRole('button', { name: label, exact: true })).toContainText('All')
     expect(new URL(page.url()).searchParams.has('state')).toBe(false)
   }
   await page.goto('/providers/settings')
@@ -146,7 +149,7 @@ test('source directories share filters and a stale activation is reloaded withou
     .toBe(false)
   expect(writes).toBe(1)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.getByLabel('Find a source', { exact: true }).fill('missing')
+  await page.goto('/providers/settings?selection=missing')
   await expect(
     page.getByRole('heading', { name: 'No sources match these filters', exact: true }),
   ).toBeVisible()

@@ -36,11 +36,17 @@
 
 :root {
   color-scheme: dark;
+  --control-height: 2.75rem;
   --background: #191d20;
   --foreground: #e5e9ea;
   --card: #202528;
   --popover: #23292d;
   --primary: #87cabc;
+}
+@media (min-width: 48rem) {
+  :root {
+    --control-height: 2.5rem;
+  }
 }
 @layer base {
   * {
@@ -136,7 +142,7 @@
     @apply border-destructive/40 bg-destructive/10 text-destructive;
   }
   .native-select {
-    @apply h-9 min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs focus-visible:outline-ring disabled:opacity-50 md:text-sm dark:bg-input/30;
+    @apply h-(--control-height) min-h-(--control-height) min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 text-base font-normal shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30;
   }
   .editor-frame {
     @apply overflow-hidden rounded-md border border-input;
@@ -187,17 +193,5 @@
   @apply px-3 sm:px-4;
 }
 [data-slot='disclosure-content'] [data-slot='button']:not([data-size^='icon']) {
-  @apply h-auto max-w-full whitespace-normal;
-}
-[data-slot='disclosure-content'] [data-slot='button'][data-size='default'] {
-  @apply min-h-9;
-}
-[data-slot='disclosure-content'] [data-slot='button'][data-size='sm'] {
-  @apply min-h-8;
-}
-[data-slot='disclosure-content'] [data-slot='button'][data-size='xs'] {
-  @apply min-h-6;
-}
-[data-slot='disclosure-content'] [data-slot='button'][data-size='lg'] {
-  @apply min-h-10;
+  @apply h-auto min-h-(--control-height) max-w-full whitespace-normal;
 }

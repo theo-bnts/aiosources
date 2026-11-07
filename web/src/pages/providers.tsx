@@ -54,7 +54,7 @@ import { CodeEditor } from '@/components/code-editor'
 import { SourceEditor } from '@/components/source-editor'
 import { CollectDialog } from '@/components/collect-dialog'
 import { ListFilters, useListFilters } from '@/components/list-filters'
-import { compareListNames, matchesListQuery } from '@/lib/list-view'
+import { compareListNames } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
 import { SourceImportSettings } from '@/components/source-import-settings'
 import { useDetailBackLink, useListViewState } from '@/lib/detail-navigation'
@@ -77,13 +77,13 @@ export function ProvidersPage() {
   const bySource = new Map((schedules.data?.items ?? []).map((item) => [item.provider_id, item]))
   const visible = items.filter(
     (source) =>
-      matchesListQuery(filters.query, source.name, source.id, source.adapter) &&
+      filters.matchesItem(source.id, source.name, source.id, source.adapter) &&
       filters.matchesState(
         source.enabled ? 'enabled' : 'disabled',
         ...(!source.valid ? ['invalid'] : []),
       ),
   )
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   const toggle = useMutation({
     mutationFn: toggleProvider,
     onSuccess: refreshData,
@@ -115,6 +115,7 @@ export function ProvidersPage() {
       {providers.data && (items.length > 0 || filtered) && (
         <ListFilters
           filters={filters}
+          entries={items}
           states={[
             { value: 'enabled', label: 'Enabled' },
             { value: 'disabled', label: 'Disabled' },
@@ -203,7 +204,7 @@ function SourceCard({
         : ''
   return (
     <section className="section-card" aria-label={`Source ${name}`}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="section-title min-w-0 flex-1 break-words">
           <Link className="data-link" to={sourceSettingsPath(source.id)} state={listState}>
             {name}

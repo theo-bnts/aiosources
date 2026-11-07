@@ -50,8 +50,9 @@ type CatalogRelease struct {
 // ReleasePresentation contains only formatted public release information.
 // Playback URLs, tracker addresses and provider credentials are never included.
 type ReleasePresentation struct {
-	Language string   `json:"language,omitempty"`
-	Details  []string `json:"details"`
+	Highlights []string `json:"highlights,omitempty"`
+	Language   string   `json:"language,omitempty"`
+	Details    []string `json:"details"`
 }
 
 type CatalogAvailability struct {

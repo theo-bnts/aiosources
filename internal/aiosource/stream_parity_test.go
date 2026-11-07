@@ -48,7 +48,7 @@ func TestV1StreamPresentationAndEpisodeEligibility(t *testing.T) {
 			// filter this would hide original audio and invent audio metadata.
 			if strings.Contains(fixture.Title, "VOSTFR") && len(fixture.Languages) == 0 {
 				want = nil
-				if !strings.Contains(stream.Title, "FR subtitles") {
+				if !strings.Contains(stream.Name, "French subtitles") {
 					t.Fatal("subtitle information lost")
 				}
 			}

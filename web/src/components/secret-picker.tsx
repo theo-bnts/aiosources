@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { compareListNames } from '@/lib/list-view'
-import { randomID } from '@/lib/random-id'
+import { newSecretReference } from '@/lib/secret-reference'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, queryClient } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
@@ -98,7 +98,7 @@ export function SecretPicker({
         return { reference, revision: selected.revision, replacing: true }
       }
       return {
-        reference: `${prefix.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)}_${randomID()}`,
+        reference: newSecretReference(prefix),
         revision: 0,
         replacing: false,
       }

@@ -109,8 +109,11 @@ test('Search displays the same release details as Stremio at desktop and mobile 
   expect(stream).toBeDefined()
   const releases = await (await page.request.get(`/api/catalog/${ids.movie}/releases`)).json()
   const release = releases.items.find((item: { provider: string }) => item.provider === 'zulu')
-  expect(stream.description).toBe([release.title, ...release.presentation.details].join('\n'))
-  expect(stream.name).toBe(`AIOSources\n${release.presentation.language}`)
+  expect(stream.description).toBe(release.presentation.details.join('\n'))
+  expect(stream.name).toBe(
+    [...release.presentation.highlights, release.presentation.language].join('\n'),
+  )
+  expect(stream.behaviorHints.filename).toBe(release.title)
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto(`/search/${ids.movie}`)
@@ -118,6 +121,9 @@ test('Search displays the same release details as Stremio at desktop and mobile 
       .locator('[data-slot="release-presentation"]')
       .filter({ hasText: release.title })
     await expect(presentation.getByText(release.title, { exact: true })).toHaveCount(1)
+    for (const highlight of release.presentation.highlights) {
+      await expect(presentation.getByText(highlight, { exact: true })).toHaveCount(1)
+    }
     await expect(
       presentation.getByText(release.presentation.language, { exact: true }),
     ).toBeVisible()

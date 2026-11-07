@@ -51,12 +51,13 @@ func TestCatalogReleaseUsesTheStremioFormatterWithoutAdditionalRequests(t *testi
 		t.Fatal("Search release fixture was unavailable", err)
 	}
 	release := releases.Items[0]
-	description := strings.Join(append([]string{release.Title}, release.Presentation.Details...), "\n")
-	if description != streams[0].Title || "AIOSources\n"+release.Presentation.Language != streams[0].Name {
+	description := strings.Join(release.Presentation.Details, "\n")
+	name := strings.Join(append(release.Presentation.Highlights, release.Presentation.Language), "\n")
+	if description != streams[0].Title || name != streams[0].Name || streams[0].Hints.Filename != release.Title {
 		t.Fatal("Search and Stremio formatted the same release differently")
 	}
-	for _, label := range []string{"🖼️ 1080P", "🎞️ WEB-DL", "🎨 HDR10+", "🔊 DTS", "✨ EXTENDED", "💬 FR subtitles", "📦", "⏱️ 1h 30m", "🧭 Public Library", "🧩 ExampleGroup", "📅 2026-10-09"} {
-		if !strings.Contains(description, label) {
+	for _, label := range []string{"🖼️ 1080P", "🎞️ WEB-DL", "🎨 HDR10+", "🔊 DTS", "✨ EXTENDED (1h 30m)", "💬 French subtitles", "📦", "🧭 Public Library", "🧩 ExampleGroup", "📅 2026-10-09"} {
+		if !strings.Contains(name+"\n"+description, label) {
 			t.Fatalf("known presentation detail was lost: %s", label)
 		}
 	}

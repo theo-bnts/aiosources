@@ -98,15 +98,8 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	bookExtras := ""
 	bookScope := ""
 	if len(media) == 0 || slices.Contains(media, "book") {
-		// Discovery only needs works represented in the imported catalog.
-		// Inline this scope before candidate aggregation; a common word must
-		// not materialize millions of unrelated Open Library works/editions.
-		bookScope = `WITH catalog_book_ids AS MATERIALIZED(SELECT DISTINCT m.work_id AS id FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.status='matched' AND w.media_type='book'),
-catalog_books AS NOT MATERIALIZED(SELECT w.* FROM ingest.aio_works w JOIN catalog_book_ids b ON b.id=w.id) `
-		// Reuse the small set of represented books in every title/edition/author
-		// branch. An unfinished first identification must not search millions of
-		// unrelated entries merely to discover that this set is still empty.
-		bookExtras = ` UNION ALL SELECT * FROM (` + strings.TrimPrefix(bookCatalogCandidates("$1", "$3", matching, anchor, "catalog_books"), " UNION ALL ") + `) book_matches WHERE EXISTS(SELECT 1 FROM catalog_book_ids)`
+		bookScope = catalogBookScope
+		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
  SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1

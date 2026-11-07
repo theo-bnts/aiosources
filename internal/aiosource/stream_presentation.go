@@ -119,8 +119,8 @@ func streamLanguages(r model.AIORecord) []streamLanguage {
 	return out
 }
 
-func streamLanguageLabel(languages []streamLanguage) string {
-	labels, flags := []string{}, []string{}
+func streamLanguageNames(languages []streamLanguage) string {
+	labels := []string{}
 	for _, item := range languages {
 		label := "MULTI"
 		if item.code != "multi" {
@@ -130,11 +130,18 @@ func streamLanguageLabel(languages []streamLanguage) string {
 			label = display.English.Languages().Name(language.Make(item.code))
 		}
 		labels = append(labels, label)
+	}
+	return strings.Join(labels, " / ")
+}
+
+func streamLanguageLabel(languages []streamLanguage) string {
+	flags := []string{}
+	for _, item := range languages {
 		if item.flag != "" {
 			flags = append(flags, item.flag)
 		}
 	}
-	return strings.TrimSpace(strings.Join(labels, " / ") + " " + strings.Join(flags, " "))
+	return strings.TrimSpace(streamLanguageNames(languages) + " " + strings.Join(flags, " "))
 }
 
 func streamSize(bytes int64) string {

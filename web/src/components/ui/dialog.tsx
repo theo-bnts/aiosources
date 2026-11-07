@@ -96,7 +96,7 @@ function DialogContent({
               variant="ghost"
               size="icon"
               aria-label="Close"
-              className="absolute top-2 right-2 size-10 text-muted-foreground sm:size-8"
+              className="absolute top-2 right-2 text-muted-foreground"
             >
               <XIcon aria-hidden="true" />
             </Button>
@@ -111,7 +111,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn('flex flex-col gap-2 pr-6 text-left', className)}
+      className={cn('flex flex-col gap-2 pr-8 text-left', className)}
       {...props}
     />
   )

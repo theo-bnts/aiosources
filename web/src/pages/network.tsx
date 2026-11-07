@@ -11,7 +11,7 @@ import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { Link } from 'react-router-dom'
 import { ListFilters, useListFilters } from '@/components/list-filters'
-import { compareListNames, matchesListQuery } from '@/lib/list-view'
+import { compareListNames } from '@/lib/list-view'
 import type { NetworkProxy, NetworkSettings } from '@/lib/network-types'
 import { useNetworkSettings, useSaveNetwork } from '@/lib/network-settings'
 import type { Items, ProviderSummary } from '@/lib/types'
@@ -63,10 +63,10 @@ export function NetworkPage() {
   const items = [...(settings?.proxies ?? [])].sort(compareListNames)
   const visible = items.filter(
     (proxy) =>
-      matchesListQuery(filters.query, proxy.name, proxy.id, proxy.url) &&
+      filters.matchesItem(proxy.id, proxy.name, proxy.id, proxy.url) &&
       filters.matchesState(proxy.enabled ? 'enabled' : 'disabled'),
   )
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   useSettingsEditor(
     'proxy',
     settings?.proxies,
@@ -111,6 +111,7 @@ export function NetworkPage() {
           <ListFilters
             kind="proxy"
             filters={filters}
+            entries={items}
             count={visible.length}
             total={items.length}
             states={[
@@ -131,7 +132,7 @@ export function NetworkPage() {
               const used = proxyInUse(settings, proxy.id)
               return (
                 <section key={proxy.id} className="section-card" aria-label={`Proxy ${proxy.name}`}>
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <h2 className="section-title break-words">{proxy.name}</h2>
                       <p className="mono mt-1 break-all text-muted-foreground">{proxy.url}</p>
@@ -338,7 +339,7 @@ function ProxyEditor({
               label="Username"
               value={draft.username_ref ?? ''}
               onChange={(username_ref) => update({ username_ref })}
-              prefix="proxy_username"
+              prefix={`${draft.name || draft.id || 'proxy'}_username`}
               addLabel="Add username"
               valueLabel="Proxy username"
               disabled={save.isPending}
@@ -347,7 +348,7 @@ function ProxyEditor({
               label="Password"
               value={draft.password_ref ?? ''}
               onChange={(password_ref) => update({ password_ref })}
-              prefix="proxy_password"
+              prefix={`${draft.name || draft.id || 'proxy'}_password`}
               addLabel="Add password"
               valueLabel="Proxy password"
               disabled={save.isPending}

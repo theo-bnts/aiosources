@@ -93,9 +93,30 @@ const StorageSettingsPage = lazy(() =>
 const SecurityStatisticsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecurityStatisticsPage })),
 )
-const SecuritySettingsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecuritySettingsPage })),
+const SecuritySecretsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecuritySecretsPage })),
 )
+const SecurityVerificationPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecurityVerificationPage })),
+)
+const SecuritySessionsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecuritySessionsPage })),
+)
+
+function LegacySecuritySettings() {
+  const location = useLocation()
+  const setting = settingFromHash(location.hash)
+  const target = setting?.route.startsWith('/security/')
+    ? setting.route
+    : location.hash === '#sessions'
+      ? '/security/sessions'
+      : location.hash === '#verification' || location.hash.startsWith('#runtime-security')
+        ? '/security/verification'
+        : '/security/secrets'
+  return (
+    <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
+  )
+}
 function LegacyImportSettings() {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
@@ -339,32 +360,11 @@ const router = createBrowserRouter(
           <Route path="health" element={<HealthPage />} />
           <Route path="health/settings" element={<StorageSettingsPage />} />
         </Route>
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Security"
-              tabs={[
-                { path: '/security', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/security/settings', label: 'Settings', icon: GearSixIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="security" element={<SecurityStatisticsPage />} />
-          <Route path="security/settings" element={<SecuritySettingsPage />} />
-          <Route
-            path="security/secrets"
-            element={<Navigate to="/security/settings#secrets" replace />}
-          />
-          <Route
-            path="security/verification"
-            element={<Navigate to="/security/settings#verification" replace />}
-          />
-          <Route
-            path="security/sessions"
-            element={<Navigate to="/security/settings#sessions" replace />}
-          />
-        </Route>
+        <Route path="security" element={<SecurityStatisticsPage />} />
+        <Route path="security/settings" element={<LegacySecuritySettings />} />
+        <Route path="security/secrets" element={<SecuritySecretsPage />} />
+        <Route path="security/verification" element={<SecurityVerificationPage />} />
+        <Route path="security/sessions" element={<SecuritySessionsPage />} />
         <Route
           element={
             <WorkspaceLayout
@@ -460,7 +460,7 @@ const router = createBrowserRouter(
         <Route path="torrents" element={<TorrentsPage />} />
         <Route path="search" element={<CatalogSearchPage />} />
         <Route path="search/:id" element={<CatalogTitlePage />} />
-        <Route path="secrets" element={<Navigate to="/security/settings#secrets" replace />} />
+        <Route path="secrets" element={<LegacySecuritySettings />} />
         <Route path="schedules" element={<Navigate to="/providers/settings" replace />} />
         <Route path="settings" element={<Navigate to="/providers/settings" replace />} />
         <Route path="import-settings" element={<LegacyImportSettings />} />

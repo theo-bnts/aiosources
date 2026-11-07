@@ -106,8 +106,11 @@ test('advanced import controls load on demand and folding preserves drafts and n
   )
   await toggle.click()
   await expect(section).not.toHaveAttribute('open', '')
-  await page.getByLabel('Find a source', { exact: true }).fill('Bookmarked source filter')
-  await expect(page).toHaveURL((url) => url.searchParams.get('q') === 'Bookmarked source filter')
+  await page
+    .getByRole('region', { name: 'Source filters', exact: true })
+    .getByRole('button', { name: 'Clear filters', exact: true })
+    .click()
+  await expect(page).toHaveURL((url) => !url.searchParams.has('q'))
   await expect(section).not.toHaveAttribute('open', '')
   await expect(form).toBeHidden()
 })

@@ -27,7 +27,6 @@ test('horizontal tab bars have no vertical scroll range on desktop or mobile', a
       '/metadata',
       '/debrid',
       '/addon',
-      '/security',
       '/health',
       '/remotes',
       '/sharing',
@@ -69,7 +68,6 @@ test('opening a secondary view directly reveals its active tab without scrolling
   await page.setViewportSize({ width: 390, height: 844 })
   for (const path of [
     '/metadata/history',
-    '/security/settings',
     '/health/settings',
     '/remotes/settings',
     '/sharing/settings',
@@ -96,16 +94,16 @@ test('opening a secondary view directly reveals its active tab without scrolling
 test('switching page tabs keeps scroll position and keyboard focus while menu navigation resets', async ({
   page,
 }) => {
-  await page.goto('/security/settings')
+  await page.goto('/health/settings')
   await retainDocumentHeight(page)
   const statistics = page.getByRole('tab', { name: 'Statistics', exact: true })
   await statistics.click()
-  await expect(page).toHaveURL(/\/security$/)
+  await expect(page).toHaveURL(/\/health$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
   await expect(statistics).toBeFocused()
   await page.keyboard.press('ArrowRight')
-  await expect(page).toHaveURL(/\/security\/settings$/)
+  await expect(page).toHaveURL(/\/health\/settings$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toBeFocused()

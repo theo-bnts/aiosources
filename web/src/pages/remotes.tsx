@@ -25,7 +25,7 @@ import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
 import { ListFilters, useListFilters } from '@/components/list-filters'
-import { compareListNames, matchesListQuery } from '@/lib/list-view'
+import { compareListNames } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
 import { CollectDialog } from '@/components/collect-dialog'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
@@ -79,7 +79,7 @@ export function RemoteStatisticsPage() {
   const date = useDate()
   const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
   const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   const counts = useSourceTorrentStats(items.length > 0)
   const totals = items.reduce(
     (total, remote) => {
@@ -124,6 +124,7 @@ export function RemoteStatisticsPage() {
               <ListFilters
                 kind="remote"
                 filters={filters}
+                entries={items}
                 states={remoteStates}
                 count={visible.length}
                 total={items.length}
@@ -180,7 +181,7 @@ const remoteStates = [
 
 function matchesRemoteFilters(remote: RemoteCatalog, filters: ReturnType<typeof useListFilters>) {
   return (
-    matchesListQuery(filters.query, remote.name, remote.id) &&
+    filters.matchesItem(remote.id, remote.name, remote.id) &&
     filters.matchesState(
       remote.enabled ? 'enabled' : 'disabled',
       ...(!remote.valid ? ['invalid'] : []),
@@ -205,7 +206,7 @@ export default function RemotesPage() {
   )
   const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
   const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   function openEditor(remote: RemoteCatalog | 'new') {
     returnFocus.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -224,6 +225,7 @@ export default function RemotesPage() {
         <ListFilters
           kind="remote"
           filters={filters}
+          entries={items}
           states={remoteStates}
           count={visible.length}
           total={items.length}
@@ -254,7 +256,7 @@ export default function RemotesPage() {
                 className="section-card"
                 aria-label={`Remote catalog ${remote.name || remote.id}`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h2 className="section-title break-words">{remote.name || remote.id}</h2>
                     <p className="mono mt-1 break-all text-muted-foreground">{remote.url}</p>
@@ -586,7 +588,7 @@ function RemoteForm({
           label="Sharing password"
           value={draft.secretRef}
           onChange={(reference) => change('secretRef', reference)}
-          prefix="remote_catalog"
+          prefix={`${draft.id || draft.name || 'remote_catalog'}_sharing_password`}
           addLabel="Add sharing password"
           valueLabel="Sharing password"
           emptyLabel="Select a secret"

@@ -253,7 +253,9 @@ test.describe('return navigation', () => {
     await page.reload()
     await page.getByRole('link', { name: 'All sources', exact: true }).click()
     await expect(page).toHaveURL(origin)
-    await expect(page.getByLabel('Find a source', { exact: true })).toHaveValue('Return')
+    await expect(page.getByRole('region', { name: 'Source filters', exact: true })).toContainText(
+      'Matching “Return”',
+    )
   })
 
   test('a manual import returns to the source configuration that started it', async ({

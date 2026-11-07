@@ -25,7 +25,7 @@ export function Disclosure({
       data-variant={variant}
       className={cn(
         '[&[open]>summary>svg]:rotate-90',
-        inline ? 'text-xs' : 'rounded-md border border-border bg-card',
+        inline ? '' : 'rounded-md border border-border bg-card',
         className,
       )}
     >
@@ -41,7 +41,8 @@ export function Disclosure({
         data-slot="disclosure-trigger"
         className={cn(
           'flex cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden',
-          inline ? 'min-h-5 text-xs leading-5' : 'min-h-11 px-4 py-2.5 text-sm leading-5',
+          'text-base leading-6 md:text-sm md:leading-5',
+          inline ? 'min-h-(--control-height)' : 'min-h-[calc(var(--control-height)-2px)] px-4 py-2',
         )}
       >
         <CaretRightIcon aria-hidden="true" className="size-3 shrink-0 transition-transform" />

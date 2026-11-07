@@ -8,7 +8,7 @@ import type { CollectionOverview } from '@/lib/collection-types'
 import type { Controls, InformationStatus } from '@/lib/aiosource-types'
 import { Empty, ErrorNotice, Loading, PageHeader, ResultCount } from '@/components/common'
 import { ListFilters, useListFilters } from '@/components/list-filters'
-import { compareListNames, matchesListQuery } from '@/lib/list-view'
+import { compareListNames } from '@/lib/list-view'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Badge } from '@/components/ui/badge'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -36,13 +36,13 @@ export function SourceStatisticsPage() {
   const counts = useSourceTorrentStats(Boolean(providers.data))
   const visible = items.filter(
     (source) =>
-      matchesListQuery(filters.query, source.name, source.id, source.adapter) &&
+      filters.matchesItem(source.id, source.name, source.id, source.adapter) &&
       filters.matchesState(
         source.enabled ? 'enabled' : 'disabled',
         ...(!source.valid ? ['invalid'] : []),
       ),
   )
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   // Keep existing bookmarks to advanced settings useful after separating views.
   if (new URLSearchParams(location.search).get('settings') === 'advanced')
     return (
@@ -98,6 +98,7 @@ export function SourceStatisticsPage() {
       {providers.data && (items.length > 0 || filtered) && (
         <ListFilters
           filters={filters}
+          entries={items}
           states={[
             { value: 'enabled', label: 'Enabled' },
             { value: 'disabled', label: 'Disabled' },

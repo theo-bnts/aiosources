@@ -29,7 +29,7 @@ import { resolvedLanguage } from '@/lib/language-preferences'
 import { torznabCachePreferences } from '@/lib/torznab-preferences'
 import { ResultCount, ConfirmAction, Empty, ErrorNotice, Loading } from '@/components/common'
 import { ListFilters, useListFilters } from '@/components/list-filters'
-import { compareListNames, matchesListQuery } from '@/lib/list-view'
+import { compareListNames } from '@/lib/list-view'
 import { catalogFieldsSummary, catalogShareState, connectionSummary } from '@/lib/catalog-display'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -97,7 +97,7 @@ const accessStates = [
 
 function matchesShareFilters(share: CatalogShare, filters: ReturnType<typeof useListFilters>) {
   return (
-    matchesListQuery(filters.query, share.name, share.id) &&
+    filters.matchesItem(share.id, share.name, share.id) &&
     filters.matchesState(catalogShareState(share))
   )
 }
@@ -130,7 +130,7 @@ export function SharedCatalogStatisticsPage() {
       a.name.localeCompare(b.name),
   )
   const visible = items.filter((share) => matchesShareFilters(share, filters))
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   return (
     <div className="page">
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
@@ -155,6 +155,7 @@ export function SharedCatalogStatisticsPage() {
               <ListFilters
                 kind="share"
                 filters={filters}
+                entries={items}
                 states={accessStates}
                 count={visible.length}
                 total={items.length}
@@ -251,7 +252,7 @@ export default function SharingPage({
   const filters = useListFilters()
   const items = [...(shares.data?.items ?? [])].sort(compareListNames)
   const visible = items.filter((share) => matchesShareFilters(share, filters))
-  const filtered = Boolean(filters.query || filters.state)
+  const filtered = Boolean(filters.query || filters.selection || filters.state)
   useSettingsEditor(
     format === 'catalog' ? 'share' : format,
     shares.data ? (shares.data.items ?? []) : undefined,
@@ -308,6 +309,7 @@ export default function SharingPage({
           <ListFilters
             kind={connection ? 'access' : 'share'}
             filters={filters}
+            entries={items}
             states={accessStates}
             count={visible.length}
             total={items.length}
@@ -327,7 +329,7 @@ export default function SharingPage({
                 className="section-card"
                 aria-label={`${connection ? 'Access' : 'Share'} ${share.name}`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <h2 className="section-title break-words">{share.name}</h2>
                     <p className="mono mt-1 break-all text-muted-foreground">{share.id}</p>

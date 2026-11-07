@@ -73,7 +73,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await page.getByLabel('Cache validity (minutes)').fill('1500')
   await storeCredential(page, 'Add AllDebrid key', 'AllDebrid API key', 'synthetic-ad-key')
   const ad = await page.getByLabel('AllDebrid API key', { exact: true }).inputValue()
-  expect(ad).toMatch(/^alldebrid_[a-f0-9]{32}$/)
+  expect(ad).toMatch(/^alldebrid_api_key_[a-f0-9]{32}$/)
   await expect(
     page.getByRole('button', { name: 'Replace AllDebrid key', exact: true }),
   ).toBeEnabled()
@@ -106,7 +106,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const saved = await configuration(page)
   expect(saved.alldebrid_secret).toBe(ad)
-  expect(saved.torbox_secret).toMatch(/^torbox_[a-f0-9]{32}$/)
+  expect(saved.torbox_secret).toMatch(/^torbox_api_key_[a-f0-9]{32}$/)
   expect(saved.cache_minutes).toBe(1500)
   expect(JSON.stringify(await (await page.request.get('/api/secrets')).json())).not.toContain(
     'synthetic-',
@@ -123,7 +123,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   const metadata = page.getByRole('form', { name: 'Videos configuration', exact: true })
   await metadata.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(metadata.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  expect((await configuration(page)).tmdb_secret).toMatch(/^tmdb_[a-f0-9]{32}$/)
+  expect((await configuration(page)).tmdb_secret).toMatch(/^tmdb_api_token_[a-f0-9]{32}$/)
   await expect(
     page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeEnabled()

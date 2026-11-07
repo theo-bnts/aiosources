@@ -101,15 +101,15 @@ async function seedDirectories(page: Page, origin: string, sourceURL: string, lo
 }
 
 const directories = [
-  ['/providers', 'Source filters', 'Find a source', 'sources'],
-  ['/providers/settings', 'Source filters', 'Find a source', 'sources'],
-  ['/remotes', 'Remote catalog filters', 'Find a remote catalog', 'remote catalogs'],
-  ['/remotes/settings', 'Remote catalog filters', 'Find a remote catalog', 'remote catalogs'],
-  ['/addon/settings', 'Access filters', 'Find an access key', 'access keys'],
-  ['/torznab', 'Access filters', 'Find an access key', 'access keys'],
-  ['/sharing', 'Share filters', 'Find a share', 'shares'],
-  ['/sharing/settings', 'Share filters', 'Find a share', 'shares'],
-  ['/network/outgoing', 'Proxy filters', 'Find a proxy', 'proxies'],
+  ['/providers', 'Source filters', 'Source', 'sources'],
+  ['/providers/settings', 'Source filters', 'Source', 'sources'],
+  ['/remotes', 'Remote catalog filters', 'Remote catalog', 'remote catalogs'],
+  ['/remotes/settings', 'Remote catalog filters', 'Remote catalog', 'remote catalogs'],
+  ['/addon/settings', 'Access filters', 'Access', 'access keys'],
+  ['/torznab', 'Access filters', 'Access', 'access keys'],
+  ['/sharing', 'Share filters', 'Share', 'shares'],
+  ['/sharing/settings', 'Share filters', 'Share', 'shares'],
+  ['/network/outgoing', 'Proxy filters', 'Proxy', 'proxies'],
   ['/security/settings#secrets', 'Secret filters', 'Find a secret', 'secrets'],
 ] as const
 
@@ -127,17 +127,38 @@ test('directories share query, status, counts, clearing and reload behavior with
     await page.goto(path)
     const controls = page.getByRole('region', { name: label, exact: true })
     await expect(controls.getByRole('status')).toHaveText(`Showing 2 of 2 ${plural}`)
-    await controls.getByLabel(queryLabel, { exact: true }).fill('ALPHA')
+    if (plural === 'secrets') await controls.getByLabel(queryLabel, { exact: true }).fill('ALPHA')
+    else {
+      await controls.getByRole('button', { name: queryLabel, exact: true }).click()
+      await page.getByRole('menuitemcheckbox', { name: 'Alpha 2', exact: true }).check()
+      await page.keyboard.press('Escape')
+    }
     await expect(controls.getByRole('status')).toHaveText(`Showing 1 of 2 ${plural}`)
     if (plural !== 'secrets') await selectMultiple(controls, 'Status', ['disabled'])
     await page.reload()
-    await expect(controls.getByLabel(queryLabel, { exact: true })).toHaveValue('ALPHA')
+    if (plural === 'secrets')
+      await expect(controls.getByLabel(queryLabel, { exact: true })).toHaveValue('ALPHA')
+    else
+      await expect(controls.getByRole('button', { name: queryLabel, exact: true })).toContainText(
+        'Alpha 2',
+      )
     await expect(controls.getByRole('status')).toHaveText(`Showing 1 of 2 ${plural}`)
-    await controls.getByLabel(queryLabel, { exact: true }).fill('unavailable fixture')
+    if (plural === 'secrets')
+      await controls.getByLabel(queryLabel, { exact: true }).fill('unavailable fixture')
+    else {
+      const url = new URL(page.url())
+      url.searchParams.set('selection', 'unknown-directory-entry')
+      await page.goto(url.toString())
+    }
     await expect(controls.getByRole('status')).toHaveText(`Showing 0 of 2 ${plural}`)
     await controls.getByRole('button', { name: 'Clear filters', exact: true }).click()
     await expect(controls.getByRole('status')).toHaveText(`Showing 2 of 2 ${plural}`)
-    await expect(controls.getByLabel(queryLabel, { exact: true })).toHaveValue('')
+    if (plural === 'secrets')
+      await expect(controls.getByLabel(queryLabel, { exact: true })).toHaveValue('')
+    else
+      await expect(controls.getByRole('button', { name: queryLabel, exact: true })).toContainText(
+        `All ${plural}`,
+      )
   }
   expect(writes).toEqual([])
 })

@@ -1,8 +1,7 @@
 import { useNotification } from '@/lib/notifications'
 import { useEffect, useRef, useState } from 'react'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
-import { useIsFetching, useQuery } from '@tanstack/react-query'
-import { useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ShieldCheckIcon, SignOutIcon } from '@phosphor-icons/react'
 import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
@@ -84,7 +83,7 @@ export function SecurityStatisticsPage() {
           label="Stored secrets"
           value={secrets.data?.items?.length ?? 'Not available'}
           loadingLabel={secrets.isPending ? 'Loading secrets…' : undefined}
-          to="/security/settings#secrets"
+          to="/security/secrets"
         />
         <Statistic
           label="Two-step verification"
@@ -95,7 +94,7 @@ export function SecurityStatisticsPage() {
               ? 'text-emerald-800 dark:text-emerald-300'
               : 'text-muted-foreground'
           }
-          to="/security/settings#verification"
+          to="/security/verification"
         />
         <Statistic
           label="Recovery codes remaining"
@@ -114,56 +113,49 @@ export function SecurityStatisticsPage() {
                 : 'Not set up'
               : 'Not available'
           }
-          to="/security/settings#verification"
+          to="/security/verification"
         />
         <Statistic
           label="Active sessions"
           value={sessions.data?.items?.length ?? 'Not available'}
           loadingLabel={sessions.isPending ? 'Loading sessions…' : undefined}
-          to="/security/settings#sessions"
+          to="/security/sessions"
         />
       </dl>
     </div>
   )
 }
 
-export function SecuritySettingsPage() {
-  const { hash, key } = useLocation()
-  const fetching = useIsFetching({
-    predicate: (query) => query.queryKey[0] === 'security' || query.queryKey[0] === 'secrets',
-  })
-  const revealed = useRef('')
-  useEffect(() => {
-    // Filtering a list changes the location key, but must not scroll back to its anchor.
-    const requested = hash
-    if (!['#secrets', '#verification', '#sessions'].includes(hash)) {
-      revealed.current = ''
-      return
-    }
-    if (fetching || revealed.current === requested) return
-    const frame = requestAnimationFrame(() => {
-      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
-      revealed.current = requested
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [hash, key, fetching])
+export function SecuritySecretsPage() {
   return (
-    <div className="page">
-      <PageHeaderVisibility.Provider value={{ title: true, description: false }}>
+    <div className="page [&_.page]:p-0">
+      <PageHeaderVisibility.Provider value={{ title: false, description: false }}>
         <section id="secrets" aria-label="Secrets" className="min-w-0 scroll-mt-20">
           <SecretsPage />
         </section>
-        <div id="verification" className="min-w-0 scroll-mt-20">
-          <SecurityPage view="mfa" />
-        </div>
-        <div id="sessions" className="min-w-0 scroll-mt-20">
-          <SecurityPage view="sessions" />
-        </div>
         <SettingsSections>
-          <RuntimeSettingsPanel section="security" />
           <SecretReferencesHelp />
         </SettingsSections>
       </PageHeaderVisibility.Provider>
+    </div>
+  )
+}
+
+export function SecurityVerificationPage() {
+  return (
+    <div className="page [&_.page]:p-0" id="verification">
+      <SecurityPage view="mfa" />
+      <SettingsSections>
+        <RuntimeSettingsPanel section="security" />
+      </SettingsSections>
+    </div>
+  )
+}
+
+export function SecuritySessionsPage() {
+  return (
+    <div id="sessions">
+      <SecurityPage view="sessions" />
     </div>
   )
 }
@@ -337,7 +329,7 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       </Button>
                     </div>
                   </>
-                ) : (
+                ) : enrollment || status.data.pending_expires_at ? (
                   <div className="space-y-4">
                     {status.data.pending_expires_at && (
                       <p className="text-sm text-muted-foreground">
@@ -369,7 +361,7 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
                       )}
                     </div>
                   </div>
-                )}
+                ) : null}
                 <p className="help">
                   Enabling, disabling or replacing recovery codes requires your current password and
                   revokes other sessions. Enabled protection can only be changed with an unused
@@ -385,7 +377,6 @@ function SecurityPage({ view }: { view: 'mfa' | 'sessions' }) {
         <section className="space-y-4" aria-label="Active sessions">
           <div className="page-heading">
             <div>
-              <h2 className="section-title">Active sessions</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 Each session keeps the expiry assigned at sign-in. Device descriptions are
                 deliberately coarse; no IP address or raw user agent is stored.

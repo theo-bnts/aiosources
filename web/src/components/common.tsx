@@ -431,15 +431,8 @@ export function ConfirmAction({
         </AlertDialogHeader>
         <ErrorNotice error={error} />
         <AlertDialogFooter>
-          <AlertDialogCancel className="min-h-11 sm:min-h-9" disabled={pending}>
-            Back
-          </AlertDialogCancel>
-          <Button
-            variant={selected.variant}
-            className="min-h-11 sm:min-h-9"
-            disabled={pending}
-            onClick={() => void confirm()}
-          >
+          <AlertDialogCancel disabled={pending}>Back</AlertDialogCancel>
+          <Button variant={selected.variant} disabled={pending} onClick={() => void confirm()}>
             {pending ? 'Processing…' : selected.label}
           </Button>
         </AlertDialogFooter>

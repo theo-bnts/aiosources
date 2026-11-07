@@ -64,7 +64,7 @@ test('closing a settings-linked editor keeps directory filters usable without re
   await expect(editor.getByLabel('Name', { exact: true })).toBeFocused()
   await editor.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(editor).toHaveCount(0)
-  await page.getByLabel('Find a proxy', { exact: true }).fill('Nothing')
+  await page.goto('/network/outgoing?selection=unknown-proxy')
   await expect(page.getByText('No proxies match these filters', { exact: true })).toBeVisible()
   await expect(editor).toHaveCount(0)
 })

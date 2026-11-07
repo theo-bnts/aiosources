@@ -174,7 +174,7 @@ test('operation errors remain in their history and manual controls without appea
   }
 })
 
-test('Security opens Statistics and existing security bookmarks lead to Settings', async ({
+test('Security separates its pages and preserves existing bookmarks without repeated scrolling', async ({
   page,
   server,
 }) => {
@@ -187,54 +187,35 @@ test('Security opens Statistics and existing security bookmarks lead to Settings
       })
     ).status(),
   ).toBe(204)
-  for (const path of [
-    '/security/secrets',
-    '/secrets',
-    '/security/verification',
-    '/security/sessions',
+  for (const [path, target, region] of [
+    ['/secrets', '/security/secrets', 'Secrets'],
+    ['/security/settings', '/security/secrets', 'Secrets'],
+    ['/security/settings#secrets', '/security/secrets', 'Secrets'],
+    ['/security/settings#verification', '/security/verification', 'Two-step verification'],
+    ['/security/settings#sessions', '/security/sessions', 'Active sessions'],
+    ['/security/settings#setting=security.mfa', '/security/verification', 'Two-step verification'],
+    ['/security/settings#setting=security.sessions', '/security/sessions', 'Active sessions'],
   ]) {
     await page.goto(path)
-    await expect(page).toHaveURL(/\/security\/settings#(secrets|verification|sessions)$/)
-    await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
-    await expect(
-      page.getByRole('button', { name: 'Create secret', exact: true }).first(),
-    ).toBeVisible()
+    await expect(page).toHaveURL((url) => url.pathname === target)
+    await expect(page.getByRole('region', { name: region, exact: true })).toBeVisible()
+    await expect(page.getByRole('tablist', { name: 'Security views', exact: true })).toHaveCount(0)
+    for (const other of ['Secrets', 'Two-step verification', 'Active sessions'].filter(
+      (name) => name !== region,
+    ))
+      await expect(page.getByRole('region', { name: other, exact: true })).toHaveCount(0)
   }
-  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
-  await expect(page).toHaveURL(/\/security$/)
+  await page.goto('/security')
   await page.reload()
-  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
-  await page
-    .getByRole('navigation', { name: 'Main navigation', exact: true })
-    .getByRole('link', { name: 'Security', exact: true })
-    .click()
-  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
-  await expect(
-    page.getByRole('tablist', { name: 'Security views', exact: true }).getByRole('tab'),
-  ).toHaveText(['Statistics', 'Settings'])
-  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toHaveCount(0)
   await expect(page.getByText('Stored secrets', { exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'View stored secrets', exact: true }).click()
+  await expect(page).toHaveURL(/\/security\/secrets$/)
   await expect(
     page.getByRole('region', { name: 'Secrets', exact: true }).getByRole('columnheader'),
   ).toHaveText(['Reference', 'Last updated', 'Actions'])
-  await expect(
-    page.getByRole('region', { name: 'Two-step verification', exact: true }),
-  ).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  await page.goto('/security')
   await page.getByRole('link', { name: 'View active sessions', exact: true }).click()
-  await expect(page).toHaveURL(/\/security\/settings#sessions$/)
-  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toBeInViewport()
+  await expect(page).toHaveURL(/\/security\/sessions$/)
   await page.locator('#main-content').evaluate((main) => {
     main.style.minHeight = '2400px'
   })

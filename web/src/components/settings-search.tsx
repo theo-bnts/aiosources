@@ -320,7 +320,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
                     key={row.id}
                     aria-selected={active === index}
                     tabIndex={-1}
-                    className={`flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-3 text-left text-sm ${active === index ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
+                    className={`flex min-h-(--control-height) w-full min-w-0 items-center gap-3 rounded-md px-3 py-3 text-left text-base md:text-sm ${active === index ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
                     onPointerMove={(event) => {
                       if (event.pointerType === 'mouse') {
                         keyboardSelection.current = false
@@ -352,7 +352,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
                   id={`${id}-result-${visible.length}`}
                   aria-selected={active === visible.length}
                   tabIndex={-1}
-                  className={`w-full rounded-md px-3 py-3 text-left text-sm font-medium ${active === visible.length ? 'bg-accent' : 'hover:bg-accent/60'}`}
+                  className={`min-h-(--control-height) w-full rounded-md px-3 py-2 text-left text-base font-medium md:text-sm ${active === visible.length ? 'bg-accent' : 'hover:bg-accent/60'}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onPointerMove={(event) => {
                     if (event.pointerType === 'mouse') {

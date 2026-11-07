@@ -29,7 +29,7 @@ async function expectBounded(control: Locator, truncated = false) {
           bounds.width > 0 &&
           bounds.left >= Math.max(field.left, dialog?.left ?? 0) &&
           bounds.right <= Math.min(field.right, dialog?.right ?? innerWidth, innerWidth) + 1 &&
-          bounds.height <= 40
+          bounds.height <= (innerWidth < 768 ? 44 : 40) + 1
         )
       }),
     )

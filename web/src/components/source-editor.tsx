@@ -16,6 +16,7 @@ import { parseProviderJSON, type ProviderJSON } from '@/lib/provider-json'
 import { Button } from '@/components/ui/button'
 import { ConfirmAction } from '@/components/common'
 import { SecretPicker } from '@/components/secret-picker'
+import { sourceCredentialPurpose } from '@/lib/secret-reference'
 import { DurationSelect, ScheduleTimingFields } from '@/components/schedule-fields'
 import { timingMode, type TimingMode } from '@/lib/schedule-input'
 import { Switch } from '@/components/ui/switch'
@@ -131,11 +132,17 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
 function SourceSecretField({ path, label }: { path: string[]; label: string }) {
   const { document, change, readOnly } = useSourceEditor()
   const current = document.getIn(path)
+  const service = document.get('id') || document.get('name') || 'source'
+  const purpose = sourceCredentialPurpose(
+    path.at(-1) ?? '',
+    String(document.getIn(['auth', 'type']) ?? ''),
+    String(document.getIn(['auth', 'name']) ?? ''),
+  )
   return (
     <SecretPicker
       label={label}
       value={typeof current === 'string' ? current : ''}
-      prefix="source_auth"
+      prefix={`${service}_${purpose}`}
       addLabel={`Add ${label.replace(/ reference$/i, '').toLowerCase()}`}
       valueLabel={
         label === 'Secret reference' ? 'Credential value' : label.replace(/ reference$/i, '')
@@ -1429,7 +1436,7 @@ export function SourceEditor({
                           buttons.current[index] = element
                         }}
                         disabled={drafts.size > 0 && selected !== index}
-                        className={`flex w-full items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors disabled:opacity-50 ${selected === index ? 'border-primary/60 bg-primary/8' : 'border-border bg-card/70 hover:border-primary/30 hover:bg-accent'}`}
+                        className={`flex min-h-(--control-height) w-full items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors disabled:opacity-50 ${selected === index ? 'border-primary/60 bg-primary/8' : 'border-border bg-card/70 hover:border-primary/30 hover:bg-accent'}`}
                         onClick={() => setSelected(index)}
                         onKeyDown={(event) => {
                           if (drafts.size > 0) return
@@ -1456,7 +1463,9 @@ export function SourceEditor({
                           <Icon size={17} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-medium">{stage.label}</span>
+                          <span className="block text-base font-medium md:text-sm">
+                            {stage.label}
+                          </span>
                           <span
                             className={`mt-1 break-words text-xs leading-5 text-muted-foreground ${selected === index ? 'block' : 'hidden lg:block'}`}
                           >

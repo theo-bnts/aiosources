@@ -36,7 +36,7 @@ export function MultiSelect({
             aria-label={label}
             type="button"
             variant="outline"
-            className="min-w-0 w-full max-w-full justify-between py-1 text-base md:text-sm"
+            className="min-w-0 w-full max-w-full justify-between py-1 font-normal"
           >
             <span className="min-w-0 flex-1 truncate text-left" title={selected}>
               {selected}
@@ -53,7 +53,7 @@ export function MultiSelect({
           >
             <DropdownMenu.Item
               onSelect={() => onChange([])}
-              className="cursor-pointer rounded-sm px-3 py-2 text-sm outline-none data-[highlighted]:bg-accent"
+              className="flex min-h-(--control-height) cursor-pointer items-center rounded-sm px-3 py-2 text-base outline-none data-[highlighted]:bg-accent md:text-sm"
             >
               {allLabel}
             </DropdownMenu.Item>
@@ -80,9 +80,9 @@ export function MultiSelect({
                         )
                       }
                       onSelect={(event) => event.preventDefault()}
-                      className="relative cursor-pointer rounded-sm py-2 pr-3 pl-8 text-sm outline-none data-[highlighted]:bg-accent"
+                      className="relative flex min-h-(--control-height) cursor-pointer items-center rounded-sm py-2 pr-3 pl-8 text-base outline-none data-[highlighted]:bg-accent md:text-sm"
                     >
-                      <DropdownMenu.ItemIndicator className="absolute left-2 top-2.5">
+                      <DropdownMenu.ItemIndicator className="absolute inset-y-0 left-2 flex items-center">
                         <CheckIcon aria-hidden="true" />
                       </DropdownMenu.ItemIndicator>
                       <span className="break-words">{option.label}</span>

@@ -239,7 +239,6 @@ function RunControls({
       {(active || canHold || (run.status === 'paused' && pending === 'pause')) && (
         <Button
           variant="warning"
-          className="min-h-11 sm:min-h-9"
           disabled={pausing || cancelling || pending === 'resume'}
           title={
             canHold
@@ -269,11 +268,7 @@ function RunControls({
           label={active ? 'Request cancellation' : 'Cancel run'}
           variant="destructive"
           trigger={
-            <Button
-              variant="destructive"
-              className="min-h-11 sm:min-h-9"
-              disabled={cancelling || pending === 'resume'}
-            >
+            <Button variant="destructive" disabled={cancelling || pending === 'resume'}>
               <StopIcon aria-hidden="true" />
               {cancelling ? 'Cancellation requested' : 'Cancel'}
             </Button>
@@ -287,7 +282,7 @@ function RunControls({
           description="Resuming clears any manual hold, starts from the last validated point and adds a new page budget. It uses the original source snapshot, not later JSON changes. The current source must still be valid and enabled."
           label="Resume run"
           trigger={
-            <Button className="min-h-11 sm:min-h-9" disabled={Boolean(pending)}>
+            <Button disabled={Boolean(pending)}>
               <PlayIcon aria-hidden="true" />
               {pending === 'resume' ? 'Resuming…' : 'Resume'}
             </Button>

@@ -219,7 +219,7 @@ export default function AIOSourcePage({
       label={label}
       value={config?.[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
-      prefix={key.replace('_secret', '')}
+      prefix={key === 'tmdb_secret' ? 'tmdb_api_token' : `${key.replace('_secret', '')}_api_key`}
       addLabel={`Add ${key === 'tmdb_secret' ? 'TMDB token' : `${debridProviders.find((provider) => provider.secret === key)?.name} key`}`}
       valueLabel={label}
       disabled={save.isPending}
@@ -711,7 +711,7 @@ export default function AIOSourcePage({
                   <p className="help">
                     For uncached private torrents, add the complete announce URL, including its
                     passkey, in{' '}
-                    <Link className="data-link" to="/security/settings#secrets">
+                    <Link className="data-link" to="/security/secrets">
                       Secrets
                     </Link>
                     , or directly below, then save the playback settings. The URL is used exactly as
@@ -745,7 +745,7 @@ export default function AIOSourcePage({
                           label="Announce URL secret"
                           value={tracker.announce_secret}
                           onChange={(reference) => change({ announce_secret: reference })}
-                          prefix={`announce_${p.id}`}
+                          prefix={`${p.id}_announce_url`}
                           addLabel="Add announce URL"
                           valueLabel="Complete announce URL"
                           disabled={save.isPending || !tracker.private}

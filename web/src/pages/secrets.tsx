@@ -12,6 +12,7 @@ import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { PlusIcon, KeyIcon, ArrowClockwiseIcon, TrashIcon } from '@phosphor-icons/react'
+import { newSecretReference } from '@/lib/secret-reference'
 import { api, ApiError, queryClient } from '@/lib/api'
 import { useDate } from '@/lib/format'
 import type { Items, SecretInfo } from '@/lib/types'
@@ -99,14 +100,15 @@ export default function SecretsPage() {
   })
   const busy = save.isPending || review.isPending
   function openSecret(secretName = '') {
+    const reference = secretName || newSecretReference('secret')
     returnFocus.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
-    setName(secretName)
+    setName(reference)
     setValue('')
     save.reset()
     review.reset()
     setEditing({
-      name: secretName,
+      name: reference,
       rotate: Boolean(secretName),
       revision: secrets.data?.items?.find((secret) => secret.name === secretName)?.revision ?? 0,
     })
@@ -122,14 +124,6 @@ export default function SecretsPage() {
           </Button>
         }
       />
-      <div className="notice flex items-start gap-3">
-        <KeyIcon className="mt-1 shrink-0 text-primary" />
-        <p>
-          Create a secret here or directly from a settings form, then select its name where it is
-          needed. Replacing a value updates every setting that uses this name. Values remain hidden
-          after saving.
-        </p>
-      </div>
       <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
       {secrets.data &&
         (items.length || filtered ? (

@@ -55,11 +55,11 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Administration', 'Outgoing', '/network/routing'],
     ['Administration', 'Incoming', '/network/incoming'],
     ['Administration', 'Storage', '/health'],
-    ['Administration', 'Security', '/security'],
-    ['Administration', 'Security', '/secrets'],
-    ['Administration', 'Security', '/security/secrets'],
-    ['Administration', 'Security', '/security/verification'],
-    ['Administration', 'Security', '/security/sessions'],
+    ['Administration', 'Statistics', '/security'],
+    ['Administration', 'Secrets', '/secrets'],
+    ['Administration', 'Secrets', '/security/secrets'],
+    ['Administration', 'Sign-in protection', '/security/verification'],
+    ['Administration', 'Active sessions', '/security/sessions'],
     ['Administration', 'Logs', '/logs'],
     ['Administration', 'Logs', '/notifications'],
     ['Administration', 'Logs', '/webhooks'],
@@ -72,7 +72,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
       ['Sources', 'Metadata', 'Connections', 'Administration'].includes(group)
         ? ['Incoming', 'Outgoing'].includes(label)
           ? [`${group}/`, 'Network/', label]
-          : [`${group}/`, label]
+          : ['Statistics', 'Secrets', 'Sign-in protection', 'Active sessions'].includes(label)
+            ? [`${group}/`, 'Security/', label]
+            : [`${group}/`, label]
         : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -100,6 +102,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
   }
   await page.goto('/providers')
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
+  const security = navigation.getByRole('button', { name: 'Security', exact: true })
+  if ((await security.getAttribute('aria-expanded')) === 'true') await security.click()
   const network = navigation.getByRole('button', { name: 'Network', exact: true })
   if ((await network.getAttribute('aria-expanded')) === 'true') await network.click()
   await expect(navigation.getByRole('button')).toHaveText([
@@ -107,6 +111,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Metadata',
     'Connections',
     'Administration',
+    'Security',
     'Network',
   ])
   await expect(navigation.getByRole('link')).toHaveText([
@@ -121,7 +126,6 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Stremio',
     'Torznab',
     'Shared catalogs',
-    'Security',
     'Public access',
     'Storage',
     'Logs',
@@ -195,20 +199,21 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   ).toBeHidden()
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
-  await navigation.getByRole('link', { name: 'Security', exact: true }).click()
+  await navigation.getByRole('button', { name: 'Security', exact: true }).click()
+  await navigation.getByRole('link', { name: 'Secrets', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
-  const tabs = page.getByRole('tablist', { name: 'Security views', exact: true })
-  await expect(tabs).toHaveAttribute('aria-orientation', 'horizontal')
-  await expect(tabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  )
-  await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toHaveCount(0)
-  await tabs.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('tablist', { name: 'Security views', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
+  await page
+    .getByRole('navigation', { name: 'Main navigation', exact: true })
+    .getByRole('link', { name: 'Active sessions', exact: true })
+    .click()
   await expect(page.getByText('This session', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Active sessions', exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Active sessions', exact: true, level: 1 }),
+  ).toBeVisible()
   await expect(page.getByText('Security audit', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
