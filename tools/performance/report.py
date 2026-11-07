@@ -63,9 +63,16 @@ def evaluate(report, baseline=None):
         # timings and scheduler noise must not masquerade as regressions.
         for metric in ("median_ms", "p95_ms"):
             limit = max(before[metric] * 1.20, before[metric] + case.get("noise_ms", 50))
-            if case[metric] > limit:
+            # With five repetitions p95 is the maximum. Require a repeated
+            # relative tail slowdown, while every hard deadline still applies
+            # to even one sample above. A host scheduling pause is not evidence
+            # of a code regression by itself.
+            repeated = metric != "p95_ms" or sum(value > limit for value in case["samples_ms"]) >= 2
+            if case[metric] > limit and repeated:
                 failures.append({"case": case["id"], "reason": metric + "_regression", "actual_ms": case[metric], "limit_ms": round(limit, 3)})
         for metric, slack in (("bytes_per_op", 4096), ("allocs_per_op", 10)):
+            if metric == "bytes_per_op":
+                slack = case.get("noise_bytes", slack)
             if metric in case and metric in before and case[metric] > max(before[metric] * 1.20, before[metric] + slack):
                 failures.append({"case": case["id"], "reason": metric + "_regression"})
     for metric, slack in (("peak_rss_mib", 128), ("sampled_cpu_seconds", 2)):

@@ -134,6 +134,9 @@ def go_benchmarks(database, samples):
         # Batch imports/matching legitimately do more work than a page request.
         budget = 15_000 if any(value in name for value in ("Matching", "MetadataRetrieval", "BookImport", "Reset", "CatalogRoundTrip")) else 5000
         row = {"id": name, "budget_ms": budget, "samples_ms": values, "noise_ms": 20, "contract": "asserted"}
+        # Full one-iteration flows can acquire a pooled 16 KiB HTTP/PG buffer
+        # after benchmark GC. Warm micro profiles retain the tighter allowance.
+        row["noise_bytes"] = 4096 if name.startswith("synthetic.books.") or ".BenchmarkProviderAccountValidation/" in name else 32768
         if allocations[name]:
             row.update(bytes_per_op=statistics.median(value[0] for value in allocations[name]), allocs_per_op=statistics.median(value[1] for value in allocations[name]))
         result.append(row)
@@ -243,7 +246,7 @@ def measure_application(database, binary, samples):
 
 def environment_identity(samples):
     # No hostname, paths, user name, connection URI or credential enters a report.
-    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "account_iterations": 100, "operation_iterations": 1, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
+    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "account_iterations": 100, "operation_iterations": 1, "operation_allocation_noise_bytes": 32768, "relative_tail_samples": 2, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
 
 
 def main():

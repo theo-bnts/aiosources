@@ -30,6 +30,22 @@ class PerformanceContracts(unittest.TestCase):
         self.assertIn("median_ms_regression", reasons)
         self.assertIn("p95_ms_regression", reasons)
 
+    def test_relative_tail_slowdown_needs_repetition_but_deadlines_do_not(self):
+        before = report()
+        self.assertEqual(evaluate(report((100, 100, 100, 100, 300)), before), [])
+        reasons = {row["reason"] for row in evaluate(report((100, 100, 100, 300, 300)), before)}
+        self.assertEqual(reasons, {"p95_ms_regression"})
+        self.assertIn("time_budget", {row["reason"] for row in evaluate(report((100, 100, 100, 100, 6000)), before)})
+
+    def test_pooled_buffer_allowance_still_detects_larger_allocation_changes(self):
+        before = report()
+        before["cases"][0].update(bytes_per_op=64000, noise_bytes=32768)
+        after = copy.deepcopy(before)
+        after["cases"][0]["bytes_per_op"] += 16384
+        self.assertEqual(evaluate(after, before), [])
+        after["cases"][0]["bytes_per_op"] = 100000
+        self.assertIn("bytes_per_op_regression", {row["reason"] for row in evaluate(after, before)})
+
     def test_absolute_deadline_applies_without_any_baseline(self):
         failures = evaluate(report((6000,) * 5))
         self.assertEqual(failures[0]["reason"], "time_budget")
