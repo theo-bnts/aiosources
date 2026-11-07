@@ -105,10 +105,15 @@ def parse_go_benchmarks(output):
 
 def go_benchmarks(database, samples):
     env = child_environment(database, TEST_DATABASE_URL=database.uri(), GOMAXPROCS="2", GOMEMLIMIT="512MiB")
-    code = invoke(database, [os.environ.get("GO", "go"), "test", "-run=^$", "-bench=.", "-benchtime=1x", "-benchmem", "-count=" + str(samples), "-timeout=10m", "./internal/books", "./internal/connectors", "./internal/jobs", "./internal/store", "./internal/aiosource", "./internal/httpapi"], "synthetic", env, timeout=900, check=False)
-    if code:
+    common = [os.environ.get("GO", "go"), "test", "-run=^$", "-bench=.", "-benchmem", "-count=" + str(samples), "-timeout=10m"]
+    # One parse is too small to amortize regexp/sync.Pool initialization after
+    # Go's benchmark GC. Keep expensive complete operations at one iteration.
+    micro = invoke(database, [*common, "-benchtime=100x", "./internal/books"], "synthetic-books", env, timeout=120, check=False)
+    code = invoke(database, [*common, "-benchtime=1x", "./internal/connectors", "./internal/jobs", "./internal/store", "./internal/aiosource", "./internal/httpapi"], "synthetic", env, timeout=900, check=False)
+    if code or micro:
         return [{"id": "synthetic.execution", "budget_ms": 1, "samples_ms": [0], "error": "operation_failed"}]
-    groups, allocations = parse_go_benchmarks((database.root / "synthetic.log").read_text())
+    output = (database.root / "synthetic-books.log").read_text() + "\n" + (database.root / "synthetic.log").read_text()
+    groups, allocations = parse_go_benchmarks(output)
     if not REQUIRED_BENCHMARKS.issubset(groups) or any(len(values) != samples for values in groups.values()):
         raise RuntimeError("Synthetic benchmark coverage or repetition count is incomplete")
     result = []
@@ -225,7 +230,7 @@ def measure_application(database, binary, samples):
 
 def environment_identity(samples):
     # No hostname, paths, user name, connection URI or credential enters a report.
-    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "samples": samples}
+    return {"os": platform.system(), "architecture": platform.machine(), "cpu_count": os.cpu_count(), "app_threads": 2, "go_memory_mib": 512, "pg_shared_buffers_mib": 256, "pg_work_mem_mib": 4, "pg_io_method": "sync", "pg_wal_mib": 1024, "book_iterations": 100, "operation_iterations": 1, "browser_navigation_noise_ms": 350, "browser_control_noise_ms": 150, "samples": samples}
 
 
 def main():

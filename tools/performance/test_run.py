@@ -4,6 +4,14 @@ from run import parse_go_benchmarks
 
 
 class GoBenchmarkOutput(unittest.TestCase):
+    def test_microbenchmark_metrics_remain_per_operation(self):
+        groups, allocations = parse_go_benchmarks(
+            "pkg: example/internal/books\n"
+            "BenchmarkParse-2     100 6000 ns/op 2400 B/op 43 allocs/op\n"
+        )
+        self.assertEqual(groups["synthetic.books.BenchmarkParse"], [0.006])
+        self.assertEqual(allocations["synthetic.books.BenchmarkParse"], [(2400, 43)])
+
     def test_intervening_background_logs_preserve_each_complete_sample(self):
         groups, allocations = parse_go_benchmarks(
             "pkg: example/internal/store\n"

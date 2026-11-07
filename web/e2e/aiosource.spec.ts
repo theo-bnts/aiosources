@@ -388,13 +388,21 @@ test('private playback saves independently and fields have space below their lab
     announce_secret: 'private_announce_url',
   })
   const assertSpacing = async (id: string) => {
-    const label = await page.locator(`label[for="${id}"]`).boundingBox()
-    const field = await page.locator(`[id="${id}"]`).boundingBox()
-    expect(label).not.toBeNull()
-    expect(field).not.toBeNull()
-    expect(field!.y - (label!.y + label!.height)).toBeGreaterThanOrEqual(6)
+    const label = page.locator(`label[for="${id}"]`)
+    const field = page.locator(`[id="${id}"]`)
+    await expect(label).toBeVisible()
+    await expect(field).toBeVisible()
+    // An opening dialog scales its children briefly. Check the settled layout,
+    // while still failing if the actual label/field spacing is too small.
+    await expect
+      .poll(async () => {
+        const [labelBox, fieldBox] = await Promise.all([label.boundingBox(), field.boundingBox()])
+        return labelBox && fieldBox ? fieldBox.y - (labelBox.y + labelBox.height) : 0
+      })
+      .toBeGreaterThanOrEqual(6)
   }
   await assertSpacing('announce-private-playback')
+  await openDisclosure(page, 'Cache availability')
   await assertSpacing('cache_minutes')
   await assertSpacing('alldebrid_secret')
   const assertPlaybackFooter = async () => {

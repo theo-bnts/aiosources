@@ -34,6 +34,20 @@ class PerformanceContracts(unittest.TestCase):
         failures = evaluate(report((6000,) * 5))
         self.assertEqual(failures[0]["reason"], "time_budget")
 
+    def test_one_deadline_miss_cannot_hide_beyond_the_95th_percentile(self):
+        after = report([100] * 19 + [6000])
+        self.assertEqual(after["cases"][0]["p95_ms"], 100)
+        self.assertEqual(evaluate(after)[0]["reason"], "time_budget")
+
+    def test_measured_browser_noise_does_not_remove_the_regression_guard(self):
+        before = report()
+        before["cases"][0].update(id="browser.search", noise_ms=350)
+        after = copy.deepcopy(before)
+        after["cases"][0] = summarize({**after["cases"][0], "samples_ms": [400] * 5})
+        self.assertEqual(evaluate(after, before), [])
+        after["cases"][0] = summarize({**after["cases"][0], "samples_ms": [500] * 5})
+        self.assertIn("median_ms_regression", {row["reason"] for row in evaluate(after, before)})
+
     def test_missing_case_is_not_silently_skipped(self):
         after = report()
         after["cases"] = []

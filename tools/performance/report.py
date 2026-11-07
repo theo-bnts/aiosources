@@ -36,8 +36,8 @@ def evaluate(report, baseline=None):
             raise ValueError("Invalid performance budget")
         if case.get("error"):
             failures.append({"case": case["id"], "reason": case["error"]})
-        elif case["p95_ms"] > case["budget_ms"]:
-            failures.append({"case": case["id"], "reason": "time_budget", "actual_ms": case["p95_ms"], "limit_ms": case["budget_ms"]})
+        elif max(case["samples_ms"]) > case["budget_ms"]:
+            failures.append({"case": case["id"], "reason": "time_budget", "actual_ms": max(case["samples_ms"]), "limit_ms": case["budget_ms"]})
     resources = report.get("resources", {})
     # Summed RSS includes PostgreSQL shared mappings in several processes.
     # Use a conservative ceiling; the baseline still guards a 20% increase.

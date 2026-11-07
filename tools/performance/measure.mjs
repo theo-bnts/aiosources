@@ -29,6 +29,15 @@ const finiteError = (error) =>
     ? error.message
     : 'operation_failed'
 
+function timingNoise(id) {
+  if (!id.startsWith('browser.')) return 50
+  // A lazy React route can commit one Suspense fallback later (about 300 ms)
+  // on an otherwise identical navigation. Playwright actionability/frame waits
+  // similarly vary by about 130 ms. Keep these measured presentation allowances
+  // separate from the strict API/processing comparison and absolute deadlines.
+  return /\.(?:section|stage)\.\d+$|\.(?:json|create)$/.test(id) ? 150 : 350
+}
+
 async function measure(id, budget, action, contract = () => 'ok', count = samples) {
   const values = []
   let expected
@@ -43,7 +52,13 @@ async function measure(id, budget, action, contract = () => 'ok', count = sample
       expected = current
       if (i >= 0) values.push(Math.round(elapsed * 1000) / 1000)
     }
-    output.push({ id, budget_ms: budget, samples_ms: values, contract: expected })
+    output.push({
+      id,
+      budget_ms: budget,
+      noise_ms: timingNoise(id),
+      samples_ms: values,
+      contract: expected,
+    })
   } catch (error) {
     diagnostics.push({ case: id, message: String(error), stack: error?.stack })
     output.push({
@@ -60,7 +75,10 @@ function listContract(body) {
   if (!Array.isArray(body?.items) || !Number.isInteger(body.total) || body.total < 0)
     throw new Error('wrong_result')
   if (body.total > 0 && body.items.length === 0) throw new Error('empty_result')
-  return { has_items: body.items.length > 0, paginated: typeof body.limit === 'number' }
+  return {
+    has_items: body.items.length > 0,
+    paginated: typeof body.limit === 'number',
+  }
 }
 
 function searchContract(wanted) {
@@ -68,7 +86,10 @@ function searchContract(wanted) {
     listContract(body)
     if (!body.items.some((item) => String(item.id) === String(wanted)))
       throw new Error('empty_result')
-    return { total: body.total, items: body.items.map((item) => [item.id, item.type]) }
+    return {
+      total: body.total,
+      items: body.items.map((item) => [item.id, item.type]),
+    }
   }
 }
 
@@ -165,7 +186,12 @@ try {
           requests_per_minute: 0,
           max_concurrent_downloads: 0,
           ...(kind === 'stremio'
-            ? { stream_preferences: { services: ['direct'], skip_cache_check: true } }
+            ? {
+                stream_preferences: {
+                  services: ['direct'],
+                  skip_cache_check: true,
+                },
+              }
             : {}),
         },
       })
@@ -173,7 +199,9 @@ try {
       credentials[kind] = await response.json()
     }
   }
-  await fs.writeFile(credentialsPath, JSON.stringify(credentials), { mode: 0o600 })
+  await fs.writeFile(credentialsPath, JSON.stringify(credentials), {
+    mode: 0o600,
+  })
   const stremioToken = 's1.' + credentials.stremio.share.id + '.' + credentials.stremio.password
   // Seed the connection's history before comparing read-only directory paths.
   await get(`/stremio/${stremioToken}/manifest.json`)
@@ -215,7 +243,10 @@ try {
         : ['sources.statistics', 'identification.statistics'].includes(id)
           ? 10_000
           : 5000,
-      () => get(route, { timeout: id === 'identification.matched' ? 20_000 : 12_000 }),
+      () =>
+        get(route, {
+          timeout: id === 'identification.matched' ? 20_000 : 12_000,
+        }),
       (body) =>
         typeof body?.total === 'number' ? listContract(body) : { keys: Object.keys(body).sort() },
     )
@@ -243,7 +274,10 @@ try {
         (body) => {
           listContract(body)
           if (!body.items.length) throw new Error('empty_result')
-          return { total: body.total, items: body.items.map((item) => [item.id, item.type]) }
+          return {
+            total: body.total,
+            items: body.items.map((item) => [item.id, item.type]),
+          }
         },
       )
     const identifier = work.openlibrary_id || work.imdb_id || work.tmdb_id
@@ -483,7 +517,10 @@ try {
       pending.clear()
       requestFailure = pageFailure = badResponse = false
       changed = performance.now()
-      await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 })
+      await page.goto(route, {
+        waitUntil: 'domcontentloaded',
+        timeout: 15_000,
+      })
       await ready()
     }
     async function sections(scope, id) {
@@ -529,14 +566,19 @@ try {
         ['sources.statistics', 'identification.results'].includes(id) ? 10_000 : 5000,
         async () => {
           await navigate(route)
-          return { heading: await page.getByRole('heading', { level: 1 }).textContent() }
+          return {
+            heading: await page.getByRole('heading', { level: 1 }).textContent(),
+          }
         },
         () => 'ready',
       )
       await sections(page.locator('main'), `browser.${width}.${id}`)
       if (id.startsWith('sources.editor.')) {
         const tabs = page
-          .getByRole('tablist', { name: 'Source configuration stages', exact: true })
+          .getByRole('tablist', {
+            name: 'Source configuration stages',
+            exact: true,
+          })
           .getByRole('tab')
         for (let index = 0; index < (await tabs.count()); index++) {
           await measure(
@@ -635,8 +677,17 @@ try {
     await visitor.close()
   }
 } catch (error) {
-  diagnostics.push({ case: 'suite.setup', message: String(error), stack: error?.stack })
-  output.push({ id: 'suite.setup', budget_ms: 1, samples_ms: [0], error: 'operation_failed' })
+  diagnostics.push({
+    case: 'suite.setup',
+    message: String(error),
+    stack: error?.stack,
+  })
+  output.push({
+    id: 'suite.setup',
+    budget_ms: 1,
+    samples_ms: [0],
+    error: 'operation_failed',
+  })
   process.exitCode = 1
 } finally {
   await browser?.close()
