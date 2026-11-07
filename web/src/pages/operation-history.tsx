@@ -159,7 +159,7 @@ export function OperationHistoryPage({
     <div className="page">
       <div className="toolbar items-end rounded-md border border-border p-4">
         {!metadataSection && (
-          <div className="field">
+          <div className="field filter-field">
             <Label htmlFor="operation-type">Service</Label>
             <FilterSelect
               id="operation-type"
@@ -175,7 +175,7 @@ export function OperationHistoryPage({
           </div>
         )}
         {section === 'debrid' && (
-          <div className="field">
+          <div className="field filter-field">
             <Label htmlFor="debrid-operation-kind">Operation</Label>
             <FilterSelect
               id="debrid-operation-kind"
@@ -191,7 +191,7 @@ export function OperationHistoryPage({
             />
           </div>
         )}
-        <div className="field">
+        <div className="field filter-field">
           <Label htmlFor="operation-status">Status</Label>
           <FilterSelect
             id="operation-status"

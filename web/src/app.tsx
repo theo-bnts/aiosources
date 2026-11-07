@@ -41,7 +41,6 @@ import {
   FilmStripIcon,
   BookOpenIcon,
   KeyIcon,
-  ChartBarIcon,
   DevicesIcon,
 } from '@phosphor-icons/react'
 import {
@@ -234,12 +233,6 @@ const navigationGroups: NavigationGroup[] = [
         description: 'Encrypted secrets, sign-in protection and active sessions.',
         icon: ShieldCheckIcon,
         children: [
-          {
-            to: '/security',
-            label: 'Statistics',
-            description: 'Secrets, verification and signed-in devices.',
-            icon: ChartBarIcon,
-          },
           {
             to: '/security/secrets',
             label: 'Secrets',

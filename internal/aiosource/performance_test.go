@@ -61,6 +61,11 @@ func BenchmarkMetadataRetrieval(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+	b.StopTimer()
+	var imported int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='movie'`).Scan(&imported); err != nil || imported != 100 {
+		b.Fatal("metadata retrieval lost records", imported, err)
+	}
 	b.ReportMetric(float64(peak.Load()), "max-inflight")
 	b.ReportMetric(float64(requests.Load())/b.Elapsed().Seconds(), "requests/s")
 }
@@ -92,8 +97,8 @@ func BenchmarkMatchingDenseCatalog(b *testing.B) {
 	}
 	b.StopTimer()
 	var matched int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches WHERE status='matched'`).Scan(&matched); err != nil {
-		b.Fatal(err)
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches WHERE status='matched'`).Scan(&matched); err != nil || matched != 200 {
+		b.Fatal("dense matching lost reliable results", matched, err)
 	}
 	b.ReportMetric(float64(matched), "matched/200")
 }

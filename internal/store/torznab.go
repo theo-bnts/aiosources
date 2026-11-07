@@ -281,6 +281,12 @@ WHERE ` + strings.Join(clauses, " AND ")
 		q.Limit = min(q.Limit, max(0, q.MaxResults-q.Offset))
 	}
 	result.Limit = q.Limit
+	if !filtered && (q.Limit == 0 || result.Total <= int64(q.Offset)) {
+		if q.MaxResults > 0 {
+			result.Total = min(result.Total, int64(q.MaxResults))
+		}
+		return result, nil
+	}
 	query := "SELECT " + columns + from + " ORDER BY " + strings.Join(order, ",")
 	if !filtered {
 		query += " LIMIT " + bind(q.Limit) + " OFFSET " + bind(q.Offset)

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ShieldCheckIcon, SignOutIcon } from '@phosphor-icons/react'
 import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
-import type { Items, SecretInfo } from '@/lib/types'
+import type { Items } from '@/lib/types'
 import type {
   AdminSession,
   MFAEnrollment,
@@ -14,7 +14,6 @@ import type {
 } from '@/lib/security-types'
 import { Switch } from '@/components/ui/switch'
 import SecretsPage, { SecretReferencesHelp } from '@/pages/secrets'
-import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -63,67 +62,6 @@ function useAdminSessions(enabled = true) {
     refetchInterval: AUTO_REFRESH_INTERVAL,
     enabled,
   })
-}
-
-export function SecurityStatisticsPage() {
-  const status = useSecurityStatus()
-  const sessions = useAdminSessions()
-  const secrets = useQuery({
-    queryKey: ['secrets'],
-    queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
-    refetchInterval: AUTO_REFRESH_INTERVAL,
-  })
-  return (
-    <div className="page">
-      <ErrorNotice error={status.error} retry={() => void status.refetch()} />
-      <ErrorNotice error={sessions.error} retry={() => void sessions.refetch()} />
-      <ErrorNotice error={secrets.error} retry={() => void secrets.refetch()} />
-      <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Statistic
-          label="Stored secrets"
-          value={secrets.data?.items?.length ?? 'Not available'}
-          loadingLabel={secrets.isPending ? 'Loading secrets…' : undefined}
-          to="/security/secrets"
-        />
-        <Statistic
-          label="Two-step verification"
-          value={status.data ? (status.data.mfa_enabled ? 'Enabled' : 'Disabled') : 'Not available'}
-          loadingLabel={status.isPending ? 'Loading verification…' : undefined}
-          valueClassName={
-            status.data?.mfa_enabled
-              ? 'text-emerald-800 dark:text-emerald-300'
-              : 'text-muted-foreground'
-          }
-          to="/security/verification"
-        />
-        <Statistic
-          label="Recovery codes remaining"
-          loadingLabel={status.isPending ? 'Loading recovery codes…' : undefined}
-          valueClassName={
-            status.data?.mfa_enabled
-              ? status.data.recovery_codes_remaining === 0
-                ? 'text-warning-foreground'
-                : undefined
-              : 'text-muted-foreground'
-          }
-          value={
-            status.data
-              ? status.data.mfa_enabled
-                ? status.data.recovery_codes_remaining
-                : 'Not set up'
-              : 'Not available'
-          }
-          to="/security/verification"
-        />
-        <Statistic
-          label="Active sessions"
-          value={sessions.data?.items?.length ?? 'Not available'}
-          loadingLabel={sessions.isPending ? 'Loading sessions…' : undefined}
-          to="/security/sessions"
-        />
-      </dl>
-    </div>
-  )
 }
 
 export function SecuritySecretsPage() {

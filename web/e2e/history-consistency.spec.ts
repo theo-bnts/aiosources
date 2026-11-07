@@ -207,14 +207,17 @@ test('Security separates its pages and preserves existing bookmarks without repe
   }
   await page.goto('/security')
   await page.reload()
-  await expect(page.getByText('Stored secrets', { exact: true })).toBeVisible()
-  await page.getByRole('link', { name: 'View stored secrets', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
+  await expect(page.getByText('Stored secrets', { exact: true })).toHaveCount(0)
   await expect(page).toHaveURL(/\/security\/secrets$/)
   await expect(
     page.getByRole('region', { name: 'Secrets', exact: true }).getByRole('columnheader'),
   ).toHaveText(['Reference', 'Last updated', 'Actions'])
   await page.goto('/security')
-  await page.getByRole('link', { name: 'View active sessions', exact: true }).click()
+  await page
+    .getByRole('navigation', { name: 'Main navigation', exact: true })
+    .getByRole('link', { name: 'Active sessions', exact: true })
+    .click()
   await expect(page).toHaveURL(/\/security\/sessions$/)
   await page.locator('#main-content').evaluate((main) => {
     main.style.minHeight = '2400px'

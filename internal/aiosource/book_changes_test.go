@@ -61,7 +61,7 @@ func bookAPIRecord(id string, revision int, fields map[string]any) map[string]an
 	return data
 }
 
-func newBookAPIFixture(t *testing.T, s *Service) *bookAPIFixture {
+func newBookAPIFixture(t testing.TB, s *Service) *bookAPIFixture {
 	t.Helper()
 	at := time.Now().UTC().Add(-2 * time.Hour)
 	f := &bookAPIFixture{day: at.Truncate(24 * time.Hour), time: at, documents: map[string]map[string]any{}, requests: map[string]int{}, rows: []bookAPIEvent{{ID: "100", Timestamp: at.Format(time.RFC3339Nano), Changes: []map[string]any{}}}}

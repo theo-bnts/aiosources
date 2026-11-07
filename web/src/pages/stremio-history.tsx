@@ -166,7 +166,7 @@ export function StremioHistoryPage() {
           filter({ q: String(new FormData(event.currentTarget).get('q') ?? '').trim() })
         }}
       >
-        <div className="field min-w-0 basis-full sm:basis-auto sm:flex-1">
+        <div className="field w-full">
           <Label htmlFor="stremio-resource">Resource identifier</Label>
           <Input
             id="stremio-resource"
@@ -176,7 +176,7 @@ export function StremioHistoryPage() {
             placeholder="IMDb, TMDB, TVDB or episode"
           />
         </div>
-        <div className="field">
+        <div className="field filter-field">
           <Label htmlFor="stremio-outcome">Result</Label>
           <FilterSelect
             id="stremio-outcome"
@@ -191,7 +191,7 @@ export function StremioHistoryPage() {
           { name: 'origin', label: 'Installation', value: origin, choices: origins },
           { name: 'kind', label: 'Request type', value: kind, choices: kinds },
         ].map((item) => (
-          <div className="field" key={item.name}>
+          <div className="field filter-field" key={item.name}>
             <Label htmlFor={`stremio-${item.name}`}>{item.label}</Label>
             <FilterSelect
               id={`stremio-${item.name}`}

@@ -74,7 +74,16 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 		return model.ErrInvalid
 	}
 	for key, value := range run.Results {
-		if value < 0 || (key != "matched" && key != "ambiguous" && key != "unmatched" && key != "cached" && key != "uncached" && key != "cleaned") {
+		if value < 0 {
+			return model.ErrInvalid
+		}
+		switch key {
+		case "matched", "ambiguous", "unmatched", "cached", "uncached", "cleaned":
+		case "snapshot_checked":
+			if run.Kind != "metadata" || run.Service != "openlibrary" {
+				return model.ErrInvalid
+			}
+		default:
 			return model.ErrInvalid
 		}
 	}

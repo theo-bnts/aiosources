@@ -72,34 +72,19 @@ test('source and remote statistics distinguish pending counts from unavailable c
   }
 })
 
-test('security statistics name the information loading before showing saved values', async ({
+test('Security opens Secrets directly without requesting a removed statistics dashboard', async ({
   page,
 }) => {
-  let release!: () => void
-  const pending = new Promise<void>((resolve) => {
-    release = resolve
+  const requested: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (['/api/security', '/api/security/sessions'].includes(path)) requested.push(path)
   })
-  const endpoints = /\/api\/(?:security(?:\/sessions)?|secrets)$/
-  await page.route(endpoints, async (route) => {
-    await pending
-    await route.continue()
-  })
-  try {
-    await page.goto('/security')
-    const totals = page.locator('main dl').first()
-    await expect(totals.locator('dd')).toHaveText([
-      'Loading secrets…',
-      'Loading verification…',
-      'Loading recovery codes…',
-      'Loading sessions…',
-    ])
-    await expect(page.locator('main').getByText('Not available', { exact: true })).toHaveCount(0)
-    release()
-    await expect(totals.locator('dd')).toHaveText(['0', 'Disabled', 'Not set up', '1'])
-  } finally {
-    release()
-    await page.unroute(endpoints)
-  }
+  await page.goto('/security')
+  await expect(page).toHaveURL(/\/security\/secrets$/)
+  await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
+  await expect(page.getByText('Stored secrets', { exact: true })).toHaveCount(0)
+  expect(requested).toEqual([])
 })
 
 test('a failed statistic becomes unavailable instead of loading indefinitely', async ({ page }) => {
@@ -107,7 +92,7 @@ test('a failed statistic becomes unavailable instead of loading indefinitely', a
   const pending = new Promise<void>((resolve) => {
     release = resolve
   })
-  await page.route('**/api/secrets', async (route) => {
+  await page.route('**/api/source-torrent-stats', async (route) => {
     await pending
     await route.fulfill({
       status: 503,
@@ -116,15 +101,15 @@ test('a failed statistic becomes unavailable instead of loading indefinitely', a
     })
   })
   try {
-    await page.goto('/security')
-    const secrets = page.locator('main dl').first().locator('dd').first()
-    await expect(secrets).toHaveText('Loading secrets…')
+    await page.goto('/providers')
+    const imported = page.locator('main dl').first().locator('dd').first()
+    await expect(imported).toHaveText('Loading counts…')
     release()
-    await expect(secrets).toHaveText('Not available')
-    await expect(secrets).toHaveAttribute('aria-busy', 'false')
-    await expect(page.locator('main dl').first().locator('dd').last()).toHaveText('1')
+    await expect(imported).toHaveText('Not available')
+    await expect(imported).toHaveAttribute('aria-busy', 'false')
+    await expect(page.locator('main dl').first().locator('dd').nth(2)).toHaveText('0')
   } finally {
     release()
-    await page.unroute('**/api/secrets')
+    await page.unroute('**/api/source-torrent-stats')
   }
 })

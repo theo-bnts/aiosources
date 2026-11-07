@@ -90,9 +90,6 @@ const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m
 const StorageSettingsPage = lazy(() =>
   import('@/pages/health').then((m) => ({ default: m.StorageSettingsPage })),
 )
-const SecurityStatisticsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecurityStatisticsPage })),
-)
 const SecuritySecretsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecuritySecretsPage })),
 )
@@ -360,7 +357,7 @@ const router = createBrowserRouter(
           <Route path="health" element={<HealthPage />} />
           <Route path="health/settings" element={<StorageSettingsPage />} />
         </Route>
-        <Route path="security" element={<SecurityStatisticsPage />} />
+        <Route path="security" element={<LegacySecuritySettings />} />
         <Route path="security/settings" element={<LegacySecuritySettings />} />
         <Route path="security/secrets" element={<SecuritySecretsPage />} />
         <Route path="security/verification" element={<SecurityVerificationPage />} />

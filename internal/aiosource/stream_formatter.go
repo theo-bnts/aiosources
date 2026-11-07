@@ -198,7 +198,7 @@ func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.Releas
 	if hints.Service != "" {
 		footer = append(footer, "🌐 "+model.ServiceName(hints.Service))
 	}
-	presentation.Details = append(presentation.Details, strings.Join(footer, " • "))
+	presentation.Details = append(presentation.Details, strings.Join(footer, " "))
 	return presentation
 }
 

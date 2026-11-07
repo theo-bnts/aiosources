@@ -144,7 +144,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
     <div className="page">
       <PageHeader title="History" />
       <div className="toolbar items-end rounded-md border border-border p-4">
-        <div className="field">
+        <div className="field filter-field">
           <Label htmlFor="run-provider">{remote ? 'Remote catalog' : 'Source'}</Label>
           <FilterSelect
             id="run-provider"
@@ -158,7 +158,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
             }))}
           />
         </div>
-        <div className="field">
+        <div className="field filter-field">
           <Label htmlFor="run-status">Status</Label>
           <FilterSelect
             id="run-status"

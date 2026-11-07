@@ -29,8 +29,11 @@ test('password-manager form values work for sign-in and verification without cha
       throw new Error('Could not populate the isolated sign-in credential.')
     }
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Statistics', exact: true })).toBeVisible()
-    await page.getByRole('link', { name: 'View two-step verification', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Main navigation', exact: true })
+      .getByRole('link', { name: 'Sign-in protection', exact: true })
+      .click()
     await page.getByRole('switch', { name: 'Two-step verification', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const current = dialog.getByLabel('Current password', { exact: true })

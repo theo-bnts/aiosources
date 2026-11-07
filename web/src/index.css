@@ -120,6 +120,9 @@
   .field {
     @apply grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2;
   }
+  .filter-field {
+    @apply w-full sm:w-56 sm:flex-none;
+  }
   .label {
     @apply text-sm font-medium;
   }

@@ -55,7 +55,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Administration', 'Outgoing', '/network/routing'],
     ['Administration', 'Incoming', '/network/incoming'],
     ['Administration', 'Storage', '/health'],
-    ['Administration', 'Statistics', '/security'],
+    ['Administration', 'Secrets', '/security'],
     ['Administration', 'Secrets', '/secrets'],
     ['Administration', 'Secrets', '/security/secrets'],
     ['Administration', 'Sign-in protection', '/security/verification'],

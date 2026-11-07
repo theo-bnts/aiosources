@@ -23,7 +23,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/vault"
 )
 
-func schedulerDatabase(t *testing.T) (context.Context, string, *store.Store) {
+func schedulerDatabase(t testing.TB) (context.Context, string, *store.Store) {
 	t.Helper()
 	ctx, url := testutil.NewDatabase(t)
 	db, err := store.Open(ctx, url)
@@ -47,7 +47,7 @@ func schedulerProvider(id, endpoint string) model.Provider {
 		Schedule:   model.Schedule{Every: "1m", Mode: model.ModeFull, MaxPages: 1}}
 }
 
-func saveScheduledProvider(t *testing.T, registry *providers.Registry, p model.Provider, revision string) model.ProviderDocument {
+func saveScheduledProvider(t testing.TB, registry *providers.Registry, p model.Provider, revision string) model.ProviderDocument {
 	t.Helper()
 	raw, err := json.Marshal(p)
 	if err != nil {
@@ -60,7 +60,7 @@ func saveScheduledProvider(t *testing.T, registry *providers.Registry, p model.P
 	return doc
 }
 
-func collectScheduledAttempt(t *testing.T, ctx context.Context, manager *Manager, db *store.Store, id string, want model.RunStatus) model.Run {
+func collectScheduledAttempt(t testing.TB, ctx context.Context, manager *Manager, db *store.Store, id string, want model.RunStatus) model.Run {
 	t.Helper()
 	run, err := db.ClaimNext(ctx)
 	if err != nil || run == nil || run.ID != id {

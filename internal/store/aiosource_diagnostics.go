@@ -83,6 +83,9 @@ CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics ORDER 
 	if err = tx.QueryRow(ctx, countSQL, countArgs...).Scan(&result.Total); err != nil {
 		return result, databaseError("count identification diagnostics", err)
 	}
+	if result.Total <= int64(opts.Offset) {
+		return result, databaseError("finish identification diagnostics", tx.Commit(ctx))
+	}
 	rows, err := tx.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return result, databaseError("list identification diagnostics", err)

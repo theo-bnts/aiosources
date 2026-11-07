@@ -32,7 +32,7 @@ func TestFormatterOrdersHighlightsAndGroupsTechnicalDetails(t *testing.T) {
 		"🖼️ 2160P", "🎞️ WEB-DL • H265 • PROPER", "🎨 HDR10+ • H-SBS",
 		"🔊 TRUEHD • 5.1", "📦 7.45 GB • 11.9 Mbps",
 		"🧩 ExampleGroup • 📅 2026-10-09",
-		"🔍 AIOSources • 🧭 Example Library • 🌐 AllDebrid",
+		"🔍 AIOSources 🧭 Example Library 🌐 AllDebrid",
 	}
 	if got := strings.Split(stream.Title, "\n"); !reflect.DeepEqual(got, wantDescription) {
 		t.Fatalf("description ordering: %q, want %q", got, wantDescription)

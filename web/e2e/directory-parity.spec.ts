@@ -180,6 +180,55 @@ test('directory names and controls stay bounded on mobile and desktop including 
   }
 })
 
+test('directory and history dropdowns share one width regardless of their labels or selections', async ({
+  page,
+  server,
+}) => {
+  test.setTimeout(120_000)
+  await seedDirectories(page, server.origin, server.sourceURL, true)
+  const paths = [
+    ['/providers', 'Source'],
+    ['/providers/settings', 'Source'],
+    ['/runs', 'Source'],
+    ['/remotes', 'Remote catalog'],
+    ['/remotes/settings', 'Remote catalog'],
+    ['/remotes/history', 'Remote catalog'],
+    ['/addon/settings', 'Access'],
+    ['/torznab', 'Access'],
+    ['/sharing', 'Share'],
+    ['/sharing/settings', 'Share'],
+    ['/network/outgoing', 'Proxy'],
+    ['/debrid/history', 'Service'],
+    ['/addon/history', 'Result'],
+  ] as const
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 950 })
+    let firstWidth = 0
+    for (const [path, name] of paths) {
+      await page.goto(path)
+      const control = page.locator('main').getByRole('button', { name, exact: true })
+      await expect(control).toBeVisible()
+      await page.evaluate(() => document.fonts.ready)
+      const before = (await control.boundingBox())!
+      if (width >= 640) {
+        firstWidth ||= before.width
+        expect(Math.abs(before.width - firstWidth), `${path} / ${name}`).toBeLessThan(1)
+      }
+      await control.click()
+      const menu = page.getByRole('menu', { name, exact: true })
+      const option = menu.getByRole('menuitemcheckbox').first()
+      if (await option.count()) await option.click()
+      await page.keyboard.press('Escape')
+      const after = (await control.boundingBox())!
+      expect(Math.abs(before.width - after.width), `${path} selection`).toBeLessThan(1)
+      expect(after.x + after.width).toBeLessThanOrEqual(width)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+    }
+  }
+})
+
 test('saved connection summaries expose the same applied controls and credential actions', async ({
   page,
   server,
@@ -301,7 +350,10 @@ test('history filters keep visible labels and align their clear action with the 
         .getByRole('button', { name: 'Clear filters', exact: true })
         .boundingBox()
       if (width > 1000)
-        expect(Math.abs(field!.y + field!.height - clear!.y - clear!.height)).toBeLessThan(2)
+        expect(
+          Math.abs(field!.y + field!.height - clear!.y - clear!.height),
+          `${path} at ${width}px`,
+        ).toBeLessThan(2)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       )

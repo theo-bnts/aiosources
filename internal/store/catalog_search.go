@@ -51,6 +51,15 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	return title, err
 }
 
+type countedCatalogTitle struct {
+	row   scanner
+	total *int64
+}
+
+func (r countedCatalogTitle) Scan(values ...any) error {
+	return r.row.Scan(append([]any{r.total}, values...)...)
+}
+
 func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
@@ -124,16 +133,16 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		return result, databaseError("begin catalog search", err)
 	}
 	defer rollback(tx)
-	if err = tx.QueryRow(ctx, bookScope+`SELECT count(*)`+filter, args...).Scan(&result.Total); err != nil {
-		return result, databaseError("count catalog titles", err)
-	}
+	countArgs := append([]any{}, args...)
 	args = append(args, locale, opts.Limit, opts.Offset)
-	rows, err := tx.Query(ctx, bookScope+`SELECT `+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
+	// The total and visible page share the same candidate search. In particular,
+	// book editions/aliases must not be materialized twice for every search.
+	rows, err := tx.Query(ctx, bookScope+`SELECT count(*) OVER(),`+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
 	}
 	for rows.Next() {
-		title, e := scanCatalogTitle(rows)
+		title, e := scanCatalogTitle(countedCatalogTitle{row: rows, total: &result.Total})
 		if e != nil {
 			rows.Close()
 			return result, databaseError("read catalog title", e)
@@ -144,6 +153,13 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	rows.Close()
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
+	}
+	// An empty first page has an exact total of zero. Only an out-of-range
+	// later page needs a separate count so pagination can recover correctly.
+	if len(result.Items) == 0 && opts.Offset > 0 {
+		if err = tx.QueryRow(ctx, bookScope+`SELECT count(*)`+filter, countArgs...).Scan(&result.Total); err != nil {
+			return result, databaseError("count catalog titles", err)
+		}
 	}
 	return result, databaseError("finish catalog search", tx.Commit(ctx))
 }

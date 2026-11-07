@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func addonAPI(t *testing.T) (sharingAPIFixture, *aiosource.Service, *pgx.Conn) {
+func addonAPI(t testing.TB) (sharingAPIFixture, *aiosource.Service, *pgx.Conn) {
 	t.Helper()
 	ctx, dsn := testutil.NewDatabase(t)
 	db, err := store.Open(ctx, dsn)

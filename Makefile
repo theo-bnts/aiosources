@@ -5,7 +5,7 @@ GOVULNCHECK_VERSION := v1.1.4
 GITLEAKS_VERSION := v8.30.1
 TRIVY_IMAGE := aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
 
-.PHONY: build web dev check e2e security compose-check image-check image-security release-check
+.PHONY: build web dev check e2e security compose-check image-check image-security release-check performance-check performance-if-configured
 
 web:
 	$(NPM) --prefix web ci --no-audit --no-fund
@@ -24,6 +24,20 @@ check: web
 	$(GO) -C torznab test -race ./...
 	$(GO) vet ./...
 	$(GO) -C torznab vet ./...
+	python3 -m unittest discover -s tools/performance -p 'test_*.py'
+	$(MAKE) performance-if-configured
+
+# Private data and reports stay local. A configured baseline makes the normal
+# local check include this gate; CI never imports or uploads an instance dump.
+performance-if-configured:
+	@if [ -z "$$CI" ] && [ -f .ingest/performance/baseline.json ]; then \
+		$(MAKE) performance-check; \
+	fi
+
+performance-check:
+	$(NPM) --prefix web run build
+	$(GO) build -tags production -ldflags "-X main.version=$(VERSION)" -o .ingest/performance/current-app ./cmd/ingest
+	python3 tools/performance/run.py check --binary .ingest/performance/current-app
 
 # Uses a prebuilt production binary and a mandatory disposable PostgreSQL DSN.
 # Keep browser execution separate from the existing database-optional checks.

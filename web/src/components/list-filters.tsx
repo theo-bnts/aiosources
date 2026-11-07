@@ -77,7 +77,9 @@ export function ListFilters({
   return (
     <section className="space-y-3 rounded-md border border-border p-4" aria-label={label}>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="field min-w-48 flex-1 sm:max-w-md">
+        <div
+          className={entries ? 'field filter-field' : 'field min-w-0 w-full sm:max-w-md sm:flex-1'}
+        >
           <Label htmlFor={`${kind}-query`}>{entries ? entityLabel : queryLabel}</Label>
           {entries ? (
             <FilterSelect
@@ -101,7 +103,7 @@ export function ListFilters({
           )}
         </div>
         {states.length > 0 && (
-          <div className="field min-w-44">
+          <div className="field filter-field">
             <Label htmlFor={`${kind}-state`}>Status</Label>
             <FilterSelect
               id={`${kind}-state`}

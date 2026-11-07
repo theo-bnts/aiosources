@@ -9,6 +9,42 @@ import (
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
+func TestBookReconciliationProgressCanReachCompletedHistory(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	release, locked, err := db.AIOLock(ctx, "openlibrary")
+	if err != nil || !locked {
+		t.Fatal("book worker lock", err)
+	}
+	defer release()
+	run, err := db.BeginOperation(ctx, model.OperationRun{Kind: "metadata", Service: "openlibrary", Trigger: "manual"}, "openlibrary")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run.Processed, run.Phase, run.Results = 1000, "book_reconciliation", map[string]int64{"snapshot_checked": 700}
+	if err := db.SaveOperation(ctx, run); err != nil {
+		t.Fatal("reconciliation checkpoint rejected", err)
+	}
+	run.Status = "succeeded"
+	if err := db.SaveOperation(ctx, run); err != nil {
+		t.Fatal("completed book history rejected", err)
+	}
+	saved, err := db.Operation(ctx, run.ID)
+	if err != nil || saved.Status != "succeeded" || saved.Processed != 1000 || saved.Results["snapshot_checked"] != 700 || saved.FinishedAt == nil {
+		t.Fatal("book history lost completion or progress", saved, err)
+	}
+	for _, value := range []struct {
+		key     string
+		count   int64
+		service string
+	}{{"snapshot_checked", -1, "openlibrary"}, {"unknown_counter", 1, "openlibrary"}, {"snapshot_checked", 1, "tmdb"}} {
+		run.Results = map[string]int64{value.key: value.count}
+		run.Service = value.service
+		if err := db.SaveOperation(ctx, run); !errors.Is(err, model.ErrInvalid) {
+			t.Fatal("invalid progress accepted", err)
+		}
+	}
+}
+
 func TestOperationHistoryRecoveryUsesActualWorkerLocks(t *testing.T) {
 	ctx, dsn := testutil.NewDatabase(t)
 	db, err := Open(ctx, dsn)

@@ -27,7 +27,7 @@ type sharingAPIFixture struct {
 	registry *providers.Registry
 }
 
-func sharingAPI(t *testing.T, origin string) sharingAPIFixture {
+func sharingAPI(t testing.TB, origin string) sharingAPIFixture {
 	t.Helper()
 	ctx, endpoint := testutil.NewDatabase(t)
 	db, err := store.Open(ctx, endpoint)
