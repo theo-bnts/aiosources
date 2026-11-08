@@ -1,5 +1,5 @@
 import { CatalogCover } from '@/components/catalog-cover'
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
 import { FilterSelect } from '@/components/filter-select'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -65,7 +65,9 @@ export function CatalogSearchPage() {
   const pagination = useURLPagination()
   const q = search.get('q') || ''
   const [draftQuery, setDraftQuery] = useState(q)
-  useEffect(() => setDraftQuery(q), [q])
+  // Synchronize the shortcut before the next input event. The form keeps its
+  // own draft so submitting cannot overwrite text entered immediately after it.
+  useLayoutEffect(() => setDraftQuery(q), [q])
   const kind = search.get('type') || ''
   const year = search.get('year') || ''
   const query = useQuery({
@@ -111,8 +113,8 @@ export function CatalogSearchPage() {
             id="catalog-query"
             name="q"
             type="search"
-            value={draftQuery}
-            onChange={(event) => setDraftQuery(event.target.value)}
+            defaultValue={q}
+            onInput={(event) => setDraftQuery(event.currentTarget.value)}
             minLength={2}
             maxLength={500}
             required
