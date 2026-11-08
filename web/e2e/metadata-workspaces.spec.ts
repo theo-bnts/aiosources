@@ -131,7 +131,9 @@ test('workspace saves preserve other provider settings and protect drafts betwee
   page,
 }) => {
   await page.goto('/metadata/videos/settings')
+  await openDisclosure(page, 'Request limits')
   await page.getByLabel('TMDB requests per second', { exact: true }).fill('20')
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Information update interval (minutes)', { exact: true }).fill('30')
   await page.getByLabel('Automatically update film & series information').uncheck()
   const videos = page.getByRole('form', { name: 'Videos configuration', exact: true })
@@ -140,11 +142,13 @@ test('workspace saves preserve other provider settings and protect drafts betwee
   await page.goto('/metadata/books/settings')
   await expect(page.getByLabel('TMDB requests per second')).toHaveCount(0)
   await expect(page.getByLabel('Automatically identify torrents')).toHaveCount(0)
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Book information update interval (minutes)', { exact: true }).fill('45')
   const books = page.getByRole('form', { name: 'Books configuration', exact: true })
   await books.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(books.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.goto('/metadata/identification/settings')
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('120')
   const identification = page.getByRole('form', {
     name: 'Identification configuration',
@@ -160,6 +164,7 @@ test('workspace saves preserve other provider settings and protect drafts betwee
     openlibrary_minutes: 45,
     match_seconds: 120,
   })
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('180')
   if (page.viewportSize()!.width < 1024)
     await page.getByRole('button', { name: 'Open navigation', exact: true }).click()

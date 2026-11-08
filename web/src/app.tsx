@@ -339,7 +339,7 @@ const publicNavigationGroups: NavigationGroup[] = [
 ]
 const navigationStorageKey = 'ingest.navigation.groups'
 const navigationLinkClassName =
-  'flex min-h-(--control-height) items-center gap-3 rounded-md px-3 py-2 text-base text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary md:text-sm'
+  'flex min-h-(--control-height) items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary'
 
 function AppNavigation({
   groups = navigationGroups,
@@ -439,7 +439,7 @@ function AppNavigation({
                   aria-expanded={openGroups[group.id] ?? group.defaultOpen}
                   aria-controls={`${id}-${group.id}`}
                   onClick={() => onToggle(group.id)}
-                  className="flex min-h-(--control-height) w-full items-center gap-3 rounded-md px-3 py-2 text-left text-base font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground md:text-sm"
+                  className="flex min-h-(--control-height) w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground"
                 >
                   <group.icon size={19} aria-hidden="true" className="shrink-0" />
                   <span className="min-w-0 flex-1">{group.label}</span>
@@ -748,8 +748,8 @@ export function AppShell({
         : 'Reconnecting · refreshing every 30 s'
   const branding = (
     <>
-      <DatabaseIcon size={32} aria-hidden="true" className="shrink-0 text-primary" />
-      <span className="text-2xl leading-none font-semibold tracking-tight">AIOSources</span>
+      <DatabaseIcon size={24} aria-hidden="true" className="shrink-0 text-primary" />
+      <span className="text-base leading-none font-semibold tracking-tight">AIOSources</span>
     </>
   )
   const footer = publicMode ? (
@@ -785,7 +785,7 @@ export function AppShell({
       <div ref={shellRef} data-app-shell className="min-h-dvh">
         <a
           href="#main-content"
-          className="fixed left-4 top-3 z-50 -translate-y-24 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:translate-y-0"
+          className="fixed left-4 top-3 z-100 -translate-y-24 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:translate-y-0"
         >
           Skip to content
         </a>
@@ -798,7 +798,7 @@ export function AppShell({
         <div className="lg:pl-60">
           <header
             ref={headerRef}
-            className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9"
+            className="sticky top-0 z-(--layer-header) flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3 pr-28 sm:pr-40 lg:pr-0">
               <DialogTrigger asChild>

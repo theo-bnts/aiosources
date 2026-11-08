@@ -204,6 +204,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
     <>
       <Button
         ref={trigger}
+        data-input-like
         variant="outline"
         className="w-full min-w-0 justify-start gap-2 bg-background text-base font-normal text-muted-foreground md:text-sm lg:w-60 xl:w-72"
         onClick={show}
@@ -213,7 +214,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
         <MagnifyingGlassIcon className="shrink-0" />
         <span className="truncate">Search settings…</span>
         <kbd
-          className="ml-auto hidden rounded border border-border px-1.5 text-[10px] lg:inline"
+          className="ml-auto hidden rounded border border-border px-1.5 text-xs lg:inline"
           aria-hidden="true"
         >
           Ctrl / ⌘ K

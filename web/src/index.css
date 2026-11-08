@@ -8,6 +8,14 @@
 @theme inline {
   --font-sans: 'Geist Variable', sans-serif;
   --font-mono: 'Geist Mono Variable', monospace;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.25;
+  --text-3xl: 1.5rem;
+  --text-3xl--line-height: 1.25;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -37,6 +45,12 @@
 :root {
   color-scheme: dark;
   --control-height: 2.75rem;
+  --layer-menu: 40;
+  --layer-header: 50;
+  --layer-header-actions: 51;
+  --layer-overlay: 60;
+  --layer-dialog: 60;
+  --layer-dialog-menu: 65;
   --background: #191d20;
   --foreground: #e5e9ea;
   --card: #202528;
@@ -114,6 +128,9 @@
   .toolbar {
     @apply flex flex-wrap items-center gap-3;
   }
+  .card-actions {
+    @apply flex flex-wrap items-center gap-3 border-t border-border pt-4;
+  }
   .table-frame {
     @apply overflow-hidden rounded-md border border-border bg-card/30;
   }
@@ -152,7 +169,7 @@
   }
 }
 .cm-editor {
-  font-size: 13px;
+  font-size: 14px;
 }
 .cm-scroller {
   font-family: 'Geist Mono Variable', monospace !important;

@@ -76,7 +76,10 @@ VALUES('fixture','audio','{"title":"Morgan Vale - The Amber Orchard [MP3.128]","
 	if err := s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"book", "ebook", "audiobook", "book,ebook,audiobook"} {
+	if found, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book"}); err != nil || found.Total != 0 {
+		t.Fatal("Other books included ebook or audio releases", found.Total, err)
+	}
+	for _, kind := range []string{"ebook", "audiobook", "book,ebook,audiobook"} {
 		found, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: kind})
 		if err != nil || found.Total != 1 {
 			t.Fatal("a supported book format disappeared from Search", kind, found.Total, err)
@@ -93,7 +96,7 @@ VALUES('fixture','audio','{"title":"Morgan Vale - The Amber Orchard [MP3.128]","
 		}
 	}
 	// An explicit manual book choice without a known format remains a book;
-	// it must not be presented as an ebook or excluded from the general type.
+	// it belongs to Other books rather than a known digital or audio format.
 	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
 VALUES('fixture','opaque','{"title":"Opaque archive","info_hash":"cccccccccccccccccccccccccccccccccccccccc"}')`); err != nil {
 		t.Fatal(err)
@@ -110,7 +113,7 @@ VALUES('fixture','opaque','{"title":"Opaque archive","info_hash":"cccccccccccccc
 		t.Fatal(err)
 	}
 	result, err := s.DB.PublicTorznabCatalog(ctx, model.TorznabQuery{Mode: "search", Limit: 50, MediaTypes: []string{"book"}}, nil, []string{"book"}, store.TorznabVisibility{Public: true, UncachedSources: []string{"fixture"}, CacheAfter: time.Now().Add(-time.Hour)}, nil)
-	if err != nil || result.Total != 3 {
-		t.Fatal("the generic book type lost a manual choice with an unknown format", result.Total, err)
+	if err != nil || result.Total != 1 || result.Items[0].Category != 7000 {
+		t.Fatal("Other books did not isolate a manual choice with an unknown format", result.Total, err)
 	}
 }

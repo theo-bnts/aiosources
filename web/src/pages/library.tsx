@@ -348,7 +348,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                             </p>
                           )}
                         </TableCell>
-                        <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        <TableCell className="font-mono text-xs text-muted-foreground">
                           {record.content_type || 'Not specified'}
                         </TableCell>
                         <TableCell>

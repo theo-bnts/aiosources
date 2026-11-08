@@ -13,6 +13,8 @@ import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-t
 import { Badge } from '@/components/ui/badge'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Statistic } from '@/components/statistic'
+import { Button } from '@/components/ui/button'
+import { ArrowRightIcon } from '@phosphor-icons/react'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { useDate } from '@/lib/format'
 import { bookSyncLabel, metadataSyncLabel } from '@/lib/information-sync'
@@ -112,9 +114,9 @@ export function SourceStatisticsPage() {
       {providers.isPending ? (
         <Loading />
       ) : visible.length ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((source) => (
-            <section key={source.id} className="section-card">
+            <section key={source.id} className="statistic-card flex h-full flex-col gap-4">
               <h2 className="section-title">
                 <Link className="data-link" to={sourceSettingsPath(source.id)} state={listState}>
                   {source.name || source.id}
@@ -126,6 +128,14 @@ export function SourceStatisticsPage() {
                 unavailable={counts.isError}
                 totals={counts.totals}
               />
+              <div className="card-actions mt-auto">
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/runs?provider=${encodeURIComponent(source.id)}`} state={listState}>
+                    <ArrowRightIcon />
+                    View history
+                  </Link>
+                </Button>
+              </div>
             </section>
           ))}
         </div>

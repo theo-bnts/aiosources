@@ -7,8 +7,8 @@ export const stremioMediaTypes = [
 export const torznabMediaTypes = [
   { value: 'movie', label: 'Movies' },
   { value: 'tv', label: 'Series' },
-  { value: 'book', label: 'Books (all formats)' },
   { value: 'ebook', label: 'Ebooks' },
   { value: 'audiobook', label: 'Audiobooks' },
   { value: 'other', label: 'Other / not identified' },
+  { value: 'book', label: 'Other books' },
 ]

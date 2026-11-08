@@ -253,7 +253,7 @@ function ReviewForm({
             options={[
               { value: 'movie', label: 'Movies' },
               { value: 'tv', label: 'Series' },
-              { value: 'book', label: 'Books (all formats)' },
+              { value: 'book', label: 'Books' },
             ]}
           />
         </div>

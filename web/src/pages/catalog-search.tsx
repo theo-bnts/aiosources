@@ -129,9 +129,9 @@ export function CatalogSearchPage() {
                 options={[
                   { value: 'movie', label: 'Movies' },
                   { value: 'tv', label: 'Series' },
-                  { value: 'book', label: 'Books (all formats)' },
                   { value: 'ebook', label: 'Ebooks' },
                   { value: 'audiobook', label: 'Audiobooks' },
+                  { value: 'book', label: 'Other books' },
                 ]}
               />
             </div>

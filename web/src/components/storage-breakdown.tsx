@@ -316,7 +316,7 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="-ml-2 h-auto max-w-full justify-start whitespace-normal text-left"
+                            className="h-auto max-w-full justify-start whitespace-normal text-left"
                             aria-expanded={expanded === category.key}
                             aria-controls={`storage-${category.key}`}
                             onClick={() =>

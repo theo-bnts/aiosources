@@ -109,12 +109,12 @@ func TestBooksUseLocalMatchingSearchAndReviewWithoutVideoRegression(t *testing.T
 		t.Fatal(err)
 	}
 	for _, q := range []string{"The.Amber.Orchard", "978-0-306-40615-7", "Morgan Vale", "Le Verger Ambre", "OL100W", "OL300M", "Morgan Orchard", "Orchard Morgan", "Amber Writer"} {
-		page, err := s.CatalogSearch(ctx, model.ListOptions{Query: q}, model.CatalogSearchFilters{Language: "fr", Type: "book"})
+		page, err := s.CatalogSearch(ctx, model.ListOptions{Query: q}, model.CatalogSearchFilters{Language: "fr", Type: "book,ebook,audiobook"})
 		if err != nil || page.Total != 1 || page.Items[0].Title != "Le Verger Ambré" || page.Items[0].TMDB != "" || page.Items[0].Cover == "" {
 			t.Fatalf("local book search failed (%q): %+v %v", q, page, err)
 		}
 	}
-	translated, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Le Verger Ambre"}, model.CatalogSearchFilters{Language: "de", Type: "book"})
+	translated, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Le Verger Ambre"}, model.CatalogSearchFilters{Language: "de", Type: "book,ebook,audiobook"})
 	if err != nil || translated.Total != 1 || translated.Items[0].Title != "Le Verger Ambré" {
 		t.Fatal("query-language title fallback was lost", err)
 	}
@@ -151,7 +151,7 @@ func TestBooksUseLocalMatchingSearchAndReviewWithoutVideoRegression(t *testing.T
 	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_works SET years='{}' WHERE media_type='book'`); err != nil {
 		t.Fatal(err)
 	}
-	dated, e := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book"})
+	dated, e := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"})
 	if e != nil || dated.Total != 1 || len(dated.Items[0].Years) != 1 || dated.Items[0].Years[0] != 2024 {
 		t.Fatal("known edition year was not displayed", e)
 	}
@@ -214,7 +214,7 @@ func TestBookEditionAliasesAndMergesDoNotLoseMatchesOrDuplicateWorks(t *testing.
 	if err = s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Zither Amber"}, model.CatalogSearchFilters{Type: "book"})
+	page, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Zither Amber"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"})
 	if err != nil || page.Total != 1 {
 		t.Fatalf("later edition alias was not matched: %+v %v", page, err)
 	}
@@ -259,7 +259,7 @@ func TestInterruptedBookRefreshWithdrawsChangedEditionEvidence(t *testing.T) {
 	if err := s.DB.SaveOpenLibraryBatch(ctx, snapshot, 0, 1, []books.Record{{Edition: &edition}}); err != nil {
 		t.Fatal(err)
 	}
-	result, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book"})
+	result, err := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"})
 	if err != nil || result.Total != 0 {
 		t.Fatal("stale edition evidence stayed published during an interrupted refresh", err)
 	}

@@ -21,7 +21,6 @@ import {
   PencilSimpleIcon,
   TrashIcon,
   CheckCircleIcon,
-  FloppyDiskIcon,
   ArrowClockwiseIcon,
   PlayIcon,
   DownloadSimpleIcon,
@@ -261,7 +260,7 @@ function SourceCard({
           }
         />
       </dl>
-      <div className="toolbar">
+      <div className="card-actions">
         <CollectDialog
           providerId={source.id}
           trigger={
@@ -589,7 +588,6 @@ function ProviderForm({
               {validate.isPending ? 'Checking…' : 'Check configuration'}
             </Button>
             <Button disabled={blocked || !dirty} onClick={() => save.mutate(json)}>
-              <FloppyDiskIcon />
               {save.isPending ? 'Saving…' : 'Save'}
             </Button>
           </>
@@ -635,7 +633,7 @@ function ProviderForm({
             height="280px"
             readOnly
           />
-          <div className="toolbar">
+          <div className="card-actions">
             <Button
               variant="outline"
               disabled={busy || locallyInvalid || fieldDraft}
@@ -742,7 +740,7 @@ function ProviderForm({
             {dirty ? 'Your current unsaved changes will be discarded. ' : ''}Review and save
             separately; no collection will start.
           </p>
-          <div className="toolbar">
+          <div className="card-actions">
             <Button
               variant="warning"
               disabled={busy || fieldDraft}

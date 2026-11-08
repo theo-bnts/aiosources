@@ -9,6 +9,7 @@ test('save feedback distinguishes reverted controls from committed changes', asy
   })
   await page.goto('/metadata/videos/settings')
   const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
+  await openDisclosure(page, 'Automatic updates')
   const interval = configuration.getByLabel('Information update interval (minutes)', {
     exact: true,
   })

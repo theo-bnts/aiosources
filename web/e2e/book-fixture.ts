@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import pg from 'pg'
 import { expect } from './fixtures'
@@ -106,6 +107,7 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
     true,
   )
   await page.goto('/metadata/books/settings')
+  await openDisclosure(page, 'Automatic updates')
   const interval = page.getByLabel('Book information update interval (minutes)', { exact: true })
   await expect(interval).toHaveValue('15')
   await interval.fill('5')

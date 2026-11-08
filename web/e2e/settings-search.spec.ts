@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test'
 import { test, expect, createStremioAccess } from './fixtures'
 import { runtimeSections } from '../src/lib/runtime-settings-definitions'
 import { settingsCatalog, settingsHash } from '../src/lib/settings-catalog'
+import { openDisclosure } from './disclosures'
 
 async function expectHeaderControlsSeparated(page: Page, name: string) {
   await expect
@@ -117,6 +118,7 @@ test('search navigation keeps the ordinary unsaved-changes guard and preferences
   page,
 }) => {
   await page.goto('/metadata/videos/settings')
+  await openDisclosure(page, 'Request limits')
   const rate = page.getByLabel('TMDB requests per second', { exact: true })
   await rate.fill('17')
   await page.getByRole('button', { name: 'Search settings', exact: true }).click()

@@ -73,7 +73,7 @@ func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
-	key, err := addon.CreatePublicTorznab(f.ctx, "https://addon.example", model.PublicTorznabOptions{MediaTypes: []string{"book"}}, nil)
+	key, err := addon.CreatePublicTorznab(f.ctx, "https://addon.example", model.PublicTorznabOptions{MediaTypes: []string{"book", "ebook", "audiobook"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

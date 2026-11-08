@@ -1,12 +1,12 @@
 import { applicationPages } from './application-pages'
 import { test, expect } from './fixtures'
 
-test('grouped book filters explicitly include all formats', async ({ page }) => {
+test('other book formats have their own explicit filter', async ({ page }) => {
   await page.goto('/search')
   await page.locator('summary', { hasText: /^Filters$/ }).click()
   await page.getByRole('button', { name: 'Type', exact: true }).click()
   await expect(
-    page.getByRole('menuitemcheckbox', { name: 'Books (all formats)', exact: true }),
+    page.getByRole('menuitemcheckbox', { name: 'Other books', exact: true }),
   ).toBeVisible()
   await page.keyboard.press('Escape')
   await page.goto('/torznab')
@@ -15,7 +15,7 @@ test('grouped book filters explicitly include all formats', async ({ page }) => 
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
   await dialog.getByRole('button', { name: 'Media types', exact: true }).click()
   await expect(
-    page.getByRole('menuitemcheckbox', { name: 'Books (all formats)', exact: true }),
+    page.getByRole('menuitemcheckbox', { name: 'Other books', exact: true }),
   ).toBeVisible()
 })
 

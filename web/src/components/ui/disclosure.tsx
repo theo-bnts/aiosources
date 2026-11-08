@@ -41,7 +41,7 @@ export function Disclosure({
         data-slot="disclosure-trigger"
         className={cn(
           'flex cursor-pointer list-none items-center gap-2 font-medium [&::-webkit-details-marker]:hidden',
-          'text-base leading-6 md:text-sm md:leading-5',
+          'text-sm leading-5',
           inline ? 'min-h-(--control-height)' : 'min-h-[calc(var(--control-height)-2px)] px-4 py-2',
         )}
       >

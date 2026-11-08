@@ -56,6 +56,13 @@ test('action confirmations use the shared opaque notification, field errors stay
   expect(box!.x + box!.width).toBeLessThanOrEqual(390)
   expect(box!.y + box!.height).toBeLessThanOrEqual(844)
   await page.getByRole('button', { name: 'Create secret', exact: true }).click()
+  // Opening a dialog must not hide a pending confirmation behind its overlay.
+  const notificationLayer = await notification.evaluate((element) => {
+    const viewport = element.closest('[data-radix-toast-viewport]') ?? element.parentElement!
+    return Number(getComputedStyle(viewport).zIndex)
+  })
+  const dialogLayer = await dialog.evaluate((element) => Number(getComputedStyle(element).zIndex))
+  expect(notificationLayer).toBeGreaterThan(dialogLayer)
   const generatedReference = await dialog.getByLabel('Reference name', { exact: true }).inputValue()
   await dialog.getByLabel('Reference name', { exact: true }).fill('synthetic-reference')
   await dialog.getByLabel('Secret value', { exact: true }).fill('different-synthetic-secret')

@@ -30,6 +30,7 @@ import { FormStatus } from '@/components/form-status'
 import { CollectDialog } from '@/components/collect-dialog'
 import { SourceTorrentStats, useSourceTorrentStats } from '@/components/source-torrent-stats'
 import { Button } from '@/components/ui/button'
+import { PageActions } from '@/components/page-actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -215,12 +216,12 @@ export default function RemotesPage() {
   const toggle = useMutation({ mutationFn: toggleProvider, onSuccess: refreshData })
   return (
     <div className="page">
-      <div className="flex justify-end">
+      <PageActions>
         <Button onClick={() => openEditor('new')}>
           <PlusIcon />
           Add remote catalog
         </Button>
-      </div>
+      </PageActions>
       {remotes.data && (items.length > 0 || filtered) && (
         <ListFilters
           kind="remote"
@@ -319,7 +320,7 @@ export default function RemotesPage() {
                     </dd>
                   </div>
                 </dl>
-                <div className="toolbar">
+                <div className="card-actions">
                   <CollectDialog
                     providerId={remote.id}
                     remote

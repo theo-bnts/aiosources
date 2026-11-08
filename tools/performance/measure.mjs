@@ -268,6 +268,7 @@ try {
       })
       continue
     }
+    const types = type === 'book' ? 'book,ebook,audiobook' : type
     const query = work.title.slice(0, 500)
     for (const [kind, text] of [
       ['title', query],
@@ -276,7 +277,7 @@ try {
       await measure(
         `api.search.${type}.${kind}`,
         5000,
-        () => get(`/api/catalog/search?q=${q(text)}&type=${type}`),
+        () => get(`/api/catalog/search?q=${q(text)}&type=${types}`),
         (body) => {
           listContract(body)
           if (!body.items.length) throw new Error('empty_result')
@@ -291,7 +292,7 @@ try {
       await measure(
         `api.search.${type}.identifier`,
         5000,
-        () => get(`/api/catalog/search?q=${q(identifier)}&type=${type}`),
+        () => get(`/api/catalog/search?q=${q(identifier)}&type=${types}`),
         searchContract(work.id),
       )
     const detail = await get('/api/catalog/' + work.id)

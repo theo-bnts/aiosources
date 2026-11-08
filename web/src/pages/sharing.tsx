@@ -52,6 +52,7 @@ import type {
 } from '@/lib/catalog-types'
 import { useDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
+import { PageActions } from '@/components/page-actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CopyButton } from '@/components/copy-button'
@@ -276,12 +277,12 @@ export default function SharingPage({
   }
   return (
     <div className={format === 'catalog' ? 'page' : 'space-y-5'}>
-      <div className="flex justify-end">
+      <PageActions>
         <Button disabled={!shares.data} onClick={() => openEditor('new')}>
           <PlusIcon />
           {connection ? 'Create access' : 'Create share'}
         </Button>
-      </div>
+      </PageActions>
       {shares.data && !originReady && (
         <section className="notice notice-warning space-y-1">
           <h2 className="font-medium">
@@ -489,7 +490,7 @@ export default function SharingPage({
                     />
                   </div>
                 )}
-                <div className="toolbar">
+                <div className="card-actions">
                   <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
                     <PencilSimpleIcon />
                     Edit

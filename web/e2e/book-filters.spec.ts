@@ -8,7 +8,9 @@ test('book catalog filters keep their defaults, save one coherent scope and fit 
 }) => {
   await page.goto('/metadata/books/settings')
   const form = page.getByRole('form', { name: 'Books configuration', exact: true })
-  const filters = form.locator('details')
+  const filters = form
+    .locator('details')
+    .filter({ has: page.locator('summary', { hasText: /^Catalog filters$/ }) })
   await expect(filters).not.toHaveAttribute('open', '')
   await openDisclosure(page, 'Catalog filters')
   const relevance = page.getByRole('switch', { name: 'Relevant editions only', exact: true })

@@ -92,7 +92,11 @@ export function StremioStatisticsPage() {
         query.data && (
           <>
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Statistic label="Requests" value={query.data.requests} to="/addon/history" />
+              <Statistic
+                label="Retained requests"
+                value={query.data.requests}
+                to="/addon/history"
+              />
               <Statistic
                 label="Results returned"
                 value={query.data.results}
@@ -113,7 +117,8 @@ export function StremioStatisticsPage() {
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />
             </dl>
             <p className="help">
-              Within the configured history retention period, up to 10,000 requests.
+              Statistics cover the retained history: up to 10,000 requests within the configured
+              retention period. Request IDs continue increasing after older entries are removed.
               {query.data.since && ` Oldest request: ${date(query.data.since)}.`}
             </p>
             {query.data.requests === 0 && (

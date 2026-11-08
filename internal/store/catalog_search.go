@@ -81,7 +81,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	media := []string{}
 	formats := []string{}
 	for _, kind := range kinds {
-		if kind == "ebook" || kind == "audiobook" {
+		if kind == "book" || kind == "ebook" || kind == "audiobook" {
 			formats = append(formats, kind)
 			kind = "book"
 		}
@@ -116,7 +116,8 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
  public.similarity($3,normalized) FROM ingest.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
  JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
-	if len(formats) > 0 && !slices.Contains(kinds, "book") {
+	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")
+	if len(formats) > 0 && !allBookFormats {
 		args = append(args, formats)
 		filter += " AND (w.media_type<>'book' OR EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("m") + fmt.Sprintf("=ANY($%d::text[])))", len(args))
 	}

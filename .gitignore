@@ -20,6 +20,9 @@ __pycache__/
 .DS_Store
 
 # Browser regressions: never commit reports, downloads or authenticated state
+/test-results/
+/playwright-report/
+/blob-report/
 /web/test-results/
 /web/playwright-report/
 /web/blob-report/

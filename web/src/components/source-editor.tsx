@@ -49,38 +49,31 @@ const stages = [
     id: 'identity',
     label: 'Identity',
     icon: FingerprintIcon,
-    description: 'Name the source and select its adapter.',
   },
   {
     id: 'connection',
     label: 'Connection',
     icon: GlobeIcon,
-    description: 'Define the endpoint, authentication and requests.',
   },
   {
     id: 'pagination',
     label: 'Pagination',
     icon: RowsIcon,
-    description: 'Control how the collector advances through a listing.',
   },
   {
     id: 'mapping',
     label: 'Source fields',
     icon: ArrowsLeftRightIcon,
-    description:
-      'Read torrent fields from this source. This is separate from identifying films, series and books.',
   },
   {
     id: 'collection',
     label: 'Imports',
     icon: TimerIcon,
-    description: 'Control request pacing and collection limits.',
   },
   {
     id: 'schedules',
     label: 'Schedules',
     icon: CalendarIcon,
-    description: 'Choose when this source imports automatically.',
   },
 ] as const
 
@@ -1463,9 +1456,7 @@ export function SourceEditor({
                           <Icon size={17} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-base font-medium md:text-sm">
-                            {stage.label}
-                          </span>
+                          <span className="block text-sm font-medium">{stage.label}</span>
                           <span
                             className={`mt-1 break-words text-xs leading-5 text-muted-foreground ${selected === index ? 'block' : 'hidden lg:block'}`}
                           >
@@ -1489,10 +1480,6 @@ export function SourceEditor({
               tabIndex={0}
               className="min-w-0 p-5 sm:p-6"
             >
-              <header className="mb-7 flex items-start gap-4 border-b border-border pb-5">
-                <span className="mono pt-1 text-primary">0{selected + 1}</span>
-                <p className="help">{current.description}</p>
-              </header>
               <fieldset disabled={readOnly} className="min-w-0 space-y-7 disabled:opacity-60">
                 <legend className="sr-only">{current.label} settings</legend>
                 {selected === 0 && <IdentitySettings sourceID={sourceID} />}

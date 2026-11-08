@@ -24,6 +24,7 @@ import { messageText, number, statusLabels } from '@/lib/format'
 import { useDetailBackLink, type BackLink } from '@/lib/detail-navigation'
 import type { Run } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+import { PageActions, PageActionsTarget } from '@/components/page-actions'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -50,9 +51,12 @@ export function PageHeader({
 }) {
   const level = useContext(PageHeadingLevel)
   const visibility = useContext(PageHeaderVisibility)
+  const actionsTarget = useContext(PageActionsTarget)
   const Heading = level === 1 ? 'h1' : 'h2'
   const back = useDetailBackLink(defaultBack)
   const showDescription = visibility.description && description
+  if (actionsTarget && !visibility.title && !showDescription && !back)
+    return actions ? <PageActions>{actions}</PageActions> : null
   if (!visibility.title && !showDescription && !actions && !back) return null
   return (
     <header className="space-y-4">
@@ -87,7 +91,7 @@ export function PageHeader({
             )}
           </div>
         )}
-        {actions && <div className="toolbar ml-auto">{actions}</div>}
+        {actions && <PageActions>{actions}</PageActions>}
       </div>
     </header>
   )

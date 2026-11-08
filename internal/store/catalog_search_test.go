@@ -2,10 +2,53 @@ package store
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+func TestBookFormatFiltersAreDisjointAndCombineWithoutLosingTitles(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	for index, kind := range []string{"book", "ebook", "audiobook"} {
+		id := []string{"OL100W", "OL200W", "OL300W"}[index]
+		var workID int64
+		if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,book_normalized,years) VALUES('book',$1,'Example format','example format','{}') RETURNING id`, id).Scan(&workID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_titles(work_id,title,normalized) VALUES($1,'Example format','example format')`, workID); err != nil {
+			t.Fatal(err)
+		}
+		publishSharingRow(t, ctx, db, "fixture", kind, `{"title":"Example format","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
+		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT provider_id,source_id,fields_fingerprint,$1,1,'matched','fixture',$2 FROM ingest.torrents WHERE source_id=$2`, workID, kind); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.aio_match_queue`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		selection string
+		count     int64
+	}{{"", 3}, {"book", 1}, {"ebook", 1}, {"audiobook", 1}, {"ebook,audiobook", 2}, {"book,ebook,audiobook", 3}} {
+		page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example"}, "example", model.CatalogSearchFilters{Type: tc.selection})
+		if err != nil || page.Total != tc.count {
+			t.Fatalf("format %q: total=%d: %v", tc.selection, page.Total, err)
+		}
+		if tc.selection == "book" && page.Items[0].OpenLibrary != "OL100W" {
+			t.Fatal("Other books included a known digital or audio format")
+		}
+		var media []string
+		if tc.selection != "" {
+			media = strings.Split(tc.selection, ",")
+		}
+		feed, err := db.PublicTorznabCatalog(ctx, model.TorznabQuery{Limit: 50}, nil, media, TorznabVisibility{Public: true, UncachedSources: []string{"fixture"}, CacheAfter: time.Now().Add(-time.Hour)}, nil)
+		if err != nil || feed.Total != tc.count || int64(len(feed.Items)) != tc.count {
+			t.Fatalf("Torznab formats %q: %+v %v", tc.selection, feed, err)
+		}
+	}
+}
 
 func TestCatalogSearchOnlyPublishesCurrentIdentifications(t *testing.T) {
 	ctx, db := sharingDatabase(t)

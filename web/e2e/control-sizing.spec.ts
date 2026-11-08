@@ -6,7 +6,6 @@ async function expectConsistentControls(page: Page) {
     .poll(async () =>
       page.evaluate(() => {
         const expected = innerWidth < 768 ? 44 : 40
-        const fontSize = innerWidth < 768 ? '16px' : '14px'
         const issues: string[] = []
         const selectors = [
           '[data-slot="input"]',
@@ -25,6 +24,13 @@ async function expectConsistentControls(page: Page) {
           if (!box.width || !box.height || getComputedStyle(element).visibility === 'hidden')
             continue
           const slot = element.dataset.slot
+          const fontSize =
+            innerWidth < 768 &&
+            (slot === 'input' ||
+              element.hasAttribute('data-input-like') ||
+              element.classList.contains('native-select'))
+              ? '16px'
+              : '14px'
           const label = element.getAttribute('aria-label') || element.id || slot || element.tagName
           const disclosure = slot === 'disclosure-trigger'
           const expectedHeight =

@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import { test, expect } from './fixtures'
 import pg from 'pg'
 
@@ -48,7 +49,7 @@ test('statistics are the first view, settings contain configuration and statuses
     ['/providers', 'Sources', 'Imported torrents'],
     ['/metadata/videos', 'Videos', 'Catalog entries'],
     ['/metadata/books', 'Books', 'Catalog entries'],
-    ['/debrid', 'Debrid', 'Availability checks'],
+    ['/debrid', 'Debrid', 'Configured services'],
   ]) {
     await page.goto(path)
     const views = page.getByRole('tablist', { name: `${heading} views`, exact: true })
@@ -101,6 +102,7 @@ test('the Statistics tab preserves unsaved settings until an explicit discard', 
   page,
 }) => {
   await page.goto('/metadata/videos/settings')
+  await openDisclosure(page, 'Automatic updates')
   const interval = page.getByLabel('Information update interval (minutes)', { exact: true })
   const original = await interval.inputValue()
   const changed = original === '30' ? '45' : '30'

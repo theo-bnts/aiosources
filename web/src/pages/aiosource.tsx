@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, MagnifyingGlassIcon, StopIcon, TrashIcon } from '@phosphor-icons/react'
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { BookImportFilters } from '@/components/book-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
@@ -331,7 +332,7 @@ export default function AIOSourcePage({
         submit(scope)
       }}
     >
-      <fieldset disabled={save.isPending} className="contents">
+      <fieldset disabled={save.isPending} className="min-w-0 space-y-5">
         <Panel
           title={
             metadata
@@ -344,7 +345,6 @@ export default function AIOSourcePage({
           {section === 'videos' && (
             <div className="grid gap-5 md:grid-cols-2">
               {secret('TMDB read access token', 'tmdb_secret')}
-              {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
             </div>
           )}
           {section === 'books' && (
@@ -354,11 +354,6 @@ export default function AIOSourcePage({
                 import can take hours; later updates follow recent changes. Cover images stay
                 remote.
               </p>
-              <BookImportFilters
-                value={config}
-                onChange={(patch) => update(scope, patch)}
-                busy={Boolean(status.books?.running) || resetting}
-              />
             </div>
           )}
           {section === 'debrid' && (
@@ -369,60 +364,57 @@ export default function AIOSourcePage({
                   {'hint' in provider && <p className="help">{provider.hint}</p>}
                 </div>
               ))}
-              <div className="md:col-span-2">
-                <Disclosure title="Cache availability">
-                  {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
-                  <div className="space-y-2">
-                    {toggle('Automatically recheck availability', 'auto_cache')}
-                    <p className="help">
-                      Retry incomplete checks made with your configured accounts while their cache
-                      window remains valid. Public visitors are never rechecked in the background.
-                      Temporary-item cleanup remains active.
-                    </p>
-                  </div>
-                </Disclosure>
-              </div>
             </div>
           )}
-          {metadata && (
-            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-              <legend className="pr-3 text-sm font-medium">Schedules</legend>
-              <div className="grid gap-5 md:grid-cols-2">
-                {section === 'videos' && (
-                  <div className="space-y-4">
-                    {toggle('Automatically update film & series information', 'auto_sync')}
-                    {number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
-                  </div>
-                )}
-                {section === 'books' && (
-                  <div className="space-y-4">
-                    {toggle('Automatically update book information', 'openlibrary_enabled')}
-                    {number(
-                      'Book information update interval (minutes)',
-                      'openlibrary_minutes',
-                      5,
-                      1440,
-                    )}
-                  </div>
-                )}
-                {section === 'identification' && (
-                  <div className="space-y-4">
-                    {toggle('Automatically identify torrents', 'auto_match')}
-                    {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
-                  </div>
-                )}
-              </div>
-              {section === 'identification' && (
-                <p className="help">
-                  Identification waits for this interval after each attempt. Pending work and timing
-                  survive restarts. These settings apply to videos and books. Manual actions run
-                  immediately.
-                </p>
-              )}
-            </fieldset>
-          )}
-          {footer(scope)}
+          {section === 'videos' &&
+            toggle('Automatically update film & series information', 'auto_sync')}
+          {section === 'books' &&
+            toggle('Automatically update book information', 'openlibrary_enabled')}
+          {section === 'identification' && toggle('Automatically identify torrents', 'auto_match')}
         </Panel>
+        {section === 'debrid' && (
+          <Disclosure title="Cache availability">
+            {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
+            <div className="space-y-2">
+              {toggle('Automatically recheck availability', 'auto_cache')}
+              <p className="help">
+                Retry incomplete checks made with your configured accounts while their cache window
+                remains valid. Public visitors are never rechecked in the background. Temporary-item
+                cleanup remains active.
+              </p>
+            </div>
+          </Disclosure>
+        )}
+        {section === 'books' && (
+          <BookImportFilters
+            value={config}
+            onChange={(patch) => update(scope, patch)}
+            busy={Boolean(status.books?.running) || resetting}
+          />
+        )}
+        {metadata && (
+          <Disclosure title="Automatic updates">
+            {section === 'videos' &&
+              number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
+            {section === 'books' &&
+              number('Book information update interval (minutes)', 'openlibrary_minutes', 5, 1440)}
+            {section === 'identification' && (
+              <>
+                {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
+                <p className="help">
+                  Pending work and timing survive restarts. This interval applies to videos and
+                  books; manual actions run immediately.
+                </p>
+              </>
+            )}
+          </Disclosure>
+        )}
+        {section === 'videos' && (
+          <Disclosure title="Request limits">
+            {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
+          </Disclosure>
+        )}
+        {footer(scope)}
       </fieldset>
     </form>
   )
@@ -459,6 +451,7 @@ export default function AIOSourcePage({
                 action={() => action.mutateAsync('reset-videos')}
                 trigger={
                   <Button variant="destructive" disabled={maintenanceBusy}>
+                    <TrashIcon />
                     Reset video information
                   </Button>
                 }
@@ -473,6 +466,7 @@ export default function AIOSourcePage({
                 action={() => action.mutateAsync('reset-books')}
                 trigger={
                   <Button variant="destructive" disabled={maintenanceBusy}>
+                    <TrashIcon />
                     Reset book information
                   </Button>
                 }
@@ -487,6 +481,7 @@ export default function AIOSourcePage({
                 action={() => action.mutateAsync('reset-mapping')}
                 trigger={
                   <Button variant="destructive" disabled={maintenanceBusy}>
+                    <TrashIcon />
                     Reset matches
                   </Button>
                 }
@@ -510,6 +505,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-cache')}
               trigger={
                 <Button variant="destructive" disabled={action.isPending || resetting}>
+                  <TrashIcon />
                   Reset cache
                 </Button>
               }
@@ -619,6 +615,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync')}
                     >
+                      <ArrowClockwiseIcon />
                       Update film & series information
                     </Button>
                     {status.syncing && (
@@ -627,6 +624,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-sync')}
                       >
+                        <StopIcon />
                         Stop film & series information update
                       </Button>
                     )}
@@ -640,6 +638,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync-books')}
                     >
+                      <ArrowClockwiseIcon />
                       Update book information
                     </Button>
                     {status.books?.running && (
@@ -648,6 +647,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-books')}
                       >
+                        <StopIcon />
                         Stop book information update
                       </Button>
                     )}
@@ -665,6 +665,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('match')}
                     >
+                      <MagnifyingGlassIcon />
                       Identify torrents
                     </Button>
                     {status.matching && (
@@ -673,6 +674,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-matching')}
                       >
+                        <StopIcon />
                         Stop identification
                       </Button>
                     )}

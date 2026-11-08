@@ -30,7 +30,9 @@ test('metadata configuration persists and missing information explains disabled 
   ).toBeDisabled()
   const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
   await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
+  await openDisclosure(page, 'Request limits')
   await page.getByLabel('TMDB requests per second').fill('20')
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Information update interval (minutes)', { exact: true }).fill('30')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -42,6 +44,7 @@ test('metadata configuration persists and missing information explains disabled 
   await page.goto('/metadata/identification/settings')
   await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
   await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)').fill('90')
   const identification = page.getByRole('form', {
     name: 'Identification configuration',
@@ -51,6 +54,7 @@ test('metadata configuration persists and missing information explains disabled 
   await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
   await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('90')
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)').fill('4')
   await identification.getByRole('button', { name: 'Save', exact: true }).click()
   expect(
@@ -58,6 +62,7 @@ test('metadata configuration persists and missing information explains disabled 
       .getByLabel('Identification interval (seconds)')
       .evaluate((field) => (field as HTMLInputElement).validity.rangeUnderflow),
   ).toBe(true)
+  await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)').fill('5')
   await identification.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -154,7 +159,13 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     ).toBeVisible()
     await expect(page.getByRole('link', { name: 'View history', exact: true })).toBeVisible()
     await page.setViewportSize({ width: 390, height: 844 })
-    await expect(form.getByRole('group', { name: 'Schedules', exact: true })).toBeVisible()
+    await expect(
+      page.getByLabel('Information update interval (minutes)', { exact: true }),
+    ).toBeHidden()
+    await openDisclosure(page, 'Automatic updates')
+    await expect(
+      page.getByLabel('Information update interval (minutes)', { exact: true }),
+    ).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   } finally {
     await db.end()
@@ -418,8 +429,10 @@ test('private playback saves independently and fields have space below their lab
   await assertPlaybackFooter()
   await page.goto('/metadata/videos/settings')
   await assertSpacing('tmdb_secret')
+  await openDisclosure(page, 'Automatic updates')
   await assertSpacing('sync_minutes')
   await page.goto('/metadata/identification/settings')
+  await openDisclosure(page, 'Automatic updates')
   await assertSpacing('match_seconds')
   await page.goto('/addon/settings')
   await page.getByRole('button', { name: 'Create access', exact: true }).click()

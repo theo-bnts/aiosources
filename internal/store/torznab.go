@@ -145,16 +145,10 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	}
 	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("m") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 WHEN ` + bookReleaseKindSQL("m") + `='ebook' THEN 7020 ELSE 7000 END ELSE 8000 END`
 	if len(media) > 0 {
-		cats := []int{}
-		for _, pair := range []struct {
-			typ string
-			cat int
-		}{{"movie", 2000}, {"tv", 5000}, {"book", 7000}, {"book", 7020}, {"book", 7030}, {"book", 3030}, {"ebook", 7020}, {"ebook", 7030}, {"audiobook", 3030}, {"other", 8000}} {
-			if slices.Contains(media, pair.typ) {
-				cats = append(cats, pair.cat)
-			}
-		}
-		clauses = append(clauses, category+"=ANY("+bind(cats)+"::int[])")
+		// Release format and Torznab category are separate: a known comic
+		// category does not turn an unclassified release into an ebook.
+		kind := `CASE WHEN w.media_type='book' THEN ` + bookReleaseKindSQL("m") + ` ELSE COALESCE(w.media_type,'other') END`
+		clauses = append(clauses, kind+"=ANY("+bind(media)+"::text[])")
 	}
 	if q.Mode == "movie" {
 		clauses = append(clauses, "w.media_type='movie'")

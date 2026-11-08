@@ -6,6 +6,9 @@ import { number, percentage, useDate } from '@/lib/format'
 import type { Config } from '@/lib/aiosource-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
+import { Statistic } from '@/components/statistic'
+import { Button } from '@/components/ui/button'
+import { ArrowRightIcon } from '@phosphor-icons/react'
 
 type CacheStats = {
   service: string
@@ -22,6 +25,14 @@ export function DebridStatistics({ config }: { config: Config }) {
     queryFn: ({ signal }) => api<{ items: CacheStats[] }>('/debrid/statistics', { signal }),
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
+  const totals = (query.data?.items ?? []).reduce(
+    (sum, item) => ({
+      cached: sum.cached + item.cached,
+      uncached: sum.uncached + item.uncached,
+      account: sum.account + (item.checks ? item.checks.cached + item.checks.uncached : 0),
+    }),
+    { cached: 0, uncached: 0, account: 0 },
+  )
   return (
     <>
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
@@ -30,8 +41,24 @@ export function DebridStatistics({ config }: { config: Config }) {
       ) : (
         query.data && (
           <section className="space-y-4" aria-label="Availability checks">
-            <h2 className="section-title">Availability checks</h2>
-            <div className="grid gap-5 md:grid-cols-2">
+            <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <Statistic
+                label="Configured services"
+                value={debridProviders.filter((provider) => config[provider.secret]).length}
+              />
+              <Statistic
+                label="Shared cached observations"
+                value={totals.cached}
+                detail={`(${percentage(totals.cached, totals.cached + totals.uncached)})`}
+              />
+              <Statistic
+                label="Shared not cached observations"
+                value={totals.uncached}
+                detail={`(${percentage(totals.uncached, totals.cached + totals.uncached)})`}
+              />
+              <Statistic label="Account observations" value={totals.account} />
+            </dl>
+            <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
               {debridProviders.map((provider) => {
                 const { id: service, name } = provider
                 const configured = Boolean(config[provider.secret])
@@ -41,9 +68,13 @@ export function DebridStatistics({ config }: { config: Config }) {
                   uncached = counts?.uncached ?? 0,
                   total = cached + uncached
                 return (
-                  <section className="section-card" key={service}>
+                  <section className="statistic-card flex h-full flex-col gap-4" key={service}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="section-title mb-0">{name}</h3>
+                      <h3 className="section-title mb-0">
+                        <Link className="data-link" to={`/debrid/settings#${provider.secret}`}>
+                          {name}
+                        </Link>
+                      </h3>
                       <Badge variant={configured ? 'success' : 'secondary'}>
                         {configured ? 'Configured' : 'Not configured'}
                       </Badge>
@@ -74,9 +105,14 @@ export function DebridStatistics({ config }: { config: Config }) {
                         cached
                       </p>
                     )}
-                    <Link className="data-link text-sm" to={`/debrid/history?service=${service}`}>
-                      View history
-                    </Link>
+                    <div className="card-actions mt-auto">
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/debrid/history?service=${service}`}>
+                          <ArrowRightIcon />
+                          View history
+                        </Link>
+                      </Button>
+                    </div>
                   </section>
                 )
               })}
