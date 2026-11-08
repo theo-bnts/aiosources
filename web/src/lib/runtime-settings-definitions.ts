@@ -29,7 +29,7 @@ export const runtimeSections = {
   },
   history: {
     title: 'History retention',
-    help: 'Expired diagnostics are removed progressively. Published data and evidence needed to resume imports are preserved. Shortening retention can permanently remove older history; increasing it cannot restore deleted history. Stremio history also keeps its 10,000-request safety limit.',
+    help: 'Default retention and progressive cleanup. Per-history overrides and the Stremio request limit are available in Retention overrides. Published data and evidence needed to resume imports are preserved. Shortening retention permanently removes older history; increasing it cannot restore deleted history.',
     fields: [
       ['days', 'Keep history (days)', 1, 3650],
       ['cleanup_seconds', 'Cleanup interval (seconds)', 5, 3600],

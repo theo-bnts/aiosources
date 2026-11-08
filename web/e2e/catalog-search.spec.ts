@@ -838,3 +838,42 @@ test.describe('browser language preferences', () => {
     ).toBeChecked()
   })
 })
+
+test('direct torrent Search is always reachable and reuses release formatting without metadata matches', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server, true)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query('DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue;')
+  } finally {
+    await db.end()
+  }
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('/search')
+    await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
+    await expect(page).toHaveURL(/\/search\/torrents$/)
+    await expect(page.getByRole('heading', { name: 'Find a torrent', exact: true })).toBeVisible()
+    await page.goto('/search')
+    await page.getByLabel('Title, author or identifier', { exact: true }).fill('Example Film')
+    await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
+    await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
+    await page.goto('/search?q=Example%20Film')
+    await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
+    await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
+    await expect(page).toHaveURL(/\/search\/torrents\?q=Example(?:%20|\+)Film/)
+    await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
+    await expect(page.locator('[data-slot="release-presentation"]')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Add to debrid', exact: true })).toHaveCount(1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+  const response = await page.request.get('/api/catalog/torrents?q=Example%20Film')
+  expect(response.status()).toBe(200)
+  const body = await response.json()
+  expect(body.items.map((row: { size: number }) => row.size)).toEqual([200, 100])
+  expect(ids.movie).toBeTruthy()
+})

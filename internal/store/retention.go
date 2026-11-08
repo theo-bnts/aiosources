@@ -143,7 +143,8 @@ VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID
 	}
 	var stagedUpdates []stagedUpdate
 	bulkValidated := false
-	if run.StorageMode == model.StorageCompact && run.Mode != model.ModePreview && page.Error == "" {
+	storageOptions := run.EffectiveStorageOptions()
+	if !storageOptions.SuccessfulRecords && run.Mode != model.ModePreview && page.Error == "" {
 		bulkValidated, err = validateCompactRecords(ctx, tx, page.Items, page.ContentType)
 		if err != nil {
 			return model.Run{}, err
@@ -174,14 +175,14 @@ $8,$9,$10,FALSE) RETURNING id`
 		// Evaluate the JSONB interpretation in every mode, even when its fields
 		// are not retained here. PostgreSQL can reject otherwise valid wire JSON
 		// (for example U+0000 or an overflowing exponent).
-		retainObservation := run.StorageMode != model.StorageCompact || run.Mode == model.ModePreview || record.Error != "" || page.Error != ""
+		retainObservation := storageOptions.SuccessfulRecords || run.Mode == model.ModePreview || record.Error != "" || page.Error != ""
 		if retainObservation || !bulkValidated {
 			itemTx, err := tx.Begin(ctx)
 			if err != nil {
 				return model.Run{}, databaseError("begin record retention", err)
 			}
 			if retainObservation {
-				err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview).Scan(&rawID)
+				err = itemTx.QueryRow(ctx, insertRaw, run.ID, run.ProviderID, record.SourceID, pageID, pageIndex, contentType, fields, record.Error, record.Ignored, record.Auxiliary, run.Mode == model.ModePreview || storageOptions.RecordFields).Scan(&rawID)
 			} else {
 				// Validate the same interpretation without writing millions of empty
 				// success observations. Durable identity/scope/filter ledgers below,
@@ -234,7 +235,7 @@ $8,$9,$10,FALSE) RETURNING id`
 		if run.Mode == model.ModePreview {
 			continue
 		}
-		record.Fields = model.StoredTorrentFields(record.Fields, run.StorageMode)
+		record.Fields = run.StoredFields(record.Fields)
 		if remote {
 			fields, err = jsonObject(record.Fields)
 			if err != nil {

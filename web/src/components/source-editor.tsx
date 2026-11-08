@@ -686,7 +686,7 @@ function MappingSettings() {
       <OptionalSection
         title="Output selection"
         configuredPaths={[['output', 'fields']]}
-        description="Output fields control presentation. Storage → Settings → Data retention controls which mapped fields and processing details are retained. Leave empty for the default output."
+        description="Output fields control presentation. Storage → Settings → Torrent data controls which mapped fields and processing details are retained. Leave empty for the default output."
       >
         <StringArrayField
           path={['output', 'fields']}

@@ -21,6 +21,7 @@ export const applicationPages = [
   ['debrid.settings', '/debrid/settings'],
   ['debrid.history', '/debrid/history'],
   ['search', '/search'],
+  ['search.torrents', '/search/torrents'],
   ['stremio.statistics', '/addon'],
   ['stremio.settings', '/addon/settings'],
   ['stremio.history', '/addon/history'],

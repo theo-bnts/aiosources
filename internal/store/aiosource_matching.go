@@ -20,7 +20,7 @@ func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandida
 	if filter.Type == "book" {
 		return searchBookCandidates(ctx, tx, filter)
 	}
-	rows, err := tx.Query(ctx, aioCandidatesQuery, filter.Title, filter.TMDB, filter.IMDb, filter.TVDB, filter.Type, filter.Year, filter.Seasons, filter.Episode, filter.ExactOnly)
+	rows, err := tx.Query(ctx, aioCandidatesQuery, filter.Title, filter.TMDB, filter.IMDb, filter.TVDB, filter.Type, filter.Year, filter.Seasons, filter.Episode, filter.ExactOnly, filter.Titles)
 	if err != nil {
 		return nil, false, databaseError("find metadata candidates", err)
 	}

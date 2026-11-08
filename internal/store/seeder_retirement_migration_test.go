@@ -124,7 +124,10 @@ func TestSeederRetirementPreservesIdentificationProgressAndHistory(t *testing.T)
 	if err = db.pool.QueryRow(ctx, `SELECT raw FROM ingest.raw_records WHERE run_id=$1`, run.ID).Scan(&raw); err != nil || string(raw) != data {
 		t.Fatalf("original archive changed: %v", err)
 	}
-	preserved, err := db.GetRun(ctx, run.ID)
+	// This fixture intentionally stops before later schema additions. Verify
+	// the historical checkpoint directly rather than using the current scanner.
+	var preserved model.Run
+	err = db.pool.QueryRow(ctx, `SELECT cursor,pages,records FROM ingest.runs WHERE id=$1`, run.ID).Scan(&preserved.Cursor, &preserved.Pages, &preserved.Records)
 	if err != nil || string(preserved.Cursor) != `{"page": 12}` || preserved.Pages != 11 || preserved.Records != 4 {
 		t.Fatalf("progress changed: %+v %v", preserved, err)
 	}

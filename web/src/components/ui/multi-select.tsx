@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 
 export type MultiSelectOption = { value: string; label: string; group?: string }
 
-// An empty selection deliberately means all, including future options.
+// The caller defines the empty selection. Source selectors use all sources,
+// including future entries; optional-field selectors use required fields only.
 export function MultiSelect({
   id,
   label,

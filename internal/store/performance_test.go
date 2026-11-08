@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,7 +69,7 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	for _, name := range []string{"source-statistics", "metadata-statistics", "information-statistics", "metadata-controls", "identification", "identification-filtered", "search", "title-search", "review-search", "stremio", "shared-cache", "storage"} {
+	for _, name := range []string{"source-statistics", "metadata-statistics", "information-statistics", "metadata-controls", "identification", "identification-filtered", "search", "direct-search", "title-search", "review-search", "stremio", "shared-cache", "storage"} {
 		b.Run(name, func(b *testing.B) {
 			for b.Loop() {
 				switch name {
@@ -88,6 +89,8 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 					_, err = db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Status: status, Limit: 50})
 				case "search":
 					_, err = db.ListTorrents(ctx, model.ListOptions{Query: "Documentary.1234", Limit: 50})
+				case "direct-search":
+					_, err = db.CatalogTorrentRecords(ctx, model.ListOptions{Query: "Documentary.1234", Limit: 50}, nil, CatalogTorrentPolicy{CacheAfter: time.Now().Add(-time.Hour), Services: []string{}})
 				case "title-search":
 					_, err = db.CatalogTitles(ctx, model.ListOptions{Query: "Synthetic Documentary", Limit: 50}, "synthetic documentary", model.CatalogSearchFilters{})
 				case "review-search":
@@ -148,6 +151,86 @@ func BenchmarkAdministrationPaths(b *testing.B) {
 					b.Fatal(err)
 				}
 			}
+		})
+	}
+}
+
+// Independent options are measured against the same synthetic import. These
+// are write costs, unlike the read-speed benefit shown for optional indexes.
+func BenchmarkStorageChoices(b *testing.B) {
+	for _, name := range []string{"required-only", "additional-field", "all-fields", "successful-records", "record-field-copies", "published-history"} {
+		b.Run(name, func(b *testing.B) {
+			ctx, db := sharingDatabase(b)
+			settings, err := db.StorageOverview(ctx)
+			if err != nil {
+				b.Fatal(err)
+			}
+			options := model.StorageOptions{}
+			switch name {
+			case "additional-field":
+				options.AdditionalFields = []string{"description"}
+			case "all-fields":
+				options.AllFields = true
+			case "successful-records":
+				options.SuccessfulRecords = true
+			case "record-field-copies":
+				options.SuccessfulRecords = true
+				options.RecordFields = true
+			case "published-history":
+				options.PublicationHistory = true
+			}
+			settings.Settings.Options = &options
+			if options.AllFields {
+				settings.Settings.Mode = model.StorageFull
+			}
+			if err = db.UpdateStorageSettings(ctx, settings.Settings); err != nil {
+				b.Fatal(err)
+			}
+			p := model.Provider{ID: "synthetic-storage", Adapter: "http_json"}
+			created, err := db.CreateRun(ctx, model.Run{ProviderID: p.ID, Config: p, Mode: model.ModeIncremental})
+			if err != nil {
+				b.Fatal(err)
+			}
+			claimed, err := db.ClaimNext(ctx)
+			if err != nil || claimed == nil || claimed.ID != created.ID {
+				b.Fatal("claim storage fixture", err)
+			}
+			run := *claimed
+			items := make([]model.Record, 100)
+			for i := range items {
+				items[i] = model.Record{SourceID: fmt.Sprint(i), Fields: map[string]any{
+					"title": fmt.Sprintf("Synthetic.Documentary.%d.2026.1080p", i), "info_hash": fmt.Sprintf("%040x", i+1), "size": int64(123456789), "categories": []int{2000},
+					"description": strings.Repeat("Synthetic source description. ", 64), "extra_details": strings.Repeat("Synthetic unused detail. ", 64),
+				}}
+			}
+			iteration := 0
+			allocated := func() int64 {
+				var size int64
+				if err := db.pool.QueryRow(ctx, `SELECT sum(pg_total_relation_size(name::regclass)) FROM unnest(ARRAY['ingest.torrents','ingest.raw_records','ingest.torrent_history']) name`).Scan(&size); err != nil {
+					b.Fatal(err)
+				}
+				return size
+			}
+			before := allocated()
+			b.ResetTimer()
+			for b.Loop() {
+				for i := range items {
+					items[i].SourceID = fmt.Sprintf("%d-%d", iteration, i)
+				}
+				run, err = db.SavePage(ctx, run, model.Page{Items: items}, "")
+				if err != nil {
+					b.Fatal(err)
+				}
+				iteration++
+			}
+			b.StopTimer()
+			var bytes int64
+			if err = db.pool.QueryRow(ctx, `SELECT COALESCE((SELECT sum(pg_column_size(t)) FROM ingest.torrents t),0)+COALESCE((SELECT sum(pg_column_size(r)) FROM ingest.raw_records r),0)+COALESCE((SELECT sum(pg_column_size(h)) FROM ingest.torrent_history h),0)`).Scan(&bytes); err != nil {
+				b.Fatal(err)
+			}
+			b.ReportMetric(float64(bytes)/float64(iteration*len(items)), "row-B/record")
+			b.ReportMetric(float64(allocated()-before)/float64(iteration*len(items)), "allocated-B/record")
+			b.ReportMetric(100, "records/page")
 		})
 	}
 }

@@ -106,3 +106,22 @@ func TestCoverURLsUseOnlyCanonicalProviderIdentifiers(t *testing.T) {
 		t.Fatal("canonical cover URL lost")
 	}
 }
+
+func TestOptionalSourceFieldSelectionRetainsTypedNestedValuesWithoutMutatingInputs(t *testing.T) {
+	fields := map[string]any{"title": "Example", "description": "selected", "discarded": "omitted", "attributes": map[string][]string{"language": {"fr"}, "description": {"selected attribute"}, "unused": {"omitted"}}, "metadata": map[string]any{"extra": "selected nested", "discarded": "omitted"}}
+	before, _ := json.Marshal(fields)
+	r := Run{StorageOptions: &StorageOptions{AdditionalFields: []string{"description", "attributes.description", "metadata.extra"}}}
+	got := r.StoredFields(fields)
+	after, _ := json.Marshal(fields)
+	if string(before) != string(after) || got["description"] != "selected" || got["discarded"] != nil {
+		t.Fatal("optional projection changed original fields")
+	}
+	attr := got["attributes"].(map[string]any)
+	if !reflect.DeepEqual(attr["language"], []string{"fr"}) || !reflect.DeepEqual(attr["description"], []string{"selected attribute"}) || attr["unused"] != nil {
+		t.Fatal("typed attributes projected incorrectly", attr)
+	}
+	nested := got["metadata"].(map[string]any)
+	if nested["extra"] != "selected nested" || nested["discarded"] != nil {
+		t.Fatal("nested optional field lost", nested)
+	}
+}

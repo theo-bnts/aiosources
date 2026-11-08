@@ -209,7 +209,7 @@ export function DownloadAction({
               setReady(null)
             }}
           >
-            <option value="">Choose a format or audio track</option>
+            <option value="">Choose a file</option>
             {bookFiles.map((file) => (
               <option key={file.path} value={file.path}>
                 {file.path}

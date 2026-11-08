@@ -226,7 +226,7 @@ ANALYZE ingest.aio_works;ANALYZE ingest.aio_titles;`); err != nil {
 		t.Fatalf("catalog-scale candidates: %d %v %v", len(works), overflow, err)
 	}
 	var raw []byte
-	if err = conn.QueryRow(ctx, `EXPLAIN (ANALYZE,FORMAT JSON) `+aioCandidatesQuery, "unique target film", "", "tt8888888", "", "", nil, []int{}, nil, false).Scan(&raw); err != nil {
+	if err = conn.QueryRow(ctx, `EXPLAIN (ANALYZE,FORMAT JSON) `+aioCandidatesQuery, "unique target film", "", "tt8888888", "", "", nil, []int{}, nil, false, []string{}).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
 	type planNode struct {
@@ -260,7 +260,7 @@ ANALYZE ingest.aio_works;ANALYZE ingest.aio_titles;`); err != nil {
 	if _, err = conn.Exec(ctx, `SET plan_cache_mode=force_generic_plan`); err != nil {
 		t.Fatal(err)
 	}
-	if err = conn.QueryRow(ctx, `EXPLAIN (ANALYZE,FORMAT JSON) `+aioCandidatesQuery, "unique target film", "", "tt8888888", "", "", nil, []int{}, nil, false).Scan(&raw); err != nil {
+	if err = conn.QueryRow(ctx, `EXPLAIN (ANALYZE,FORMAT JSON) `+aioCandidatesQuery, "unique target film", "", "tt8888888", "", "", nil, []int{}, nil, false, []string{}).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
 	if err = json.Unmarshal(raw, &roots); err != nil {

@@ -194,8 +194,55 @@ add(
     route: '/health/settings',
     group: 'Administration / Storage / Settings',
     keywords: 'storage stockage disk espace retention',
+    reveal: ['Torrent data'],
   },
-  [['storage.mode', 'Stored torrent information', 'compact complete space']],
+  [
+    ['storage.fields', 'All mapped source fields', 'compact complete descriptions space'],
+    ['storage.additional', 'Additional source fields', 'mapping fields extras'],
+    ['storage.records', 'Successful processed records', 'diagnostics import records'],
+    ['storage.record-fields', 'Processed record field copies', 'diagnostics fields'],
+    ['storage.publication', 'Published change history', 'changes differences history'],
+  ],
+)
+add(
+  {
+    route: '/health/settings',
+    group: 'Administration / Storage / Search indexes',
+    reveal: ['Search indexes'],
+  },
+  [
+    ['storage.index.words', 'Whole-word torrent search', 'fulltext index performance storage'],
+    ['storage.index.fragments', 'Partial torrent search', 'fragments index performance storage'],
+    ['storage.index.categories', 'Torrent category filters', 'categories index'],
+    ['storage.index.size', 'Torrent size filters and sorting', 'size index'],
+    ['storage.index.dates', 'Torrent date filters and sorting', 'date index'],
+    ['storage.index.records', 'Processed record search', 'diagnostic index'],
+  ],
+)
+add(
+  {
+    route: '/health/settings',
+    group: 'Administration / Storage / Retention overrides',
+    reveal: ['Retention overrides'],
+  },
+  [
+    ['storage.retention.sources', 'Source diagnostics (days)', 'retention source records'],
+    ['storage.retention.changes', 'Published changes (days)', 'retention history'],
+    ['storage.retention.logs', 'Activity logs (days)', 'retention logs'],
+    ['storage.retention.operations', 'Operation history (days)', 'retention downloads'],
+    ['storage.retention.requests', 'Stremio request history (days)', 'retention requests'],
+    ['storage.retention.sharing', 'Catalog sharing changes (days)', 'retention sharing journal'],
+    [
+      'storage.retention.request-limit',
+      'Maximum retained Stremio requests',
+      'retention request limit count',
+    ],
+    [
+      'storage.retention.request-results',
+      'Stremio result details',
+      'retention request results fields',
+    ],
+  ],
 )
 settings.push({
   id: 'storage.reset',

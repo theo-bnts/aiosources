@@ -266,6 +266,7 @@ type Run struct {
 	PauseReason           PauseReason       `json:"pause_reason,omitempty"`
 	Policy                *CollectionPolicy `json:"policy,omitempty"`
 	StorageMode           StorageMode       `json:"storage_mode"`
+	StorageOptions        *StorageOptions   `json:"storage_options,omitempty"`
 	RequestsWithoutNewIDs int64             `json:"requests_without_new_ids"`
 	ProgressWarningSent   bool              `json:"progress_warning_sent"`
 	TraversalDone         bool              `json:"traversal_done"`

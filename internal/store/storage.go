@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
 
@@ -17,8 +18,16 @@ func lockSourceData(ctx context.Context, tx pgx.Tx) error {
 
 func (s *Store) StorageOverview(ctx context.Context) (model.StorageOverview, error) {
 	var result model.StorageOverview
-	err := s.pool.QueryRow(ctx, `SELECT mode,revision,(SELECT count(*) FROM ingest.runs WHERE status='running')
- FROM ingest.storage_settings WHERE singleton`).Scan(&result.Settings.Mode, &result.Settings.Revision, &result.Running)
+	var options []byte
+	err := s.pool.QueryRow(ctx, `SELECT mode,revision,options,(SELECT count(*) FROM ingest.runs WHERE status='running'),
+ EXISTS(SELECT 1 FROM pg_locks l JOIN pg_stat_activity a USING(pid) WHERE l.locktype='advisory' AND l.classid=1768843109 AND l.objid=5 AND l.granted AND a.datname=current_database() AND a.application_name='aiosources-storage-indexes')
+ FROM ingest.storage_settings WHERE singleton`).Scan(&result.Settings.Mode, &result.Settings.Revision, &options, &result.Running, &result.Indexing)
+	if err == nil {
+		err = json.Unmarshal(options, &result.Settings.Options)
+		if err == nil && result.Settings.Options != nil && result.Settings.Options.AdditionalFields == nil {
+			result.Settings.Options.AdditionalFields = []string{}
+		}
+	}
 	return result, databaseError("read storage settings", err)
 }
 
@@ -26,14 +35,54 @@ func (s *Store) UpdateStorageSettings(ctx context.Context, settings model.Storag
 	if !settings.Mode.Valid() || settings.Revision < 1 {
 		return model.ErrInvalid
 	}
-	result, err := s.pool.Exec(ctx, `UPDATE ingest.storage_settings SET mode=$1,revision=revision+1 WHERE singleton AND revision=$2`, settings.Mode, settings.Revision)
+	opts := settings.EffectiveOptions()
+	// Older browser bundles round-trip newly returned fields while changing
+	// only mode. Honour that explicit legacy edit without discarding unrelated
+	// history choices introduced by a newer client.
+	if settings.Options != nil && opts.AllFields != (settings.Mode == model.StorageFull) {
+		opts.AllFields = settings.Mode == model.StorageFull
+		opts.SuccessfulRecords = opts.AllFields
+	}
+	if !opts.Valid() {
+		return model.ErrInvalid
+	}
+	opts.AdditionalFields = append([]string{}, opts.AdditionalFields...)
+	mode := model.StorageCompact
+	if opts.AllFields {
+		mode = model.StorageFull
+	}
+	encoded, err := json.Marshal(opts)
+	if err != nil {
+		return model.ErrInvalid
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin data selection", err)
+	}
+	defer rollback(tx)
+	if err = lockSourceData(ctx, tx); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
+		return databaseError("lock data selection", err)
+	}
+	var historyChanged bool
+	if err = tx.QueryRow(ctx, `SELECT (options->>'publication_history')::boolean<>$1 FROM ingest.storage_settings WHERE singleton FOR UPDATE`, opts.PublicationHistory).Scan(&historyChanged); err != nil {
+		return databaseError("read previous history selection", err)
+	}
+	result, err := tx.Exec(ctx, `UPDATE ingest.storage_settings SET mode=$1,options=$3,revision=revision+1 WHERE singleton AND revision=$2`, mode, settings.Revision, encoded)
 	if err != nil {
 		return databaseError("save storage settings", err)
 	}
 	if result.RowsAffected() == 0 {
 		return model.ErrConflict
 	}
-	return nil
+	if historyChanged {
+		if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true); UPDATE ingest.torrent_history_metadata SET history_since=clock_timestamp()`); err != nil {
+			return databaseError("advance publication history boundary", err)
+		}
+	}
+	return databaseError("commit data selection", tx.Commit(ctx))
 }
 
 // ResetSourceData retains definitions (managed outside this database), secrets,

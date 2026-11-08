@@ -112,7 +112,8 @@ func (p *ProviderHTTP) dbFiles(ctx context.Context, key, id string, resources ..
 			// One supported named file can use the documented account download link.
 			file := model.AIOFile{Path: item.Filename, Link: link}
 			booksAllowed := len(resources) == 0 || resources[0].Type == "book"
-			if _, ok := SelectFile([]model.AIOFile{file}, Resource{Type: "movie"}); ok || booksAllowed && len(bookFiles([]model.AIOFile{file})) == 1 {
+			directAllowed := len(resources) > 0 && resources[0].Type == "torrent" && len(resourceDownloadFiles([]model.AIOFile{file}, resources[0])) == 1
+			if _, ok := SelectFile([]model.AIOFile{file}, Resource{Type: "movie"}); ok || booksAllowed && len(bookFiles([]model.AIOFile{file})) == 1 || directAllowed {
 				files = append(files, file)
 				continue
 			}

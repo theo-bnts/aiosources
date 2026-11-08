@@ -209,6 +209,13 @@ export type PauseReason = '' | 'manual' | 'budget' | 'quota' | 'no_progress' | '
 export interface Run {
   remote_catalog?: boolean
   storage_mode: 'compact' | 'full'
+  storage_options?: {
+    all_fields: boolean
+    successful_records: boolean
+    record_fields: boolean
+    additional_fields: string[]
+    publication_history: boolean
+  }
   id: string
   provider_id: string
   provider_name: string

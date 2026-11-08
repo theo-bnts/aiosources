@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/store"
 	"net/url"
 	"slices"
 	"strings"
@@ -392,6 +393,7 @@ func (s *Service) playback(ctx context.Context, service, provider, sourceID, med
 }
 
 type playbackPolicy struct {
+	RawOccurrence string
 	SelectionFile string
 	Account       string
 	CachedOnly    bool
@@ -406,6 +408,9 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		return "", model.ErrInvalid
 	}
 	r, err := ParseID(id, mediaType)
+	if mediaType == "torrent" && policy.RawOccurrence == id && store.ValidOccurrenceID(id) {
+		r, err = Resource{Type: "torrent", Kind: "torrent", ID: id}, nil
+	}
 	r.File = policy.SelectionFile
 	if err != nil {
 		return "", model.ErrInvalid
@@ -432,15 +437,23 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		return "", model.ErrInvalid
 	}
 	// Token holders can only play a torrent still published for this resource.
-	rows, err := s.DB.AIOStreams(life, r.Kind, r.ID, mediaType)
-	if err != nil {
-		return "", err
-	}
 	allowed := false
-	for _, row := range rows {
-		if row.Provider == provider && row.SourceID == sourceID {
-			allowed = true
-			break
+	if directCatalogResource(r) {
+		row, e := s.DB.CatalogTorrent(life, r.ID)
+		if e != nil {
+			return "", e
+		}
+		allowed = row.Provider == provider && row.SourceID == sourceID && row.Fingerprint == rec.Fingerprint
+	} else {
+		rows, e := s.DB.AIOStreams(life, r.Kind, r.ID, mediaType)
+		if e != nil {
+			return "", e
+		}
+		for _, row := range rows {
+			if row.Provider == provider && row.SourceID == sourceID {
+				allowed = true
+				break
+			}
 		}
 	}
 	if !allowed {
@@ -502,7 +515,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			if len(items) == 1 && items[0].Cached {
 				observed = items[0]
 				_, cachedOnly = SelectFile(observed.Files, r)
-				if r.Type == "book" && r.File == "" && len(bookFiles(observed.Files)) > 1 {
+				if (r.Type == "book" || r.Type == "torrent") && r.File == "" && len(resourceDownloadFiles(observed.Files, r)) > 1 {
 					cachedOnly = true
 				}
 				if !cachedOnly && len(observed.Files) > 0 {

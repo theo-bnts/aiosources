@@ -93,7 +93,8 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 		cancel()
 		return nil, err
 	}
-	s.wg.Add(3)
+	s.wg.Add(4)
+	go s.storageIndexes()
 	go s.retainHistory()
 	go s.maintenance()
 	go s.automation()

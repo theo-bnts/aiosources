@@ -11,6 +11,10 @@ import { PublicAnnounceFields, type PublicInfo } from './public-connection-field
 const CatalogSearchPage = lazy(() =>
   import('@/pages/catalog-search').then((module) => ({ default: module.CatalogSearchPage })),
 )
+const CatalogTorrentsPage = lazy(() =>
+  import('@/pages/catalog-torrents').then((module) => ({ default: module.CatalogTorrentsPage })),
+)
+
 const CatalogTitlePage = lazy(() =>
   import('@/pages/catalog-search').then((module) => ({ default: module.CatalogTitlePage })),
 )
@@ -46,7 +50,13 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
           <Disclosure title="Debrid services">{form}</Disclosure>
         </section>
         <Suspense fallback={<Loading label="Loading Search" />}>
-          {id ? <CatalogTitlePage publicID={id} /> : <CatalogSearchPage />}
+          {location.pathname === '/public/search/torrents' ? (
+            <CatalogTorrentsPage />
+          ) : id ? (
+            <CatalogTitlePage publicID={id} />
+          ) : (
+            <CatalogSearchPage />
+          )}
         </Suspense>
       </div>
     </PublicSearchContext>

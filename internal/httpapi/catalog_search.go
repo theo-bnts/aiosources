@@ -13,12 +13,32 @@ import (
 )
 
 func catalogID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	if r.PathValue("id") == "torrents" {
+		return 0, true
+	}
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 53)
 	if err != nil || id < 1 {
 		respondError(w, model.ErrNotFound)
 		return 0, false
 	}
 	return id, true
+}
+
+func (s *server) catalogTorrents(w http.ResponseWriter, r *http.Request) {
+	opts, selection, filters, ok := catalogReleaseInput(w, r)
+	if !ok {
+		return
+	}
+	if len([]rune(aiosource.Normalize(opts.Query))) < 2 || selection.Season != nil || selection.Episode != nil || selection.File != "" {
+		respondError(w, model.ErrInvalid)
+		return
+	}
+	result, err := s.options.AIOSource.CatalogTorrents(r.Context(), opts, filters, nil)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 func catalogSearchInput(w http.ResponseWriter, r *http.Request) (model.ListOptions, model.CatalogSearchFilters, bool) {
 	opts, ok := listOptions(w, r)

@@ -12,19 +12,24 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const runColumns = `id,provider_id,provider_name,mode,status,cancel_requested,max_pages,pages,records,errors,revision,cursor,config,created_at,started_at,finished_at,error,traversal_done,trigger,distinct_records,pause_requested,policy,pause_reason,requests_without_new_ids,progress_warning_sent,known_page_streak,COALESCE(metadata_parent_run_id,''),initial_full,storage_mode`
+const runColumns = `id,provider_id,provider_name,mode,status,cancel_requested,max_pages,pages,records,errors,revision,cursor,config,created_at,started_at,finished_at,error,traversal_done,trigger,distinct_records,pause_requested,policy,pause_reason,requests_without_new_ids,progress_warning_sent,known_page_streak,COALESCE(metadata_parent_run_id,''),initial_full,storage_mode,storage_options`
 
 type scanner interface{ Scan(...any) error }
 
 func scanRun(row scanner) (model.Run, error) {
 	var run model.Run
-	var config, cursor, policy []byte
-	err := row.Scan(&run.ID, &run.ProviderID, &run.ProviderName, &run.Mode, &run.Status, &run.CancelRequested, &run.MaxPages, &run.Pages, &run.Records, &run.Errors, &run.Revision, &cursor, &config, &run.CreatedAt, &run.StartedAt, &run.FinishedAt, &run.Error, &run.TraversalDone, &run.Trigger, &run.DistinctRecords, &run.PauseRequested, &policy, &run.PauseReason, &run.RequestsWithoutNewIDs, &run.ProgressWarningSent, &run.KnownPageStreak, &run.MetadataParentRunID, &run.InitialFull, &run.StorageMode)
+	var config, cursor, policy, storage []byte
+	err := row.Scan(&run.ID, &run.ProviderID, &run.ProviderName, &run.Mode, &run.Status, &run.CancelRequested, &run.MaxPages, &run.Pages, &run.Records, &run.Errors, &run.Revision, &cursor, &config, &run.CreatedAt, &run.StartedAt, &run.FinishedAt, &run.Error, &run.TraversalDone, &run.Trigger, &run.DistinctRecords, &run.PauseRequested, &policy, &run.PauseReason, &run.RequestsWithoutNewIDs, &run.ProgressWarningSent, &run.KnownPageStreak, &run.MetadataParentRunID, &run.InitialFull, &run.StorageMode, &storage)
 	if err != nil {
 		return run, err
 	}
 	if !run.StorageMode.Valid() {
 		return run, errors.New("stored storage mode is invalid")
+	}
+	if len(storage) > 0 && string(storage) != "null" {
+		if json.Unmarshal(storage, &run.StorageOptions) != nil || run.StorageOptions == nil || !run.StorageOptions.Valid() {
+			return run, errors.New("stored data selection is invalid")
+		}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(config))
 	decoder.UseNumber()
@@ -100,8 +105,8 @@ func (s *Store) createRun(ctx context.Context, run model.Run, resolveInitial boo
 	if err := lockProviderSecrets(ctx, tx, run.Config); err != nil {
 		return model.Run{}, err
 	}
-	created, err := scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,initial_full,storage_mode)
-VALUES($1,$2,$3,$4,'queued',$5,$6,$7,$8,$9,(SELECT mode FROM ingest.storage_settings WHERE singleton)) RETURNING `+runColumns, id, run.ProviderID, run.ProviderName, run.Mode, run.MaxPages, run.Revision, config, policy, run.InitialFull))
+	created, err := scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,initial_full,storage_mode,storage_options)
+VALUES($1,$2,$3,$4,'queued',$5,$6,$7,$8,$9,(SELECT mode FROM ingest.storage_settings WHERE singleton),(SELECT options FROM ingest.storage_settings WHERE singleton)) RETURNING `+runColumns, id, run.ProviderID, run.ProviderName, run.Mode, run.MaxPages, run.Revision, config, policy, run.InitialFull))
 	if err != nil {
 		return model.Run{}, databaseError("create collection", err)
 	}

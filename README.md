@@ -18,7 +18,7 @@ AIOSources is open source and self-hosted. It includes no sources or media: conn
 - **Choose your debrid services.** AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox are supported. Availability features vary by service.
 - **Tailor each connection.** Create several Stremio or Torznab connections with different sources, media types, services, filters and sorting priorities.
 - **Share a catalog or open a public instance.** Exchange catalogs with other instances, or offer public Search, Stremio, Torznab and read-only catalog sharing.
-- **Keep control.** Review uncertain identifications, see request history, understand storage use and find any setting from the search bar on desktop or mobile.
+- **Keep control.** Review uncertain identifications, see request history, choose retained data and search indexes, understand storage use and find any setting from the search bar on desktop or mobile.
 
 Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INSTANCES.md#use-a-public-instance). You do not need Docker or an AIOSources administrator account.
 

@@ -98,9 +98,9 @@ var episodeRE = regexp.MustCompile(`(?i)` + episodeMarker + `(\d{1,4})(?:\s*[-�
 var episodePrefixRE = regexp.MustCompile(`(?i)\bS\d{1,3}(?:` + episodeMarker + `\d{1,4})*$`)
 var crossRE = regexp.MustCompile(`(?i)\b(\d{1,2})x(\d{1,3})\b`)
 var seasonWordRE = regexp.MustCompile(`(?i)\b(?:season|saison)\s*(\d{1,3})(?:\s*[-–]\s*(?:season|saison)?\s*(\d{1,3}))?`)
-var absoluteRE = regexp.MustCompile(`(?i)(?:\s-\s|\b(?:ep|episode)\s*)(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\b`)
+var absoluteRE = regexp.MustCompile(`(?i)(?:\s-\s|\b(?:ep|episode)\s*)(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?(?:v[0-9]+)?\b`)
 var ordinalSeasonRE = regexp.MustCompile(`(?i)\b(\d{1,3})(?:st|nd|rd|th)\s+season\b`)
-var separatedSeasonEpisodeRE = regexp.MustCompile(`(?i)\b(?:S|season\s*|saison\s*)(\d{1,3})\s+[-–]\s+(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?\b`)
+var separatedSeasonEpisodeRE = regexp.MustCompile(`(?i)\b(?:S|season\s*|saison\s*)(\d{1,3})\s+[-–]\s+(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?(?:v[0-9]+)?\b`)
 var localEpisodeRE = regexp.MustCompile(`(?i)\bS\d{1,3}\s*E\d{1,4}(?:(?:[-–]` + episodeMarker + `|\s*[-–]\s*E?|\s*E)\d{1,4})*`)
 var packMarkerRE = regexp.MustCompile(`(?i)\b(?:complete|integrale|intégrale|pack)\b`)
 var yearRE = regexp.MustCompile(`\b(?:18|19|20|21)\d{2}\b`)
@@ -270,6 +270,17 @@ func ParseRelease(raw string) Release {
 			cut = at[0]
 		}
 	}
+	// A standalone E05 is already recognised as numbering above. Remove it
+	// from the title too, applying the same boundary guard as parsedEpisodes.
+	for _, at := range episodeRE.FindAllStringIndex(s, -1) {
+		if at[0] > 0 {
+			before, _ := utf8.DecodeLastRuneInString(s[:at[0]])
+			if (unicode.IsLetter(before) || unicode.IsNumber(before) || before == '_') && !episodePrefixRE.MatchString(s[:at[0]]) {
+				continue
+			}
+		}
+		cut = min(cut, at[0])
+	}
 	title := strings.Trim(s[:cut], " []()-")
 	p.Title = norm.NFC.String(title)
 	p.Normalized = Normalize(title)
@@ -349,6 +360,9 @@ func fileNumbering(path string) Release {
 }
 
 func SelectFile(files []model.AIOFile, r Resource) (model.AIOFile, bool) {
+	if r.Type == "torrent" {
+		return selectDownloadFile(files, r)
+	}
 	if r.Type == "book" {
 		return selectBookFile(files, r.File)
 	}

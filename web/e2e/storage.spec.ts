@@ -7,17 +7,14 @@ test('Storage saving is the default, edits are explicit and data reset requires 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/health/settings')
-  const retention = page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Stored data', exact: true }) })
-  const mode = retention.getByLabel('Stored torrent information', { exact: true })
-  await expect(mode).toHaveValue('compact')
-  await retention
-    .getByRole('button', { name: 'About Stored torrent information', exact: true })
-    .click()
-  await expect(
-    page.getByRole('dialog', { name: 'About Stored torrent information', exact: true }),
-  ).toContainText('Applies to imports started after saving.')
+  await openDisclosure(page, 'Torrent data')
+  const retention = page.getByRole('form', { name: 'Torrent data', exact: true })
+  const mode = retention.getByRole('switch', { name: 'All mapped source fields', exact: true })
+  await expect(mode).not.toBeChecked()
+  await page.getByRole('button', { name: 'About Torrent data', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'About Torrent data', exact: true })).toContainText(
+    'Fields and processed-record choices apply to imports started after saving.',
+  )
   await page.keyboard.press('Escape')
   const save = retention.getByRole('button', { name: 'Save', exact: true })
   const maintenance = page.locator('details#maintenance')
@@ -27,24 +24,28 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await openDisclosure(page, 'Maintenance')
   await expect(save).toBeDisabled()
   await expect(reset).toBeEnabled()
-  await mode.selectOption('full')
+  await mode.check()
+  await expect(retention.getByLabel('Additional source fields', { exact: true })).toHaveText(
+    'All mapped fields retained',
+  )
   await expect(reset).toBeDisabled()
   await expect(resetStatus).toHaveText(
-    'Save the selected storage mode before resetting source data.',
+    'Save the selected storage settings before resetting source data.',
   )
   await expect(reset).toHaveAttribute('aria-describedby', 'source-data-reset-status')
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   const unsaved = page.getByRole('alertdialog')
   await expect(unsaved).toContainText('storage settings')
   await unsaved.getByRole('button', { name: 'Keep editing', exact: true }).click()
-  await expect(mode).toHaveValue('full')
+  await expect(mode).toBeChecked()
   await expect(reset).toBeDisabled()
   await save.click()
   await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
   await expect(reset).toBeEnabled()
   await expect(resetStatus).toHaveText('')
   await page.reload()
-  await expect(mode).toHaveValue('full')
+  await openDisclosure(page, 'Torrent data')
+  await expect(mode).toBeChecked()
   await expect(reset).toBeHidden()
   await openDisclosure(page, 'Maintenance')
   await reset.click()
@@ -55,13 +56,13 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await expect(dialog).toContainText('This cannot be undone.')
   await dialog.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(dialog).toBeHidden()
-  await mode.selectOption('compact')
+  await mode.uncheck()
   await save.click()
   await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
   await reset.click()
   await dialog.getByRole('button', { name: 'Reset source data', exact: true }).click()
   await expect(dialog).toBeHidden()
-  await expect(mode).toHaveValue('compact')
+  await expect(mode).not.toBeChecked()
   await expect(reset).toBeEnabled()
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   await expect(page).toHaveURL(/\/health$/)
@@ -71,7 +72,8 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await expect(mode).toHaveCount(0)
   await expect(reset).toHaveCount(0)
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
-  await expect(mode).toHaveValue('compact')
+  await openDisclosure(page, 'Torrent data')
+  await expect(mode).not.toBeChecked()
   await expect(reset).toBeHidden()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
@@ -81,9 +83,10 @@ test('Storage settings report stale edits without silently overwriting another a
   server,
 }) => {
   await page.goto('/health/settings#maintenance')
-  const mode = page.getByLabel('Stored torrent information', { exact: true })
-  await expect(mode).toHaveValue('compact')
-  await mode.selectOption('full')
+  await openDisclosure(page, 'Torrent data')
+  const mode = page.getByRole('switch', { name: 'All mapped source fields', exact: true })
+  await expect(mode).not.toBeChecked()
+  await mode.check()
   const current = await (await page.request.get('/api/settings/storage')).json()
   const session = await (await page.request.get('/api/session')).json()
   const updated = await page.request.put('/api/settings/storage', {
@@ -102,7 +105,7 @@ test('Storage settings report stale edits without silently overwriting another a
   await expect(page.locator('#source-data-reset-status')).toHaveText(
     'Reload the saved storage settings before resetting source data.',
   )
-  await mode.selectOption('compact')
+  await mode.uncheck()
   await expect(
     page.getByRole('button', { name: 'Reset all source data', exact: true }),
   ).toBeDisabled()
@@ -110,7 +113,7 @@ test('Storage settings report stale edits without silently overwriting another a
     'Reload the saved storage settings before resetting source data.',
   )
   await page.getByRole('button', { name: 'Reload saved value', exact: true }).click()
-  await expect(mode).toHaveValue('compact')
+  await expect(mode).not.toBeChecked()
   await expect(page.getByText('Storage settings changed elsewhere.', { exact: false })).toBeHidden()
   await expect(
     page.getByRole('button', { name: 'Reset all source data', exact: true }),
@@ -133,13 +136,14 @@ test.describe('resetting source data with imports in progress', () => {
         VALUES('storage-active','example','Example source','full','running','manual','',
           '{"version":1,"id":"example","adapter":"http_json","enabled":false}',now())`)
       await page.goto('/health/settings#maintenance')
+      await openDisclosure(page, 'Torrent data')
       const reset = page.getByRole('button', { name: 'Reset all source data', exact: true })
       const status = page.locator('#source-data-reset-status')
       await expect(reset).toBeDisabled()
       await expect(status).toHaveText('Pause running imports before resetting source data.')
-      await page.getByLabel('Stored torrent information', { exact: true }).selectOption('full')
+      await page.getByRole('switch', { name: 'All mapped source fields', exact: true }).check()
       await expect(status).toHaveText(
-        'Save the selected storage mode before resetting source data.',
+        'Save the selected storage settings before resetting source data.',
       )
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByText('Changes saved.', { exact: true })).toBeVisible()
@@ -177,4 +181,31 @@ test.describe('resetting source data with imports in progress', () => {
       await db.end()
     }
   })
+})
+
+test('granular data, indexes and retention save independently on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 1000 })
+  await page.goto('/health/settings')
+  await expect(page.locator('main details[open]')).toHaveCount(0)
+  await openDisclosure(page, 'Torrent data')
+  await openDisclosure(page, 'Search indexes')
+  await openDisclosure(page, 'Retention overrides')
+  const data = page.getByRole('form', { name: 'Torrent data', exact: true })
+  const indexes = page.getByRole('form', { name: 'Search indexes', exact: true })
+  const retention = page.getByRole('form', { name: 'Retention overrides', exact: true })
+  await data.getByRole('switch', { name: 'Successful processed records', exact: true }).check()
+  await retention.getByLabel('Stremio request history (days)', { exact: true }).fill('30')
+  await retention.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(retention.getByText('Changes saved.', { exact: true })).toBeVisible()
+  await expect(data.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
+  await expect(indexes.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  let stored = await (await page.request.get('/api/settings/storage')).json()
+  expect(stored.settings.options.successful_records).toBe(false)
+  await data.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(data.getByText('Changes saved.', { exact: true })).toBeVisible()
+  stored = await (await page.request.get('/api/settings/storage')).json()
+  expect(stored.settings.options.successful_records).toBe(true)
+  const saved = await (await page.request.get('/api/settings/storage/retention')).json()
+  expect(saved.days.requests).toBe(30)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

@@ -143,7 +143,14 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 			_ = s.DB.UnavailableOperationDownload(final, operation)
 		}
 	}()
-	rows, err := s.DB.CatalogRecords(ctx, workID)
+	var rows []store.CatalogRecord
+	var err error
+	if workID == 0 {
+		row, e := s.DB.CatalogSourceTorrent(ctx, source.Provider, source.SourceID)
+		rows, err = []store.CatalogRecord{row}, e
+	} else {
+		rows, err = s.DB.CatalogRecords(ctx, workID)
+	}
 	if err != nil {
 		return model.CatalogDownload{}, err
 	}

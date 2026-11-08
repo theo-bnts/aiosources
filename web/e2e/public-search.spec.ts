@@ -454,3 +454,98 @@ test('Stremio keys are reused by public Search on mobile and failed requests pre
     await context.close()
   }
 })
+
+test('public direct torrent Search keeps visitor credentials and uses the same release actions', async ({
+  page,
+  server,
+  browser,
+}) => {
+  await page.goto('/public-access')
+  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  await access.getByLabel('Enable public access', { exact: true }).check()
+  await access.getByLabel('Allow public Search', { exact: true }).check()
+  await access.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const context = await browser.newContext({
+    baseURL: server.origin,
+    viewport: { width: 390, height: 1000 },
+  })
+  await context.addInitScript(
+    (credential) =>
+      localStorage.setItem(
+        'aiosources.public.credentials',
+        JSON.stringify({ credential, services: ['torbox'] }),
+      ),
+    credential,
+  )
+  const unexpected: string[] = []
+  await context.route('**/*', async (route) => {
+    const request = route.request(),
+      url = new URL(request.url())
+    if (url.origin !== server.origin) return route.abort('blockedbyclient')
+    if (url.pathname === '/api/public/catalog/search')
+      return route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } })
+    if (url.pathname === '/api/public/catalog/torrents') {
+      expect(request.headers().authorization).toBe(`Bearer ${credential}`)
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              occurrence_id: 'synthetic-unidentified',
+              download_token: 'synthetic-source-capability',
+              title: 'Example.Release.EPUB',
+              size: 100,
+              languages: [],
+              presentation: { highlights: [], language: '', details: ['📦 100 B'] },
+              services: [{ service: 'torbox', state: 'cached', can_add: false }],
+            },
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      })
+    }
+    if (url.pathname === '/api/public/catalog/torrents/download') {
+      expect(request.headers().authorization).toBe(`Bearer ${credential}`)
+      expect(request.postDataJSON()).toMatchObject({
+        download_token: 'synthetic-source-capability',
+        service: 'torbox',
+        allow_uncached: false,
+      })
+      return route.fulfill({
+        json: { status: 'ready', url: '/api/public/catalog-downloads/synthetic' },
+      })
+    }
+    if (url.pathname === '/api/public/catalog-downloads/synthetic')
+      return route.fulfill({
+        headers: { 'Content-Disposition': 'attachment; filename="Example.epub"' },
+        body: 'Synthetic file',
+      })
+    if (
+      url.pathname.startsWith('/api/') &&
+      !url.pathname.startsWith('/api/public/') &&
+      !['/api/session', '/api/about'].includes(url.pathname)
+    )
+      unexpected.push(url.pathname)
+    return route.continue()
+  })
+  const visitor = await context.newPage()
+  try {
+    await visitor.goto('/public/search?q=Example')
+    await visitor.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
+    await expect(visitor.locator('[data-result-count]')).toHaveText('1 torrent')
+    await expect(visitor.locator('[data-slot="release-presentation"]')).toHaveCount(1)
+    const downloading = visitor.waitForEvent('download')
+    await visitor.getByRole('button', { name: 'Download', exact: true }).click()
+    expect(await (await downloading).failure()).toBeNull()
+    await expect(visitor.getByLabel('Sources', { exact: true })).toHaveCount(0)
+    expect(unexpected).toEqual([])
+    expect(context.pages()).toHaveLength(1)
+    expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    )
+  } finally {
+    await context.close()
+  }
+})

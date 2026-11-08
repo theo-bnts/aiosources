@@ -20,6 +20,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/catalog-downloads/{token}", s.auth.protect(s.catalogFile))
 	mux.HandleFunc("POST /api/operations/{id}/download", s.auth.protect(s.operationDownload))
 	mux.HandleFunc("GET /api/catalog/search", s.auth.protect(s.catalogSearch))
+	mux.HandleFunc("GET /api/catalog/torrents", s.auth.protect(s.catalogTorrents))
 	mux.HandleFunc("GET /api/catalog/{id}", s.auth.protect(s.catalogTitle))
 	mux.HandleFunc("GET /api/catalog/{id}/releases", s.auth.protect(s.catalogReleases))
 	mux.HandleFunc("POST /api/catalog/{id}/download", s.auth.protect(s.catalogDownload))

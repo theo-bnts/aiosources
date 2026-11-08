@@ -23,10 +23,31 @@ func TestStorageSettingsAndResetRequireAdminCSRFValidInputAndCurrentRevision(t *
 			t.Fatalf("anonymous storage access: %d", response.Code)
 		}
 	}
+	for _, suffix := range []string{"/indexes", "/retention"} {
+		for _, method := range []string{"GET", "PUT"} {
+			if response := fixture.request(method, path+suffix, nil, nil); response.Code != http.StatusUnauthorized {
+				t.Fatalf("anonymous granular storage access: %d", response.Code)
+			}
+		}
+	}
 	if response := fixture.request("POST", path+"/reset-sources", nil, nil); response.Code != http.StatusUnauthorized {
 		t.Fatalf("anonymous reset: %d", response.Code)
 	}
 	cookie := fixture.login(t, "")
+	for _, suffix := range []string{"/indexes", "/retention"} {
+		if response := fixture.request("GET", path+suffix, nil, cookie); response.Code != http.StatusOK {
+			t.Fatalf("granular storage read: %d", response.Code)
+		}
+		request := httptest.NewRequest("PUT", "https://admin.example.test"+path+suffix, strings.NewReader(`{}`)).WithContext(fixture.ctx)
+		request.AddCookie(cookie)
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Origin", "https://admin.example.test")
+		response := httptest.NewRecorder()
+		fixture.handler.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("granular storage write without CSRF: %d", response.Code)
+		}
+	}
 	initial, err := fixture.db.StorageOverview(fixture.ctx)
 	if err != nil || initial.Settings.Mode != model.StorageCompact {
 		t.Fatalf("default storage: %+v %v", initial, err)

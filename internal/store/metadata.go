@@ -50,9 +50,9 @@ func queueMetadataAfterDiscovery(ctx context.Context, tx pgx.Tx, parent model.Ru
 		return err
 	}
 	err = tx.QueryRow(ctx, `INSERT INTO ingest.runs
-(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,trigger,metadata_parent_run_id,storage_mode)
+(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,trigger,metadata_parent_run_id,storage_mode,storage_options)
 SELECT $1,parent.provider_id,parent.provider_name,'metadata','queued',parent.max_pages,
-parent.revision,parent.config,parent.policy,parent.trigger,parent.id,parent.storage_mode
+parent.revision,parent.config,parent.policy,parent.trigger,parent.id,parent.storage_mode,parent.storage_options
 FROM ingest.runs AS parent WHERE parent.id=$2 AND EXISTS (
     SELECT 1 FROM ingest.run_record_identities AS accepted
     JOIN ingest.torrents AS record ON record.provider_id=parent.provider_id AND record.source_id=accepted.source_id

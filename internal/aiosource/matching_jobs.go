@@ -73,25 +73,58 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 	}
 	p := withSourceNumbering(ParseRelease(r.Title), SourceEpisode{r.Season, r.Episode})
 	r.Normalized = p.Normalized
+	// Categories corroborate an otherwise untyped title; they do not replace
+	// explicit episode evidence or turn inconsistent categories into certainty.
+	if p.Type == "" && p.Year == nil && r.TMDB == "" && r.IMDb == "" && r.TVDB == "" && r.VideoType != "conflict" {
+		p.Type = r.VideoType
+	}
 	if p.InvalidNumbering {
 		return model.AIOMatchResult{Record: r, Status: "unmatched", Reason: "invalid or unsupported numbering range"}, nil
 	}
-	filter := model.AIOCandidateFilter{Title: p.Normalized, TMDB: r.TMDB, IMDb: canonicalIMDb(r.IMDb), TVDB: r.TVDB, Type: p.Type, Year: p.Year, Seasons: p.Seasons}
+	filter := model.AIOCandidateFilter{Title: p.Normalized, Titles: compoundTitleParts(p.Title), TMDB: r.TMDB, IMDb: canonicalIMDb(r.IMDb), TVDB: r.TVDB, Type: p.Type, Year: p.Year, Seasons: p.Seasons}
 	if filter.Type == "" && (r.Season != nil || r.Episode != nil) {
 		filter.Type = "tv"
 	}
 	if !p.Pack && len(p.Seasons) == 1 && len(p.Episodes) == 1 {
 		filter.Episode = &p.Episodes[0]
 	}
-	works, overflow, err := find(filter)
+	ids := SourceIDs{TMDB: r.TMDB, IMDb: r.IMDb, TVDB: r.TVDB}
+	choose := func(works []model.AIOWork, overflow bool) Decision {
+		candidates := make([]Candidate, len(works))
+		for i, work := range works {
+			candidates[i] = WorkCandidate(work)
+		}
+		return ChooseMatchWithPolicy(p, candidates, ids, overflow, SourceEpisode{r.Season, r.Episode}, r.MatchingPolicy)
+	}
+	var works []model.AIOWork
+	var d Decision
+	var err error
+	// A verified native ID plus an exact complete alias need not compete with
+	// hundreds of fuzzy neighbours. Keep all exact aliases/IDs in this first
+	// query; contradictory IDs and exact homonyms still reach the same chooser.
+	if r.TMDB != "" || r.IMDb != "" || r.TVDB != "" {
+		exact := filter
+		exact.ExactOnly = true
+		var overflow bool
+		works, overflow, err = find(exact)
+		if err != nil {
+			return model.AIOMatchResult{}, err
+		}
+		d = choose(works, overflow)
+		if d.Winner == nil || !hasExactReleaseAlias(p, d.Winner.Titles) {
+			d = Decision{}
+		}
+	}
+	if d.Winner == nil {
+		var overflow bool
+		works, overflow, err = find(filter)
+		if err == nil {
+			d = choose(works, overflow)
+		}
+	}
 	if err != nil {
 		return model.AIOMatchResult{}, err
 	}
-	candidates := make([]Candidate, len(works))
-	for i, work := range works {
-		candidates[i] = WorkCandidate(work)
-	}
-	d := ChooseMatchWithPolicy(p, candidates, SourceIDs{TMDB: r.TMDB, IMDb: r.IMDb, TVDB: r.TVDB}, overflow, SourceEpisode{r.Season, r.Episode}, r.MatchingPolicy)
 	result := model.AIOMatchResult{Record: r, Status: d.Status, Reason: d.Reason}
 	if d.Winner != nil {
 		for i := range works {
@@ -110,7 +143,7 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 			return model.AIOMatchResult{}, err
 		}
 		for _, work := range possible {
-			exact := false
+			exact := exactCompoundAlias(p.Title, work.Titles)
 			for _, title := range work.Titles {
 				exact = exact || Normalize(title) == p.Normalized
 			}

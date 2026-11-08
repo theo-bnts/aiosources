@@ -238,6 +238,9 @@ try {
     ['network.settings', '/api/settings/network'],
     ['public.settings', '/api/public-access'],
     ['storage.statistics', '/api/system-health'],
+    ['storage.data', '/api/settings/storage'],
+    ['storage.indexes', '/api/settings/storage/indexes'],
+    ['storage.retention', '/api/settings/storage/retention'],
     ['runtime.settings', '/api/settings/runtime/history'],
     ['logs.list', '/api/logs'],
   ]
@@ -320,6 +323,16 @@ try {
   }
   if (entities.torrent) {
     const title = entities.torrent.title
+    await measure(
+      'api.search.direct',
+      5000,
+      () => get('/api/catalog/torrents?q=' + q(title)),
+      (body) => {
+        listContract(body)
+        if (!body.items.length) throw new Error('empty_result')
+        return body.items.map((item) => [item.occurrence_id, item.size])
+      },
+    )
     await measure(
       'api.torrents.query',
       5000,

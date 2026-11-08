@@ -88,6 +88,9 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	if got := send("GET", "/api/public/catalog/search?q=Example", "", installed.Credential); got.Code != 404 {
 		t.Fatal("Search should be opt-in", got.Code)
 	}
+	if got := send("GET", "/api/public/catalog/torrents?q=Example", "", installed.Credential); got.Code != 404 {
+		t.Fatal("Direct Search should be opt-in", got.Code)
+	}
 	access, _ := f.db.PublicAccess(f.ctx)
 	access.SearchEnabled = true
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
@@ -113,6 +116,19 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	for _, credential := range []string{"", installed.Credential + "x"} {
 		if got := send("GET", "/api/public/catalog/search?q=Example", "", credential); got.Code != 401 {
 			t.Fatal("Invalid credential accepted", got.Code)
+		}
+		if got := send("GET", "/api/public/catalog/torrents?q=Example", "", credential); got.Code != 401 {
+			t.Fatal("Direct Search accepted invalid credential", got.Code)
+		}
+	}
+	direct := send("GET", "/api/public/catalog/torrents?q=Example", "", installed.Credential)
+	var directRows model.List[model.CatalogRelease]
+	if direct.Code != 200 || json.Unmarshal(direct.Body.Bytes(), &directRows) != nil || directRows.Total != 1 || len(directRows.Items) != 1 {
+		t.Fatal("public direct Search failed", direct.Code)
+	}
+	for _, private := range []string{"hidden-source", "native-id", hash, key} {
+		if strings.Contains(direct.Body.String(), private) {
+			t.Fatal("Direct Search exposed private data")
 		}
 	}
 	response = send("GET", "/api/public/catalog/search?q=Example.Movie&year=2021", "", installed.Credential)

@@ -95,6 +95,16 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 }
 
 func (s *server) registerPublicCatalog(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/public/catalog/torrents", s.publicCatalogHandler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+		opts, selection, filters, ok := catalogReleaseInput(w, r)
+		if !ok {
+			return nil, nil
+		}
+		if len([]rune(aiosource.Normalize(opts.Query))) < 2 || selection.Season != nil || selection.Episode != nil || selection.File != "" {
+			return nil, model.ErrInvalid
+		}
+		return s.options.AIOSource.CatalogTorrents(r.Context(), opts, filters, visitor)
+	}))
 	mux.HandleFunc("GET /api/public/catalog/search", s.publicCatalogHandler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, filters, ok := catalogSearchInput(w, r)
 		if !ok {

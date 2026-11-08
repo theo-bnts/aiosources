@@ -1,5 +1,6 @@
 import { CatalogCover } from '@/components/catalog-cover'
-import { ReleasePresentation } from '@/components/release-presentation'
+import { useEffect, useState } from 'react'
+import { CatalogReleaseList } from '@/components/catalog-release-list'
 import { FilterSelect } from '@/components/filter-select'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
@@ -35,7 +36,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { DownloadAction } from '@/components/catalog-download'
 import {
   Table,
   TableHeader,
@@ -64,6 +64,8 @@ export function CatalogSearchPage() {
   const listState = useListViewState()
   const pagination = useURLPagination()
   const q = search.get('q') || ''
+  const [draftQuery, setDraftQuery] = useState(q)
+  useEffect(() => setDraftQuery(q), [q])
   const kind = search.get('type') || ''
   const year = search.get('year') || ''
   const query = useQuery({
@@ -109,7 +111,8 @@ export function CatalogSearchPage() {
             id="catalog-query"
             name="q"
             type="search"
-            defaultValue={q}
+            value={draftQuery}
+            onChange={(event) => setDraftQuery(event.target.value)}
             minLength={2}
             maxLength={500}
             required
@@ -157,6 +160,7 @@ export function CatalogSearchPage() {
           </Button>
           <ClearFiltersButton
             onClear={() => {
+              setDraftQuery('')
               setSearch(new URLSearchParams(), { flushSync: true })
             }}
           />
@@ -242,6 +246,17 @@ export function CatalogSearchPage() {
           </>
         )
       )}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button asChild variant="outline">
+          <Link
+            to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
+            state={listState}
+          >
+            <MagnifyingGlassIcon />
+            Search torrents directly
+          </Link>
+        </Button>
+      </div>
     </div>
   )
 }
@@ -498,55 +513,12 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                       </p>
                     )}
                   {releases.data.items?.length ? (
-                    <div className="table-frame">
-                      <Table className="max-md:block max-md:[&_thead]:sr-only max-md:[&_tbody]:block max-md:[&_tr]:grid max-md:[&_tr]:grid-cols-1 max-md:[&_td]:block">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>
-                              {discloseSources ? 'Version / source' : 'Version'}
-                            </TableHead>
-                            <TableHead>Download</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {releases.data.items?.map((release) => (
-                            <TableRow key={release.occurrence_id}>
-                              <TableCell className="max-w-xl align-top whitespace-normal">
-                                <ReleasePresentation release={release} />
-                              </TableCell>
-                              <TableCell className="align-top whitespace-normal">
-                                {release.services.length ? (
-                                  <div className="flex flex-wrap gap-5">
-                                    {release.services.map((service) => (
-                                      <DownloadAction
-                                        key={`${visitor?.scope ?? 'admin'}:${id}:${selection.season}:${selection.episode}:${release.occurrence_id}:${release.fingerprint}:${service.service}`}
-                                        workID={id}
-                                        release={release}
-                                        service={service}
-                                        selection={selection}
-                                      />
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="help">
-                                    {visitor ? (
-                                      'No service is available for this version.'
-                                    ) : (
-                                      <>
-                                        <Link to="/debrid/settings">
-                                          Configure a debrid service
-                                        </Link>{' '}
-                                        to download this version.
-                                      </>
-                                    )}
-                                  </p>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                    <CatalogReleaseList
+                      items={releases.data.items}
+                      id={id}
+                      selection={selection}
+                      discloseSources={discloseSources}
+                    />
                   ) : (
                     <Empty
                       title={cachedOnly ? 'No cached releases' : 'No source releases'}

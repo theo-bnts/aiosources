@@ -479,14 +479,20 @@ export function StremioRequestPage() {
                     </div>
                   ) : (
                     <Empty
-                      title="No results returned"
-                      description="This request did not return any playable result."
+                      title={
+                        item.returned > 0 ? 'Result details not retained' : 'No results returned'
+                      }
+                      description={
+                        item.returned > 0
+                          ? 'The request summary and result counts remain available.'
+                          : 'This request did not return any playable result.'
+                      }
                     />
                   )}
                   {item.truncated && (
                     <p className="notice notice-warning">
-                      This request returned more than 1,000 results. The first 1,000 display
-                      summaries were retained; the total count above is complete.
+                      Result details were limited by the retention settings or the per-request
+                      safety limit. The total count above is complete.
                     </p>
                   )}
                 </section>

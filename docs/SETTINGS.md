@@ -56,7 +56,7 @@ Use the settings search at the top of the application to find a control directly
 - **Metadata → Videos / Books → Settings:** update schedules and provider settings, with separate **Manual actions** and **Maintenance** sections. Each workspace has its own statistics and history.
 - **Metadata → Identification → Settings:** automatic identification for both videos and books, with separate processing, reliability and maintenance sections. Its **Results** and **History** tabs keep review and identification activity together.
 - **Debrid → Settings:** service accounts, availability checks, operation limits and cleanup.
-- **Storage → Settings:** storage mode, history retention and maintenance.
+- **Storage → Settings:** retained torrent fields, optional search indexes, history retention and maintenance.
 - **Security:** Secrets, two-step verification and signed-in sessions.
 - **Network:** trusted incoming proxies and outgoing connections.
 - **Public access:** offered visitor pages and request limits.

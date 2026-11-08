@@ -27,6 +27,8 @@ Optional **Filters** and **Sorting** start closed. New searches include all resu
 
 Sorting can prioritize cached status, language, size, publication date, age, name or source. Several priorities apply in order. Optional language and cached-only filters restrict what is shown; leave them off to see all permitted results. Cache checks and downloads may still contact your debrid service.
 
+**Search torrents directly**, below the title results, also finds releases without a metadata match. It is available before entering a search and keeps your query when you use it after searching. Results use the same release presentation, debrid download actions and file selection as a title page. Public access follows the same private-source restrictions.
+
 Posters and book covers load directly from their official image services. Your instance does not save the image files.
 
 **Download** opens a ready file in your browser. For a book with several formats or audio tracks, use **Choose file**, then select the file you want. **Add to debrid** starts preparation, with **View operation** linking to its progress in Debrid history.
@@ -59,7 +61,13 @@ Historical error counts include earlier attempts and do not necessarily mean the
 
 **Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series and book information and shared caches are counted separately.
 
-Choose the storage mode in **Storage → Settings**. The compact option keeps information used by search, identification, playback and sharing while avoiding unnecessary source payloads. A mode change applies to new data; it does not automatically rewrite all older records.
+In **Storage → Settings**, choose what to retain in **Torrent data**. Required search, identification and playback information is always kept. Extra source fields can be selected individually; successful processed records, their field copies and published-change history are separate choices. Each option shows its relative storage and performance impact.
+
+Field and processed-record choices apply to newly started imports. Existing imports retain their saved choices. Enabling a previously omitted field cannot fill older data automatically: reset source data and import again if you need it throughout the catalog. Disabling a field does not erase older torrent data. Published-change history can be stopped immediately without affecting imports or sharing.
+
+**Search indexes** shows the actual allocated space of optional search accelerators. Turning one off preserves data and search behavior but can greatly slow the relevant queries. Index changes run in the background; rebuilding needs time and temporary free space. Identity, recovery and matching indexes remain protected.
+
+**Retention overrides** lets each history group use a different age limit. Leave a limit blank to use **History retention**, or enter 0 to remove eligible history progressively. Stremio request limits and returned-result details can also be adjusted independently. Shorter retention permanently removes older history; increasing it cannot restore deleted details.
 
 History retention defaults to seven days and is configurable. It cleans up eligible diagnostic history, not your published catalog. Some saved work for resumable imports can remain longer. Removing rows can free reusable space without immediately shrinking the PostgreSQL volume.
 

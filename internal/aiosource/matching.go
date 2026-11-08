@@ -99,6 +99,10 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 				compatible = max(compatible, s)
 			}
 		}
+		compound := exactCompoundAlias(p.Title, c.Titles)
+		if compound {
+			e.exact, e.titleScore, compatible, hasCompatible = true, 1, 1, true
+		}
 		e.id = (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB == c.SourceID) || (ids.IMDb != "" && c.IDs["imdb"] != "" && canonicalIMDb(ids.IMDb) == canonicalIMDb(c.IDs["imdb"])) || (ids.TVDB != "" && ids.TVDB == c.IDs["tvdb"])
 		idConflict := (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB != c.SourceID) || (ids.IMDb != "" && c.IDs["imdb"] != "" && canonicalIMDb(ids.IMDb) != canonicalIMDb(c.IDs["imdb"])) || (ids.TVDB != "" && c.IDs["tvdb"] != "" && ids.TVDB != c.IDs["tvdb"])
 		unverified := (ids.TMDB != "" && c.Source != "tmdb") || (ids.IMDb != "" && c.IDs["imdb"] == "") || (ids.TVDB != "" && c.IDs["tvdb"] == "")

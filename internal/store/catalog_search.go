@@ -51,12 +51,12 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	return title, err
 }
 
-type countedCatalogTitle struct {
+type countedCatalogRow struct {
 	row   scanner
 	total *int64
 }
 
-func (r countedCatalogTitle) Scan(values ...any) error {
+func (r countedCatalogRow) Scan(values ...any) error {
 	return r.row.Scan(append([]any{r.total}, values...)...)
 }
 
@@ -143,7 +143,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		return result, databaseError("search catalog titles", err)
 	}
 	for rows.Next() {
-		title, e := scanCatalogTitle(countedCatalogTitle{row: rows, total: &result.Total})
+		title, e := scanCatalogTitle(countedCatalogRow{row: rows, total: &result.Total})
 		if e != nil {
 			rows.Close()
 			return result, databaseError("read catalog title", e)

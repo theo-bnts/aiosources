@@ -149,6 +149,18 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 			return !hashRE.MatchString(rec.Hash) || !AllowsInstallation(visitor.Preferences, rec.Provider, "", r.Type)
 		})
 	}
+	return s.catalogReleasePage(ctx, workID, r, rows, opts, visitor, access, options...)
+}
+
+// Metadata-backed and direct torrent searches share formatting, availability,
+// private-source safeguards and download actions.
+func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resource, rows []store.CatalogRecord, opts model.ListOptions, visitor *PublicInstallation, access model.PublicAccess, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+	limit := opts.Limit
+	if limit < 1 || limit > 200 {
+		limit = 50
+	}
+	offset := max(0, opts.Offset)
+	result := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}
 	filters := model.CatalogReleaseFilters{}
 	if len(options) > 0 {
 		filters = options[0]
@@ -179,9 +191,11 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	for _, row := range rows {
 		ranks[row.OccurrenceID] = recordRank(row.AIORecord, names[row.Provider], sortingLanguage(prefs))
 	}
-	slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
-		return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
-	})
+	if !directCatalogResource(r) {
+		slices.SortStableFunc(rows, func(a, b store.CatalogRecord) int {
+			return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
+		})
+	}
 	allResults := filters.CachedOnly || visitor != nil || slices.ContainsFunc(rules, func(rule model.ResultSort) bool { return rule.Field == "cached" })
 	result.Total = int64(len(rows))
 	start := min(offset, len(rows))
@@ -213,6 +227,7 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	resource := "catalog:" + streamResourceKey(r, records) + ":" + fingerprint(strings.Join(hashes, ","))
 	var availability map[string]map[string]model.AIOAvailability
 	var announces map[string]string
+	defer func() { clear(announces) }()
 	if visitor == nil {
 		availability, err = s.availability(ctx, c, resource, hashes, "manual")
 	} else {
@@ -257,17 +272,21 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 				if observed.Cached {
 					file, found := SelectFile(observed.Files, r)
 					state.State = "cached"
-					if r.Type == "book" {
-						state.FileCount = len(bookFiles(observed.Files))
+					if r.Type == "book" || r.Type == "torrent" {
+						state.FileCount = len(resourceDownloadFiles(observed.Files, r))
 					}
 					if found {
 						state.Filename = file.Path
 						state.Size = file.Size
-					} else if r.Type == "book" && state.FileCount > 1 {
+					} else if (r.Type == "book" || r.Type == "torrent") && state.FileCount > 1 {
 						// The recipient chooses a format or audio track before downloading.
 					} else if len(observed.Files) > 0 {
-						state.State = "unavailable"
-						state.CanAdd = false
+						if r.Type == "torrent" && canAdd {
+							state.State = "unknown"
+						} else {
+							state.State = "unavailable"
+							state.CanAdd = false
+						}
 					} else if r.Episode != nil || (visitor != nil && (!configured || tracker.Private)) {
 						state.State = "unknown"
 					}
@@ -317,9 +336,13 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 			result.Items = append(result.Items, item)
 		}
 	}
-	slices.SortStableFunc(result.Items, func(a, b model.CatalogRelease) int {
-		return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
-	})
+	// Direct search is globally ordered in SQL before pagination. Re-sorting
+	// just this page with newly observed availability would break that order.
+	if !directCatalogResource(r) {
+		slices.SortStableFunc(result.Items, func(a, b model.CatalogRelease) int {
+			return compareResults(ranks[a.OccurrenceID], ranks[b.OccurrenceID], rules)
+		})
+	}
 	if allResults {
 		result.Total = int64(len(result.Items))
 		start = min(offset, len(result.Items))
@@ -351,15 +374,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 		return result, err
 	}
 	defer s.downloadSlots.release()
-	title, err := s.DB.CatalogTitle(ctx, workID)
-	if err != nil {
-		return result, err
-	}
-	r, id, err := catalogResource(title, input.CatalogSelection)
-	if err != nil {
-		return result, err
-	}
-	rows, err := s.DB.CatalogRecords(ctx, workID)
+	title, r, id, rows, err := s.catalogDownloadContext(ctx, workID, input)
 	if err != nil {
 		return result, err
 	}
@@ -443,16 +458,19 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	}
 	h.checkpoint(ctx, "download")
 	policy := playbackPolicy{SelectionFile: input.File, CachedOnly: !input.AllowUncached, Fingerprint: input.Fingerprint, Account: fingerprint(key), PreparationID: input.PreparationID, PreparedID: &result.PreparationID}
+	if workID == 0 {
+		policy.RawOccurrence = selected.OccurrenceID
+	}
 	if visitor != nil {
 		policy.Preferences = &visitor.Preferences
 	}
-	if title.Type == "book" && input.File == "" && input.PreparationID == "" && !input.AllowUncached {
+	if (title.Type == "book" || title.Type == "torrent") && input.File == "" && input.PreparationID == "" && !input.AllowUncached {
 		observed, e := s.DB.SharedAvailability(ctx, input.Service, []string{selected.Hash}, time.Now().Add(-time.Duration(config.CacheMinutes)*time.Minute))
 		if e != nil {
 			return result, e
 		}
 		if len(observed) == 1 && observed[0].Cached {
-			if files := bookFiles(observed[0].Files); len(files) > 1 {
+			if files := resourceDownloadFiles(observed[0].Files, r); len(files) > 1 {
 				result.Files = files
 				result.Status = "pending"
 				return result, ErrPending

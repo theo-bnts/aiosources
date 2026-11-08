@@ -39,7 +39,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('old-native','o
 	snapshot := func() string {
 		t.Helper()
 		var value string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(r) ORDER BY id)::text FROM ingest.runs r`).Scan(&value); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(r)-'storage_options' ORDER BY id)::text FROM ingest.runs r`).Scan(&value); err != nil {
 			t.Fatal(err)
 		}
 		return value
@@ -60,6 +60,10 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('old-native','o
 		if err = db.Migrate(ctx); err != nil || snapshot() != before {
 			t.Fatal("upgrade rewrote an immutable run or its classification", err)
 		}
+	}
+	var changed int
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.runs WHERE storage_options IS NOT NULL`).Scan(&changed); err != nil || changed != 0 {
+		t.Fatal("old run acquired new storage choices", err)
 	}
 	for _, catalog := range []bool{false, true} {
 		p := model.Provider{ID: "new-native", Adapter: "json"}

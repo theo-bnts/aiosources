@@ -45,79 +45,92 @@ func seedTestBook(t *testing.T, ctx context.Context, s *Service, conn *pgx.Conn,
 
 func TestBookDownloadSelectsFormatWithoutLeakingAnnouncements(t *testing.T) {
 	for _, service := range []string{"alldebrid", "torbox"} {
-		t.Run(service, func(t *testing.T) {
-			ctx, s, conn := testService(t)
-			work := seedTestBook(t, ctx, s, conn, "fixture")
-			if err := s.Vault.Put(ctx, "book_debrid", "synthetic-book-key"); err != nil {
-				t.Fatal(err)
-			}
-			c, _ := s.DB.AIOConfig(ctx)
-			if service == "torbox" {
-				c.TorBoxSecret = "book_debrid"
-			} else {
-				c.AllDebridSecret = "book_debrid"
-			}
-			c.Trackers["fixture"] = model.AIOTracker{Private: true}
-			if err := s.SaveConfig(ctx, c); err != nil {
-				t.Fatal(err)
-			}
-			var requests atomic.Int32
-			s.Providers = providerTest(t, func(w http.ResponseWriter, r *http.Request) {
-				requests.Add(1)
-				switch r.URL.Path {
-				case "/v4.1/magnet/status":
-					fmt.Fprint(w, `{"status":"success","data":{"magnets":[]}}`)
-				case "/v4/magnet/upload":
-					_ = r.ParseForm()
-					if strings.Contains(r.Form.Get("magnets[]"), "tr=") {
-						t.Error("private announce used")
+		for _, direct := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/direct=%t", service, direct), func(t *testing.T) {
+				ctx, s, conn := testService(t)
+				work := seedTestBook(t, ctx, s, conn, "fixture")
+				if direct {
+					work = 0
+					if _, err := conn.Exec(ctx, `DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue`); err != nil {
+						t.Fatal(err)
 					}
-					fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"ready":true}]}}`, strings.Repeat("b", 40))
-				case "/v4/magnet/delete":
-					fmt.Fprint(w, `{"status":"success","data":{"message":"Deleted"}}`)
-				case "/v4/magnet/files":
-					fmt.Fprint(w, `{"status":"success","data":{"magnets":[{"id":7,"files":[{"n":"The Amber Orchard.epub","s":100,"l":"https://files.example/epub"},{"n":"The Amber Orchard.pdf","s":200,"l":"https://files.example/pdf"}]}]}}`)
-				case "/v4/link/unlock":
-					_ = r.ParseForm()
-					if r.Form.Get("link") != "https://files.example/epub" {
-						t.Error("wrong format selected")
+				}
+				if err := s.Vault.Put(ctx, "book_debrid", "synthetic-book-key"); err != nil {
+					t.Fatal(err)
+				}
+				c, _ := s.DB.AIOConfig(ctx)
+				if service == "torbox" {
+					c.TorBoxSecret = "book_debrid"
+				} else {
+					c.AllDebridSecret = "book_debrid"
+				}
+				c.Trackers["fixture"] = model.AIOTracker{Private: true}
+				if err := s.SaveConfig(ctx, c); err != nil {
+					t.Fatal(err)
+				}
+				var requests atomic.Int32
+				s.Providers = providerTest(t, func(w http.ResponseWriter, r *http.Request) {
+					requests.Add(1)
+					switch r.URL.Path {
+					case "/v4.1/magnet/status":
+						fmt.Fprint(w, `{"status":"success","data":{"magnets":[]}}`)
+					case "/v4/magnet/upload":
+						_ = r.ParseForm()
+						if strings.Contains(r.Form.Get("magnets[]"), "tr=") {
+							t.Error("private announce used")
+						}
+						fmt.Fprintf(w, `{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"ready":true}]}}`, strings.Repeat("b", 40))
+					case "/v4/magnet/delete":
+						fmt.Fprint(w, `{"status":"success","data":{"message":"Deleted"}}`)
+					case "/v4/magnet/files":
+						fmt.Fprint(w, `{"status":"success","data":{"magnets":[{"id":7,"files":[{"n":"The Amber Orchard.epub","s":100,"l":"https://files.example/epub"},{"n":"The Amber Orchard.pdf","s":200,"l":"https://files.example/pdf"}]}]}}`)
+					case "/v4/link/unlock":
+						_ = r.ParseForm()
+						if r.Form.Get("link") != "https://files.example/epub" {
+							t.Error("wrong format selected")
+						}
+						fmt.Fprint(w, `{"status":"success","data":{"link":"https://files.example/book.epub"}}`)
+					case "/torrents/createtorrent":
+						if r.ParseMultipartForm(4096) != nil || r.FormValue("add_only_if_cached") != "true" || strings.Contains(r.FormValue("magnet"), "tr=") {
+							t.Error("cached-only policy bypassed")
+						}
+						fmt.Fprintf(w, `{"success":true,"data":{"torrent_id":7,"hash":%q}}`, strings.Repeat("b", 40))
+					case "/torrents/mylist":
+						fmt.Fprintf(w, `{"success":true,"data":{"hash":%q,"download_finished":true,"download_present":true,"files":[{"id":1,"name":"The Amber Orchard.epub","size":100},{"id":2,"name":"The Amber Orchard.pdf","size":200}]}}`, strings.Repeat("b", 40))
+					case "/torrents/requestdl":
+						if r.URL.Query().Get("file_id") != "1" {
+							t.Error("wrong format selected")
+						}
+						fmt.Fprint(w, `{"success":true,"data":"https://files.example/book.epub"}`)
+					default:
+						t.Errorf("unexpected provider request: %s", r.URL.Path)
+						w.WriteHeader(500)
 					}
-					fmt.Fprint(w, `{"status":"success","data":{"link":"https://files.example/book.epub"}}`)
-				case "/torrents/createtorrent":
-					if r.ParseMultipartForm(4096) != nil || r.FormValue("add_only_if_cached") != "true" || strings.Contains(r.FormValue("magnet"), "tr=") {
-						t.Error("cached-only policy bypassed")
+				})
+				generation, _ := s.DB.AIOCacheGeneration(ctx)
+				if err := s.DB.SaveSharedAvailability(ctx, service, model.AIOAvailability{Hash: strings.Repeat("b", 40), Cached: true, CheckedAt: time.Now(), Generation: generation, Files: []model.AIOFile{{Path: "The Amber Orchard.epub", Size: 100}, {Path: "The Amber Orchard.pdf", Size: 200}}}); err != nil {
+					t.Fatal(err)
+				}
+				rows, err := func() (model.List[model.CatalogRelease], error) {
+					if direct {
+						return s.CatalogTorrents(ctx, model.ListOptions{Query: "Amber Orchard"}, model.CatalogReleaseFilters{}, nil)
 					}
-					fmt.Fprintf(w, `{"success":true,"data":{"torrent_id":7,"hash":%q}}`, strings.Repeat("b", 40))
-				case "/torrents/mylist":
-					fmt.Fprintf(w, `{"success":true,"data":{"hash":%q,"download_finished":true,"download_present":true,"files":[{"id":1,"name":"The Amber Orchard.epub","size":100},{"id":2,"name":"The Amber Orchard.pdf","size":200}]}}`, strings.Repeat("b", 40))
-				case "/torrents/requestdl":
-					if r.URL.Query().Get("file_id") != "1" {
-						t.Error("wrong format selected")
-					}
-					fmt.Fprint(w, `{"success":true,"data":"https://files.example/book.epub"}`)
-				default:
-					t.Errorf("unexpected provider request: %s", r.URL.Path)
-					w.WriteHeader(500)
+					return s.CatalogReleases(ctx, work, model.CatalogSelection{}, model.ListOptions{})
+				}()
+				if err != nil || len(rows.Items) != 1 || rows.Items[0].Services[0].FileCount != 2 {
+					t.Fatalf("book availability: %+v %v", rows, err)
+				}
+				row := rows.Items[0]
+				result, err := s.CatalogDownload(ctx, work, model.CatalogDownloadInput{OccurrenceID: row.OccurrenceID, Fingerprint: row.Fingerprint, Service: service})
+				if !errors.Is(err, ErrPending) || len(result.Files) != 2 || requests.Load() != 0 {
+					t.Fatalf("local file choice made a provider request: %+v %v", result, err)
+				}
+				selected, err := s.CheckOperationDownload(ctx, result.OperationID, "The Amber Orchard.epub")
+				if err != nil || selected.Status != "ready" || selected.URL != "https://files.example/book.epub" {
+					t.Fatalf("book download: %+v %v", selected, err)
 				}
 			})
-			generation, _ := s.DB.AIOCacheGeneration(ctx)
-			if err := s.DB.SaveSharedAvailability(ctx, service, model.AIOAvailability{Hash: strings.Repeat("b", 40), Cached: true, CheckedAt: time.Now(), Generation: generation, Files: []model.AIOFile{{Path: "The Amber Orchard.epub", Size: 100}, {Path: "The Amber Orchard.pdf", Size: 200}}}); err != nil {
-				t.Fatal(err)
-			}
-			rows, err := s.CatalogReleases(ctx, work, model.CatalogSelection{}, model.ListOptions{})
-			if err != nil || len(rows.Items) != 1 || rows.Items[0].Services[0].FileCount != 2 {
-				t.Fatalf("book availability: %+v %v", rows, err)
-			}
-			row := rows.Items[0]
-			result, err := s.CatalogDownload(ctx, work, model.CatalogDownloadInput{OccurrenceID: row.OccurrenceID, Fingerprint: row.Fingerprint, Service: service})
-			if !errors.Is(err, ErrPending) || len(result.Files) != 2 || requests.Load() != 0 {
-				t.Fatalf("local file choice made a provider request: %+v %v", result, err)
-			}
-			selected, err := s.CheckOperationDownload(ctx, result.OperationID, "The Amber Orchard.epub")
-			if err != nil || selected.Status != "ready" || selected.URL != "https://files.example/book.epub" {
-				t.Fatalf("book download: %+v %v", selected, err)
-			}
-		})
+		}
 	}
 }
 
@@ -191,18 +204,27 @@ func TestPublicBooksKeepCachedOnlyAndSourcePrivacy(t *testing.T) {
 		if err != nil || (rows.Total == 1) != state.visible {
 			t.Fatalf("public book visibility: %+v %v", rows, err)
 		}
+		direct, err := s.CatalogTorrents(ctx, model.ListOptions{Query: "Amber Orchard"}, model.CatalogReleaseFilters{}, visitor)
+		if err != nil || (direct.Total == 1) != state.visible || (len(direct.Items) == 1) != state.visible {
+			t.Fatalf("public direct visibility: %+v %v", direct, err)
+		}
 		if state.visible {
-			row := rows.Items[0]
-			if row.Provider != "" || row.ProviderName != "" || row.DownloadToken == "" || row.Services[0].CanAdd {
-				t.Fatal("source privacy or private uncached access changed")
-			}
-			pending, e := s.PublicCatalogDownload(ctx, visitor, work, model.CatalogDownloadInput{DownloadToken: row.DownloadToken, Service: "torbox"})
-			if !errors.Is(e, ErrPending) || len(pending.Files) != 2 || pending.PreparationID == "" {
-				t.Fatalf("public book choice: %+v %v", pending, e)
-			}
-			selected, e := s.PublicCatalogDownload(ctx, visitor, work, model.CatalogDownloadInput{PreparationID: pending.PreparationID, CatalogSelection: model.CatalogSelection{File: "The Amber Orchard.epub"}})
-			if e != nil || selected.Status != "ready" || selected.URL != "https://files.example/public-book.epub" {
-				t.Fatalf("public book download failed: %+v %v", selected, e)
+			for _, item := range []struct {
+				work int64
+				row  model.CatalogRelease
+			}{{work, rows.Items[0]}, {0, direct.Items[0]}} {
+				row := item.row
+				if row.Provider != "" || row.ProviderName != "" || row.DownloadToken == "" || row.Services[0].CanAdd {
+					t.Fatal("source privacy or private uncached access changed")
+				}
+				pending, e := s.PublicCatalogDownload(ctx, visitor, item.work, model.CatalogDownloadInput{DownloadToken: row.DownloadToken, Service: "torbox"})
+				if !errors.Is(e, ErrPending) || len(pending.Files) != 2 || pending.PreparationID == "" {
+					t.Fatalf("public book choice: %+v %v", pending, e)
+				}
+				selected, e := s.PublicCatalogDownload(ctx, visitor, item.work, model.CatalogDownloadInput{PreparationID: pending.PreparationID, CatalogSelection: model.CatalogSelection{File: "The Amber Orchard.epub"}})
+				if e != nil || selected.Status != "ready" || selected.URL != "https://files.example/public-book.epub" {
+					t.Fatalf("public book download failed: %+v %v", selected, e)
+				}
 			}
 		}
 	}
@@ -210,42 +232,55 @@ func TestPublicBooksKeepCachedOnlyAndSourcePrivacy(t *testing.T) {
 
 func TestBookPreparationsResumeAcrossEveryExtendedProvider(t *testing.T) {
 	for _, service := range []string{"realdebrid", "premiumize", "debridlink", "deepbrid"} {
-		t.Run(service, func(t *testing.T) {
-			ctx, s, conn := testService(t)
-			work := seedTestBook(t, ctx, s, conn, "fixture")
-			if err := s.Vault.Put(ctx, "book_debrid", "synthetic-book-key"); err != nil {
-				t.Fatal(err)
-			}
-			c, _ := s.DB.AIOConfig(ctx)
-			setTestDebridSecret(&c, service, "book_debrid")
-			c.Trackers["fixture"] = model.AIOTracker{Private: false}
-			if err := s.SaveConfig(ctx, c); err != nil {
-				t.Fatal(err)
-			}
-			var ready, deleted atomic.Bool
-			var adds atomic.Int32
-			upstream := extendedPlaybackServer(t, service, strings.Repeat("b", 40), "synthetic-book-key", &ready, &deleted, &adds, "The Amber Orchard.epub")
-			defer upstream.Close()
-			s.Providers.RDBase, s.Providers.PMBase, s.Providers.DLBase, s.Providers.DBBase = upstream.URL, upstream.URL, upstream.URL, upstream.URL
-			rows, err := s.CatalogReleases(ctx, work, model.CatalogSelection{}, model.ListOptions{})
-			if err != nil || len(rows.Items) != 1 {
-				t.Fatalf("book releases: %+v %v", rows, err)
-			}
-			row := rows.Items[0]
-			pending, err := s.CatalogDownload(ctx, work, model.CatalogDownloadInput{OccurrenceID: row.OccurrenceID, Fingerprint: row.Fingerprint, Service: service, AllowUncached: true})
-			if !errors.Is(err, ErrPending) || pending.PreparationID == "" || adds.Load() != 1 {
-				t.Fatalf("book preparation not saved: %+v %v", pending, err)
-			}
-			ready.Store(true)
-			result, err := s.CheckOperationDownload(ctx, pending.OperationID)
-			if err != nil || result.Status != "ready" || adds.Load() != 1 {
-				t.Fatalf("book preparation was lost or recreated: %+v %v", result, err)
-			}
-			deleted.Store(true)
-			_, err = s.CheckOperationDownload(ctx, pending.OperationID)
-			if providerFailureCode(err) != "not_found" || adds.Load() != 1 {
-				t.Fatalf("deleted book was recreated: %v", err)
-			}
-		})
+		for _, direct := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/direct=%t", service, direct), func(t *testing.T) {
+				ctx, s, conn := testService(t)
+				work := seedTestBook(t, ctx, s, conn, "fixture")
+				if direct {
+					work = 0
+					if _, err := conn.Exec(ctx, `DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := s.Vault.Put(ctx, "book_debrid", "synthetic-book-key"); err != nil {
+					t.Fatal(err)
+				}
+				c, _ := s.DB.AIOConfig(ctx)
+				setTestDebridSecret(&c, service, "book_debrid")
+				c.Trackers["fixture"] = model.AIOTracker{Private: false}
+				if err := s.SaveConfig(ctx, c); err != nil {
+					t.Fatal(err)
+				}
+				var ready, deleted atomic.Bool
+				var adds atomic.Int32
+				upstream := extendedPlaybackServer(t, service, strings.Repeat("b", 40), "synthetic-book-key", &ready, &deleted, &adds, "The Amber Orchard.epub")
+				defer upstream.Close()
+				s.Providers.RDBase, s.Providers.PMBase, s.Providers.DLBase, s.Providers.DBBase = upstream.URL, upstream.URL, upstream.URL, upstream.URL
+				rows, err := func() (model.List[model.CatalogRelease], error) {
+					if direct {
+						return s.CatalogTorrents(ctx, model.ListOptions{Query: "Amber Orchard"}, model.CatalogReleaseFilters{}, nil)
+					}
+					return s.CatalogReleases(ctx, work, model.CatalogSelection{}, model.ListOptions{})
+				}()
+				if err != nil || len(rows.Items) != 1 {
+					t.Fatalf("book releases: %+v %v", rows, err)
+				}
+				row := rows.Items[0]
+				pending, err := s.CatalogDownload(ctx, work, model.CatalogDownloadInput{OccurrenceID: row.OccurrenceID, Fingerprint: row.Fingerprint, Service: service, AllowUncached: true})
+				if !errors.Is(err, ErrPending) || pending.PreparationID == "" || adds.Load() != 1 {
+					t.Fatalf("book preparation not saved: %+v %v", pending, err)
+				}
+				ready.Store(true)
+				result, err := s.CheckOperationDownload(ctx, pending.OperationID)
+				if err != nil || result.Status != "ready" || adds.Load() != 1 {
+					t.Fatalf("book preparation was lost or recreated: %+v %v", result, err)
+				}
+				deleted.Store(true)
+				_, err = s.CheckOperationDownload(ctx, pending.OperationID)
+				if providerFailureCode(err) != "not_found" || adds.Load() != 1 {
+					t.Fatalf("deleted book was recreated: %v", err)
+				}
+			})
+		}
 	}
 }

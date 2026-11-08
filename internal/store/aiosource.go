@@ -200,6 +200,7 @@ const aioCandidatesQuery = `WITH candidate_ids AS (
  UNION SELECT id FROM ingest.aio_works WHERE $3<>'' AND imdb_id=$3
  UNION SELECT id FROM ingest.aio_works WHERE $4<>'' AND tvdb_id=$4
  UNION SELECT work_id FROM ingest.aio_titles WHERE normalized=$1
+ UNION SELECT work_id FROM ingest.aio_titles WHERE normalized=ANY($10::text[])
  UNION SELECT work_id FROM ingest.aio_titles WHERE NOT $9::boolean AND normalized OPERATOR(public.%) $1 AND public.similarity(normalized,$1)>=0.5
 ) SELECT ` + aioWorkColumns + ` FROM candidate_ids c JOIN ingest.aio_works w ON w.id=c.id
 WHERE NOT w.adult AND w.media_type<>'book' AND ($5='' OR w.media_type=$5) AND ($6::int IS NULL OR $6=ANY(w.years)
@@ -249,6 +250,7 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 		return ""
 	}
 	r.Title = text("title", "name")
+	r.VideoType = model.VideoTypeEvidence(f)
 	r.BookHints = model.BookSourceHints(f)
 	r.Hash = strings.ToLower(text("info_hash", "hash", "infohash"))
 	r.Size, _ = strconv.ParseInt(text("size"), 10, 64)

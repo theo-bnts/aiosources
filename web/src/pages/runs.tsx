@@ -715,7 +715,10 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         <TabsContent value="raw" className="mt-5">
           <RawTableView
             runId={run.id}
-            compact={run.storage_mode === 'compact' && run.mode !== 'preview'}
+            compact={
+              !(run.storage_options?.successful_records ?? run.storage_mode === 'full') &&
+              run.mode !== 'preview'
+            }
           />
         </TabsContent>
       </Tabs>

@@ -135,6 +135,8 @@ func BenchmarkAddonReadFlows(b *testing.B) {
 	}{
 		{"private-search", "/api/catalog/search?q=Synthetic", "", true, "list", 1},
 		{"public-search", "/api/public/catalog/search?q=Synthetic", public.Credential, false, "list", 1},
+		{"private-direct-search", "/api/catalog/torrents?q=Synthetic", "", true, "list", 20},
+		{"public-direct-search", "/api/public/catalog/torrents?q=Synthetic", public.Credential, false, "list", 20},
 		{"private-releases", fmt.Sprintf("/api/catalog/%d/releases", work), "", true, "list", 20},
 		{"public-releases", fmt.Sprintf("/api/public/catalog/%d/releases", work), public.Credential, false, "list", 20},
 		{"private-stremio", "/stremio/" + private + "/stream/movie/tt1234567.json", "", false, "streams", 1},

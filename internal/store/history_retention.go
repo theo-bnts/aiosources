@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"time"
 )
 
 // PruneHistory expires diagnostic content under the saved retention policy. Each pass is
@@ -25,10 +24,11 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if !locked {
 		return 0, nil
 	}
-	var cutoff time.Time
-	if err = tx.QueryRow(ctx, `SELECT now()-make_interval(days=>(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'))`).Scan(&cutoff); err != nil {
+	cutoffs, err := storageRetentionCutoffs(ctx, tx)
+	if err != nil {
 		return 0, databaseError("read history cutoff", err)
 	}
+	cutoff := cutoffs["diagnostics"]
 	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true)`); err != nil {
 		return 0, databaseError("authorize history cleanup", err)
 	}
@@ -106,15 +106,27 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	for _, table := range []string{"activity_logs", "events", "operation_events", "stremio_requests"} {
+		tableCutoff := cutoff
+		switch table {
+		case "activity_logs":
+			tableCutoff = cutoffs["logs"]
+		case "operation_events":
+			tableCutoff = cutoffs["operations"]
+		case "stremio_requests":
+			tableCutoff = cutoffs["requests"]
+		}
 		if err = exec(`DELETE FROM ingest.`+table+` WHERE id IN (
- SELECT id FROM ingest.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, cutoff, batchSize); err != nil {
+ SELECT id FROM ingest.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, tableCutoff, batchSize); err != nil {
 			return 0, err
 		}
+	}
+	if err = exec(`DELETE FROM ingest.stremio_requests WHERE id IN (SELECT id FROM ingest.stremio_requests WHERE id<=COALESCE((SELECT id FROM ingest.stremio_requests ORDER BY id DESC OFFSET (SELECT request_limit FROM ingest.storage_retention_settings WHERE singleton) LIMIT 1),0) AND (SELECT request_limit>0 FROM ingest.storage_retention_settings WHERE singleton) ORDER BY id LIMIT $1)`, batchSize); err != nil {
+		return 0, err
 	}
 	if err = exec(`DELETE FROM ingest.operation_runs WHERE id IN (
  SELECT r.id FROM ingest.operation_runs r WHERE finished_at<$1 AND status<>'running'
  AND NOT EXISTS(SELECT 1 FROM ingest.operation_events e WHERE e.run_id=r.id)
- ORDER BY finished_at,id LIMIT $2 FOR UPDATE SKIP LOCKED)`, cutoff, batchSize); err != nil {
+ ORDER BY finished_at,id LIMIT $2 FOR UPDATE SKIP LOCKED)`, cutoffs["operations"], batchSize); err != nil {
 		return 0, err
 	}
 	for _, table := range []string{"run_record_identities", "run_scope_memberships", "run_scope_counts", "run_scope_refresh_candidates", "run_progress_identities"} {
@@ -125,15 +137,15 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	}
 	before := removed
 	if err = exec(`DELETE FROM ingest.torrent_history WHERE id IN (
- SELECT id FROM ingest.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoff, batchSize); err != nil {
+ SELECT id FROM ingest.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
 		return 0, err
 	}
 	if err = exec(`DELETE FROM ingest.torrent_history_baselines WHERE occurrence_id IN (
- SELECT occurrence_id FROM ingest.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoff, batchSize); err != nil {
+ SELECT occurrence_id FROM ingest.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
 		return 0, err
 	}
 	if removed > before {
-		if _, err = tx.Exec(ctx, `UPDATE ingest.torrent_history_metadata SET history_since=GREATEST(history_since,$1) WHERE singleton AND history_since<$1`, cutoff); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE ingest.torrent_history_metadata SET history_since=GREATEST(history_since,$1) WHERE singleton AND history_since<$1`, cutoffs["changes"]); err != nil {
 			return 0, databaseError("advance retained history boundary", err)
 		}
 	}
@@ -178,7 +190,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
  sequence=EXCLUDED.sequence,recorded_at=EXCLUDED.recorded_at WHERE previous.sequence<EXCLUDED.sequence
  RETURNING 1
 )
-DELETE FROM ingest.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoff, batchSize); err != nil {
+DELETE FROM ingest.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoffs["sharing"], batchSize); err != nil {
 		return 0, err
 	}
 	if err = tx.Commit(ctx); err != nil {

@@ -54,6 +54,7 @@ type AIOWork struct {
 	Revision        int64             `json:"revision"`
 }
 type AIORecord struct {
+	VideoType              string              `json:"-"`
 	BookInformationPending bool                `json:"-"`
 	BookHints              BookHints           `json:"-"`
 	MatchingPolicy         MatchingPolicy      `json:"-"`

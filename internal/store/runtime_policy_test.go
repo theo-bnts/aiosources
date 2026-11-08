@@ -22,9 +22,10 @@ func TestExtendedSettingsMigrationPreservesPoliciesAndSavedImports(t *testing.T)
 	if _, err := db.pool.Exec(ctx, `UPDATE ingest.runtime_settings SET values=jsonb_set(values,'{days}','14'),revision=8 WHERE section='history'`); err != nil {
 		t.Fatal(err)
 	}
-	run := mirrorClaim(t, ctx, db, model.Provider{ID: "migration-source", Adapter: "json"}, model.ModeFull)
-	run, err = db.SavePage(ctx, run, model.Page{Next: []byte(`{"page":7}`)}, "checkpoint")
-	if err != nil {
+	// Historical fixtures use their original schema, not a current writer that
+	// snapshots settings introduced by later migrations.
+	run := model.Run{ID: "migration-run", ProviderID: "migration-source", Cursor: []byte(`{"page": 7}`), Status: model.StatusRunning}
+	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,cursor) VALUES($1,$2,$2,'full','running','','{"version":1,"id":"migration-source","adapter":"json"}',$3)`, run.ID, run.ProviderID, run.Cursor); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {

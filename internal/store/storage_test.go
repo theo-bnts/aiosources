@@ -20,6 +20,7 @@ func setStorageMode(t *testing.T, ctx context.Context, db *Store, mode model.Sto
 		t.Fatal(err)
 	}
 	current.Settings.Mode = mode
+	current.Settings.Options = nil // Exercise the previous mode-based API as well.
 	if err := db.UpdateStorageSettings(ctx, current.Settings); err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +402,7 @@ func TestSourceResetRollsBackDataAndSharingStateIfTheTransactionFails(t *testing
 	if rows := mirrorRows(t, ctx, db, "kept"); len(rows) != 1 || rows["one"].Fields["title"] != "Keep this" {
 		t.Fatal("failed reset removed published data")
 	}
-	if got, _ := db.StorageOverview(ctx); got.Settings != settings.Settings {
+	if got, _ := db.StorageOverview(ctx); !reflect.DeepEqual(got.Settings, settings.Settings) {
 		t.Fatal("failed reset advanced the revision")
 	}
 	delta := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: before.Checkpoint})

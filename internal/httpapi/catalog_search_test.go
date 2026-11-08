@@ -44,7 +44,7 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 	if err := conn.QueryRow(f.ctx, `SELECT id::text FROM ingest.aio_works WHERE id=$1`, workID).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/catalog/search?q=Example", "/api/catalog/" + id, "/api/catalog/" + id + "/releases"} {
+	for _, path := range []string{"/api/catalog/search?q=Example", "/api/catalog/torrents?q=Example", "/api/catalog/" + id, "/api/catalog/" + id + "/releases"} {
 		if res := f.request("GET", path, "", false, ""); res.Code != 401 {
 			t.Fatalf("anonymous access to %s: %d", path, res.Code)
 		}

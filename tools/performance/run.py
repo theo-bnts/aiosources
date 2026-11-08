@@ -38,6 +38,14 @@ REQUIRED_BENCHMARKS = {
     "synthetic.httpapi.BenchmarkAddonReadFlows/public-download",
 }
 REQUIRED_BENCHMARKS.update(
+    "synthetic.store.BenchmarkStorageChoices/" + name
+    for name in ("required-only", "additional-field", "all-fields", "successful-records", "record-field-copies", "published-history")
+)
+REQUIRED_BENCHMARKS.update(
+    "synthetic.httpapi.BenchmarkAddonReadFlows/" + name
+    for name in ("private-direct-search", "public-direct-search")
+)
+REQUIRED_BENCHMARKS.update(
     "synthetic.aiosource.BenchmarkProviderAccountValidation/" + service
     for service in ("alldebrid", "debridlink", "deepbrid", "premiumize", "realdebrid", "torbox")
 )
