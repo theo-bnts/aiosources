@@ -38,12 +38,13 @@ function timingNoise(id) {
   return /\.(?:section|stage)\.\d+$|\.(?:json|create)$/.test(id) ? 150 : 350
 }
 
-async function measure(id, budget, action, contract = () => 'ok', count = samples) {
+async function measure(id, budget, action, contract = () => 'ok', count = samples, prepare) {
   const values = []
   let expected
   try {
     // Warm-up is separate from the measured repetitions and still validates data.
     for (let i = -1; i < count; i++) {
+      if (prepare) await prepare()
       const started = performance.now()
       const value = await action()
       const elapsed = performance.now() - started
@@ -487,10 +488,9 @@ try {
       pageFailure = false,
       badResponse = false
     async function resetPage() {
-      // Keep a page and its optional sections together, then release its
-      // cookies' browser context, requests and live-event connections before
-      // measuring another route. Hundreds of full document reloads in one
-      // intercepted context can otherwise exhaust its HTTP connection pool.
+      // Isolate each document navigation, then keep its optional controls in
+      // the final document's context. Repeated full reloads in one intercepted
+      // Chromium context can queue fetches before they ever reach the server.
       await context?.close()
       pending = new Set()
       requestFailure = pageFailure = badResponse = false
@@ -626,7 +626,6 @@ try {
       ]),
     ]
     for (const [id, route] of pages) {
-      await resetPage()
       await measure(
         `browser.${width}.${id}`,
         ['sources.statistics', 'identification.results'].includes(id) ? 10_000 : 5000,
@@ -637,6 +636,8 @@ try {
           }
         },
         () => 'ready',
+        samples,
+        resetPage,
       )
       await sections(page.locator('main'), `browser.${width}.${id}`)
       if (id.startsWith('sources.editor.')) {
