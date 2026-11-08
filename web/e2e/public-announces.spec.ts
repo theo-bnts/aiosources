@@ -66,7 +66,13 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     const permission = access.getByLabel('Expose source names and filters', { exact: true })
     await expect(permission).not.toBeChecked()
     await permission.check()
-    await expect(access).toContainText('Applies to all public features, including Shared catalogs')
+    await access
+      .getByRole('button', { name: 'About Expose source names and filters', exact: true })
+      .click()
+    await expect(
+      page.getByRole('dialog', { name: 'About Expose source names and filters', exact: true }),
+    ).toContainText('Applies to all public features, including Shared catalogs')
+    await page.keyboard.press('Escape')
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await expect(visitor.locator('summary', { hasText: 'Private source playback' })).toBeVisible()

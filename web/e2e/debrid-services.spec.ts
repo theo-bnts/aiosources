@@ -47,7 +47,8 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
   ).toBe(204)
   await page.goto('/debrid/settings')
   const form = page.getByRole('form', { name: 'Debrid configuration', exact: true })
-  const rechecks = form.getByRole('switch', {
+  const availability = page.getByRole('form', { name: 'Cache availability', exact: true })
+  const rechecks = availability.getByRole('switch', {
     name: 'Automatically recheck availability',
     exact: true,
   })
@@ -55,14 +56,14 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
   await openDisclosure(page, 'Cache availability')
   await expect(rechecks).toBeChecked()
   await rechecks.uncheck()
-  await form.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await availability.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(availability.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
   await openDisclosure(page, 'Cache availability')
   await expect(rechecks).not.toBeChecked()
   await rechecks.check()
-  await form.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await availability.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(availability.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await expect(form.locator('label').filter({ hasText: /API key$/ })).toHaveText(
     debridProviders.map((p) => `${p.name} API key`),
   )

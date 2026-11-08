@@ -42,7 +42,7 @@ export function AboutDialog() {
         <DialogHeader>
           <DialogTitle className="flex min-w-0 items-center gap-2">
             <DatabaseIcon size={24} className="shrink-0 text-primary" aria-hidden="true" />
-            <span className="min-w-0 break-words">
+            <span className="min-w-0 break-words text-2xl">
               AIOSources{' '}
               <span className="text-sm font-normal text-muted-foreground">({version})</span>
             </span>

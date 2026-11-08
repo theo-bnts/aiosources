@@ -8,7 +8,7 @@ test('save feedback distinguishes reverted controls from committed changes', asy
     if (request.method() === 'PUT') writes.push(new URL(request.url()).pathname)
   })
   await page.goto('/metadata/videos/settings')
-  const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
+  const configuration = page.getByRole('form', { name: 'Videos automatic updates', exact: true })
   await openDisclosure(page, 'Automatic updates')
   const interval = configuration.getByLabel('Information update interval (minutes)', {
     exact: true,
@@ -27,13 +27,14 @@ test('save feedback distinguishes reverted controls from committed changes', asy
   await save.click()
   await expect(configuration.getByRole('status')).toHaveText('Changes saved.')
   await page.reload()
+  await openDisclosure(page, 'Automatic updates')
   await expect(interval).toHaveValue(changed)
   expect(writes).toEqual(['/api/aiosource/config'])
 
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
-  const advanced = page.getByRole('form', { name: 'Import execution', exact: true })
+  const advanced = page.getByRole('form', { name: 'Concurrency', exact: true })
   const workers = advanced.getByLabel('Simultaneous imports', { exact: true })
   const originalWorkers = await workers.inputValue()
   await workers.fill(originalWorkers === '7' ? '6' : '7')

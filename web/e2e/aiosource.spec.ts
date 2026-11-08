@@ -22,48 +22,57 @@ test('metadata configuration persists and missing information explains disabled 
   await page.goto('/metadata/videos/settings')
   await expect(page.getByRole('heading', { name: 'Videos', exact: true, level: 1 })).toBeVisible()
   await expectMaintenanceFooter(page)
-  await expect(page.getByLabel('Automatically update film & series information')).toBeChecked()
-  await expect(page.getByLabel('Automatically identify torrents')).toHaveCount(0)
+  await expect(
+    page.getByLabel('Automatically update film & series information', { exact: true }),
+  ).toBeChecked()
+  await expect(page.getByLabel('Automatically identify torrents', { exact: true })).toHaveCount(0)
   await openDisclosure(page, 'Manual actions')
   await expect(
     page.getByRole('button', { name: 'Update film & series information', exact: true }),
   ).toBeDisabled()
-  const configuration = page.getByRole('form', { name: 'Videos configuration', exact: true })
-  await expect(page.getByLabel('TMDB requests per second')).toHaveValue('35')
+  const configuration = page.getByRole('form', { name: 'Videos automatic updates', exact: true })
+  await expect(page.getByLabel('TMDB requests per second', { exact: true })).toHaveValue('35')
   await openDisclosure(page, 'Request limits')
-  await page.getByLabel('TMDB requests per second').fill('20')
+  await page.getByLabel('TMDB requests per second', { exact: true }).fill('20')
   await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Information update interval (minutes)', { exact: true }).fill('30')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  const requests = page.getByRole('form', { name: 'Videos request limits', exact: true })
+  await requests.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(requests.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
   await expect(
     page.getByLabel('Information update interval (minutes)', { exact: true }),
   ).toHaveValue('30')
-  await expect(page.getByLabel('TMDB requests per second')).toHaveValue('20')
+  await expect(page.getByLabel('TMDB requests per second', { exact: true })).toHaveValue('20')
   await page.goto('/metadata/identification/settings')
-  await expect(page.getByLabel('Automatically identify torrents')).toBeChecked()
-  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('30')
+  await expect(page.getByLabel('Automatically identify torrents', { exact: true })).toBeChecked()
+  await expect(page.getByLabel('Identification interval (seconds)', { exact: true })).toHaveValue(
+    '30',
+  )
   await openDisclosure(page, 'Automatic updates')
-  await page.getByLabel('Identification interval (seconds)').fill('90')
+  await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('90')
   const identification = page.getByRole('form', {
-    name: 'Identification configuration',
+    name: 'Identification automatic updates',
     exact: true,
   })
   await identification.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await expect(page.getByLabel('Identification interval (seconds)')).toHaveValue('90')
+  await expect(page.getByLabel('Identification interval (seconds)', { exact: true })).toHaveValue(
+    '90',
+  )
   await openDisclosure(page, 'Automatic updates')
-  await page.getByLabel('Identification interval (seconds)').fill('4')
+  await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('4')
   await identification.getByRole('button', { name: 'Save', exact: true }).click()
   expect(
     await page
-      .getByLabel('Identification interval (seconds)')
+      .getByLabel('Identification interval (seconds)', { exact: true })
       .evaluate((field) => (field as HTMLInputElement).validity.rangeUnderflow),
   ).toBe(true)
   await openDisclosure(page, 'Automatic updates')
-  await page.getByLabel('Identification interval (seconds)').fill('5')
+  await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('5')
   await identification.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(identification.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(
@@ -133,7 +142,9 @@ test('metadata automation persists schedules, retry dates and manual choices wit
       page.getByRole('heading', { name: 'Torrent identification', exact: true }),
     ).toHaveCount(0)
     const form = page.getByRole('form', { name: 'Videos configuration', exact: true })
-    await page.getByLabel('Automatically update film & series information').uncheck()
+    await page
+      .getByLabel('Automatically update film & series information', { exact: true })
+      .uncheck()
     await form.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     expect((await (await page.request.get('/api/aiosource')).json()).automation.updates).toBe(
@@ -141,9 +152,9 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     )
     await page.reload()
     await expect(
-      page.getByLabel('Automatically update film & series information'),
+      page.getByLabel('Automatically update film & series information', { exact: true }),
     ).not.toBeChecked()
-    await page.getByLabel('Automatically update film & series information').check()
+    await page.getByLabel('Automatically update film & series information', { exact: true }).check()
     await form.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await db.query(
@@ -268,16 +279,16 @@ test('debrid settings validate, persist and expose no default trackers', async (
   await page.goto('/debrid/settings')
   await expect(page.getByRole('heading', { name: 'Debrid', exact: true, level: 1 })).toBeVisible()
   await expectMaintenanceFooter(page)
-  await expect(page.getByLabel('AllDebrid API key')).toHaveValue('')
-  await expect(page.getByLabel('TorBox API key')).toHaveValue('')
-  const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  await expect(page.getByLabel('AllDebrid API key', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('TorBox API key', { exact: true })).toHaveValue('')
+  const configuration = page.getByRole('form', { name: 'Cache availability', exact: true })
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('1440')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('1440')
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1440')
-  await expect(page.getByLabel('Stream response timeout (seconds)')).toHaveCount(0)
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('1440')
+  await expect(page.getByLabel('Stream response timeout (seconds)', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('alert')).toHaveCount(0)
   const sources = await (await page.request.get('/api/providers')).json()
   expect(sources.items).toEqual([])
@@ -318,13 +329,13 @@ test('private playback saves independently and fields have space below their lab
       .getByRole('button', { name: 'Create secret', exact: true })
       .click()
     const dialog = page.getByRole('dialog')
-    await dialog.getByLabel('Reference name').fill(name)
+    await dialog.getByLabel('Reference name', { exact: true }).fill(name)
     await dialog.getByLabel('Secret value', { exact: true }).fill(value)
     await dialog.getByRole('button', { name: 'Create secret', exact: true }).click()
     await expect(dialog).toHaveCount(0)
   }
   await page.goto('/debrid/settings')
-  const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  const configuration = page.getByRole('form', { name: 'Cache availability', exact: true })
   await openDisclosure(page, 'Private source playback')
   const playback = page.getByRole('form', { name: 'Private source playback', exact: true })
   const source = page.locator('div.border-t').filter({
@@ -336,33 +347,33 @@ test('private playback saves independently and fields have space below their lab
   // Invalid fields in the separate configuration form cannot prevent saving
   // playback settings, and its draft must never be published by that save.
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('0')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('0')
   await selector.selectOption('invalid_announce_url')
   await playback.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(playback.getByRole('alert')).toHaveCount(1)
   await expect(configuration.getByRole('alert')).toHaveCount(0)
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('1')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('1')
   await expect(playback.getByRole('alert')).toHaveCount(1)
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('0')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('0')
   await expect(selector).toHaveValue('invalid_announce_url')
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('0')
   await selector.selectOption('')
   await expect(playback.getByRole('alert')).toHaveCount(0)
   await expect(selector).toHaveValue('')
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('0')
   await selector.selectOption('private_announce_url')
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
   await playback.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(playback.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('0')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('0')
   expect((await (await page.request.get('/api/aiosource')).json()).config.cache_minutes).toBe(
     stored.config.cache_minutes,
   )
   // Saving the other form keeps a pending source edit intact and unpublished.
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('1500')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('1500')
   await source.getByRole('switch', { name: 'Private source' }).uncheck()
   await configuration.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(configuration.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -373,7 +384,7 @@ test('private playback saves independently and fields have space below their lab
   expect(independent.config.trackers['private-playback'].private).toBe(true)
   await source.getByRole('switch', { name: 'Private source' }).check()
   await expect(source.getByRole('switch', { name: 'Private source' })).toBeChecked()
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('1500')
   // The playback draft can save again against the refreshed revision.
   await source.getByRole('switch', { name: 'Private source' }).uncheck()
   await playback.getByRole('button', { name: 'Save', exact: true }).click()
@@ -388,7 +399,7 @@ test('private playback saves independently and fields have space below their lab
   await page.reload()
   await openDisclosure(page, 'Private source playback')
   await expect(selector).toHaveValue('private_announce_url')
-  await expect(page.getByLabel('Announce URL (without passkey)')).toHaveCount(0)
+  await expect(page.getByLabel('Announce URL (without passkey)', { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Passkey secret', { exact: true })).toHaveCount(0)
   const response = await page.request.get('/api/aiosource')
   const body = await response.text()

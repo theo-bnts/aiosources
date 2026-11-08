@@ -25,6 +25,15 @@ for (const width of [390, 1440]) {
       await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
       await expect(toolbar.locator('[data-slot="button"]')).toHaveCount(0)
     }
+    await page.goto('/network/outgoing')
+    const toolbar = page.locator('[data-workspace-toolbar]')
+    const action = toolbar.getByRole('button', { name: 'Add proxy', exact: true })
+    await expect(action).toBeVisible()
+    const tabs = await toolbar.getByRole('tablist').boundingBox()
+    const button = await action.boundingBox()
+    expect(Math.abs(tabs!.y - button!.y)).toBeLessThan(5)
+    await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+    await expect(toolbar.getByRole('button', { name: 'Add proxy', exact: true })).toHaveCount(0)
   })
 }
 

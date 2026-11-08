@@ -19,6 +19,7 @@ import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/compo
 import { FormStatus } from '@/components/form-status'
 import { SecretPicker } from '@/components/secret-picker'
 import { Button } from '@/components/ui/button'
+import { PageActions } from '@/components/page-actions'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -89,7 +90,7 @@ export function NetworkPage() {
   )
   return (
     <div className="page">
-      <div className="flex justify-end">
+      <PageActions>
         <Button
           disabled={!settings || save.isPending || settings.proxies.length >= 32}
           onClick={() => {
@@ -103,7 +104,7 @@ export function NetworkPage() {
           <PlusIcon />
           Add proxy
         </Button>
-      </div>
+      </PageActions>
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       <ErrorNotice error={save.error} retry={() => void query.refetch().then(() => save.reset())} />
       {settings &&
@@ -318,7 +319,12 @@ function ProxyEditor({
             />
           </div>
           <div className="field">
-            <Label htmlFor="proxy-url">Proxy URL</Label>
+            <Label
+              htmlFor="proxy-url"
+              help="Use an address reachable from AIOSources. Keep credentials in Secrets."
+            >
+              Proxy URL
+            </Label>
             <Input
               id="proxy-url"
               required
@@ -330,11 +336,11 @@ function ProxyEditor({
               disabled={save.isPending}
               onChange={(event) => update({ url: event.target.value })}
             />
-            <p className="help">
-              Use an address reachable from AIOSources. Keep credentials in Secrets.
-            </p>
           </div>
-          <Disclosure title="Authentication">
+          <Disclosure
+            title="Authentication"
+            help="Leave both empty if this proxy does not require authentication."
+          >
             <SecretPicker
               label="Username"
               value={draft.username_ref ?? ''}
@@ -353,7 +359,6 @@ function ProxyEditor({
               valueLabel="Proxy password"
               disabled={save.isPending}
             />
-            <p className="help">Leave both empty if this proxy does not require authentication.</p>
           </Disclosure>
           {conflict && (
             <div className="notice notice-warning space-y-3">

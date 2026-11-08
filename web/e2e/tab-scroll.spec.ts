@@ -34,25 +34,26 @@ test('horizontal tab bars have no vertical scroll range on desktop or mobile', a
       await page.goto(path)
       const tabs = page.getByRole('tablist').first()
       await expect(tabs).toBeVisible()
-      const dimensions = await tabs.evaluate((element) => ({
+      const viewport = tabs.locator('..')
+      const dimensions = await viewport.evaluate((element) => ({
         height: element.clientHeight,
         contentHeight: element.scrollHeight,
       }))
       expect(dimensions.contentHeight, `${path} at ${width}px`).toBe(dimensions.height)
-      await tabs.evaluate((element) => {
+      await viewport.evaluate((element) => {
         element.scrollTop = 10
       })
-      expect(await tabs.evaluate((element) => element.scrollTop)).toBe(0)
+      expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0)
       const last = tabs.getByRole('tab').last()
       await last.focus()
       await expect(last).toBeFocused()
-      expect(await tabs.evaluate((element) => element.scrollTop)).toBe(0)
+      expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0)
       await page.evaluate(() => document.fonts.ready)
       await expect
         .poll(() =>
           tabs.evaluate((element) => {
             const active = element.querySelector('[role="tab"][data-state="active"]')!
-            const bar = element.getBoundingClientRect()
+            const bar = element.closest('[data-slot="tabs-scroll"]')!.getBoundingClientRect()
             const tab = active.getBoundingClientRect()
             return tab.left >= bar.left - 1 && tab.right <= bar.right + 1
           }),
@@ -81,7 +82,7 @@ test('opening a secondary view directly reveals its active tab without scrolling
       .poll(() =>
         tabs.evaluate((element) => {
           const active = element.querySelector('[role="tab"][data-state="active"]')!
-          const bar = element.getBoundingClientRect()
+          const bar = element.closest('[data-slot="tabs-scroll"]')!.getBoundingClientRect()
           const tab = active.getBoundingClientRect()
           return tab.left >= bar.left - 1 && tab.right <= bar.right + 1
         }),
@@ -213,4 +214,47 @@ test('catalog pages use the same statistics and settings navigation as other sec
     'aria-selected',
     'true',
   )
+})
+
+test('source stages use a full-width single row and leave room for a visible horizontal scrollbar', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/providers/new')
+  await page
+    .getByRole('row')
+    .filter({ has: page.getByText('HTML', { exact: true }) })
+    .getByRole('button', { name: 'Use this template', exact: true })
+    .click()
+  await page.addStyleTag({
+    content: '[data-slot="tabs-scroll"]::-webkit-scrollbar { height: 16px; width: 16px; }',
+  })
+  const tabs = page.getByRole('tablist', { name: 'Source configuration stages', exact: true })
+  const viewport = tabs.locator('..')
+  await expect(tabs).toHaveAttribute('aria-orientation', 'horizontal')
+  const boxes = await tabs.getByRole('tab').evaluateAll((tabs) =>
+    tabs.map((tab) => ({
+      top: tab.getBoundingClientRect().top,
+      height: tab.getBoundingClientRect().height,
+    })),
+  )
+  expect(new Set(boxes.map((box) => box.top)).size).toBe(1)
+  for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(38)
+  const dimensions = await viewport.evaluate((element) => ({
+    height: element.clientHeight,
+    contentHeight: element.scrollHeight,
+    width: element.clientWidth,
+    contentWidth: element.scrollWidth,
+  }))
+  expect(dimensions.contentWidth).toBeGreaterThan(dimensions.width)
+  expect(dimensions.contentHeight).toBe(dimensions.height)
+  const last = tabs.getByRole('tab').last()
+  await last.click()
+  await expect(last).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+  await viewport.evaluate((element) => {
+    element.scrollTop = 10
+  })
+  expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

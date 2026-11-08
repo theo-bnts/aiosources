@@ -29,7 +29,7 @@ test('source setting sections save independently and folding preserves both draf
   const initial = await (await page.request.get('/api/settings/collections')).json()
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
-  const imports = page.getByRole('form', { name: 'Import execution', exact: true })
+  const imports = page.getByRole('form', { name: 'Concurrency', exact: true })
   await imports.getByLabel('Simultaneous imports', { exact: true }).fill('7')
   await openDisclosure(page, 'Temporary source errors')
   const retries = page.getByRole('form', { name: 'Temporary source errors', exact: true })

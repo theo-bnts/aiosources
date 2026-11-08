@@ -111,7 +111,9 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
   const interval = page.getByLabel('Book information update interval (minutes)', { exact: true })
   await expect(interval).toHaveValue('15')
   await interval.fill('5')
-  const save = page.locator('main form').first().getByRole('button', { name: 'Save', exact: true })
+  const save = page
+    .getByRole('form', { name: 'Books automatic updates', exact: true })
+    .getByRole('button', { name: 'Save', exact: true })
   await save.click()
   await expect(save).toBeDisabled()
   await page.reload()

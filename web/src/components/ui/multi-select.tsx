@@ -1,6 +1,7 @@
 import { DropdownMenu } from 'radix-ui'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckIcon, CaretDownIcon } from '@phosphor-icons/react'
+import { popupLayer } from '@/lib/popup-layer'
 import { Button } from '@/components/ui/button'
 
 export type MultiSelectOption = { value: string; label: string; group?: string }
@@ -14,6 +15,7 @@ export function MultiSelect({
   options,
   onChange,
   name,
+  disabled = false,
 }: {
   id: string
   label: string
@@ -22,8 +24,13 @@ export function MultiSelect({
   options: MultiSelectOption[]
   onChange: (value: string[]) => void
   name?: string
+  disabled?: boolean
 }) {
   const trigger = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (disabled) setOpen(false)
+  }, [disabled])
   const [insideDialog, setInsideDialog] = useState(false)
   const [topBoundary, setTopBoundary] = useState(8)
   const selected = value.length
@@ -32,15 +39,19 @@ export function MultiSelect({
   const groups = [...new Set(options.map((option) => option.group ?? ''))]
   return (
     <>
-      {name && value.map((item) => <input key={item} type="hidden" name={name} value={item} />)}
+      {name &&
+        value.map((item) => (
+          <input key={item} type="hidden" name={name} value={item} disabled={disabled} />
+        ))}
       <DropdownMenu.Root
         modal={false}
+        open={!disabled && open}
         onOpenChange={(open) => {
+          setOpen(open && !disabled)
           if (!open) return
-          const modal = Boolean(trigger.current?.closest('[role="dialog"], [role="alertdialog"]'))
-          setInsideDialog(modal)
-          const header = document.querySelector('[data-app-shell] header')
-          setTopBoundary(modal ? 8 : Math.max(8, (header?.getBoundingClientRect().bottom ?? 0) + 8))
+          const layer = popupLayer(trigger.current)
+          setInsideDialog(layer.dialog)
+          setTopBoundary(layer.top)
         }}
       >
         <DropdownMenu.Trigger asChild>
@@ -49,6 +60,7 @@ export function MultiSelect({
             ref={trigger}
             aria-label={label}
             type="button"
+            disabled={disabled}
             variant="outline"
             className="min-w-0 w-full max-w-full justify-between py-1 font-normal"
           >

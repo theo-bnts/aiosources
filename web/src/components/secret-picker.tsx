@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { compareListNames } from '@/lib/list-view'
 import { newSecretReference } from '@/lib/secret-reference'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -35,6 +35,7 @@ async function latestSecret(reference: string) {
 // Replacements retain the selected reference and require its observed revision.
 export function SecretPicker({
   label,
+  help,
   value,
   onChange,
   prefix,
@@ -47,6 +48,7 @@ export function SecretPicker({
   inputId,
 }: {
   label: string
+  help?: ReactNode
   value: string
   onChange: (reference: string) => void
   prefix: string
@@ -127,7 +129,9 @@ export function SecretPicker({
   const entries = [...(secrets.data?.items ?? [])].sort(compareListNames)
   return (
     <div className="field min-w-0 grid-cols-1">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} help={help}>
+        {label}
+      </Label>
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
         <select
           id={id}

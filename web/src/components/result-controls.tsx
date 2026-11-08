@@ -24,7 +24,10 @@ export function ResultSorting({
     (field) => (language || field.value !== 'language') && (sources || field.value !== 'source'),
   )
   return (
-    <Disclosure title="Sorting">
+    <Disclosure
+      title="Sorting"
+      help={`Rules apply from top to bottom. Descending puts cached results, preferred languages and larger sizes first. Without custom rules: ${defaultOrder}.`}
+    >
       <div className="space-y-4">
         {[0, 1, 2].map((index) => {
           const rule = value[index]
@@ -92,10 +95,6 @@ export function ResultSorting({
           )
         })}
       </div>
-      <p className="help">
-        Rules apply from top to bottom. Descending puts cached results, preferred languages and
-        larger sizes first. Without custom rules: {defaultOrder}.
-      </p>
     </Disclosure>
   )
 }
@@ -105,16 +104,18 @@ export function ResponseTimeout({
   onChange,
   stream = true,
   disabled = false,
+  help,
 }: {
   value?: number
   onChange: (value?: number) => void
   stream?: boolean
   disabled?: boolean
+  help?: string
 }) {
   const id = useId()
   return (
     <div className="field min-w-0">
-      <Label htmlFor={id}>
+      <Label htmlFor={id} help={help}>
         {stream ? 'Stream response timeout (seconds)' : 'Response timeout (seconds)'}
       </Label>
       <Input
@@ -196,7 +197,18 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
     <div className="space-y-4">
       <div className="grid items-start gap-4 sm:grid-cols-2">
         <div className="field min-w-0">
-          <Label htmlFor={`${id}-results`}>Maximum results</Label>
+          <Label
+            htmlFor={`${id}-results`}
+            help={
+              value.cached_only
+                ? 'Only the cached limit applies. The general limit is kept for later.'
+                : cache
+                  ? 'Limits returned results and candidates for new cache checks.'
+                  : 'Limits apply across all pages.'
+            }
+          >
+            Maximum results
+          </Label>
           <Input
             id={`${id}-results`}
             type="number"
@@ -212,7 +224,18 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
           />
         </div>
         <div className="field min-w-0">
-          <Label htmlFor={`${id}-cached`}>Maximum cached results</Label>
+          <Label
+            htmlFor={`${id}-cached`}
+            help={
+              localOnly
+                ? 'Only saved checks are used. The cached limit applies with Cached results only.'
+                : cache
+                  ? 'The cached limit stops new checks; local observations are reused and unchecked results stay Unknown.'
+                  : 'The cached limit applies only with Cached results only.'
+            }
+          >
+            Maximum cached results
+          </Label>
           <Input
             id={`${id}-cached`}
             type="number"
@@ -232,22 +255,15 @@ export function ResultLimits<T extends ResultPreferences & { cached_only?: boole
           onChange={(response_seconds) => onChange({ ...value, response_seconds })}
           stream={cache}
           disabled={localOnly}
+          help={
+            localOnly
+              ? 'The availability timeout is kept for later. The instance request deadline still applies.'
+              : cache
+                ? 'Limits availability checks, within the instance request deadline.'
+                : 'Can shorten the instance request deadline for this connection.'
+          }
         />
       </div>
-      <p className="help">
-        {value.cached_only
-          ? 'Only the cached limit applies. The general limit is kept for later.'
-          : localOnly
-            ? 'Only saved checks are used. Maximum results applies; the cached limit is kept for use with Cached results only.'
-            : cache
-              ? 'The cached limit stops new checks; local observations are reused and unchecked results stay Unknown. Maximum results also limits candidates for new checks.'
-              : 'Limits apply across all pages. The cached limit applies only with Cached results only.'}{' '}
-        {localOnly
-          ? 'The availability timeout is kept for later. The instance request deadline still applies.'
-          : cache
-            ? 'The timeout limits availability checks, within the instance request deadline.'
-            : 'The timeout can shorten the instance request deadline for this connection.'}
-      </p>
     </div>
   )
 }

@@ -687,7 +687,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
           setSearch(next, { replace: true })
         }}
       >
-        <TabsList className="grid w-full grid-cols-2 group-data-[orientation=horizontal]/tabs:h-auto sm:flex sm:w-fit">
+        <TabsList>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="changes">Published changes</TabsTrigger>
           <TabsTrigger value="raw">Processed records</TabsTrigger>

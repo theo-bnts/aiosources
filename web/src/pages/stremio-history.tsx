@@ -27,6 +27,7 @@ import { Statistic } from '@/components/statistic'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Disclosure } from '@/components/ui/disclosure'
 import {
   Table,
   TableBody,
@@ -93,11 +94,6 @@ export function StremioStatisticsPage() {
           <>
             <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Statistic
-                label="Retained requests"
-                value={query.data.requests}
-                to="/addon/history"
-              />
-              <Statistic
                 label="Results returned"
                 value={query.data.results}
                 to="/addon/history?status=results"
@@ -116,11 +112,21 @@ export function StremioStatisticsPage() {
               />
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />
             </dl>
-            <p className="help">
-              Statistics cover the retained history: up to 10,000 requests within the configured
-              retention period. Request IDs continue increasing after older entries are removed.
-              {query.data.since && ` Oldest request: ${date(query.data.since)}.`}
-            </p>
+            <Disclosure
+              title="History details"
+              help="Statistics cover the retained history: up to 10,000 requests within the configured retention period. Request IDs continue increasing after older entries are removed."
+            >
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <Statistic
+                  label="Retained requests"
+                  value={query.data.requests}
+                  to="/addon/history"
+                />
+                {query.data.since && (
+                  <Statistic label="Oldest request" value={date(query.data.since)} size="sm" />
+                )}
+              </dl>
+            </Disclosure>
             {query.data.requests === 0 && (
               <Empty
                 title="No Stremio requests yet"

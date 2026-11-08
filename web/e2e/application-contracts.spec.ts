@@ -260,7 +260,7 @@ test('debrid drafts require review before adopting another writer after a separa
     ).status(),
   ).toBe(204)
   await page.goto('/debrid/settings')
-  const configuration = page.getByRole('form', { name: 'Debrid configuration', exact: true })
+  const configuration = page.getByRole('form', { name: 'Cache availability', exact: true })
   await openDisclosure(page, 'Private source playback')
   const playback = page.getByRole('form', { name: 'Private source playback', exact: true })
   // The fixture has no enabled source; a private-playback draft changes only

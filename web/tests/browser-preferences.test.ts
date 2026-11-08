@@ -46,3 +46,16 @@ test('UTC date inputs retain the exact saved instant and unchanged fractional se
     saveBrowserPreferences(defaultBrowserPreferences)
   }
 })
+
+test('retired numeric date display falls back to browser language without changing other preferences', () => {
+  assert.deepEqual(
+    normalizeBrowserPreferences({
+      pageSize: 25,
+      refresh: 'reduced',
+      timeZone: 'utc',
+      dateFormat: 'iso',
+    }),
+    { pageSize: 25, refresh: 'reduced', timeZone: 'utc', dateFormat: 'browser' },
+  )
+  assert.equal(normalizeBrowserPreferences({ dateFormat: 'english' }).dateFormat, 'english')
+})

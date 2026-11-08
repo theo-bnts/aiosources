@@ -89,7 +89,25 @@ export function StorageSettingsPanel() {
               }}
             >
               <div className="max-w-xl space-y-2">
-                <Label htmlFor="storage-mode">Stored torrent information</Label>
+                <Label
+                  htmlFor="storage-mode"
+                  help={
+                    <>
+                      <p>
+                        Storage saving keeps identifiers and release/playback information used by
+                        AIOSources and AIOStreams. Unused source details and successful record
+                        diagnostics are omitted; errors, run history and information used for
+                        identification are retained.
+                      </p>
+                      <p>
+                        Applies to imports started after saving. Existing imports keep their mode,
+                        and previously stored data is not reduced automatically.
+                      </p>
+                    </>
+                  }
+                >
+                  Stored torrent information
+                </Label>
                 <select
                   className="native-select w-full"
                   id="storage-mode"
@@ -106,16 +124,6 @@ export function StorageSettingsPanel() {
                   <option value="compact">Storage saving (recommended)</option>
                   <option value="full">All mapped fields</option>
                 </select>
-                <p className="help">
-                  Storage saving keeps identifiers and release/playback information used by
-                  AIOSources and AIOStreams. Unused source details and successful record diagnostics
-                  are omitted; errors, run history and information used for identification are
-                  retained.
-                </p>
-                <p className="help">
-                  Applies to imports started after saving. Existing imports keep their mode, and
-                  previously stored data is not reduced automatically.
-                </p>
               </div>
               <ErrorNotice error={save.error} />
               {conflict && (
@@ -151,6 +159,7 @@ export function StorageSettingsPanel() {
           title="Maintenance"
           open={maintenanceOpen}
           onOpenChange={setMaintenanceOpen}
+          help="Optional: start over to reclaim space used by previously stored source data. Queued and paused imports are removed with their data."
         >
           <ConfirmAction
             variant="destructive"
@@ -162,16 +171,12 @@ export function StorageSettingsPanel() {
               <Button
                 variant="destructive"
                 disabled={Boolean(resetUnavailableReason)}
-                aria-describedby="source-data-reset-help source-data-reset-status"
+                aria-describedby={resetUnavailableReason ? 'source-data-reset-status' : undefined}
               >
                 Reset all source data
               </Button>
             }
           />
-          <p className="help" id="source-data-reset-help">
-            Optional: start over to reclaim space used by previously stored source data. Queued and
-            paused imports are removed with their data.
-          </p>
           <p
             className={resetUnavailableReason ? 'help text-warning-foreground' : 'sr-only'}
             id="source-data-reset-status"

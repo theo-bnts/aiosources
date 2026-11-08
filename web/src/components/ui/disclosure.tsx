@@ -1,12 +1,15 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { CaretRightIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
+import { InfoTip } from '@/components/ui/info-tip'
 
 type DisclosureProps = Omit<ComponentProps<'details'>, 'title' | 'children'> & {
   title: ReactNode
   children: ReactNode
   variant?: 'card' | 'inline'
   onOpenChange?: (open: boolean) => void
+  help?: ReactNode
+  helpLabel?: string
 }
 
 export function Disclosure({
@@ -15,6 +18,8 @@ export function Disclosure({
   variant = 'card',
   className,
   onOpenChange,
+  help,
+  helpLabel,
   ...props
 }: DisclosureProps) {
   const inline = variant === 'inline'
@@ -46,7 +51,14 @@ export function Disclosure({
         )}
       >
         <CaretRightIcon aria-hidden="true" className="size-3 shrink-0 transition-transform" />
-        <span className="min-w-0 flex-1 break-words">{title}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="min-w-0 break-words">{title}</span>
+          {help && (
+            <InfoTip label={helpLabel ?? (typeof title === 'string' ? title : 'this section')}>
+              {help}
+            </InfoTip>
+          )}
+        </span>
       </summary>
       <div
         data-slot="disclosure-content"

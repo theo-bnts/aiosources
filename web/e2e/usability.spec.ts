@@ -70,7 +70,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   const original = await configuration(page)
   const form = page.getByRole('form', { name: 'Debrid configuration', exact: true })
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('1500')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('1500')
   await storeCredential(page, 'Add AllDebrid key', 'AllDebrid API key', 'synthetic-ad-key')
   const ad = await page.getByLabel('AllDebrid API key', { exact: true }).inputValue()
   expect(ad).toMatch(/^alldebrid_api_key_[a-f0-9]{32}$/)
@@ -78,7 +78,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
     page.getByRole('button', { name: 'Replace AllDebrid key', exact: true }),
   ).toBeEnabled()
   expect(await configuration(page)).toEqual(original)
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('1500')
   // The server commits the secret, but its response is lost. Retrying must use
   // the same fresh reference, without saving the parent form or creating orphans.
   let loseResponse = true
@@ -107,13 +107,17 @@ test('inline credentials stay encrypted, retry one owned reference and require a
   const saved = await configuration(page)
   expect(saved.alldebrid_secret).toBe(ad)
   expect(saved.torbox_secret).toMatch(/^torbox_api_key_[a-f0-9]{32}$/)
-  expect(saved.cache_minutes).toBe(1500)
+  expect(saved.cache_minutes).toBe(original.cache_minutes)
+  const availability = page.getByRole('form', { name: 'Cache availability', exact: true })
+  await availability.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(availability.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect((await configuration(page)).cache_minutes).toBe(1500)
   expect(JSON.stringify(await (await page.request.get('/api/secrets')).json())).not.toContain(
     'synthetic-',
   )
   await page.goto('/metadata/videos/settings')
   // A synthetic credential must never initiate a real TMDB download.
-  await page.getByLabel('Automatically update film & series information').uncheck()
+  await page.getByLabel('Automatically update film & series information', { exact: true }).uncheck()
   await openDisclosure(page, 'Manual actions')
   await storeCredential(page, 'Add TMDB token', 'TMDB read access token', 'synthetic-tmdb-token')
   await expect(
@@ -163,7 +167,7 @@ test('full announce URLs added inline keep playback and debrid drafts independen
   await openDisclosure(page, 'Private source playback')
   const original = await configuration(page)
   await openDisclosure(page, 'Cache availability')
-  await page.getByLabel('Cache validity (minutes)').fill('1500')
+  await page.getByLabel('Cache validity (minutes)', { exact: true }).fill('1500')
   await storeCredential(
     page,
     'Add announce URL',
@@ -178,7 +182,7 @@ test('full announce URLs added inline keep playback and debrid drafts independen
   const saved = await configuration(page)
   expect(saved.trackers['inline-private'].announce_secret).toBe(reference)
   expect(saved.cache_minutes).toBe(original.cache_minutes)
-  await expect(page.getByLabel('Cache validity (minutes)')).toHaveValue('1500')
+  await expect(page.getByLabel('Cache validity (minutes)', { exact: true })).toHaveValue('1500')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
@@ -315,7 +319,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await page.getByLabel('Daily time', { exact: true }).fill('02:30')
   await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue('Europe/Paris')
   await page.getByText('Collection policy', { exact: true }).click()
-  await page.getByLabel('Page budget per tick').fill('12')
+  await page.getByLabel('Page budget per tick', { exact: true }).fill('12')
   await save.click()
   await expect(save).toBeDisabled()
   let saved = (await source(page, 'simple-schedule')).provider.schedule
@@ -338,7 +342,7 @@ test('source schedules preserve daily times, exact custom expressions and bounde
   await page.reload()
   await expect(page.getByLabel('Cron expression', { exact: true })).toHaveValue(custom)
   await page.getByText('Collection policy', { exact: true }).click()
-  await page.getByLabel('Page budget per tick').fill('13')
+  await page.getByLabel('Page budget per tick', { exact: true }).fill('13')
   await save.click()
   await expect(save).toBeDisabled()
   saved = (await source(page, 'simple-schedule')).provider.schedule
@@ -373,7 +377,7 @@ test('source schedule conflicts merge untouched controls while preserving local 
   const original = await source(page, 'schedule-conflict')
   await page.goto('/providers/schedule-conflict#schedules')
   await page.getByText('Collection policy', { exact: true }).click()
-  await page.getByLabel('Page budget per tick').fill('12')
+  await page.getByLabel('Page budget per tick', { exact: true }).fill('12')
   const session = await (await page.request.get('/api/session')).json()
   expect(
     (
@@ -394,7 +398,7 @@ test('source schedule conflicts merge untouched controls while preserving local 
   await page.getByRole('button', { name: 'Merge my field edits', exact: true }).click()
   await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue('America/New_York')
   await expect(page.getByLabel('Known-page boundary', { exact: true })).toHaveValue('9')
-  await expect(page.getByLabel('Page budget per tick')).toHaveValue('12')
+  await expect(page.getByLabel('Page budget per tick', { exact: true })).toHaveValue('12')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect((await source(page, 'schedule-conflict')).provider.schedule).toMatchObject({

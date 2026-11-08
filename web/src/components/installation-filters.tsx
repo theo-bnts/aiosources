@@ -57,11 +57,17 @@ export function InstallationFilters({
       />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <Label htmlFor={`${id}-saved-cache`}>Use saved cache checks only</Label>
-          <p className="help mt-1">
-            Listing results does not contact debrid services. Missing or expired checks stay
-            Unknown. Playback still contacts your selected service.
-          </p>
+          <Label
+            htmlFor={`${id}-saved-cache`}
+            help={
+              <>
+                Listing results does not contact debrid services. Missing or expired checks stay
+                Unknown. Playback still contacts your selected service.
+              </>
+            }
+          >
+            Use saved cache checks only
+          </Label>
         </div>
         <Switch
           id={`${id}-saved-cache`}
@@ -71,13 +77,18 @@ export function InstallationFilters({
       </div>
       {children}
       <ResultLimits value={value} onChange={onChange} cache localOnly={value.skip_cache_check} />
-      {showHelp && (
-        <p className="help">
-          Filters belong to this link. Copy or install a separate link for each configuration;
-          changing these controls does not change existing installations.
-        </p>
-      )}
     </div>
   )
-  return <Disclosure title="Filters">{fields}</Disclosure>
+  return (
+    <Disclosure
+      title="Filters"
+      help={
+        showHelp
+          ? 'Filters belong to this link. Copy or install a separate link for each configuration; changing these controls does not change existing installations.'
+          : undefined
+      }
+    >
+      {fields}
+    </Disclosure>
+  )
 }

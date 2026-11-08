@@ -56,16 +56,6 @@ export function useDate() {
       if (!value) return 'Not provided'
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) return value
-      if (preferences.dateFormat === 'iso') {
-        const date =
-          preferences.timeZone === 'utc'
-            ? parsed
-            : new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000)
-        return (
-          date.toISOString().slice(0, 16).replace('T', ' ') +
-          (preferences.timeZone === 'utc' ? ' UTC' : '')
-        )
-      }
       return dates.format(parsed)
     }
   }, [preferences])

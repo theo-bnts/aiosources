@@ -1,7 +1,7 @@
 import { useSettingDestination } from '@/lib/settings-navigation'
 import { useLocation } from 'react-router-dom'
 import { useNotification } from '@/lib/notifications'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import {
   FingerprintIcon,
   GlobeIcon,
@@ -22,6 +22,8 @@ import { timingMode, type TimingMode } from '@/lib/schedule-input'
 import { Switch } from '@/components/ui/switch'
 import { isJSONAdapter } from '@/lib/source-adapters'
 import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { InfoTip } from '@/components/ui/info-tip'
 import { CodeEditor } from '@/components/code-editor'
 import {
   HTMLMappingSettings,
@@ -1258,7 +1260,6 @@ export function SourceEditor({
     onModeChange('visual')
     // Run once per requested destination; normal stage clicks keep their behavior.
   }, [destination, location.key])
-  const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
   const reportDraft = useCallback((key: string, invalid: boolean) => {
     setDrafts((previous) => {
@@ -1390,96 +1391,44 @@ export function SourceEditor({
             </p>
           </>
         ) : (
-          <div className="grid overflow-hidden rounded-md border border-border bg-card/30 lg:grid-cols-[255px_minmax(0,1fr)]">
-            <aside className="border-b border-border bg-background/45 p-4 lg:border-r lg:border-b-0 lg:p-5">
-              <div className="mb-5 flex items-center justify-between gap-2">
-                <h2 className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                  Source stages
-                </h2>
-                <span className="mono text-primary">
+          <Tabs
+            value={current.id}
+            onValueChange={(value) => {
+              if (drafts.size === 0)
+                setSelected(sourceStages.findIndex((stage) => stage.id === value))
+            }}
+            className="min-w-0 gap-4"
+          >
+            <TabsList aria-label="Source configuration stages">
+              {sourceStages.map((stage, index) => {
+                const Icon = stage.icon
+                return (
+                  <TabsTrigger
+                    key={stage.id}
+                    value={stage.id}
+                    id={`${id}-${stage.id}`}
+                    aria-controls={`${id}-panel`}
+                    disabled={drafts.size > 0 && selected !== index}
+                  >
+                    <Icon aria-hidden="true" />
+                    {stage.label}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+            <TabsContent
+              value={current.id}
+              id={`${id}-panel`}
+              aria-labelledby={`${id}-${current.id}`}
+              className="min-w-0 rounded-md border border-border bg-card p-4 sm:p-6"
+            >
+              <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="mono">
                   {String(selected + 1).padStart(2, '0')} /{' '}
                   {String(sourceStages.length).padStart(2, '0')}
                 </span>
+                <InfoTip label={`${current.label} stage`}>{summaries[selected]}</InfoTip>
               </div>
-              <div
-                role="tablist"
-                aria-label="Source configuration stages"
-                aria-orientation="vertical"
-                className="space-y-0"
-              >
-                {sourceStages.map((stage, index) => {
-                  const Icon = stage.icon
-                  return (
-                    <div key={stage.id}>
-                      {index > 0 && (
-                        <div
-                          className="ml-[25px] h-3 w-px bg-primary/35 lg:h-6"
-                          aria-hidden="true"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-label={stage.label}
-                        id={`${id}-${stage.id}`}
-                        aria-controls={`${id}-panel`}
-                        aria-selected={selected === index}
-                        tabIndex={selected === index ? 0 : -1}
-                        ref={(element) => {
-                          buttons.current[index] = element
-                        }}
-                        disabled={drafts.size > 0 && selected !== index}
-                        className={`flex min-h-(--control-height) w-full items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors disabled:opacity-50 ${selected === index ? 'border-primary/60 bg-primary/8' : 'border-border bg-card/70 hover:border-primary/30 hover:bg-accent'}`}
-                        onClick={() => setSelected(index)}
-                        onKeyDown={(event) => {
-                          if (drafts.size > 0) return
-                          const next =
-                            event.key === 'ArrowDown' || event.key === 'ArrowRight'
-                              ? (index + 1) % sourceStages.length
-                              : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
-                                ? (index + sourceStages.length - 1) % sourceStages.length
-                                : event.key === 'Home'
-                                  ? 0
-                                  : event.key === 'End'
-                                    ? sourceStages.length - 1
-                                    : -1
-                          if (next >= 0) {
-                            event.preventDefault()
-                            setSelected(next)
-                            buttons.current[next]?.focus({ preventScroll: true })
-                          }
-                        }}
-                      >
-                        <span
-                          className={`flex size-7 shrink-0 items-center justify-center rounded border ${selected === index ? 'border-primary/40 text-primary' : 'border-border text-muted-foreground'}`}
-                        >
-                          <Icon size={17} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium">{stage.label}</span>
-                          <span
-                            className={`mt-1 break-words text-xs leading-5 text-muted-foreground ${selected === index ? 'block' : 'hidden lg:block'}`}
-                          >
-                            {summaries[index]}
-                          </span>
-                        </span>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="help mt-6 hidden lg:block">
-                Select a stage to configure it. Connections show the fixed collection sequence, not
-                custom execution logic.
-              </p>
-            </aside>
-            <section
-              role="tabpanel"
-              id={`${id}-panel`}
-              aria-labelledby={`${id}-${current.id}`}
-              tabIndex={0}
-              className="min-w-0 p-5 sm:p-6"
-            >
               <fieldset disabled={readOnly} className="min-w-0 space-y-7 disabled:opacity-60">
                 <legend className="sr-only">{current.label} settings</legend>
                 {selected === 0 && <IdentitySettings sourceID={sourceID} />}
@@ -1489,8 +1438,8 @@ export function SourceEditor({
                 {selected === 4 && <CollectionSettings />}
                 {selected === 5 && <SourceScheduleSettings />}
               </fieldset>
-            </section>
-          </div>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </SourceEditorContext.Provider>

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Switch } from '@/components/ui/switch'
 import { SecretPicker } from '@/components/secret-picker'
 import { FormStatus } from '@/components/form-status'
@@ -23,7 +24,22 @@ import type { Config, Controls, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
 import { metadataSections, type MetadataSection } from '@/lib/metadata-navigation'
 
-type FormScope = MetadataSection | 'debrid' | 'trackers'
+type MainScope = MetadataSection | 'debrid'
+type FormScope =
+  | MainScope
+  | 'trackers'
+  | 'book-catalog'
+  | 'cache-availability'
+  | 'videos-updates'
+  | 'books-updates'
+  | 'identification-updates'
+  | 'videos-requests'
+const sectionForms: Record<MainScope, FormScope[]> = {
+  videos: ['videos', 'videos-updates', 'videos-requests'],
+  books: ['books', 'book-catalog', 'books-updates'],
+  identification: ['identification', 'identification-updates'],
+  debrid: ['debrid', 'cache-availability'],
+}
 type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
   trackers?: Record<string, Partial<Tracker>>
 }
@@ -47,10 +63,21 @@ function applyChanges(base: Config, changes: Changes): Config {
   }
   return value
 }
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({
+  title,
+  help,
+  children,
+}: {
+  title: string
+  help?: ReactNode
+  children: ReactNode
+}) {
   return (
     <section className="section-card">
-      <h2 className="section-title">{title}</h2>
+      <div className="flex items-center gap-1.5">
+        <h2 className="section-title">{title}</h2>
+        {help && <InfoTip label={title}>{help}</InfoTip>}
+      </div>
       {children}
     </section>
   )
@@ -85,8 +112,19 @@ export default function AIOSourcePage({
   >({})
   const metadata = section === 'videos' || section === 'books' || section === 'identification'
   const scope = section === 'stremio' ? 'debrid' : section
-  const draft = drafts[scope]
-  const config = draft ? applyChanges(draft.base, draft.changes) : query.data?.config
+  const formConfig = (form: FormScope) => {
+    const draft = drafts[form]
+    return draft ? applyChanges(draft.base, draft.changes) : query.data?.config
+  }
+  const config = formConfig(scope)
+  const forms = sectionForms[scope]
+  const dirty = forms.some((form) => Boolean(drafts[form]))
+  const automaticScope =
+    section === 'books'
+      ? 'books-updates'
+      : section === 'identification'
+        ? 'identification-updates'
+        : 'videos-updates'
   const trackersDraft = drafts.trackers
   const trackersConfig = trackersDraft
     ? applyChanges(trackersDraft.base, trackersDraft.changes)
@@ -135,12 +173,9 @@ export default function AIOSourcePage({
         (feedback[form]?.error instanceof ApiError && feedback[form]?.error.status === 409)),
     )
   useUnsavedChanges(
-    Boolean(
-      draft &&
-      JSON.stringify(applyChanges(draft.base, draft.changes)) !== JSON.stringify(draft.base),
-    ),
+    dirty,
     metadata ? `${metadataSections[section].label.toLowerCase()} settings` : 'debrid settings',
-    save.isPending && save.variables?.scope === scope,
+    save.isPending && forms.includes(save.variables?.scope),
   )
   useUnsavedChanges(
     Boolean(
@@ -214,10 +249,11 @@ export default function AIOSourcePage({
       return next
     })
   }
-  const secret = (label: string, key: 'tmdb_secret' | DebridSecret) => (
+  const secret = (label: string, key: 'tmdb_secret' | DebridSecret, help?: ReactNode) => (
     <SecretPicker
       inputId={key}
       label={label}
+      help={help}
       value={config?.[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
       prefix={key === 'tmdb_secret' ? 'tmdb_api_token' : `${key.replace('_secret', '')}_api_key`}
@@ -237,9 +273,13 @@ export default function AIOSourcePage({
       | 'openlibrary_minutes',
     min: number,
     max: number,
+    form: FormScope = scope,
+    help?: ReactNode,
   ) => (
     <div className="field">
-      <Label htmlFor={key}>{label}</Label>
+      <Label htmlFor={key} help={help}>
+        {label}
+      </Label>
       <Input
         id={key}
         type="number"
@@ -247,24 +287,29 @@ export default function AIOSourcePage({
         required
         min={min}
         max={max}
-        value={config?.[key] ?? ''}
-        onChange={(e) => update(scope, { [key]: e.target.valueAsNumber })}
+        value={formConfig(form)?.[key] ?? ''}
+        onChange={(e) => update(form, { [key]: e.target.valueAsNumber })}
       />
     </div>
   )
   const toggle = (
     label: string,
     key: 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
+    form: FormScope = scope,
+    help?: ReactNode,
   ) => (
-    <label className="flex items-center gap-3 text-sm">
-      <Switch
-        aria-label={label}
-        checked={config?.[key] ?? false}
-        disabled={save.isPending}
-        onCheckedChange={(checked) => update(scope, { [key]: checked })}
-      />
-      {label}
-    </label>
+    <div className="flex items-center gap-1.5">
+      <label className="flex items-center gap-3 text-sm">
+        <Switch
+          aria-label={label}
+          checked={formConfig(form)?.[key] ?? false}
+          disabled={save.isPending}
+          onCheckedChange={(checked) => update(form, { [key]: checked })}
+        />
+        {label}
+      </label>
+      {help && <InfoTip label={label}>{help}</InfoTip>}
+    </div>
   )
   if (query.isPending)
     return (
@@ -300,7 +345,13 @@ export default function AIOSourcePage({
       <div className="flex flex-wrap items-center gap-4 border-t pt-5">
         <Button
           type="submit"
-          disabled={!drafts[form] || save.isPending || review.isPending || conflict(form)}
+          disabled={
+            !drafts[form] ||
+            save.isPending ||
+            review.isPending ||
+            conflict(form) ||
+            (form === 'book-catalog' && (Boolean(status.books?.running) || resetting))
+          }
         >
           {save.isPending && save.variables?.scope === form ? 'Saving…' : 'Save'}
         </Button>
@@ -323,100 +374,165 @@ export default function AIOSourcePage({
     </>
   )
   const settingsForm = (
-    <form
-      aria-label={
-        metadata ? `${metadataSections[section].label} configuration` : 'Debrid configuration'
-      }
-      onSubmit={(e) => {
-        e.preventDefault()
-        submit(scope)
-      }}
-    >
-      <fieldset disabled={save.isPending} className="min-w-0 space-y-5">
-        <Panel
-          title={
-            metadata
-              ? section === 'identification'
-                ? 'Automatic identification'
-                : 'Information settings'
-              : 'Debrid settings'
-          }
-        >
-          {section === 'videos' && (
-            <div className="grid gap-5 md:grid-cols-2">
-              {secret('TMDB read access token', 'tmdb_secret')}
-            </div>
-          )}
-          {section === 'books' && (
-            <div className="space-y-5">
-              <p className="help">
-                Open Library supplies book and audiobook information without an API key. The first
-                import can take hours; later updates follow recent changes. Cover images stay
-                remote.
-              </p>
-            </div>
-          )}
-          {section === 'debrid' && (
-            <div className="grid gap-5 md:grid-cols-2">
-              {debridProviders.map((provider) => (
-                <div key={provider.id} className="min-w-0 space-y-2">
-                  {secret(`${provider.name} API key`, provider.secret)}
-                  {'hint' in provider && <p className="help">{provider.hint}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-          {section === 'videos' &&
-            toggle('Automatically update film & series information', 'auto_sync')}
-          {section === 'books' &&
-            toggle('Automatically update book information', 'openlibrary_enabled')}
-          {section === 'identification' && toggle('Automatically identify torrents', 'auto_match')}
-        </Panel>
+    <>
+      <form
+        aria-label={
+          metadata ? `${metadataSections[section].label} configuration` : 'Debrid configuration'
+        }
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit(scope)
+        }}
+      >
+        <fieldset disabled={save.isPending} className="min-w-0 space-y-5">
+          <Panel
+            title={
+              metadata
+                ? section === 'identification'
+                  ? 'Automatic identification'
+                  : 'Information settings'
+                : 'Debrid settings'
+            }
+            help={
+              section === 'books'
+                ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
+                : undefined
+            }
+          >
+            {section === 'videos' && (
+              <div className="grid gap-5 md:grid-cols-2">
+                {secret('TMDB read access token', 'tmdb_secret')}
+              </div>
+            )}
+            {section === 'debrid' && (
+              <div className="grid gap-5 md:grid-cols-2">
+                {debridProviders.map((provider) => (
+                  <div key={provider.id} className="min-w-0 space-y-2">
+                    {secret(
+                      `${provider.name} API key`,
+                      provider.secret,
+                      'hint' in provider ? provider.hint : undefined,
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {section === 'videos' &&
+              toggle('Automatically update film & series information', 'auto_sync')}
+            {section === 'books' &&
+              toggle('Automatically update book information', 'openlibrary_enabled')}
+            {section === 'identification' &&
+              toggle('Automatically identify torrents', 'auto_match')}
+            {footer(scope)}
+          </Panel>
+        </fieldset>
+      </form>
+      <SettingsSections>
         {section === 'debrid' && (
           <Disclosure title="Cache availability">
-            {number('Cache validity (minutes)', 'cache_minutes', 5, 43200)}
-            <div className="space-y-2">
-              {toggle('Automatically recheck availability', 'auto_cache')}
-              <p className="help">
-                Retry incomplete checks made with your configured accounts while their cache window
-                remains valid. Public visitors are never rechecked in the background. Temporary-item
-                cleanup remains active.
-              </p>
-            </div>
+            <form
+              aria-label="Cache availability"
+              className="space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submit('cache-availability')
+              }}
+            >
+              {number('Cache validity (minutes)', 'cache_minutes', 5, 43200, 'cache-availability')}
+              {toggle(
+                'Automatically recheck availability',
+                'auto_cache',
+                'cache-availability',
+                'Retry incomplete checks made with your configured accounts while their cache window remains valid. Public visitors are never rechecked in the background. Temporary-item cleanup remains active.',
+              )}
+              {footer('cache-availability')}
+            </form>
           </Disclosure>
         )}
         {section === 'books' && (
-          <BookImportFilters
-            value={config}
-            onChange={(patch) => update(scope, patch)}
-            busy={Boolean(status.books?.running) || resetting}
-          />
+          <form
+            aria-label="Books catalog filters"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submit('book-catalog')
+            }}
+          >
+            <BookImportFilters
+              value={formConfig('book-catalog')!}
+              onChange={(patch) => update('book-catalog', patch)}
+              busy={Boolean(status.books?.running) || resetting || save.isPending}
+              footer={footer('book-catalog')}
+            />
+          </form>
         )}
         {metadata && (
-          <Disclosure title="Automatic updates">
-            {section === 'videos' &&
-              number('Information update interval (minutes)', 'sync_minutes', 5, 1440)}
-            {section === 'books' &&
-              number('Book information update interval (minutes)', 'openlibrary_minutes', 5, 1440)}
-            {section === 'identification' && (
-              <>
-                {number('Identification interval (seconds)', 'match_seconds', 5, 86400)}
-                <p className="help">
-                  Pending work and timing survive restarts. This interval applies to videos and
-                  books; manual actions run immediately.
-                </p>
-              </>
-            )}
+          <Disclosure
+            title="Automatic updates"
+            help={
+              section === 'identification'
+                ? 'Pending work and timing survive restarts. This interval applies to videos and books; manual actions run immediately.'
+                : undefined
+            }
+          >
+            <form
+              aria-label={`${metadataSections[section].label} automatic updates`}
+              className="space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submit(automaticScope)
+              }}
+            >
+              {section === 'videos' &&
+                number(
+                  'Information update interval (minutes)',
+                  'sync_minutes',
+                  5,
+                  1440,
+                  automaticScope,
+                )}
+              {section === 'books' &&
+                number(
+                  'Book information update interval (minutes)',
+                  'openlibrary_minutes',
+                  5,
+                  1440,
+                  automaticScope,
+                )}
+              {section === 'identification' &&
+                number(
+                  'Identification interval (seconds)',
+                  'match_seconds',
+                  5,
+                  86400,
+                  automaticScope,
+                )}
+              {footer(automaticScope)}
+            </form>
           </Disclosure>
         )}
         {section === 'videos' && (
           <Disclosure title="Request limits">
-            {number('TMDB requests per second', 'tmdb_requests_per_second', 5, 40)}
+            <form
+              aria-label="Videos request limits"
+              className="space-y-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                submit('videos-requests')
+              }}
+            >
+              {number(
+                'TMDB requests per second',
+                'tmdb_requests_per_second',
+                5,
+                40,
+                'videos-requests',
+              )}
+              {footer('videos-requests')}
+            </form>
           </Disclosure>
         )}
-        {footer(scope)}
-      </fieldset>
-    </form>
+      </SettingsSections>
+    </>
   )
   const maintenance = (
     <Disclosure
@@ -424,6 +540,11 @@ export default function AIOSourcePage({
       title="Maintenance"
       open={maintenanceOpen}
       onOpenChange={setMaintenanceOpen}
+      help={
+        metadata
+          ? 'Rebuild information or identification results when needed. Each action explains what it removes before confirmation.'
+          : undefined
+      }
     >
       <MaintenanceStatus
         value={status.maintenance}
@@ -437,10 +558,6 @@ export default function AIOSourcePage({
       />
       {metadata && (
         <>
-          <p className="help">
-            Rebuild information or identification results when needed. Each action explains what it
-            removes before confirmation.
-          </p>
           <div className="flex flex-wrap gap-3">
             {section === 'videos' && (
               <ConfirmAction
@@ -542,7 +659,10 @@ export default function AIOSourcePage({
                 <RuntimeSettingsPanel section="matching" />
               </>
             )}
-            <Disclosure title="Manual actions">
+            <Disclosure
+              title="Manual actions"
+              help="Run a task now without changing its automatic settings. Stopping the current task preserves committed progress; disable its automatic option to stop future runs."
+            >
               {section === 'videos' && status.recovery_required && (
                 <p role="status" className="notice notice-warning">
                   The TMDB change history could not cover the interruption. Film & series
@@ -597,11 +717,7 @@ export default function AIOSourcePage({
                   </Link>
                 </p>
               )}
-              <p className="help">
-                Run a task now without changing its automatic settings. Stopping the current task
-                preserves committed progress; disable its automatic option to stop future runs.
-              </p>
-              {draft && <p className="help">Save your changes before starting a run.</p>}
+              {dirty && <p className="help">Save your changes before starting a run.</p>}
               <div className="flex flex-wrap gap-3">
                 {section === 'videos' && (
                   <>
@@ -610,7 +726,7 @@ export default function AIOSourcePage({
                         status.syncing ||
                         resetting ||
                         action.isPending ||
-                        draft ||
+                        dirty ||
                         !status.config.tmdb_secret,
                       )}
                       onClick={() => action.mutate('sync')}
@@ -634,7 +750,7 @@ export default function AIOSourcePage({
                   <>
                     <Button
                       disabled={Boolean(
-                        status.books?.running || resetting || action.isPending || draft,
+                        status.books?.running || resetting || action.isPending || dirty,
                       )}
                       onClick={() => action.mutate('sync-books')}
                     >
@@ -660,7 +776,7 @@ export default function AIOSourcePage({
                         status.matching ||
                         resetting ||
                         action.isPending ||
-                        draft ||
+                        dirty ||
                         !status.status.has_information,
                       )}
                       onClick={() => action.mutate('match')}
@@ -701,7 +817,20 @@ export default function AIOSourcePage({
         <>
           {settingsForm}
           <SettingsSections>
-            <Disclosure title="Private source playback">
+            <Disclosure
+              title="Private source playback"
+              help={
+                <>
+                  For uncached private torrents, add the complete announce URL, including its
+                  passkey, in{' '}
+                  <Link className="data-link" to="/security/secrets">
+                    Secrets
+                  </Link>
+                  , or directly below, then save the playback settings. The URL is used exactly as
+                  supplied by the tracker, whatever the position of the passkey.
+                </>
+              }
+            >
               <form
                 aria-label="Private source playback"
                 onSubmit={(e) => {
@@ -710,15 +839,6 @@ export default function AIOSourcePage({
                 }}
               >
                 <fieldset disabled={save.isPending} className="space-y-4">
-                  <p className="help">
-                    For uncached private torrents, add the complete announce URL, including its
-                    passkey, in{' '}
-                    <Link className="data-link" to="/security/secrets">
-                      Secrets
-                    </Link>
-                    , or directly below, then save the playback settings. The URL is used exactly as
-                    supplied by the tracker, whatever the position of the passkey.
-                  </p>
                   {providers.data?.items?.length === 0 && (
                     <p className="text-sm text-muted-foreground">
                       Add your own sources first. No tracker is bundled.

@@ -11,8 +11,12 @@ export async function openDisclosure(page: Page | Locator, title: string) {
   const parents = summary.locator('xpath=ancestor::details')
   for (let index = 0; index < (await parents.count()); index++) {
     const parent = parents.nth(index)
-    if ((await parent.getAttribute('open')) === null)
-      await parent.locator(':scope > summary').click()
+    if ((await parent.getAttribute('open')) === null) {
+      // The summary can also contain an independent help button. Click its
+      // leading padding, rather than whichever child happens to be centered.
+      const toggle = parent.locator(':scope > summary')
+      await toggle.click({ position: { x: 8, y: 12 } })
+    }
     await expect(parent).toHaveAttribute('open', '')
   }
 }

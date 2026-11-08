@@ -32,11 +32,8 @@ export function WorkspaceLayout({ title, tabs }: { title: string; tabs: Workspac
           if (value !== current.path) navigate(value)
         }}
       >
-        <div className="flex min-w-0 items-center gap-3" data-workspace-toolbar>
-          <TabsList
-            aria-label={`${title} views`}
-            className="min-w-0 max-w-full flex-1 justify-start overflow-x-auto"
-          >
+        <div className="flex min-w-0 items-start gap-3" data-workspace-toolbar>
+          <TabsList aria-label={`${title} views`} containerClassName="flex-1">
             {tabs.map((tab) => (
               <TabsTrigger key={tab.path} value={tab.path} className="shrink-0">
                 <tab.icon aria-hidden="true" />

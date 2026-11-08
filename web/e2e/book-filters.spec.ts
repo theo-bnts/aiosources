@@ -7,7 +7,7 @@ test('book catalog filters keep their defaults, save one coherent scope and fit 
   page,
 }) => {
   await page.goto('/metadata/books/settings')
-  const form = page.getByRole('form', { name: 'Books configuration', exact: true })
+  const form = page.getByRole('form', { name: 'Books catalog filters', exact: true })
   const filters = form
     .locator('details')
     .filter({ has: page.locator('summary', { hasText: /^Catalog filters$/ }) })

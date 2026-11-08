@@ -86,7 +86,22 @@ export function RuntimeSettingsPanel({
     )
   useUnsavedChanges(dirty, definition.title.toLowerCase(), save.isPending)
   return (
-    <Disclosure title={definition.title} open={open} onOpenChange={setOpen}>
+    <Disclosure
+      title={definition.title}
+      open={open}
+      onOpenChange={setOpen}
+      help={
+        <>
+          <p>
+            {definition.help}
+            {scopeHelp && ` ${scopeHelp}`}
+          </p>
+          {section === 'identification' && query.data?.automatic_workers !== undefined && (
+            <p>Automatic currently uses {query.data.automatic_workers} workers on this process.</p>
+          )}
+        </>
+      }
+    >
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       {query.isPending
         ? open && <Loading label={`Loading ${definition.title.toLowerCase()}`} />
@@ -105,15 +120,6 @@ export function RuntimeSettingsPanel({
                   })
               }}
             >
-              <p className="help">
-                {definition.help}
-                {scopeHelp && ` ${scopeHelp}`}
-              </p>
-              {section === 'identification' && query.data.automatic_workers !== undefined && (
-                <p className="help">
-                  Automatic currently uses {query.data.automatic_workers} workers on this process.
-                </p>
-              )}
               <div className="grid items-start gap-5 md:grid-cols-2">
                 {definition.fields.map(([key, label, min, max]) => {
                   const id = `runtime-${section}-${key}`
@@ -124,7 +130,9 @@ export function RuntimeSettingsPanel({
                     Number(values[key]) > max
                   return (
                     <div className="min-w-0 space-y-2" key={key}>
-                      <Label htmlFor={id}>{label}</Label>
+                      <Label htmlFor={id} help={`Range: ${min}–${max}.`}>
+                        {label}
+                      </Label>
                       <Input
                         id={id}
                         name={key}
@@ -136,7 +144,7 @@ export function RuntimeSettingsPanel({
                         value={values[key] ?? ''}
                         disabled={save.isPending}
                         aria-invalid={fieldInvalid}
-                        aria-describedby={`${id}-help`}
+                        aria-describedby={fieldInvalid ? `${id}-help` : undefined}
                         onChange={(event) => {
                           setDraft({
                             base: draft?.base ?? query.data!,
@@ -145,12 +153,11 @@ export function RuntimeSettingsPanel({
                           save.reset()
                         }}
                       />
-                      <p
-                        className={fieldInvalid ? 'help text-destructive' : 'help'}
-                        id={`${id}-help`}
-                      >
-                        Range: {min}–{max}.
-                      </p>
+                      {fieldInvalid && (
+                        <p className="help text-destructive" id={`${id}-help`}>
+                          Enter a whole number between {min} and {max}.
+                        </p>
+                      )}
                     </div>
                   )
                 })}

@@ -75,7 +75,7 @@ async function openOptionalSections(scope: Locator) {
     const closed = scope.locator('details:not([open]) > summary:visible').first()
     if (!(await closed.count())) return
     const parent = await closed.locator('..').elementHandle()
-    await closed.click()
+    await closed.click({ position: { x: 8, y: 12 } })
     await expect.poll(() => parent?.evaluate((element) => element.hasAttribute('open'))).toBe(true)
   }
   throw new Error('Optional settings did not finish opening')

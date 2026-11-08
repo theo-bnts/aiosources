@@ -61,7 +61,7 @@ export function SourceStatisticsPage() {
       <ErrorNotice error={overview.error} retry={() => void overview.refetch()} />
       <ErrorNotice error={counts.error} retry={() => void counts.refetch()} />
       {overview.data && (
-        <dl className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <Statistic
             label="Imported torrents"
             value={counts.totals ? counts.totals.imported : 'Not available'}
@@ -84,18 +84,7 @@ export function SourceStatisticsPage() {
             value={overview.data.source_queued}
             to="/runs?status=queued"
           />
-          <Statistic
-            label="Import capacity on this instance"
-            value={overview.data.capacity}
-            className="col-span-2 xl:col-span-1"
-          />
         </dl>
-      )}
-      {counts.data && (
-        <p className="help">
-          Published and awaiting records are counted separately. Storage estimates include source
-          history and indexes; shared metadata and caches are separate.
-        </p>
       )}
       {providers.data && (items.length > 0 || filtered) && (
         <ListFilters

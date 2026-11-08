@@ -319,7 +319,7 @@ test('invalid raw and structured drafts block saving and stage changes without d
     await expect(page.getByRole('tab', { name })).toBeDisabled()
   }
   const connection = page.getByRole('tab', { name: /^Connection/ })
-  await connection.press('ArrowDown')
+  await connection.press('ArrowRight')
   await expect(connection).toHaveAttribute('aria-selected', 'true')
   await expect(body).toHaveText(fieldDraft)
   expect((await readSource(page, id)).json).toBe(original.json)

@@ -126,14 +126,20 @@ export function PublicAccessSettings() {
                   disabled={busy}
                   onCheckedChange={(enabled) => change({ enabled })}
                 />
-                <Label htmlFor="public-access-enabled">Enable public access</Label>
+                <Label
+                  htmlFor="public-access-enabled"
+                  help={
+                    <>
+                      Visitors use the features enabled below. Playback uses their own keys. The
+                      server does not save these keys, and administration stays protected. Turning
+                      this off revokes public links. Availability checks use visitors’ own keys and
+                      reuse the shared cache.
+                    </>
+                  }
+                >
+                  Enable public access
+                </Label>
               </div>
-              <p className="help">
-                Visitors use the features enabled below. Playback uses their own keys. The server
-                does not save these keys, and administration stays protected. Turning this off
-                revokes public links. Availability checks use visitors’ own keys and reuse the
-                shared cache.
-              </p>
             </div>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
               <legend className="pr-3 text-sm font-medium">Search</legend>
@@ -145,13 +151,20 @@ export function PublicAccessSettings() {
                     disabled={busy || !current.enabled}
                     onCheckedChange={(search_enabled) => change({ search_enabled })}
                   />
-                  <Label htmlFor="public-search-enabled">Allow public Search</Label>
+                  <Label
+                    htmlFor="public-search-enabled"
+                    help={
+                      <>
+                        Visitors can search the identified catalog and download using their own
+                        debrid services. Source visibility and private download permissions follow
+                        the same rules as Stremio. Browser downloads pass through this instance and
+                        use its bandwidth.
+                      </>
+                    }
+                  >
+                    Allow public Search
+                  </Label>
                 </div>
-                <p className="help">
-                  Visitors can search the identified catalog and download using their own debrid
-                  services. Source visibility and private download permissions follow the same rules
-                  as Stremio. Browser downloads pass through this instance and use its bandwidth.
-                </p>
               </div>
             </fieldset>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
@@ -164,12 +177,18 @@ export function PublicAccessSettings() {
                     disabled={busy || !current.enabled}
                     onCheckedChange={(stremio_enabled) => change({ stremio_enabled })}
                   />
-                  <Label htmlFor="public-stremio-enabled">Allow public Stremio connections</Label>
+                  <Label
+                    htmlFor="public-stremio-enabled"
+                    help={
+                      <>
+                        Visitors can create installation links for Stremio and AIOStreams. Disabling
+                        this option revokes those links without affecting other public features.
+                      </>
+                    }
+                  >
+                    Allow public Stremio connections
+                  </Label>
                 </div>
-                <p className="help">
-                  Visitors can create installation links for Stremio and AIOStreams. Disabling this
-                  option revokes those links without affecting other public features.
-                </p>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -179,12 +198,18 @@ export function PublicAccessSettings() {
                     disabled={busy || !current.enabled}
                     onCheckedChange={(torznab_enabled) => change({ torznab_enabled })}
                   />
-                  <Label htmlFor="public-torznab-enabled">Allow public Torznab connections</Label>
+                  <Label
+                    htmlFor="public-torznab-enabled"
+                    help={
+                      <>
+                        Visitors can create encrypted Torznab configurations without an account.
+                        Disabling this option revokes those links.
+                      </>
+                    }
+                  >
+                    Allow public Torznab connections
+                  </Label>
                 </div>
-                <p className="help">
-                  Visitors can create encrypted Torznab configurations without an account. Disabling
-                  this option revokes those links.
-                </p>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
@@ -194,13 +219,20 @@ export function PublicAccessSettings() {
                     disabled={busy || !current.enabled || !current.expose_sources}
                     onCheckedChange={(catalog_enabled) => change({ catalog_enabled })}
                   />
-                  <Label htmlFor="public-catalog-enabled">Allow public shared catalogs</Label>
+                  <Label
+                    htmlFor="public-catalog-enabled"
+                    help={
+                      <>
+                        Visitors can sync a read-only catalog to another AIOSources instance. Choose
+                        the allowed data in Shared catalog data below. Expose source names and
+                        filters must be enabled. Disabling either option revokes public catalog
+                        links.
+                      </>
+                    }
+                  >
+                    Allow public shared catalogs
+                  </Label>
                 </div>
-                <p className="help">
-                  Visitors can sync a read-only catalog to another AIOSources instance. Choose the
-                  allowed data in Shared catalog data below. Expose source names and filters must be
-                  enabled. Disabling either option revokes public catalog links.
-                </p>
               </div>
             </fieldset>
             <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
@@ -213,14 +245,21 @@ export function PublicAccessSettings() {
                     disabled={busy || !current.enabled}
                     onCheckedChange={(expose_sources) => change({ expose_sources })}
                   />
-                  <Label htmlFor="public-private-downloads">Expose source names and filters</Label>
+                  <Label
+                    htmlFor="public-private-downloads"
+                    help={
+                      <>
+                        Applies to all public features, including Shared catalogs. Visitors can
+                        select sources and supply their own announce URLs for private sources. Your
+                        source definitions and announce URLs stay private. When off, source names
+                        and source filters are hidden and private sources require known cached
+                        availability.
+                      </>
+                    }
+                  >
+                    Expose source names and filters
+                  </Label>
                 </div>
-                <p className="help">
-                  Applies to all public features, including Shared catalogs. Visitors can select
-                  sources and supply their own announce URLs for private sources. Your source
-                  definitions and announce URLs stay private. When off, source names and source
-                  filters are hidden and private sources require known cached availability.
-                </p>
               </div>
             </fieldset>
             {conflict && (

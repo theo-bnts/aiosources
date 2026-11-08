@@ -6,6 +6,7 @@ import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { InfoTip } from '@/components/ui/info-tip'
 import { CodeEditor } from '@/components/code-editor'
 
 export interface SourceEditorContextValue {
@@ -40,20 +41,20 @@ export function TextField({
   const mismatch = value !== undefined && typeof value !== 'string'
   return (
     <div className="field min-w-0">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} help={help}>
+        {label}
+      </Label>
       <Input
         id={id}
         value={typeof value === 'string' ? value : ''}
         placeholder={placeholder}
         readOnly={readOnly}
-        aria-describedby={help || mismatch ? `${id}-help` : undefined}
+        aria-describedby={mismatch ? `${id}-help` : undefined}
         onChange={(event) => change((next) => next.setIn(path, event.target.value))}
       />
-      {(help || mismatch) && (
+      {mismatch && (
         <p id={`${id}-help`} className="help">
-          {mismatch
-            ? 'The current value is not text. Enter text to replace it, or repair it in JSON.'
-            : help}
+          The current value is not text. Enter text to replace it, or repair it in JSON.
         </p>
       )}
     </div>
@@ -78,12 +79,13 @@ export function SelectField({
   const current = typeof value === 'string' ? value : ''
   return (
     <div className="field min-w-0">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} help={help}>
+        {label}
+      </Label>
       <select
         id={id}
         className="native-select w-full"
         value={current}
-        aria-describedby={help ? `${id}-help` : undefined}
         onChange={(event) =>
           change((next) =>
             event.target.value ? next.setIn(path, event.target.value) : next.deleteIn(path),
@@ -100,11 +102,6 @@ export function SelectField({
           </option>
         ))}
       </select>
-      {help && (
-        <p className="help" id={`${id}-help`}>
-          {help}
-        </p>
-      )}
     </div>
   )
 }
@@ -122,12 +119,13 @@ export function BooleanField({
   return (
     <div className="field">
       <div className="flex min-h-(--control-height) items-center justify-between gap-3">
-        <Label htmlFor={id}>{label}</Label>
+        <Label htmlFor={id} help={help}>
+          {label}
+        </Label>
         <Switch
           id={id}
           checked={value === true}
           disabled={!allowEnabled && value !== true}
-          aria-describedby={help ? `${id}-help` : undefined}
           onCheckedChange={(enabled) => change((next) => next.setIn(path, enabled))}
         />
       </div>
@@ -141,11 +139,6 @@ export function BooleanField({
         >
           Use default
         </Button>
-      )}
-      {help && (
-        <p className="help" id={`${id}-help`}>
-          {help}
-        </p>
       )}
     </div>
   )
@@ -197,7 +190,9 @@ export function JSONField({
   }
   return (
     <div className="field min-w-0">
-      <Label htmlFor={multiline ? undefined : id}>{label}</Label>
+      <Label htmlFor={multiline ? undefined : id} help={help}>
+        {label}
+      </Label>
       {multiline ? (
         <CodeEditor
           value={draft}
@@ -214,7 +209,7 @@ export function JSONField({
           placeholder={placeholder}
           value={draft}
           aria-invalid={Boolean(error)}
-          aria-describedby={error || help ? `${id}-help` : undefined}
+          aria-describedby={error ? `${id}-help` : undefined}
           onChange={(event) => update(event.target.value)}
         />
       )}
@@ -233,13 +228,7 @@ export function JSONField({
             Discard field draft
           </Button>
         </div>
-      ) : (
-        help && (
-          <p className="help" id={`${id}-help`}>
-            {help}
-          </p>
-        )
-      )}
+      ) : null}
     </div>
   )
 }
@@ -262,9 +251,9 @@ export function FieldSection({
       data-settings-section={title}
       className="space-y-5 border-t border-border pt-6 first-of-type:border-0 first-of-type:pt-0"
     >
-      <div>
+      <div className="flex items-center gap-1.5">
         <h3 className="font-medium">{title}</h3>
-        {description && <p className="help mt-1 max-w-2xl">{description}</p>}
+        {description && <InfoTip label={title}>{description}</InfoTip>}
       </div>
       {children}
     </section>
@@ -290,6 +279,8 @@ export function OptionalSection({
   return (
     <Disclosure
       data-settings-section={title}
+      help={description}
+      helpLabel={title}
       title={
         <span className="flex flex-wrap items-center justify-between gap-2">
           <span>{title}</span>
@@ -299,7 +290,6 @@ export function OptionalSection({
         </span>
       }
     >
-      {description && <p className="help">{description}</p>}
       {children}
     </Disclosure>
   )
@@ -406,17 +396,17 @@ export function MapField({
   const kind = document.kindIn(path)
   return (
     <div className="min-w-0 space-y-3">
-      <div>
+      <div className="flex items-center gap-1.5">
         <h4 className="text-sm font-medium">{label}</h4>
-        {help && <p className="help mt-1">{help}</p>}
+        {help && <InfoTip label={label}>{help}</InfoTip>}
       </div>
       {kind && kind !== 'object' && kind !== 'null' ? (
-        <JSONField
-          path={path}
-          label={`${label} JSON`}
-          help="This value is not an object. Repair it here or in the full JSON definition."
-          multiline
-        />
+        <>
+          <p className="help text-destructive" role="alert">
+            This value is not an object. Repair it here or in the full JSON definition.
+          </p>
+          <JSONField path={path} label={`${label} JSON`} multiline />
+        </>
       ) : (
         <>
           {keys.map((name) => (
@@ -486,12 +476,17 @@ export function ArrayField({
   const kind = document.kindIn(path)
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex items-center gap-1.5">
         <h4 className="text-sm font-medium">{label}</h4>
-        {help && <p className="help mt-1">{help}</p>}
+        {help && <InfoTip label={label}>{help}</InfoTip>}
       </div>
       {kind && kind !== 'array' && kind !== 'null' ? (
-        <JSONField path={path} label={`${label} JSON`} multiline />
+        <>
+          <p className="help text-destructive" role="alert">
+            This value is not an array. Repair it here or in the full JSON definition.
+          </p>
+          <JSONField path={path} label={`${label} JSON`} multiline />
+        </>
       ) : (
         <>
           {Array.from({ length: count }, (_, index) => (

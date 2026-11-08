@@ -15,7 +15,7 @@ test('the full import concurrency range persists without local-capacity warnings
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
-  const form = page.getByRole('form', { name: 'Import execution', exact: true })
+  const form = page.getByRole('form', { name: 'Concurrency', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   const save = form.getByRole('button', { name: 'Save', exact: true })
   await expect(workers).toHaveAttribute('min', '1')
@@ -62,7 +62,7 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await page.goto('/providers/settings')
   const section = page.locator('#import-execution-settings')
   const toggle = section.locator(':scope > summary')
-  const form = section.getByRole('form', { name: 'Import execution', exact: true })
+  const form = section.getByRole('form', { name: 'Concurrency', exact: true })
   await expect(section).not.toHaveAttribute('open', '')
   await expect(form).toHaveCount(0)
   expect(requests).toEqual([])
@@ -123,17 +123,18 @@ test('moved import settings preserve validation, persisted policies and concurre
   await page.goto('/import-settings')
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
-  const form = page.getByRole('form', { name: 'Import execution', exact: true })
+  const form = page.getByRole('form', { name: 'Concurrency', exact: true })
   const workers = form.getByLabel('Simultaneous imports', { exact: true })
   await openDisclosure(page, 'Useful progress')
   await openDisclosure(page, 'Quota handling')
-  const progress = form.getByLabel('Responses without new source IDs', { exact: true })
-  const save = form.getByRole('button', { name: 'Save', exact: true })
-  await expect(form.locator('details')).toHaveCount(4)
+  const progressForm = page.getByRole('form', { name: 'Useful progress', exact: true })
+  const progress = progressForm.getByLabel('Responses without new source IDs', { exact: true })
+  let save = form.getByRole('button', { name: 'Save', exact: true })
+  await expect(page.locator('#import-execution-settings details')).toHaveCount(4)
   await expect(
     form.getByLabel('Automatically resume technically interrupted runs', { exact: true }),
   ).toHaveCount(0)
-  await expect(form.getByLabel('Automatic retries after HTTP 429', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Automatic retries after HTTP 429', { exact: true })).toBeVisible()
   await expect(form.getByLabel('Request timeout (seconds)', { exact: true })).toHaveCount(0)
   await expect(form.getByLabel('Preview page budget', { exact: true })).toHaveCount(0)
   expect(Object.keys(original).sort()).toEqual([
@@ -160,6 +161,12 @@ test('moved import settings preserve validation, persisted policies and concurre
   await save.click()
   expect((await saved).status()).toBe(200)
   await expect(save).toBeDisabled()
+  const concurrencyOnly = await savedSettings(page)
+  expect(concurrencyOnly.no_progress_requests).toBe(original.no_progress_requests)
+  await expect(progress).toHaveValue('7')
+  save = progressForm.getByRole('button', { name: 'Save', exact: true })
+  await save.click()
+  await expect(save).toBeDisabled()
   const updated = await savedSettings(page)
   expect(updated).toEqual({
     ...original,
@@ -172,6 +179,7 @@ test('moved import settings preserve validation, persisted policies and concurre
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue('3')
+  await openDisclosure(page, 'Useful progress')
   await expect(progress).toHaveValue('7')
   await expect(page.getByLabel('Display timezone', { exact: true })).toHaveCount(0)
 
@@ -212,10 +220,10 @@ test('moved import settings preserve validation, persisted policies and concurre
     // Keep forwarding through the context's egress guard until teardown. Removing
     // page interception while a live refresh is in flight can handle it twice.
   }
-  await expect(form.getByRole('alert')).toContainText('Your unsaved draft is preserved.')
+  await expect(progressForm.getByRole('alert')).toContainText('Your unsaved draft is preserved.')
   await expect(progress).toHaveValue('11')
   await expect(save).toBeDisabled()
-  await form.getByRole('button', { name: 'Keep my draft', exact: true }).click()
+  await progressForm.getByRole('button', { name: 'Keep my draft', exact: true }).click()
   const retried = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/settings/collections') && response.request().method() === 'PUT',
@@ -224,7 +232,12 @@ test('moved import settings preserve validation, persisted policies and concurre
   expect((await retried).status()).toBe(200)
   await expect(save).toBeDisabled()
   const resolved = await savedSettings(page)
-  expect(resolved).toEqual({ ...updated, no_progress_requests: 11, revision: resolved.revision })
+  expect(resolved).toEqual({
+    ...updated,
+    max_quota_retries: 6,
+    no_progress_requests: 11,
+    revision: resolved.revision,
+  })
   expect(resolved.revision).toBeGreaterThan(updated.revision)
 })
 

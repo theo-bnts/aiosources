@@ -20,7 +20,7 @@ test('navigation waits for an explicit save to finish without offering to discar
   })
   try {
     await page
-      .getByRole('form', { name: 'Import execution', exact: true })
+      .getByRole('form', { name: 'Concurrency', exact: true })
       .getByRole('button', { name: 'Save', exact: true })
       .click()
     await page
@@ -145,10 +145,8 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await openDisclosure(page, 'Import execution')
   await openDisclosure(page, 'Concurrency')
   await expect(workers).toHaveValue(String(persisted.settings.workers))
-  // All groups share one explicit save and preserve their drafts when folded.
-  await expect(
-    page.getByRole('form', { name: 'Import execution', exact: true }).locator('details'),
-  ).toHaveCount(4)
+  // Each optional group owns its save and keeps its draft when folded.
+  await expect(page.locator('#import-execution-settings details')).toHaveCount(4)
   await openDisclosure(page, 'Quota handling')
   const retries = page.getByLabel('Automatic retries after HTTP 429', { exact: true })
   await retries.fill('11')
@@ -156,7 +154,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await expect(retries).toHaveAttribute('aria-invalid', 'true')
   await expect(
     page
-      .getByRole('form', { name: 'Import execution', exact: true })
+      .getByRole('form', { name: 'Quota handling', exact: true })
       .getByRole('button', { name: 'Save', exact: true }),
   ).toBeDisabled()
   await retries.fill(String(persisted.settings.max_quota_retries))

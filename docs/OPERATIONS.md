@@ -17,6 +17,8 @@
 
 The settings search stays available on desktop and mobile. Select a result to open the relevant control, even inside a collapsed section.
 
+Each settings block has its own **Save**. Saving the main settings does not apply pending changes in optional sections. Folding a section keeps its unsaved edits. Use the small **i** beside a heading or label for explanations; hover on desktop or tap on mobile.
+
 ## Search and choose a release
 
 Search uses your imported information, including local titles and aliases. It does not contact TMDB, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.

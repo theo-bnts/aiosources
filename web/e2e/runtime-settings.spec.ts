@@ -121,7 +121,7 @@ test('operational policies persist independently and reject stale updates', asyn
   const recovery = page.getByRole('switch', { name: 'Automatically resume interrupted imports' })
   await expect(recovery).toBeChecked()
   await recovery.click()
-  const imports = page.getByRole('form', { name: 'Import execution', exact: true })
+  const imports = page.getByRole('form', { name: 'Recovery', exact: true })
   await imports.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(imports.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(
@@ -142,7 +142,7 @@ test('interface preferences apply across tables and reloads without a server wri
   await dialog.getByLabel('Rows per page', { exact: true }).selectOption('25')
   await dialog.getByLabel('Automatic refresh', { exact: true }).selectOption('reduced')
   await dialog.getByLabel('Time zone', { exact: true }).selectOption('utc')
-  await dialog.getByLabel('Date format', { exact: true }).selectOption('iso')
+  await dialog.getByLabel('Date format', { exact: true }).selectOption('english')
   await page.keyboard.press('Escape')
   const listing = page.waitForRequest(
     (request) =>
@@ -154,7 +154,7 @@ test('interface preferences apply across tables and reloads without a server wri
   await page.reload()
   await page.getByRole('button', { name: 'Interface preferences', exact: true }).click()
   await expect(dialog.getByLabel('Rows per page', { exact: true })).toHaveValue('25')
-  await expect(dialog.getByLabel('Date format', { exact: true })).toHaveValue('iso')
+  await expect(dialog.getByLabel('Date format', { exact: true })).toHaveValue('english')
   await expect(dialog.getByLabel('Automatic refresh', { exact: true })).toHaveValue('reduced')
   expect(writes).toEqual([])
 })

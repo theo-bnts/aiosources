@@ -527,9 +527,28 @@ try {
           .count()
         if (!loading && pending.size === 0 && performance.now() - changed > 100) break
         if (performance.now() > until) {
+          // Probe through a separate HTTP client: queued browser requests and
+          // a slow backend require different diagnoses. Retain no response body.
+          const probes = []
+          for (const request of [...pending].slice(0, 3)) {
+            if (request.method() !== 'GET') continue
+            const path = new URL(request.url()).pathname
+            const started = performance.now()
+            try {
+              const response = await api.get(path, { timeout: 2000, maxRedirects: 0 })
+              probes.push({
+                path,
+                status: response.status(),
+                elapsed_ms: Math.round(performance.now() - started),
+              })
+            } catch {
+              probes.push({ path, error: 'probe_timeout' })
+            }
+          }
           diagnostics.push({
             case: 'browser.readiness',
             loading,
+            probes,
             pending: [...pending].map((r) => ({
               path: new URL(r.url()).pathname,
               type: r.resourceType(),
@@ -571,8 +590,8 @@ try {
             1500,
             async () => {
               if ((await detail.getAttribute('open')) !== null)
-                await detail.locator(':scope > summary').click()
-              await detail.locator(':scope > summary').click()
+                await detail.locator(':scope > summary').click({ position: { x: 8, y: 12 } })
+              await detail.locator(':scope > summary').click({ position: { x: 8, y: 12 } })
               await ready()
               if ((await detail.getAttribute('open')) === null) throw new Error('rendering_error')
             },
@@ -659,19 +678,19 @@ try {
         async () => {
           await page.getByRole('button', { name: button, exact: true }).click()
           try {
-            await page.getByRole('dialog').waitFor()
+            await page.locator('[data-slot="dialog-content"][role="dialog"]').waitFor()
             await ready()
           } finally {
             await page.keyboard.press('Escape')
-            await page.getByRole('dialog').waitFor({ state: 'hidden' })
+            await page.locator('[data-slot="dialog-content"][role="dialog"]').waitFor({ state: 'hidden' })
           }
         },
         () => 'ready',
         3,
       )
       await page.getByRole('button', { name: button, exact: true }).click()
-      await page.getByRole('dialog').waitFor()
-      await sections(page.getByRole('dialog'), `browser.${width}.${id}`)
+      await page.locator('[data-slot="dialog-content"][role="dialog"]').waitFor()
+      await sections(page.locator('[data-slot="dialog-content"][role="dialog"]'), `browser.${width}.${id}`)
       await page.keyboard.press('Escape')
     }
     await context.close()

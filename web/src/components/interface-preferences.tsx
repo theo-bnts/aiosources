@@ -80,7 +80,12 @@ export function InterfacePreferences() {
             </select>
           </div>
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="interface-refresh">Automatic refresh</Label>
+            <Label
+              htmlFor="interface-refresh"
+              help="Reduced activity refreshes lists and progress three times less often. Server schedules and background work are unchanged."
+            >
+              Automatic refresh
+            </Label>
             <select
               id="interface-refresh"
               className="native-select w-full"
@@ -105,7 +110,6 @@ export function InterfacePreferences() {
             >
               <option value="browser">Browser language</option>
               <option value="english">English (UK)</option>
-              <option value="iso">YYYY-MM-DD</option>
             </select>
           </div>
           <div className="min-w-0 space-y-2">
@@ -123,10 +127,6 @@ export function InterfacePreferences() {
             </select>
           </div>
         </div>
-        <p className="help">
-          Reduced activity refreshes lists and progress three times less often. Server schedules and
-          background work are unchanged.
-        </p>
       </DialogContent>
     </Dialog>
   )

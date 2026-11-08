@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 export type BrowserPreferences = {
   pageSize: 25 | 50 | 100
-  dateFormat: 'browser' | 'english' | 'iso'
+  dateFormat: 'browser' | 'english'
   timeZone: 'browser' | 'utc'
   refresh: 'normal' | 'reduced'
 }
@@ -20,8 +20,7 @@ export function normalizeBrowserPreferences(value: unknown): BrowserPreferences 
   const input = value && typeof value === 'object' ? (value as Partial<BrowserPreferences>) : {}
   return {
     pageSize: input.pageSize === 25 || input.pageSize === 100 ? input.pageSize : 50,
-    dateFormat:
-      input.dateFormat === 'english' || input.dateFormat === 'iso' ? input.dateFormat : 'browser',
+    dateFormat: input.dateFormat === 'english' ? 'english' : 'browser',
     timeZone: input.timeZone === 'utc' ? 'utc' : 'browser',
     refresh: input.refresh === 'reduced' ? 'reduced' : 'normal',
   }

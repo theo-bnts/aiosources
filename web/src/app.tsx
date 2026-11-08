@@ -749,7 +749,7 @@ export function AppShell({
   const branding = (
     <>
       <DatabaseIcon size={24} aria-hidden="true" className="shrink-0 text-primary" />
-      <span className="text-base leading-none font-semibold tracking-tight">AIOSources</span>
+      <span className="text-2xl leading-none font-semibold tracking-tight">AIOSources</span>
     </>
   )
   const footer = publicMode ? (

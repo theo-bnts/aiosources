@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   Dialog,
   DialogContent,
@@ -108,9 +109,10 @@ export function TorrentTable({
                     </Link>
                   </Button>
                 ) : (
-                  <span className="text-muted-foreground" title="Processed record unavailable">
-                    —
-                  </span>
+                  <InfoTip label="Processed record unavailable">
+                    The processed record is not available for this occurrence. Open its title to
+                    view the retained torrent information.
+                  </InfoTip>
                 )}
               </TableCell>
             </TableRow>
@@ -384,13 +386,11 @@ export function OccurrenceDialog({
                 setSearch(next, { replace: true })
               }}
             >
-              <div className="overflow-x-auto">
-                <TabsList className="flex-wrap group-data-[orientation=horizontal]/tabs:h-auto">
-                  {torrent && <TabsTrigger value="fields">Published fields</TabsTrigger>}
-                  <TabsTrigger value="history">Change history</TabsTrigger>
-                  <TabsTrigger value="related">Related occurrences</TabsTrigger>
-                </TabsList>
-              </div>
+              <TabsList>
+                {torrent && <TabsTrigger value="fields">Published fields</TabsTrigger>}
+                <TabsTrigger value="history">Change history</TabsTrigger>
+                <TabsTrigger value="related">Related occurrences</TabsTrigger>
+              </TabsList>
               {torrent && (
                 <TabsContent value="fields" className="mt-5 space-y-4">
                   <dl className="grid grid-cols-2 gap-4 text-xs">

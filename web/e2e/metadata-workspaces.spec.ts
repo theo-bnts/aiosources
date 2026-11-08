@@ -139,19 +139,24 @@ test('workspace saves preserve other provider settings and protect drafts betwee
   const videos = page.getByRole('form', { name: 'Videos configuration', exact: true })
   await videos.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(videos.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  for (const name of ['Videos automatic updates', 'Videos request limits']) {
+    const block = page.getByRole('form', { name, exact: true })
+    await block.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(block.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  }
   await page.goto('/metadata/books/settings')
   await expect(page.getByLabel('TMDB requests per second')).toHaveCount(0)
   await expect(page.getByLabel('Automatically identify torrents')).toHaveCount(0)
   await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Book information update interval (minutes)', { exact: true }).fill('45')
-  const books = page.getByRole('form', { name: 'Books configuration', exact: true })
+  const books = page.getByRole('form', { name: 'Books automatic updates', exact: true })
   await books.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(books.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.goto('/metadata/identification/settings')
   await openDisclosure(page, 'Automatic updates')
   await page.getByLabel('Identification interval (seconds)', { exact: true }).fill('120')
   const identification = page.getByRole('form', {
-    name: 'Identification configuration',
+    name: 'Identification automatic updates',
     exact: true,
   })
   await identification.getByRole('button', { name: 'Save', exact: true }).click()

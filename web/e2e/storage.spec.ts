@@ -12,9 +12,13 @@ test('Storage saving is the default, edits are explicit and data reset requires 
     .filter({ has: page.getByRole('heading', { name: 'Stored data', exact: true }) })
   const mode = retention.getByLabel('Stored torrent information', { exact: true })
   await expect(mode).toHaveValue('compact')
+  await retention
+    .getByRole('button', { name: 'About Stored torrent information', exact: true })
+    .click()
   await expect(
-    retention.getByText('Applies to imports started after saving.', { exact: false }),
-  ).toBeVisible()
+    page.getByRole('dialog', { name: 'About Stored torrent information', exact: true }),
+  ).toContainText('Applies to imports started after saving.')
+  await page.keyboard.press('Escape')
   const save = retention.getByRole('button', { name: 'Save', exact: true })
   const maintenance = page.locator('details#maintenance')
   const reset = maintenance.getByRole('button', { name: 'Reset all source data', exact: true })
@@ -28,10 +32,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await expect(resetStatus).toHaveText(
     'Save the selected storage mode before resetting source data.',
   )
-  await expect(reset).toHaveAttribute(
-    'aria-describedby',
-    'source-data-reset-help source-data-reset-status',
-  )
+  await expect(reset).toHaveAttribute('aria-describedby', 'source-data-reset-status')
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   const unsaved = page.getByRole('alertdialog')
   await expect(unsaved).toContainText('storage settings')

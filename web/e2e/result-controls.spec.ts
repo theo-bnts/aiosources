@@ -143,25 +143,31 @@ test('public Stremio and Torznab use the same optional controls without creating
   }
 })
 
-test('source execution has grouped disclosures and one save, while torrent sorting keeps a normal query URL', async ({
+test('source execution saves each group independently, while torrent sorting keeps a normal query URL', async ({
   page,
 }) => {
   await page.goto('/providers/settings')
   await page.locator('summary', { hasText: /^Import execution$/ }).click()
-  const form = page.getByRole('form', { name: 'Import execution', exact: true })
-  await expect(form.locator('summary')).toHaveText([
+  const form = page.getByRole('form', { name: 'Concurrency', exact: true })
+  await expect(page.locator('#import-execution-settings details > summary')).toHaveText([
     'Concurrency',
     'Quota handling',
     'Useful progress',
     'Recovery',
   ])
-  await form.locator('summary', { hasText: /^Concurrency$/ }).click()
+  await openDisclosure(page, 'Concurrency')
   await form.getByLabel('Simultaneous imports', { exact: true }).fill('7')
-  await form.locator('summary', { hasText: /^Quota handling$/ }).click()
-  await form.getByLabel('Automatic retries after HTTP 429', { exact: true }).fill('4')
+  await openDisclosure(page, 'Quota handling')
+  await page.getByLabel('Automatic retries after HTTP 429', { exact: true }).fill('4')
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1)
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect(
+    (await (await page.request.get('/api/settings/collections')).json()).settings.max_quota_retries,
+  ).toBe(3)
+  const quota = page.getByRole('form', { name: 'Quota handling', exact: true })
+  await quota.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(quota.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.goto('/torrents')
   await openDisclosure(page, 'Sorting')
   await page.getByLabel('Sort by', { exact: true }).selectOption('size_desc')

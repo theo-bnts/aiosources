@@ -138,12 +138,13 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                     disabled={save.isPending}
                     onCheckedChange={(enabled) => change({ enabled })}
                   />
-                  <Label htmlFor="incoming-enabled">Trust an incoming proxy header</Label>
+                  <Label
+                    htmlFor="incoming-enabled"
+                    help="Use the visitor’s IP for public request limits and sign-in protection. Only headers received from the trusted proxies below are accepted."
+                  >
+                    Trust an incoming proxy header
+                  </Label>
                 </div>
-                <p className="help">
-                  Use the visitor’s IP for public request limits and sign-in protection. Only
-                  headers received from the trusted proxies below are accepted.
-                </p>
                 <div className="grid gap-5 md:grid-cols-2">
                   <div className="field min-w-0">
                     <Label htmlFor="incoming-header">IP address header</Label>
@@ -175,7 +176,12 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                     </datalist>
                   </div>
                   <div className="field min-w-0">
-                    <Label htmlFor="incoming-format">Header format</Label>
+                    <Label
+                      htmlFor="incoming-format"
+                      help="Cloudflare uses CF-Connecting-IP with a single address. X-Forwarded-For chains are read from the nearest proxy back to the first untrusted address. Missing or invalid headers use the direct connection address. IPv4 and IPv6 are supported."
+                    >
+                      Header format
+                    </Label>
                     <select
                       id="incoming-format"
                       className="native-select w-full"
@@ -191,7 +197,26 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                   </div>
                 </div>
                 <div className="field">
-                  <Label htmlFor="incoming-proxies">Trusted proxy addresses</Label>
+                  <Label
+                    htmlFor="incoming-proxies"
+                    help={
+                      <>
+                        One IP address or CIDR network per line. For a tunnel, enter the cloudflared
+                        address seen by AIOSources. For Cloudflare’s standard proxy, use its{' '}
+                        <a
+                          className="link"
+                          href="https://www.cloudflare.com/ips/"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          published IP ranges
+                        </a>
+                        . Trust only proxies you control or explicitly authorize.
+                      </>
+                    }
+                  >
+                    Trusted proxy addresses
+                  </Label>
                   <Textarea
                     id="incoming-proxies"
                     value={trusted}
@@ -210,25 +235,6 @@ function IncomingSettings({ section }: { section: 'proxy' | 'limits' }) {
                         .
                       </p>
                     )}
-                    <p className="help">
-                      One IP address or CIDR network per line. For a tunnel, enter the cloudflared
-                      address seen by AIOSources. For Cloudflare’s standard proxy, use its{' '}
-                      <a
-                        className="link"
-                        href="https://www.cloudflare.com/ips/"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        published IP ranges
-                      </a>
-                      . Trust only proxies you control or explicitly authorize.
-                    </p>
-                    <p className="help">
-                      Cloudflare uses CF-Connecting-IP with a single address. X-Forwarded-For chains
-                      are read from the nearest proxy back to the first untrusted address. Missing
-                      or invalid headers use the direct connection address. IPv4 and IPv6 are
-                      supported.
-                    </p>
                   </div>
                 </div>
               </section>
