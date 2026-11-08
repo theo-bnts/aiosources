@@ -101,7 +101,7 @@ A new source becomes available after its first successful complete import. A pau
 ### Stremio, Nuvio and AIOStreams
 
 1. Open **Connections → Stremio → Settings** and choose **Create access**.
-2. Give the connection a name. Optionally choose **Filters**, up to three **Sorting** priorities, or an expiration date and request limits under **Advanced**.
+2. Give the connection a name. Optionally choose **Filters**, up to three **Sorting** priorities, or adjust **Request limits** and **Expiration**.
 3. Save the installation link when shown, then enable the connection.
 4. Install the manifest URL as a custom addon in Stremio or Nuvio, or add it as a custom addon in AIOStreams. Use an address reachable by that application.
 
@@ -119,7 +119,7 @@ Open **Connections → Torznab**, create and enable an access, then copy its URL
 
 **Administration → Public access** lets you offer Search, Stremio, Torznab and Shared catalogs independently. Visitors cannot open administration. Playback uses their own credentials; keys and optional personal announce URLs are remembered in their browser, without being saved by AIOSources on the server. Public catalog sharing requires source exposure and includes only the data you allow. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
 
-Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, two-step verification and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options inside **Advanced**.
+Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, two-step verification and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options in collapsed sections.
 
 ## Update or try a preview
 
