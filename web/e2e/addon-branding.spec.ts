@@ -1,10 +1,17 @@
 import { test, expect, createStremioAccess } from './fixtures'
+import { readFile } from 'node:fs/promises'
 
 test('installed addons advertise their public PNG without exposing administrator access', async ({
   page,
   browser,
   server,
 }) => {
+  const versionSource = await readFile(
+    new URL('../../internal/aiosource/manifest.go', import.meta.url),
+    'utf8',
+  )
+  const expectedVersion = versionSource.match(/^const Version = "([^"]+)"$/m)?.[1]
+  expect(expectedVersion, 'The addon version must be declared in the current source').toBeTruthy()
   const { manifestURL } = await createStremioAccess(page)
   const visitor = await browser.newContext({ baseURL: server.origin })
   try {
@@ -12,7 +19,7 @@ test('installed addons advertise their public PNG without exposing administrator
     expect(response.status()).toBe(200)
     expect(response.headers()['access-control-allow-origin']).toBe('*')
     const manifest = await response.json()
-    expect(manifest.version).toBe('2.2.0')
+    expect(manifest.version).toBe(expectedVersion)
     expect(manifest.logo).toBe(
       'https://raw.githubusercontent.com/theo-bnts/aiosources/main/web/public/logo.png',
     )
