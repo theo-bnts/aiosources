@@ -28,6 +28,8 @@ test('detail return links retain the complete public list view and direct links 
     ['/torrents', '?q=example&provider=source&sort=oldest', 'Torrents'],
     ['/search', '?q=example&type=tv&offset=50', 'Search'],
     ['/public/search', '?q=example&type=tv&year=2026&offset=50', 'Search'],
+    ['/search/torrents', '?q=example&provider=source&offset=50', 'Search torrents'],
+    ['/public/search/torrents', '?q=example&cached_only=true', 'Search torrents'],
     ['/sharing/remotes', '?q=example&state=disabled', 'Remote catalogs'],
     ['/remotes/settings', '?q=example&state=disabled', 'Remote catalogs'],
     ['/remotes/history', '?status=failed&offset=50', 'Remote catalog history'],
@@ -86,6 +88,14 @@ test('download operations can return to releases and then the original title sea
   assert.equal(back.to, '/search/123?q=example&cached_only=true')
   assert.equal(back.label, 'Source releases')
   assert.deepEqual(back.state, titles)
+  const torrents = listViewState(
+    { pathname: '/search/torrents', search: '?q=example&provider=source&offset=50' },
+    titles,
+  )
+  const directBack = detailBackLink(torrents, { to: '/debrid/history', label: 'History' })!
+  assert.equal(directBack.to, '/search/torrents?q=example&provider=source&offset=50')
+  assert.equal(directBack.label, 'Search torrents')
+  assert.deepEqual(directBack.state, titles)
 })
 
 test('return ancestry copies only valid local views and bounds cyclic browser state', () => {

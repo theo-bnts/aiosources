@@ -49,6 +49,12 @@ async function submitAndContinueTyping(page: Page, input: Locator, key: string) 
 
 for (const view of [
   { name: 'Search', path: '/search?q=Original', input: '#catalog-query', key: 'q' },
+  {
+    name: 'Direct torrent Search',
+    path: '/search/torrents?q=Original',
+    input: '#direct-torrent-query',
+    key: 'q',
+  },
   { name: 'Torrents', path: '/torrents?q=Original', input: '#torrent-search', key: 'q' },
   {
     name: 'Identification',

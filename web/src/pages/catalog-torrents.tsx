@@ -135,12 +135,12 @@ export function CatalogTorrentsPage() {
           />
         </Disclosure>
         <div className="flex flex-wrap gap-2">
-          <Button type="submit">
+          <Button id="direct-torrent-submit" type="submit">
             <MagnifyingGlassIcon />
             Search
           </Button>
           <ClearFiltersButton
-            onClear={() => setSearch(new URLSearchParams(q ? { q } : {}), { flushSync: true })}
+            onClear={() => setSearch(new URLSearchParams(), { flushSync: true })}
           />
         </div>
       </form>

@@ -10,6 +10,8 @@ const viewLabels: Record<string, string> = {
   '/torrents': 'Torrents',
   '/search': 'Search',
   '/public/search': 'Search',
+  '/search/torrents': 'Search torrents',
+  '/public/search/torrents': 'Search torrents',
   '/remotes': 'Remote catalogs',
   '/remotes/settings': 'Remote catalogs',
   '/remotes/history': 'Remote catalog history',
