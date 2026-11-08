@@ -1,6 +1,6 @@
 package aiosource
 
-const Version = "2.2.0"
+const Version = "2.3.0"
 
 // Client image loaders may not reach a private Docker hostname or pass an
 // instance's access gateway. Keep the public brand asset independent of both

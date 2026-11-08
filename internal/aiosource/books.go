@@ -17,7 +17,7 @@ import (
 )
 
 const openLibraryExport = "https://openlibrary.org/data/ol_dump_latest.txt.gz"
-const openLibraryAgent = "AIOSources/2.2 (+https://github.com/theo-bnts/aiosources)"
+const openLibraryAgent = "AIOSources/" + Version + " (+https://github.com/theo-bnts/aiosources)"
 
 func trustedBookExport(r *http.Request, via []*http.Request) error {
 	host := r.URL.Hostname()

@@ -12,7 +12,7 @@ func TestAddonManifestsAdvertiseTheSamePublicLogoAndVersion(t *testing.T) {
 	base := Manifest()
 	filtered := InstallationManifest(model.StreamPreferences{Types: []string{"movie"}, Services: []string{"torbox"}})
 	for _, manifest := range []map[string]any{base, filtered} {
-		if manifest["version"] != Version || Version != "2.2.0" || manifest["logo"] != LogoURL {
+		if manifest["version"] != Version || Version != "2.3.0" || manifest["logo"] != LogoURL {
 			t.Fatal("addon identity does not include the current version and logo")
 		}
 		logo, err := url.Parse(manifest["logo"].(string))
