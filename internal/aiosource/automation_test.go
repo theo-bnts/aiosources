@@ -221,8 +221,11 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 	}
 	waitAutomation(t, func() bool {
 		status, err := s.DB.AIOStatus(ctx)
-		active, _, _ := s.State()
-		return err == nil && status.LastSync != nil && status.Matched == 1 && !active
+		syncing, matching, _ := s.State()
+		// A published match can be visible before its worker finishes draining
+		// the queue and saves the durable cadence. Wait for both jobs before
+		// introducing work that is supposed to belong to the next pass.
+		return err == nil && status.LastSync != nil && status.LastMatch != nil && status.Matched == 1 && !syncing && !matching
 	})
 	count := requests.Load()
 	for range 5 {
