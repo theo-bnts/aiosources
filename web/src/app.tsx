@@ -754,7 +754,7 @@ export function AppShell({
     </>
   )
   const footer = publicMode ? (
-    <div className="shrink-0 border-t border-border p-3">
+    <div className="shrink-0 p-3">
       <Button variant="outline" className="w-full" asChild>
         <Link to={authenticated ? '/providers' : '/login'}>
           {authenticated ? 'Administration' : 'Admin login'}
@@ -762,7 +762,7 @@ export function AppShell({
       </Button>
     </div>
   ) : (
-    <div className="shrink-0 space-y-3 border-t border-border p-3">
+    <div className="shrink-0 space-y-3 p-3">
       <ErrorNotice error={logout.error} scope="action" />
       <Button
         variant="warning"

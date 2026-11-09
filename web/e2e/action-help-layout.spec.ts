@@ -33,6 +33,9 @@ for (const width of [390, 1440]) {
           if (getComputedStyle(actions).borderTopWidth !== '0px')
             issues.push('Actions have a separator')
         }
+        const navigationActions = document.querySelector('aside > :last-child')
+        if (navigationActions && getComputedStyle(navigationActions).borderTopWidth !== '0px')
+          issues.push('Navigation actions have a separator')
         return { checked, issues }
       })
       checked += result.checked
