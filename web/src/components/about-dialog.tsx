@@ -27,13 +27,12 @@ export function AboutDialog() {
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
-          className="w-(--control-height) bg-background sm:w-auto dark:bg-background"
+          size="icon"
+          className="bg-background dark:bg-background"
           aria-label="About AIOSources"
           title="About AIOSources"
         >
           <InfoIcon />
-          <span className="hidden sm:inline">About</span>
         </Button>
       </DialogTrigger>
       <DialogContent>

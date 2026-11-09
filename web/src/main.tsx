@@ -208,7 +208,7 @@ const router = createBrowserRouter(
     <Route
       element={
         <>
-          <div className="fixed top-2.5 right-5 z-(--layer-header-actions) flex items-center gap-2 md:right-9 lg:top-3.5">
+          <div className="fixed top-3 right-5 z-(--layer-header-actions) flex items-center gap-2 md:right-9">
             <InterfacePreferences />
             <AboutDialog />
           </div>

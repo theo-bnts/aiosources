@@ -526,7 +526,6 @@ export function SessionGate({ children }: { children: ReactNode }) {
 }
 
 function useLiveUpdates(enabled = true) {
-  const [state, setState] = useState<'connecting' | 'live' | 'reconnecting'>('connecting')
   useEffect(() => {
     if (!enabled) return
     const source = new EventSource('/api/events', { withCredentials: true })
@@ -543,13 +542,9 @@ function useLiveUpdates(enabled = true) {
           Math.max(500, nextRefresh - performance.now()),
         )
     }
-    source.onopen = () => {
-      setState('live')
-      queueRefresh()
-    }
+    source.onopen = queueRefresh
     source.addEventListener('update', queueRefresh)
     source.onerror = () => {
-      setState('reconnecting')
       void queryClient.invalidateQueries({ queryKey: ['session'] }, { cancelRefetch: false })
     }
     return () => {
@@ -557,7 +552,6 @@ function useLiveUpdates(enabled = true) {
       clearTimeout(timer)
     }
   }, [enabled])
-  return state
 }
 
 export function AppShell({
@@ -596,7 +590,7 @@ export function AppShell({
   const items = groups.flatMap((group) => navigationItems(group.items))
   const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
-  const live = useLiveUpdates(!publicMode)
+  useLiveUpdates(!publicMode)
   const location = useLocation()
   const navigationPath = publicMode
     ? location.pathname.startsWith('/public/search')
@@ -740,13 +734,6 @@ export function AppShell({
         ),
       })),
   }
-  const connectionStatus = publicMode
-    ? 'Public access'
-    : live === 'live'
-      ? 'Live updates'
-      : live === 'connecting'
-        ? 'Connecting to updates'
-        : 'Reconnecting · refreshing every 30 s'
   const branding = (
     <>
       <DatabaseIcon size={24} aria-hidden="true" className="shrink-0 text-primary" />
@@ -799,9 +786,9 @@ export function AppShell({
         <div className="lg:pl-60">
           <header
             ref={headerRef}
-            className="sticky top-0 z-(--layer-header) flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9"
+            className="sticky top-0 z-(--layer-header) flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9 lg:pr-[calc(2.25rem+var(--header-actions-width)+0.75rem)]"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3 pr-28 sm:pr-40 lg:pr-0">
+            <div className="flex min-w-0 flex-1 items-center gap-3 pr-[calc(var(--header-actions-width)+0.75rem)] lg:pr-0">
               <DialogTrigger asChild>
                 <Button
                   variant="ghost"
@@ -864,20 +851,6 @@ export function AppShell({
                   services: publicInfo.data?.providers.map((service) => service.id),
                 }}
               />
-            </div>
-            <div className="mr-36 hidden shrink-0 items-center gap-3 lg:flex">
-              <span
-                className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"
-                role="status"
-                title={connectionStatus}
-              >
-                <span
-                  className={`size-1.5 rounded-full ${live === 'live' ? 'bg-primary' : 'bg-muted-foreground'}`}
-                />
-                <span className="sr-only max-w-60 truncate 2xl:not-sr-only">
-                  {connectionStatus}
-                </span>
-              </span>
             </div>
           </header>
           <main id="main-content" ref={mainRef} tabIndex={-1} className="outline-none">

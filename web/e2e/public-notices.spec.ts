@@ -119,7 +119,21 @@ test('one About entry stays in the same place on public, sign-in and administrat
     // Wait for stable geometry. Hover/focus color transitions can be cancelled
     // normally and must not reject the position check through Animation.finished.
     await trigger.scrollIntoViewIfNeeded()
-    return trigger.boundingBox()
+    const bounds = await trigger.boundingBox()
+    const preferences = await target
+      .getByRole('button', { name: 'Interface preferences', exact: true })
+      .boundingBox()
+    expect(await trigger.innerText()).toBe('')
+    expect(bounds!.width).toBe(preferences!.width)
+    expect(bounds!.height).toBe(preferences!.height)
+    await expect(target.locator('header').getByRole('status')).toHaveCount(0)
+    const search = target.getByRole('button', { name: 'Search settings', exact: true })
+    if (await search.isVisible()) {
+      const searchBounds = await search.boundingBox()
+      if (searchBounds!.y < bounds!.y + bounds!.height)
+        expect(searchBounds!.x + searchBounds!.width).toBeLessThanOrEqual(preferences!.x - 8)
+    }
+    return bounds
   }
   async function checkAtSamePosition(target: Page, expected: Awaited<ReturnType<typeof position>>) {
     expect(await position(target)).toEqual(expected)

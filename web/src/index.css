@@ -45,6 +45,7 @@
 :root {
   color-scheme: dark;
   --control-height: 2.75rem;
+  --header-actions-width: calc(2 * var(--control-height) + 0.5rem);
   --layer-menu: 40;
   --layer-header: 50;
   --layer-header-actions: 51;

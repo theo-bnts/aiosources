@@ -2,12 +2,58 @@ package aiosource
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+func TestOneMetadataJobCollectsLocalizedPostersWithoutAFullSynchronization(t *testing.T) {
+	ctx, s, conn := testService(t)
+	var body map[string]any
+	if err := json.Unmarshal([]byte(movieDetail), &body); err != nil {
+		t.Fatal(err)
+	}
+	body["poster_path"] = "/english.jpg"
+	body["images"] = map[string]any{"posters": []map[string]any{
+		{"iso_639_1": "fr", "file_path": "/french.jpg", "vote_average": 8, "vote_count": 10},
+		{"iso_639_1": "en", "file_path": "/english.jpg", "vote_average": 8, "vote_count": 10},
+	}}
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path != "/movie/101" || !strings.Contains(","+r.URL.Query().Get("append_to_response")+",", ",images,") || r.URL.Query().Has("language") || r.URL.Query().Has("include_image_language") {
+			t.Error("image collection omitted images or restricted their languages")
+		}
+		if err := json.NewEncoder(w).Encode(body); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer server.Close()
+	s.TMDBBase, s.MetadataHTTP = server.URL, server.Client()
+	if err := s.DB.QueueAIOMetadata(ctx, "movie", []string{"101"}, true); err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := s.DB.AIOMetadataJobs(ctx)
+	if err != nil || len(jobs) != 1 {
+		t.Fatal("missing individual metadata job", err)
+	}
+	if ok, err := s.details(ctx, "synthetic-metadata-key", jobs[0]); !ok || err != nil {
+		t.Fatal("individual metadata update failed", err)
+	}
+	var french, english string
+	if err := conn.QueryRow(ctx, `SELECT localized_posters->>'fr',localized_posters->>'en' FROM aiosources.aio_works WHERE media_type='movie' AND tmdb_id='101'`).Scan(&french, &english); err != nil || french != "/french.jpg" || english != "/english.jpg" || calls.Load() != 1 {
+		t.Fatal("individual update did not store localized images in one request", err)
+	}
+	jobs, err = s.DB.AIOMetadataJobs(ctx)
+	if err != nil || len(jobs) != 0 {
+		t.Fatal("individual job did not finish", err)
+	}
+}
 
 func TestTMDBPostersSelectValidatedPathsWithoutChangingMatchingData(t *testing.T) {
 	for _, tc := range []struct{ kind, id, detail string }{{"movie", "101", movieDetail}, {"tv", "202", tvDetail}} {
