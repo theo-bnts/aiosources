@@ -248,7 +248,7 @@ export function CatalogSearchPage() {
           </>
         )
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button asChild variant="outline">
           <Link
             to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
