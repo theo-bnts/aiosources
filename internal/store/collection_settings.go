@@ -6,16 +6,6 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const collectionSettingsSchema = `
-CREATE TABLE aiosources.collection_settings (
-    singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),
-    workers INTEGER CHECK(workers BETWEEN 1 AND 32),
-    revision BIGINT NOT NULL DEFAULT 1 CHECK(revision > 0)
-);
--- NULL preserves the first serve invocation's --workers bootstrap value.
-INSERT INTO aiosources.collection_settings(singleton) VALUES(TRUE);
-`
-
 // InitializeCollectionSettings seeds only an unset value, never a saved setting.
 func (s *Store) InitializeCollectionSettings(ctx context.Context, workers int) error {
 	if workers < 1 || workers > model.MaxCollectionWorkers {

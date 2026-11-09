@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func TestIncomingTrustAndPublicLimitsPreserveExistingConnectionsAndGenerations(t *testing.T) {
@@ -89,62 +88,6 @@ func TestIncomingTrustAndPublicLimitsPreserveExistingConnectionsAndGenerations(t
 	var logs int
 	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='network.settings_changed' AND service='network' AND data='{}'::jsonb`).Scan(&logs); err != nil || logs != 4 {
 		t.Fatal("network audit events missing, duplicated or contain unrelated data", logs, err)
-	}
-}
-
-func TestIncomingNetworkMigrationPreservesEnabledVisitorLinksAndOutgoingRoutes(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if err = db.migrateThrough(ctx, 64); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,torznab_enabled=true,generation=42,torznab_generation=17;
- UPDATE aiosources.network_settings SET default_route='direct';`); err != nil {
-		t.Fatal(err)
-	}
-	if err = db.migrateThrough(ctx, 65); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET setup_per_minute=19, requests_per_minute=321,concurrent=61;`); err != nil {
-		t.Fatal(err)
-	}
-	tx, err := db.pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = tx.Exec(ctx, networkLimitsSchema); err != nil {
-		t.Fatal(err)
-	}
-	if err = tx.Rollback(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var quota int
-	if err = db.pool.QueryRow(ctx, `SELECT requests_per_minute FROM aiosources.aio_public_access WHERE singleton`).Scan(&quota); err != nil || quota != 321 {
-		t.Fatal("interrupted migration lost saved quotas", err)
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	access, err := db.PublicAccess(ctx)
-	if err != nil || !access.Enabled || !access.TorznabEnabled || access.Generation != 42 || access.TorznabGeneration != 17 {
-		t.Fatal("upgrade revoked or changed existing public access", err)
-	}
-	network, err := db.NetworkSettings(ctx)
-	want := model.PublicLimits{SetupPerMinute: 19, RequestsPerMinute: 321, Concurrent: 61}
-	if err != nil || network.Default != model.NetworkDirect || network.Incoming.Enabled || network.PublicLimits == nil || *network.PublicLimits != want {
-		t.Fatal("upgrade changed routing, trusted headers or saved quotas", err)
-	}
-	revision := network.Revision
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	network, _ = db.NetworkSettings(ctx)
-	if network.Revision != revision {
-		t.Fatal("repeated startup rewrote settings")
 	}
 }
 

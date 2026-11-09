@@ -7,43 +7,7 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
-
-func TestBookChangeUpgradePreservesAnImportedCatalogAndItsCheckpoint(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if err = db.migrateThrough(ctx, 78); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','The Amber Orchard','{}')`); err != nil {
-		t.Fatal(err)
-	}
-	_, err = db.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET complete=TRUE,snapshot='https://archive.org/download/ol_dump_2026-01-01/all.gz',position=1234,works=1,last_sync=now();
-INSERT INTO aiosources.settings(key,value) VALUES('aiosource.config.v2','{"revision":4,"openlibrary_days":30,"openlibrary_enabled":true}');`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	status, err := db.OpenLibraryStatus(ctx)
-	if err != nil || !status.Complete || !status.DataComplete || status.Position != 1234 || status.Works != 1 {
-		t.Fatal("upgrade reset the imported catalog", status, err)
-	}
-	config, err := db.AIOConfig(ctx)
-	if err != nil || config.OpenLibraryMinutes != 15 || !config.OpenLibraryEnabled {
-		t.Fatal("upgrade did not preserve enabled state and migrate the cadence", config.OpenLibraryMinutes, err)
-	}
-	var title string
-	if err = db.pool.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title); err != nil || title != "The Amber Orchard" {
-		t.Fatal("existing book was lost", title, err)
-	}
-}
 
 func TestBookResetClearsOnlyBookChangesAndKeepsVideoAndSources(t *testing.T) {
 	ctx, db := sharingDatabase(t)

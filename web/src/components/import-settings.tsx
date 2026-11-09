@@ -315,7 +315,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                   </div>
                 )}
                 {!rejected && <ErrorNotice error={error} />}
-                <div className="flex flex-wrap items-center gap-4 border-t border-border pt-5">
+                <div className="flex flex-wrap items-center gap-4">
                   <Button type="submit" disabled={!dirty || invalid || save.isPending || conflict}>
                     {save.isPending && save.variables.scope === scope ? 'Saving…' : 'Save'}
                   </Button>

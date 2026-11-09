@@ -14,21 +14,6 @@ import (
 
 var sharedHashRE = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
-const publicAccessSchema = `
-CREATE TABLE aiosources.aio_public_access(singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton), revision BIGINT NOT NULL DEFAULT 1, enabled BOOLEAN NOT NULL DEFAULT FALSE, generation BIGINT NOT NULL DEFAULT 1);
-INSERT INTO aiosources.aio_public_access(singleton) VALUES(TRUE);
-CREATE TABLE aiosources.aio_shared_availability(service TEXT NOT NULL CHECK(service IN ('alldebrid','torbox')), hash TEXT NOT NULL, cached BOOLEAN NOT NULL, checked_at TIMESTAMPTZ NOT NULL, files JSONB NOT NULL CHECK(jsonb_typeof(files)='array'), PRIMARY KEY(service,hash));
-ALTER TABLE aiosources.stremio_requests ADD COLUMN origin TEXT NOT NULL DEFAULT 'private' CHECK(origin IN ('private','public'));
-ALTER TABLE aiosources.stremio_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'stream' CHECK(kind IN ('stream','manifest','playback'));
-ALTER TABLE aiosources.stremio_requests ADD COLUMN service TEXT NOT NULL DEFAULT '' CHECK(service IN ('','alldebrid','torbox'));
-ALTER TABLE aiosources.stremio_requests ADD COLUMN calls JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(calls)='array');
-ALTER TABLE aiosources.stremio_requests DROP CONSTRAINT stremio_requests_outcome_check;
-ALTER TABLE aiosources.stremio_requests ADD CHECK(outcome IN ('results','empty','invalid','failed','cancelled','busy','pending'));
-ALTER TABLE aiosources.operation_events ADD COLUMN duration_ms BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE aiosources.operation_events ADD COLUMN http_status INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE aiosources.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT '';
-`
-
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
 	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation FROM aiosources.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration)

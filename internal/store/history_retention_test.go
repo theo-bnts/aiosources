@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 const historyBatchSize = 5000
@@ -378,65 +377,6 @@ func TestHistoryRetentionExpiresOperationsLogsAndIdleStremioRequests(t *testing.
 	stats, e := db.StremioStatistics(ctx)
 	if e != nil || stats.Requests != 1 {
 		t.Fatalf("idle requests were not purged: %+v %v", stats, e)
-	}
-}
-
-func TestHistoryRetentionMigrationKeepsLegacyAcceptanceEvidence(t *testing.T) {
-	ctx, endpoint := testutil.NewDatabase(t)
-	db, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if err = db.migrateThrough(ctx, 45); err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range []struct {
-		id     string
-		reject bool
-	}{{"trusted", false}, {"partial", true}} {
-		// Seed using the historical schema, rather than a current writer that
-		// necessarily requires columns added by later migrations.
-		run := model.Run{ID: tc.id + "-legacy", ProviderID: tc.id}
-		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,revision,mode,status,config) VALUES($1,$2,$2,'','incremental','queued',jsonb_build_object('id',$2::text,'adapter','http_json'))`, run.ID, tc.id); err != nil {
-			t.Fatal(err)
-		}
-		var page int64
-		if err = db.pool.QueryRow(ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,$2,1,'','application/json') RETURNING id`, run.ID, tc.id).Scan(&page); err != nil {
-			t.Fatal(err)
-		}
-		errorText := ""
-		if tc.reject {
-			errorText = "invalid primary"
-		}
-		for _, statement := range []struct {
-			query string
-			args  []any
-		}{
-			{`INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,error) VALUES($1,$2,'accepted',$3,1,'','application/json',''),($1,$2,'rejected',$3,1,'','application/json',$4)`, []any{run.ID, tc.id, page, errorText}},
-			{`INSERT INTO aiosources.run_record_identities(run_id,source_id) VALUES($1,'accepted')`, []any{run.ID}},
-			{`INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,'accepted','{"title":"Legacy"}')`, []any{tc.id}},
-			{`UPDATE aiosources.runs SET status='succeeded',finished_at=now(),errors=1 WHERE id=$1`, []any{run.ID}},
-		} {
-			if _, err = db.pool.Exec(ctx, statement.query, statement.args...); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for _, tc := range []struct {
-		id    string
-		known bool
-	}{{"trusted", true}, {"partial", false}} {
-		known, e := db.Known(ctx, tc.id, []string{"accepted"}, time.Now().Add(time.Second))
-		if e != nil || known["accepted"] != tc.known {
-			t.Fatalf("upgrade changed %s acceptance: %v %v", tc.id, known, e)
-		}
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
 	}
 }
 

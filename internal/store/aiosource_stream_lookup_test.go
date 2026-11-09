@@ -49,36 +49,6 @@ func TestNativeMALLookupUsesTheSameAssertionsAsTheRecordDecoder(t *testing.T) {
 	}
 }
 
-func TestNativeMALIndexUpgradePreservesPublishedDataAndQueueVersions(t *testing.T) {
-	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
-VALUES('example','1','{"mal_id":"21","title":"Example.Anime - 03"}');
-UPDATE aiosources.aio_match_queue SET version=9;
-DROP INDEX aiosources.aio_torrents_native_mal;
-DROP FUNCTION aiosources.aio_native_mal_candidates(JSONB);
-DELETE FROM aiosources.schema_migrations WHERE version=35;`); err != nil {
-		t.Fatal(err)
-	}
-	before, err := db.AIOTorrent(ctx, "example", "1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	after, err := db.AIOTorrent(ctx, "example", "1")
-	if err != nil || before.Fingerprint != after.Fingerprint || after.MAL != "21" {
-		t.Fatal("native fields changed during index upgrade", before, after, err)
-	}
-	var version int
-	if err := db.pool.QueryRow(ctx, `SELECT version FROM aiosources.aio_match_queue WHERE provider_id='example' AND source_id='1'`).Scan(&version); err != nil || version != 9 {
-		t.Fatal("upgrade changed the existing queue version", version, err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal("upgrade is not idempotent", err)
-	}
-}
-
 func BenchmarkNativeMALLookup(b *testing.B) {
 	ctx, db := sharingDatabase(b)
 	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)

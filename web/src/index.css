@@ -129,7 +129,7 @@
     @apply flex flex-wrap items-center gap-3;
   }
   .card-actions {
-    @apply flex flex-wrap items-center gap-3 border-t border-border pt-4;
+    @apply flex flex-wrap items-center gap-3;
   }
   .table-frame {
     @apply overflow-hidden rounded-md border border-border bg-card/30;

@@ -2,33 +2,22 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
 
-const applicationSchema = "aiosources"
-
-// These identifiers are retained only to upgrade existing installations. The
-// application itself always uses applicationSchema after a successful migration.
+// Only released 2.3 installations can still need the database namespace move.
 const legacySchema = "ingest"
 const legacySchemaVersion = 92
 const legacySchemaGuard = "application-data-moved-to-aiosources"
 
-func legacyMigrationSQL(sql string) string {
-	return strings.NewReplacer(
-		applicationSchema+".", legacySchema+".",
-		"'"+applicationSchema+"'", "'"+legacySchema+"'",
-		applicationSchema+"_run_changes", legacySchema+"_run_changes",
-	).Replace(sql)
-}
-
-func legacyMigrationChecksum(sql string) string {
-	sum := sha256.Sum256([]byte(legacyMigrationSQL(sql)))
-	return hex.EncodeToString(sum[:])
+var releasedUpgradeChecksums = map[int]string{
+	90: "00717d50064e66b7e0e03330562ddb3186ddc26010dca2cc68bf7cc8748fe198",
+	91: "4907506bebe59d0535865a9ebe28106aeaf6abb8db02a8f75da4ad971581ef93",
+	92: "0be4b6d0152d2b4bce7061dcf75f10f0709bc6c2cbb9bb88466e01600c2aabef",
+	93: "ce8aa87be4b50f9b976b125c85b5bc3cb17975ba94f956660ef8fe703cd0e3bc",
 }
 
 // adoptApplicationSchema moves only catalog metadata, never torrent contents or
@@ -66,8 +55,8 @@ func adoptApplicationSchema(ctx context.Context, tx pgx.Tx) (bool, error) {
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(version),0) FROM ingest.schema_migrations`).Scan(&installed); err != nil {
 		return false, err
 	}
-	if installed < 1 || installed > legacySchemaVersion {
-		return false, errors.New("the legacy application database version is not supported by this upgrade")
+	if installed < minimumSchemaVersion || installed > legacySchemaVersion {
+		return false, errUpgradeRequired
 	}
 	if _, err := tx.Exec(ctx, `ALTER SCHEMA ingest RENAME TO aiosources`); err != nil {
 		return false, err

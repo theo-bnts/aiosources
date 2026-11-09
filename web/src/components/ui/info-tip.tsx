@@ -38,7 +38,7 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
           type="button"
           data-slot="info-trigger"
           aria-label={`About ${label}`}
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="relative inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1 before:rounded-full"
           onClick={(event) => {
             keyboard.current = event.detail === 0
             event.stopPropagation()

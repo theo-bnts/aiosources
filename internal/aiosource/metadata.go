@@ -7,8 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/store"
 	"io"
 	"log/slog"
 	"net/http"
@@ -18,6 +16,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (bool, error) {
@@ -115,6 +116,14 @@ type tmdbSeasonDetails struct {
 	} `json:"episodes"`
 }
 type tmdbDetails struct {
+	Images *struct {
+		Posters []struct {
+			Language string  `json:"iso_639_1"`
+			Path     string  `json:"file_path"`
+			Score    float64 `json:"vote_average"`
+			Votes    int     `json:"vote_count"`
+		} `json:"posters"`
+	} `json:"images"`
 	Poster           string `json:"poster_path"`
 	Adult            *bool  `json:"adult"`
 	ID               int64  `json:"id"`
@@ -175,6 +184,25 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 	}
 	w.Adult = *d.Adult
 	w.PosterPath = d.Poster
+	w.LocalizedPosters = map[string]string{}
+	if d.Images != nil {
+		type rating struct {
+			score float64
+			votes int
+		}
+		ratings := map[string]rating{}
+		for _, poster := range d.Images.Posters {
+			lang := NormalizeLanguage(poster.Language)
+			if lang == "" || model.CoverURL(typ, poster.Path, 0) == "" {
+				continue
+			}
+			previous, found := ratings[lang]
+			if !found || poster.Score > previous.score || poster.Score == previous.score && poster.Votes > previous.votes {
+				w.LocalizedPosters[lang] = poster.Path
+				ratings[lang] = rating{poster.Score, poster.Votes}
+			}
+		}
+	}
 	primary := d.Title
 	date := d.Date
 	original := d.OriginalTitle
@@ -256,7 +284,7 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 	return w, nil
 }
 func (s *Service) loadDetails(ctx context.Context, key string, j store.AIOJob) (*store.AIOMetadataPublication, error) {
-	appendFields := "external_ids,alternative_titles,translations"
+	appendFields := "external_ids,alternative_titles,translations,images"
 	if j.Type == "movie" {
 		appendFields += ",release_dates"
 	}

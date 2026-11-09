@@ -180,7 +180,7 @@ export function RuntimeSettingsPanel({
                 </div>
               )}
               {!conflict && <ErrorNotice error={save.error} />}
-              <div className="toolbar border-t border-border pt-5">
+              <div className="toolbar">
                 <Button type="submit" disabled={!dirty || invalid || conflict || save.isPending}>
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>

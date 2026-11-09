@@ -58,39 +58,3 @@ func TestIdentificationIntervalDefaultsForExistingSavedConfiguration(t *testing.
 		t.Fatal("old configuration lost interval default", c.MatchSeconds, err)
 	}
 }
-
-func TestNumberingUpgradePreservesWorkingDataAndQueuedVersions(t *testing.T) {
-	ctx, db := sharingDatabase(t)
-	_, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
-('example','spaced','{"title":"Example Serial Season 3 - 09"}'),
-('example','ordinal','{"title":"Example Serial 2nd Season - 01"}'),
-('example','range','{"title":"Example Serial - 01-12"}'),
-('example','absolute','{"title":"Example.Serial.S01E02.EP1158"}'),
-('example','year','{"title":"Example Film - 2021"}'),
-('example','reviewed','{"title":"Example Serial Season 3 - 09"}'),
-('example','working','{"title":"Example.Serial.S01E02.1080p"}');
-INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,status,reason)
-SELECT provider_id,source_id,md5(fields::text),'unmatched','old decision' FROM aiosources.torrents;
-INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
-SELECT provider_id,source_id,md5(fields::text),md5(aiosources.aio_review_evidence(fields)::text),'tv','1' FROM aiosources.torrents WHERE source_id='reviewed';
-DELETE FROM aiosources.aio_match_queue WHERE source_id<>'spaced'; UPDATE aiosources.aio_match_queue SET version=7;`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for range 2 {
-		if _, err = db.pool.Exec(ctx, releaseNumberingRecheckSchema); err != nil {
-			t.Fatal(err)
-		}
-		var ids []string
-		var version, matches int
-		if err = db.pool.QueryRow(ctx, `SELECT array_agg(source_id ORDER BY source_id) FROM aiosources.aio_match_queue`).Scan(&ids); err != nil {
-			t.Fatal(err)
-		}
-		if len(ids) != 5 {
-			t.Fatal("wrong recheck scope", ids)
-		}
-		if err = db.pool.QueryRow(ctx, `SELECT (SELECT version FROM aiosources.aio_match_queue WHERE source_id='spaced'),(SELECT count(*) FROM aiosources.aio_matches)`).Scan(&version, &matches); err != nil || version != 7 || matches != 7 {
-			t.Fatal("upgrade changed saved decisions", version, matches, err)
-		}
-	}
-}

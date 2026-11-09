@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -125,31 +124,6 @@ SELECT 'source',n::text,jsonb_build_object('title','Example.Film.2021') FROM gen
 	var matches, queue int
 	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_matches),(SELECT count(*) FROM aiosources.aio_match_queue)`).Scan(&matches, &queue); err != nil || matches != 30 || queue != 0 {
 		t.Fatal("pool contention lost matching work", matches, queue, err)
-	}
-}
-
-func TestAIOPerformanceUpgradeRequeuesOldMissesWithoutWithdrawingMatches(t *testing.T) {
-	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) VALUES('movie','101',ARRAY[2021]);
-INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','matched','{}'),('source','unmatched','{}'),('source','ambiguous','{}');
-INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM aiosources.aio_works),1,source_id,'previous decision' FROM aiosources.torrents;
-DELETE FROM aiosources.aio_match_queue;
-INSERT INTO aiosources.aio_match_queue(provider_id,source_id,version) VALUES('source','ambiguous',9);
-ALTER TABLE aiosources.aio_works DROP COLUMN adult;
-DROP INDEX aiosources.aio_metadata_jobs_due,aiosources.aio_works_refresh,aiosources.aio_torrents_tmdb,aiosources.aio_torrents_imdb,aiosources.aio_torrents_tvdb;
-DELETE FROM aiosources.schema_migrations WHERE version=34;`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var queue, version int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*),max(version) FROM aiosources.aio_match_queue`).Scan(&queue, &version); err != nil || queue != 2 || version != 9 {
-		t.Fatal("upgrade lost an existing queue version or withdrew working streams", queue, version, err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal("upgrade was not idempotent", err)
 	}
 }
 

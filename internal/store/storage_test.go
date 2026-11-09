@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func setStorageMode(t *testing.T, ctx context.Context, db *Store, mode model.StorageMode) {
@@ -329,61 +328,6 @@ func TestSourceResetIsFencedAndRetainsConfigurationMetadataAndCache(t *testing.T
 	var logged int
 	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='storage.sources_reset' AND created_at>$1`, time.Now().Add(-time.Minute)).Scan(&logged); err != nil || logged != 1 {
 		t.Fatalf("reset was not logged once: %d %v", logged, err)
-	}
-}
-
-func TestStorageMigrationClearsUnusedSharingWithoutRewritingCatalogOrOldRunModes(t *testing.T) {
-	for _, active := range []bool{false, true} {
-		t.Run(map[bool]string{false: "unused", true: "active"}[active], func(t *testing.T) {
-			ctx, endpoint := testutil.NewDatabase(t)
-			db, err := Open(ctx, endpoint)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer db.Close()
-			if err := db.migrateThrough(ctx, 50); err != nil {
-				t.Fatal(err)
-			}
-			fields := `{"title":"Legacy title","description":"` + strings.Repeat("old selected detail ", 1000) + `"}`
-			publishSharingRow(t, ctx, db, "legacy", "one", fields, nil)
-			publishSharingRow(t, ctx, db, "legacy", "two", fields, nil)
-			if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,revision,mode,status,config)
- VALUES('legacy-queued','legacy-run','Legacy','','full','queued','{"id":"legacy-run"}')`); err != nil {
-				t.Fatal(err)
-			}
-			var grant model.ShareCredential
-			var first model.CatalogEnvelope
-			if active {
-				grant = legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Legacy recipient", Scope: "all", Enabled: true, Fields: CatalogFields()})
-				first = legacyCatalogPageFixture(t, ctx, db, grant, CatalogPageRequest{Limit: 1})
-			}
-			if err := db.Migrate(ctx); err != nil {
-				t.Fatal(err)
-			}
-			old, err := db.GetRun(ctx, "legacy-queued")
-			if err != nil || old.StorageMode != model.StorageFull {
-				t.Fatalf("upgrade changed an existing snapshot: %+v %v", old, err)
-			}
-			rows := mirrorRows(t, ctx, db, "legacy")
-			if len(rows) != 2 || rows["one"].Fields["description"] != strings.Repeat("old selected detail ", 1000) {
-				t.Fatal("upgrade rewrote published source fields")
-			}
-			var snapshots int
-			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&snapshots); err != nil {
-				t.Fatal(err)
-			}
-			if active {
-				last := sharingPage(t, ctx, db, grant, CatalogPageRequest{Cursor: first.NextCursor})
-				if snapshots != 2 || len(last.Items) != 1 || last.Checkpoint == "" {
-					t.Fatalf("upgrade broke an active snapshot: %+v, rows=%d", last, snapshots)
-				}
-			} else if snapshots != 0 {
-				t.Fatal("unused journal remained allocated")
-			}
-			if err := db.Migrate(ctx); err != nil {
-				t.Fatal("repeated upgrade was not idempotent:", err)
-			}
-		})
 	}
 }
 

@@ -9,38 +9,6 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const runtimePolicySchema = `
-CREATE TABLE aiosources.runtime_settings (
- section TEXT PRIMARY KEY CHECK(section IN ('debrid','outgoing','connections','history')),
- revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0),
- values JSONB NOT NULL CHECK(jsonb_typeof(values)='object')
-);
-INSERT INTO aiosources.runtime_settings(section,values) VALUES
- ('debrid','{"cache_jobs":4,"download_jobs":4,"cleanup_jobs":4,"public_checks":1}'),
- ('outgoing','{"metadata_seconds":60,"debrid_seconds":60,"inventory_seconds":600}'),
- ('connections','{"stremio_seconds":70,"torznab_seconds":20,"catalog_seconds":20}'),
- ('history','{"days":7,"cleanup_seconds":30}');
-`
-
-const runtimeSettingsSchema = runtimePolicySchema + `ALTER TABLE aiosources.collection_settings ADD COLUMN auto_resume_interrupted BOOLEAN NOT NULL DEFAULT TRUE;`
-
-const extendedRuntimeSettingsSchema = `
-ALTER TABLE aiosources.runtime_settings DROP CONSTRAINT runtime_settings_section_check;
-ALTER TABLE aiosources.runtime_settings ADD CONSTRAINT runtime_settings_section_check CHECK(section IN
- ('debrid','outgoing','connections','history','identification','matching','metadata','metadata_retries','source_retries','debrid_retries','downloads','security','payloads'));
-UPDATE aiosources.runtime_settings SET values='{"batch_size":5000,"pass_seconds":10}'::jsonb || values,revision=revision+1 WHERE section='history';
-INSERT INTO aiosources.runtime_settings(section,values) VALUES
- ('identification','{"workers":0,"queue_batch":250,"transaction_batch":25}'),
- ('matching','{"minimum_similarity":92,"ambiguity_margin":8}'),
- ('metadata','{"workers":16,"queue_batch":100,"publication_batch":16}'),
- ('metadata_retries','{"request_attempts":4,"request_retry_seconds":1,"sync_retry_seconds":60,"sync_retry_max_seconds":900,"detail_retry_seconds":60,"detail_retry_max_seconds":86400}'),
- ('source_retries','{"retries":3,"initial_seconds":2,"maximum_seconds":8}'),
- ('debrid_retries','{"delay_minutes":15,"maximum_hours":48}'),
- ('downloads','{"duration_hours":24,"ticket_minutes":10}'),
- ('security','{"session_hours":12,"login_per_minute":10,"login_global_per_minute":60,"session_limit":256,"enrollment_minutes":10}'),
- ('payloads','{"source_kib":128,"public_stremio_bytes":8192,"public_torznab_bytes":6000}');
-`
-
 type runtimeSettingsCache struct {
 	loading  chan struct{}
 	epoch    uint64

@@ -1,7 +1,7 @@
 // Package buildinfo identifies the product release and its exact published build.
 package buildinfo
 
-const Release = "2.3.0"
+const Release = "2.4.0"
 
 // Display preserves explicit local version overrides. Actions supplies the full
 // Git revision; the same twelve characters identify its GitHub pre-release.

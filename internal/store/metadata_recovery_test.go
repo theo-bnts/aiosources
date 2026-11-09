@@ -2,12 +2,8 @@ package store
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func TestInvalidBookScheduleNeverAdmitsWork(t *testing.T) {
@@ -16,50 +12,6 @@ func TestInvalidBookScheduleNeverAdmitsWork(t *testing.T) {
 		if due, err := db.OpenLibraryDue(context.Background(), minutes); due || err == nil {
 			t.Fatal("an invalid schedule admitted work", minutes, due, err)
 		}
-	}
-}
-
-func TestInformationRecoveryUpgradeKeepsExistingCatalogsAndHonestFreshness(t *testing.T) {
-	for _, pending := range []bool{false, true} {
-		t.Run(fmt.Sprint(pending), func(t *testing.T) {
-			ctx, dsn := testutil.NewDatabase(t)
-			db, err := Open(ctx, dsn)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer db.Close()
-			if err = db.migrateThrough(ctx, 79); err != nil {
-				t.Fatal(err)
-			}
-			if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) VALUES('movie','101','{}');
- INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Almanac','{}');
- UPDATE aiosources.aio_state SET last_sync=now()-interval '10 minutes',changes_through=now()-interval '10 minutes';
- UPDATE aiosources.ol_import_state SET position=1234,complete=TRUE,works=1;`); err != nil {
-				t.Fatal(err)
-			}
-			if pending {
-				if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id) VALUES('movie','101')`); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err = db.Migrate(ctx); err != nil {
-				t.Fatal(err)
-			}
-			var index string
-			if err = db.pool.QueryRow(ctx, `SELECT pg_get_indexdef('aiosources.aio_works_refresh'::regclass)`).Scan(&index); err != nil || !strings.Contains(index, "WHERE") {
-				t.Fatal("video freshness checks would index the entire book catalog", index, err)
-			}
-			status, err := db.AIOAutomationStatus(ctx)
-			if err != nil || status.LastSync == nil || status.ChangesThrough == nil || (status.AppliedThrough == nil) != pending {
-				t.Fatal("upgrade lost progress or acknowledged pending details", status, err)
-			}
-			var videos, books int
-			err = db.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE media_type='movie'),count(*) FILTER(WHERE media_type='book') FROM aiosources.aio_works`).Scan(&videos, &books)
-			bookState, bookErr := db.OpenLibraryStatus(ctx)
-			if err != nil || bookErr != nil || videos != 1 || books != 1 || !bookState.Complete || bookState.Position != 1234 {
-				t.Fatal("upgrade erased an existing catalog", videos, books, bookState, err, bookErr)
-			}
-		})
 	}
 }
 

@@ -142,31 +142,3 @@ func TestTorznabSavedCachePolicyAppliesToExistingKeyAndCannotBeRelaxed(t *testin
 		}
 	}
 }
-
-func TestTorznabPreferencesUpgradePreservesExistingKeysAndDefaultVisibility(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(db.Close)
-	if err = db.migrateThrough(ctx, 59); err != nil {
-		t.Fatal(err)
-	}
-	grant := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing Torznab", Scope: "all", Enabled: true, Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='torznab',media_types=ARRAY['movie','tv'],requests_per_minute=19,max_concurrent_downloads=3 WHERE id=$1`, grant.Share.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	current, err := db.Share(ctx, grant.Share.ID)
-	if err != nil || current.TorznabPreferences == nil || current.TorznabPreferences.CachedOnly || len(current.TorznabPreferences.Services) != 0 || len(current.MediaTypes) != 2 || current.RequestsPerMinute != 19 || current.MaxConcurrentDownloads != 3 {
-		t.Fatal("upgrade changed existing permissions or defaults", err)
-	}
-	request, err := db.BeginTorznabRequest(ctx, grant.Share.ID, grant.Password)
-	if err != nil {
-		t.Fatal("upgrade invalidated an existing key", err)
-	}
-	defer request.Close()
-}

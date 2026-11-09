@@ -31,7 +31,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
 }
 
 func catalogYearFilter(year string) string {

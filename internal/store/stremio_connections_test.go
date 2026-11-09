@@ -4,10 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func TestStremioAccessAdmissionRevocationAndCredentialStorage(t *testing.T) {
@@ -93,51 +91,5 @@ func TestStremioAccessAdmissionRevocationAndCredentialStorage(t *testing.T) {
 	}
 	if err = active.Validate(ctx); !errors.Is(err, ErrCatalogAuthentication) {
 		t.Fatal("revocation failed to cancel an admitted response", err)
-	}
-}
-
-func TestStremioConnectionsUpgradeKeepsExistingAccessAndPublicConsent(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(db.Close)
-	if err = db.migrateThrough(ctx, 56); err != nil {
-		t.Fatal(err)
-	}
-	old := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing Torznab", Scope: "all", Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='torznab',enabled=true WHERE id=$1`, old.Share.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,torznab_enabled=true,expose_sources=true,revision=7,generation=9,torznab_generation=3`); err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	access, err := db.PublicAccess(ctx)
-	if err != nil || !access.Enabled || !access.ExposeSources || !access.TorznabEnabled || access.Revision != 7 || access.Generation != 9 || access.TorznabGeneration != 3 {
-		t.Fatal("upgrade changed existing public access", access, err)
-	}
-	request, err := db.BeginTorznabRequest(ctx, old.Share.ID, old.Password)
-	if err != nil {
-		t.Fatal("existing Torznab credential lost", err)
-	}
-	defer request.Close()
-	if err = request.Validate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var retained bool
-	if err = db.pool.QueryRow(ctx, `SELECT enabled FROM aiosources.catalog_tracking`).Scan(&retained); err != nil || retained {
-		t.Fatal("upgrade enabled unnecessary catalog retention", err)
-	}
-	expired := time.Now().Add(-time.Hour)
-	grant, err := db.CreateShare(ctx, model.ShareInput{Format: "stremio", Name: "Expired", Scope: "all", Fields: CatalogFields(), Enabled: true, ExpiresAt: &expired, StreamPreferences: &model.StreamPreferences{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.StremioConnection(ctx, grant.Share.ID, grant.Password); !errors.Is(err, ErrCatalogAuthentication) {
-		t.Fatal("expired installation authorized", err)
 	}
 }

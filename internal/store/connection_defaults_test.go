@@ -1,12 +1,10 @@
 package store
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func TestPrivateConnectionsHaveNoImplicitPerAccessLimits(t *testing.T) {
@@ -75,39 +73,5 @@ func TestPrivateConnectionsHaveNoImplicitPerAccessLimits(t *testing.T) {
 				t.Fatal("explicit rate limit ignored or unlimited concurrency treated as zero capacity", err)
 			}
 		})
-	}
-}
-
-func TestConnectionDefaultsUpgradePreservesNamedAccessAndExplicitPolicies(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(db.Close)
-	if err = db.migrateThrough(ctx, 57); err != nil {
-		t.Fatal(err)
-	}
-	requests, concurrent := 17, 3
-	grant := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing connection", Enabled: true, Scope: "all", Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='stremio',requests_per_minute=$2,max_concurrent_downloads=$3,stream_preferences='{"mode":"all","cached_only":true}' WHERE id=$1`, grant.Share.ID, requests, concurrent); err != nil {
-		t.Fatal("prepare historical named access", err)
-	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.secrets(name,ciphertext) VALUES('aiosource_installation','obsolete credential'::bytea)`); err != nil {
-		t.Fatal(err)
-	}
-	if err = db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	current, err := db.StremioConnection(ctx, grant.Share.ID, grant.Password)
-	if err != nil || current.RequestsPerMinute != requests || current.MaxConcurrentDownloads != concurrent || !current.StreamPreferences.CachedOnly {
-		t.Fatal("upgrade changed a saved policy or invalidated a named key", err)
-	}
-	var retained bool
-	if err = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.secrets WHERE name='aiosource_installation')`).Scan(&retained); err != nil || retained {
-		t.Fatal("obsolete global key retained", err)
-	}
-	if _, err = db.CreateShare(context.Background(), model.ShareInput{Name: "Catalog", Scope: "all", Fields: CatalogFields(), RequestsPerMinute: new(0)}); !errors.Is(err, model.ErrInvalid) {
-		t.Fatal("catalog limit policy widened", err)
 	}
 }

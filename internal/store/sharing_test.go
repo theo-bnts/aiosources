@@ -13,12 +13,6 @@ import (
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
-// Partial-schema publication tests already install unrelated access-control
-// columns needed by the current reader. These columns do not alter the catalog
-// identity/publication migration being exercised, and those fixtures are never
-// passed through the complete migration sequence.
-const testShareFormatColumns = `ALTER TABLE aiosources.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN stream_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN torznab_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN catalog_entities JSONB NOT NULL DEFAULT '{}';`
-
 // Historical upgrade fixtures must be written in their original schema, rather
 // than by a current writer which depends on columns added in later migrations.
 func legacyShareFixture(t *testing.T, ctx context.Context, db *Store, input model.ShareInput) model.ShareCredential {
@@ -372,44 +366,6 @@ func TestCatalogPublicationLockRollbackAndObservationOnlyUpdates(t *testing.T) {
 	}
 }
 
-func TestCatalogMigrationSeedsExistingRowsAndDurableIdentity(t *testing.T) {
-	ctx, endpoint := testutil.NewDatabase(t)
-	db, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+activitySchema+`INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema+"COMMIT;"); err != nil {
-		t.Fatal(err)
-	}
-	grant := sharingGrant(t, ctx, db)
-	page := sharingPage(t, ctx, db, grant, CatalogPageRequest{})
-	if len(page.Items) != 1 || page.Items[0].Fields["title"] != "existing" || page.Items[0].Origin.ProviderID != "legacy" || page.Items[0].Origin.SourceID == "" || page.Items[0].Origin.SourceID == "row" {
-		t.Fatalf("existing catalogue absent from first snapshot: %+v", page)
-	}
-	other, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer other.Close()
-	identity, err := other.CatalogInstanceID(ctx)
-	if err != nil || identity != page.InstanceID || identity != page.Items[0].Origin.InstanceID {
-		t.Fatalf("installation identity was not durable: %q %v", identity, err)
-	}
-	resumed := sharingPage(t, ctx, other, grant, CatalogPageRequest{Checkpoint: page.Checkpoint})
-	if resumed.Mode != "incremental" || len(resumed.Items) != 0 {
-		t.Fatalf("signing identity did not survive new store: %+v", resumed)
-	}
-	items, err := db.Shares(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encoded, err := json.Marshal(items)
-	if err != nil || strings.Contains(string(encoded), grant.Password) || strings.Contains(string(encoded), "password_hash") {
-		t.Fatalf("listing disclosed credential material: %s %v", encoded, err)
-	}
-}
-
 func TestCatalogLongImportedIdentityHasBoundedResumableCursor(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	origin := &model.CatalogOrigin{InstanceID: "remote-instance", ProviderID: "remote-source", SourceID: strings.Repeat("large-source-id-", 1000)}
@@ -455,46 +411,5 @@ func TestCatalogNativeSourceIdentifiersDoNotDiscloseCredentials(t *testing.T) {
 	deleted := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: updated.Checkpoint})
 	if len(deleted.Items) != 1 || deleted.Items[0].ID != original.ID || deleted.Items[0].Origin != original.Origin || !deleted.Items[0].Deleted {
 		t.Fatalf("opaque deletion identity changed: %+v", deleted)
-	}
-}
-
-func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
-	ctx, endpoint := testutil.NewDatabase(t)
-	db, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA aiosources;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema); err != nil {
-		t.Fatal(err)
-	}
-	source := "https://tracker.invalid/file?passkey=private-passkey"
-	publishSharingRow(t, ctx, db, "native", source, `{"title":"native record"}`, nil)
-	imported := &model.CatalogOrigin{InstanceID: "remote", ProviderID: "remote-provider", SourceID: "opaque-remote-id"}
-	publishSharingRow(t, ctx, db, "mirror", "local-id", `{"title":"imported record"}`, imported)
-	grant := sharingGrant(t, ctx, db)
-	oldPage := sharingPage(t, ctx, db, grant, CatalogPageRequest{Limit: 1})
-	oldSnapshot := sharingPage(t, ctx, db, grant, CatalogPageRequest{})
-	if _, err := db.pool.Exec(ctx, "BEGIN;"+catalogIdentityPrivacySchema+"COMMIT;"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.CatalogPage(ctx, grant.Share.ID, grant.Password, CatalogPageRequest{Cursor: oldPage.NextCursor}); !errors.Is(err, ErrCatalogCursor) {
-		t.Fatalf("old page mixed identity schemes: %v", err)
-	}
-	reset := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: oldSnapshot.Checkpoint})
-	encoded, err := json.Marshal(reset)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reset.Mode != "full" || len(reset.Items) != 2 || strings.Contains(string(encoded), "passkey") || reset.Items[0].ID == oldSnapshot.Items[0].ID || reset.Items[1].Origin != *imported {
-		t.Fatalf("privacy upgrade failed to reset native identity while preserving imports: %+v", reset)
-	}
-	publishSharingRow(t, ctx, db, "native", source, `{"title":"updated native"}`, nil)
-	delta := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: reset.Checkpoint})
-	if len(delta.Items) != 1 || delta.Items[0].ID != reset.Items[0].ID || delta.Items[0].Fields["title"] != "updated native" {
-		t.Fatalf("post-upgrade native identity was not stable: %+v", delta)
-	}
-	if _, err := db.pool.Exec(ctx, "DELETE FROM aiosources.catalog_journal"); err == nil {
-		t.Fatal("privacy migration left history mutable")
 	}
 }

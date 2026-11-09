@@ -3,325 +3,177 @@ package store
 import (
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// Migration identifiers use the two-int advisory namespace, separate from the
-// one-bigint namespace used by provider workers.
+// Keep the migration lock stable while supported release workers are replaced.
 const migrationLockNamespace int32 = 1768843109
 const migrationLockID int32 = 1
+const applicationSchema = "aiosources"
+const minimumSchemaVersion = 89 // The first AIOSources 2.3.0 release.
 
-const initialSchema = `
-CREATE TABLE IF NOT EXISTS aiosources.runs (
-    id TEXT PRIMARY KEY,
-    provider_id TEXT NOT NULL,
-    provider_name TEXT NOT NULL,
-    mode TEXT NOT NULL CHECK (mode IN ('preview','incremental','full')),
-    status TEXT NOT NULL CHECK (status IN ('queued','running','paused','succeeded','failed','cancelled')),
-    cancel_requested BOOLEAN NOT NULL DEFAULT FALSE,
-    max_pages INTEGER NOT NULL DEFAULT 0 CHECK (max_pages >= 0),
-    pages INTEGER NOT NULL DEFAULT 0 CHECK (pages >= 0),
-    records INTEGER NOT NULL DEFAULT 0 CHECK (records >= 0),
-    errors INTEGER NOT NULL DEFAULT 0 CHECK (errors >= 0),
-    revision TEXT NOT NULL,
-    config JSONB NOT NULL CHECK (jsonb_typeof(config) = 'object'),
-    cursor JSONB,
-    traversal_done BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    started_at TIMESTAMPTZ,
-    finished_at TIMESTAMPTZ,
-    error TEXT NOT NULL DEFAULT ''
-);
-CREATE UNIQUE INDEX IF NOT EXISTS runs_one_active_provider
-    ON aiosources.runs(provider_id) WHERE status IN ('queued','running');
-CREATE INDEX IF NOT EXISTS runs_recent ON aiosources.runs(created_at DESC, id DESC);
-CREATE INDEX IF NOT EXISTS runs_provider_recent ON aiosources.runs(provider_id, created_at DESC, id DESC);
-CREATE INDEX IF NOT EXISTS runs_queue ON aiosources.runs(created_at, id) WHERE status = 'queued';
-CREATE TABLE IF NOT EXISTS aiosources.pages (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES aiosources.runs(id),
-    provider_id TEXT NOT NULL,
-    page_index INTEGER NOT NULL,
-    body BYTEA NOT NULL,
-    content_type TEXT NOT NULL,
-    fingerprint TEXT,
-    position TEXT NOT NULL DEFAULT '',
-    metadata JSONB NOT NULL DEFAULT '{}',
-    error TEXT NOT NULL DEFAULT '',
-    done BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE UNIQUE INDEX IF NOT EXISTS pages_success_fingerprint
-    ON aiosources.pages(run_id, fingerprint) WHERE fingerprint IS NOT NULL;
-CREATE INDEX IF NOT EXISTS pages_run ON aiosources.pages(run_id, id);
-CREATE TABLE IF NOT EXISTS aiosources.raw_records (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES aiosources.runs(id),
-    provider_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    page_id BIGINT NOT NULL REFERENCES aiosources.pages(id),
-    page_index INTEGER NOT NULL,
-    raw BYTEA NOT NULL,
-    content_type TEXT NOT NULL,
-    fields JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(fields) = 'object'),
-    error TEXT NOT NULL DEFAULT '',
-    ignored BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS raw_records_provider ON aiosources.raw_records(provider_id, id DESC);
-CREATE INDEX IF NOT EXISTS raw_records_run ON aiosources.raw_records(run_id, id DESC);
-CREATE INDEX IF NOT EXISTS raw_records_source ON aiosources.raw_records(provider_id, source_id);
-CREATE TABLE IF NOT EXISTS aiosources.torrents (
-    provider_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    fields JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(fields) = 'object'),
-    raw_id BIGINT REFERENCES aiosources.raw_records(id),
-    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    historical BOOLEAN NOT NULL DEFAULT FALSE,
-    PRIMARY KEY (provider_id, source_id),
-    CHECK (NOT historical OR raw_id IS NULL)
-);
-CREATE INDEX IF NOT EXISTS torrents_recent ON aiosources.torrents(last_seen_at DESC, provider_id, source_id);
-CREATE TABLE IF NOT EXISTS aiosources.staged_torrents (
-    run_id TEXT NOT NULL REFERENCES aiosources.runs(id),
-    provider_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    fields JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(fields) = 'object'),
-    raw_id BIGINT NOT NULL REFERENCES aiosources.raw_records(id),
-    first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (run_id, source_id)
-);
-CREATE TABLE IF NOT EXISTS aiosources.events (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    run_id TEXT NOT NULL REFERENCES aiosources.runs(id),
-    kind TEXT NOT NULL,
-    message TEXT NOT NULL,
-    data JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(data) = 'object'),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS events_run ON aiosources.events(run_id, id);
-CREATE TABLE IF NOT EXISTS aiosources.secrets (
-    name TEXT PRIMARY KEY,
-    ciphertext BYTEA NOT NULL CHECK (octet_length(ciphertext) > 0),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS aiosources.settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS aiosources.legacy_imports (
-    provider_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (provider_id, source_id)
-);
-`
+//go:embed schema.sql
+var initialSchema string
 
-const observationSchema = `
-ALTER TABLE aiosources.raw_records ADD COLUMN IF NOT EXISTS auxiliary BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE aiosources.pages ADD COLUMN IF NOT EXISTS reset_staging BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE aiosources.pages ADD COLUMN IF NOT EXISTS require_unique_ids BOOLEAN NOT NULL DEFAULT FALSE;
-`
-
-const scheduleSchema = `
-ALTER TABLE aiosources.runs ADD COLUMN trigger TEXT NOT NULL DEFAULT 'manual'
-    CHECK (trigger IN ('manual','scheduled'));
-CREATE TABLE aiosources.schedule_clocks (
-    provider_id TEXT PRIMARY KEY,
-    revision TEXT NOT NULL,
-    active BOOLEAN NOT NULL,
-    next_run_at TIMESTAMPTZ,
-    last_attempt_at TIMESTAMPTZ,
-    last_error TEXT NOT NULL DEFAULT '',
-    CHECK (active = (next_run_at IS NOT NULL))
-);
-CREATE INDEX runs_scheduled_paused ON aiosources.runs(provider_id,created_at,id)
-    WHERE status='paused' AND trigger='scheduled';
-DELETE FROM aiosources.settings WHERE key LIKE 'jobs.schedule.initial.%';
-`
-
-const knownPageStreakSchema = `
-ALTER TABLE aiosources.runs ADD COLUMN known_page_streak INTEGER NOT NULL DEFAULT 0 CHECK (known_page_streak>=0);
-`
-
-const fullScheduleSchema = `
-ALTER TABLE aiosources.schedule_clocks ADD COLUMN full_due_at TIMESTAMPTZ;
-`
-
-const metadataFollowupSchema = `
-ALTER TABLE aiosources.runs ADD COLUMN metadata_parent_run_id TEXT REFERENCES aiosources.runs(id);
-ALTER TABLE aiosources.runs ADD CONSTRAINT runs_metadata_parent_mode
-    CHECK (metadata_parent_run_id IS NULL OR mode='metadata');
-CREATE UNIQUE INDEX runs_one_metadata_followup ON aiosources.runs(metadata_parent_run_id);
-`
-
-const initialFullSchema = `
-ALTER TABLE aiosources.runs ADD COLUMN initial_full BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE aiosources.runs ADD CONSTRAINT runs_initial_full_mode CHECK (NOT initial_full OR mode='full');
-CREATE INDEX runs_successful_collection ON aiosources.runs(provider_id)
-    WHERE status='succeeded' AND mode IN ('full','incremental');
-`
+var errUpgradeRequired = errors.New("AIOSources 2.3 or later is required before upgrading to 2.4. Upgrade this installation to the latest 2.3 build first, then retry. Your existing data has not been changed")
 
 var migrations = []struct {
 	version int
 	sql     string
 }{
-	{1, initialSchema}, {2, observationSchema}, {3, scheduleSchema},
-	{4, activitySchema}, {5, sharingSchema}, {6, catalogIdentityPrivacySchema},
-	{7, operationsEventsSchema}, {8, securitySchema}, {9, shareControlsSchema},
-	{10, searchHistorySchema}, {11, healthSchema}, {12, backupSchema},
-	{13, coverageSchema}, {14, runRecordsSchema},
-	{15, pauseSchema}, {16, coverageLatestSchema},
-	{17, filterCoverageSchema},
-	{18, collectionSettingsSchema},
-	{19, collectionPolicySchema},
-	{20, metadataRetentionSchema},
-	{21, archiveReferenceSchema},
-	{22, knownPageStreakSchema},
-	{23, fullScheduleSchema},
-	{24, requestLimitsSchema},
-	{25, metadataFollowupSchema},
-	{26, aiosourceSchema},
-	{27, initialFullSchema},
-	{28, automaticRecoveryDefaultSchema},
-	{29, healthRevisionSchema},
-	{30, secretRevisionSchema},
-	{31, aioAutomationSchema},
-	{32, serviceActivitySchema},
-	{33, operationsSchema},
-	{34, aioPerformanceSchema},
-	{35, aioNativeIDSchema},
-	{36, searchFragmentsSchema},
-	{37, catalogSyncSchema},
-	{38, activityConsolidationSchema},
-	{39, rawSearchSchema},
-	{40, consoleSimplificationSchema},
-	{41, seederRetirementSchema},
-	{42, fixedImportDefaultsSchema},
-	{43, aioExperienceSchema},
-	{44, matchingRecheckSchema},
-	{45, wordEpisodeRecheckSchema},
-	{46, historyRetentionSchema},
-	{47, peersRetirementSchema},
-	{48, statisticsFingerprintSchema},
-	{49, publicAccessSchema},
-	{50, publicAccessActivitySchema},
-	{51, storageSchema},
-	{52, publicDownloadsSchema},
-	{53, catalogSearchSchema},
-	{54, localizedTitlesSchema},
-	{55, torznabSchema},
-	{56, publicConnectionsSchema},
-	{57, stremioConnectionsSchema},
-	{58, connectionDefaultsSchema},
-	{59, operationDownloadsSchema},
-	{60, torznabPreferencesSchema},
-	{61, leecherRetirementSchema},
-	{62, catalogHistorySchema},
-	{63, networkSchema},
-	{64, jsonAdapterSchema},
-	{65, incomingNetworkSchema},
-	{66, networkLimitsSchema},
-	{67, optionalNetworkLimitsSchema},
-	{68, publicSearchSchema},
-	{69, publicStremioSchema},
-	{70, matchingScheduleSchema},
-	{71, releaseNumberingRecheckSchema},
-	{72, savedViewRetirementSchema},
-	{73, runtimeSettingsSchema},
-	{74, extendedRuntimeSettingsSchema},
-	{75, debridServicesSchema},
-	{76, catalogEntitiesSchema},
-	{77, catalogDetailsSchema},
-	{78, booksSchema},
-	{79, bookChangesSchema},
-	{80, metadataRecoverySchema},
-	{81, bookReliabilitySchema},
-	{82, bookImportSelectionSchema},
-	{83, informationResetIndexSchema},
-	{84, publicCatalogSchema},
-	{85, publicVisitorProbesSchema},
-	{86, publicCatalogDependencySchema},
-	{87, bookMatchingSchema},
-	{88, catalogSearchIndexSchema},
-	{89, catalogReadSchema},
 	{90, storageControlsSchema},
 	{91, directCatalogSchema},
 	{92, compoundMatchingSchema},
 	{93, `COMMENT ON SCHEMA aiosources IS 'AIOSources application data';`},
+	{94, localizedPostersSchema},
+}
+
+func schemaChecksum(sql string) string {
+	sum := sha256.Sum256([]byte(sql))
+	return hex.EncodeToString(sum[:])
 }
 
 // LatestSchemaVersion is the newest schema this binary can migrate and read.
-func LatestSchemaVersion() int {
-	return migrations[len(migrations)-1].version
-}
-
+func LatestSchemaVersion() int { return migrations[len(migrations)-1].version }
 func (s *Store) Migrate(ctx context.Context) error {
 	return s.migrateThrough(ctx, LatestSchemaVersion())
 }
 
 func (s *Store) migrateThrough(ctx context.Context, version int) error {
+	if version < minimumSchemaVersion || version > LatestSchemaVersion() {
+		return errUpgradeRequired
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return databaseError("begin schema migration", err)
 	}
 	defer rollback(tx)
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1, $2)", migrationLockNamespace, migrationLockID); err != nil {
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", migrationLockNamespace, migrationLockID); err != nil {
 		return databaseError("lock schema migration", err)
 	}
 	adopted, err := adoptApplicationSchema(ctx, tx)
 	if err != nil {
-		return databaseError("upgrade application database namespace", err)
+		return err
 	}
-	if _, err := tx.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS aiosources;
-CREATE TABLE IF NOT EXISTS aiosources.schema_migrations (
-    version INTEGER PRIMARY KEY,
-    checksum TEXT NOT NULL,
-    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`); err != nil {
+	var metadata, occupied, firstGeneration bool
+	if err = tx.QueryRow(ctx, `SELECT to_regclass('aiosources.schema_migrations') IS NOT NULL,
+ EXISTS(SELECT 1 FROM pg_class WHERE relnamespace=to_regnamespace('aiosources')),
+ to_regclass('public.torrents') IS NOT NULL`).Scan(&metadata, &occupied, &firstGeneration); err != nil {
+		return databaseError("inspect application schema", err)
+	}
+	if !metadata && (occupied || firstGeneration) {
+		return errUpgradeRequired
+	}
+	if _, err = tx.Exec(ctx, `CREATE SCHEMA IF NOT EXISTS aiosources;
+CREATE TABLE IF NOT EXISTS aiosources.schema_migrations(version INTEGER PRIMARY KEY,checksum TEXT NOT NULL,applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); err != nil {
 		return databaseError("initialize schema migration", err)
 	}
 	var installed int
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(version),0) FROM aiosources.schema_migrations`).Scan(&installed); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT COALESCE(max(version),0) FROM aiosources.schema_migrations`).Scan(&installed); err != nil {
 		return databaseError("read installed schema version", err)
 	}
 	if installed > LatestSchemaVersion() {
 		return errors.New("the database was upgraded by a newer application version")
 	}
-	for _, migration := range migrations {
-		if migration.version > version {
+	if metadata && installed < minimumSchemaVersion {
+		return errUpgradeRequired
+	}
+	if !metadata {
+		if _, err = tx.Exec(ctx, initialSchema); err != nil {
+			return databaseError("initialize application database", err)
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.schema_migrations(version,checksum) VALUES($1,$2)`, minimumSchemaVersion, schemaChecksum(initialSchema)); err != nil {
+			return databaseError("record schema baseline", err)
+		}
+		installed = minimumSchemaVersion
+	} else if err = consolidateSchemaBaseline(ctx, tx, adopted); err != nil {
+		return err
+	}
+	for _, m := range migrations {
+		if m.version > version {
 			break
 		}
-		sum := sha256.Sum256([]byte(migration.sql))
-		checksum := hex.EncodeToString(sum[:])
+		checksum := schemaChecksum(m.sql)
 		var previous string
-		err := tx.QueryRow(ctx, "SELECT checksum FROM aiosources.schema_migrations WHERE version=$1", migration.version).Scan(&previous)
+		err = tx.QueryRow(ctx, `SELECT checksum FROM aiosources.schema_migrations WHERE version=$1`, m.version).Scan(&previous)
 		if err == nil {
 			if previous != checksum {
-				if adopted && migration.version <= legacySchemaVersion && previous == legacyMigrationChecksum(migration.sql) {
-					if _, err := tx.Exec(ctx, `UPDATE aiosources.schema_migrations SET checksum=$2 WHERE version=$1`, migration.version, checksum); err != nil {
-						return databaseError("preserve upgraded migration history", err)
-					}
-					continue
+				if !adopted || previous != releasedUpgradeChecksums[m.version] {
+					return errors.New("application schema migration checksum mismatch")
 				}
-				return errors.New("collection schema migration checksum mismatch")
+				if _, err = tx.Exec(ctx, `UPDATE aiosources.schema_migrations SET checksum=$2 WHERE version=$1`, m.version, checksum); err != nil {
+					return databaseError("preserve schema upgrade history", err)
+				}
 			}
 			continue
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return databaseError("read schema migration", err)
 		}
-		if _, err := tx.Exec(ctx, migration.sql); err != nil {
+		if m.version <= installed {
+			return errors.New("application schema migration history is incomplete")
+		}
+		if _, err = tx.Exec(ctx, m.sql); err != nil {
 			return databaseError("apply schema migration", err)
 		}
-		if _, err := tx.Exec(ctx, "INSERT INTO aiosources.schema_migrations(version,checksum) VALUES($1,$2)", migration.version, checksum); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.schema_migrations(version,checksum) VALUES($1,$2)`, m.version, checksum); err != nil {
 			return databaseError("record schema migration", err)
 		}
 	}
 	return databaseError("commit schema migration", tx.Commit(ctx))
+}
+
+// Verify the released 2.3 history once before replacing its obsolete entries by
+// the baseline. Fingerprints retain integrity checking without shipping old SQL.
+func consolidateSchemaBaseline(ctx context.Context, tx pgx.Tx, adopted bool) error {
+	rows, err := tx.Query(ctx, `SELECT version,checksum FROM aiosources.schema_migrations WHERE version<=$1 ORDER BY version`, minimumSchemaVersion)
+	if err != nil {
+		return databaseError("read schema baseline", err)
+	}
+	defer rows.Close()
+	var history strings.Builder
+	count := 0
+	baseline := false
+	for rows.Next() {
+		var version int
+		var checksum string
+		if err = rows.Scan(&version, &checksum); err != nil {
+			return databaseError("read schema baseline", err)
+		}
+		count++
+		if version != count && count != 1 {
+			return errors.New("application schema migration history is incomplete")
+		}
+		if version == minimumSchemaVersion && checksum == schemaChecksum(initialSchema) {
+			baseline = true
+		}
+		fmt.Fprintf(&history, "%d:%s\n", version, checksum)
+	}
+	if err = rows.Err(); err != nil {
+		return databaseError("read schema baseline", err)
+	}
+	rows.Close()
+	if baseline && count == 1 {
+		return nil
+	}
+	expected := "4a927ac47f3ff42ad7f4a9c0c6637d8e1b567e9e6c02a06a400c76462cafdc5f"
+	if adopted {
+		expected = "e2ee592d791260240da387fcc2e113eabbbc13d69f596b3359e7632bbb72d244"
+	}
+	if count != minimumSchemaVersion || schemaChecksum(history.String()) != expected {
+		return errors.New("application schema baseline checksum mismatch")
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.schema_migrations WHERE version<$1`, minimumSchemaVersion); err != nil {
+		return databaseError("consolidate schema baseline", err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.schema_migrations SET checksum=$2 WHERE version=$1`, minimumSchemaVersion, schemaChecksum(initialSchema)); err != nil {
+		return databaseError("record schema baseline", err)
+	}
+	return nil
 }

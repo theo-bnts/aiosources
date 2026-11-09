@@ -3,16 +3,9 @@ package store
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/theo-bnts/aiosources/internal/model"
 )
-
-// Download continuations contain only the selected local record and a provider
-// object ID. Keys, announce URLs and generated download URLs are never retained.
-// Their lifetime follows the seven-day operation history via the foreign key.
-const operationDownloadsSchema = `CREATE TABLE aiosources.operation_downloads (
- run_id TEXT PRIMARY KEY REFERENCES aiosources.operation_runs(id) ON DELETE CASCADE,
- work_id BIGINT NOT NULL CHECK(work_id>0), input JSONB NOT NULL CHECK(jsonb_typeof(input)='object'),account TEXT NOT NULL
-);`
 
 func (s *Store) SaveOperationDownload(ctx context.Context, id string, download model.OperationDownload) error {
 	download.Input.AllowUncached = false

@@ -1,105 +1,12 @@
 package store
 
 import (
-	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
-
-func TestDistinctRecordsMigrationPreservesHistoryAndResume(t *testing.T) {
-	ctx, _, db := activityDatabase(t)
-	// This scenario verifies the optional complete processing history.
-	setStorageMode(t, ctx, db, model.StorageFull)
-	provider := model.Provider{Version: 1, ID: "distinct-migration", Adapter: "http_json"}
-	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
-	save := func(page model.Page, fingerprint string) {
-		t.Helper()
-		var err error
-		run, err = db.SavePage(ctx, run, page, fingerprint)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	save(model.Page{Items: []model.Record{coverageRecord("old"), coverageRecord("keep")}, Next: json.RawMessage(`{"page":2}`)}, "old")
-	checkpoint := append([]byte(nil), run.Cursor...)
-	ignored := coverageRecord("ignored")
-	ignored.Ignored = true
-	auxiliary := coverageRecord("auxiliary")
-	auxiliary.Auxiliary = true
-	invalid := coverageRecord("invalid")
-	invalid.Error = "Invalid source record"
-	save(model.Page{
-		ResetStaging: true,
-		Items:        []model.Record{coverageRecord("keep"), coverageRecord("new"), coverageRecord("keep"), ignored, auxiliary, invalid},
-		Next:         json.RawMessage(`{"page":3}`),
-	}, "reset")
-	if run.DistinctRecords != 2 || !bytes.Equal(run.Cursor, checkpoint) {
-		t.Fatalf("rejected full reset changed its accepted generation: %+v", run)
-	}
-	save(model.Page{
-		ResetStaging: true,
-		Items:        []model.Record{coverageRecord("keep"), coverageRecord("new"), coverageRecord("keep"), ignored, auxiliary},
-		Next:         json.RawMessage(`{"page":3}`),
-	}, "reset")
-	save(model.Page{Items: []model.Record{coverageRecord("rejected")}, Error: "Rejected source page", ResetStaging: true}, "")
-	if run.DistinctRecords != 2 {
-		t.Fatalf("rejected pages changed the current traversal's identity count: %+v", run)
-	}
-	if _, err := db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
-		t.Fatal(err)
-	}
-	preview := mirrorClaim(t, ctx, db, model.Provider{ID: "preview-migration", Adapter: "http_json"}, model.ModePreview)
-	preview, err := db.SavePage(ctx, preview, model.Page{Items: []model.Record{coverageRecord("keep"), coverageRecord("new"), coverageRecord("keep")}, Done: true}, "preview")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.FinishRun(ctx, preview.ID, model.StatusSucceeded, "", ""); err != nil {
-		t.Fatal(err)
-	}
-	before, err := db.ListRaw(ctx, model.ListOptions{Limit: 200})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Recreate the immediately preceding schema while retaining its original
-	// archives, checkpoints and raw counters. Migration must rebuild evidence
-	// for previews as well as only the latest accepted full-run generation.
-	if _, err := db.pool.Exec(ctx, `DROP TABLE aiosources.run_record_identities;
-ALTER TABLE aiosources.runs DROP COLUMN distinct_records;
-DELETE FROM aiosources.schema_migrations WHERE version=14`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for _, prior := range []model.Run{run, preview} {
-		restored, err := db.GetRun(ctx, prior.ID)
-		if err != nil || restored.DistinctRecords != 2 || restored.Records != prior.Records || restored.Pages != prior.Pages || !bytes.Equal(restored.Cursor, prior.Cursor) {
-			t.Fatalf("historical run count or checkpoint was not reconstructed: %+v %v", restored, err)
-		}
-	}
-	after, err := db.ListRaw(ctx, model.ListOptions{Limit: 200})
-	if err != nil || !reflect.DeepEqual(before, after) {
-		t.Fatalf("count reconstruction changed retained observations: before=%+v after=%+v error=%v", before, after, err)
-	}
-	if _, err := db.ResumeRun(ctx, run.ID); err != nil {
-		t.Fatal(err)
-	}
-	resumed, err := db.ClaimNext(ctx)
-	if err != nil || resumed == nil || resumed.ID != run.ID {
-		t.Fatalf("could not resume migrated run: %+v %v", resumed, err)
-	}
-	run = *resumed
-	save(model.Page{Items: []model.Record{coverageRecord("keep"), coverageRecord("new"), coverageRecord("additional")}, Next: json.RawMessage(`{"page":4}`)}, "after-migration")
-	if run.DistinctRecords != 3 {
-		t.Fatalf("resume counted repeated historical IDs or merged different IDs sharing a hash: %+v", run)
-	}
-	if _, err := db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestKnownIDsKeepRunCreationBaselineAcrossWritesAndResume(t *testing.T) {
 	ctx, endpoint, db := activityDatabase(t)

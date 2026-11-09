@@ -575,7 +575,7 @@ export function RawDetailPage() {
         </TabsContent>
       </Tabs>
       {record.page_id > 0 && payloadRetained && (
-        <section className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5">
+        <section className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="section-title">Complete provider response</h2>
             <p className="help mt-1">The page contains this record’s original context.</p>

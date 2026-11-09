@@ -834,7 +834,7 @@ function ProviderForm({
           ))}
         </ul>
       )}
-      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5">
+      <footer className="flex flex-wrap items-center justify-between gap-4">
         <p className="help max-w-2xl">
           Saving always uses server validation. Secret values stay in the vault; source JSON
           contains references only. Configure automatic imports in the Schedules section above. New

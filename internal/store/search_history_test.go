@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
 
 func TestTorrentSearchPrecisionCombinedFiltersAndIndependentOccurrences(t *testing.T) {
@@ -143,31 +142,6 @@ func TestSemanticPublicationHistoryIgnoresStagingAndObservations(t *testing.T) {
 	}
 }
 
-func TestSemanticHistoryMigrationBaselineDoesNotInventTransitions(t *testing.T) {
-	ctx, endpoint := testutil.NewDatabase(t)
-	db, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
-INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy','live','{"title":"Legacy"}'),('legacy','deleted','{"title":"Gone"}');
-DELETE FROM aiosources.torrents WHERE source_id='deleted';`+searchHistorySchema+"COMMIT;")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, source := range []string{"live", "deleted"} {
-		var id string
-		if err := db.pool.QueryRow(ctx, "SELECT aiosources.torrent_occurrence_id('legacy',$1)", source).Scan(&id); err != nil {
-			t.Fatal(err)
-		}
-		history, err := db.TorrentHistory(ctx, id, model.ListOptions{})
-		if err != nil || history.Total != 0 || history.Baseline == nil || history.Baseline.Deleted != (source == "deleted") {
-			t.Fatalf("legacy baseline fabricated changes: %+v %v", history, err)
-		}
-	}
-}
-
 func TestSearchBoundValidation(t *testing.T) {
 	for _, filters := range []model.SearchFilters{
 		{MinSize: "9007199254740994", MaxSize: "9007199254740993"},
@@ -178,42 +152,6 @@ func TestSearchBoundValidation(t *testing.T) {
 	} {
 		if _, err := NormalizeSearchFilters(filters); !errors.Is(err, model.ErrInvalid) {
 			t.Fatalf("invalid search filters accepted: %+v %v", filters, err)
-		}
-	}
-}
-
-func TestSearchHistoryMigrationPreservesMalformedTimestampOccurrences(t *testing.T) {
-	ctx, endpoint := testutil.NewDatabase(t)
-	db, err := Open(ctx, endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	fields := `{"title":"Legacy malformed zone","published_at":"2026-09-01T00:00:00+99:00","size":9007199254740993,"arbitrary":{"keep":null},"info_hash":"` + strings.Repeat("b", 40) + `"}`
-	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
-INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy-one','same','`+fields+`'),('legacy-two','same','`+fields+`');`+searchHistorySchema+"COMMIT;")
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, err := db.ListTorrents(ctx, model.ListOptions{})
-	if err != nil || rows.Total != 2 || len(rows.Items) != 2 {
-		t.Fatalf("migration lost legacy occurrences: %+v %v", rows, err)
-	}
-	if rows.Items[0].OccurrenceID == rows.Items[1].OccurrenceID || rows.Items[0].ProviderID == rows.Items[1].ProviderID {
-		t.Fatal("migration merged provider occurrences")
-	}
-	for _, row := range rows.Items {
-		encoded, err := json.Marshal(row.Fields)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var equal, unindexed bool
-		if err := db.pool.QueryRow(ctx, "SELECT $1::jsonb=$2::jsonb,search_published_at IS NULL FROM aiosources.torrents WHERE occurrence_id=$3", encoded, fields, row.OccurrenceID).Scan(&equal, &unindexed); err != nil || !equal || !unindexed {
-			t.Fatalf("invalid projection changed legacy fields: equal=%v unindexed=%v %v", equal, unindexed, err)
-		}
-		history, err := db.TorrentHistory(ctx, row.OccurrenceID, model.ListOptions{})
-		if err != nil || history.Total != 0 || history.Baseline == nil || !reflect.DeepEqual(history.Baseline.Fields, row.Fields) {
-			t.Fatalf("legacy baseline lost exact fields: %+v %v", history, err)
 		}
 	}
 }

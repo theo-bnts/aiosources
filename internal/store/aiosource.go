@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5"
-	"github.com/theo-bnts/aiosources/internal/model"
 	"math"
 	"slices"
 	"sort"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 func DefaultAIOConfig() model.AIOConfig {
@@ -175,14 +176,14 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvdb_id,` + bookWorkYears + `,w.revision,w.adult,w.display_title,w.localized_titles,
 ARRAY(SELECT title FROM aiosources.aio_titles WHERE work_id=w.id UNION SELECT w.display_title WHERE w.media_type='book'),
 COALESCE((SELECT jsonb_object_agg(season,year) FROM aiosources.aio_seasons WHERE work_id=w.id),'{}'),
-COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,
+COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,w.localized_posters,
 w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM aiosources.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
 'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0))`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork
 	var seasons, episodes, book []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &book)
+	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book)
 	if err != nil {
 		return w, err
 	}

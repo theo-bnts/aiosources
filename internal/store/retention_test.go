@@ -135,57 +135,6 @@ func TestCompactObservationsPreservePostgresInterpretationErrors(t *testing.T) {
 	}
 }
 
-func TestMetadataRetentionMigrationLeavesLegacyArchivesAndCheckpointsUntouched(t *testing.T) {
-	ctx, _, db := activityDatabase(t)
-	// This scenario verifies the optional complete processing history.
-	setStorageMode(t, ctx, db, model.StorageFull)
-	provider := metadataSource("legacy-archives")
-	run := mirrorClaim(t, ctx, db, provider, model.ModeFull)
-	run, err := db.SavePage(ctx, run, model.Page{Items: []model.Record{coverageRecord("old")}, Next: json.RawMessage(`{"old_cursor":{"unmodified":true}}`)}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	run = mirrorFinish(t, ctx, db, run, model.StatusPaused)
-	observations, err := db.ListRaw(ctx, model.ListOptions{RunID: run.ID})
-	if err != nil || len(observations.Items) != 1 {
-		t.Fatalf("missing legacy fixture: %+v %v", observations, err)
-	}
-	observation := observations.Items[0]
-	oldBody, oldRaw := []byte{'p', 0, 'g'}, []byte{'r', 0, 'w'}
-	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.pages SET body=$2 WHERE id=$1", observation.PageID, oldBody); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET raw=$2,fields='{"legacy":{"exact":true}}'::jsonb WHERE id=$1`, observation.ID, oldRaw); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.pages DROP COLUMN payload_retained;
-ALTER TABLE aiosources.raw_records DROP COLUMN payload_retained;
-ALTER TABLE aiosources.runs DROP CONSTRAINT runs_mode_check;
-ALTER TABLE aiosources.runs ADD CONSTRAINT runs_mode_check CHECK(mode IN ('preview','incremental','full'));
-DELETE FROM aiosources.schema_migrations WHERE version=20`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Migrate(ctx); err != nil {
-		t.Fatal(err)
-	}
-	archived, err := db.Raw(ctx, observation.ID)
-	if err != nil || !archived.PayloadRetained || !bytes.Equal(archived.Raw, oldRaw) || !reflect.DeepEqual(archived.Fields, map[string]any{"legacy": map[string]any{"exact": true}}) {
-		t.Fatalf("migration altered historical raw bytes or fields: %+v %v", archived, err)
-	}
-	body, _, err := db.RawPage(ctx, observation.PageID)
-	if err != nil || !bytes.Equal(body, oldBody) {
-		t.Fatalf("migration hid or changed historical response: %q %v", body, err)
-	}
-	restored, err := db.GetRun(ctx, run.ID)
-	if err != nil || !bytes.Equal(restored.Cursor, run.Cursor) || !reflect.DeepEqual(restored.Config, run.Config) || !reflect.DeepEqual(restored.Policy, run.Policy) || restored.Status != run.Status {
-		t.Fatalf("migration changed immutable run continuation: %+v %v", restored, err)
-	}
-	metadata := mirrorClaim(t, ctx, db, provider, model.ModeMetadata)
-	if metadata.Mode != model.ModeMetadata {
-		t.Fatalf("migrated run-mode constraint rejected metadata: %+v", metadata)
-	}
-}
-
 func TestRejectedAtomicPagesPreserveStagingAndCoverage(t *testing.T) {
 	for _, remote := range []bool{false, true} {
 		name := "native-full"

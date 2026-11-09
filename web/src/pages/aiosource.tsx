@@ -342,7 +342,7 @@ export default function AIOSourcePage({
           be kept.
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-4 border-t pt-5">
+      <div className="flex flex-wrap items-center gap-4">
         <Button
           type="submit"
           disabled={

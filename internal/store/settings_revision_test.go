@@ -81,29 +81,3 @@ func TestSecretRevisionConcurrentCreationRotationAndRecreation(t *testing.T) {
 		t.Fatal("an explicit internal rotation did not invalidate open forms")
 	}
 }
-
-func TestSettingsRevisionMigrationsPreserveExistingValues(t *testing.T) {
-	ctx, _, db := activityDatabase(t)
-	if err := db.PutSecret(ctx, "retained", []byte("retained ciphertext")); err != nil {
-		t.Fatal(err)
-	}
-	before, _ := db.ListSecrets(ctx)
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.secrets DROP COLUMN revision;
-DROP SEQUENCE aiosources.secret_revisions;
-DELETE FROM aiosources.schema_migrations WHERE version=30`); err != nil {
-		t.Fatal(err)
-	}
-	for range 2 {
-		if err := db.Migrate(ctx); err != nil {
-			t.Fatal(err)
-		}
-		items, err := db.ListSecrets(ctx)
-		if err != nil || len(items) != 1 || items[0].Name != before[0].Name || !items[0].UpdatedAt.Equal(before[0].UpdatedAt) || items[0].Revision < 1 {
-			t.Fatal("migration changed existing secret metadata")
-		}
-		ciphertext, err := db.Secret(ctx, "retained")
-		if err != nil || string(ciphertext) != "retained ciphertext" {
-			t.Fatal("migration changed encrypted data")
-		}
-	}
-}

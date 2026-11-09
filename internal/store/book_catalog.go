@@ -25,6 +25,13 @@ func bookEditionTitle(locale string) string {
 const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
  SELECT cover FROM editions ORDER BY id LIMIT 1)`
 
+// Cover language belongs to the edition, not the image server. Select from
+// locally indexed editions, with English followed by a stable fallback.
+func bookEditionLocalizedCover(locale string) string {
+	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover,e.languages FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
+ SELECT cover FROM editions ORDER BY COALESCE(languages && ` + bookLanguageSQL(locale) + `,false) DESC,COALESCE(languages && ARRAY['en'],false) DESC,id LIMIT 1)`
+}
+
 // Start with the edition's small set of work identifiers, then follow the same
 // eight-key, cycle-safe redirect paths as ol_aliases in the opposite direction.
 // Keeping intermediate keys preserves editions while a redirect is being

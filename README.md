@@ -134,6 +134,8 @@ Back up both volumes before updating. Keep them when recreating containers; `doc
 
 To test a prerelease, replace `:stable` with `:preview` and run the same commands. Preview builds may contain unfinished changes. A `:sha-FULL_COMMIT_SHA` image pins an exact build. Back up before switching channels: an older image may not accept data already upgraded by a newer version.
 
+**Upgrading to 2.4?** Install AIOSources 2.3 or later first. Earlier versions must go through the latest 2.3 build before installing 2.4. Keep your existing volumes and back up before upgrading; your sources, progress and settings are preserved. Fresh installations can start directly on 2.4.
+
 **Moving from V1?** Back up your V1 volume and start V2 with fresh volumes. V1 data cannot be used directly by V2. Keep the original backup until you are satisfied with the migration.
 
 ## Environment settings

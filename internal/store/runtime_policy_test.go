@@ -6,47 +6,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"github.com/theo-bnts/aiosources/internal/testutil"
 )
-
-func TestExtendedSettingsMigrationPreservesPoliciesAndSavedImports(t *testing.T) {
-	ctx, dsn := testutil.NewDatabase(t)
-	db, err := Open(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if err := db.migrateThrough(ctx, 73); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runtime_settings SET values=jsonb_set(values,'{days}','14'),revision=8 WHERE section='history'`); err != nil {
-		t.Fatal(err)
-	}
-	// Historical fixtures use their original schema, not a current writer that
-	// snapshots settings introduced by later migrations.
-	run := model.Run{ID: "migration-run", ProviderID: "migration-source", Cursor: []byte(`{"page": 7}`), Status: model.StatusRunning}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,cursor) VALUES($1,$2,$2,'full','running','','{"version":1,"id":"migration-source","adapter":"json"}',$3)`, run.ID, run.ProviderID, run.Cursor); err != nil {
-		t.Fatal(err)
-	}
-	for range 2 {
-		if err := db.Migrate(ctx); err != nil {
-			t.Fatal(err)
-		}
-	}
-	history, err := db.RuntimeSection(ctx, "history")
-	if err != nil || history.Values["days"] != 14 || history.Values["batch_size"] != 5000 || history.Revision != 9 {
-		t.Fatal("saved retention was overwritten", history, err)
-	}
-	after, err := db.GetRun(ctx, run.ID)
-	if err != nil || string(after.Cursor) != string(run.Cursor) || after.Status != run.Status {
-		t.Fatal("migration changed an import checkpoint", err)
-	}
-	for _, section := range model.RuntimeSections() {
-		if value, err := db.RuntimeSection(ctx, section); err != nil || !value.Valid(section) {
-			t.Fatal("missing operational policy", section, err)
-		}
-	}
-}
 
 func TestMatchingPolicyRechecksAutomaticResultsAndKeepsManualReviews(t *testing.T) {
 	ctx, db := sharingDatabase(t)

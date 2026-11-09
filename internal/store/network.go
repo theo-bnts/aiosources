@@ -10,28 +10,6 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const networkSchema = `
-CREATE TABLE aiosources.network_settings (
- singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),
- revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0),
- default_route TEXT NOT NULL DEFAULT 'system',
- proxies JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(proxies)='array'),
- overrides JSONB NOT NULL DEFAULT '{}' CHECK(jsonb_typeof(overrides)='object')
-);
-INSERT INTO aiosources.network_settings(singleton) VALUES(TRUE);
-ALTER TABLE aiosources.activity_logs DROP CONSTRAINT activity_logs_service_check;
-ALTER TABLE aiosources.activity_logs ADD CHECK(service IN ('','tmdb','alldebrid','torbox','network'));
-
-ALTER FUNCTION aiosources.access_activity_message(TEXT) RENAME TO access_activity_message_before_network;
-CREATE FUNCTION aiosources.access_activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
- SELECT COALESCE(aiosources.access_activity_message_before_network(kind), CASE kind
- WHEN 'network.settings_changed' THEN 'Network connections changed'
- WHEN 'network.test_completed' THEN 'Proxy connection test completed'
- WHEN 'network.test_failed' THEN 'Proxy connection test failed'
- ELSE NULL END);
-$$;
-`
-
 func (s *Store) NetworkSettings(ctx context.Context) (model.NetworkSettings, error) {
 	var result model.NetworkSettings
 	var proxies, overrides, incoming, limits []byte
