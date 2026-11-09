@@ -11,13 +11,13 @@ import (
 
 func TestCatalogBookScopePreservesEditionAuthorAndRedirectCandidates(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	_, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,book_normalized,book_data,years)
+	_, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,book_normalized,book_data,years)
 SELECT 'book','OL'||n||'W','example orchard',jsonb_build_object('author_keys',ARRAY['OL400A']),ARRAY[2024] FROM generate_series(100,112) n;
-INSERT INTO ingest.ol_redirects(source,target)
+INSERT INTO aiosources.ol_redirects(source,target)
 SELECT 'OL'||n||'W','OL'||(n+1)||'W' FROM generate_series(100,108) n;
-INSERT INTO ingest.ol_redirects(source,target) VALUES('OL110W','OL111W'),('OL111W','OL110W'),('OL400A','OL401A'),('OL401A','OL402A'),('OL402A','OL401A');
-INSERT INTO ingest.ol_authors(id,name,normalized) VALUES('OL400A','Old Author','old author'),('OL401A','Morgan Vale','morgan vale'),('OL402A','Other Author','other author');
-INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn) VALUES
+INSERT INTO aiosources.ol_redirects(source,target) VALUES('OL110W','OL111W'),('OL111W','OL110W'),('OL400A','OL401A'),('OL401A','OL402A'),('OL402A','OL401A');
+INSERT INTO aiosources.ol_authors(id,name,normalized) VALUES('OL400A','Old Author','old author'),('OL401A','Morgan Vale','morgan vale'),('OL402A','Other Author','other author');
+INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,isbn) VALUES
 ('OL200M',ARRAY['OL100W'],'The Amber Orchard','the amber orchard',ARRAY['9780306406157']),
 ('OL201M',ARRAY['OL104W','OL106W','OL104W'],'The Silver Field','the silver field','{}'),
 ('OL202M',ARRAY['OL110W'],'Example cycle edition','example cycle edition','{}'),
@@ -28,8 +28,8 @@ INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn) VALUES
 	for n := 100; n < 112; n++ {
 		publishSharingRow(t, ctx, db, "example", strconv.Itoa(n), `{"title":"Example Orchard EPUB"}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.openlibrary_id='OL'||t.source_id||'W';DELETE FROM ingest.aio_match_queue;`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.openlibrary_id='OL'||t.source_id||'W';DELETE FROM aiosources.aio_match_queue;`); err != nil {
 		t.Fatal(err)
 	}
 	read := func(query string, args []any) [][]any {

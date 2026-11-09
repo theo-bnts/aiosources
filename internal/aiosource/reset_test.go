@@ -29,7 +29,7 @@ func waitReset(t *testing.T, s *Service) ResetState {
 
 func TestResetRunsInBackgroundWithoutHoldingTheServiceMutex(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}'); UPDATE ingest.ol_import_state SET works=1`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}'); UPDATE aiosources.ol_import_state SET works=1`); err != nil {
 		t.Fatal(err)
 	}
 	block, err := conn.Begin(ctx)
@@ -75,7 +75,7 @@ func TestResetRunsInBackgroundWithoutHoldingTheServiceMutex(t *testing.T) {
 		t.Fatal(state)
 	}
 	var books int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 0 {
 		t.Fatal("reset did not remove book information", books, err)
 	}
 	logs, err := s.DB.Logs(ctx, model.LogOptions{ListOptions: model.ListOptions{Limit: 50}, Service: "openlibrary"})
@@ -86,7 +86,7 @@ func TestResetRunsInBackgroundWithoutHoldingTheServiceMutex(t *testing.T) {
 
 func TestResetFailurePreservesDataAndReleasesAdmission(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
 		t.Fatal(err)
 	}
 	release, locked, err := s.DB.AIOLock(ctx, "openlibrary")
@@ -101,7 +101,7 @@ func TestResetFailurePreservesDataAndReleasesAdmission(t *testing.T) {
 		t.Fatal(state)
 	}
 	var books int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 1 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 1 {
 		t.Fatal("failed reset changed book data", books, err)
 	}
 	release()
@@ -115,7 +115,7 @@ func TestResetFailurePreservesDataAndReleasesAdmission(t *testing.T) {
 
 func TestShutdownCancelsWaitingResetWithoutCommitting(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
 		t.Fatal(err)
 	}
 	block, err := conn.BeginTx(ctx, pgx.TxOptions{})
@@ -135,7 +135,7 @@ func TestShutdownCancelsWaitingResetWithoutCommitting(t *testing.T) {
 		t.Fatal("shutdown did not cancel pending maintenance", err)
 	}
 	var books int
-	if err = block.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 1 {
+	if err = block.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&books); err != nil || books != 1 {
 		t.Fatal("interrupted reset changed book data", books, err)
 	}
 }
@@ -144,7 +144,7 @@ func TestResetStopsAndJoinsActiveInformationWorkers(t *testing.T) {
 	for _, scope := range []string{"books", "videos", "metadata", "mapping"} {
 		t.Run(scope, func(t *testing.T) {
 			ctx, s, conn := testService(t)
-			if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
+			if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
 				t.Fatal(err)
 			}
 			bookStarted, bookCancelled := make(chan struct{}), make(chan struct{})
@@ -230,7 +230,7 @@ func TestResetStopsAndJoinsActiveInformationWorkers(t *testing.T) {
 				t.Fatal("another reset replaced pending maintenance", err)
 			}
 			var count int
-			if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != 1 {
+			if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != 1 {
 				t.Fatal("reset changed data before its workers finished", count, err)
 			}
 			finish()
@@ -244,7 +244,7 @@ func TestResetStopsAndJoinsActiveInformationWorkers(t *testing.T) {
 			if scope == "books" || scope == "metadata" {
 				want = 0
 			}
-			if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != want {
+			if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != want {
 				t.Fatal("reset did not preserve its scope", count, want, err)
 			}
 		})
@@ -253,7 +253,7 @@ func TestResetStopsAndJoinsActiveInformationWorkers(t *testing.T) {
 
 func TestCancelledResetWaitPreservesDataAndReleasesAdmission(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL100W','Synthetic Book','{}')`); err != nil {
 		t.Fatal(err)
 	}
 	stopping, finished := make(chan struct{}), make(chan struct{})
@@ -287,7 +287,7 @@ func TestCancelledResetWaitPreservesDataAndReleasesAdmission(t *testing.T) {
 		t.Fatal("cancelled reset stayed stuck waiting for a worker")
 	}
 	var count int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != 1 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='book'`).Scan(&count); err != nil || count != 1 {
 		t.Fatal("cancelled reset removed information", count, err)
 	}
 	finish()

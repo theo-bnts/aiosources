@@ -22,8 +22,8 @@ import pg from 'pg'
 import { launchBackend } from './backend-readiness'
 
 const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const databasePrefix = 'ingest_e2e_'
-const directoryPrefix = 'ingest-e2e-'
+const databasePrefix = 'aiosources_e2e_'
+const directoryPrefix = 'aiosources-e2e-'
 
 type DatabaseIdentity = { oid: number; owner: number }
 
@@ -37,8 +37,7 @@ export type TestServer = {
 }
 
 function maintenanceURL(): URL {
-  // Compatibility for the retained workflow; never passed to the application.
-  const raw = process.env.TEST_DATABASE_URL || process.env.INGEST_TEST_DATABASE_URL
+  const raw = process.env.TEST_DATABASE_URL
   if (!raw)
     throw new Error('TEST_DATABASE_URL is required for browser regressions; no tests were skipped.')
   let url: URL
@@ -77,7 +76,7 @@ function client(url: URL) {
     connectionTimeoutMillis: 10_000,
     query_timeout: 15_000,
     statement_timeout: 10_000,
-    application_name: 'ingest-browser-regression',
+    application_name: 'aiosources-browser-regression',
   })
   // Connection failures are surfaced by the awaited operation, without an unhandled
   // event printing a credential-bearing driver error to a CI log.
@@ -140,7 +139,7 @@ export async function startServer({
   collectionSource = false,
 }: { collectionSource?: boolean } = {}): Promise<TestServer> {
   const maintenance = maintenanceURL()
-  const binary = resolve(webDirectory, process.env.E2E_BINARY || '../bin/ingest')
+  const binary = resolve(webDirectory, process.env.E2E_BINARY || '../bin/aiosources')
   try {
     await access(binary, constants.X_OK)
   } catch {
@@ -208,7 +207,7 @@ export async function startServer({
           )
           const current = result.rows[0] as DatabaseIdentity | undefined
           if (
-            !/^ingest_e2e_[a-f0-9]{24}$/.test(name) ||
+            !/^aiosources_e2e_[a-f0-9]{24}$/.test(name) ||
             !identity ||
             !current ||
             current.oid !== identity.oid ||

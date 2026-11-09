@@ -95,7 +95,7 @@ func TestIdentificationPlanUsesSavedInterval(t *testing.T) {
 func TestIdentificationAdmissionAndRestartKeepPendingWork(t *testing.T) {
 	ctx, s, conn := testService(t)
 	seedMovie(t, ctx, s, conn, "source", "1", strings.Repeat("a", 40))
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','2','{"title":"Example.Movie.2021.720p"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','2','{"title":"Example.Movie.2021.720p"}')`); err != nil {
 		t.Fatal(err)
 	}
 	// A metadata notification cannot bypass the saved interval, even when
@@ -211,7 +211,7 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 	if err := s.Vault.Put(ctx, "tmdb", "synthetic"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','1','{"title":"Example.Movie.2021.1080p"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','1','{"title":"Example.Movie.2021.1080p"}')`); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
@@ -234,7 +234,7 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 	if requests.Load() != count {
 		t.Fatal("wake redownloaded a completed catalog")
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','2','{"title":"Example.Movie.2021.720p"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','2','{"title":"Example.Movie.2021.720p"}')`); err != nil {
 		t.Fatal(err)
 	}
 	s.runAutomation()
@@ -244,7 +244,7 @@ func TestAutomaticInformationThenMatchingAndRestartCadence(t *testing.T) {
 		t.Fatalf("new import bypassed the identification interval: %+v %v", status, err)
 	}
 	// Move only the durable clock; no wall-clock wait or skipped queue item.
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET last_match=now()-INTERVAL '31 seconds'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET last_match=now()-INTERVAL '31 seconds'`); err != nil {
 		t.Fatal(err)
 	}
 	s.wakeAutomation()
@@ -318,7 +318,7 @@ func TestAutomaticFailuresRetryWithoutLosingProgressOrHidingErrors(t *testing.T)
 		if attempt == 3 {
 			unavailable.Store(false)
 		}
-		if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET sync_retry_at=now()-INTERVAL '1 second'`); err != nil {
+		if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET sync_retry_at=now()-INTERVAL '1 second'`); err != nil {
 			t.Fatal(err)
 		}
 		s.wakeAutomation()

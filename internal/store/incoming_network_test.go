@@ -70,9 +70,9 @@ func TestIncomingTrustAndPublicLimitsPreserveExistingConnectionsAndGenerations(t
 	if saved.Incoming.TrustedProxies == nil {
 		t.Fatal("disabled policy returned null instead of an address list")
 	}
-	if _, err = db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_network_audit() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+	if _, err = db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_network_audit() RETURNS TRIGGER LANGUAGE plpgsql AS $$
  BEGIN IF NEW.kind='network.settings_changed' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END; $$;
- CREATE TRIGGER reject_network_audit BEFORE INSERT ON ingest.activity_logs FOR EACH ROW EXECUTE FUNCTION ingest.reject_network_audit()`); err != nil {
+ CREATE TRIGGER reject_network_audit BEFORE INSERT ON aiosources.activity_logs FOR EACH ROW EXECUTE FUNCTION aiosources.reject_network_audit()`); err != nil {
 		t.Fatal(err)
 	}
 	failed := saved
@@ -87,7 +87,7 @@ func TestIncomingTrustAndPublicLimitsPreserveExistingConnectionsAndGenerations(t
 		t.Fatal("failed quota save changed the live policy")
 	}
 	var logs int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='network.settings_changed' AND service='network' AND data='{}'::jsonb`).Scan(&logs); err != nil || logs != 4 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='network.settings_changed' AND service='network' AND data='{}'::jsonb`).Scan(&logs); err != nil || logs != 4 {
 		t.Fatal("network audit events missing, duplicated or contain unrelated data", logs, err)
 	}
 }
@@ -102,14 +102,14 @@ func TestIncomingNetworkMigrationPreservesEnabledVisitorLinksAndOutgoingRoutes(t
 	if err = db.migrateThrough(ctx, 64); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET enabled=true,torznab_enabled=true,generation=42,torznab_generation=17;
- UPDATE ingest.network_settings SET default_route='direct';`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,torznab_enabled=true,generation=42,torznab_generation=17;
+ UPDATE aiosources.network_settings SET default_route='direct';`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.migrateThrough(ctx, 65); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET setup_per_minute=19, requests_per_minute=321,concurrent=61;`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET setup_per_minute=19, requests_per_minute=321,concurrent=61;`); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := db.pool.Begin(ctx)
@@ -123,7 +123,7 @@ func TestIncomingNetworkMigrationPreservesEnabledVisitorLinksAndOutgoingRoutes(t
 		t.Fatal(err)
 	}
 	var quota int
-	if err = db.pool.QueryRow(ctx, `SELECT requests_per_minute FROM ingest.aio_public_access WHERE singleton`).Scan(&quota); err != nil || quota != 321 {
+	if err = db.pool.QueryRow(ctx, `SELECT requests_per_minute FROM aiosources.aio_public_access WHERE singleton`).Scan(&quota); err != nil || quota != 321 {
 		t.Fatal("interrupted migration lost saved quotas", err)
 	}
 	if err = db.Migrate(ctx); err != nil {
@@ -170,7 +170,7 @@ func TestPublicLimitsCanBeDisabledIndividuallyWithoutChangingOtherNetworkSetting
 			t.Fatal("disabled limits were changed or affected unrelated network settings", err)
 		}
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.network_settings SET public_limits=jsonb_set(public_limits,'{requests_per_minute}','-1') WHERE singleton`); err == nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.network_settings SET public_limits=jsonb_set(public_limits,'{requests_per_minute}','-1') WHERE singleton`); err == nil {
 		t.Fatal("database constraint accepted a negative request limit")
 	}
 }

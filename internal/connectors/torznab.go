@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	sdk "github.com/moodiness/ingest/torznab"
 	"github.com/theo-bnts/aiosources/internal/model"
+	sdk "github.com/theo-bnts/aiosources/torznab"
 )
 
 type torznabConnector struct {

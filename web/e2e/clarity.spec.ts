@@ -210,20 +210,20 @@ test('matching counters open real filtered diagnostics, explain decisions and us
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','1','tt1234567',ARRAY[2021]);
-UPDATE ingest.aio_state SET last_sync='2026-01-02T03:04:00Z';
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','1','tt1234567',ARRAY[2021]);
+UPDATE aiosources.aio_state SET last_sync='2026-01-02T03:04:00Z';
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
 ('diagnostic-source','matched','{"title":"Identified release","download_url":"https://source.invalid/private-path"}'),
 ('diagnostic-source','ambiguous','{"title":"Ambiguous release"}'),
 ('diagnostic-source','unmatched','{"title":"Wrong year release"}'),
 ('diagnostic-source','pending','{"title":"Pending release"}');
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT provider_id,source_id,md5(fields::text),CASE WHEN source_id='matched' THEN (SELECT id FROM ingest.aio_works) ELSE NULL END,1,
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT provider_id,source_id,md5(fields::text),CASE WHEN source_id='matched' THEN (SELECT id FROM aiosources.aio_works) ELSE NULL END,1,
 CASE WHEN source_id='matched' THEN 'matched' WHEN source_id='ambiguous' THEN 'ambiguous' ELSE 'unmatched' END,
-CASE WHEN source_id='ambiguous' THEN 'multiple plausible works' WHEN source_id='unmatched' THEN 'year conflict' ELSE 'exact alias with compatible evidence' END FROM ingest.torrents WHERE source_id<>'pending';
-DELETE FROM ingest.aio_match_queue WHERE source_id<>'pending';`)
+CASE WHEN source_id='ambiguous' THEN 'multiple plausible works' WHEN source_id='unmatched' THEN 'year conflict' ELSE 'exact alias with compatible evidence' END FROM aiosources.torrents WHERE source_id<>'pending';
+DELETE FROM aiosources.aio_match_queue WHERE source_id<>'pending';`)
     await db.query(
-      "UPDATE ingest.aio_matches SET updated_at='2026-01-02T03:04:00Z' WHERE provider_id='diagnostic-source'",
+      "UPDATE aiosources.aio_matches SET updated_at='2026-01-02T03:04:00Z' WHERE provider_id='diagnostic-source'",
     )
   } finally {
     await db.end()
@@ -316,8 +316,8 @@ test.describe('import processing diagnostics', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained)
-SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title":"Rejected sample"}','Missing source identifier',false,false,false FROM ingest.pages WHERE run_id=$1;
+        `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained)
+SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title":"Rejected sample"}','Missing source identifier',false,false,false FROM aiosources.pages WHERE run_id=$1;
 `,
         [run.id],
       )

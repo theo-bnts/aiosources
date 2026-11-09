@@ -1,3 +1,4 @@
+import { readNavigationPreferences } from '@/lib/navigation-preferences'
 import { SettingsSearch } from '@/components/settings-search'
 import { SettingsDestination } from '@/components/settings-destination'
 import {
@@ -337,7 +338,7 @@ const publicNavigationGroups: NavigationGroup[] = [
     ],
   },
 ]
-const navigationStorageKey = 'ingest.navigation.groups'
+const navigationStorageKey = 'aiosources.navigation.groups'
 const navigationLinkClassName =
   'flex min-h-(--control-height) items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary'
 
@@ -637,7 +638,7 @@ export function AppShell({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     let stored: unknown
     try {
-      stored = JSON.parse(localStorage.getItem(storageKey) ?? 'null')
+      stored = readNavigationPreferences(localStorage, storageKey)
     } catch {
       // Browser preferences must not prevent access to the console.
     }

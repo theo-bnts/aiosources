@@ -42,7 +42,7 @@ func TestStremioAccessAdmissionRevocationAndCredentialStorage(t *testing.T) {
 	defer download.Close()
 	var lifetime float64
 	var seen bool
-	if err = db.pool.QueryRow(ctx, `SELECT extract(epoch FROM r.lease_until-r.requested_at),s.last_access_at IS NOT NULL FROM ingest.share_requests r JOIN ingest.shares s ON s.id=r.share_id WHERE r.id=$1`, download.id).Scan(&lifetime, &seen); err != nil || lifetime != 75 || !seen {
+	if err = db.pool.QueryRow(ctx, `SELECT extract(epoch FROM r.lease_until-r.requested_at),s.last_access_at IS NOT NULL FROM aiosources.share_requests r JOIN aiosources.shares s ON s.id=r.share_id WHERE r.id=$1`, download.id).Scan(&lifetime, &seen); err != nil || lifetime != 75 || !seen {
 		t.Fatal("playback lease too short or last access absent", lifetime, seen, err)
 	}
 	if _, err = db.BeginStremioRequest(ctx, grant.Share.ID, grant.Password); err == nil {
@@ -84,7 +84,7 @@ func TestStremioAccessAdmissionRevocationAndCredentialStorage(t *testing.T) {
 	defer active.Close()
 	for _, table := range []string{"shares", "share_requests", "activity_logs"} {
 		var saved bool
-		if err = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.`+table+` t WHERE strpos(row_to_json(t)::text,$1)>0 OR strpos(row_to_json(t)::text,$2)>0)`, grant.Password, rotated.Password).Scan(&saved); err != nil || saved {
+		if err = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.`+table+` t WHERE strpos(row_to_json(t)::text,$1)>0 OR strpos(row_to_json(t)::text,$2)>0)`, grant.Password, rotated.Password).Scan(&saved); err != nil || saved {
 			t.Fatal("raw installation key persisted", table, err)
 		}
 	}
@@ -107,10 +107,10 @@ func TestStremioConnectionsUpgradeKeepsExistingAccessAndPublicConsent(t *testing
 		t.Fatal(err)
 	}
 	old := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing Torznab", Scope: "all", Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET format='torznab',enabled=true WHERE id=$1`, old.Share.ID); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='torznab',enabled=true WHERE id=$1`, old.Share.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET enabled=true,torznab_enabled=true,expose_sources=true,revision=7,generation=9,torznab_generation=3`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,torznab_enabled=true,expose_sources=true,revision=7,generation=9,torznab_generation=3`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {
@@ -129,7 +129,7 @@ func TestStremioConnectionsUpgradeKeepsExistingAccessAndPublicConsent(t *testing
 		t.Fatal(err)
 	}
 	var retained bool
-	if err = db.pool.QueryRow(ctx, `SELECT enabled FROM ingest.catalog_tracking`).Scan(&retained); err != nil || retained {
+	if err = db.pool.QueryRow(ctx, `SELECT enabled FROM aiosources.catalog_tracking`).Scan(&retained); err != nil || retained {
 		t.Fatal("upgrade enabled unnecessary catalog retention", err)
 	}
 	expired := time.Now().Add(-time.Hour)

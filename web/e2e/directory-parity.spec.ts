@@ -463,7 +463,7 @@ test.describe('import directory summaries', () => {
         ['remote', records[0].remote],
       ] as const)
         await db.query(
-          `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,error,finished_at) VALUES($1,$2,$3,'full','failed','',$4,'synthetic import failure.',now())`,
+          `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,error,finished_at) VALUES($1,$2,$3,'full','failed','',$4,'synthetic import failure.',now())`,
           [`${kind}-failure`, config.id, config.name, JSON.stringify(config)],
         )
     } finally {

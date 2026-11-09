@@ -25,8 +25,8 @@ func enrichCatalogItems(ctx context.Context, tx pgx.Tx, share model.Share, permi
 	for i, key := range keys {
 		providers[i], sources[i], indices[key] = key.provider, key.source, i
 	}
-	rows, err := tx.Query(ctx, `SELECT t.provider_id,t.source_id,t.fields,ingest.catalog_origin(t.origin,t.provider_id,t.source_id)
-FROM ingest.torrents t JOIN unnest($1::text[],$2::text[]) k(provider_id,source_id) USING(provider_id,source_id)`, providers, sources)
+	rows, err := tx.Query(ctx, `SELECT t.provider_id,t.source_id,t.fields,aiosources.catalog_origin(t.origin,t.provider_id,t.source_id)
+FROM aiosources.torrents t JOIN unnest($1::text[],$2::text[]) k(provider_id,source_id) USING(provider_id,source_id)`, providers, sources)
 	if err != nil {
 		return databaseError("read shared torrent information", err)
 	}
@@ -65,8 +65,8 @@ FROM ingest.torrents t JOIN unnest($1::text[],$2::text[]) k(provider_id,source_i
 // exposed in cursors, and no additional copy of a source payload is stored.
 func catalogDetailsPage(ctx context.Context, tx pgx.Tx, share model.Share, state *catalogToken, result *model.CatalogEnvelope) (bool, error) {
 	limit := min(state.Limit, 100)
-	rows, err := tx.Query(ctx, `SELECT t.catalog_details_tx,t.occurrence_id,t.fields,ingest.catalog_origin(t.origin,t.provider_id,t.source_id)
-FROM ingest.torrents t WHERE t.catalog_details_tx>$1 AND t.catalog_details_tx<=$2
+	rows, err := tx.Query(ctx, `SELECT t.catalog_details_tx,t.occurrence_id,t.fields,aiosources.catalog_origin(t.origin,t.provider_id,t.source_id)
+FROM aiosources.torrents t WHERE t.catalog_details_tx>$1 AND t.catalog_details_tx<=$2
 AND (t.catalog_details_tx,t.occurrence_id)>($3,$4) AND ($5 OR t.provider_id=ANY($6::text[]))
 ORDER BY t.catalog_details_tx,t.occurrence_id LIMIT $7`, state.DetailsLow, state.AuxUpper, state.AuxAfter, state.AuxIdentity, share.Scope == "all", share.SourceIDs, limit+1)
 	if err != nil {
@@ -110,7 +110,7 @@ ORDER BY t.catalog_details_tx,t.occurrence_id LIMIT $7`, state.DetailsLow, state
 func publishCatalogTorrentDetails(ctx context.Context, tx pgx.Tx, run model.Run) error {
 	after := ""
 	for {
-		rows, err := tx.Query(ctx, `SELECT identity,data FROM ingest.run_catalog_entities WHERE run_id=$1 AND kind='torrent' AND identity>$2 ORDER BY identity LIMIT 100`, run.ID, after)
+		rows, err := tx.Query(ctx, `SELECT identity,data FROM aiosources.run_catalog_entities WHERE run_id=$1 AND kind='torrent' AND identity>$2 ORDER BY identity LIMIT 100`, run.ID, after)
 		if err != nil {
 			return err
 		}
@@ -149,7 +149,7 @@ func applyCatalogTorrentDetails(ctx context.Context, tx pgx.Tx, provider string,
 	for i, entry := range entries {
 		ids[i], byID[entry.ID] = entry.ID, entry
 	}
-	rows, err := tx.Query(ctx, `SELECT source_id,fields,origin FROM ingest.torrents
+	rows, err := tx.Query(ctx, `SELECT source_id,fields,origin FROM aiosources.torrents
 WHERE provider_id=$1 AND source_id=ANY($2::text[]) ORDER BY source_id FOR UPDATE`, provider, ids)
 	if err != nil {
 		return databaseError("read shared torrent versions", err)
@@ -187,7 +187,7 @@ WHERE provider_id=$1 AND source_id=ANY($2::text[]) ORDER BY source_id FOR UPDATE
 			return err
 		}
 		if !bytes.Equal(before, data) {
-			batch.Queue(`UPDATE ingest.torrents SET fields=$3 WHERE provider_id=$1 AND source_id=$2 AND fields IS DISTINCT FROM $3::jsonb`, provider, id, data)
+			batch.Queue(`UPDATE aiosources.torrents SET fields=$3 WHERE provider_id=$1 AND source_id=$2 AND fields IS DISTINCT FROM $3::jsonb`, provider, id, data)
 		}
 	}
 	err = rows.Err()

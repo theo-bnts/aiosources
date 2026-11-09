@@ -15,26 +15,26 @@ func TestRawFragmentSearchUsesIndexBeforeResolvingPayloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	var pageID int64
-	if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,'bulk',0,''::bytea,'application/json') RETURNING id`, run.ID).Scan(&pageID); err != nil {
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,'bulk',0,''::bytea,'application/json') RETURNING id`, run.ID).Scan(&pageID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,payload_retained)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,payload_retained)
 SELECT $1,'bulk',n::text,$2,0,''::bytea,'application/json',jsonb_build_object('title','Ordinary.Release.'||n,'size',9007199254740993),false FROM generate_series(1,20000) n`, run.ID, pageID); err != nil {
 		t.Fatal(err)
 	}
 	var keeper int64
-	if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
 VALUES($1,'bulk','marker',$2,0,''::bytea,'application/json','{"title":"Rare.Astronomical.%_Sample","size":9007199254740993}') RETURNING id`, run.ID, pageID).Scan(&keeper); err != nil {
 		t.Fatal(err)
 	}
 	var reference int64
-	if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,payload_id)
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,payload_id)
 VALUES($1,'reference','different-identity',$2,0,''::bytea,'application/json','{}',$3) RETURNING id`, run.ID, pageID, keeper).Scan(&reference); err != nil {
 		t.Fatal(err)
 	}
 	// Match the completed-upgrade index (and normal vacuum maintenance),
 	// rather than measuring an unflushed bulk-load pending list.
-	if _, err := db.pool.Exec(ctx, "SELECT pg_catalog.gin_clean_pending_list('ingest.raw_records_fragments'); ANALYZE ingest.raw_records"); err != nil {
+	if _, err := db.pool.Exec(ctx, "SELECT pg_catalog.gin_clean_pending_list('aiosources.raw_records_fragments'); ANALYZE aiosources.raw_records"); err != nil {
 		t.Fatal(err)
 	}
 	for _, test := range []struct {

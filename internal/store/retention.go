@@ -34,7 +34,7 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 		return model.Run{}, databaseError("begin page retention", err)
 	}
 	defer rollback(tx)
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 FOR UPDATE", expected.ID))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", expected.ID))
 	if err != nil {
 		return model.Run{}, databaseError("read page checkpoint", err)
 	}
@@ -42,7 +42,7 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 	if run.Status != model.StatusRunning || run.Pages != expected.Pages || run.Records != expected.Records || run.Errors != expected.Errors || !bytes.Equal(run.Cursor, expected.Cursor) {
 		return model.Run{}, model.ErrConflict
 	}
-	if _, err := tx.Exec(ctx, "SELECT set_config('ingest.publication_run_id',$1,true)", run.ID); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT set_config('aiosources.publication_run_id',$1,true)", run.ID); err != nil {
 		return model.Run{}, databaseError("set page publication context", err)
 	}
 	primaryCount := 0
@@ -58,7 +58,7 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 	var pageFingerprint any
 	stalled := false
 	if page.Error == "" && primaryCount > 0 && fingerprint != "" {
-		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.pages WHERE run_id=$1 AND fingerprint=$2)", run.ID, fingerprint).Scan(&stalled); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM aiosources.pages WHERE run_id=$1 AND fingerprint=$2)", run.ID, fingerprint).Scan(&stalled); err != nil {
 			return model.Run{}, databaseError("check page progress", err)
 		}
 	}
@@ -82,7 +82,7 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 		// A requested reset defines a new traversal generation. Its prior
 		// staging is irrelevant, but duplicate IDs in the new page still fail.
 		if !stalled && !page.ResetStaging && len(ids) > 0 {
-			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.staged_torrents WHERE run_id=$1 AND source_id=ANY($2::text[]))", run.ID, ids).Scan(&stalled); err != nil {
+			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM aiosources.staged_torrents WHERE run_id=$1 AND source_id=ANY($2::text[]))", run.ID, ids).Scan(&stalled); err != nil {
 				return model.Run{}, databaseError("check staged identities", err)
 			}
 		}
@@ -121,7 +121,7 @@ func (s *Store) SavePage(ctx context.Context, expected model.Run, page model.Pag
 	pageIndex := run.Pages + 1
 	var pageID int64
 	resetStaging := page.Error == "" && (run.Mode == model.ModeFull || remote) && page.ResetStaging
-	if err := tx.QueryRow(ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type,fingerprint,position,metadata,error,done,reset_staging,require_unique_ids,payload_retained)
+	if err := tx.QueryRow(ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type,fingerprint,position,metadata,error,done,reset_staging,require_unique_ids,payload_retained)
 VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID, run.ProviderID, pageIndex, page.ContentType, pageFingerprint, page.Position, metadata, page.Error, page.Error == "" && page.Done, resetStaging, page.RequireUniqueIDs).Scan(&pageID); err != nil {
 		return model.Run{}, databaseError("save response observation", err)
 	}
@@ -168,7 +168,7 @@ VALUES($1,$2,$3,''::bytea,$4,$5,$6,$7,$8,$9,$10,$11,FALSE) RETURNING id`, run.ID
 			contentType = page.ContentType
 		}
 		var rawID *int64
-		const insertRaw = `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained)
+		const insertRaw = `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained)
 VALUES($1,$2,$3,$4,$5,''::bytea,$6,
 CASE WHEN $11 OR jsonb_typeof($7::jsonb)<>'object' THEN $7::jsonb ELSE '{}'::jsonb END,
 $8,$9,$10,FALSE) RETURNING id`
@@ -254,9 +254,9 @@ $8,$9,$10,FALSE) RETURNING id`
 		}
 		switch run.Mode {
 		case model.ModeIncremental:
-			_, err = tx.Exec(ctx, `INSERT INTO ingest.torrents AS previous(provider_id,source_id,fields,raw_id)
+			_, err = tx.Exec(ctx, `INSERT INTO aiosources.torrents AS previous(provider_id,source_id,fields,raw_id)
 VALUES($1,$2,$3,$4) ON CONFLICT(provider_id,source_id) DO UPDATE SET
-fields=CASE WHEN $5 AND ingest.torrent_hash(previous.fields->'info_hash') IS DISTINCT FROM ingest.torrent_hash(EXCLUDED.fields->'info_hash')
+fields=CASE WHEN $5 AND aiosources.torrent_hash(previous.fields->'info_hash') IS DISTINCT FROM aiosources.torrent_hash(EXCLUDED.fields->'info_hash')
 THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_seen_at=NOW(),historical=FALSE,origin=NULL`, run.ProviderID, record.SourceID, canonical, rawID, run.Config.SupportsMetadata())
 		case model.ModeFull:
 			stagedUpdates = append(stagedUpdates, stagedUpdate{sourceID: record.SourceID, fields: canonical, rawID: rawID})
@@ -287,7 +287,7 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 		}
 		page.Done = false
 		pages = 0
-		if _, err := tx.Exec(ctx, "UPDATE ingest.pages SET error=$2,done=FALSE,fingerprint=NULL,reset_staging=FALSE,metadata=jsonb_set(metadata,'{coverage_refresh_applied}','false'::jsonb,FALSE) WHERE id=$1", pageID, page.Error); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE aiosources.pages SET error=$2,done=FALSE,fingerprint=NULL,reset_staging=FALSE,metadata=jsonb_set(metadata,'{coverage_refresh_applied}','false'::jsonb,FALSE) WHERE id=$1", pageID, page.Error); err != nil {
 			return model.Run{}, databaseError("mark incomplete catalogue page", err)
 		}
 	}
@@ -296,7 +296,7 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 			return model.Run{}, err
 		}
 		if resetStaging {
-			if _, err := tx.Exec(ctx, "DELETE FROM ingest.staged_torrents WHERE run_id=$1", run.ID); err != nil {
+			if _, err := tx.Exec(ctx, "DELETE FROM aiosources.staged_torrents WHERE run_id=$1", run.ID); err != nil {
 				return model.Run{}, databaseError("reset collection staging", err)
 			}
 		}
@@ -304,20 +304,20 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 			return model.Run{}, err
 		}
 		if len(page.RefreshScopes) > 0 {
-			if err := tx.QueryRow(ctx, "SELECT count(*) FROM ingest.run_record_identities WHERE run_id=$1", run.ID).Scan(&run.DistinctRecords); err != nil {
+			if err := tx.QueryRow(ctx, "SELECT count(*) FROM aiosources.run_record_identities WHERE run_id=$1", run.ID).Scan(&run.DistinctRecords); err != nil {
 				return model.Run{}, databaseError("count refreshed identities", err)
 			}
 		}
 		for _, update := range stagedUpdates {
 			if remote {
-				_, err = tx.Exec(ctx, `INSERT INTO ingest.staged_torrents(run_id,provider_id,source_id,fields,raw_id,origin,deleted)
+				_, err = tx.Exec(ctx, `INSERT INTO aiosources.staged_torrents(run_id,provider_id,source_id,fields,raw_id,origin,deleted)
 VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(run_id,source_id) DO UPDATE SET
 fields=EXCLUDED.fields,raw_id=EXCLUDED.raw_id,origin=EXCLUDED.origin,deleted=EXCLUDED.deleted,last_seen_at=NOW()`,
 					run.ID, run.ProviderID, update.sourceID, update.fields, update.rawID, update.origin, update.deleted)
 			} else {
-				_, err = tx.Exec(ctx, `INSERT INTO ingest.staged_torrents AS previous(run_id,provider_id,source_id,fields,raw_id)
+				_, err = tx.Exec(ctx, `INSERT INTO aiosources.staged_torrents AS previous(run_id,provider_id,source_id,fields,raw_id)
 VALUES($1,$2,$3,$4,$5) ON CONFLICT(run_id,source_id) DO UPDATE SET
-fields=CASE WHEN ingest.torrent_hash(previous.fields->'info_hash') IS DISTINCT FROM ingest.torrent_hash(EXCLUDED.fields->'info_hash')
+fields=CASE WHEN aiosources.torrent_hash(previous.fields->'info_hash') IS DISTINCT FROM aiosources.torrent_hash(EXCLUDED.fields->'info_hash')
 THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_seen_at=NOW()`, run.ID, run.ProviderID, update.sourceID, update.fields, update.rawID)
 			}
 			if err != nil {
@@ -334,7 +334,7 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 	}
 	if page.Error == "" {
 		if resetStaging {
-			if _, err := tx.Exec(ctx, "DELETE FROM ingest.run_record_identities WHERE run_id=$1", run.ID); err != nil {
+			if _, err := tx.Exec(ctx, "DELETE FROM aiosources.run_record_identities WHERE run_id=$1", run.ID); err != nil {
 				return model.Run{}, databaseError("reset collection identities", err)
 			}
 			run.DistinctRecords = 0
@@ -342,7 +342,7 @@ THEN EXCLUDED.fields ELSE `+nativeFieldMerge+` END,raw_id=EXCLUDED.raw_id,last_s
 		if len(recordIDs) > 0 {
 			var added int64
 			if err := tx.QueryRow(ctx, `WITH inserted AS (
-    INSERT INTO ingest.run_record_identities(run_id,source_id)
+    INSERT INTO aiosources.run_record_identities(run_id,source_id)
     SELECT $1,source_id FROM unnest($2::text[]) AS observed(source_id)
     ON CONFLICT (run_id,source_id) DO NOTHING
     RETURNING 1
@@ -362,12 +362,12 @@ SELECT count(*) FROM inserted`, run.ID, recordIDs).Scan(&added); err != nil {
 			}
 		}
 		if len(outside) > 0 {
-			if _, err := tx.Exec(ctx, "DELETE FROM ingest.staged_torrents WHERE run_id=$1 AND source_id=ANY($2::text[])", run.ID, outside); err != nil {
+			if _, err := tx.Exec(ctx, "DELETE FROM aiosources.staged_torrents WHERE run_id=$1 AND source_id=ANY($2::text[])", run.ID, outside); err != nil {
 				return model.Run{}, databaseError("retire out-of-scope staging", err)
 			}
 			var retired int64
 			if err := tx.QueryRow(ctx, `WITH removed AS (
-DELETE FROM ingest.run_record_identities WHERE run_id=$1 AND source_id=ANY($2::text[]) RETURNING 1
+DELETE FROM aiosources.run_record_identities WHERE run_id=$1 AND source_id=ANY($2::text[]) RETURNING 1
 )
 SELECT count(*) FROM removed`, run.ID, outside).Scan(&retired); err != nil {
 				return model.Run{}, databaseError("retire out-of-scope identities", err)
@@ -382,7 +382,7 @@ SELECT count(*) FROM removed`, run.ID, outside).Scan(&retired); err != nil {
 	progressResponse := page.Body != nil && !auxiliaryResponse && !(primaryCount == 0 && len(page.Items) > 0)
 	if policy.NoProgressRequests > 0 && page.Error == "" {
 		if resetStaging {
-			if _, err := tx.Exec(ctx, "DELETE FROM ingest.run_progress_identities WHERE run_id=$1", run.ID); err != nil {
+			if _, err := tx.Exec(ctx, "DELETE FROM aiosources.run_progress_identities WHERE run_id=$1", run.ID); err != nil {
 				return model.Run{}, databaseError("reset useful-progress generation", err)
 			}
 			run.RequestsWithoutNewIDs, run.ProgressWarningSent = 0, false
@@ -390,7 +390,7 @@ SELECT count(*) FROM removed`, run.ID, outside).Scan(&retired); err != nil {
 		var added int64
 		if len(recordIDs) > 0 {
 			if err := tx.QueryRow(ctx, `WITH inserted AS (
-INSERT INTO ingest.run_progress_identities(run_id,source_id)
+INSERT INTO aiosources.run_progress_identities(run_id,source_id)
 SELECT $1,source_id FROM unnest($2::text[]) AS observed(source_id)
 ON CONFLICT (run_id,source_id) DO NOTHING RETURNING 1)
 SELECT count(*) FROM inserted`, run.ID, recordIDs).Scan(&added); err != nil {
@@ -415,7 +415,7 @@ SELECT count(*) FROM inserted`, run.ID, recordIDs).Scan(&added); err != nil {
 		}
 	}
 	if !remote && run.Mode == model.ModeIncremental && primaryCount > 0 && page.Error == "" {
-		if _, err := tx.Exec(ctx, "DELETE FROM ingest.remote_checkpoints WHERE provider_id=$1", run.ProviderID); err != nil {
+		if _, err := tx.Exec(ctx, "DELETE FROM aiosources.remote_checkpoints WHERE provider_id=$1", run.ProviderID); err != nil {
 			return model.Run{}, databaseError("invalidate replaced catalogue checkpoint", err)
 		}
 	}
@@ -428,12 +428,12 @@ SELECT count(*) FROM inserted`, run.ID, recordIDs).Scan(&added); err != nil {
 	// Errored attempts contribute to observation/error counters but cannot
 	// change traversal state or its completion evidence.
 	if page.Error == "" && page.Metadata["traversal_phase"] == "options_list" && len(recordIDs) > 0 {
-		if _, err := tx.Exec(ctx, `INSERT INTO ingest.run_filter_records(page_id,source_id)
+		if _, err := tx.Exec(ctx, `INSERT INTO aiosources.run_filter_records(page_id,source_id)
 SELECT $1,source_id FROM unnest($2::text[]) AS accepted(source_id) ON CONFLICT DO NOTHING`, pageID, recordIDs); err != nil {
 			return model.Run{}, databaseError("retain filter coverage evidence", err)
 		}
 	}
-	run, err = scanRun(tx.QueryRow(ctx, `UPDATE ingest.runs SET pages=pages+$2,records=records+$3,errors=errors+$4,
+	run, err = scanRun(tx.QueryRow(ctx, `UPDATE aiosources.runs SET pages=pages+$2,records=records+$3,errors=errors+$4,
 cursor=$5,traversal_done=CASE WHEN $6 THEN $7 ELSE traversal_done END,distinct_records=$8,
 requests_without_new_ids=$9,progress_warning_sent=$10,pause_reason=$11,known_page_streak=$12,rejected_primary=rejected_primary OR $13
 WHERE id=$1 RETURNING `+runColumns, run.ID, pages, primaryCount, errorCount, cursor, page.Error == "", page.Done, run.DistinctRecords, run.RequestsWithoutNewIDs, run.ProgressWarningSent, run.PauseReason, run.KnownPageStreak, page.Error == "" && rejectedPrimary))
@@ -483,7 +483,7 @@ WHERE id=$1 RETURNING `+runColumns, run.ID, pages, primaryCount, errorCount, cur
 	if err != nil {
 		return model.Run{}, err
 	}
-	if _, err := tx.Exec(ctx, "INSERT INTO ingest.events(run_id,kind,message,data) VALUES($1,$2,$3,$4)", run.ID, eventKind, eventMessage, eventData); err != nil {
+	if _, err := tx.Exec(ctx, "INSERT INTO aiosources.events(run_id,kind,message,data) VALUES($1,$2,$3,$4)", run.ID, eventKind, eventMessage, eventData); err != nil {
 		return model.Run{}, databaseError("record retained page event", err)
 	}
 	if err := notify(ctx, tx); err != nil {
@@ -506,7 +506,7 @@ func (s *Store) Known(ctx context.Context, providerID string, ids []string, befo
 	if len(ids) == 0 {
 		return known, nil
 	}
-	rows, err := s.pool.Query(ctx, `SELECT record.source_id FROM ingest.torrents AS record
+	rows, err := s.pool.Query(ctx, `SELECT record.source_id FROM aiosources.torrents AS record
 WHERE record.provider_id=$1 AND record.source_id=ANY($2::text[]) AND record.first_seen_at<$3
 AND record.collection_verified_at>=record.first_seen_at AND record.collection_verified_at<$3`, providerID, ids, before)
 	if err != nil {

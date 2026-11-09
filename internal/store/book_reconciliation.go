@@ -16,7 +16,7 @@ var bookSnapshotTables = []struct {
 }
 
 func (s *Store) BookExportLoaded(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `UPDATE ingest.ol_import_state SET data_complete=TRUE WHERE singleton`)
+	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET data_complete=TRUE WHERE singleton`)
 	return err
 }
 
@@ -36,7 +36,7 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 	if _, err = tx.Exec(ctx, `SET LOCAL statement_timeout='60s'`); err != nil {
 		return false, 0, err
 	}
-	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		return false, 0, err
 	}
 	var generation, skipped int64
@@ -45,7 +45,7 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 	var at *time.Time
 	var loaded, rebuild bool
 	var phase int
-	if err = tx.QueryRow(ctx, `SELECT generation,snapshot_at,prune_table,prune_after,skipped,data_complete,selection_rebuild,export_phase FROM ingest.ol_import_state WHERE singleton FOR UPDATE`).Scan(&generation, &at, &index, &after, &skipped, &loaded, &rebuild, &phase); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT generation,snapshot_at,prune_table,prune_after,skipped,data_complete,selection_rebuild,export_phase FROM aiosources.ol_import_state WHERE singleton FOR UPDATE`).Scan(&generation, &at, &index, &after, &skipped, &loaded, &rebuild, &phase); err != nil {
 		return false, 0, err
 	}
 	if !loaded {
@@ -72,7 +72,7 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 			args = append(args, config.OpenLibraryLanguages)
 		}
 	}
-	query := fmt.Sprintf(`SELECT %s,ol_revision,ol_seen,ol_modified_at,%s FROM ingest.%s WHERE %s>$1%s ORDER BY %s LIMIT 1000`, table.key, extra, table.table, table.key, where, table.key)
+	query := fmt.Sprintf(`SELECT %s,ol_revision,ol_seen,ol_modified_at,%s FROM aiosources.%s WHERE %s>$1%s ORDER BY %s LIMIT 1000`, table.key, extra, table.table, table.key, where, table.key)
 	if filtered && table.table == "aio_works" {
 		query = bookSnapshotWorkBatchSQL
 	}
@@ -106,25 +106,25 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 	}
 	if len(keys) > 0 {
 		if _, err = tx.Exec(ctx, `WITH affected AS (
- UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE media_type='book' AND openlibrary_id<>'' AND (
+ UPDATE aiosources.aio_works w SET revision=revision+1,updated_at=now() WHERE media_type='book' AND openlibrary_id<>'' AND (
  openlibrary_id=ANY($1::text[]) OR (book_data->'author_keys') ?| $1::text[]
- OR openlibrary_id IN(SELECT ingest.ol_resolve(unnest(e.work_keys)) FROM ingest.ol_editions e WHERE e.id=ANY($1::text[]))) RETURNING id
- ) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id
- ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, keys); err != nil {
+ OR openlibrary_id IN(SELECT aiosources.ol_resolve(unnest(e.work_keys)) FROM aiosources.ol_editions e WHERE e.id=ANY($1::text[]))) RETURNING id
+ ) INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN affected a ON a.id=m.work_id
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, keys); err != nil {
 			return false, 0, err
 		}
 		if !filtered {
-			if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_deleted(id,ol_revision,ol_modified_at) SELECT * FROM unnest($1::text[],$2::bigint[],array_fill($3::timestamptz,ARRAY[cardinality($1::text[])]))
- ON CONFLICT(id) DO UPDATE SET ol_revision=GREATEST(ingest.ol_deleted.ol_revision,EXCLUDED.ol_revision),ol_modified_at=GREATEST(ingest.ol_deleted.ol_modified_at,EXCLUDED.ol_modified_at)`, keys, revisions, at); err != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO aiosources.ol_deleted(id,ol_revision,ol_modified_at) SELECT * FROM unnest($1::text[],$2::bigint[],array_fill($3::timestamptz,ARRAY[cardinality($1::text[])]))
+ ON CONFLICT(id) DO UPDATE SET ol_revision=GREATEST(aiosources.ol_deleted.ol_revision,EXCLUDED.ol_revision),ol_modified_at=GREATEST(aiosources.ol_deleted.ol_modified_at,EXCLUDED.ol_modified_at)`, keys, revisions, at); err != nil {
 				return false, 0, err
 			}
 		}
-		if _, err = tx.Exec(ctx, "DELETE FROM ingest."+table.table+" WHERE "+table.key+"=ANY($1::text[])", keys); err != nil {
+		if _, err = tx.Exec(ctx, "DELETE FROM aiosources."+table.table+" WHERE "+table.key+"=ANY($1::text[])", keys); err != nil {
 			return false, 0, err
 		}
 		if table.counter >= 0 {
 			column := []string{"works", "editions", "authors"}[table.counter]
-			if _, err = tx.Exec(ctx, "UPDATE ingest.ol_import_state SET "+column+"="+column+"-$1 WHERE singleton", len(keys)); err != nil {
+			if _, err = tx.Exec(ctx, "UPDATE aiosources.ol_import_state SET "+column+"="+column+"-$1 WHERE singleton", len(keys)); err != nil {
 				return false, 0, err
 			}
 		}
@@ -133,7 +133,7 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 		index++
 		last = ""
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET prune_table=$1,prune_after=$2 WHERE singleton`, index, last); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.ol_import_state SET prune_table=$1,prune_after=$2 WHERE singleton`, index, last); err != nil {
 		return false, 0, err
 	}
 	return index >= len(bookSnapshotTables), inspected, databaseError("reconcile book snapshot", tx.Commit(ctx))
@@ -144,19 +144,19 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 // of every work. The shared key set makes the GIN lookup independent of each
 // candidate while preserving positive edition evidence, including redirects.
 const bookSnapshotWorkBatchSQL = `WITH batch AS MATERIALIZED (
- SELECT openlibrary_id,ol_revision,ol_seen,ol_modified_at FROM ingest.aio_works
+ SELECT openlibrary_id,ol_revision,ol_seen,ol_modified_at FROM aiosources.aio_works
  WHERE openlibrary_id>$1 AND media_type='book' AND openlibrary_id<>''
  ORDER BY openlibrary_id LIMIT 1000
 ), aliases AS MATERIALIZED (
- SELECT openlibrary_id,unnest(ingest.ol_aliases(openlibrary_id)) AS key FROM batch
+ SELECT openlibrary_id,unnest(aiosources.ol_aliases(openlibrary_id)) AS key FROM batch
 ), selected AS MATERIALIZED (
- SELECT DISTINCT unnest(e.work_keys) AS key FROM ingest.ol_editions e
+ SELECT DISTINCT unnest(e.work_keys) AS key FROM aiosources.ol_editions e
  WHERE e.work_keys && ARRAY(SELECT DISTINCT key FROM aliases)
 )
 SELECT b.*,NOT EXISTS(SELECT 1 FROM aliases a JOIN selected s USING(key)
  WHERE a.openlibrary_id=b.openlibrary_id) FROM batch b ORDER BY b.openlibrary_id`
 
-const resetBookChangesSQL = `TRUNCATE ingest.ol_change_jobs,ingest.ol_deleted,ingest.ol_import_references;
- UPDATE ingest.ol_changes_state SET anchor_id='',anchor_at=NULL,tail_since=NULL,tail_start_id='',bootstrap_day=NULL,bootstrap_complete=FALSE,changes_through=NULL,last_sync=NULL,checked_at=NULL,retry_at=NULL,needs_dump_after=NULL,dump_checked_at=NULL,error='' WHERE singleton;
- UPDATE ingest.ol_import_state SET generation=0,snapshot_at=NULL,prune_table=0,prune_after='',data_complete=FALSE,sync_failures=0,
+const resetBookChangesSQL = `TRUNCATE aiosources.ol_change_jobs,aiosources.ol_deleted,aiosources.ol_import_references;
+ UPDATE aiosources.ol_changes_state SET anchor_id='',anchor_at=NULL,tail_since=NULL,tail_start_id='',bootstrap_day=NULL,bootstrap_complete=FALSE,changes_through=NULL,last_sync=NULL,checked_at=NULL,retry_at=NULL,needs_dump_after=NULL,dump_checked_at=NULL,error='' WHERE singleton;
+ UPDATE aiosources.ol_import_state SET generation=0,snapshot_at=NULL,prune_table=0,prune_after='',data_complete=FALSE,sync_failures=0,
  selection='',export_phase=0,phase_snapshot='',phase_etag='',phase_position=0,filtered=0,selection_rebuild=FALSE WHERE singleton;`

@@ -27,19 +27,19 @@ func TestJSONAdapterUpgradePreservesSnapshotsAndRemoteHistory(t *testing.T) {
 		if encodeErr != nil {
 			t.Fatal(encodeErr)
 		}
-		if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config) VALUES($1,$2,$2,'full','queued','original-definition',$3)`, p.ID+"-run", p.ID, encoded); err != nil {
+		if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config) VALUES($1,$2,$2,'full','queued','original-definition',$3)`, p.ID+"-run", p.ID, encoded); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.runs SET status='paused',pause_reason='budget',cursor='{"page":23}',pages=22;
-INSERT INTO ingest.collection_state(provider_id,initialized_at) VALUES('old-native',now());
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('old-native','one','{"title":"Example release"}');`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runs SET status='paused',pause_reason='budget',cursor='{"page":23}',pages=22;
+INSERT INTO aiosources.collection_state(provider_id,initialized_at) VALUES('old-native',now());
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('old-native','one','{"title":"Example release"}');`); err != nil {
 		t.Fatal(err)
 	}
 	snapshot := func() string {
 		t.Helper()
 		var value string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(r)-'storage_options' ORDER BY id)::text FROM ingest.runs r`).Scan(&value); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(r)-'storage_options' ORDER BY id)::text FROM aiosources.runs r`).Scan(&value); err != nil {
 			t.Fatal(err)
 		}
 		return value
@@ -62,7 +62,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('old-native','o
 		}
 	}
 	var changed int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.runs WHERE storage_options IS NOT NULL`).Scan(&changed); err != nil || changed != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.runs WHERE storage_options IS NOT NULL`).Scan(&changed); err != nil || changed != 0 {
 		t.Fatal("old run acquired new storage choices", err)
 	}
 	for _, catalog := range []bool{false, true} {
@@ -92,7 +92,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('old-native','o
 		t.Fatal("adapter rename triggered another initial Full import", err)
 	}
 	var count int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.torrents WHERE provider_id='old-native'`).Scan(&count); err != nil || count != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.torrents WHERE provider_id='old-native'`).Scan(&count); err != nil || count != 1 {
 		t.Fatal("adapter rename changed already imported data", err)
 	}
 }

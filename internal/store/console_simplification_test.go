@@ -17,15 +17,15 @@ func TestConsoleSimplificationUpgradePreservesCoreStateAndAccessOutcomes(t *test
 	if err := db.migrateThrough(ctx, 39); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.health_settings SET stale_hours=72;
-INSERT INTO ingest.security_audit(action,target_id) VALUES('security.mfa_enabled','administrator'),('share.created','opaque-share');
-INSERT INTO ingest.secrets(name,ciphertext) VALUES('retained','\x0102');`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.health_settings SET stale_hours=72;
+INSERT INTO aiosources.security_audit(action,target_id) VALUES('security.mfa_enabled','administrator'),('share.created','opaque-share');
+INSERT INTO aiosources.secrets(name,ciphertext) VALUES('retained','\x0102');`); err != nil {
 		t.Fatal(err)
 	}
 	snapshot := func() string {
 		t.Helper()
 		var result string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('security',(SELECT jsonb_agg(to_jsonb(s)) FROM ingest.admin_security s),'secrets',(SELECT jsonb_agg(to_jsonb(s)) FROM ingest.secrets s),'settings',(SELECT jsonb_agg(to_jsonb(s) ORDER BY key) FROM ingest.settings s))::text`).Scan(&result); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('security',(SELECT jsonb_agg(to_jsonb(s)) FROM aiosources.admin_security s),'secrets',(SELECT jsonb_agg(to_jsonb(s)) FROM aiosources.secrets s),'settings',(SELECT jsonb_agg(to_jsonb(s) ORDER BY key) FROM aiosources.settings s))::text`).Scan(&result); err != nil {
 			t.Fatal(err)
 		}
 		return result
@@ -43,7 +43,7 @@ INSERT INTO ingest.secrets(name,ciphertext) VALUES('retained','\x0102');`); err 
 		t.Fatal(err)
 	}
 	var oldTable bool
-	if err := db.pool.QueryRow(ctx, "SELECT to_regclass('ingest.security_audit') IS NOT NULL").Scan(&oldTable); err != nil || !oldTable || snapshot() != before {
+	if err := db.pool.QueryRow(ctx, "SELECT to_regclass('aiosources.security_audit') IS NOT NULL").Scan(&oldTable); err != nil || !oldTable || snapshot() != before {
 		t.Fatal("interrupted simplification changed core state or retired schema")
 	}
 	for range 2 {
@@ -59,7 +59,7 @@ INSERT INTO ingest.secrets(name,ciphertext) VALUES('retained','\x0102');`); err 
 		t.Fatal("retired audit outcomes were lost, duplicated or made unreadable")
 	}
 	var retired bool
-	if err := db.pool.QueryRow(ctx, `SELECT to_regclass('ingest.security_audit') IS NULL AND to_regclass('ingest.health_settings') IS NULL AND to_regclass('ingest.health_daily_samples') IS NULL AND to_regclass('ingest.health_source_observations') IS NULL AND to_regclass('ingest.health_alert_states') IS NULL`).Scan(&retired); err != nil || !retired {
+	if err := db.pool.QueryRow(ctx, `SELECT to_regclass('aiosources.security_audit') IS NULL AND to_regclass('aiosources.health_settings') IS NULL AND to_regclass('aiosources.health_daily_samples') IS NULL AND to_regclass('aiosources.health_source_observations') IS NULL AND to_regclass('aiosources.health_alert_states') IS NULL`).Scan(&retired); err != nil || !retired {
 		t.Fatal("retired diagnostic/audit tables remain")
 	}
 }

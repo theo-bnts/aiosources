@@ -28,13 +28,13 @@ func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*mode
 		return nil, databaseError("measure database storage", err)
 	}
 	rows, err := tx.Query(ctx, `SELECT CASE
-WHEN n.nspname='ingest' AND (`+sourceStorageRelations+` OR c.relname='run_catalog_entities') THEN 'sources'
-WHEN n.nspname='ingest' AND c.relname IN ('ol_import_references','ol_redirects','ol_authors','ol_editions','ol_import_state','ol_changes_state','ol_change_jobs','ol_deleted','aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
-WHEN n.nspname='ingest' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_preparations','aio_cleanup','aio_incidents') THEN 'debrid'
-WHEN n.nspname='ingest' AND c.relname='stremio_requests' THEN 'stremio'
-WHEN n.nspname='ingest' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','catalog_entity_changes','remote_checkpoints','shares','public_catalog_policy') OR c.relname LIKE 'share_%') THEN 'sharing'
-WHEN n.nspname='ingest' AND c.relname IN ('activity_logs','operation_runs','operation_events','operation_downloads') THEN 'logs'
-WHEN n.nspname='ingest' AND (c.relname IN ('aio_public_access','secrets','security_settings','security_attempts','security_recovery_codes') OR c.relname LIKE 'admin_%') THEN 'access'
+WHEN n.nspname='aiosources' AND (`+sourceStorageRelations+` OR c.relname='run_catalog_entities') THEN 'sources'
+WHEN n.nspname='aiosources' AND c.relname IN ('ol_import_references','ol_redirects','ol_authors','ol_editions','ol_import_state','ol_changes_state','ol_change_jobs','ol_deleted','aio_works','aio_titles','aio_seasons','aio_episodes','aio_metadata_jobs','aio_matches','aio_match_queue','aio_match_reviews','aio_state','aio_title_variants','aio_season_requests','aio_inventory') THEN 'metadata'
+WHEN n.nspname='aiosources' AND c.relname IN ('aio_availability','aio_shared_availability','aio_resources','aio_preparations','aio_cleanup','aio_incidents') THEN 'debrid'
+WHEN n.nspname='aiosources' AND c.relname='stremio_requests' THEN 'stremio'
+WHEN n.nspname='aiosources' AND (c.relname IN ('catalog_journal','catalog_baselines','catalog_identity','catalog_retention','catalog_tracking','catalog_entity_changes','remote_checkpoints','shares','public_catalog_policy') OR c.relname LIKE 'share_%') THEN 'sharing'
+WHEN n.nspname='aiosources' AND c.relname IN ('activity_logs','operation_runs','operation_events','operation_downloads') THEN 'logs'
+WHEN n.nspname='aiosources' AND (c.relname IN ('aio_public_access','secrets','security_settings','security_attempts','security_recovery_codes') OR c.relname LIKE 'admin_%') THEN 'access'
 ELSE 'other' END AS category,
 CASE
  WHEN c.relname='torrents' THEN 'published'

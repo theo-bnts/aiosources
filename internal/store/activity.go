@@ -60,11 +60,11 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 		return result, databaseError("begin activity query", err)
 	}
 	defer rollback(tx)
-	if err := tx.QueryRow(ctx, "SELECT count(*) FROM ingest.activity_logs"+where, args...).Scan(&result.Total); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM aiosources.activity_logs"+where, args...).Scan(&result.Total); err != nil {
 		return result, databaseError("count activity logs", err)
 	}
 	args = append(args, options.Limit, options.Offset)
-	rows, err := tx.Query(ctx, "SELECT id,level,kind,message,provider_id,run_id,created_at,data,service,title FROM ingest.activity_logs"+where+" ORDER BY created_at DESC,id DESC LIMIT $9 OFFSET $10", args...)
+	rows, err := tx.Query(ctx, "SELECT id,level,kind,message,provider_id,run_id,created_at,data,service,title FROM aiosources.activity_logs"+where+" ORDER BY created_at DESC,id DESC LIMIT $9 OFFSET $10", args...)
 	if err != nil {
 		return result, databaseError("list activity logs", err)
 	}
@@ -139,7 +139,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		}
 		if kind == "schedule.failed" {
 			var lastKind string
-			err := tx.QueryRow(ctx, `SELECT kind FROM ingest.activity_logs WHERE provider_id=$1 AND kind LIKE 'schedule.%' ORDER BY id DESC LIMIT 1`, providerID).Scan(&lastKind)
+			err := tx.QueryRow(ctx, `SELECT kind FROM aiosources.activity_logs WHERE provider_id=$1 AND kind LIKE 'schedule.%' ORDER BY id DESC LIMIT 1`, providerID).Scan(&lastKind)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				return databaseError("read previous schedule activity", err)
 			}
@@ -150,13 +150,13 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	}
 	// Keep ordinary activity compatible with the earlier catalog migrations.
 	// Network events are only emitted after the network schema is installed.
-	query := `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6))`
+	query := `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6))`
 	if strings.HasPrefix(kind, "network.") {
-		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'network')`
+		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'network')`
 	} else if strings.HasPrefix(kind, "maintenance.books_") {
-		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'openlibrary')`
+		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'openlibrary')`
 	} else if strings.HasPrefix(kind, "maintenance.videos_") {
-		query = `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,ingest.activity_message($3),$4,$5,ingest.safe_activity_data($6),'tmdb')`
+		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'tmdb')`
 	}
 	_, err = tx.Exec(ctx, query, "activity-"+id, level, kind, providerID, runID, encoded)
 	if err != nil {

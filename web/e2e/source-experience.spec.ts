@@ -20,11 +20,11 @@ test('manual review selects a local work, protects drafts, publishes it and supp
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]),('movie','102','tt2345678',ARRAY[2024]);
-  INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,CASE tmdb_id WHEN '101' THEN 'Example Film' ELSE 'Example Film Returns' END,CASE tmdb_id WHEN '101' THEN 'example film' ELSE 'example film returns' END FROM ingest.aio_works;
-  INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','review-item','{"title":"Example.Film.2021.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","download_url":"https://source.invalid/synthetic-private-value"}');
-  DELETE FROM ingest.aio_match_queue;
-  INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,status,reason) SELECT provider_id,source_id,md5(fields::text),'ambiguous','multiple plausible works' FROM ingest.torrents;`)
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]),('movie','102','tt2345678',ARRAY[2024]);
+  INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,CASE tmdb_id WHEN '101' THEN 'Example Film' ELSE 'Example Film Returns' END,CASE tmdb_id WHEN '101' THEN 'example film' ELSE 'example film returns' END FROM aiosources.aio_works;
+  INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','review-item','{"title":"Example.Film.2021.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","download_url":"https://source.invalid/synthetic-private-value"}');
+  DELETE FROM aiosources.aio_match_queue;
+  INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,status,reason) SELECT provider_id,source_id,md5(fields::text),'ambiguous','multiple plausible works' FROM aiosources.torrents;`)
   } finally {
     await db.end()
   }
@@ -105,7 +105,7 @@ test('Stremio statistics and request details show actual results and preserve fi
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
+    await db.query(`INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
   VALUES(now(),'movie','imdb:tt1234567',21,'results',3,2,1,0,1,0,1,false,'[{"name":"Example result","provider":"example","source_id":"item","title":"Example Film","service":"alldebrid","cache":"cached","filename":"example.mp4","size":1024}]'),
   (now(),'series','imdb:tt2345678:1:4',18,'empty',0,0,0,0,0,0,0,false,'[]')`)
   } finally {

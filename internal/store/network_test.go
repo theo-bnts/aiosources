@@ -38,7 +38,7 @@ func TestNetworkSettingsRevisionsSecretsDeletionAndAtomicLogs(t *testing.T) {
 		t.Fatal("Saving changed activation or scoped routing")
 	}
 	var logs int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='network.settings_changed' AND service='network' AND message='Network connections changed'`).Scan(&logs); err != nil || logs != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='network.settings_changed' AND service='network' AND message='Network connections changed'`).Scan(&logs); err != nil || logs != 1 {
 		t.Fatal("Failed settings writes changed logs or successful writes were not recorded")
 	}
 	if err := db.DeleteSourceData(ctx, "sample", nil); err != nil {

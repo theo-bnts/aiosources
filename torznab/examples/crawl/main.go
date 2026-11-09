@@ -12,7 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/moodiness/ingest/torznab"
+	"github.com/theo-bnts/aiosources/torznab"
 )
 
 var errPageLimit = errors.New("requested page limit reached")

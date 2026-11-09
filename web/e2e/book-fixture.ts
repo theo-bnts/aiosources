@@ -54,27 +54,27 @@ async function seedBooks(page: Page, server: TestServer) {
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
-    INSERT INTO ingest.aio_works(media_type,tmdb_id,openlibrary_id,display_title,book_normalized,years,book_data) VALUES
+    await db.query(`INSERT INTO aiosources.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
+    INSERT INTO aiosources.aio_works(media_type,tmdb_id,openlibrary_id,display_title,book_normalized,years,book_data) VALUES
     ('book',NULL,'OL100W','The Amber Orchard','the amber orchard',ARRAY[2001],'{"author_keys":["OL200A"],"cover":12345}'),
     ('movie','101','','Example Film','',ARRAY[2026],'{}');
-    UPDATE ingest.aio_works SET poster_path='/syntheticPoster.jpg' WHERE media_type='movie';
-    INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,display_title,'example film' FROM ingest.aio_works WHERE media_type='movie';
-    INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn,author_keys,languages,year) VALUES
+    UPDATE aiosources.aio_works SET poster_path='/syntheticPoster.jpg' WHERE media_type='movie';
+    INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,display_title,'example film' FROM aiosources.aio_works WHERE media_type='movie';
+    INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,isbn,author_keys,languages,year) VALUES
     ('OL300M',ARRAY['OL100W'],'Le Verger Ambré','le verger ambre',ARRAY['9780306406157'],ARRAY['OL200A'],ARRAY['fr'],2024);
-    INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+    INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
     ('book-fixture','ebook','{"title":"Morgan Vale - The Amber Orchard EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"categories":[7020]}'),
     ('book-fixture','audio','{"title":"Morgan Vale - The Amber Orchard M4B","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200,"categories":[3030]}'),
     ('book-fixture','film','{"title":"Example.Film.2026.1080p","info_hash":"cccccccccccccccccccccccccccccccccccccccc","size":300}');
-    INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture',CASE t.source_id WHEN 'audio' THEN 'audiobook' WHEN 'ebook' THEN 'ebook' ELSE '' END FROM ingest.torrents t JOIN ingest.aio_works w ON w.media_type=CASE WHEN t.source_id='film' THEN 'movie' ELSE 'book' END;
-    DELETE FROM ingest.aio_match_queue;
-    INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finished_at) VALUES
+    INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture',CASE t.source_id WHEN 'audio' THEN 'audiobook' WHEN 'ebook' THEN 'ebook' ELSE '' END FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.media_type=CASE WHEN t.source_id='film' THEN 'movie' ELSE 'book' END;
+    DELETE FROM aiosources.aio_match_queue;
+    INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,finished_at) VALUES
     ('00000000-0000-4000-8000-000000000101','metadata','openlibrary','automatic',1,'succeeded',now()),
     ('00000000-0000-4000-8000-000000000102','metadata','tmdb','automatic',2,'succeeded',now());
-    INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
+    INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
     ('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[{"path":"The Amber Orchard.epub","size":100},{"path":"The Amber Orchard.pdf","size":200}]'),
     ('torbox','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',true,now(),'[{"path":"The Amber Orchard.m4b","size":200}]');`)
-    const rows = await db.query("SELECT id FROM ingest.aio_works WHERE media_type='book'")
+    const rows = await db.query("SELECT id FROM aiosources.aio_works WHERE media_type='book'")
     return String(rows.rows[0].id)
   } finally {
     await db.end()
@@ -86,9 +86,9 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`UPDATE ingest.ol_import_state SET complete=TRUE,position=3,imported=0,works=1,editions=1,authors=1,snapshot_at='2026-01-01T00:00:00Z',last_sync='2026-01-02T00:00:00Z';
-      UPDATE ingest.ol_changes_state SET needs_dump_after='2026-01-03T00:00:00Z',changes_through='2026-01-02T00:00:00Z',bootstrap_complete=FALSE;
-      INSERT INTO ingest.ol_change_jobs(id,revision,changed_at) VALUES('OL500W',2,'2026-01-03T00:00:00Z');`)
+    await db.query(`UPDATE aiosources.ol_import_state SET complete=TRUE,position=3,imported=0,works=1,editions=1,authors=1,snapshot_at='2026-01-01T00:00:00Z',last_sync='2026-01-02T00:00:00Z';
+      UPDATE aiosources.ol_changes_state SET needs_dump_after='2026-01-03T00:00:00Z',changes_through='2026-01-02T00:00:00Z',bootstrap_complete=FALSE;
+      INSERT INTO aiosources.ol_change_jobs(id,revision,changed_at) VALUES('OL500W',2,'2026-01-03T00:00:00Z');`)
   } finally {
     await db.end()
   }

@@ -4,7 +4,7 @@ package store
 // fragments. The expression index avoids rewriting every published row or
 // storing a second copy of its text when upgrading an existing catalogue.
 const searchFragmentsSchema = `
-CREATE FUNCTION ingest.torrent_search_text(provider TEXT, source TEXT, fields JSONB) RETURNS TEXT
+CREATE FUNCTION aiosources.torrent_search_text(provider TEXT, source TEXT, fields JSONB) RETURNS TEXT
 LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
 DECLARE encoded BYTEA;
 BEGIN
@@ -20,10 +20,10 @@ BEGIN
     END LOOP;
 END;
 $$;
-CREATE OR REPLACE FUNCTION ingest.torrent_search_vector(provider TEXT, source TEXT, fields JSONB) RETURNS TSVECTOR
+CREATE OR REPLACE FUNCTION aiosources.torrent_search_vector(provider TEXT, source TEXT, fields JSONB) RETURNS TSVECTOR
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
-    SELECT to_tsvector('simple'::regconfig,ingest.torrent_search_text(provider,source,fields));
+    SELECT to_tsvector('simple'::regconfig,aiosources.torrent_search_text(provider,source,fields));
 $$;
-CREATE INDEX torrents_fragments ON ingest.torrents USING GIN
-    (ingest.torrent_search_text(provider_id,source_id,fields) public.gin_trgm_ops);
+CREATE INDEX torrents_fragments ON aiosources.torrents USING GIN
+    (aiosources.torrent_search_text(provider_id,source_id,fields) public.gin_trgm_ops);
 `

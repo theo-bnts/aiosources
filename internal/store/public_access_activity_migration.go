@@ -3,7 +3,7 @@ package store
 // Preserve the common access messages and add public exposure changes without
 // rewriting the immutable migrations or retaining any visitor information.
 const publicAccessActivitySchema = `
-CREATE OR REPLACE FUNCTION ingest.access_activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION aiosources.access_activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
  SELECT CASE kind
  WHEN 'security.mfa_enabled' THEN 'Two-step verification enabled'
  WHEN 'security.mfa_disabled' THEN 'Two-step verification disabled'

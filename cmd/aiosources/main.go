@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
+	"github.com/theo-bnts/aiosources/internal/buildinfo"
 	"github.com/theo-bnts/aiosources/internal/connectors"
 	"github.com/theo-bnts/aiosources/internal/health"
 	"github.com/theo-bnts/aiosources/internal/httpapi"
@@ -44,7 +45,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	if err := command(ctx, os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "ingest:", err)
+		fmt.Fprintln(os.Stderr, "aiosources:", err)
 		os.Exit(1)
 	}
 }
@@ -55,7 +56,7 @@ func command(ctx context.Context, args []string) error {
 		name, args = args[0], args[1:]
 	}
 	if name == "help" || name == "--help" || name == "-h" {
-		fmt.Print(`Usage: ingest <command> [options]
+		fmt.Print(`Usage: aiosources <command> [options]
 
   serve          Serve the panel/API and durable collection workers (default)
   init           Create private local state and initial administrator password
@@ -67,7 +68,7 @@ func command(ctx context.Context, args []string) error {
   resume         Resume a saved collection from its checkpoint (--run ID)
   cancel         Interrupt a queued or running collection (--run ID)
   secret set     Read a named secret from stdin and store it encrypted
-  import-legacy  Import public.torrents additively into the new ingest schema
+  import-legacy  Import public.torrents additively into the new aiosources schema
   healthcheck    Probe the local service without database writes
   version        Print the build version
 
@@ -85,7 +86,7 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 		return healthcheck(ctx)
 	}
 	if name == "version" {
-		fmt.Println(version)
+		fmt.Println(buildinfo.Display(version))
 		return nil
 	}
 	if name == "migrate-sources" {
@@ -93,18 +94,18 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 	}
 	if name == "secret" {
 		if len(args) == 0 || args[0] != "set" {
-			return errors.New("usage: ingest secret set [options] NAME < secret-file")
+			return errors.New("usage: aiosources secret set [options] NAME < secret-file")
 		}
 		args = args[1:]
 	}
 	switch name {
 	case "serve", "init", "password", "validate", "enqueue", "pause", "resume", "cancel", "secret", "import-legacy":
 	default:
-		return errors.New("unknown command; run ingest help")
+		return errors.New("unknown command; run aiosources help")
 	}
 	c := config{}
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
-	flags.StringVar(&c.dataDir, "data-dir", environment("DATA_DIR", ".ingest"), "private state directory (master key and initial password)")
+	flags.StringVar(&c.dataDir, "data-dir", environment("DATA_DIR", ".aiosources"), "private state directory (master key and initial password)")
 	flags.StringVar(&c.providersDir, "providers", environment("PROVIDERS_DIR", "providers"), "authoritative JSON provider directory")
 	var providerID, runMode, runID string
 	var pageLimit, knownPageLimit int
@@ -128,6 +129,17 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 			return nil
 		}
 		return err
+	}
+	if os.Getenv("DATA_DIR") == "" && (name == "init" || name == "password" || name == "serve" || name == "secret") {
+		explicit := false
+		flags.Visit(func(f *flag.Flag) { explicit = explicit || f.Name == "data-dir" })
+		if !explicit {
+			selected, err := defaultStateDirectory(".")
+			if err != nil {
+				return err
+			}
+			c.dataDir = selected
+		}
 	}
 	if name != "secret" && flags.NArg() != 0 {
 		return errors.New("unexpected positional arguments")
@@ -219,7 +231,7 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 		if err != nil {
 			return err
 		}
-		return printJSON(map[string]any{"imported": count, "source": "public.torrents", "destination": "ingest.torrents", "source_unchanged": true})
+		return printJSON(map[string]any{"imported": count, "source": "public.torrents", "destination": "aiosources.torrents", "source_unchanged": true})
 	}
 	finishStage = startupStage(name == "serve", "local state and sources")
 	if err := privateDirectory(c.dataDir); err != nil {
@@ -257,7 +269,7 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 		if _, err := registry.UpgradeDefinitions(); err != nil {
 			// The old adapter remains supported if the filesystem cannot be
 			// updated. A cosmetic rename must not prevent collection recovery.
-			fmt.Fprintln(os.Stderr, "ingest: Source adapter names could not be updated; existing definitions remain supported")
+			fmt.Fprintln(os.Stderr, "aiosources: Source adapter names could not be updated; existing definitions remain supported")
 		}
 	}
 	manager := jobs.New(db, registry, secretVault.Resolve, c.workers)
@@ -356,7 +368,7 @@ func serve(ctx context.Context, c config, db *store.Store, registry *providers.R
 	handler, err := httpapi.New(httpapi.Options{
 		Store: db, Providers: registry, Jobs: manager, Vault: secretVault, AIOSource: addon,
 		Health: monitor, AdminPassword: password,
-		PublicURL: c.publicURL, Frontend: frontend, Version: version,
+		PublicURL: c.publicURL, Frontend: frontend, Version: buildinfo.Display(version),
 	})
 	if err != nil {
 		return err

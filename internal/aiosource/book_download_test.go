@@ -27,7 +27,7 @@ func seedTestBook(t *testing.T, ctx context.Context, s *Service, conn *pgx.Conn,
 		t.Fatal(err)
 	}
 	f, _ := json.Marshal(map[string]any{"title": "Morgan Vale - The Amber Orchard EPUB", "info_hash": strings.Repeat("b", 40), "size": 500, "categories": []int{7020}})
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,'book',$2)`, provider, f); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,'book',$2)`, provider, f); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.FinishOpenLibrary(ctx); err != nil {
@@ -37,7 +37,7 @@ func seedTestBook(t *testing.T, ctx context.Context, s *Service, conn *pgx.Conn,
 		t.Fatal(err)
 	}
 	var id int64
-	if err := conn.QueryRow(ctx, `SELECT id FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&id); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT id FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -51,7 +51,7 @@ func TestBookDownloadSelectsFormatWithoutLeakingAnnouncements(t *testing.T) {
 				work := seedTestBook(t, ctx, s, conn, "fixture")
 				if direct {
 					work = 0
-					if _, err := conn.Exec(ctx, `DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue`); err != nil {
+					if _, err := conn.Exec(ctx, `DELETE FROM aiosources.aio_matches; DELETE FROM aiosources.aio_match_queue`); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -238,7 +238,7 @@ func TestBookPreparationsResumeAcrossEveryExtendedProvider(t *testing.T) {
 				work := seedTestBook(t, ctx, s, conn, "fixture")
 				if direct {
 					work = 0
-					if _, err := conn.Exec(ctx, `DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue`); err != nil {
+					if _, err := conn.Exec(ctx, `DELETE FROM aiosources.aio_matches; DELETE FROM aiosources.aio_match_queue`); err != nil {
 						t.Fatal(err)
 					}
 				}

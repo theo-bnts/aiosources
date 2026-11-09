@@ -21,7 +21,7 @@ func TestDirectCatalogSearchDoesNotRequireMatchesAndFiltersBeforePagination(t *t
 	} {
 		publishSharingRow(t, ctx, db, row.provider, row.id, `{"title":"Example.Chronicle.EPUB","info_hash":"`+row.hash+`","size":`+strconv.Itoa(row.size)+`,"private_note":"never-return-this"}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',$1,true,now(),'[{"path":"Example.epub","size":100}]')`, strings.Repeat("a", 40)); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',$1,true,now(),'[{"path":"Example.epub","size":100}]')`, strings.Repeat("a", 40)); err != nil {
 		t.Fatal(err)
 	}
 	policy := CatalogTorrentPolicy{CacheAfter: time.Now().Add(-time.Hour), Services: []string{"torbox"}}
@@ -56,7 +56,7 @@ func TestDirectCatalogSearchDoesNotRequireMatchesAndFiltersBeforePagination(t *t
 	if err != nil || page.Total != 1 {
 		t.Fatalf("cached-only: %+v %v", page, err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '2 hours'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()-interval '2 hours'`); err != nil {
 		t.Fatal(err)
 	}
 	page, err = db.CatalogTorrentRecords(ctx, model.ListOptions{Query: "Example"}, nil, policy)
@@ -65,7 +65,7 @@ func TestDirectCatalogSearchDoesNotRequireMatchesAndFiltersBeforePagination(t *t
 	}
 	policy.CachedOnly = false
 	policy.UncachedSources = nil
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now(),files='[{"path":"folder/readme.txt","size":12}]'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now(),files='[{"path":"folder/readme.txt","size":12}]'`); err != nil {
 		t.Fatal(err)
 	}
 	page, err = db.CatalogTorrentRecords(ctx, model.ListOptions{Query: "Example"}, nil, policy)

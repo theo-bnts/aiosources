@@ -9,15 +9,15 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,errors,results,finished_at,error)
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,errors,results,finished_at,error)
       VALUES('metadata-failed','metadata','tmdb','automatic',0,'failed','details',242000,1,'{}',now(),'Information update failed. Committed progress is preserved.'),
       ('cache-success','cache','torbox','playback',0,'succeeded','availability',2,0,'{"cached":1,"uncached":1}',now(),''),
       ('cache-failed','cache','alldebrid','playback',0,'failed','availability',0,1,'{}',now(),'Cache verification failed. Saved availability is preserved.'),
       ('cleanup-success','cleanup','alldebrid','automatic',0,'succeeded','cleanup',1,0,'{"cleaned":1}',now(),'')`)
-    await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,results,finished_at)
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,results,finished_at)
       SELECT 'matching-'||n,'matching','local','automatic',0,'succeeded','identification',7,'{"matched":5,"unmatched":2}',now() FROM generate_series(1,55) n`)
     await db.query(
-      `INSERT INTO ingest.operation_events(run_id,phase,processed,errors) SELECT id,status,processed,errors FROM ingest.operation_runs`,
+      `INSERT INTO aiosources.operation_events(run_id,phase,processed,errors) SELECT id,status,processed,errors FROM aiosources.operation_runs`,
     )
   } finally {
     await db.end()
@@ -94,13 +94,13 @@ test('a real manual identification appears in metadata history without mixing so
   await db.connect()
   try {
     await db.query(
-      `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567','{2021}')`,
+      `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567','{2021}')`,
     )
     await db.query(
-      `INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Synthetic Movie','synthetic movie' FROM ingest.aio_works WHERE tmdb_id='101'`,
+      `INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Synthetic Movie','synthetic movie' FROM aiosources.aio_works WHERE tmdb_id='101'`,
     )
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','one','{"title":"Synthetic Movie 2021","imdb_id":"tt1234567","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`,
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','one','{"title":"Synthetic Movie 2021","imdb_id":"tt1234567","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`,
     )
   } finally {
     await db.end()

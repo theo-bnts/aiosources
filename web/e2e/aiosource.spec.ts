@@ -121,7 +121,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
   try {
     // Publish a recent completion before configuring the synthetic token, so
     // enabling automation cannot make an external metadata request.
-    await db.query('UPDATE ingest.aio_state SET last_sync=now(),changes_through=now()')
+    await db.query('UPDATE aiosources.aio_state SET last_sync=now(),changes_through=now()')
     const current = await (await page.request.get('/api/aiosource')).json()
     expect(
       (
@@ -158,7 +158,7 @@ test('metadata automation persists schedules, retry dates and manual choices wit
     await form.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await db.query(
-      "UPDATE ingest.aio_state SET sync_retry_at=now()+INTERVAL '5 minutes',sync_failures=2,sync_error='Information update failed. Committed progress is preserved.'",
+      "UPDATE aiosources.aio_state SET sync_retry_at=now()+INTERVAL '5 minutes',sync_failures=2,sync_error='Information update failed. Committed progress is preserved.'",
     )
     await page.reload()
     const retry = await (await page.request.get('/api/aiosource')).json()
@@ -192,9 +192,9 @@ test('information recovery and schedules stay consistent without asking to erase
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`UPDATE ingest.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
-      UPDATE ingest.ol_import_state SET complete=TRUE,data_complete=TRUE,last_sync=now();
-      UPDATE ingest.ol_changes_state SET bootstrap_complete=TRUE,changes_through=now(),checked_at=now(),retry_at=now()+interval '1 hour';`)
+    await db.query(`UPDATE aiosources.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
+      UPDATE aiosources.ol_import_state SET complete=TRUE,data_complete=TRUE,last_sync=now();
+      UPDATE aiosources.ol_changes_state SET bootstrap_complete=TRUE,changes_through=now(),checked_at=now(),retry_at=now()+interval '1 hour';`)
     expect(
       (
         await page.request.put('/api/secrets/information_recovery_fixture', {

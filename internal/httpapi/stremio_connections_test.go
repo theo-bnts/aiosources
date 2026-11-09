@@ -36,7 +36,7 @@ func TestStremioSavedInstallationsResolveBothPlaybackProviders(t *testing.T) {
 			if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie"}, Years: []int{2021}}, []string{"example movie"}); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one',jsonb_build_object('title','Example.Movie.2021.FRENCH','info_hash',$1::text,'imdb_id','tt1234567'))`, hash); err != nil {
+			if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one',jsonb_build_object('title','Example.Movie.2021.FRENCH','info_hash',$1::text,'imdb_id','tt1234567'))`, hash); err != nil {
 				t.Fatal(err)
 			}
 			if err := addon.Match(f.ctx); err != nil {
@@ -128,7 +128,7 @@ func TestStremioDeliveryRechecksConcurrentRevocationAndClosesItsLease(t *testing
 		t.Fatal("revocation during a request did not block delivery", w.Code)
 	}
 	var active int
-	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.share_requests WHERE lease_until>clock_timestamp()`).Scan(&active); err != nil || active != 0 {
+	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM aiosources.share_requests WHERE lease_until>clock_timestamp()`).Scan(&active); err != nil || active != 0 {
 		t.Fatal("request lease leaked", active, err)
 	}
 	w = httptest.NewRecorder()
@@ -151,7 +151,7 @@ func TestStremioConnectionsSaveIndependentSettingsAndPreserveLegacyLinks(t *test
 		t.Fatal(err)
 	}
 	for i, row := range []struct{ provider, id, language string }{{"alpha", "one", "FRENCH"}, {"alpha", "two", "GERMAN"}, {"beta", "one", "FRENCH"}} {
-		if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,$2,jsonb_build_object('title',$3::text,'info_hash',$4::text,'imdb_id','tt1234567','size',$5::bigint))`, row.provider, row.id, "Example.Movie.2021."+row.language, strings.Repeat(string(rune('a'+i)), 40), i+1); err != nil {
+		if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,$2,jsonb_build_object('title',$3::text,'info_hash',$4::text,'imdb_id','tt1234567','size',$5::bigint))`, row.provider, row.id, "Example.Movie.2021."+row.language, strings.Repeat(string(rune('a'+i)), 40), i+1); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -277,7 +277,7 @@ func TestStremioConnectionsSaveIndependentSettingsAndPreserveLegacyLinks(t *test
 	}
 	manifest(stremioAccessPath(other))
 	var retained bool
-	if err = conn.QueryRow(f.ctx, `SELECT enabled FROM ingest.catalog_tracking`).Scan(&retained); err != nil || retained {
+	if err = conn.QueryRow(f.ctx, `SELECT enabled FROM aiosources.catalog_tracking`).Scan(&retained); err != nil || retained {
 		t.Fatal("Stremio enabled catalog sharing retention", err)
 	}
 }

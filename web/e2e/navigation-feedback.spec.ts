@@ -67,7 +67,7 @@ test('invalid search ranges keep the applied results and the editable draft with
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.torrents(provider_id,source_id,fields)
+    await db.query(`INSERT INTO aiosources.torrents(provider_id,source_id,fields)
       VALUES('search-example','original','{"title":"Original searchable release"}')`)
   } finally {
     await db.end()
@@ -132,7 +132,7 @@ test('non-metadata histories do not promise information retries for retained err
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,errors,results,finished_at)
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,errors,results,finished_at)
       VALUES('cache-partial','cache','torbox','playback',0,'succeeded','availability',2,1,'{"cached":1}',now()),
       ('metadata-partial','metadata','tmdb','automatic',0,'succeeded','details',2,1,'{}',now())`)
   } finally {
@@ -235,7 +235,7 @@ test.describe('return navigation', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         VALUES('return-run','return-source','Return source','preview','succeeded','',$1::jsonb,now())`,
         [JSON.stringify(definition)],
       )
@@ -303,17 +303,17 @@ test.describe('return navigation', () => {
     const db = new pg.Client({ connectionString: server.databaseURL })
     await db.connect()
     try {
-      await db.query(`INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+      await db.query(`INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         VALUES('search-origin','search-source','Search example','preview','succeeded','','{}',now());
         WITH saved_page AS (
-          INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type)
+          INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type)
           VALUES('search-origin','search-source',1,''::bytea,'application/json') RETURNING id
         ), saved_record AS (
-          INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
+          INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
           SELECT 'search-origin','search-source','record',id,1,''::bytea,'application/json','{"title":"Search example release"}'
           FROM saved_page RETURNING id,fields
         )
-        INSERT INTO ingest.torrents(provider_id,source_id,fields,raw_id)
+        INSERT INTO aiosources.torrents(provider_id,source_id,fields,raw_id)
         SELECT 'search-source','record',fields,id FROM saved_record`)
     } finally {
       await db.end()
@@ -374,7 +374,7 @@ test.describe('return navigation', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         VALUES('remote-return-run','remote-return','Remote return','full','succeeded','',$1::jsonb,now())`,
         [JSON.stringify(definition)],
       )

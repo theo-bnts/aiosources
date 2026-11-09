@@ -30,8 +30,8 @@ func decodeObject(data []byte) (map[string]any, error) {
 const rawColumns = `record.id,record.run_id,record.provider_id,record.source_id,record.page_index,record.content_type,
 COALESCE(payload.fields,record.fields),record.error,record.ignored,record.auxiliary,record.created_at,record.page_id,record.payload_retained`
 
-const rawSource = ` FROM ingest.raw_records AS record
-LEFT JOIN ingest.raw_records AS payload ON payload.id=record.payload_id`
+const rawSource = ` FROM aiosources.raw_records AS record
+LEFT JOIN aiosources.raw_records AS payload ON payload.id=record.payload_id`
 
 func scanRaw(row scanner, includeBytes bool) (model.RawRecord, error) {
 	var record model.RawRecord
@@ -114,7 +114,7 @@ func rawSelection(opts model.ListOptions) (string, []any) {
 	if opts.RunID != "" {
 		filters = append(filters, "record.run_id="+bind(opts.RunID))
 	}
-	const columns = "SELECT record.id,record.error,record.ignored,record.auxiliary FROM ingest.raw_records AS record"
+	const columns = "SELECT record.id,record.error,record.ignored,record.auxiliary FROM aiosources.raw_records AS record"
 	where := func(extra string) string {
 		terms := append([]string{}, filters...)
 		if extra != "" {
@@ -129,13 +129,13 @@ func rawSelection(opts model.ListOptions) (string, []any) {
 		return columns + where(""), args
 	}
 	pattern, literal := bind("%"+escapeSearchFragment.Replace(opts.Query)+"%"), bind(opts.Query)
-	direct := "ingest.raw_search_text(record.source_id,record.fields,record.error) ILIKE " + pattern +
+	direct := "aiosources.raw_search_text(record.source_id,record.fields,record.error) ILIKE " + pattern +
 		" AND (strpos(lower(record.source_id),lower(" + literal + "))>0 OR (record.payload_id IS NULL AND strpos(lower(record.fields::text),lower(" + literal + "))>0) OR strpos(lower(record.error),lower(" + literal + "))>0)"
-	referenced := "record.payload_id IS NOT NULL AND ingest.raw_search_text(payload.source_id,payload.fields,payload.error) ILIKE " + pattern +
+	referenced := "record.payload_id IS NOT NULL AND aiosources.raw_search_text(payload.source_id,payload.fields,payload.error) ILIKE " + pattern +
 		" AND strpos(lower(payload.fields::text),lower(" + literal + "))>0"
 	// UNION preserves one observation when its own identity/error and the
 	// referenced fields both match. Source/run filters apply to the observation.
-	return columns + where(direct) + " UNION " + columns + " JOIN ingest.raw_records AS payload ON payload.id=record.payload_id" + where(referenced), args
+	return columns + where(direct) + " UNION " + columns + " JOIN aiosources.raw_records AS payload ON payload.id=record.payload_id" + where(referenced), args
 }
 
 func (s *Store) Raw(ctx context.Context, id int64) (model.RawRecord, error) {
@@ -147,7 +147,7 @@ func (s *Store) RawPage(ctx context.Context, id int64) ([]byte, string, error) {
 	var body []byte
 	var contentType string
 	err := s.pool.QueryRow(ctx, `SELECT COALESCE(payload.body,page.body),page.content_type
-FROM ingest.pages AS page LEFT JOIN ingest.pages AS payload ON payload.id=page.payload_id
+FROM aiosources.pages AS page LEFT JOIN aiosources.pages AS payload ON payload.id=page.payload_id
 WHERE page.id=$1 AND page.payload_retained`, id).Scan(&body, &contentType)
 	return body, contentType, databaseError("read response page", err)
 }

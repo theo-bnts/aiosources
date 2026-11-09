@@ -31,8 +31,8 @@ func (s *Store) resetInformation(ctx context.Context, scope string) error {
 	defer rollback(tx)
 	// Retention takes this fence before catalog publication and metadata locks.
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,4);
-SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;
-SELECT ingest.lock_catalog_entity_writes();
+SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;
+SELECT aiosources.lock_catalog_entity_writes();
 CREATE TEMP TABLE reset_information_records(provider_id TEXT,source_id TEXT,occurrence_id TEXT,hash TEXT,PRIMARY KEY(provider_id,source_id)) ON COMMIT DROP;
 CREATE TEMP TABLE reset_information_candidates(provider_id TEXT,source_id TEXT,PRIMARY KEY(provider_id,source_id)) ON COMMIT DROP;
 CREATE TEMP TABLE reset_information_hashes(hash TEXT PRIMARY KEY) ON COMMIT DROP;
@@ -41,8 +41,8 @@ CREATE TEMP TABLE reset_information_operations(id TEXT PRIMARY KEY) ON COMMIT DR
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_records
 SELECT t.provider_id,t.source_id,t.occurrence_id,t.search_info_hash
-FROM ingest.torrents t LEFT JOIN ingest.aio_matches m USING(provider_id,source_id)
-LEFT JOIN ingest.aio_works w ON w.id=m.work_id LEFT JOIN ingest.aio_match_reviews r USING(provider_id,source_id)
+FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id)
 WHERE w.media_type=ANY($1::text[]) OR (r.active AND r.media_type=ANY($1::text[]));
 `, types); err != nil {
 		return databaseError("select related identifications", err)
@@ -52,11 +52,11 @@ WHERE w.media_type=ANY($1::text[]) OR (r.active AND r.media_type=ANY($1::text[])
 	// book from an unrelated numeric source category or copy source payloads.
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_candidates
 SELECT t.provider_id,t.source_id FROM (
- SELECT hash FROM ingest.aio_availability UNION SELECT hash FROM ingest.aio_shared_availability
- UNION SELECT hash FROM ingest.aio_preparations
-) cached JOIN ingest.torrents t ON t.search_info_hash=cached.hash
-UNION SELECT provider_id,source_id FROM ingest.aio_match_reviews WHERE media_type=''
-UNION SELECT provider_id,source_id FROM ingest.aio_matches WHERE work_id IS NULL
+ SELECT hash FROM aiosources.aio_availability UNION SELECT hash FROM aiosources.aio_shared_availability
+ UNION SELECT hash FROM aiosources.aio_preparations
+) cached JOIN aiosources.torrents t ON t.search_info_hash=cached.hash
+UNION SELECT provider_id,source_id FROM aiosources.aio_match_reviews WHERE media_type=''
+UNION SELECT provider_id,source_id FROM aiosources.aio_matches WHERE work_id IS NULL
 ON CONFLICT DO NOTHING`); err != nil {
 		return databaseError("select related cache observations", err)
 	}
@@ -64,8 +64,8 @@ ON CONFLICT DO NOTHING`); err != nil {
 	// bibliographic parsing; do not reread every already identified video when
 	// removing books (or every identified book when removing videos).
 	if _, err = tx.Exec(ctx, `DELETE FROM reset_information_candidates c WHERE
- EXISTS(SELECT 1 FROM ingest.aio_matches m JOIN ingest.aio_works w ON w.id=m.work_id WHERE m.provider_id=c.provider_id AND m.source_id=c.source_id)
- OR EXISTS(SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=c.provider_id AND r.source_id=c.source_id AND r.active AND r.media_type<>'');
+ EXISTS(SELECT 1 FROM aiosources.aio_matches m JOIN aiosources.aio_works w ON w.id=m.work_id WHERE m.provider_id=c.provider_id AND m.source_id=c.source_id)
+ OR EXISTS(SELECT 1 FROM aiosources.aio_match_reviews r WHERE r.provider_id=c.provider_id AND r.source_id=c.source_id AND r.active AND r.media_type<>'');
  ANALYZE reset_information_candidates;`); err != nil {
 		return databaseError("prepare unresolved information records", err)
 	}
@@ -77,7 +77,7 @@ ON CONFLICT DO NOTHING`); err != nil {
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_hashes
 SELECT hash FROM reset_information_records WHERE hash IS NOT NULL
-UNION SELECT unnest(hashes) FROM ingest.aio_resources WHERE split_part(resource,':',1)=ANY($1::text[])
+UNION SELECT unnest(hashes) FROM aiosources.aio_resources WHERE split_part(resource,':',1)=ANY($1::text[])
 ON CONFLICT DO NOTHING`, resources); err != nil {
 		return databaseError("select related cache hashes", err)
 	}
@@ -85,17 +85,17 @@ ON CONFLICT DO NOTHING`, resources); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_operations
-SELECT r.id FROM ingest.operation_runs r WHERE (r.kind='metadata' AND r.service=ANY($1::text[]))
+SELECT r.id FROM aiosources.operation_runs r WHERE (r.kind='metadata' AND r.service=ANY($1::text[]))
 OR (r.kind IN ('cache','download') AND split_part(r.resource,':',1)=ANY($2::text[]))
-OR EXISTS(SELECT 1 FROM ingest.operation_downloads d WHERE d.run_id=r.id AND (
- EXISTS(SELECT 1 FROM ingest.aio_works w WHERE w.id=d.work_id AND w.media_type=ANY($3::text[]))
+OR EXISTS(SELECT 1 FROM aiosources.operation_downloads d WHERE d.run_id=r.id AND (
+ EXISTS(SELECT 1 FROM aiosources.aio_works w WHERE w.id=d.work_id AND w.media_type=ANY($3::text[]))
  OR d.input->>'occurrence_id' IN(SELECT occurrence_id FROM reset_information_records)))
 OR ($4 AND r.kind='matching')`, services, resources, types, scope == "metadata"); err != nil {
 		return databaseError("select related operation history", err)
 	}
 	// A live preparation owns its operation's advisory lock. Refuse the entire
 	// reset before deleting anything, rather than lose its continuation or events.
-	rows, err := tx.Query(ctx, `SELECT DISTINCT r.lock_key FROM ingest.operation_runs r
+	rows, err := tx.Query(ctx, `SELECT DISTINCT r.lock_key FROM aiosources.operation_runs r
 JOIN reset_information_operations selected ON selected.id=r.id
 WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 	if err != nil {
@@ -128,17 +128,17 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 		sql  string
 		args []any
 	}{
-		{`DELETE FROM ingest.activity_logs WHERE service=ANY($1::text[]) OR run_id IN(SELECT id FROM reset_information_operations)`, []any{services}},
-		{`DELETE FROM ingest.operation_events WHERE run_id IN(SELECT id FROM reset_information_operations)`, nil},
-		{`DELETE FROM ingest.operation_runs WHERE id IN(SELECT id FROM reset_information_operations)`, nil},
-		{`DELETE FROM ingest.aio_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
-		{`DELETE FROM ingest.aio_shared_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
-		{`DELETE FROM ingest.aio_resources r WHERE split_part(resource,':',1)=ANY($1::text[]) OR EXISTS(SELECT 1 FROM reset_information_hashes h WHERE h.hash=ANY(r.hashes))`, []any{resources}},
-		{`DELETE FROM ingest.stremio_requests WHERE $1 AND kind<>'manifest' AND media_type IN ('movie','series','anime')`, []any{scope != "books"}},
-		{`DELETE FROM ingest.aio_match_reviews r WHERE r.media_type=ANY($1::text[]) OR (r.media_type='' AND (r.provider_id,r.source_id) IN(SELECT provider_id,source_id FROM reset_information_records))`, []any{types}},
-		{`DELETE FROM ingest.aio_matches WHERE (provider_id,source_id) IN(SELECT provider_id,source_id FROM reset_information_records)`, nil},
-		{`INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM reset_information_records ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, nil},
-		{`DELETE FROM ingest.aio_works WHERE media_type=ANY($1::text[])`, []any{types}},
+		{`DELETE FROM aiosources.activity_logs WHERE service=ANY($1::text[]) OR run_id IN(SELECT id FROM reset_information_operations)`, []any{services}},
+		{`DELETE FROM aiosources.operation_events WHERE run_id IN(SELECT id FROM reset_information_operations)`, nil},
+		{`DELETE FROM aiosources.operation_runs WHERE id IN(SELECT id FROM reset_information_operations)`, nil},
+		{`DELETE FROM aiosources.aio_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
+		{`DELETE FROM aiosources.aio_shared_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
+		{`DELETE FROM aiosources.aio_resources r WHERE split_part(resource,':',1)=ANY($1::text[]) OR EXISTS(SELECT 1 FROM reset_information_hashes h WHERE h.hash=ANY(r.hashes))`, []any{resources}},
+		{`DELETE FROM aiosources.stremio_requests WHERE $1 AND kind<>'manifest' AND media_type IN ('movie','series','anime')`, []any{scope != "books"}},
+		{`DELETE FROM aiosources.aio_match_reviews r WHERE r.media_type=ANY($1::text[]) OR (r.media_type='' AND (r.provider_id,r.source_id) IN(SELECT provider_id,source_id FROM reset_information_records))`, []any{types}},
+		{`DELETE FROM aiosources.aio_matches WHERE (provider_id,source_id) IN(SELECT provider_id,source_id FROM reset_information_records)`, nil},
+		{`INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM reset_information_records ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, nil},
+		{`DELETE FROM aiosources.aio_works WHERE media_type=ANY($1::text[])`, []any{types}},
 	}
 	// Provider object ownership is retained: resetting local observations must
 	// never orphan temporary objects or delete files from a debrid account.
@@ -148,29 +148,29 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 		}
 	}
 	if scope != "videos" {
-		if _, err = tx.Exec(ctx, `TRUNCATE ingest.ol_authors,ingest.ol_editions,ingest.ol_redirects;
-UPDATE ingest.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,checked_at=NULL,retry_at=NULL,error='',complete=FALSE WHERE singleton;`+resetBookChangesSQL); err != nil {
+		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.ol_authors,aiosources.ol_editions,aiosources.ol_redirects;
+UPDATE aiosources.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,checked_at=NULL,retry_at=NULL,error='',complete=FALSE WHERE singleton;`+resetBookChangesSQL); err != nil {
 			return databaseError("reset book information", err)
 		}
 	}
 	if scope != "books" {
-		if _, err = tx.Exec(ctx, `TRUNCATE ingest.aio_metadata_jobs,ingest.aio_season_requests,ingest.aio_inventory;
-DELETE FROM ingest.catalog_entity_changes WHERE kind='metadata';
-UPDATE ingest.aio_state SET last_sync=NULL,changes_through=NULL,inventory_date='',
+		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.aio_metadata_jobs,aiosources.aio_season_requests,aiosources.aio_inventory;
+DELETE FROM aiosources.catalog_entity_changes WHERE kind='metadata';
+UPDATE aiosources.aio_state SET last_sync=NULL,changes_through=NULL,inventory_date='',
 sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at END,
 sync_failures=0,sync_error='',recovery_started_at=NULL,applied_through=NULL;`); err != nil {
 			return databaseError("reset video information", err)
 		}
 	}
 	if scope == "metadata" {
-		if _, err = tx.Exec(ctx, `DELETE FROM ingest.aio_matches;DELETE FROM ingest.aio_match_reviews;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.torrents
-ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
-UPDATE ingest.aio_state SET last_match=NULL;`); err != nil {
+		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_reviews;
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents
+ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1;
+UPDATE aiosources.aio_state SET last_match=NULL;`); err != nil {
 			return databaseError("reset identification", err)
 		}
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1,cache_generation=cache_generation+1;`); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,cache_generation=cache_generation+1;`); err != nil {
 		return err
 	}
 	if err = notify(ctx, tx); err != nil {
@@ -187,9 +187,9 @@ func selectResetInformationRecords(ctx context.Context, tx pgx.Tx, types []strin
 	if _, err := tx.Exec(ctx, `SET LOCAL cursor_tuple_fraction=1.0;
 DECLARE reset_information_cursor NO SCROLL CURSOR FOR
 SELECT `+aioRecordColumns+`,COALESCE(CASE WHEN r.active THEN NULLIF(r.media_type,'') END,w.media_type,''),m.provider_id IS NOT NULL
-FROM reset_information_candidates c JOIN ingest.torrents t USING(provider_id,source_id)
-LEFT JOIN ingest.aio_match_reviews r USING(provider_id,source_id) LEFT JOIN ingest.aio_matches m USING(provider_id,source_id)
-LEFT JOIN ingest.aio_works w ON w.id=m.work_id`); err != nil {
+FROM reset_information_candidates c JOIN aiosources.torrents t USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id) LEFT JOIN aiosources.aio_matches m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 		return databaseError("prepare related cache records", err)
 	}
 	for {
@@ -226,7 +226,7 @@ LEFT JOIN ingest.aio_works w ON w.id=m.work_id`); err != nil {
 		}
 		if len(providers) > 0 {
 			if _, err = tx.Exec(ctx, `INSERT INTO reset_information_records
-SELECT t.provider_id,t.source_id,t.occurrence_id,t.search_info_hash FROM ingest.torrents t
+SELECT t.provider_id,t.source_id,t.occurrence_id,t.search_info_hash FROM aiosources.torrents t
 WHERE (provider_id,source_id) IN(SELECT * FROM unnest($1::text[],$2::text[])) ON CONFLICT DO NOTHING`, providers, sources); err != nil {
 				return databaseError("select related cache records", err)
 			}

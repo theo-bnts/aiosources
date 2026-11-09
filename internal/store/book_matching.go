@@ -27,34 +27,34 @@ func matchedBookKind(record model.AIORecord, work *model.AIOWork) string {
 // not hide a reliable match behind an artificial candidate overflow.
 const bookCandidateEvidenceSQL = `WITH keys AS MATERIALIZED (
  SELECT openlibrary_id AS key,book_normalized AS normalized,'{}'::text[] AS author_keys,TRUE AS reference,FALSE AS part
- FROM ingest.aio_works WHERE $3<>'' AND openlibrary_id<>'' AND openlibrary_id=ingest.ol_resolve($3)
- UNION ALL SELECT unnest(work_keys),normalized,author_keys,TRUE,FALSE FROM ingest.ol_editions WHERE $3<>'' AND id=ingest.ol_resolve($3)
- UNION ALL SELECT unnest(work_keys),normalized,author_keys,TRUE,FALSE FROM ingest.ol_editions WHERE $2<>'' AND isbn @> ARRAY[$2::text]
- UNION ALL SELECT openlibrary_id,book_normalized,'{}'::text[],FALSE,FALSE FROM ingest.aio_works
+ FROM aiosources.aio_works WHERE $3<>'' AND openlibrary_id<>'' AND openlibrary_id=aiosources.ol_resolve($3)
+ UNION ALL SELECT unnest(work_keys),normalized,author_keys,TRUE,FALSE FROM aiosources.ol_editions WHERE $3<>'' AND id=aiosources.ol_resolve($3)
+ UNION ALL SELECT unnest(work_keys),normalized,author_keys,TRUE,FALSE FROM aiosources.ol_editions WHERE $2<>'' AND isbn @> ARRAY[$2::text]
+ UNION ALL SELECT openlibrary_id,book_normalized,'{}'::text[],FALSE,FALSE FROM aiosources.aio_works
  WHERE $2='' AND $3='' AND media_type='book' AND (book_normalized=ANY($5::text[]) OR
  (NOT $4 AND book_normalized OPERATOR(public.%) $1 AND cardinality(string_to_array(book_normalized,' '))=ANY($7::int[])))
- UNION ALL SELECT unnest(work_keys),normalized,author_keys,FALSE,FALSE FROM ingest.ol_editions
+ UNION ALL SELECT unnest(work_keys),normalized,author_keys,FALSE,FALSE FROM aiosources.ol_editions
  WHERE $2='' AND $3='' AND (normalized=ANY($5::text[]) OR
  (NOT $4 AND normalized OPERATOR(public.%) $1 AND cardinality(string_to_array(normalized,' '))=ANY($7::int[])))
- UNION ALL SELECT openlibrary_id,book_normalized,'{}'::text[],FALSE,TRUE FROM ingest.aio_works
+ UNION ALL SELECT openlibrary_id,book_normalized,'{}'::text[],FALSE,TRUE FROM aiosources.aio_works
  WHERE $2='' AND $3='' AND media_type='book' AND book_normalized=ANY($6::text[])
- UNION ALL SELECT unnest(work_keys),normalized,author_keys,FALSE,TRUE FROM ingest.ol_editions
+ UNION ALL SELECT unnest(work_keys),normalized,author_keys,FALSE,TRUE FROM aiosources.ol_editions
  WHERE $2='' AND $3='' AND normalized=ANY($6::text[])
 ), resolved AS MATERIALIZED (
- SELECT DISTINCT ingest.ol_resolve(key) AS key,normalized,author_keys,reference,part FROM keys
+ SELECT DISTINCT aiosources.ol_resolve(key) AS key,normalized,author_keys,reference,part FROM keys
 ), candidates AS MATERIALIZED (
  SELECT w.id,k.normalized,k.reference,k.part,ARRAY(
  SELECT DISTINCT key FROM (
  SELECT jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')) AS key
  UNION ALL SELECT unnest(k.author_keys)) author_keys ORDER BY key) AS author_keys
- FROM resolved k JOIN ingest.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=k.key
+ FROM resolved k JOIN aiosources.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=k.key
  WHERE NOT w.adult
- AND ($2='' OR EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.isbn @> ARRAY[$2::text]))
- AND ($3='' OR w.openlibrary_id=ingest.ol_resolve($3) OR EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.id=ingest.ol_resolve($3) AND e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id)))))
+ AND ($2='' OR EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.isbn @> ARRAY[$2::text]))
+ AND ($3='' OR w.openlibrary_id=aiosources.ol_resolve($3) OR EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.id=aiosources.ol_resolve($3) AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id)))))
 )
 SELECT c.id,c.normalized,c.reference,c.part,ARRAY(
  WITH authors AS MATERIALIZED(
- SELECT a.name,a.aliases FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(key) FROM unnest(c.author_keys) key)))
+ SELECT a.name,a.aliases FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(key) FROM unnest(c.author_keys) key)))
  SELECT name FROM authors UNION ALL (SELECT DISTINCT unnest(aliases) FROM authors LIMIT 200))
 FROM candidates c ORDER BY c.id,c.part,c.normalized`
 
@@ -133,7 +133,7 @@ func searchBookCandidates(ctx context.Context, tx pgx.Tx, f model.AIOCandidateFi
 	if err != nil || len(ids) == 0 {
 		return []model.AIOWork{}, overflow, err
 	}
-	rows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM ingest.aio_works w WHERE w.id=ANY($1::bigint[]) ORDER BY w.id`, ids)
+	rows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE w.id=ANY($1::bigint[]) ORDER BY w.id`, ids)
 	if err != nil {
 		return nil, false, databaseError("find book candidates", err)
 	}
@@ -158,10 +158,10 @@ func searchBookCandidates(ctx context.Context, tx pgx.Tx, f model.AIOCandidateFi
 		// Select this work's editions before ordering, and establish year
 		// evidence before limiting display aliases for very popular works.
 		aliases, err := tx.Query(ctx, `WITH editions AS MATERIALIZED(
- SELECT e.id,e.title,e.normalized,e.year,e.author_keys FROM ingest.ol_editions e
- WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases($1)))
+ SELECT e.id,e.title,e.normalized,e.year,e.author_keys FROM aiosources.ol_editions e
+ WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases($1)))
  AND (e.normalized=ANY($2::text[]) OR e.normalized OPERATOR(public.%) $3 OR ($4::int IS NOT NULL AND e.year=$4)))
-SELECT e.title,e.year,ARRAY(SELECT name FROM ingest.ol_authors WHERE id=ANY(ARRAY(SELECT ingest.ol_resolve(key) FROM unnest(e.author_keys) key))),
+SELECT e.title,e.year,ARRAY(SELECT name FROM aiosources.ol_authors WHERE id=ANY(ARRAY(SELECT aiosources.ol_resolve(key) FROM unnest(e.author_keys) key))),
  COALESCE(bool_or(e.year=$4) OVER(),FALSE)
 FROM editions e ORDER BY (e.normalized=ANY($2::text[])) DESC,e.id LIMIT 101`, w.OpenLibrary, titles, f.Title, f.Year)
 		if err != nil {

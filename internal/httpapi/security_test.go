@@ -208,7 +208,7 @@ func TestPasswordChangeInvalidatesOldProcessesAndRollsBackOnLogFailure(t *testin
 	}
 	defer conn.Close(f.ctx)
 	// A durable activity failure must roll back verifier/session changes together.
-	if _, err = conn.Exec(f.ctx, `ALTER TABLE ingest.activity_logs ADD CONSTRAINT reject_fixture_activity CHECK (false)`); err != nil {
+	if _, err = conn.Exec(f.ctx, `ALTER TABLE aiosources.activity_logs ADD CONSTRAINT reject_fixture_activity CHECK (false)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = newAuthentication("changed-test-password", "https://admin.example.test", f.db, f.vault); err == nil {
@@ -217,7 +217,7 @@ func TestPasswordChangeInvalidatesOldProcessesAndRollsBackOnLogFailure(t *testin
 	if w := f.request(http.MethodGet, "/api/security", nil, cookie); w.Code != http.StatusOK {
 		t.Fatal("failed verifier transaction revoked session")
 	}
-	if _, err = conn.Exec(f.ctx, `ALTER TABLE ingest.activity_logs DROP CONSTRAINT reject_fixture_activity`); err != nil {
+	if _, err = conn.Exec(f.ctx, `ALTER TABLE aiosources.activity_logs DROP CONSTRAINT reject_fixture_activity`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = newAuthentication("changed-test-password", "https://admin.example.test", f.db, f.vault); err != nil {

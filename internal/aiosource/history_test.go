@@ -47,7 +47,7 @@ func TestOperationHistoryMatchingResultsAndDebridRetry(t *testing.T) {
 		t.Fatal("credential exposed in history")
 	}
 	failing.Store(false)
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_resources SET checked_at=now()-interval '60 days'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_resources SET checked_at=now()-interval '60 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.checkResource(ctx, "torbox", "synthetic-key-must-not-be-recorded", "movie:tt1234567", hashes, c); err != nil {

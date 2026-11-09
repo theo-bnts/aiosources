@@ -71,7 +71,7 @@ func (s *Store) ReconcileSchedules(ctx context.Context, sources []scheduling.Sou
 				fullDue = &deadline
 			}
 		}
-		result, err := tx.Exec(ctx, `INSERT INTO ingest.schedule_clocks(provider_id,revision,active,next_run_at,full_due_at,profile)
+		result, err := tx.Exec(ctx, `INSERT INTO aiosources.schedule_clocks(provider_id,revision,active,next_run_at,full_due_at,profile)
 VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(provider_id) DO UPDATE
 SET revision=EXCLUDED.revision,active=EXCLUDED.active,next_run_at=EXCLUDED.next_run_at,full_due_at=EXCLUDED.full_due_at,profile=EXCLUDED.profile,last_error=''
 WHERE schedule_clocks.revision<>EXCLUDED.revision OR schedule_clocks.active<>EXCLUDED.active OR schedule_clocks.profile<>EXCLUDED.profile`, source.ID, source.Revision, source.Active(), next, fullDue, source.Profile())
@@ -80,12 +80,12 @@ WHERE schedule_clocks.revision<>EXCLUDED.revision OR schedule_clocks.active<>EXC
 		}
 		changed = changed || result.RowsAffected() != 0
 	}
-	result, err := tx.Exec(ctx, "DELETE FROM ingest.schedule_clocks WHERE NOT (provider_id=ANY($1::text[]))", ids)
+	result, err := tx.Exec(ctx, "DELETE FROM aiosources.schedule_clocks WHERE NOT (provider_id=ANY($1::text[]))", ids)
 	if err != nil {
 		return nil, databaseError("remove deleted schedule clocks", err)
 	}
 	changed = changed || result.RowsAffected() != 0
-	rows, err := tx.Query(ctx, "SELECT "+clockColumns+" FROM ingest.schedule_clocks")
+	rows, err := tx.Query(ctx, "SELECT "+clockColumns+" FROM aiosources.schedule_clocks")
 	if err != nil {
 		return nil, databaseError("read reconciled schedule clocks", err)
 	}
@@ -120,7 +120,7 @@ func (s *Store) ScheduleRuns(ctx context.Context, providerIDs []string) (map[str
 	if len(providerIDs) == 0 {
 		return result, nil
 	}
-	rows, err := s.pool.Query(ctx, "SELECT "+runColumns+` FROM ingest.runs
+	rows, err := s.pool.Query(ctx, "SELECT "+runColumns+` FROM aiosources.runs
 WHERE provider_id=ANY($1::text[]) AND (status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress') OR (status='paused' AND trigger='scheduled'))
 ORDER BY provider_id,created_at,id`, providerIDs)
 	if err != nil {
@@ -149,7 +149,7 @@ func (s *Store) AttemptSchedule(ctx context.Context, source scheduling.Source, n
 		return ScheduleClock{}, nil, databaseError("begin scheduled collection", err)
 	}
 	defer rollback(tx)
-	clock, err := scanClock(tx.QueryRow(ctx, "SELECT "+clockColumns+" FROM ingest.schedule_clocks WHERE provider_id=$1 FOR UPDATE", source.ID))
+	clock, err := scanClock(tx.QueryRow(ctx, "SELECT "+clockColumns+" FROM aiosources.schedule_clocks WHERE provider_id=$1 FOR UPDATE", source.ID))
 	if err != nil {
 		return clock, nil, databaseError("lock due schedule", err)
 	}
@@ -159,7 +159,7 @@ func (s *Store) AttemptSchedule(ctx context.Context, source scheduling.Source, n
 	if err := lockProviderQueue(ctx, tx, source.ID); err != nil {
 		return clock, nil, databaseError("lock scheduled collection queue", err)
 	}
-	rows, err := tx.Query(ctx, "SELECT "+runColumns+` FROM ingest.runs
+	rows, err := tx.Query(ctx, "SELECT "+runColumns+` FROM aiosources.runs
 WHERE provider_id=$1 AND (status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress') OR (status='paused' AND trigger='scheduled'))
 ORDER BY created_at,id FOR UPDATE`, source.ID)
 	if err != nil {
@@ -193,7 +193,7 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 		// Alternate a bounded automatic enrichment attempt with discovery. Its
 		// original snapshot/cursor stays paused; no second source worker runs.
 		var discovered *time.Time
-		if err := tx.QueryRow(ctx, `SELECT max(finished_at) FROM ingest.runs WHERE provider_id=$1 AND status='succeeded' AND mode IN ('full','incremental')`, source.ID).Scan(&discovered); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT max(finished_at) FROM aiosources.runs WHERE provider_id=$1 AND status='succeeded' AND mode IN ('full','incremental')`, source.ID).Scan(&discovered); err != nil {
 			return clock, nil, databaseError("read last successful discovery", err)
 		}
 		if discovered != nil && !discovered.After(*resume.FinishedAt) {
@@ -220,7 +220,7 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				if err := lockProviderSecrets(ctx, tx, config); err != nil {
 					return clock, nil, err
 				}
-				run, err = scanRun(tx.QueryRow(ctx, "UPDATE ingest.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NULL,error='' WHERE id=$1 AND NOT pause_requested AND pause_reason='budget' RETURNING "+runColumns, resume.ID))
+				run, err = scanRun(tx.QueryRow(ctx, "UPDATE aiosources.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NULL,error='' WHERE id=$1 AND NOT pause_requested AND pause_reason='budget' RETURNING "+runColumns, resume.ID))
 				if err == nil {
 					err = lifecycleEvent(ctx, tx, run.ID, "resumed", "Scheduled collection queued for continuation")
 				}
@@ -243,7 +243,7 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				if err := lockProviderSecrets(ctx, tx, config); err != nil {
 					return clock, nil, err
 				}
-				settings, settingsErr := scanCollectionSettings(tx.QueryRow(ctx, "SELECT "+collectionSettingsColumns+" FROM ingest.collection_settings WHERE singleton"))
+				settings, settingsErr := scanCollectionSettings(tx.QueryRow(ctx, "SELECT "+collectionSettingsColumns+" FROM aiosources.collection_settings WHERE singleton"))
 				if settingsErr != nil {
 					return clock, nil, settingsErr
 				}
@@ -267,8 +267,8 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				if err != nil {
 					return clock, nil, err
 				}
-				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full,storage_mode,storage_options)
-VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM ingest.storage_settings WHERE singleton),(SELECT options FROM ingest.storage_settings WHERE singleton)) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull))
+				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full,storage_mode,storage_options)
+VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM aiosources.storage_settings WHERE singleton),(SELECT options FROM aiosources.storage_settings WHERE singleton)) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull))
 				if err == nil {
 					err = lifecycleEvent(ctx, tx, run.ID, "queued", "Scheduled collection queued")
 				}
@@ -290,7 +290,7 @@ VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM ingest.
 	if next.IsZero() {
 		return clock, nil, model.ErrInvalid
 	}
-	clock, err = scanClock(tx.QueryRow(ctx, `UPDATE ingest.schedule_clocks
+	clock, err = scanClock(tx.QueryRow(ctx, `UPDATE aiosources.schedule_clocks
 SET next_run_at=$2,last_attempt_at=$3,last_error=$4,full_due_at=$5 WHERE provider_id=$1 RETURNING `+clockColumns, source.ID, next, now, message, clock.FullDueAt))
 	if err != nil {
 		return clock, nil, databaseError("advance schedule clock", err)

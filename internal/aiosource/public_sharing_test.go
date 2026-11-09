@@ -47,7 +47,7 @@ func TestPublicSharingCredentialsAreStatelessScopedAndIndependentlyRevocable(t *
 		t.Fatal("catalog password accepted as a Torznab credential", err)
 	}
 	var rows int
-	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.shares)+(SELECT count(*) FROM ingest.share_requests)+(SELECT count(*) FROM ingest.secrets)`).Scan(&rows); err != nil || rows != 0 {
+	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.shares)+(SELECT count(*) FROM aiosources.share_requests)+(SELECT count(*) FROM aiosources.secrets)`).Scan(&rows); err != nil || rows != 0 {
 		t.Fatal("visitor configuration persisted", rows, err)
 	}
 	// Other connection switches do not invalidate catalog credentials.

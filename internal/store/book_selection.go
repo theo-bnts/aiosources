@@ -13,7 +13,7 @@ func (s *Store) BookImportSelection(ctx context.Context, config model.AIOConfig)
 	if !selection.RelevantOnly {
 		return selection, nil
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+` FROM ingest.torrents t`)
+	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+` FROM aiosources.torrents t`)
 	if err != nil {
 		return selection, err
 	}
@@ -31,8 +31,8 @@ func (s *Store) BookImportSelection(ctx context.Context, config model.AIOConfig)
 	rows.Close()
 	// A manual book choice is explicit local evidence even when an opaque source
 	// filename has no book extension or category that the parser can recognize.
-	rows, err = s.pool.Query(ctx, `SELECT openlibrary_id FROM ingest.aio_match_reviews WHERE active AND media_type='book' AND openlibrary_id<>''
-UNION SELECT ingest.ol_resolve(openlibrary_id) FROM ingest.aio_match_reviews WHERE active AND media_type='book' AND openlibrary_id<>''`)
+	rows, err = s.pool.Query(ctx, `SELECT openlibrary_id FROM aiosources.aio_match_reviews WHERE active AND media_type='book' AND openlibrary_id<>''
+UNION SELECT aiosources.ol_resolve(openlibrary_id) FROM aiosources.aio_match_reviews WHERE active AND media_type='book' AND openlibrary_id<>''`)
 	if err != nil {
 		return selection, err
 	}

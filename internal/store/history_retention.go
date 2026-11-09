@@ -29,16 +29,16 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		return 0, databaseError("read history cutoff", err)
 	}
 	cutoff := cutoffs["diagnostics"]
-	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true)`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true)`); err != nil {
 		return 0, databaseError("authorize history cleanup", err)
 	}
 	// Paused work and unsuccessful full imports with staging are recoverable.
 	// A metadata child retains its parent's identity membership until it expires.
 	// Skip row locks held by workers or Resume, rather than blocking either.
-	rows, err := tx.Query(ctx, `SELECT r.id FROM ingest.runs r
+	rows, err := tx.Query(ctx, `SELECT r.id FROM aiosources.runs r
  WHERE r.finished_at<$1 AND r.status IN ('succeeded','failed','cancelled')
- AND NOT EXISTS(SELECT 1 FROM ingest.staged_torrents t WHERE t.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.runs child WHERE child.metadata_parent_run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.staged_torrents t WHERE t.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.runs child WHERE child.metadata_parent_run_id=r.id)
  ORDER BY r.finished_at,r.id LIMIT 64 FOR UPDATE OF r SKIP LOCKED`, cutoff)
 	if err != nil {
 		return 0, databaseError("select expired collections", err)
@@ -65,43 +65,43 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		}
 		return databaseError("expire history batch", err)
 	}
-	if err = exec(`DELETE FROM ingest.aio_preparations WHERE (service,account,hash) IN (
- SELECT service,account,hash FROM ingest.aio_preparations WHERE expires_at<now() ORDER BY expires_at LIMIT $1)`, batchSize); err != nil {
+	if err = exec(`DELETE FROM aiosources.aio_preparations WHERE (service,account,hash) IN (
+ SELECT service,account,hash FROM aiosources.aio_preparations WHERE expires_at<now() ORDER BY expires_at LIMIT $1)`, batchSize); err != nil {
 		return 0, err
 	}
 	// A reference never keeps an old original archive alive indefinitely. New
 	// observations retain their processing identity, with no archived payload.
 	for _, table := range []string{"raw_records", "pages"} {
-		if result, e := tx.Exec(ctx, `UPDATE ingest.`+table+` SET payload_id=NULL,payload_retained=FALSE
- WHERE id IN (SELECT r.id FROM ingest.`+table+` r JOIN ingest.`+table+` payload ON payload.id=r.payload_id
+		if result, e := tx.Exec(ctx, `UPDATE aiosources.`+table+` SET payload_id=NULL,payload_retained=FALSE
+ WHERE id IN (SELECT r.id FROM aiosources.`+table+` r JOIN aiosources.`+table+` payload ON payload.id=r.payload_id
  WHERE payload.created_at<$1 ORDER BY r.id LIMIT $2)`, cutoff, batchSize); e != nil {
 			return 0, databaseError("expire archive references", e)
 		} else {
 			removed += result.RowsAffected()
 		}
 	}
-	if err = exec(`DELETE FROM ingest.raw_records WHERE id IN (
- SELECT r.id FROM ingest.raw_records r WHERE r.created_at<$1
- AND NOT EXISTS(SELECT 1 FROM ingest.raw_records reference WHERE reference.payload_id=r.id)
+	if err = exec(`DELETE FROM aiosources.raw_records WHERE id IN (
+ SELECT r.id FROM aiosources.raw_records r WHERE r.created_at<$1
+ AND NOT EXISTS(SELECT 1 FROM aiosources.raw_records reference WHERE reference.payload_id=r.id)
  ORDER BY r.created_at,r.id LIMIT $2)`, cutoff, batchSize); err != nil {
 		return 0, err
 	}
 	// Fingerprints, filter coverage and the latest retry observation still serve
 	// an unfinished traversal. Their original response bytes are diagnostic only.
-	if result, e := tx.Exec(ctx, `UPDATE ingest.pages SET body=''::bytea,payload_id=NULL,payload_retained=FALSE
- WHERE id IN (SELECT id FROM ingest.pages WHERE created_at<$1
+	if result, e := tx.Exec(ctx, `UPDATE aiosources.pages SET body=''::bytea,payload_id=NULL,payload_retained=FALSE
+ WHERE id IN (SELECT id FROM aiosources.pages WHERE created_at<$1
  AND (payload_retained OR octet_length(body)>0) ORDER BY created_at,id LIMIT $2)`, cutoff, batchSize); e != nil {
 		return 0, databaseError("expire response payloads", e)
 	} else {
 		removed += result.RowsAffected()
 	}
-	if err = exec(`DELETE FROM ingest.pages WHERE id IN (
- SELECT p.id FROM ingest.pages p JOIN ingest.runs r ON r.id=p.run_id WHERE p.created_at<$1
+	if err = exec(`DELETE FROM aiosources.pages WHERE id IN (
+ SELECT p.id FROM aiosources.pages p JOIN aiosources.runs r ON r.id=p.run_id WHERE p.created_at<$1
  AND (r.status='succeeded' OR r.id=ANY($2::text[])
   OR (p.fingerprint IS NULL AND COALESCE(p.metadata->>'traversal_phase','')<>'options_list'
-   AND p.id<>(SELECT id FROM ingest.pages latest WHERE latest.run_id=r.id ORDER BY id DESC LIMIT 1)))
- AND NOT EXISTS(SELECT 1 FROM ingest.raw_records raw WHERE raw.page_id=p.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.pages reference WHERE reference.payload_id=p.id)
+   AND p.id<>(SELECT id FROM aiosources.pages latest WHERE latest.run_id=r.id ORDER BY id DESC LIMIT 1)))
+ AND NOT EXISTS(SELECT 1 FROM aiosources.raw_records raw WHERE raw.page_id=p.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.pages reference WHERE reference.payload_id=p.id)
  ORDER BY p.created_at,p.id LIMIT $3)`, cutoff, ids, batchSize); err != nil {
 		return 0, err
 	}
@@ -115,50 +115,50 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 		case "stremio_requests":
 			tableCutoff = cutoffs["requests"]
 		}
-		if err = exec(`DELETE FROM ingest.`+table+` WHERE id IN (
- SELECT id FROM ingest.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, tableCutoff, batchSize); err != nil {
+		if err = exec(`DELETE FROM aiosources.`+table+` WHERE id IN (
+ SELECT id FROM aiosources.`+table+` WHERE created_at<$1 ORDER BY created_at,id LIMIT $2)`, tableCutoff, batchSize); err != nil {
 			return 0, err
 		}
 	}
-	if err = exec(`DELETE FROM ingest.stremio_requests WHERE id IN (SELECT id FROM ingest.stremio_requests WHERE id<=COALESCE((SELECT id FROM ingest.stremio_requests ORDER BY id DESC OFFSET (SELECT request_limit FROM ingest.storage_retention_settings WHERE singleton) LIMIT 1),0) AND (SELECT request_limit>0 FROM ingest.storage_retention_settings WHERE singleton) ORDER BY id LIMIT $1)`, batchSize); err != nil {
+	if err = exec(`DELETE FROM aiosources.stremio_requests WHERE id IN (SELECT id FROM aiosources.stremio_requests WHERE id<=COALESCE((SELECT id FROM aiosources.stremio_requests ORDER BY id DESC OFFSET (SELECT request_limit FROM aiosources.storage_retention_settings WHERE singleton) LIMIT 1),0) AND (SELECT request_limit>0 FROM aiosources.storage_retention_settings WHERE singleton) ORDER BY id LIMIT $1)`, batchSize); err != nil {
 		return 0, err
 	}
-	if err = exec(`DELETE FROM ingest.operation_runs WHERE id IN (
- SELECT r.id FROM ingest.operation_runs r WHERE finished_at<$1 AND status<>'running'
- AND NOT EXISTS(SELECT 1 FROM ingest.operation_events e WHERE e.run_id=r.id)
+	if err = exec(`DELETE FROM aiosources.operation_runs WHERE id IN (
+ SELECT r.id FROM aiosources.operation_runs r WHERE finished_at<$1 AND status<>'running'
+ AND NOT EXISTS(SELECT 1 FROM aiosources.operation_events e WHERE e.run_id=r.id)
  ORDER BY finished_at,id LIMIT $2 FOR UPDATE SKIP LOCKED)`, cutoffs["operations"], batchSize); err != nil {
 		return 0, err
 	}
 	for _, table := range []string{"run_record_identities", "run_scope_memberships", "run_scope_counts", "run_scope_refresh_candidates", "run_progress_identities"} {
-		if err = exec(`DELETE FROM ingest.`+table+` WHERE ctid IN (
- SELECT ctid FROM ingest.`+table+` WHERE run_id=ANY($1::text[]) LIMIT $2)`, ids, batchSize); err != nil {
+		if err = exec(`DELETE FROM aiosources.`+table+` WHERE ctid IN (
+ SELECT ctid FROM aiosources.`+table+` WHERE run_id=ANY($1::text[]) LIMIT $2)`, ids, batchSize); err != nil {
 			return 0, err
 		}
 	}
 	before := removed
-	if err = exec(`DELETE FROM ingest.torrent_history WHERE id IN (
- SELECT id FROM ingest.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
+	if err = exec(`DELETE FROM aiosources.torrent_history WHERE id IN (
+ SELECT id FROM aiosources.torrent_history WHERE occurred_at<$1 ORDER BY occurred_at,id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
 		return 0, err
 	}
-	if err = exec(`DELETE FROM ingest.torrent_history_baselines WHERE occurrence_id IN (
- SELECT occurrence_id FROM ingest.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
+	if err = exec(`DELETE FROM aiosources.torrent_history_baselines WHERE occurrence_id IN (
+ SELECT occurrence_id FROM aiosources.torrent_history_baselines WHERE recorded_at<$1 ORDER BY recorded_at,occurrence_id LIMIT $2)`, cutoffs["changes"], batchSize); err != nil {
 		return 0, err
 	}
 	if removed > before {
-		if _, err = tx.Exec(ctx, `UPDATE ingest.torrent_history_metadata SET history_since=GREATEST(history_since,$1) WHERE singleton AND history_since<$1`, cutoffs["changes"]); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.torrent_history_metadata SET history_since=GREATEST(history_since,$1) WHERE singleton AND history_since<$1`, cutoffs["changes"]); err != nil {
 			return 0, databaseError("advance retained history boundary", err)
 		}
 	}
-	if err = exec(`DELETE FROM ingest.runs r WHERE r.id=ANY($1::text[])
- AND NOT EXISTS(SELECT 1 FROM ingest.pages p WHERE p.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.raw_records raw WHERE raw.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.events e WHERE e.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.torrent_history h WHERE h.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.run_record_identities i WHERE i.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.run_scope_memberships i WHERE i.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.run_scope_counts i WHERE i.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.run_scope_refresh_candidates i WHERE i.run_id=r.id)
- AND NOT EXISTS(SELECT 1 FROM ingest.run_progress_identities i WHERE i.run_id=r.id)`, ids); err != nil {
+	if err = exec(`DELETE FROM aiosources.runs r WHERE r.id=ANY($1::text[])
+ AND NOT EXISTS(SELECT 1 FROM aiosources.pages p WHERE p.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.raw_records raw WHERE raw.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.events e WHERE e.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.torrent_history h WHERE h.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.run_record_identities i WHERE i.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.run_scope_memberships i WHERE i.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.run_scope_counts i WHERE i.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.run_scope_refresh_candidates i WHERE i.run_id=r.id)
+ AND NOT EXISTS(SELECT 1 FROM aiosources.run_progress_identities i WHERE i.run_id=r.id)`, ids); err != nil {
 		return 0, err
 	}
 	// Serialize the immutable publication boundary with native writers. Keep
@@ -167,30 +167,30 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
 		return 0, databaseError("lock catalog retention", err)
 	}
-	if _, err = tx.Exec(ctx, `SELECT ingest.sync_catalog_tracking()`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT aiosources.sync_catalog_tracking()`); err != nil {
 		return 0, databaseError("reconcile catalog storage", err)
 	}
-	if _, err = tx.Exec(ctx, `SELECT ingest.prune_catalog_entity_index()`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT aiosources.prune_catalog_entity_index()`); err != nil {
 		return 0, databaseError("release inactive shared data index", err)
 	}
 	if err = exec(`WITH expired AS MATERIALIZED (
- SELECT sequence,provider_id,source_id,origin,fields,deleted,recorded_at FROM ingest.catalog_journal
+ SELECT sequence,provider_id,source_id,origin,fields,deleted,recorded_at FROM aiosources.catalog_journal
  WHERE recorded_at<$1 ORDER BY recorded_at,sequence LIMIT $2
 ), boundary AS (
- UPDATE ingest.catalog_retention SET floor=candidate.floor
+ UPDATE aiosources.catalog_retention SET floor=candidate.floor
  FROM (SELECT max(sequence) AS floor FROM expired) candidate
  WHERE singleton AND catalog_retention.floor<candidate.floor RETURNING catalog_retention.floor
 ), latest AS (
  SELECT DISTINCT ON(provider_id,source_id,origin) * FROM expired
  ORDER BY provider_id,source_id,origin,sequence DESC
 ), retained AS (
- INSERT INTO ingest.catalog_baselines AS previous(provider_id,source_id,origin,fields,deleted,sequence,recorded_at)
- SELECT provider_id,source_id,origin,ingest.catalog_fields(fields),deleted,sequence,recorded_at FROM latest
+ INSERT INTO aiosources.catalog_baselines AS previous(provider_id,source_id,origin,fields,deleted,sequence,recorded_at)
+ SELECT provider_id,source_id,origin,aiosources.catalog_fields(fields),deleted,sequence,recorded_at FROM latest
  ON CONFLICT(provider_id,source_id,origin) DO UPDATE SET fields=EXCLUDED.fields,deleted=EXCLUDED.deleted,
  sequence=EXCLUDED.sequence,recorded_at=EXCLUDED.recorded_at WHERE previous.sequence<EXCLUDED.sequence
  RETURNING 1
 )
-DELETE FROM ingest.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoffs["sharing"], batchSize); err != nil {
+DELETE FROM aiosources.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoffs["sharing"], batchSize); err != nil {
 		return 0, err
 	}
 	if err = tx.Commit(ctx); err != nil {

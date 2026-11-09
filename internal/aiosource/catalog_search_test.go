@@ -117,7 +117,7 @@ func TestCatalogDownloadUsesExistingProvidersAndSanitizedHistory(t *testing.T) {
 			if _, err = s.CatalogDownload(ctx, page.Items[0].ID, input); !errors.Is(err, model.ErrNotFound) || uploads.Load() != before {
 				t.Fatal("forged occurrence reached provider", err)
 			}
-			if _, err = conn.Exec(ctx, `UPDATE ingest.aio_works SET revision=revision+1`); err != nil {
+			if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_works SET revision=revision+1`); err != nil {
 				t.Fatal(err)
 			}
 			input.OccurrenceID = rows[0].OccurrenceID
@@ -135,7 +135,7 @@ func TestCatalogEpisodeSelectionUsesVerifiedFilesAndSeasonPacks(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, title := range []string{"Example.Series.S01.COMPLETE.1080p", "Example.Series.S01E02.1080p", "Example.Series.S02E02.1080p"} {
-		if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source',$1,jsonb_build_object('title',$2::text,'info_hash',$3::text,'imdb_id','tt2345678'))`, fmt.Sprint(i), title, strings.Repeat(fmt.Sprint(i+1), 40)); err != nil {
+		if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source',$1,jsonb_build_object('title',$2::text,'info_hash',$3::text,'imdb_id','tt2345678'))`, fmt.Sprint(i), title, strings.Repeat(fmt.Sprint(i+1), 40)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -378,7 +378,7 @@ func TestCatalogSeasonChoicesKeepEverySeasonInAnAnchoredPack(t *testing.T) {
 	if err := s.DB.SaveAIOWork(ctx, w, []string{"example series"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','pack','{"title":"Example.Series.S01-S03.COMPLETE.1080p","season":1,"imdb_id":"tt2345678","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','pack','{"title":"Example.Series.S01-S03.COMPLETE.1080p","season":1,"imdb_id":"tt2345678","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {

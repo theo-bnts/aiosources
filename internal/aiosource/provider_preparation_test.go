@@ -58,7 +58,7 @@ func TestVisitorPreparationIsBoundedAndStripsDownloadCredentials(t *testing.T) {
 		t.Fatal("visitor state grew without a bound")
 	}
 	var count int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_preparations`).Scan(&count); err != nil || count != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_preparations`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("visitor preparation persisted in PostgreSQL")
 	}
 }

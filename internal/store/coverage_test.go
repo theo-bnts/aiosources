@@ -86,7 +86,7 @@ func TestScopeCoverageSurvivesResumeWithoutPublishingPreview(t *testing.T) {
 		t.Fatalf("preview published rows: %+v %v", rows, err)
 	}
 	var journalCount int
-	if err := reopened.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.catalog_journal WHERE provider_id=$1", provider.ID).Scan(&journalCount); err != nil || journalCount != 1 {
+	if err := reopened.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.catalog_journal WHERE provider_id=$1", provider.ID).Scan(&journalCount); err != nil || journalCount != 1 {
 		t.Fatalf("preview changed publication history: %d %v", journalCount, err)
 	}
 	next := mirrorClaim(t, ctx, reopened, provider, model.ModePreview)
@@ -191,11 +191,11 @@ func TestScopeCoverageResetsOnlyDerivedGeneration(t *testing.T) {
 		t.Fatalf("generation reset lost original history: %+v %v", raw, err)
 	}
 	var journalCount int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.catalog_journal WHERE provider_id=$1", provider.ID).Scan(&journalCount); err != nil || journalCount != 1 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.catalog_journal WHERE provider_id=$1", provider.ID).Scan(&journalCount); err != nil || journalCount != 1 {
 		t.Fatalf("generation reset changed publication history: %d %v", journalCount, err)
 	}
 	var staged string
-	if err := db.pool.QueryRow(ctx, "SELECT source_id FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != "new" {
+	if err := db.pool.QueryRow(ctx, "SELECT source_id FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != "new" {
 		t.Fatalf("generation staging = %q %v", staged, err)
 	}
 }
@@ -212,11 +212,11 @@ func TestScopeCoverageRollsBackWithCheckpointFailure(t *testing.T) {
 	}
 	// Fail after membership insertion, including after the old generation was
 	// cleared, to prove that neither counts nor observations outrun the cursor.
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_coverage_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $$
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_coverage_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'checkpoint unavailable'; END;
 $$;
-CREATE TRIGGER reject_coverage_checkpoint BEFORE UPDATE ON ingest.runs
-FOR EACH ROW EXECUTE FUNCTION ingest.reject_coverage_checkpoint()`); err != nil {
+CREATE TRIGGER reject_coverage_checkpoint BEFORE UPDATE ON aiosources.runs
+FOR EACH ROW EXECUTE FUNCTION aiosources.reject_coverage_checkpoint()`); err != nil {
 		t.Fatal(err)
 	}
 	page := model.Page{ResetStaging: true, Items: []model.Record{coverageRecord("new", "root")}, Next: json.RawMessage(`{"page":3}`)}
@@ -232,7 +232,7 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_coverage_checkpoint()`); err != nil 
 	if err != nil || raw.Total != 1 {
 		t.Fatalf("failed transaction partially retained raw page: %+v %v", raw, err)
 	}
-	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_coverage_checkpoint ON ingest.runs; DROP FUNCTION ingest.reject_coverage_checkpoint()"); err != nil {
+	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_coverage_checkpoint ON aiosources.runs; DROP FUNCTION aiosources.reject_coverage_checkpoint()"); err != nil {
 		t.Fatal(err)
 	}
 	run, err = db.SavePage(ctx, run, page, "new")
@@ -285,7 +285,7 @@ func TestScopeRefreshResumesAtomicallyWithoutPublishingOrLosingOtherScopes(t *te
 	var retainedScopes []string
 	var applied bool
 	if err := db.pool.QueryRow(ctx, `SELECT ARRAY(SELECT jsonb_array_elements_text(metadata->'coverage_refresh_scopes')),
-(metadata->>'coverage_refresh_applied')::boolean FROM ingest.pages WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, run.ID).Scan(&retainedScopes, &applied); err != nil || !reflect.DeepEqual(retainedScopes, []string{"a", "b"}) || !applied {
+(metadata->>'coverage_refresh_applied')::boolean FROM aiosources.pages WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, run.ID).Scan(&retainedScopes, &applied); err != nil || !reflect.DeepEqual(retainedScopes, []string{"a", "b"}) || !applied {
 		t.Fatalf("refresh provenance was not retained: %v %t %v", retainedScopes, applied, err)
 	}
 	if _, err := db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
@@ -356,11 +356,11 @@ func TestScopeRefreshRollbackKeepsCoverageStagingAndCursorTogether(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_scope_refresh() RETURNS trigger LANGUAGE plpgsql AS $$
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_scope_refresh() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'checkpoint unavailable'; END;
 $$;
-CREATE TRIGGER reject_scope_refresh BEFORE UPDATE ON ingest.runs
-FOR EACH ROW EXECUTE FUNCTION ingest.reject_scope_refresh()`); err != nil {
+CREATE TRIGGER reject_scope_refresh BEFORE UPDATE ON aiosources.runs
+FOR EACH ROW EXECUTE FUNCTION aiosources.reject_scope_refresh()`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.SavePage(ctx, run, model.Page{RefreshScopes: []string{"a"}, Next: json.RawMessage(`{"round":1}`)}, ""); err == nil {
@@ -368,10 +368,10 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_scope_refresh()`); err != nil {
 	}
 	assertCoverage(t, ctx, db, run.ID, map[string]int64{"a": 1, "b": 1}, []string{"1", "2"}, map[string]bool{"1": true, "2": true})
 	var staged, candidates int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 2 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 2 {
 		t.Fatalf("rolled-back refresh deleted staging: %d %v", staged, err)
 	}
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.run_scope_refresh_candidates WHERE run_id=$1", run.ID).Scan(&candidates); err != nil || candidates != 0 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.run_scope_refresh_candidates WHERE run_id=$1", run.ID).Scan(&candidates); err != nil || candidates != 0 {
 		t.Fatalf("rolled-back refresh retained candidates: %d %v", candidates, err)
 	}
 	persisted, err := db.GetRun(ctx, run.ID)
@@ -441,25 +441,25 @@ func TestLatestCoverageMigrationBackfillsOnlyAcceptedCurrentObservations(t *test
 		t.Fatal(err)
 	}
 	if _, err := db.pool.Exec(ctx, `WITH observed AS (
-SELECT id,row_number() OVER (ORDER BY id) AS ordinal FROM ingest.raw_records WHERE run_id=$1)
-UPDATE ingest.raw_records AS raw SET fields=$2::jsonb->(observed.ordinal::integer-1)
+SELECT id,row_number() OVER (ORDER BY id) AS ordinal FROM aiosources.raw_records WHERE run_id=$1)
+UPDATE aiosources.raw_records AS raw SET fields=$2::jsonb->(observed.ordinal::integer-1)
 FROM observed WHERE raw.id=observed.id`, run.ID, archivedFields); err != nil {
 		t.Fatal(err)
 	}
 	// Restore the old union-of-ever-seen bug, then apply the new migration to
 	// prove that only derived state changes and its evidence filter is sound.
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.run_scope_memberships(run_id,scope_id,source_id) VALUES($1,'a','1');
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.run_scope_memberships(run_id,scope_id,source_id) VALUES($1,'a','1');
 `, run.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.run_scope_counts SET observed_count=3 WHERE run_id=$1 AND scope_id='a'", run.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.run_scope_counts SET observed_count=3 WHERE run_id=$1 AND scope_id='a'", run.ID); err != nil {
 		t.Fatal(err)
 	}
 	var beforeRaw, beforePages string
-	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(raw,'hex'),'|' ORDER BY id)) FROM ingest.raw_records WHERE run_id=$1`, run.ID).Scan(&beforeRaw); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(raw,'hex'),'|' ORDER BY id)) FROM aiosources.raw_records WHERE run_id=$1`, run.ID).Scan(&beforeRaw); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(body,'hex'),'|' ORDER BY id)) FROM ingest.pages WHERE run_id=$1`, run.ID).Scan(&beforePages); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(body,'hex'),'|' ORDER BY id)) FROM aiosources.pages WHERE run_id=$1`, run.ID).Scan(&beforePages); err != nil {
 		t.Fatal(err)
 	}
 	tx, err := db.pool.Begin(ctx)
@@ -467,7 +467,7 @@ FROM observed WHERE raw.id=observed.id`, run.ID, archivedFields); err != nil {
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err := tx.Exec(ctx, "DROP TABLE ingest.run_scope_refresh_candidates"); err != nil {
+	if _, err := tx.Exec(ctx, "DROP TABLE aiosources.run_scope_refresh_candidates"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, coverageLatestSchema); err != nil {
@@ -478,17 +478,17 @@ FROM observed WHERE raw.id=observed.id`, run.ID, archivedFields); err != nil {
 	}
 	assertCoverage(t, ctx, db, run.ID, map[string]int64{"a": 1, "b": 1, "common": 2}, []string{"1", "2", "retired-generation"}, map[string]bool{"1": true, "2": true})
 	var afterRaw, afterPages string
-	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(raw,'hex'),'|' ORDER BY id)) FROM ingest.raw_records WHERE run_id=$1`, run.ID).Scan(&afterRaw); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(raw,'hex'),'|' ORDER BY id)) FROM aiosources.raw_records WHERE run_id=$1`, run.ID).Scan(&afterRaw); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(body,'hex'),'|' ORDER BY id)) FROM ingest.pages WHERE run_id=$1`, run.ID).Scan(&afterPages); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT md5(string_agg(encode(body,'hex'),'|' ORDER BY id)) FROM aiosources.pages WHERE run_id=$1`, run.ID).Scan(&afterPages); err != nil {
 		t.Fatal(err)
 	}
 	if beforeRaw != afterRaw || beforePages != afterPages {
 		t.Fatal("coverage backfill rewrote archived bytes")
 	}
 	var staged int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 2 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 2 {
 		t.Fatalf("backfill changed staged independent same-hash identities: %d %v", staged, err)
 	}
 	persisted, err := db.GetRun(ctx, run.ID)
@@ -535,7 +535,7 @@ func TestScopeMembershipMovesOutAndBackWithoutChangingOtherOccurrences(t *testin
 			assertCoverage(t, ctx, db, run.ID, map[string]int64{"a": 1}, []string{"1", "2"}, map[string]bool{"2": true})
 			if mode == model.ModeFull {
 				var staged []string
-				if err := db.pool.QueryRow(ctx, "SELECT array_agg(source_id ORDER BY source_id) FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || !reflect.DeepEqual(staged, []string{"2"}) {
+				if err := db.pool.QueryRow(ctx, "SELECT array_agg(source_id ORDER BY source_id) FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || !reflect.DeepEqual(staged, []string{"2"}) {
 					t.Fatalf("move-out left stale full staging or removed same-hash peer: %v %v", staged, err)
 				}
 			} else {

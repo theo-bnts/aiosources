@@ -163,7 +163,7 @@ func TestPublicAllDebridVisitorProbesRetainSharedEvidenceAndActualCleanupCalls(t
 		t.Fatal("visitor probe did not fill common availability", err)
 	}
 	var accountRows int
-	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_resources)+(SELECT count(*) FROM ingest.aio_cleanup)+(SELECT count(*) FROM ingest.aio_availability)`).Scan(&accountRows); err != nil || accountRows != 0 {
+	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_resources)+(SELECT count(*) FROM aiosources.aio_cleanup)+(SELECT count(*) FROM aiosources.aio_availability)`).Scan(&accountRows); err != nil || accountRows != 0 {
 		t.Fatal("visitor account entered restartable background state", accountRows, err)
 	}
 	if states["alldebrid"][hash].Files[0].Link != "" {
@@ -305,7 +305,7 @@ func TestPublicInstallationIsStatelessScopedAndRevocable(t *testing.T) {
 		t.Fatal("restart invalidates durable encryption")
 	}
 	for _, table := range []string{"settings", "secrets", "aio_public_access", "stremio_requests", "operation_runs", "operation_events", "operation_downloads", "aio_availability", "aio_shared_availability", "aio_resources", "aio_cleanup", "activity_logs"} {
-		rows, e := conn.Query(ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, e := conn.Query(ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -408,7 +408,7 @@ func TestPublicSharedCachePrivatePlaybackAndIndependentProviders(t *testing.T) {
 	if err = s.DB.SaveSharedAvailability(ctx, "alldebrid", model.AIOAvailability{Hash: hash, Cached: true, CheckedAt: time.Now(), Files: shared[0].Files, Generation: generation}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '90 days' WHERE service='torbox'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()-interval '90 days' WHERE service='torbox'`); err != nil {
 		t.Fatal(err)
 	}
 	visitor.Services["alldebrid"] = "visitor-ad-key"
@@ -474,7 +474,7 @@ func TestPublicCacheFailureStaysUnknownAndDoesNotSaveCredentials(t *testing.T) {
 		t.Fatal("provider diagnostics missing")
 	}
 	for _, table := range []string{"operation_runs", "operation_events", "stremio_requests", "activity_logs", "aio_resources", "aio_cleanup"} {
-		rows, e := conn.Query(ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, e := conn.Query(ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -515,7 +515,7 @@ func TestPublicSeasonPackSelectionAndHistoryUseThePublishedEpisode(t *testing.T)
 	if err := s.DB.SaveAIOWork(ctx, work, []string{"example serial"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','pack',jsonb_build_object('title','Example.Serial.S02.COMPLETE.2020','imdb_id','tt1234567','info_hash',$1::text,'season',2))`, hash); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','pack',jsonb_build_object('title','Example.Serial.S02.COMPLETE.2020','imdb_id','tt1234567','info_hash',$1::text,'season',2))`, hash); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {

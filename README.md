@@ -173,7 +173,7 @@ Contributions are welcome: see [Contributing](CONTRIBUTING.md). Report security 
 
 AIOSources is distributed under the [MIT license](LICENSE). Use it only with content and services you are authorized to access; see [usage and service terms](LEGAL.md).
 
-Built on [Ingest](https://github.com/moodiness/ingest). Original copyrights and [third-party license notices](web/public/THIRD-PARTY-NOTICES.txt) are preserved.
+[Licenses and third-party notices](web/public/THIRD-PARTY-NOTICES.txt). Original copyrights are preserved.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Book information and covers are provided by [Open Library](https://openlibrary.org).
 

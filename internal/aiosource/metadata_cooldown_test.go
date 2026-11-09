@@ -67,7 +67,7 @@ func TestTMDBProviderCooldownSurvivesRestartAndManualRetry(t *testing.T) {
 				if err != nil || after.SyncFailures != before.SyncFailures || plan.Updates != "retry" || plan.NextUpdate == nil || !plan.NextUpdate.Equal(*before.ProviderRetryAt) {
 					t.Fatal("the displayed automatic schedule ignored the provider deadline", plan, err)
 				}
-				if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET provider_retry_at=now()-interval '1 minute',sync_retry_at=now()-interval '1 minute'`); err != nil {
+				if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET provider_retry_at=now()-interval '1 minute',sync_retry_at=now()-interval '1 minute'`); err != nil {
 					t.Fatal(err)
 				}
 				blocked.Store(false)

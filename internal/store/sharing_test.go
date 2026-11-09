@@ -17,7 +17,7 @@ import (
 // columns needed by the current reader. These columns do not alter the catalog
 // identity/publication migration being exercised, and those fixtures are never
 // passed through the complete migration sequence.
-const testShareFormatColumns = `ALTER TABLE ingest.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN stream_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN torznab_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN catalog_entities JSONB NOT NULL DEFAULT '{}';`
+const testShareFormatColumns = `ALTER TABLE aiosources.shares ADD COLUMN format TEXT NOT NULL DEFAULT 'catalog', ADD COLUMN media_types TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN stream_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN torznab_preferences JSONB NOT NULL DEFAULT '{}', ADD COLUMN catalog_entities JSONB NOT NULL DEFAULT '{}';`
 
 // Historical upgrade fixtures must be written in their original schema, rather
 // than by a current writer which depends on columns added in later migrations.
@@ -34,7 +34,7 @@ func legacyShareFixture(t *testing.T, ctx context.Context, db *Store, input mode
 	if input.SourceIDs == nil {
 		input.SourceIDs = []string{}
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.shares(id,name,enabled,scope,source_ids,fields,password_hash) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash); err != nil {
 		t.Fatal(err)
 	}
 	return model.ShareCredential{Share: model.Share{ID: id, Revision: 1}, Password: password}
@@ -43,7 +43,7 @@ func legacyShareFixture(t *testing.T, ctx context.Context, db *Store, input mode
 func legacyReadShare(t *testing.T, ctx context.Context, db *Store, id string) (model.Share, error) {
 	t.Helper()
 	item := model.Share{ID: id}
-	err := db.pool.QueryRow(ctx, `SELECT name,enabled,fields,revision,scope,source_ids FROM ingest.shares WHERE id=$1`, id).Scan(&item.Name, &item.Enabled, &item.Fields, &item.Revision, &item.Scope, &item.SourceIDs)
+	err := db.pool.QueryRow(ctx, `SELECT name,enabled,fields,revision,scope,source_ids FROM aiosources.shares WHERE id=$1`, id).Scan(&item.Name, &item.Enabled, &item.Fields, &item.Revision, &item.Scope, &item.SourceIDs)
 	return item, err
 }
 
@@ -57,14 +57,14 @@ func legacyCatalogPageFixture(t *testing.T, ctx context.Context, db *Store, gran
 	}
 	result := model.CatalogEnvelope{Version: 1, Mode: "full", Items: []model.CatalogItem{}}
 	var key []byte
-	if err = db.pool.QueryRow(ctx, `SELECT instance_id,signing_key FROM ingest.catalog_identity`).Scan(&result.InstanceID, &key); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT instance_id,signing_key FROM aiosources.catalog_identity`).Scan(&result.InstanceID, &key); err != nil {
 		t.Fatal(err)
 	}
 	state := catalogToken{Version: 1, ShareID: grant.Share.ID, Revision: share.Revision, InstanceID: result.InstanceID, Kind: "page", Mode: "full", Limit: q.Limit}
 	if state.Limit == 0 {
 		state.Limit = 100
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT COALESCE(max(sequence),0) FROM ingest.catalog_journal`).Scan(&state.High); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT COALESCE(max(sequence),0) FROM aiosources.catalog_journal`).Scan(&state.High); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := db.pool.Query(ctx, catalogPageSQL, state.High, share.Scope == "all", share.SourceIDs, "full", int64(0), int64(0), state.Limit+1)
@@ -135,7 +135,7 @@ func publishSharingRow(t *testing.T, ctx context.Context, db *Store, provider, s
 		}
 		encoded = data
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields,origin) VALUES($1,$2,$3::jsonb,$4::jsonb) ON CONFLICT(provider_id,source_id) DO UPDATE SET fields=excluded.fields,origin=excluded.origin`, provider, source, fields, encoded); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields,origin) VALUES($1,$2,$3::jsonb,$4::jsonb) ON CONFLICT(provider_id,source_id) DO UPDATE SET fields=excluded.fields,origin=excluded.origin`, provider, source, fields, encoded); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -185,7 +185,7 @@ func TestCatalogSnapshotRetriesAndMutationDelta(t *testing.T) {
 	}
 	publishSharingRow(t, ctx, db, "allowed", "a", `{"title":"updated a"}`, nil)
 	publishSharingRow(t, ctx, db, "allowed", "c", `{"title":"new c"}`, nil)
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.torrents WHERE provider_id='allowed' AND source_id='b'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.torrents WHERE provider_id='allowed' AND source_id='b'`); err != nil {
 		t.Fatal(err)
 	}
 	secondRequest := CatalogPageRequest{Cursor: first.NextCursor}
@@ -198,7 +198,7 @@ func TestCatalogSnapshotRetriesAndMutationDelta(t *testing.T) {
 	if !reflect.DeepEqual(second, retry) {
 		t.Fatalf("same cursor was not stable: %+v / %+v", second, retry)
 	}
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.torrents WHERE provider_id='allowed' AND source_id='b'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.torrents WHERE provider_id='allowed' AND source_id='b'`); err != nil {
 		t.Fatal(err)
 	}
 	var delta []model.CatalogItem
@@ -307,7 +307,7 @@ func TestCatalogDuplicateOriginsAndIdentityChanges(t *testing.T) {
 	if len(first.Items) != 1 || first.Items[0].Origin != *origin || first.Items[0].ID != model.CatalogItemID(*origin) || first.Items[0].Fields["title"] != "second copy" {
 		t.Fatalf("original identity was not deduplicated faithfully: %+v", first)
 	}
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.torrents WHERE provider_id='copy-two'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.torrents WHERE provider_id='copy-two'`); err != nil {
 		t.Fatal(err)
 	}
 	remaining := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: first.Checkpoint})
@@ -331,13 +331,13 @@ func TestCatalogPublicationLockRollbackAndObservationOnlyUpdates(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rollback(first)
-	if _, err := first.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('one','a','{"title":"first"}')`); err != nil {
+	if _, err := first.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('one','a','{"title":"first"}')`); err != nil {
 		t.Fatal(err)
 	}
 	// Different rows cannot block each other via row locks. A second writer
 	// must wait before allocating/publishing a later journal sequence.
 	waiting, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	_, err = db.pool.Exec(waiting, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('two','b','{"title":"second"}')`)
+	_, err = db.pool.Exec(waiting, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('two','b','{"title":"second"}')`)
 	cancel()
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("later publication overtook an uncommitted transaction: %v", err)
@@ -354,14 +354,14 @@ func TestCatalogPublicationLockRollbackAndObservationOnlyUpdates(t *testing.T) {
 	if len(committed.Items) != 2 {
 		t.Fatalf("checkpoint skipped a late commit: %+v", committed)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.torrents SET last_seen_at=NOW(),historical=TRUE WHERE provider_id='one'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.torrents SET last_seen_at=NOW(),historical=TRUE WHERE provider_id='one'`); err != nil {
 		t.Fatal(err)
 	}
 	rolledBack, err := db.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rolledBack.Exec(ctx, `DELETE FROM ingest.torrents`); err != nil {
+	if _, err := rolledBack.Exec(ctx, `DELETE FROM aiosources.torrents`); err != nil {
 		rollback(rolledBack)
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestCatalogMigrationSeedsExistingRowsAndDurableIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+activitySchema+`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema+"COMMIT;"); err != nil {
+	if _, err := db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+activitySchema+`INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy','row','{"title":"existing"}');`+sharingSchema+catalogIdentityPrivacySchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema+"COMMIT;"); err != nil {
 		t.Fatal(err)
 	}
 	grant := sharingGrant(t, ctx, db)
@@ -449,7 +449,7 @@ func TestCatalogNativeSourceIdentifiersDoNotDiscloseCredentials(t *testing.T) {
 	if len(updated.Items) != 1 || updated.Items[0].ID != original.ID || updated.Items[0].Origin != original.Origin || updated.Items[0].Fields["title"] != "updated" {
 		t.Fatalf("native identity changed across an update: %+v", updated)
 	}
-	if _, err := db.pool.Exec(ctx, "DELETE FROM ingest.torrents WHERE provider_id='allowed' AND source_id=$1", source); err != nil {
+	if _, err := db.pool.Exec(ctx, "DELETE FROM aiosources.torrents WHERE provider_id='allowed' AND source_id=$1", source); err != nil {
 		t.Fatal(err)
 	}
 	deleted := sharingPage(t, ctx, db, grant, CatalogPageRequest{Checkpoint: updated.Checkpoint})
@@ -465,7 +465,7 @@ func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema); err != nil {
+	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA aiosources;"+initialSchema+activitySchema+sharingSchema+securitySchema+shareControlsSchema+catalogRetentionStateSchema+testShareFormatColumns+runtimePolicySchema+extendedRuntimeSettingsSchema); err != nil {
 		t.Fatal(err)
 	}
 	source := "https://tracker.invalid/file?passkey=private-passkey"
@@ -494,7 +494,7 @@ func TestCatalogIdentityPrivacyUpgradeResetsExistingReaders(t *testing.T) {
 	if len(delta.Items) != 1 || delta.Items[0].ID != reset.Items[0].ID || delta.Items[0].Fields["title"] != "updated native" {
 		t.Fatalf("post-upgrade native identity was not stable: %+v", delta)
 	}
-	if _, err := db.pool.Exec(ctx, "DELETE FROM ingest.catalog_journal"); err == nil {
+	if _, err := db.pool.Exec(ctx, "DELETE FROM aiosources.catalog_journal"); err == nil {
 		t.Fatal("privacy migration left history mutable")
 	}
 }

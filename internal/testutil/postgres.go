@@ -18,10 +18,6 @@ import (
 func NewDatabase(t testing.TB) (context.Context, string) {
 	t.Helper()
 	connection := os.Getenv("TEST_DATABASE_URL")
-	// The retained GitHub workflow still supplies this test-only legacy name.
-	if connection == "" {
-		connection = os.Getenv("INGEST_TEST_DATABASE_URL")
-	}
 	if connection == "" {
 		t.Skip("set TEST_DATABASE_URL to run isolated PostgreSQL integration checks")
 	}
@@ -40,7 +36,7 @@ func NewDatabase(t testing.TB) (context.Context, string) {
 		_ = admin.Close(ctx)
 		t.Fatal(err)
 	}
-	name := "ingest_test_" + hex.EncodeToString(random[:])
+	name := "aiosources_test_" + hex.EncodeToString(random[:])
 	if _, err := admin.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
 		_ = admin.Close(ctx)
 		t.Fatal("create isolated integration database:", err)

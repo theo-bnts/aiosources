@@ -12,33 +12,33 @@ import (
 )
 
 const aioPublishedMatch = `m.status='matched' AND m.fingerprint=t.fields_fingerprint AND m.revision=w.revision
-AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id) AND NOT w.adult`
-const catalogReleaseSource = ` FROM ingest.aio_matches m JOIN ingest.torrents t USING(provider_id,source_id) WHERE m.work_id=w.id AND ` + aioPublishedMatch
+AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id) AND NOT w.adult`
+const catalogReleaseSource = ` FROM aiosources.aio_matches m JOIN aiosources.torrents t USING(provider_id,source_id) WHERE m.work_id=w.id AND ` + aioPublishedMatch
 
 // Localized labels do not change correspondence. A matching local alias is the
 // query-language fallback, followed by the English primary title.
 func catalogTitleLabel(locale, alias string) string {
 	return `COALESCE(NULLIF(w.localized_titles->>` + locale + `,''),` + bookEditionTitle(locale) + `,` + alias + `,` + bookEditionTitle("'en'") + `,NULLIF(w.localized_titles->>'en',''),NULLIF(w.display_title,''),
- (SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1),'Untitled')`
+ (SELECT title FROM aiosources.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1),'Untitled')`
 }
 
 func catalogQueryAlias(matching, normalized string) string {
 	return `(SELECT title FROM (
- SELECT title,normalized FROM ingest.aio_titles WHERE work_id=w.id
- UNION ALL SELECT title,normalized FROM ingest.ol_editions WHERE w.media_type='book' AND work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id)))
+ SELECT title,normalized FROM aiosources.aio_titles WHERE work_id=w.id
+ UNION ALL SELECT title,normalized FROM aiosources.ol_editions WHERE w.media_type='book' AND work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id)))
  ) local_titles WHERE ` + matching + ` ORDER BY public.similarity(` + normalized + `,normalized) DESC,length(normalized),title LIMIT 1)`
 }
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,w.poster_path,COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
 }
 
 func catalogYearFilter(year string) string {
 	// Film years are alternatives. A series spans all locally known work,
 	// season and episode years, including gaps between seasons.
-	return `(` + year + `=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.year=` + year + `)) OR (w.media_type='tv' AND EXISTS(
- SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM ingest.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM ingest.aio_episodes WHERE work_id=w.id) known_years
+	return `(` + year + `=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.year=` + year + `)) OR (w.media_type='tv' AND EXISTS(
+ SELECT 1 FROM (SELECT unnest(w.years) AS year UNION ALL SELECT year FROM aiosources.aio_seasons WHERE work_id=w.id UNION ALL SELECT year FROM aiosources.aio_episodes WHERE work_id=w.id) known_years
  HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
 }
 
@@ -111,10 +111,10 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
- SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
+ SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
- public.similarity($3,normalized) FROM ingest.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
- JOIN ingest.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
+ public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
+ JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")
 	if len(formats) > 0 && !allBookFormats {
@@ -184,7 +184,7 @@ func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (
 			alias = catalogQueryAlias(strings.Join(terms, " AND "), "$3")
 		}
 	}
-	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM ingest.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, args...))
+	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM aiosources.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, args...))
 	return title, databaseError("read catalog title", err)
 }
 
@@ -194,7 +194,7 @@ type CatalogRecord struct {
 }
 
 func (s *Store) CatalogRecords(ctx context.Context, id int64) ([]CatalogRecord, error) {
-	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM ingest.aio_works w JOIN ingest.aio_matches m ON m.work_id=w.id JOIN ingest.torrents t USING(provider_id,source_id) WHERE w.id=$1 AND `+aioPublishedMatch+` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`, id)
+	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.aio_works w JOIN aiosources.aio_matches m ON m.work_id=w.id JOIN aiosources.torrents t USING(provider_id,source_id) WHERE w.id=$1 AND `+aioPublishedMatch+` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`, id)
 	if err != nil {
 		return nil, databaseError("find catalog releases", err)
 	}

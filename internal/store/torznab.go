@@ -34,7 +34,7 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 	var scope string
 	var sources, media []string
 	var encodedPreferences []byte
-	err = tx.QueryRow(ctx, `SELECT scope,source_ids,media_types,torznab_preferences FROM ingest.shares s WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND EXISTS(SELECT 1 FROM ingest.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id).Scan(&scope, &sources, &media, &encodedPreferences)
+	err = tx.QueryRow(ctx, `SELECT scope,source_ids,media_types,torznab_preferences FROM aiosources.shares s WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp()) AND EXISTS(SELECT 1 FROM aiosources.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id).Scan(&scope, &sources, &media, &encodedPreferences)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrCatalogAuthentication
 	}
@@ -63,9 +63,9 @@ func (d *CatalogDownload) Torznab(ctx context.Context, q model.TorznabQuery, epi
 	// Write access time after releasing the repeatable-read snapshot. Updating
 	// its grant inside that snapshot makes concurrent searches fail with 40001.
 	// Recheck the revision and live admission so a changed policy fails closed.
-	tag, err := d.store.pool.Exec(ctx, `UPDATE ingest.shares s SET last_access_at=clock_timestamp()
+	tag, err := d.store.pool.Exec(ctx, `UPDATE aiosources.shares s SET last_access_at=clock_timestamp()
 WHERE id=$1 AND format='torznab' AND enabled AND revision=$2 AND (expires_at IS NULL OR expires_at>clock_timestamp())
-AND EXISTS(SELECT 1 FROM ingest.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id)
+AND EXISTS(SELECT 1 FROM aiosources.share_requests r WHERE r.share_id=s.id AND r.id=$3 AND lease_until>clock_timestamp())`, d.shareID, d.revision, d.id)
 	if err != nil {
 		return result, databaseError("record Torznab access", err)
 	}
@@ -134,7 +134,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 				return result, model.ErrInvalid
 			}
 		}
-		cached = "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+		cached = "EXISTS(SELECT 1 FROM aiosources.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
 
 		if policy.Public {
 			clauses = append(clauses, "(t.provider_id=ANY("+bind(policy.UncachedSources)+"::text[]) OR "+cached+")")
@@ -160,10 +160,10 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		clauses = append(clauses, bookTitleSearchSQL(q.BookTitle, bind))
 	}
 	if q.Author != "" {
-		clauses = append(clauses, "EXISTS(SELECT 1 FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+")")
+		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+")")
 	}
 	if q.ISBN != "" {
-		clauses = append(clauses, "EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")
+		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")
 	}
 	if q.Mode == "tvsearch" {
 		clauses = append(clauses, "w.media_type='tv'")
@@ -200,7 +200,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	}
 	if q.Year != 0 {
 		year := bind(q.Year) + "::int"
-		clauses = append(clauses, "("+year+"=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id) AND e.year="+year+")))")
+		clauses = append(clauses, "("+year+"=ANY(w.years) OR (w.media_type='book' AND EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id) AND e.year="+year+")))")
 	}
 	if filters.Query != "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == "" {
 		clauses = append(clauses, torrentTextSearchSQLFor("t", filters.Query, bind))
@@ -214,9 +214,9 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, f.column+f.op+bind(f.value)+typ)
 		}
 	}
-	from := ` FROM ingest.torrents t LEFT JOIN ingest.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND m.fingerprint=t.fields_fingerprint
-LEFT JOIN ingest.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM ingest.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)
-LEFT JOIN ingest.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(ingest.aio_review_evidence(t.fields)::text)
+	from := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND m.fingerprint=t.fields_fingerprint
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)
+LEFT JOIN aiosources.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(aiosources.aio_review_evidence(t.fields)::text)
 WHERE ` + strings.Join(clauses, " AND ")
 	filtered := q.Season != nil || q.Episode != nil
 	if !filtered {
@@ -226,11 +226,11 @@ WHERE ` + strings.Join(clauses, " AND ")
 	}
 	// Project only fields understood by the shared record decoder. No arbitrary
 	// JSON, source links, announce URLs, raw identities or secrets cross this boundary.
-	columns := `t.provider_id,''::text,jsonb_build_object('author',(SELECT string_agg(a.name,', ' ORDER BY a.id) FROM ingest.ol_authors a WHERE a.id=ANY(ARRAY(SELECT ingest.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
+	columns := `t.provider_id,''::text,jsonb_build_object('author',(SELECT string_agg(a.name,', ' ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,
-'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,(SELECT instance_id FROM ingest.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
+'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,(SELECT instance_id FROM aiosources.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
 	order := []string{}
 	for _, rule := range q.Sorting {
 		column := ""
@@ -261,7 +261,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 				if services == nil {
 					services = model.DebridServices()
 				}
-				cached = "EXISTS(SELECT 1 FROM ingest.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
+				cached = "EXISTS(SELECT 1 FROM aiosources.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
 			}
 			column = "(" + cached + ")"
 		}

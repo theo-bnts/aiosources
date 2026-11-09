@@ -31,9 +31,9 @@ func TestPublicSourceExposureRevocationDisablesSharingUntilExplicitlyEnabled(t *
 
 func TestPublicCatalogDependencyUpgradeNormalizesOldDisabledSwitches(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.aio_public_access DROP CONSTRAINT aio_public_catalog_requires_sources;
-DELETE FROM ingest.schema_migrations WHERE version=86;
-UPDATE ingest.aio_public_access SET expose_sources=FALSE,catalog_enabled=TRUE;`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.aio_public_access DROP CONSTRAINT aio_public_catalog_requires_sources;
+DELETE FROM aiosources.schema_migrations WHERE version=86;
+UPDATE aiosources.aio_public_access SET expose_sources=FALSE,catalog_enabled=TRUE;`); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := db.PublicAccess(ctx)

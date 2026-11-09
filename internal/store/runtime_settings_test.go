@@ -156,7 +156,7 @@ func TestRuntimePolicyWaitingReadsRespectTheirOwnCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err := tx.Exec(ctx, `LOCK TABLE ingest.runtime_settings IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := tx.Exec(ctx, `LOCK TABLE aiosources.runtime_settings IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
 	result := make(chan error, 1)
@@ -214,7 +214,7 @@ func TestConnectionBudgetsKeepTheirAdmissionLeaseUntilDeliveryEnds(t *testing.T)
 			t.Fatal("configured deadline was not used", format, remaining)
 		}
 		var lease time.Time
-		if err := db.pool.QueryRow(ctx, `SELECT lease_until FROM ingest.share_requests WHERE id=$1`, active.id).Scan(&lease); err != nil || lease.Before(active.deadline.Add(4*time.Second)) {
+		if err := db.pool.QueryRow(ctx, `SELECT lease_until FROM aiosources.share_requests WHERE id=$1`, active.id).Scan(&lease); err != nil || lease.Before(active.deadline.Add(4*time.Second)) {
 			t.Fatal("lease ended before response authorization", format, err)
 		}
 		if err := active.Close(); err != nil {

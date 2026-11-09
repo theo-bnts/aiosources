@@ -11,13 +11,13 @@ test('returning through a processed record and its run retains the original hist
   await db.connect()
   let recordID: string
   try {
-    await db.query(`INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+    await db.query(`INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
       VALUES('nested-run','nested-source','Nested source','preview','succeeded','','{}',now())`)
     const result = await db.query(`WITH saved_page AS (
-      INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type)
+      INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type)
       VALUES('nested-run','nested-source',1,''::bytea,'application/json') RETURNING id
     )
-    INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
+    INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields)
     SELECT 'nested-run','nested-source','record',id,1,''::bytea,'application/json','{"title":"Example record"}'
     FROM saved_page RETURNING id::text`)
     recordID = result.rows[0].id

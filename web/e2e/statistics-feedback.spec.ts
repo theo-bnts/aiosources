@@ -57,7 +57,7 @@ test('Identification is a separate sidebar page and shared cache statistics matc
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
+    await db.query(`INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
      ('torbox',repeat('a',40),true,now()-interval '1 minute','[]'),
      ('torbox',repeat('b',40),false,now()-interval '2 minutes','[]'),
      ('torbox',repeat('c',40),false,now()-interval '16 minutes','[]'),

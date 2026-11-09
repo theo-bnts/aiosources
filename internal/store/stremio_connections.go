@@ -20,7 +20,7 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 	}
 	var hash []byte
 	var enabled bool
-	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled AND (expires_at IS NULL OR expires_at>clock_timestamp()) FROM ingest.shares WHERE id=$1 AND format='stremio'`, id).Scan(&hash, &enabled)
+	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled AND (expires_at IS NULL OR expires_at>clock_timestamp()) FROM aiosources.shares WHERE id=$1 AND format='stremio'`, id).Scan(&hash, &enabled)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return zero, ErrCatalogAuthentication
 	}
@@ -33,7 +33,7 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 	}
 	// Verify again in the settings read so a concurrent rotation cannot authorize
 	// settings from a newer revision using the former key.
-	value, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+` FROM ingest.shares WHERE id=$1 AND format='stremio' AND password_hash=$2 AND enabled AND (expires_at IS NULL OR expires_at>clock_timestamp())`, id, candidate[:]))
+	value, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+` FROM aiosources.shares WHERE id=$1 AND format='stremio' AND password_hash=$2 AND enabled AND (expires_at IS NULL OR expires_at>clock_timestamp())`, id, candidate[:]))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return zero, ErrCatalogAuthentication
 	}

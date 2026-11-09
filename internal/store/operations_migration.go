@@ -1,7 +1,7 @@
 package store
 
 const operationsSchema = `
-CREATE TABLE ingest.operation_runs (
+CREATE TABLE aiosources.operation_runs (
  id TEXT PRIMARY KEY,
  kind TEXT NOT NULL CHECK(kind IN ('metadata','matching','cache','cleanup')),
  service TEXT NOT NULL CHECK(service IN ('tmdb','local','alldebrid','torbox')),
@@ -20,15 +20,15 @@ CREATE TABLE ingest.operation_runs (
  CHECK ((status='running') = (finished_at IS NULL)),
  CHECK ((kind='metadata' AND service='tmdb') OR (kind='matching' AND service='local') OR (kind='cache' AND service IN ('alldebrid','torbox')) OR (kind='cleanup' AND service='alldebrid'))
 );
-CREATE INDEX operation_runs_history ON ingest.operation_runs(kind,created_at DESC,id DESC);
-CREATE INDEX operation_runs_active ON ingest.operation_runs(lock_key) WHERE status='running';
-CREATE TABLE ingest.operation_events (
+CREATE INDEX operation_runs_history ON aiosources.operation_runs(kind,created_at DESC,id DESC);
+CREATE INDEX operation_runs_active ON aiosources.operation_runs(lock_key) WHERE status='running';
+CREATE TABLE aiosources.operation_events (
  id BIGSERIAL PRIMARY KEY,
- run_id TEXT NOT NULL REFERENCES ingest.operation_runs(id),
+ run_id TEXT NOT NULL REFERENCES aiosources.operation_runs(id),
  phase TEXT NOT NULL,
  processed BIGINT NOT NULL,
  errors BIGINT NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX operation_events_run ON ingest.operation_events(run_id,id);
+CREATE INDEX operation_events_run ON aiosources.operation_events(run_id,id);
 `

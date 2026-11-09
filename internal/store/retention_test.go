@@ -60,8 +60,8 @@ func TestSavePageKeepsObservationsWithoutPayloadDuplication(t *testing.T) {
 			}
 			var bytesStored int64
 			if err := db.pool.QueryRow(ctx, `SELECT
-COALESCE((SELECT sum(octet_length(body)) FROM ingest.pages WHERE run_id=$1),0)
-+ COALESCE((SELECT sum(octet_length(raw)) FROM ingest.raw_records WHERE run_id=$1),0)`, run.ID).Scan(&bytesStored); err != nil || bytesStored != 0 {
+COALESCE((SELECT sum(octet_length(body)) FROM aiosources.pages WHERE run_id=$1),0)
++ COALESCE((SELECT sum(octet_length(raw)) FROM aiosources.raw_records WHERE run_id=$1),0)`, run.ID).Scan(&bytesStored); err != nil || bytesStored != 0 {
 				t.Fatalf("source payload bytes were persisted: %d %v", bytesStored, err)
 			}
 			events, err := db.Events(ctx, run.ID, model.ListOptions{})
@@ -83,7 +83,7 @@ COALESCE((SELECT sum(octet_length(body)) FROM ingest.pages WHERE run_id=$1),0)
 			}
 			if mode == model.ModeFull {
 				var fields []byte
-				if err := db.pool.QueryRow(ctx, "SELECT fields FROM ingest.staged_torrents WHERE run_id=$1 AND source_id='10'", run.ID).Scan(&fields); err != nil {
+				if err := db.pool.QueryRow(ctx, "SELECT fields FROM aiosources.staged_torrents WHERE run_id=$1 AND source_id='10'", run.ID).Scan(&fields); err != nil {
 					t.Fatal(err)
 				}
 				parsed, err := decodeObject(fields)
@@ -152,17 +152,17 @@ func TestMetadataRetentionMigrationLeavesLegacyArchivesAndCheckpointsUntouched(t
 	}
 	observation := observations.Items[0]
 	oldBody, oldRaw := []byte{'p', 0, 'g'}, []byte{'r', 0, 'w'}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.pages SET body=$2 WHERE id=$1", observation.PageID, oldBody); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.pages SET body=$2 WHERE id=$1", observation.PageID, oldBody); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.raw_records SET raw=$2,fields='{"legacy":{"exact":true}}'::jsonb WHERE id=$1`, observation.ID, oldRaw); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET raw=$2,fields='{"legacy":{"exact":true}}'::jsonb WHERE id=$1`, observation.ID, oldRaw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.pages DROP COLUMN payload_retained;
-ALTER TABLE ingest.raw_records DROP COLUMN payload_retained;
-ALTER TABLE ingest.runs DROP CONSTRAINT runs_mode_check;
-ALTER TABLE ingest.runs ADD CONSTRAINT runs_mode_check CHECK(mode IN ('preview','incremental','full'));
-DELETE FROM ingest.schema_migrations WHERE version=20`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.pages DROP COLUMN payload_retained;
+ALTER TABLE aiosources.raw_records DROP COLUMN payload_retained;
+ALTER TABLE aiosources.runs DROP CONSTRAINT runs_mode_check;
+ALTER TABLE aiosources.runs ADD CONSTRAINT runs_mode_check CHECK(mode IN ('preview','incremental','full'));
+DELETE FROM aiosources.schema_migrations WHERE version=20`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Migrate(ctx); err != nil {

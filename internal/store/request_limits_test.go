@@ -35,7 +35,7 @@ func requestLimitClock(t *testing.T, ctx context.Context, db *Store) time.Time {
 
 func seedProviderRequest(t *testing.T, ctx context.Context, db *Store, providerID string, admittedAt time.Time) {
 	t.Helper()
-	if _, err := db.pool.Exec(ctx, "INSERT INTO ingest.provider_requests(provider_id,admitted_at) VALUES($1,$2)", providerID, admittedAt); err != nil {
+	if _, err := db.pool.Exec(ctx, "INSERT INTO aiosources.provider_requests(provider_id,admitted_at) VALUES($1,$2)", providerID, admittedAt); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -70,7 +70,7 @@ func TestProviderRequestLimitsRollingWindows(t *testing.T) {
 
 			// Expire only the older admission without sleeping. Denied attempts
 			// must not consume budget or prevent the next real reservation.
-			if _, err := db.pool.Exec(ctx, `UPDATE ingest.provider_requests SET admitted_at=$3
+			if _, err := db.pool.Exec(ctx, `UPDATE aiosources.provider_requests SET admitted_at=$3
 WHERE provider_id=$1 AND admitted_at=$2`, test.name, older, now.Add(-test.window-time.Second)); err != nil {
 				t.Fatal(err)
 			}

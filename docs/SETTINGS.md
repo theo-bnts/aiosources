@@ -24,7 +24,7 @@ Stremio and Torznab can use trusted local HTTP addresses. Catalog sharing requir
 | `BIND` | `0.0.0.0:7000` | Change the listening interface or port. Update port mappings as needed. |
 | `MASTER_KEY` | Generated and kept with application data | Supply your own 32-byte base64 or hexadecimal encryption key only when managing it deliberately. |
 
-These names have no `INGEST_` prefix. Source credentials, TMDB tokens and debrid keys are configured through **Secrets**, not separate environment variables.
+Source credentials, TMDB tokens and debrid keys are configured through **Secrets**, not separate environment variables.
 
 Changing a database password requires updating the PostgreSQL account as well as its connection setting. Editing `POSTGRES_PASSWORD` alone does not change a password in an already initialized database.
 
@@ -43,6 +43,10 @@ Use a consistent database backup or stop the services before copying their volum
 - **`:sha-FULL_COMMIT_SHA`** keeps an exact published build.
 
 After choosing the tag, run `docker compose pull` and `docker compose up -d`. Preserve your volumes. Read the release's upgrade guidance and back up first; switching back to an older image may require restoring the backup made before the update.
+
+**About AIOSources** shows the release followed by the build, for example `2.3.0.977dd1727684`. Select the build identifier to open its GitHub release and find the corresponding image.
+
+The application-name upgrade preserves source data, saved progress, credentials and sessions automatically; it does not require importing your catalog again. Keep your existing database connection and data volume. If several instances use the same database, update them together. After this upgrade, an older image cannot use the renamed database: restore the backup made before upgrading if you need to return to that image.
 
 ## Upgrade from V1
 

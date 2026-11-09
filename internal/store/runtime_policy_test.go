@@ -19,13 +19,13 @@ func TestExtendedSettingsMigrationPreservesPoliciesAndSavedImports(t *testing.T)
 	if err := db.migrateThrough(ctx, 73); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.runtime_settings SET values=jsonb_set(values,'{days}','14'),revision=8 WHERE section='history'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runtime_settings SET values=jsonb_set(values,'{days}','14'),revision=8 WHERE section='history'`); err != nil {
 		t.Fatal(err)
 	}
 	// Historical fixtures use their original schema, not a current writer that
 	// snapshots settings introduced by later migrations.
 	run := model.Run{ID: "migration-run", ProviderID: "migration-source", Cursor: []byte(`{"page": 7}`), Status: model.StatusRunning}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,cursor) VALUES($1,$2,$2,'full','running','','{"version":1,"id":"migration-source","adapter":"json"}',$3)`, run.ID, run.ProviderID, run.Cursor); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,cursor) VALUES($1,$2,$2,'full','running','','{"version":1,"id":"migration-source","adapter":"json"}',$3)`, run.ID, run.ProviderID, run.Cursor); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
@@ -187,7 +187,7 @@ func TestMetadataQueueAndDeferredRetryUseSavedBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 	var due time.Time
-	if err := db.pool.QueryRow(ctx, `SELECT next_attempt FROM ingest.aio_metadata_jobs WHERE media_type=$1 AND tmdb_id=$2`, jobs[0].Type, jobs[0].ID).Scan(&due); err != nil || time.Until(due) < 118*time.Second || time.Until(due) > 121*time.Second {
+	if err := db.pool.QueryRow(ctx, `SELECT next_attempt FROM aiosources.aio_metadata_jobs WHERE media_type=$1 AND tmdb_id=$2`, jobs[0].Type, jobs[0].ID).Scan(&due); err != nil || time.Until(due) < 118*time.Second || time.Until(due) > 121*time.Second {
 		t.Fatal("retry policy ignored", err)
 	}
 }
@@ -235,7 +235,7 @@ func TestHistoryCleanupUsesConfiguredTableBatch(t *testing.T) {
 	if err := db.UpdateRuntimeSection(ctx, "history", policy); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,created_at)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,created_at)
  SELECT 'test-cleanup-'||n,'info','test.cleanup','Synthetic cleanup record',now()-interval '8 days' FROM generate_series(1,201)n`); err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestHistoryCleanupUsesConfiguredTableBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var remaining int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='test.cleanup'`).Scan(&remaining); err != nil || remaining != 101 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='test.cleanup'`).Scan(&remaining); err != nil || remaining != 101 {
 		t.Fatal("cleanup ignored the configured table batch", remaining, err)
 	}
 }

@@ -14,12 +14,12 @@ import (
 // Only optional query accelerators belong here. Identity, uniqueness, foreign
 // key, recovery and publication indexes cannot be disabled by configuration.
 var optionalStorageIndexes = []struct{ name, definition string }{
-	{"torrents_fulltext", `ON ingest.torrents USING GIN(search_document)`},
-	{"torrents_fragments", `ON ingest.torrents USING GIN(ingest.torrent_search_text(provider_id,source_id,fields) public.gin_trgm_ops)`},
-	{"torrents_categories", `ON ingest.torrents USING GIN(search_categories)`},
-	{"torrents_size", `ON ingest.torrents((ingest.torrent_integer_key(search_size) COLLATE "C")) WHERE search_size IS NOT NULL`},
-	{"torrents_published_at", `ON ingest.torrents(search_published_at,provider_id,source_id) WHERE search_published_at IS NOT NULL`},
-	{"raw_records_fragments", `ON ingest.raw_records USING GIN(ingest.raw_search_text(source_id,fields,error) public.gin_trgm_ops)`},
+	{"torrents_fulltext", `ON aiosources.torrents USING GIN(search_document)`},
+	{"torrents_fragments", `ON aiosources.torrents USING GIN(aiosources.torrent_search_text(provider_id,source_id,fields) public.gin_trgm_ops)`},
+	{"torrents_categories", `ON aiosources.torrents USING GIN(search_categories)`},
+	{"torrents_size", `ON aiosources.torrents((aiosources.torrent_integer_key(search_size) COLLATE "C")) WHERE search_size IS NOT NULL`},
+	{"torrents_published_at", `ON aiosources.torrents(search_published_at,provider_id,source_id) WHERE search_published_at IS NOT NULL`},
+	{"raw_records_fragments", `ON aiosources.raw_records USING GIN(aiosources.raw_search_text(source_id,fields,error) public.gin_trgm_ops)`},
 }
 
 func validStorageIndexes(input model.StorageIndexSettings) bool {
@@ -37,7 +37,7 @@ func validStorageIndexes(input model.StorageIndexSettings) bool {
 func (s *Store) StorageIndexes(ctx context.Context) (model.StorageIndexSettings, error) {
 	var result model.StorageIndexSettings
 	var encoded, failures []byte
-	if err := s.pool.QueryRow(ctx, `SELECT revision,values,errors FROM ingest.storage_index_settings WHERE singleton`).Scan(&result.Revision, &encoded, &failures); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT revision,values,errors FROM aiosources.storage_index_settings WHERE singleton`).Scan(&result.Revision, &encoded, &failures); err != nil {
 		return result, databaseError("read optional index settings", err)
 	}
 	if json.Unmarshal(encoded, &result.Values) != nil || !validStorageIndexes(result) {
@@ -55,7 +55,7 @@ func (s *Store) StorageIndexes(ctx context.Context) (model.StorageIndexSettings,
 	rows, err := s.pool.Query(ctx, `SELECT configured.name,c.oid IS NOT NULL,i.indisvalid IS TRUE,
  CASE WHEN c.oid IS NULL THEN 0 ELSE pg_relation_size(c.oid) END
  FROM unnest($1::text[]) WITH ORDINALITY AS configured(name,position)
- LEFT JOIN pg_class c ON c.relname=configured.name AND c.relnamespace='ingest'::regnamespace
+ LEFT JOIN pg_class c ON c.relname=configured.name AND c.relnamespace='aiosources'::regnamespace
  LEFT JOIN pg_index i ON i.indexrelid=c.oid ORDER BY configured.position`, names)
 	if err != nil {
 		return result, databaseError("measure optional indexes", err)
@@ -83,7 +83,7 @@ func (s *Store) UpdateStorageIndexes(ctx context.Context, input model.StorageInd
 	if err != nil {
 		return model.ErrInvalid
 	}
-	result, err := s.pool.Exec(ctx, `UPDATE ingest.storage_index_settings SET values=$1,errors='{}'::jsonb,revision=revision+1 WHERE singleton AND revision=$2`, encoded, input.Revision)
+	result, err := s.pool.Exec(ctx, `UPDATE aiosources.storage_index_settings SET values=$1,errors='{}'::jsonb,revision=revision+1 WHERE singleton AND revision=$2`, encoded, input.Revision)
 	if err != nil {
 		return databaseError("save optional index settings", err)
 	}
@@ -134,7 +134,7 @@ func (s *Store) ReconcileStorageIndexes(ctx context.Context) (bool, error) {
 		}
 		// An interrupted concurrent build may leave an invalid index. Dropping
 		// it first makes the next build recoverable rather than silently skipped.
-		name := pgx.Identifier{"ingest", index.Name}.Sanitize()
+		name := pgx.Identifier{"aiosources", index.Name}.Sanitize()
 		if _, err = conn.Exec(ctx, `DROP INDEX CONCURRENTLY IF EXISTS `+name); err != nil {
 			s.storageIndexResult(ctx, index.Name, err)
 			return false, databaseError("remove optional index", err)
@@ -164,5 +164,5 @@ func (s *Store) storageIndexResult(ctx context.Context, name string, cause error
 	if cause != nil {
 		message = "This index could not be changed. Check database permissions and free disk space; the change will be retried."
 	}
-	_, _ = s.pool.Exec(ctx, `UPDATE ingest.storage_index_settings SET errors=CASE WHEN $2='' THEN errors-$1 ELSE jsonb_set(errors,ARRAY[$1],to_jsonb($2::text)) END WHERE singleton AND COALESCE(errors->>$1,'')<>$2`, name, message)
+	_, _ = s.pool.Exec(ctx, `UPDATE aiosources.storage_index_settings SET errors=CASE WHEN $2='' THEN errors-$1 ELSE jsonb_set(errors,ARRAY[$1],to_jsonb($2::text)) END WHERE singleton AND COALESCE(errors->>$1,'')<>$2`, name, message)
 }

@@ -18,14 +18,14 @@ func TestDebridServicesUpgradePreservesConfigurationAndHistory(t *testing.T) {
 	if err = db.migrateThrough(ctx, 74); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.settings(key,value) VALUES('aiosource.config.v2','{"revision":4,"alldebrid_secret":"existing-ad","torbox_secret":"existing-tb"}');
-INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]');
-INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finished_at) VALUES('old','cache','torbox','manual',1,'succeeded',now());`); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('aiosource.config.v2','{"revision":4,"alldebrid_secret":"existing-ad","torbox_secret":"existing-tb"}');
+INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]');
+INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,finished_at) VALUES('old','cache','torbox','manual',1,'succeeded',now());`); err != nil {
 		t.Fatal(err)
 	}
 	snapshot := func() string {
 		var v string
-		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('settings',(SELECT jsonb_agg(to_jsonb(s)) FROM ingest.settings s),'history',(SELECT jsonb_agg(to_jsonb(r)) FROM ingest.operation_runs r),'cache',(SELECT jsonb_agg(to_jsonb(c)-'catalog_import_source') FROM ingest.aio_shared_availability c))::text`).Scan(&v); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT jsonb_build_object('settings',(SELECT jsonb_agg(to_jsonb(s)) FROM aiosources.settings s),'history',(SELECT jsonb_agg(to_jsonb(r)) FROM aiosources.operation_runs r),'cache',(SELECT jsonb_agg(to_jsonb(c)-'catalog_import_source') FROM aiosources.aio_shared_availability c))::text`).Scan(&v); err != nil {
 			t.Fatal(err)
 		}
 		return v

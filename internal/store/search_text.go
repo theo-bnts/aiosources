@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-const torrentSearchTextSQL = "ingest.torrent_search_text(provider_id,source_id,fields)"
+const torrentSearchTextSQL = "aiosources.torrent_search_text(provider_id,source_id,fields)"
 
 type torrentSearchTerm struct {
 	text     string
@@ -84,7 +84,7 @@ func torrentTextSearchSQLFor(alias, query string, bind func(any) string) string 
 	}
 	document := torrentSearchTextSQL
 	if prefix != "" {
-		document = "ingest.torrent_search_text(" + prefix + "provider_id," + prefix + "source_id," + prefix + "fields)"
+		document = "aiosources.torrent_search_text(" + prefix + "provider_id," + prefix + "source_id," + prefix + "fields)"
 	}
 	var alternatives []string
 	for _, group := range torrentSearchGroups(query) {

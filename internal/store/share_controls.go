@@ -70,7 +70,7 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	candidate := sharingPasswordHash(shareID, password)
 	// Unauthenticated requests must never queue for a recipient's row lock.
 	// A normal MVCC read can reject them while an active download holds it.
-	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp() FROM ingest.shares WHERE id=$1 AND format=$2`, shareID, format).Scan(&hash, &enabled, &unexpired)
+	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp() FROM aiosources.shares WHERE id=$1 AND format=$2`, shareID, format).Scan(&hash, &enabled, &unexpired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
 	}
@@ -90,7 +90,7 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	var preferencesJSON []byte
 	// Recheck under the lock: rotation, revocation and expiry may have changed
 	// since the first read. Admissions and quota changes remain atomic.
-	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads,torznab_preferences FROM ingest.shares WHERE id=$1 AND format=$2 FOR UPDATE`, shareID, format).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent, &preferencesJSON)
+	err = tx.QueryRow(ctx, `SELECT password_hash,enabled,expires_at IS NULL OR expires_at>clock_timestamp(),revision,requests_per_minute,max_concurrent_downloads,torznab_preferences FROM aiosources.shares WHERE id=$1 AND format=$2 FOR UPDATE`, shareID, format).Scan(&hash, &enabled, &unexpired, &revision, &requests, &concurrent, &preferencesJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrCatalogAuthentication
 	}
@@ -114,12 +114,12 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&now); err != nil {
 		return nil, databaseError("read catalogue quota clock", err)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM ingest.share_requests WHERE share_id=$1 AND requested_at<=$2 AND (lease_until IS NULL OR lease_until<=$3)`, shareID, now.Add(-time.Minute), now); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM aiosources.share_requests WHERE share_id=$1 AND requested_at<=$2 AND (lease_until IS NULL OR lease_until<=$3)`, shareID, now.Add(-time.Minute), now); err != nil {
 		return nil, databaseError("expire catalogue admission", err)
 	}
 	var recent, active int
 	var firstRequest, firstLease *time.Time
-	err = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE requested_at>$2),count(*) FILTER (WHERE lease_until>$3),min(requested_at) FILTER (WHERE requested_at>$2),min(lease_until) FILTER (WHERE lease_until>$3) FROM ingest.share_requests WHERE share_id=$1`, shareID, now.Add(-time.Minute), now).Scan(&recent, &active, &firstRequest, &firstLease)
+	err = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE requested_at>$2),count(*) FILTER (WHERE lease_until>$3),min(requested_at) FILTER (WHERE requested_at>$2),min(lease_until) FILTER (WHERE lease_until>$3) FROM aiosources.share_requests WHERE share_id=$1`, shareID, now.Add(-time.Minute), now).Scan(&recent, &active, &firstRequest, &firstLease)
 	if err != nil {
 		return nil, databaseError("read catalogue admission", err)
 	}
@@ -139,11 +139,11 @@ func (s *Store) beginShareRequest(ctx context.Context, shareID, password, format
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO ingest.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,$3,$4)`, id, shareID, now, now.Add(timeout+5*time.Second)); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO aiosources.share_requests(id,share_id,requested_at,lease_until) VALUES($1,$2,$3,$4)`, id, shareID, now, now.Add(timeout+5*time.Second)); err != nil {
 		return nil, databaseError("reserve catalogue download", err)
 	}
 	if format == "stremio" {
-		if _, err = tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp() WHERE id=$1`, shareID); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.shares SET last_access_at=clock_timestamp() WHERE id=$1`, shareID); err != nil {
 			return nil, databaseError("record Stremio access", err)
 		}
 	}
@@ -160,7 +160,7 @@ func (d *CatalogDownload) Validate(ctx context.Context) error {
 	ctx, cancel := context.WithDeadline(ctx, d.deadline)
 	defer cancel()
 	var allowed bool
-	err := d.store.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.shares s JOIN ingest.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp())`, d.shareID, d.revision, d.id).Scan(&allowed)
+	err := d.store.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.shares s JOIN aiosources.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp())`, d.shareID, d.revision, d.id).Scan(&allowed)
 	if err != nil {
 		return databaseError("validate catalogue delivery", err)
 	}
@@ -174,7 +174,7 @@ func (d *CatalogDownload) Close() error {
 	d.closeOnce.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		_, err := d.store.pool.Exec(ctx, `UPDATE ingest.share_requests SET lease_until=NULL WHERE id=$1 AND share_id=$2`, d.id, d.shareID)
+		_, err := d.store.pool.Exec(ctx, `UPDATE aiosources.share_requests SET lease_until=NULL WHERE id=$1 AND share_id=$2`, d.id, d.shareID)
 		d.closeErr = databaseError("release catalogue download", err)
 	})
 	return d.closeErr

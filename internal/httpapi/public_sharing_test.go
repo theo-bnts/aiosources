@@ -43,7 +43,7 @@ func TestPublicSharingRoutesRequireTheirOwnCredentialAndPreservePrivateData(t *t
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('alpha','https://private.invalid/?apikey=private-native-secret','{"title":"Example Alpha","size":10,"info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","download_url":"https://private.invalid/admin-download","magnet":"magnet:?tr=https://admin.invalid/passkey/announce"}'),('beta','two','{"title":"Example Beta","size":20}')`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('alpha','https://private.invalid/?apikey=private-native-secret','{"title":"Example Alpha","size":10,"info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","download_url":"https://private.invalid/admin-download","magnet":"magnet:?tr=https://admin.invalid/passkey/announce"}'),('beta','two','{"title":"Example Beta","size":20}')`); err != nil {
 		t.Fatal(err)
 	}
 	for _, origin := range []string{"", "https://untrusted.example"} {
@@ -112,12 +112,12 @@ func TestPublicSharingRoutesRequireTheirOwnCredentialAndPreservePrivateData(t *t
 	}
 	for _, table := range []string{"shares", "share_requests", "secrets"} {
 		var count int
-		if err := conn.QueryRow(f.ctx, "SELECT count(*) FROM ingest."+table).Scan(&count); err != nil || count != 0 {
+		if err := conn.QueryRow(f.ctx, "SELECT count(*) FROM aiosources."+table).Scan(&count); err != nil || count != 0 {
 			t.Fatal("visitor state was saved", table, err)
 		}
 	}
 	var logs string
-	if err := conn.QueryRow(f.ctx, `SELECT COALESCE(jsonb_agg(to_jsonb(l))::text,'[]') FROM ingest.activity_logs l`).Scan(&logs); err != nil {
+	if err := conn.QueryRow(f.ctx, `SELECT COALESCE(jsonb_agg(to_jsonb(l))::text,'[]') FROM aiosources.activity_logs l`).Scan(&logs); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(logs, "catalog.public_exported") || !strings.Contains(logs, "Public catalog page exported") || strings.Contains(logs, connection.Password) || strings.Contains(logs, endpoint.Path) || strings.Contains(logs, "private-native-secret") {

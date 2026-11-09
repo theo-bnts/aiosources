@@ -125,7 +125,7 @@ func TestPublishedStreamMetadataUsesOrdinaryAndTorznabLanguageFields(t *testing.
 	ctx, service, connection := testService(t)
 	fields := map[string]any{"title": "Example.Movie.2021.1080p.WEB-DL", "info_hash": strings.Repeat("b", 40), "size": 1234, "published_at": "2026-10-09T14:00:00+02:00", "duration": "5400.25", "audiolangs": []string{"fra"}, "languages": []string{"eng"}, "attributes": map[string]any{"language": []string{"deu", "eng"}, "private_key": "not-for-publication"}}
 	data, _ := json.Marshal(fields)
-	if _, err := connection.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','1',$1)`, data); err != nil {
+	if _, err := connection.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','1',$1)`, data); err != nil {
 		t.Fatal(err)
 	}
 	record, err := service.DB.AIOTorrent(ctx, "example", "1")
@@ -142,7 +142,7 @@ func TestPublishedStreamMetadataUsesOrdinaryAndTorznabLanguageFields(t *testing.
 	}
 	fields["published_at"], fields["duration"] = "invalid", "NaN"
 	data, _ = json.Marshal(fields)
-	if _, err := connection.Exec(ctx, `UPDATE ingest.torrents SET fields=$1 WHERE provider_id='example'`, data); err != nil {
+	if _, err := connection.Exec(ctx, `UPDATE aiosources.torrents SET fields=$1 WHERE provider_id='example'`, data); err != nil {
 		t.Fatal(err)
 	}
 	record, err = service.DB.AIOTorrent(ctx, "example", "1")

@@ -9,13 +9,13 @@ test('real book identification publishes ebooks and audiobooks to the same Searc
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
-    INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,book_normalized,years,book_data)
+    await db.query(`INSERT INTO aiosources.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
+    INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,book_normalized,years,book_data)
     VALUES('book','OL100W','The Amber Orchard','the amber orchard',ARRAY[2024],'{"author_keys":["OL200A"]}');
-    INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,author_keys,year)
+    INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,author_keys,year)
     VALUES('OL300M',ARRAY['OL100W'],'The Amber Orchard','the amber orchard',ARRAY['OL200A'],2024);
-    UPDATE ingest.ol_import_state SET complete=TRUE,data_complete=TRUE,works=1,last_sync=now();
-    INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+    UPDATE aiosources.ol_import_state SET complete=TRUE,data_complete=TRUE,works=1,last_sync=now();
+    INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
     ('fixture','ebook','{"title":"Morgan.Vale.The.Amber.Orchard.2024.FRENCH.EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100}'),
     ('fixture','audio','{"title":"Morgan Vale - The Amber Orchard [MP3.128]","categories":[7020],"info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200}');`)
   } finally {

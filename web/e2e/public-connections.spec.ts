@@ -44,7 +44,7 @@ test('public connections share the shell and encrypted Torznab filters without v
   const visitor = await context.newPage()
   try {
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('private-example','one','{"title":"Example Feature 2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`,
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('private-example','one','{"title":"Example Feature 2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`,
     )
     await page.goto('/public-access')
     const access = page.getByRole('form', { name: 'Public access', exact: true })
@@ -154,7 +154,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(key).not.toHaveValue('')
     credential = await key.inputValue()
     const counts = await db.query(
-      'SELECT (SELECT count(*) FROM ingest.shares)::int AS grants,(SELECT count(*) FROM ingest.share_requests)::int AS requests',
+      'SELECT (SELECT count(*) FROM aiosources.shares)::int AS grants,(SELECT count(*) FROM aiosources.share_requests)::int AS requests',
     )
     expect(counts.rows[0]).toEqual({ grants: 0, requests: 0 })
     await visitor.screenshot({

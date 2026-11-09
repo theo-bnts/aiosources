@@ -90,10 +90,10 @@ func TestConnectionDefaultsUpgradePreservesNamedAccessAndExplicitPolicies(t *tes
 	}
 	requests, concurrent := 17, 3
 	grant := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing connection", Enabled: true, Scope: "all", Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET format='stremio',requests_per_minute=$2,max_concurrent_downloads=$3,stream_preferences='{"mode":"all","cached_only":true}' WHERE id=$1`, grant.Share.ID, requests, concurrent); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='stremio',requests_per_minute=$2,max_concurrent_downloads=$3,stream_preferences='{"mode":"all","cached_only":true}' WHERE id=$1`, grant.Share.ID, requests, concurrent); err != nil {
 		t.Fatal("prepare historical named access", err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.secrets(name,ciphertext) VALUES('aiosource_installation','obsolete credential'::bytea)`); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.secrets(name,ciphertext) VALUES('aiosource_installation','obsolete credential'::bytea)`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {
@@ -104,7 +104,7 @@ func TestConnectionDefaultsUpgradePreservesNamedAccessAndExplicitPolicies(t *tes
 		t.Fatal("upgrade changed a saved policy or invalidated a named key", err)
 	}
 	var retained bool
-	if err = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.secrets WHERE name='aiosource_installation')`).Scan(&retained); err != nil || retained {
+	if err = db.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.secrets WHERE name='aiosource_installation')`).Scan(&retained); err != nil || retained {
 		t.Fatal("obsolete global key retained", err)
 	}
 	if _, err = db.CreateShare(context.Background(), model.ShareInput{Name: "Catalog", Scope: "all", Fields: CatalogFields(), RequestsPerMinute: new(0)}); !errors.Is(err, model.ErrInvalid) {

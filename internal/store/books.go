@@ -40,23 +40,23 @@ func (s *Store) RecordBookInformationActivity(ctx context.Context, updateErr err
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,title,service,data) VALUES($1,$2,$3,$4,'Book information update','openlibrary',jsonb_build_object('records',$5::bigint))`, "activity-"+id, level, kind, message, processed)
+	_, err = s.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,title,service,data) VALUES($1,$2,$3,$4,'Book information update','openlibrary',jsonb_build_object('records',$5::bigint))`, "activity-"+id, level, kind, message, processed)
 	return databaseError("record book information activity", err)
 }
 
 func (s *Store) OpenLibraryStatus(ctx context.Context) (model.OpenLibraryStatus, error) {
 	var out model.OpenLibraryStatus
 	err := s.pool.QueryRow(ctx, `SELECT i.snapshot,i.position,i.imported,i.works,i.editions,i.authors,COALESCE(c.last_sync,i.last_sync),COALESCE(NULLIF(i.error,''),c.error),i.complete,i.skipped,
- i.generation,i.snapshot_at,i.data_complete,i.last_sync,c.changes_through,(SELECT count(*) FROM ingest.ol_change_jobs),NOT c.bootstrap_complete,c.needs_dump_after IS NOT NULL,
+ i.generation,i.snapshot_at,i.data_complete,i.last_sync,c.changes_through,(SELECT count(*) FROM aiosources.ol_change_jobs),NOT c.bootstrap_complete,c.needs_dump_after IS NOT NULL,
  i.selection,i.export_phase,i.phase_snapshot,i.phase_etag,i.phase_position,i.filtered
- FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`).Scan(&out.Snapshot, &out.Position, &out.Imported, &out.Works, &out.Editions, &out.Authors, &out.LastSync, &out.Error, &out.Complete, &out.Skipped, &out.Generation, &out.SnapshotAt, &out.DataComplete, &out.LastImport, &out.ChangesThrough, &out.Pending, &out.CatchingUp, &out.NeedsExport, &out.Selection, &out.ExportPhase, &out.PhaseSnapshot, &out.PhaseETag, &out.PhasePosition, &out.Filtered)
+ FROM aiosources.ol_import_state i CROSS JOIN aiosources.ol_changes_state c WHERE i.singleton AND c.singleton`).Scan(&out.Snapshot, &out.Position, &out.Imported, &out.Works, &out.Editions, &out.Authors, &out.LastSync, &out.Error, &out.Complete, &out.Skipped, &out.Generation, &out.SnapshotAt, &out.DataComplete, &out.LastImport, &out.ChangesThrough, &out.Pending, &out.CatchingUp, &out.NeedsExport, &out.Selection, &out.ExportPhase, &out.PhaseSnapshot, &out.PhaseETag, &out.PhasePosition, &out.Filtered)
 	return out, databaseError("read book information progress", err)
 }
 
 func (s *Store) OpenLibraryCheckpoint(ctx context.Context) (string, string, int64, error) {
 	var snapshot, etag string
 	var position int64
-	err := s.pool.QueryRow(ctx, `SELECT snapshot,etag,position FROM ingest.ol_import_state WHERE singleton`).Scan(&snapshot, &etag, &position)
+	err := s.pool.QueryRow(ctx, `SELECT snapshot,etag,position FROM aiosources.ol_import_state WHERE singleton`).Scan(&snapshot, &etag, &position)
 	return snapshot, etag, position, err
 }
 
@@ -78,10 +78,10 @@ func (s *Store) NextOpenLibraryUpdate(ctx context.Context, minutes int) (time.Ti
 	err := s.pool.QueryRow(ctx, `SELECT GREATEST(i.retry_at,c.provider_retry_at,LEAST(
  CASE WHEN NOT i.complete THEN now() END,
  GREATEST(c.retry_at,COALESCE(c.checked_at+make_interval(mins=>$1),now())),
- (SELECT min(next_attempt) FROM ingest.ol_change_jobs),
+ (SELECT min(next_attempt) FROM aiosources.ol_change_jobs),
  CASE WHEN NOT c.bootstrap_complete AND c.needs_dump_after IS NULL THEN GREATEST(now(),c.retry_at) END,
  CASE WHEN c.needs_dump_after IS NOT NULL THEN COALESCE(c.dump_checked_at+interval '1 day',now()) END
- )) FROM ingest.ol_import_state i CROSS JOIN ingest.ol_changes_state c WHERE i.singleton AND c.singleton`, minutes).Scan(&next)
+ )) FROM aiosources.ol_import_state i CROSS JOIN aiosources.ol_changes_state c WHERE i.singleton AND c.singleton`, minutes).Scan(&next)
 	return next, databaseError("read book update schedule", err)
 }
 
@@ -94,7 +94,7 @@ func (s *Store) BeginOpenLibrary(ctx context.Context, snapshot, etag string) (in
 	if at, ok := books.ExportDate(snapshot); ok {
 		snapshotAt = &at
 	}
-	err := s.pool.QueryRow(ctx, `UPDATE ingest.ol_import_state SET position=CASE WHEN snapshot=$1 AND etag=$2 THEN position ELSE 0 END,
+	err := s.pool.QueryRow(ctx, `UPDATE aiosources.ol_import_state SET position=CASE WHEN snapshot=$1 AND etag=$2 THEN position ELSE 0 END,
  imported=CASE WHEN snapshot=$1 AND etag=$2 THEN imported ELSE 0 END,skipped=CASE WHEN snapshot=$1 AND etag=$2 THEN skipped ELSE 0 END,
  generation=CASE WHEN snapshot=$1 AND etag=$2 AND generation>0 THEN generation ELSE generation+1 END,
  data_complete=CASE WHEN snapshot=$1 AND etag=$2 THEN data_complete ELSE FALSE END,
@@ -129,13 +129,13 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 		return err
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		return err
 	}
 	var current int64
 	var source string
 	var refresh bool
-	if err = tx.QueryRow(ctx, `SELECT snapshot,position,last_sync IS NOT NULL FROM ingest.ol_import_state WHERE singleton FOR UPDATE`).Scan(&source, &current, &refresh); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT snapshot,position,last_sync IS NOT NULL FROM aiosources.ol_import_state WHERE singleton FOR UPDATE`).Scan(&source, &current, &refresh); err != nil {
 		return err
 	}
 	if source != snapshot || current != expected {
@@ -143,7 +143,7 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 	}
 	if phase > 0 {
 		var actual int
-		if err = tx.QueryRow(ctx, `SELECT export_phase FROM ingest.ol_import_state WHERE singleton`).Scan(&actual); err != nil {
+		if err = tx.QueryRow(ctx, `SELECT export_phase FROM aiosources.ol_import_state WHERE singleton`).Scan(&actual); err != nil {
 			return err
 		}
 		if actual != phase {
@@ -151,19 +151,19 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 		}
 	}
 	var generation int64
-	if err = tx.QueryRow(ctx, `SELECT generation FROM ingest.ol_import_state WHERE singleton`).Scan(&generation); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT generation FROM aiosources.ol_import_state WHERE singleton`).Scan(&generation); err != nil {
 		return err
 	}
 	delta, imported, skipped, err := saveOpenLibraryRecords(ctx, tx, records, refresh, generation)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET position=$1,imported=imported+$2,works=works+$3,editions=editions+$4,authors=authors+$5,skipped=skipped+$6 WHERE singleton`, position, imported, delta[0], delta[1], delta[2], skipped)
+	_, err = tx.Exec(ctx, `UPDATE aiosources.ol_import_state SET position=$1,imported=imported+$2,works=works+$3,editions=editions+$4,authors=authors+$5,skipped=skipped+$6 WHERE singleton`, position, imported, delta[0], delta[1], delta[2], skipped)
 	if err != nil {
 		return err
 	}
 	if phase > 0 {
-		if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET phase_position=$1,filtered=filtered+$2 WHERE singleton`, phasePosition, filtered); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.ol_import_state SET phase_position=$1,filtered=filtered+$2 WHERE singleton`, phasePosition, filtered); err != nil {
 			return err
 		}
 		keys := []string{}
@@ -183,7 +183,7 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 			}
 		}
 		if len(keys) > 0 {
-			if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_import_references SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`, keys); err != nil {
+			if _, err = tx.Exec(ctx, `INSERT INTO aiosources.ol_import_references SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`, keys); err != nil {
 				return err
 			}
 		}
@@ -196,12 +196,12 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 				if table == "ol_redirects" {
 					key = "source"
 				}
-				if _, err = tx.Exec(ctx, `UPDATE ingest.`+table+` SET ol_seen=$1 WHERE `+key+`=ANY($2::text[])`, generation, preserved); err != nil {
+				if _, err = tx.Exec(ctx, `UPDATE aiosources.`+table+` SET ol_seen=$1 WHERE `+key+`=ANY($2::text[])`, generation, preserved); err != nil {
 					return err
 				}
 			}
-			if _, err = tx.Exec(ctx, `INSERT INTO ingest.ol_import_references
- SELECT jsonb_array_elements_text(book_data->'author_keys') FROM ingest.aio_works WHERE openlibrary_id=ANY($1::text[]) AND media_type='book'
+			if _, err = tx.Exec(ctx, `INSERT INTO aiosources.ol_import_references
+ SELECT jsonb_array_elements_text(book_data->'author_keys') FROM aiosources.aio_works WHERE openlibrary_id=ANY($1::text[]) AND media_type='book'
  ON CONFLICT DO NOTHING`, preserved); err != nil {
 				return err
 			}
@@ -229,7 +229,7 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 	}
 	counts := func() ([3]int64, error) {
 		var n [3]int64
-		err := tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=ANY($1::text[])),(SELECT count(*) FROM ingest.ol_editions WHERE id=ANY($1::text[])),(SELECT count(*) FROM ingest.ol_authors WHERE id=ANY($1::text[]))`, keys).Scan(&n[0], &n[1], &n[2])
+		err := tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=ANY($1::text[])),(SELECT count(*) FROM aiosources.ol_editions WHERE id=ANY($1::text[])),(SELECT count(*) FROM aiosources.ol_authors WHERE id=ANY($1::text[]))`, keys).Scan(&n[0], &n[1], &n[2])
 		return n, err
 	}
 	before, err := counts()
@@ -247,19 +247,19 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			return
 		}
 		batch.Queue(`WITH changed AS (`+statement+` RETURNING `+columns+`),affected AS (
-       UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND EXISTS(SELECT 1 FROM changed) AND (`+related+`) RETURNING w.id
-      ) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, args...)
+       UPDATE aiosources.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND EXISTS(SELECT 1 FROM changed) AND (`+related+`) RETURNING w.id
+      ) INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, args...)
 	}
 	invalidate := func(key string) {
 		if !refresh {
 			return
 		}
 		batch.Queue(`WITH affected AS (
-     UPDATE ingest.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND (
-      w.openlibrary_id=$1 OR w.openlibrary_id=ingest.ol_resolve($1) OR (w.book_data->'author_keys') ?| ingest.ol_aliases($1)
-      OR w.openlibrary_id IN(SELECT ingest.ol_resolve(unnest(e.work_keys)) FROM ingest.ol_editions e WHERE e.id=$1)
+     UPDATE aiosources.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND (
+      w.openlibrary_id=$1 OR w.openlibrary_id=aiosources.ol_resolve($1) OR (w.book_data->'author_keys') ?| aiosources.ol_aliases($1)
+      OR w.openlibrary_id IN(SELECT aiosources.ol_resolve(unnest(e.work_keys)) FROM aiosources.ol_editions e WHERE e.id=$1)
      ) RETURNING id
-    ) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, key)
+    ) INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, key)
 	}
 	nw, ne, na, skipped := int64(0), int64(0), int64(0), int64(0)
 	seenKeys := []string{}
@@ -273,12 +273,12 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			versions[key] = r.Revision
 			accepted = append(accepted, r)
 			if r.Deleted == "" {
-				batch.Queue(`DELETE FROM ingest.ol_deleted WHERE id=$1`, key)
+				batch.Queue(`DELETE FROM aiosources.ol_deleted WHERE id=$1`, key)
 			}
 			if r.Redirect == nil {
 				// An unmerge can restore a former alias as a standalone entry.
 				invalidate(key)
-				batch.Queue(`DELETE FROM ingest.ol_redirects WHERE source=$1`, key)
+				batch.Queue(`DELETE FROM aiosources.ol_redirects WHERE source=$1`, key)
 			}
 		}
 		switch {
@@ -287,22 +287,22 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 		case r.Redirect != nil:
 			rd := r.Redirect
 			invalidate(rd.Source)
-			batch.Queue(`INSERT INTO ingest.ol_redirects(source,target,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(source) DO UPDATE SET target=EXCLUDED.target,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at`, rd.Source, rd.Target, r.Revision, generation, r.Modified)
-			batch.Queue(`INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.aio_matches WHERE work_id=(SELECT id FROM ingest.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, rd.Source)
-			batch.Queue(`DELETE FROM ingest.aio_works WHERE openlibrary_id=$1`, rd.Source)
-			batch.Queue(`DELETE FROM ingest.ol_editions WHERE id=$1`, rd.Source)
-			batch.Queue(`DELETE FROM ingest.ol_authors WHERE id=$1`, rd.Source)
+			batch.Queue(`INSERT INTO aiosources.ol_redirects(source,target,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(source) DO UPDATE SET target=EXCLUDED.target,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at`, rd.Source, rd.Target, r.Revision, generation, r.Modified)
+			batch.Queue(`INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.aio_matches WHERE work_id=(SELECT id FROM aiosources.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, rd.Source)
+			batch.Queue(`DELETE FROM aiosources.aio_works WHERE openlibrary_id=$1`, rd.Source)
+			batch.Queue(`DELETE FROM aiosources.ol_editions WHERE id=$1`, rd.Source)
+			batch.Queue(`DELETE FROM aiosources.ol_authors WHERE id=$1`, rd.Source)
 		case r.Author != nil:
 			a := r.Author
 			na++
-			saveEntity(`INSERT INTO ingest.ol_authors(id,name,aliases,normalized,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,aliases=EXCLUDED.aliases,normalized=EXCLUDED.normalized,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at WHERE ingest.ol_authors.ol_revision<EXCLUDED.ol_revision OR (ingest.ol_authors.name,ingest.ol_authors.aliases,ingest.ol_authors.normalized) IS DISTINCT FROM (EXCLUDED.name,EXCLUDED.aliases,EXCLUDED.normalized)`, "id", `(w.book_data->'author_keys') ?| ARRAY(SELECT unnest(ingest.ol_aliases(id)) FROM changed)`, a.ID, a.Name, a.Aliases, books.Normalize(strings.Join(append([]string{a.Name}, a.Aliases...), " ")), r.Revision, generation, r.Modified)
+			saveEntity(`INSERT INTO aiosources.ol_authors(id,name,aliases,normalized,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,aliases=EXCLUDED.aliases,normalized=EXCLUDED.normalized,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at WHERE aiosources.ol_authors.ol_revision<EXCLUDED.ol_revision OR (aiosources.ol_authors.name,aiosources.ol_authors.aliases,aiosources.ol_authors.normalized) IS DISTINCT FROM (EXCLUDED.name,EXCLUDED.aliases,EXCLUDED.normalized)`, "id", `(w.book_data->'author_keys') ?| ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM changed)`, a.ID, a.Name, a.Aliases, books.Normalize(strings.Join(append([]string{a.Name}, a.Aliases...), " ")), r.Revision, generation, r.Modified)
 		case r.Work != nil:
 			w := r.Work
 			nw++
 			data, _ := json.Marshal(w.Book)
-			batch.Queue(`WITH changed AS (INSERT INTO ingest.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_data,book_normalized,ol_revision,ol_seen,ol_modified_at) VALUES('book',NULL,$1,$2,$3,$4,$5,$6,$7,$8)
+			batch.Queue(`WITH changed AS (INSERT INTO aiosources.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_data,book_normalized,ol_revision,ol_seen,ol_modified_at) VALUES('book',NULL,$1,$2,$3,$4,$5,$6,$7,$8)
  ON CONFLICT(openlibrary_id) WHERE openlibrary_id<>'' DO UPDATE SET years=EXCLUDED.years,display_title=EXCLUDED.display_title,book_data=EXCLUDED.book_data,book_normalized=EXCLUDED.book_normalized,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at,
- revision=ingest.aio_works.revision+1,updated_at=now() WHERE ingest.aio_works.ol_revision<EXCLUDED.ol_revision OR (ingest.aio_works.years,ingest.aio_works.display_title,ingest.aio_works.book_data) IS DISTINCT FROM (EXCLUDED.years,EXCLUDED.display_title,EXCLUDED.book_data) RETURNING id) INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN changed ON changed.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, w.OpenLibrary, w.Years, w.DisplayTitle, data, books.Normalize(w.DisplayTitle), r.Revision, generation, r.Modified)
+ revision=aiosources.aio_works.revision+1,updated_at=now() WHERE aiosources.aio_works.ol_revision<EXCLUDED.ol_revision OR (aiosources.aio_works.years,aiosources.aio_works.display_title,aiosources.aio_works.book_data) IS DISTINCT FROM (EXCLUDED.years,EXCLUDED.display_title,EXCLUDED.book_data) RETURNING id) INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN changed ON changed.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, w.OpenLibrary, w.Years, w.DisplayTitle, data, books.Normalize(w.DisplayTitle), r.Revision, generation, r.Modified)
 		case r.Edition != nil:
 			e := r.Edition
 			ne++
@@ -310,30 +310,30 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 				// An orphan edition may later be assigned to a canonical work.
 				// Retire its former standalone entry instead of duplicating it.
 				if len(e.Works) == 1 {
-					batch.Queue(`INSERT INTO ingest.ol_redirects(source,target,ol_revision,ol_seen,ol_modified_at) SELECT $1,$2,$3,$4,$5 WHERE EXISTS(SELECT 1 FROM ingest.aio_works WHERE openlibrary_id=$1) ON CONFLICT(source) DO UPDATE SET target=EXCLUDED.target,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at`, e.ID, e.Works[0], r.Revision, generation, r.Modified)
+					batch.Queue(`INSERT INTO aiosources.ol_redirects(source,target,ol_revision,ol_seen,ol_modified_at) SELECT $1,$2,$3,$4,$5 WHERE EXISTS(SELECT 1 FROM aiosources.aio_works WHERE openlibrary_id=$1) ON CONFLICT(source) DO UPDATE SET target=EXCLUDED.target,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at`, e.ID, e.Works[0], r.Revision, generation, r.Modified)
 				}
-				batch.Queue(`INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.aio_matches WHERE work_id=(SELECT id FROM ingest.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, e.ID)
-				batch.Queue(`DELETE FROM ingest.aio_works WHERE openlibrary_id=$1`, e.ID)
+				batch.Queue(`INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.aio_matches WHERE work_id=(SELECT id FROM aiosources.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, e.ID)
+				batch.Queue(`DELETE FROM aiosources.aio_works WHERE openlibrary_id=$1`, e.ID)
 			}
-			saveEntity(`INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn,author_keys,languages,year,format,cover,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			saveEntity(`INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,isbn,author_keys,languages,year,format,cover,ol_revision,ol_seen,ol_modified_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
  ON CONFLICT(id) DO UPDATE SET work_keys=EXCLUDED.work_keys,title=EXCLUDED.title,normalized=EXCLUDED.normalized,isbn=EXCLUDED.isbn,author_keys=EXCLUDED.author_keys,languages=EXCLUDED.languages,year=EXCLUDED.year,format=EXCLUDED.format,cover=EXCLUDED.cover,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at
- WHERE ingest.ol_editions.ol_revision<EXCLUDED.ol_revision OR (ingest.ol_editions.work_keys,ingest.ol_editions.title,ingest.ol_editions.isbn,ingest.ol_editions.author_keys,ingest.ol_editions.languages,ingest.ol_editions.year,ingest.ol_editions.format,ingest.ol_editions.cover)
- IS DISTINCT FROM (EXCLUDED.work_keys,EXCLUDED.title,EXCLUDED.isbn,EXCLUDED.author_keys,EXCLUDED.languages,EXCLUDED.year,EXCLUDED.format,EXCLUDED.cover)`, "work_keys", `w.openlibrary_id IN(SELECT ingest.ol_resolve(unnest(c.work_keys)) FROM changed c UNION SELECT ingest.ol_resolve(unnest(old.work_keys)) FROM ingest.ol_editions old WHERE old.id=$1)`, e.ID, e.Works, e.Title, e.Normalized, e.ISBN, e.Authors, e.Languages, e.Year, e.Format, e.Cover, r.Revision, generation, r.Modified)
+ WHERE aiosources.ol_editions.ol_revision<EXCLUDED.ol_revision OR (aiosources.ol_editions.work_keys,aiosources.ol_editions.title,aiosources.ol_editions.isbn,aiosources.ol_editions.author_keys,aiosources.ol_editions.languages,aiosources.ol_editions.year,aiosources.ol_editions.format,aiosources.ol_editions.cover)
+ IS DISTINCT FROM (EXCLUDED.work_keys,EXCLUDED.title,EXCLUDED.isbn,EXCLUDED.author_keys,EXCLUDED.languages,EXCLUDED.year,EXCLUDED.format,EXCLUDED.cover)`, "work_keys", `w.openlibrary_id IN(SELECT aiosources.ol_resolve(unnest(c.work_keys)) FROM changed c UNION SELECT aiosources.ol_resolve(unnest(old.work_keys)) FROM aiosources.ol_editions old WHERE old.id=$1)`, e.ID, e.Works, e.Title, e.Normalized, e.ISBN, e.Authors, e.Languages, e.Year, e.Format, e.Cover, r.Revision, generation, r.Modified)
 			if len(e.Works) == 1 && e.Works[0] == e.ID {
 				data, _ := json.Marshal(model.BookInformation{AuthorKeys: e.Authors, Cover: e.Cover, Languages: e.Languages})
 				years := []int{}
 				if e.Year != 0 {
 					years = append(years, e.Year)
 				}
-				batch.Queue(`INSERT INTO ingest.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_data,book_normalized,ol_revision,ol_seen,ol_modified_at) VALUES('book',NULL,$1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(openlibrary_id) WHERE openlibrary_id<>'' DO UPDATE SET years=EXCLUDED.years,display_title=EXCLUDED.display_title,book_data=EXCLUDED.book_data,book_normalized=EXCLUDED.book_normalized,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at,revision=ingest.aio_works.revision+1 WHERE ingest.aio_works.ol_revision<EXCLUDED.ol_revision OR (ingest.aio_works.years,ingest.aio_works.display_title,ingest.aio_works.book_data) IS DISTINCT FROM (EXCLUDED.years,EXCLUDED.display_title,EXCLUDED.book_data)`, e.ID, years, e.Title, data, e.Normalized, r.Revision, generation, r.Modified)
+				batch.Queue(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_data,book_normalized,ol_revision,ol_seen,ol_modified_at) VALUES('book',NULL,$1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(openlibrary_id) WHERE openlibrary_id<>'' DO UPDATE SET years=EXCLUDED.years,display_title=EXCLUDED.display_title,book_data=EXCLUDED.book_data,book_normalized=EXCLUDED.book_normalized,ol_revision=EXCLUDED.ol_revision,ol_seen=EXCLUDED.ol_seen,ol_modified_at=EXCLUDED.ol_modified_at,revision=aiosources.aio_works.revision+1 WHERE aiosources.aio_works.ol_revision<EXCLUDED.ol_revision OR (aiosources.aio_works.years,aiosources.aio_works.display_title,aiosources.aio_works.book_data) IS DISTINCT FROM (EXCLUDED.years,EXCLUDED.display_title,EXCLUDED.book_data)`, e.ID, years, e.Title, data, e.Normalized, r.Revision, generation, r.Modified)
 			}
 		case r.Deleted != "":
 			invalidate(r.Deleted)
-			batch.Queue(`INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM ingest.aio_matches WHERE work_id=(SELECT id FROM ingest.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, r.Deleted)
-			batch.Queue(`DELETE FROM ingest.aio_works WHERE openlibrary_id=$1`, r.Deleted)
-			batch.Queue(`DELETE FROM ingest.ol_editions WHERE id=$1`, r.Deleted)
-			batch.Queue(`DELETE FROM ingest.ol_authors WHERE id=$1`, r.Deleted)
-			batch.Queue(`INSERT INTO ingest.ol_deleted(id,ol_revision,ol_modified_at) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET ol_revision=EXCLUDED.ol_revision,ol_modified_at=EXCLUDED.ol_modified_at`, r.Deleted, r.Revision, r.Modified)
+			batch.Queue(`INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.aio_matches WHERE work_id=(SELECT id FROM aiosources.aio_works WHERE openlibrary_id=$1) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, r.Deleted)
+			batch.Queue(`DELETE FROM aiosources.aio_works WHERE openlibrary_id=$1`, r.Deleted)
+			batch.Queue(`DELETE FROM aiosources.ol_editions WHERE id=$1`, r.Deleted)
+			batch.Queue(`DELETE FROM aiosources.ol_authors WHERE id=$1`, r.Deleted)
+			batch.Queue(`INSERT INTO aiosources.ol_deleted(id,ol_revision,ol_modified_at) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET ol_revision=EXCLUDED.ol_revision,ol_modified_at=EXCLUDED.ol_modified_at`, r.Deleted, r.Revision, r.Modified)
 		}
 	}
 	if len(seenKeys) > 0 {
@@ -345,7 +345,7 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 			if table == "ol_redirects" {
 				key = "source"
 			}
-			batch.Queue("UPDATE ingest."+table+" SET ol_seen=$1 WHERE "+key+"=ANY($2::text[]) AND ol_seen<>$1", generation, seenKeys)
+			batch.Queue("UPDATE aiosources."+table+" SET ol_seen=$1 WHERE "+key+"=ANY($2::text[]) AND ol_seen<>$1", generation, seenKeys)
 		}
 	}
 	if err = tx.SendBatch(ctx, batch).Close(); err != nil {
@@ -367,18 +367,18 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 }
 
 func (s *Store) FinishOpenLibrary(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id)
-SELECT t.provider_id,t.source_id FROM ingest.torrents t LEFT JOIN ingest.aio_matches m USING(provider_id,source_id) LEFT JOIN ingest.aio_works w ON w.id=m.work_id
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
+SELECT t.provider_id,t.source_id FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m USING(provider_id,source_id) LEFT JOIN aiosources.aio_works w ON w.id=m.work_id
 WHERE w.media_type='book' OR COALESCE(t.fields->>'media_type',t.fields->>'type','') IN ('book','ebook','audiobook') OR COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m(70[0-9]{2}|3030)\M' OR COALESCE(t.fields->>'category_name','') ~* '\m(books?|livres?|ebooks?|comics?|mangas?)\M' OR t.fields ?| ARRAY['isbn','isbn_10','isbn_13','author','authors'] OR t.fields->>'title' ~* '\m(epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]|m4b|aaxc?|audiobook|ebook|livre audio)\M'
-ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
-UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1;
-UPDATE ingest.ol_import_state SET complete=TRUE,last_sync=now(),checked_at=now(),retry_at=NULL,error='',selection_rebuild=FALSE WHERE singleton;`)
+ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1;
+UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1;
+UPDATE aiosources.ol_import_state SET complete=TRUE,last_sync=now(),checked_at=now(),retry_at=NULL,error='',selection_rebuild=FALSE WHERE singleton;`)
 	return databaseError("finish book information import", err)
 }
 
 func (s *Store) FailOpenLibrary(ctx context.Context, message string, retryAt time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE ingest.ol_import_state SET error=$1,retry_at=$2 WHERE singleton`, message, retryAt)
+	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET error=$1,retry_at=$2 WHERE singleton`, message, retryAt)
 	return err
 }
 

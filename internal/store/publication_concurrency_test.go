@@ -28,7 +28,7 @@ func TestSourceDeletionDefersUntilRemoteMetadataPublicationFinishes(t *testing.T
 	}
 	defer rollback(gate)
 	var gatePID int
-	if err = gate.QueryRow(ctx, `SELECT pg_backend_pid() FROM ingest.aio_state FOR UPDATE`).Scan(&gatePID); err != nil {
+	if err = gate.QueryRow(ctx, `SELECT pg_backend_pid() FROM aiosources.aio_state FOR UPDATE`).Scan(&gatePID); err != nil {
 		t.Fatal(err)
 	}
 	finished := make(chan error, 1)

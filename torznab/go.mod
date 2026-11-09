@@ -1,4 +1,4 @@
-module github.com/moodiness/ingest/torznab
+module github.com/theo-bnts/aiosources/torznab
 
 go 1.26.10
 

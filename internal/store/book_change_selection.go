@@ -39,18 +39,18 @@ func (s *Store) BookChangeRelevant(ctx context.Context, record books.Record) (bo
 			}
 		}
 		var local bool
-		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_matches WHERE normalized=$1 AND normalized<>'')
- OR EXISTS(SELECT 1 FROM ingest.torrents WHERE (`+nativeBookAssertionPredicate+`) AND ingest.aio_native_book_candidates(fields) && $2::text[])
- OR EXISTS(SELECT 1 FROM ingest.aio_match_reviews WHERE active AND media_type='book' AND (openlibrary_id=ANY($3::text[]) OR ingest.ol_resolve(openlibrary_id)=ANY($3::text[])))`, e.Normalized, ids, append([]string{e.ID}, e.Works...)).Scan(&local)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_matches WHERE normalized=$1 AND normalized<>'')
+ OR EXISTS(SELECT 1 FROM aiosources.torrents WHERE (`+nativeBookAssertionPredicate+`) AND aiosources.aio_native_book_candidates(fields) && $2::text[])
+ OR EXISTS(SELECT 1 FROM aiosources.aio_match_reviews WHERE active AND media_type='book' AND (openlibrary_id=ANY($3::text[]) OR aiosources.ol_resolve(openlibrary_id)=ANY($3::text[])))`, e.Normalized, ids, append([]string{e.ID}, e.Works...)).Scan(&local)
 		return local, err
 	}
 	var selected bool
 	if record.Work != nil {
-		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.ol_editions WHERE work_keys && ingest.ol_aliases($1))
- OR EXISTS(SELECT 1 FROM ingest.ol_import_references WHERE id=$1 AND NOT (SELECT complete FROM ingest.ol_import_state WHERE singleton))`, record.Key()).Scan(&selected)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.ol_editions WHERE work_keys && aiosources.ol_aliases($1))
+ OR EXISTS(SELECT 1 FROM aiosources.ol_import_references WHERE id=$1 AND NOT (SELECT complete FROM aiosources.ol_import_state WHERE singleton))`, record.Key()).Scan(&selected)
 	} else {
-		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.ol_import_references WHERE id=$1)
- OR EXISTS(SELECT 1 FROM ingest.ol_redirects WHERE source=$1)`, record.Key()).Scan(&selected)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.ol_import_references WHERE id=$1)
+ OR EXISTS(SELECT 1 FROM aiosources.ol_redirects WHERE source=$1)`, record.Key()).Scan(&selected)
 	}
 	return selected, err
 }
@@ -64,16 +64,16 @@ func (s *Store) ExcludeBookChange(ctx context.Context, job BookChangeJob, record
 		return err
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		return err
 	}
 	var removed int64
 	keys := []string{}
 	if record.Edition != nil {
-		if err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT work_keys FROM ingest.ol_editions WHERE id=$1 AND ol_revision<=$2),'{}'::text[])`, job.ID, record.Revision).Scan(&keys); err != nil {
+		if err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT work_keys FROM aiosources.ol_editions WHERE id=$1 AND ol_revision<=$2),'{}'::text[])`, job.ID, record.Revision).Scan(&keys); err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `DELETE FROM ingest.ol_editions WHERE id=$1 AND ol_revision<=$2`, job.ID, record.Revision)
+		tag, err := tx.Exec(ctx, `DELETE FROM aiosources.ol_editions WHERE id=$1 AND ol_revision<=$2`, job.ID, record.Revision)
 		if err != nil {
 			return err
 		}
@@ -82,30 +82,30 @@ func (s *Store) ExcludeBookChange(ctx context.Context, job BookChangeJob, record
 		keys = append(keys, record.Key())
 	}
 	if len(keys) > 0 {
-		if _, err = tx.Exec(ctx, `WITH affected AS(UPDATE ingest.aio_works SET revision=revision+1,updated_at=now()
+		if _, err = tx.Exec(ctx, `WITH affected AS(UPDATE aiosources.aio_works SET revision=revision+1,updated_at=now()
  WHERE media_type='book' AND openlibrary_id=ANY($1::text[]) RETURNING id)
- INSERT INTO ingest.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM ingest.aio_matches m JOIN affected a ON a.id=m.work_id
- ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1`, keys); err != nil {
+ INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN affected a ON a.id=m.work_id
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, keys); err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `DELETE FROM ingest.aio_works w WHERE media_type='book' AND openlibrary_id=ANY($1::text[])
- AND NOT EXISTS(SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id))`, keys)
+		tag, err := tx.Exec(ctx, `DELETE FROM aiosources.aio_works w WHERE media_type='book' AND openlibrary_id=ANY($1::text[])
+ AND NOT EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id))`, keys)
 		if err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET works=GREATEST(0,works-$1) WHERE singleton`, tag.RowsAffected()); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.ol_import_state SET works=GREATEST(0,works-$1) WHERE singleton`, tag.RowsAffected()); err != nil {
 			return err
 		}
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.ol_import_state SET editions=GREATEST(0,editions-$1) WHERE singleton`, removed); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.ol_import_state SET editions=GREATEST(0,editions-$1) WHERE singleton`, removed); err != nil {
 		return err
 	}
 	if removed > 0 || len(keys) > 0 {
-		if _, err = tx.Exec(ctx, `UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1`); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {
 			return err
 		}
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM ingest.ol_change_jobs WHERE id=$1 AND version=$2`, job.ID, job.Version); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.ol_change_jobs WHERE id=$1 AND version=$2`, job.ID, job.Version); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

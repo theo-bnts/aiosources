@@ -28,11 +28,11 @@ func TestIdentificationUsesConfiguredWorkerCountInActualTransactions(t *testing.
 				t.Fatal(err)
 			}
 			if _, err := conn.Exec(ctx, `
-CREATE FUNCTION ingest.test_match_capacity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+CREATE FUNCTION aiosources.test_match_capacity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
  PERFORM pg_advisory_xact_lock_shared(12031203,732);
  PERFORM pg_sleep(0.04); RETURN NEW; END; $$;
-CREATE TRIGGER test_match_capacity BEFORE INSERT ON ingest.aio_matches FOR EACH ROW EXECUTE FUNCTION ingest.test_match_capacity();
-INSERT INTO ingest.torrents(provider_id,source_id,fields)
+CREATE TRIGGER test_match_capacity BEFORE INSERT ON aiosources.aio_matches FOR EACH ROW EXECUTE FUNCTION aiosources.test_match_capacity();
+INSERT INTO aiosources.torrents(provider_id,source_id,fields)
  SELECT 'capacity-test',n::text,'{"title":"Example.Film.2021.1080p","imdb_id":"tt1234567"}'::jsonb FROM generate_series(1,20)n;`); err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +156,7 @@ func TestMetadataProcessingHonorsConfiguredConcurrencyAndBatchBounds(t *testing.
 		t.Fatal(err)
 	}
 	var published, pending int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&published, &pending); err != nil || published != 2 || pending != 1 || calls.Load() != 2 || peak.Load() != 1 {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&published, &pending); err != nil || published != 2 || pending != 1 || calls.Load() != 2 || peak.Load() != 1 {
 		t.Fatal("processing limits or remaining queue changed", published, pending, calls.Load(), peak.Load(), err)
 	}
 }

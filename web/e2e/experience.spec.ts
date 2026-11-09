@@ -121,7 +121,7 @@ test('empty histories and searches return to the first page without losing filte
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,finished_at)
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,finished_at)
       VALUES('retained-metadata','metadata','tmdb','manual',0,'succeeded',now())`)
   } finally {
     await db.end()
@@ -205,11 +205,11 @@ test('getting started finishes after identification even when no safe match exis
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
       VALUES('movie','101','tt7654321','{2021}');
-      INSERT INTO ingest.aio_titles(work_id,title,normalized)
-      SELECT id,'Unrelated Film','unrelated film' FROM ingest.aio_works;
-      INSERT INTO ingest.torrents(provider_id,source_id,fields)
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+      SELECT id,'Unrelated Film','unrelated film' FROM aiosources.aio_works;
+      INSERT INTO aiosources.torrents(provider_id,source_id,fields)
       VALUES('ux-source','one','{"title":"Unknown release 2020","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`)
   } finally {
     await db.end()

@@ -86,7 +86,7 @@ func TestInstallationAuthenticationIsBoundedBeforeDatabaseAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE aiosources.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
 		_ = tx.Rollback(context.Background())
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestInstallationStorageTimeoutIsRetryableWithoutAuthorizingPlayback(t *test
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
-	if _, err := tx.Exec(f.ctx, `LOCK TABLE ingest.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := tx.Exec(f.ctx, `LOCK TABLE aiosources.shares IN ACCESS EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
 	s := &server{options: Options{AIOSource: addon, Store: f.db}, streams: make(chan struct{}, 64), streamAuth: make(chan struct{}, 64)}
@@ -299,7 +299,7 @@ func TestStremioLocalStreamAndDeferredProviderPlayback(t *testing.T) {
 				t.Fatal(err)
 			}
 			fields := `{"title":"Example.Serial.S01.COMPLETE.2020.1080p","info_hash":"` + hash + `","size":100}`
-			if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','https://source.invalid/torrent/1',$1)`, fields); err != nil {
+			if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','https://source.invalid/torrent/1',$1)`, fields); err != nil {
 				t.Fatal(err)
 			}
 			if err := addon.Match(f.ctx); err != nil {
@@ -470,8 +470,8 @@ func TestIdentificationIntervalValidationAndLightweightControls(t *testing.T) {
 			t.Fatal("interval was not saved", c.MatchSeconds)
 		}
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years) VALUES('movie','1',ARRAY[2021]);
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example Film"}');`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) VALUES('movie','1',ARRAY[2021]);
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example Film"}');`); err != nil {
 		t.Fatal(err)
 	}
 	full := f.request("GET", "/api/aiosource", "", true, "")

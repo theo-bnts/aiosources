@@ -14,18 +14,18 @@ func TestBookFormatFiltersAreDisjointAndCombineWithoutLosingTitles(t *testing.T)
 	for index, kind := range []string{"book", "ebook", "audiobook"} {
 		id := []string{"OL100W", "OL200W", "OL300W"}[index]
 		var workID int64
-		if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,book_normalized,years) VALUES('book',$1,'Example format','example format','{}') RETURNING id`, id).Scan(&workID); err != nil {
+		if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,book_normalized,years) VALUES('book',$1,'Example format','example format','{}') RETURNING id`, id).Scan(&workID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_titles(work_id,title,normalized) VALUES($1,'Example format','example format')`, workID); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_titles(work_id,title,normalized) VALUES($1,'Example format','example format')`, workID); err != nil {
 			t.Fatal(err)
 		}
 		publishSharingRow(t, ctx, db, "fixture", kind, `{"title":"Example format","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT provider_id,source_id,fields_fingerprint,$1,1,'matched','fixture',$2 FROM ingest.torrents WHERE source_id=$2`, workID, kind); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind) SELECT provider_id,source_id,fields_fingerprint,$1,1,'matched','fixture',$2 FROM aiosources.torrents WHERE source_id=$2`, workID, kind); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.aio_match_queue`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue`); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -59,9 +59,9 @@ func TestCatalogSearchOnlyPublishesCurrentIdentifications(t *testing.T) {
 	for _, id := range []string{"one", "two", "changed", "revision", "queued"} {
 		publishSharingRow(t, ctx, db, "source", id, `{"title":"Example.Movie.New.Day.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","private_note":"synthetic-private-value"}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT provider_id,source_id,CASE WHEN source_id='changed' THEN 'old' ELSE fields_fingerprint END,(SELECT id FROM ingest.aio_works),CASE WHEN source_id='revision' THEN 99 ELSE 1 END,'matched','fixture' FROM ingest.torrents;
-DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT provider_id,source_id,CASE WHEN source_id='changed' THEN 'old' ELSE fields_fingerprint END,(SELECT id FROM aiosources.aio_works),CASE WHEN source_id='revision' THEN 99 ELSE 1 END,'matched','fixture' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 		t.Fatal(err)
 	}
 	for _, q := range []struct{ raw, normalized string }{{"Example Movie New Day", "example movie new day"}, {"Movie", "movie"}, {"autre", "autre"}, {"tt1234567", "tt1234567"}, {"101", "101"}} {
@@ -108,7 +108,7 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 		}
 	}
 	var id int64
-	if err := db.pool.QueryRow(ctx, `UPDATE ingest.aio_works SET adult=true RETURNING id`).Scan(&id); err != nil {
+	if err := db.pool.QueryRow(ctx, `UPDATE aiosources.aio_works SET adult=true RETURNING id`).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.CatalogTitle(ctx, id); !errors.Is(err, model.ErrNotFound) {
@@ -128,7 +128,7 @@ func TestDisplayTitleDoesNotInvalidateMatching(t *testing.T) {
 	}
 	var title string
 	var revision int
-	if err := db.pool.QueryRow(ctx, `SELECT display_title,revision FROM ingest.aio_works`).Scan(&title, &revision); err != nil || title != "Alternative title" || revision != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT display_title,revision FROM aiosources.aio_works`).Scan(&title, &revision); err != nil || title != "Alternative title" || revision != 1 {
 		t.Fatalf("presentation change invalidated matching: %q %d %v", title, revision, err)
 	}
 }
@@ -145,8 +145,8 @@ func TestCatalogSearchYearUsesKnownFilmDatesAndSeriesSpan(t *testing.T) {
 		}
 		publishSharingRow(t, ctx, db, "source", work.TMDB, `{"title":"Example","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
- SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM ingest.aio_match_queue;`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM aiosources.aio_match_queue;`); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
@@ -189,8 +189,8 @@ func TestCatalogLocalTitlesUseBrowserQueryEnglishFallbackAndRelevance(t *testing
 		}
 		publishSharingRow(t, ctx, db, "source", w.TMDB, `{"title":"Example","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
- SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM ingest.aio_match_queue;`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.tmdb_id=t.source_id;DELETE FROM aiosources.aio_match_queue;`); err != nil {
 		t.Fatal(err)
 	}
 	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example ocean"}, "example ocean", model.CatalogSearchFilters{Language: "fr"})

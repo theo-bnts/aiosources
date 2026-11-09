@@ -6,6 +6,7 @@
 backups/
 .scraper/
 .ingest/
+.aiosources/
 compose.override.yaml
 bin/
 providers/

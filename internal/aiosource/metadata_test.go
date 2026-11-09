@@ -89,7 +89,7 @@ func TestTMDBSymbolOnlyTitleDoesNotBlockInformationUpdate(t *testing.T) {
 	var imdb string
 	var years []int
 	var titles int
-	if err := conn.QueryRow(ctx, `SELECT imdb_id,years,(SELECT count(*) FROM ingest.aio_titles WHERE work_id=w.id) FROM ingest.aio_works w WHERE media_type='movie' AND tmdb_id='366238'`).Scan(&imdb, &years, &titles); err != nil || imdb != "tt9876543" || len(years) != 1 || years[0] != 2020 || titles != 0 {
+	if err := conn.QueryRow(ctx, `SELECT imdb_id,years,(SELECT count(*) FROM aiosources.aio_titles WHERE work_id=w.id) FROM aiosources.aio_works w WHERE media_type='movie' AND tmdb_id='366238'`).Scan(&imdb, &years, &titles); err != nil || imdb != "tt9876543" || len(years) != 1 || years[0] != 2020 || titles != 0 {
 		t.Fatalf("valid identifiers were lost or an empty searchable alias was created: %q %v %d %v", imdb, years, titles, err)
 	}
 	out, err := s.Streams(ctx, "http://local", testPrivateToken(t, ctx, s), "movie", "tt1234567")
@@ -130,7 +130,7 @@ func TestTMDBInventorySyncAndEpisodeYearPublication(t *testing.T) {
 	ctx, s, conn := testService(t)
 	hash := strings.Repeat("a", 40)
 	fields := fmt.Sprintf(`{"title":"Example.Serial.S01E02.2020.1080p","info_hash":"%s","imdb_id":"tt7654321","tmdb_id":"202","size":100}`, hash)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('series','1',$1)`, fields); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('series','1',$1)`, fields); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +215,7 @@ func TestMetadataFailuresRetainQueueAndPublishedData(t *testing.T) {
 		t.Fatal("failed update erased published data")
 	}
 	var count int
-	if err = conn.QueryRow(ctx, `SELECT attempts FROM ingest.aio_metadata_jobs`).Scan(&count); err != nil || count != 1 {
+	if err = conn.QueryRow(ctx, `SELECT attempts FROM aiosources.aio_metadata_jobs`).Scan(&count); err != nil || count != 1 {
 		t.Fatal("retry was lost")
 	}
 	stale := jobs[0]
@@ -226,7 +226,7 @@ func TestMetadataFailuresRetainQueueAndPublishedData(t *testing.T) {
 		t.Fatal(err)
 	}
 	var pending int
-	if err = conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_metadata_jobs`).Scan(&pending); err != nil || pending != 1 {
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_metadata_jobs`).Scan(&pending); err != nil || pending != 1 {
 		t.Fatal("old job erased newer change")
 	}
 }
@@ -238,11 +238,11 @@ func TestFourteenDayGapRecoversWithoutErasingDataAndResumesAfterRestart(t *testi
 	}
 	c, _ := s.DB.AIOConfig(ctx)
 	c.TMDBSecret = "tmdb"
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
- UPDATE ingest.aio_works SET updated_at=now()-interval '20 days';
- INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL900W','Synthetic Almanac','{}');
- INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
- SELECT provider_id,source_id,md5(fields::text),md5(ingest.aio_review_evidence(fields)::text),'movie','101' FROM ingest.torrents;`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET last_sync=now()-interval '20 days',changes_through=now()-interval '20 days',applied_through=now()-interval '20 days';
+ UPDATE aiosources.aio_works SET updated_at=now()-interval '20 days';
+ INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years) VALUES('book','OL900W','Synthetic Almanac','{}');
+ INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
+ SELECT provider_id,source_id,md5(fields::text),md5(aiosources.aio_review_evidence(fields)::text),'movie','101' FROM aiosources.torrents;`); err != nil {
 		t.Fatal(err)
 	}
 	var incomplete atomic.Bool
@@ -297,7 +297,7 @@ func TestFourteenDayGapRecoversWithoutErasingDataAndResumesAfterRestart(t *testi
 	}
 	t.Cleanup(func() { _ = restarted.Close(ctx) })
 	restarted.TMDBBase, restarted.ExportBase, restarted.MetadataHTTP = server.URL, server.URL, server.Client()
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_metadata_jobs SET next_attempt=now()`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_metadata_jobs SET next_attempt=now()`); err != nil {
 		t.Fatal(err)
 	}
 	incomplete.Store(false)
@@ -311,9 +311,9 @@ func TestFourteenDayGapRecoversWithoutErasingDataAndResumesAfterRestart(t *testi
 	var title, book string
 	var reviews int
 	err = conn.QueryRow(ctx, `SELECT
- (SELECT display_title FROM ingest.aio_works WHERE media_type='movie' AND tmdb_id='101'),
- (SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL900W'),
- (SELECT count(*) FROM ingest.aio_match_reviews WHERE active)`).Scan(&title, &book, &reviews)
+ (SELECT display_title FROM aiosources.aio_works WHERE media_type='movie' AND tmdb_id='101'),
+ (SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL900W'),
+ (SELECT count(*) FROM aiosources.aio_match_reviews WHERE active)`).Scan(&title, &book, &reviews)
 	if err != nil || title != "Renamed Synthetic Movie" || book != "Synthetic Almanac" || reviews != 1 {
 		t.Fatal("recovery did not preserve unrelated data and manual choices", title, book, reviews, err)
 	}

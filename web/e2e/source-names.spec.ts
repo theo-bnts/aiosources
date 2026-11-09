@@ -30,43 +30,43 @@ test('source display names stay consistent while routes and historical identity 
     requestID = ''
   try {
     await db.query(
-      `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+      `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
        VALUES('display-run',$1,$2,'full','succeeded','',$3,now());
        `,
       [source.id, source.name, JSON.stringify(source)],
     )
     const response = await db.query(
-      `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type,payload_retained)
+      `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type,payload_retained)
        VALUES('display-run',$1,1,''::bytea,'application/json',false) RETURNING id`,
       [source.id],
     )
     const record = await db.query(
-      `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,payload_retained,fields)
+      `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,payload_retained,fields)
        VALUES('display-run',$1,'release-1',$2,1,''::bytea,'application/json',false,'{"title":"Example Release"}') RETURNING id`,
       [source.id, response.rows[0].id],
     )
     rawID = String(record.rows[0].id)
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields,raw_id)
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields,raw_id)
        VALUES($1,'release-1','{"title":"Example Release"}',$2);
        `,
       [source.id, rawID],
     )
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
       VALUES('movie','1','tt1234567',ARRAY[2021]);
-      INSERT INTO ingest.aio_titles(work_id,title,normalized)
-      SELECT id,'Example Release','example release' FROM ingest.aio_works;
-      INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-      SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM ingest.aio_works),1,'matched','exact alias with compatible evidence'
-      FROM ingest.torrents;
-      DELETE FROM ingest.aio_match_queue;`)
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+      SELECT id,'Example Release','example release' FROM aiosources.aio_works;
+      INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+      SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM aiosources.aio_works),1,'matched','exact alias with compatible evidence'
+      FROM aiosources.torrents;
+      DELETE FROM aiosources.aio_match_queue;`)
     await db.query(
-      `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id,run_id)
+      `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id)
        VALUES('display-log','info','system.fixture','Example source activity',$1,'display-run')`,
       [source.id],
     )
     const result = await db.query(
-      `INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
+      `INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
        VALUES(now(),'movie','imdb:tt1234567',1,'results',1,1,0,0,0,0,1,false,$1) RETURNING id`,
       [
         JSON.stringify([

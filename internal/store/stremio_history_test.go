@@ -46,8 +46,8 @@ func TestStremioHistoryFiltersDetailsAndRetention(t *testing.T) {
 	if err = db.RecordStremioRequest(ctx, model.StremioRequest{MediaType: "movie", Resource: "https://synthetic.invalid/private-value", Outcome: "empty"}); !errors.Is(err, model.ErrInvalid) {
 		t.Fatal("credential-bearing resource accepted")
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.stremio_requests SET created_at=now()-interval '31 days';
- INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.stremio_requests SET created_at=now()-interval '31 days';
+ INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
  SELECT now(),'movie','imdb:tt1234567',1,'empty',0,0,0,0,0,0,0,false,'[]' FROM generate_series(1,10001)`); err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestStremioHistoryFiltersDetailsAndRetention(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.stremio_requests`).Scan(&count); err != nil || count != 10000 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.stremio_requests`).Scan(&count); err != nil || count != 10000 {
 		t.Fatalf("history not bounded: %d %v", count, err)
 	}
 	large := model.StremioRequest{MediaType: "movie", Resource: "imdb:tt1234567", Outcome: "results", Returned: 1001}

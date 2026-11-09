@@ -62,7 +62,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie"}, Years: []int{2021}}, []string{"example movie"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one',jsonb_build_object('title','Example.Movie.2021','info_hash',$1::text,'imdb_id','tt1234567'))`, hash); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one',jsonb_build_object('title','Example.Movie.2021','info_hash',$1::text,'imdb_id','tt1234567'))`, hash); err != nil {
 		t.Fatal(err)
 	}
 	if err := addon.Match(f.ctx); err != nil {
@@ -130,7 +130,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 		t.Fatal("playback calls or outcome missing", err)
 	}
 	for _, table := range []string{"stremio_requests", "operation_runs", "operation_events", "aio_shared_availability", "aio_availability", "aio_resources", "aio_cleanup", "activity_logs"} {
-		rows, e := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, e := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -210,7 +210,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 		}
 	}
 	var publicRows int
-	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.stremio_requests WHERE origin='public'`).Scan(&publicRows); err != nil || publicRows != 2 {
+	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM aiosources.stremio_requests WHERE origin='public'`).Scan(&publicRows); err != nil || publicRows != 2 {
 		t.Fatal("requests absent from history", err)
 	}
 	filtered := f.request("GET", "/api/stremio/requests?origin=public&kind=manifest", "", true, "")
@@ -221,7 +221,7 @@ func TestPublicInstanceRoutesCiphertextAndAdministrationIsolation(t *testing.T) 
 		t.Fatal("invalid origin accepted")
 	}
 	for _, table := range []string{"settings", "secrets", "aio_public_access", "stremio_requests", "activity_logs"} {
-		rows, err := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, err := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if err != nil {
 			t.Fatal(err)
 		}

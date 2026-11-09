@@ -49,7 +49,7 @@ func TestCompactPageValidationFallsBackWithoutAdvancingIncompleteFull(t *testing
 					t.Fatalf("partial Full page advanced its checkpoint: %+v", run)
 				}
 				var staged int
-				if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 1 {
+				if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 1 {
 					t.Fatalf("incomplete Full published preparation: %d %v", staged, err)
 				}
 			} else {

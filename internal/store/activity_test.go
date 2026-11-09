@@ -43,11 +43,11 @@ func TestActivityAtomicLogsAndFiltering(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int
-	if err := tx.QueryRow(ctx, "SELECT count(*) FROM ingest.activity_logs WHERE kind='run.succeeded' AND run_id=$1", run.ID).Scan(&count); err != nil || count != 1 {
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM aiosources.activity_logs WHERE kind='run.succeeded' AND run_id=$1", run.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("log absent inside event transaction: %d %v", count, err)
 	}
 	rollback(tx)
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.activity_logs WHERE kind='run.succeeded' AND run_id=$1", run.ID).Scan(&count); err != nil || count != 0 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.activity_logs WHERE kind='run.succeeded' AND run_id=$1", run.ID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("rolled back event leaked a log: %d %v", count, err)
 	}
 	if _, err := db.AddEvent(ctx, run.ID, "succeeded", "never-publish", map[string]any{"records": 3, "url": "never-publish"}); err != nil {
@@ -100,10 +100,10 @@ func TestActivityMigrationBackfillsWithoutChangingEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(db.Close)
-	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA ingest;"+initialSchema+observationSchema+scheduleSchema+`
-INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config)
+	if _, err := db.pool.Exec(ctx, "CREATE SCHEMA aiosources;"+initialSchema+observationSchema+scheduleSchema+`
+INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config)
 VALUES('old-source-run','old-source','Old source','preview','queued','','{"id":"old-source"}');
-INSERT INTO ingest.events(run_id,kind,message,data)
+INSERT INTO aiosources.events(run_id,kind,message,data)
 VALUES('old-source-run','queued','Collection queued','{}');`); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ VALUES('old-source-run','queued','Collection queued','{}');`); err != nil {
 		t.Fatalf("history not backfilled: %+v %v", logs, err)
 	}
 	var retained int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.activity_logs WHERE kind='run.succeeded'").Scan(&retained); err != nil || retained != 1 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.activity_logs WHERE kind='run.succeeded'").Scan(&retained); err != nil || retained != 1 {
 		t.Fatalf("notable history missing from logs: %d %v", retained, err)
 	}
 }

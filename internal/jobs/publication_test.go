@@ -34,13 +34,13 @@ func TestFullPublicationCompletesOrResumesWithoutRefetch(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = control.Close(context.Background()) })
 			if _, err := control.Exec(ctx, `
-CREATE FUNCTION ingest.block_test_publication() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION aiosources.block_test_publication() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     PERFORM pg_advisory_xact_lock(976215::bigint);
     RETURN NULL;
 END $$;
-CREATE TRIGGER block_test_publication BEFORE INSERT ON ingest.torrents
-FOR EACH STATEMENT EXECUTE FUNCTION ingest.block_test_publication();
+CREATE TRIGGER block_test_publication BEFORE INSERT ON aiosources.torrents
+FOR EACH STATEMENT EXECUTE FUNCTION aiosources.block_test_publication();
 SELECT pg_advisory_lock(976215::bigint);`); err != nil {
 				t.Fatal(err)
 			}

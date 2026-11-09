@@ -28,6 +28,6 @@ func (s *Store) RecordInformationActivity(ctx context.Context, d model.ServiceDi
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,service,data) VALUES($1,$2,$3,$4,'tmdb',jsonb_build_object('operation',$5::text,'failure_code',$6::text,'status_code',$7::int,'deferred_records',$8::int))`, "activity-"+id, level, kind, message, d.Operation, d.FailureCode, d.StatusCode, deferred)
+	_, err = s.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,service,data) VALUES($1,$2,$3,$4,'tmdb',jsonb_build_object('operation',$5::text,'failure_code',$6::text,'status_code',$7::int,'deferred_records',$8::int))`, "activity-"+id, level, kind, message, d.Operation, d.FailureCode, d.StatusCode, deferred)
 	return databaseError("record information update activity", err)
 }

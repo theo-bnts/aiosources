@@ -6,7 +6,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.4
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/moodiness/ingest/torznab v0.0.0
+	github.com/theo-bnts/aiosources/torznab v0.0.0
 	github.com/robfig/cron/v3 v3.0.1
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
@@ -22,4 +22,4 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 )
 
-replace github.com/moodiness/ingest/torznab => ./torznab
+replace github.com/theo-bnts/aiosources/torznab => ./torznab

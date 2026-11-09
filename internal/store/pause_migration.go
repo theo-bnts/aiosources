@@ -1,15 +1,15 @@
 package store
 
 const pauseSchema = `
-ALTER TABLE ingest.runs ADD COLUMN pause_requested BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE ingest.runs ADD CONSTRAINT runs_manual_pause_state
+ALTER TABLE aiosources.runs ADD COLUMN pause_requested BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE aiosources.runs ADD CONSTRAINT runs_manual_pause_state
     CHECK (NOT pause_requested OR (status IN ('running','paused','failed') AND NOT cancel_requested));
-CREATE INDEX runs_manual_holds ON ingest.runs(provider_id) WHERE pause_requested;
+CREATE INDEX runs_manual_holds ON aiosources.runs(provider_id) WHERE pause_requested;
 
-CREATE OR REPLACE FUNCTION ingest.activity_kind(input TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION aiosources.activity_kind(input TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
  SELECT CASE WHEN input IN ('queued','started','resumed','succeeded','failed','paused','pause_requested','cancelled','cancel_requested','page_saved','page_error','source_error') THEN 'run.'||input ELSE 'run.activity' END;
 $$;
-CREATE OR REPLACE FUNCTION ingest.activity_message(kind TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION aiosources.activity_message(kind TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
  SELECT CASE kind
  WHEN 'run.queued' THEN 'Collection queued'
  WHEN 'run.started' THEN 'Collection attempt started'

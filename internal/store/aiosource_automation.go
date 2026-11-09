@@ -11,10 +11,10 @@ import (
 func (s *Store) AIOAutomationStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
 	err := s.pool.QueryRow(ctx, `SELECT
- CASE WHEN EXISTS(SELECT 1 FROM ingest.aio_works) THEN 1 ELSE 0 END,
- CASE WHEN EXISTS(SELECT 1 FROM ingest.aio_match_queue) THEN 1 ELSE 0 END,
- EXISTS(SELECT 1 FROM ingest.aio_metadata_jobs WHERE next_attempt<=now()),
- last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM ingest.aio_state`).Scan(
+ CASE WHEN EXISTS(SELECT 1 FROM aiosources.aio_works) THEN 1 ELSE 0 END,
+ CASE WHEN EXISTS(SELECT 1 FROM aiosources.aio_match_queue) THEN 1 ELSE 0 END,
+ EXISTS(SELECT 1 FROM aiosources.aio_metadata_jobs WHERE next_attempt<=now()),
+ last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM aiosources.aio_state`).Scan(
 		&v.Works, &v.MatchingPending, &v.MetadataDue, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
 	return v, databaseError("read metadata automation", err)
 }
@@ -24,7 +24,7 @@ func (s *Store) AIOAutomationStatus(ctx context.Context) (model.AIOStatus, error
 func (s *Store) AIOControlStatus(ctx context.Context) (model.AIOStatus, error) {
 	v, err := s.AIOAutomationStatus(ctx)
 	if err == nil {
-		err = s.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE NOT failed),count(*) FILTER (WHERE failed) FROM ingest.aio_cleanup`).Scan(&v.CleanupPending, &v.CleanupFailed)
+		err = s.pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE NOT failed),count(*) FILTER (WHERE failed) FROM aiosources.aio_cleanup`).Scan(&v.CleanupPending, &v.CleanupFailed)
 	}
 	return v, databaseError("read metadata controls", err)
 }
@@ -33,7 +33,7 @@ func (s *Store) AIOControlStatus(ctx context.Context) (model.AIOStatus, error) {
 // clock. A killed process therefore retains a bounded retry delay and its queue.
 func (s *Store) AIOBeginSync(ctx context.Context) (int, error) {
 	var attempts int
-	err := s.pool.QueryRow(ctx, `UPDATE ingest.aio_state SET
+	err := s.pool.QueryRow(ctx, `UPDATE aiosources.aio_state SET
  sync_failures=CASE WHEN provider_retry_at>now() THEN sync_failures ELSE LEAST(sync_failures+1,30) END,
  sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at ELSE now()+INTERVAL '1 minute' END
  RETURNING sync_failures`).Scan(&attempts)
@@ -41,7 +41,7 @@ func (s *Store) AIOBeginSync(ctx context.Context) (int, error) {
 }
 
 func (s *Store) AIOFailedSync(ctx context.Context, retry time.Time, message string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE ingest.aio_state SET
+	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET
  sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at ELSE $1 END,sync_error=$2`, retry, message)
 	return databaseError("retain information update retry", err)
 }

@@ -19,7 +19,7 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	hash := strings.Repeat("a", 40)
 	seedMovie(t, ctx, s, conn, "private-one", "native-private", hash)
 	var work int64
-	if err := conn.QueryRow(ctx, `SELECT id FROM ingest.aio_works`).Scan(&work); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT id FROM aiosources.aio_works`).Scan(&work); err != nil {
 		t.Fatal(err)
 	}
 	access, _ := s.DB.PublicAccess(ctx)
@@ -152,7 +152,7 @@ func TestPublicCatalogCachedOnlyDoesNotOfferUncachedActions(t *testing.T) {
 		t.Fatal(err)
 	}
 	var work int64
-	if err := conn.QueryRow(ctx, `SELECT id FROM ingest.aio_works`).Scan(&work); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT id FROM aiosources.aio_works`).Scan(&work); err != nil {
 		t.Fatal(err)
 	}
 	visitor := &PublicInstallation{
@@ -221,14 +221,14 @@ func TestPublicCatalogDownloadContinuationCannotCrossVisitorAccounts(t *testing.
 	if _, err = s.PublicCatalogDownload(ctx, &other, work, model.CatalogDownloadInput{PreparationID: pending.PreparationID}); !errors.Is(err, model.ErrConflict) || calls != before {
 		t.Fatal("Continuation crossed accounts", err)
 	}
-	if _, err = conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{size}','1')`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{size}','1')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.PublicCatalogDownload(ctx, visitor, work, model.CatalogDownloadInput{PreparationID: pending.PreparationID}); (!errors.Is(err, model.ErrConflict) && !errors.Is(err, model.ErrNotFound)) || calls != before {
 		t.Fatal("Stale preparation contacted provider", err)
 	}
 	var phase string
-	if err = conn.QueryRow(context.Background(), `SELECT phase FROM ingest.operation_runs WHERE id=$1`, pending.OperationID).Scan(&phase); err != nil || phase != "failed" {
+	if err = conn.QueryRow(context.Background(), `SELECT phase FROM aiosources.operation_runs WHERE id=$1`, pending.OperationID).Scan(&phase); err != nil || phase != "failed" {
 		t.Fatal("Stale operation remains Preparing", phase, err)
 	}
 }

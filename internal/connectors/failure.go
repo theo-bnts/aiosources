@@ -9,7 +9,7 @@ import (
 	"errors"
 	"net"
 
-	sdk "github.com/moodiness/ingest/torznab"
+	sdk "github.com/theo-bnts/aiosources/torznab"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )

@@ -25,7 +25,7 @@ func TestCatalogReleaseUsesTheStremioFormatterWithoutAdditionalRequests(t *testi
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 	seedMovie(t, ctx, s, conn, "public-one", "one", strings.Repeat("b", 40))
-	if _, err = conn.Exec(ctx, `UPDATE ingest.torrents SET fields=fields||'{
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields||'{
  "title":"Example.Movie.2021.FRENCH.1080p.WEB-DL.H265.HDR10+.DTS.5.1.EXTENDED",
  "languages":["fra","eng"],"sublangs":["fra"],"duration":5400,
  "release_group":"ExampleGroup","published_at":"2026-10-09T14:00:00+02:00",
@@ -38,7 +38,7 @@ func TestCatalogReleaseUsesTheStremioFormatterWithoutAdditionalRequests(t *testi
 		t.Fatal(err)
 	}
 	var work int64
-	if err = conn.QueryRow(ctx, `SELECT id FROM ingest.aio_works`).Scan(&work); err != nil {
+	if err = conn.QueryRow(ctx, `SELECT id FROM aiosources.aio_works`).Scan(&work); err != nil {
 		t.Fatal(err)
 	}
 	token, _ := testPrivateInstallation(t, ctx, s)

@@ -28,7 +28,7 @@ test.describe('returning from details', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,trigger,revision,config,pause_reason,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,trigger,revision,config,pause_reason,finished_at)
         VALUES('quota-hold','example','Example source','full','paused','scheduled','',$1,'quota',now()),
               ('progress-hold','example','Example source','full','paused','scheduled','',$1,'no_progress',now()),
               ('budget-hold','example','Example source','full','paused','scheduled','',$1,'budget',now()),
@@ -105,12 +105,12 @@ test.describe('returning from details', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         SELECT 'saved-run-'||n,'example','Example source','preview','succeeded','',$1::jsonb,now()
         FROM generate_series(1,51) n`,
         [JSON.stringify(definition)],
       )
-      await db.query(`INSERT INTO ingest.events(run_id,kind,message)
+      await db.query(`INSERT INTO aiosources.events(run_id,kind,message)
         SELECT 'saved-run-1','page_saved','Synthetic event '||n FROM generate_series(1,55) n`)
     } finally {
       await db.end()
@@ -210,9 +210,9 @@ test('empty identification and operation event pages recover without discarding 
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,finished_at)
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,finished_at)
       VALUES('retained-update','metadata','tmdb','manual',0,'succeeded','details',now())`)
-    await db.query(`INSERT INTO ingest.operation_events(run_id,phase,processed,errors)
+    await db.query(`INSERT INTO aiosources.operation_events(run_id,phase,processed,errors)
       VALUES('retained-update','details',5,0)`)
   } finally {
     await db.end()

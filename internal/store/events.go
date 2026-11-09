@@ -32,10 +32,10 @@ func (s *Store) AddEvent(ctx context.Context, runID, kind, message string, data 
 	// Serialize event ID allocation with this run's other transactions so
 	// chronological pages keep their order as new events commit.
 	var id string
-	if err := tx.QueryRow(ctx, "SELECT id FROM ingest.runs WHERE id=$1 FOR UPDATE", runID).Scan(&id); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT id FROM aiosources.runs WHERE id=$1 FOR UPDATE", runID).Scan(&id); err != nil {
 		return model.Event{}, databaseError("read event collection", err)
 	}
-	event, err := scanEvent(tx.QueryRow(ctx, `INSERT INTO ingest.events(run_id,kind,message,data)
+	event, err := scanEvent(tx.QueryRow(ctx, `INSERT INTO aiosources.events(run_id,kind,message,data)
 VALUES($1,$2,$3,$4) RETURNING id,run_id,kind,message,data,created_at`, runID, kind, message, encoded))
 	if err != nil {
 		return model.Event{}, databaseError("add collection event", err)
@@ -58,10 +58,10 @@ func (s *Store) Events(ctx context.Context, runID string, options model.ListOpti
 	}
 	defer rollback(tx)
 	// Count and rows share a snapshot; a missing run is not an empty event list.
-	if err := tx.QueryRow(ctx, "SELECT (SELECT count(*) FROM ingest.events WHERE run_id=$1) FROM ingest.runs WHERE id=$1", runID).Scan(&result.Total); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT (SELECT count(*) FROM aiosources.events WHERE run_id=$1) FROM aiosources.runs WHERE id=$1", runID).Scan(&result.Total); err != nil {
 		return result, databaseError("count collection events", err)
 	}
-	rows, err := tx.Query(ctx, "SELECT id,run_id,kind,message,data,created_at FROM ingest.events WHERE run_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3", runID, options.Limit, options.Offset)
+	rows, err := tx.Query(ctx, "SELECT id,run_id,kind,message,data,created_at FROM aiosources.events WHERE run_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3", runID, options.Limit, options.Offset)
 	if err != nil {
 		return result, databaseError("list collection events", err)
 	}

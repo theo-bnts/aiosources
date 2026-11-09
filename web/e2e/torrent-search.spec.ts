@@ -40,7 +40,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
       ['fixture', 'decoy', 'Release.100XdoneYcut'],
     ]) {
       await db.query(
-        'INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,$2,$3::jsonb)',
+        'INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,$2,$3::jsonb)',
         [
           provider,
           id,

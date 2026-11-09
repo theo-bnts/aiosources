@@ -99,7 +99,7 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	if err = f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Movie"}, Years: []int{2021}}, []string{"example movie"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('hidden-source','native-id-private',jsonb_build_object('title','Example.Movie.2021','info_hash',$1::text,'imdb_id','tt1234567')),
  ('hidden-source','native-id-uncached','{"title":"Example.Movie.2021.other","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","imdb_id":"tt1234567"}')`, hash); err != nil {
 		t.Fatal(err)
@@ -175,7 +175,7 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 		t.Fatal("Deleted provider file retried or became 502", response.Code)
 	}
 	var stored int
-	if err = conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.operation_downloads`).Scan(&stored); err != nil || stored != 0 {
+	if err = conn.QueryRow(f.ctx, `SELECT count(*) FROM aiosources.operation_downloads`).Scan(&stored); err != nil || stored != 0 {
 		t.Fatal("Visitor continuation persisted", err)
 	}
 	detail := f.request("GET", "/api/operations/"+pending.OperationID, "", true, "")
@@ -183,7 +183,7 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 		t.Fatal("Public download history is inconsistent", detail.Code)
 	}
 	for _, table := range []string{"operation_runs", "operation_events", "activity_logs", "aio_shared_availability", "secrets"} {
-		rows, e := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, e := conn.Query(f.ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if e != nil {
 			t.Fatal(e)
 		}

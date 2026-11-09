@@ -26,7 +26,7 @@ func (s *Store) ImportLegacy(ctx context.Context) (int64, error) {
 	}
 	// Serializing writes for the short bulk-copy transaction prevents import
 	// from interleaving with a full publication. Readers remain unblocked.
-	if _, err := tx.Exec(ctx, "LOCK TABLE ingest.torrents IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+	if _, err := tx.Exec(ctx, "LOCK TABLE aiosources.torrents IN SHARE ROW EXCLUSIVE MODE"); err != nil {
 		return 0, databaseError("lock historical destination", err)
 	}
 	var imported int64
@@ -47,14 +47,14 @@ func (s *Store) ImportLegacy(ctx context.Context) (int64, error) {
         )) AS fields
     FROM legacy
     WHERE NULLIF(fields->>'provider','') IS NOT NULL AND NULLIF(fields->>'id','') IS NOT NULL
-      AND NOT EXISTS(SELECT 1 FROM ingest.legacy_imports AS prior
+      AND NOT EXISTS(SELECT 1 FROM aiosources.legacy_imports AS prior
           WHERE prior.provider_id=legacy.fields->>'provider' AND prior.source_id=legacy.fields->>'id')
 ), inserted AS (
-    INSERT INTO ingest.torrents(provider_id,source_id,fields,raw_id,historical)
+    INSERT INTO aiosources.torrents(provider_id,source_id,fields,raw_id,historical)
     SELECT provider_id,source_id,fields,NULL,TRUE FROM candidates
     ON CONFLICT(provider_id,source_id) DO NOTHING RETURNING provider_id,source_id
 ), recorded AS (
-    INSERT INTO ingest.legacy_imports(provider_id,source_id)
+    INSERT INTO aiosources.legacy_imports(provider_id,source_id)
     SELECT provider_id,source_id FROM candidates
     ON CONFLICT(provider_id,source_id) DO NOTHING RETURNING provider_id
 )

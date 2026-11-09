@@ -23,7 +23,7 @@ func TestSelectedBookChangesImportAnEditionThatBecomesDigitalAfterExclusion(t *t
 		t.Fatal(err)
 	}
 	var excluded bool
-	if err = conn.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM ingest.ol_editions WHERE id='OL900M')`).Scan(&excluded); err != nil || !excluded {
+	if err = conn.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM aiosources.ol_editions WHERE id='OL900M')`).Scan(&excluded); err != nil || !excluded {
 		t.Fatal("print-only edition was not initially excluded", err)
 	}
 	f.mu.Lock()
@@ -136,7 +136,7 @@ func TestSelectedBookImportKeepsDigitalEditionsTranslationsAndLocalTitles(t *tes
 	if err = s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','book','{"title":"The.Azure.Almanac.EPUB"}')`); err != nil {
+	if _, err = conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','book','{"title":"The.Azure.Almanac.EPUB"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.SyncBooks(ctx, "manual"); err != nil {
@@ -181,7 +181,7 @@ func TestSelectedBookImportKeepsDigitalEditionsTranslationsAndLocalTitles(t *tes
 		t.Fatal("language selection lost a translation or retained excluded books", state, err)
 	}
 	var language []string
-	if err = conn.QueryRow(ctx, `SELECT languages FROM ingest.ol_editions`).Scan(&language); err != nil || len(language) != 1 || language[0] != "fr" {
+	if err = conn.QueryRow(ctx, `SELECT languages FROM aiosources.ol_editions`).Scan(&language); err != nil || len(language) != 1 || language[0] != "fr" {
 		t.Fatal(language, err)
 	}
 }

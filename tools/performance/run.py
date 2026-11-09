@@ -19,6 +19,7 @@ import traceback
 import urllib.request
 
 from database import Database, digest_file, private_json, unused_port
+from compatibility import default_workspace
 from report import SCHEMA, evaluate, summarize
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -57,7 +58,7 @@ REQUIRED_BENCHMARKS.update(
 
 def child_environment(database, **extra):
     # In particular, do not inherit a deployment's DATABASE_URL or ADMIN_PASSWORD.
-    env = {key: value for key, value in os.environ.items() if not key.startswith("PG") and key not in ("DATABASE_URL", "ADMIN_PASSWORD", "DATA_DIR", "PROVIDERS_DIR", "BIND", "PUBLIC_URL", "TEST_DATABASE_URL", "INGEST_TEST_DATABASE_URL")}
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PG") and key not in ("DATABASE_URL", "ADMIN_PASSWORD", "DATA_DIR", "PROVIDERS_DIR", "BIND", "PUBLIC_URL", "TEST_DATABASE_URL")}
     env.update(PERFORMANCE_WORKSPACE=str(database.root), PERFORMANCE_DATABASE_URL=database.uri("performance_snapshot"))
     env.update(extra)
     return env
@@ -259,17 +260,19 @@ def environment_identity(samples):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "run", "check", "if-configured"))
-    parser.add_argument("--workspace", type=Path, default=REPOSITORY / ".ingest/performance")
+    parser.add_argument("command", choices=("prepare", "run", "check", "if-configured", "configured"))
+    parser.add_argument("--workspace", type=Path, default=default_workspace(REPOSITORY))
     parser.add_argument("--pg-bin", type=Path)
     parser.add_argument("--dump", type=Path)
-    parser.add_argument("--binary", type=Path, default=REPOSITORY / "bin/ingest")
+    parser.add_argument("--binary", type=Path, default=REPOSITORY / "bin/aiosources")
     parser.add_argument("--label", default="current")
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--save-baseline", action="store_true")
     parser.add_argument("--samples", type=int, default=5)
     args = parser.parse_args()
     workspace = args.workspace.absolute()
+    if args.command == "configured":
+        return 0 if not os.environ.get("CI") and (workspace / "baseline.json").is_file() else 1
     if args.command == "if-configured":
         if os.environ.get("CI") or not (workspace / "baseline.json").exists():
             print("Private performance gate is local and has not been configured here.")

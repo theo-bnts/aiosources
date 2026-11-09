@@ -19,7 +19,7 @@ func remoteCatalog(p model.Provider) bool {
 // snapshot, not apply another publisher's delta to the existing namespace.
 func (s *Store) RemoteCheckpoint(ctx context.Context, providerID, endpoint string) (string, error) {
 	var checkpoint string
-	err := s.pool.QueryRow(ctx, "SELECT checkpoint FROM ingest.remote_checkpoints WHERE provider_id=$1 AND endpoint=$2", providerID, endpoint).Scan(&checkpoint)
+	err := s.pool.QueryRow(ctx, "SELECT checkpoint FROM aiosources.remote_checkpoints WHERE provider_id=$1 AND endpoint=$2", providerID, endpoint).Scan(&checkpoint)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}
@@ -33,10 +33,10 @@ func initializeRemoteCursor(ctx context.Context, tx pgx.Tx, run model.Run) error
 		return nil
 	}
 	state := model.CatalogCursor{Version: 1}
-	if err := tx.QueryRow(ctx, `SELECT cache_generation FROM ingest.aio_state`).Scan(&state.CacheGeneration); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT cache_generation FROM aiosources.aio_state`).Scan(&state.CacheGeneration); err != nil {
 		return err
 	}
-	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM ingest.remote_checkpoints WHERE provider_id=$1", run.ProviderID).Scan(&state.BaseEndpoint, &state.BaseCheckpoint)
+	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM aiosources.remote_checkpoints WHERE provider_id=$1", run.ProviderID).Scan(&state.BaseEndpoint, &state.BaseCheckpoint)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return databaseError("read catalogue publication baseline", err)
 	}
@@ -47,7 +47,7 @@ func initializeRemoteCursor(ctx context.Context, tx pgx.Tx, run model.Run) error
 	if err != nil {
 		return errors.New("cannot encode initial catalogue checkpoint")
 	}
-	_, err = tx.Exec(ctx, "UPDATE ingest.runs SET cursor=$2 WHERE id=$1", run.ID, cursor)
+	_, err = tx.Exec(ctx, "UPDATE aiosources.runs SET cursor=$2 WHERE id=$1", run.ID, cursor)
 	return databaseError("initialize catalogue continuation", err)
 }
 
@@ -57,7 +57,7 @@ func remoteBaselineMatches(ctx context.Context, tx pgx.Tx, run model.Run) (bool,
 		return false, model.ErrConflict
 	}
 	var endpoint, checkpoint string
-	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM ingest.remote_checkpoints WHERE provider_id=$1 FOR UPDATE", run.ProviderID).Scan(&endpoint, &checkpoint)
+	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM aiosources.remote_checkpoints WHERE provider_id=$1 FOR UPDATE", run.ProviderID).Scan(&endpoint, &checkpoint)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return false, databaseError("check catalogue publication baseline", err)
 	}
@@ -77,7 +77,7 @@ func (s *Store) RemoteStates(ctx context.Context, providerIDs []string) (map[str
 	if len(providerIDs) == 0 {
 		return result, nil
 	}
-	rows, err := s.pool.Query(ctx, "SELECT provider_id,endpoint,checkpoint,last_synced_at,catalog_entities FROM ingest.remote_checkpoints WHERE provider_id=ANY($1::text[])", providerIDs)
+	rows, err := s.pool.Query(ctx, "SELECT provider_id,endpoint,checkpoint,last_synced_at,catalog_entities FROM aiosources.remote_checkpoints WHERE provider_id=ANY($1::text[])", providerIDs)
 	if err != nil {
 		return nil, databaseError("list remote catalogue checkpoints", err)
 	}
@@ -122,7 +122,7 @@ func publishStaged(ctx context.Context, tx pgx.Tx, run model.Run) error {
 			}
 		}
 		fields = `CASE WHEN previous.origin IS NULL
-AND ingest.torrent_hash(previous.fields->'info_hash')=ingest.torrent_hash(EXCLUDED.fields->'info_hash')
+AND aiosources.torrent_hash(previous.fields->'info_hash')=aiosources.torrent_hash(EXCLUDED.fields->'info_hash')
 THEN COALESCE((SELECT jsonb_object_agg(key,value) FROM jsonb_each(previous.fields) WHERE key=ANY($2::text[])),'{}'::jsonb)
     || EXCLUDED.fields
     || CASE WHEN jsonb_typeof(previous.fields->'attributes')='object' AND jsonb_typeof(EXCLUDED.fields->'attributes')='object'
@@ -133,20 +133,20 @@ ELSE EXCLUDED.fields END`
 	}
 	// Exact upsert keeps observation history while avoiding delete/reinsert
 	// journal noise for identities whose values and provenance are unchanged.
-	if _, err := tx.Exec(ctx, `INSERT INTO ingest.torrents AS previous(provider_id,source_id,fields,raw_id,first_seen_at,last_seen_at,historical,origin)
+	if _, err := tx.Exec(ctx, `INSERT INTO aiosources.torrents AS previous(provider_id,source_id,fields,raw_id,first_seen_at,last_seen_at,historical,origin)
 SELECT provider_id,source_id,fields,raw_id,first_seen_at,last_seen_at,FALSE,origin
-FROM ingest.staged_torrents WHERE run_id=$1 AND NOT deleted
+FROM aiosources.staged_torrents WHERE run_id=$1 AND NOT deleted
 ON CONFLICT(provider_id,source_id) DO UPDATE SET fields=`+fields+`,raw_id=EXCLUDED.raw_id,
 first_seen_at=LEAST(previous.first_seen_at,EXCLUDED.first_seen_at),last_seen_at=EXCLUDED.last_seen_at,historical=FALSE,origin=EXCLUDED.origin`, args...); err != nil {
 		return databaseError("publish staged catalogue", err)
 	}
 	if mode == model.ModeFull {
-		if _, err := tx.Exec(ctx, `DELETE FROM ingest.torrents AS live WHERE provider_id=$1 AND NOT EXISTS
-(SELECT 1 FROM ingest.staged_torrents AS staged WHERE staged.run_id=$2 AND staged.source_id=live.source_id AND NOT staged.deleted)`, run.ProviderID, run.ID); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.torrents AS live WHERE provider_id=$1 AND NOT EXISTS
+(SELECT 1 FROM aiosources.staged_torrents AS staged WHERE staged.run_id=$2 AND staged.source_id=live.source_id AND NOT staged.deleted)`, run.ProviderID, run.ID); err != nil {
 			return databaseError("remove missing catalogue records", err)
 		}
 	} else {
-		if _, err := tx.Exec(ctx, `DELETE FROM ingest.torrents AS live USING ingest.staged_torrents AS staged
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.torrents AS live USING aiosources.staged_torrents AS staged
 WHERE staged.run_id=$1 AND staged.deleted AND live.provider_id=$2 AND live.source_id=staged.source_id`, run.ID, run.ProviderID); err != nil {
 			return databaseError("publish catalogue deletions", err)
 		}
@@ -155,17 +155,17 @@ WHERE staged.run_id=$1 AND staged.deleted AND live.provider_id=$2 AND live.sourc
 		if err := publishCatalogEntities(ctx, tx, run, state); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO ingest.remote_checkpoints(provider_id,endpoint,checkpoint,catalog_entities)
+		if _, err := tx.Exec(ctx, `INSERT INTO aiosources.remote_checkpoints(provider_id,endpoint,checkpoint,catalog_entities)
 VALUES($1,$2,$3,$4) ON CONFLICT(provider_id) DO UPDATE SET endpoint=EXCLUDED.endpoint,checkpoint=EXCLUDED.checkpoint,last_synced_at=NOW(),catalog_entities=EXCLUDED.catalog_entities`, run.ProviderID, run.Config.URL, state.Checkpoint, catalogEntitiesJSON(state.Entities)); err != nil {
 			return databaseError("publish remote catalogue checkpoint", err)
 		}
 	}
 	if !remote {
-		if _, err := tx.Exec(ctx, "DELETE FROM ingest.remote_checkpoints WHERE provider_id=$1", run.ProviderID); err != nil {
+		if _, err := tx.Exec(ctx, "DELETE FROM aiosources.remote_checkpoints WHERE provider_id=$1", run.ProviderID); err != nil {
 			return databaseError("invalidate replaced catalogue checkpoint", err)
 		}
 	}
-	if _, err := tx.Exec(ctx, "DELETE FROM ingest.staged_torrents WHERE run_id=$1", run.ID); err != nil {
+	if _, err := tx.Exec(ctx, "DELETE FROM aiosources.staged_torrents WHERE run_id=$1", run.ID); err != nil {
 		return databaseError("release published staging", err)
 	}
 	return nil

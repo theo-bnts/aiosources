@@ -1,4 +1,4 @@
-// Package aiosource adds local metadata correspondence and Stremio playback to Ingest.
+// Package aiosource implements local metadata identification and playback.
 package aiosource
 
 import (

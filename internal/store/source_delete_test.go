@@ -28,13 +28,13 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 		}
 		mirrorFinish(t, ctx, db, run, model.StatusSucceeded)
 		var occurrence string
-		if err = db.pool.QueryRow(ctx, `SELECT occurrence_id FROM ingest.torrents WHERE provider_id=$1`, id).Scan(&occurrence); err != nil {
+		if err = db.pool.QueryRow(ctx, `SELECT occurrence_id FROM aiosources.torrents WHERE provider_id=$1`, id).Scan(&occurrence); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,finished_at) VALUES($1,'download','torbox','manual',1,'succeeded','waiting',now())`, id+"-download"); err != nil {
+		if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,finished_at) VALUES($1,'download','torbox','manual',1,'succeeded','waiting',now())`, id+"-download"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.operation_events(run_id,phase,processed,errors) VALUES($1,'waiting',0,0)`, id+"-download"); err != nil {
+		if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.operation_events(run_id,phase,processed,errors) VALUES($1,'waiting',0,0)`, id+"-download"); err != nil {
 			t.Fatal(err)
 		}
 		if err = db.SaveOperationDownload(ctx, id+"-download", model.OperationDownload{WorkID: 1, Input: model.CatalogDownloadInput{OccurrenceID: occurrence, Service: "torbox"}, Account: "synthetic-account"}); err != nil {
@@ -48,9 +48,9 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	mirrorFinish(t, ctx, db, run, model.StatusFailed)
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years) VALUES('movie','991','{2020}');
- INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,status,reason) SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM ingest.aio_works WHERE tmdb_id='991'),'matched','fixture' FROM ingest.torrents;
- INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id) SELECT provider_id,source_id,md5(fields::text),md5(fields::text),'movie','991' FROM ingest.torrents;`); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) VALUES('movie','991','{2020}');
+ INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,status,reason) SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM aiosources.aio_works WHERE tmdb_id='991'),'matched','fixture' FROM aiosources.torrents;
+ INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id) SELECT provider_id,source_id,md5(fields::text),md5(fields::text),'movie','991' FROM aiosources.torrents;`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.PutSecret(ctx, "shared-announce", []byte("encrypted-synthetic-value")); err != nil {
@@ -61,23 +61,23 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 	if err = db.SetAIOConfig(ctx, config); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',repeat('a',40),true,now(),'[]')`); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',repeat('a',40),true,now(),'[]')`); err != nil {
 		t.Fatal(err)
 	}
 	checkpoint := sharingPage(t, ctx, db, all, CatalogPageRequest{Limit: 100}).Checkpoint
 	cursor := sharingPage(t, ctx, db, all, CatalogPageRequest{Limit: 1}).NextCursor
 	before := mirrorRows(t, ctx, db, "retained")
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.operation_runs SET status='running',finished_at=NULL WHERE id='removed-download'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.operation_runs SET status='running',finished_at=NULL WHERE id='removed-download'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.DeleteSourceData(ctx, "removed", func() error { t.Error("active download allowed deletion"); return nil }); !errors.Is(err, model.ErrBusy) {
 		t.Fatalf("active download not protected: %v", err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.operation_runs SET status='succeeded',finished_at=now() WHERE id='removed-download'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.operation_runs SET status='succeeded',finished_at=now() WHERE id='removed-download'`); err != nil {
 		t.Fatal(err)
 	}
 	var otherJournal int64
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal WHERE provider_id='retained'`).Scan(&otherJournal); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal WHERE provider_id='retained'`).Scan(&otherJournal); err != nil {
 		t.Fatal(err)
 	}
 	removed := false
@@ -93,16 +93,16 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 			column = "run_id"
 		}
 		var count int
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table+` WHERE `+column+`='removed-download'`).Scan(&count); err != nil || count != 0 {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table+` WHERE `+column+`='removed-download'`).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("download residue in %s: %d %v", table, count, err)
 		}
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table+` WHERE `+column+`='retained-download'`).Scan(&count); err != nil || count != 1 {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table+` WHERE `+column+`='retained-download'`).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("other download changed in %s: %d %v", table, count, err)
 		}
 	}
 	for _, table := range []string{"runs", "torrents", "staged_torrents", "raw_records", "pages", "catalog_journal", "catalog_baselines", "torrent_history", "torrent_history_baselines", "aio_matches", "aio_match_queue", "aio_match_reviews", "activity_logs", "schedule_clocks", "collection_state", "provider_requests", "remote_checkpoints", "legacy_imports"} {
 		var count int
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table+` WHERE provider_id=$1`, "removed").Scan(&count); err != nil || count != 0 {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table+` WHERE provider_id=$1`, "removed").Scan(&count); err != nil || count != 0 {
 			t.Fatalf("remaining %s: %d %v", table, count, err)
 		}
 	}
@@ -110,7 +110,7 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 		t.Fatal("other source publication changed")
 	}
 	var afterJournal int64
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal WHERE provider_id='retained'`).Scan(&afterJournal); err != nil || afterJournal != otherJournal {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal WHERE provider_id='retained'`).Scan(&afterJournal); err != nil || afterJournal != otherJournal {
 		t.Fatalf("other source journal changed: %d %d %v", otherJournal, afterJournal, err)
 	}
 	if value, err := db.Secret(ctx, "shared-announce"); err != nil || string(value) != "encrypted-synthetic-value" {
@@ -130,7 +130,7 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 		t.Fatalf("private selection was broadened: %v", err)
 	}
 	var works int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works`).Scan(&works); err != nil || works != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works`).Scan(&works); err != nil || works != 1 {
 		t.Fatalf("shared metadata changed: %d %v", works, err)
 	}
 	reduced, err := db.Share(ctx, mixed.Share.ID)
@@ -145,7 +145,7 @@ func TestDeleteSourceDataPurgesOwnedDataWithoutBroadeningAccess(t *testing.T) {
 		t.Fatalf("peer does not receive authoritative replacement: %+v", fresh)
 	}
 	var cached int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_shared_availability`).Scan(&cached); err != nil || cached != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_shared_availability`).Scan(&cached); err != nil || cached != 1 {
 		t.Fatalf("shared cache changed: %d %v", cached, err)
 	}
 }

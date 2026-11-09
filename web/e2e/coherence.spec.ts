@@ -38,16 +38,16 @@ async function reviewFixture(page: Page, server: TestServer) {
   await db.connect()
   try {
     await db.query(`
-      INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+      INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
         VALUES('movie','9001','tt1000001',ARRAY[2024]);
-      INSERT INTO ingest.aio_titles(work_id,title,normalized)
-        SELECT id,'Review Example','review example' FROM ingest.aio_works;
-      INSERT INTO ingest.torrents(provider_id,source_id,fields)
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+        SELECT id,'Review Example','review example' FROM aiosources.aio_works;
+      INSERT INTO aiosources.torrents(provider_id,source_id,fields)
         VALUES('review-fixture','one','{"title":"Review Example 2024"}');
-      INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,revision,status,reason)
+      INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,revision,status,reason)
         SELECT provider_id,source_id,md5(fields::text),1,'ambiguous','multiple plausible works'
-        FROM ingest.torrents;
-      DELETE FROM ingest.aio_match_queue;
+        FROM aiosources.torrents;
+      DELETE FROM aiosources.aio_match_queue;
     `)
   } finally {
     await db.end()
@@ -67,7 +67,7 @@ test('reviewing changed metadata clears the old choice and refreshes candidate r
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query('UPDATE ingest.aio_works SET revision=revision+1')
+    await db.query('UPDATE aiosources.aio_works SET revision=revision+1')
   } finally {
     await db.end()
   }
@@ -113,7 +113,7 @@ test('a failed review reload keeps its confirmation and selection until it can b
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query('UPDATE ingest.aio_works SET revision=revision+1')
+    await db.query('UPDATE aiosources.aio_works SET revision=revision+1')
   } finally {
     await db.end()
   }
@@ -189,7 +189,7 @@ test('failed candidate loading does not discard a review when the source record 
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`UPDATE ingest.torrents SET fields=fields || '{"size":1024}'::jsonb`)
+    await db.query(`UPDATE aiosources.torrents SET fields=fields || '{"size":1024}'::jsonb`)
   } finally {
     await db.end()
   }

@@ -7,6 +7,7 @@ import {
   InfoIcon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { buildVersion } from '@/lib/build-version'
 import {
   Dialog,
   DialogContent,
@@ -20,10 +21,7 @@ export function AboutDialog() {
   const embeddedVersion = document.querySelector<HTMLMetaElement>(
     'meta[name="application-version"]',
   )?.content
-  const version =
-    embeddedVersion && embeddedVersion !== '__AIOSOURCES_VERSION__'
-      ? embeddedVersion.slice(0, 200)
-      : 'dev'
+  const version = buildVersion(embeddedVersion)
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -44,7 +42,26 @@ export function AboutDialog() {
             <DatabaseIcon size={24} className="shrink-0 text-primary" aria-hidden="true" />
             <span className="min-w-0 break-words text-2xl">
               AIOSources{' '}
-              <span className="text-sm font-normal text-muted-foreground">({version})</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                (
+                {version.url ? (
+                  <>
+                    {version.release}.
+                    <a
+                      href={version.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="data-link"
+                      title="Open this GitHub build"
+                    >
+                      {version.build}
+                    </a>
+                  </>
+                ) : (
+                  version.display
+                )}
+                )
+              </span>
             </span>
           </DialogTitle>
           <DialogDescription>

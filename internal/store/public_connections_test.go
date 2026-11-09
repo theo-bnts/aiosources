@@ -16,7 +16,7 @@ func TestPublicConnectionsUpgradePreservesDisclosureAndKeepsTorznabOptIn(t *test
 	if err = db.migrateThrough(ctx, 55); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET enabled=true,allow_private_downloads=true,revision=7,generation=9`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,allow_private_downloads=true,revision=7,generation=9`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {

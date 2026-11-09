@@ -13,15 +13,15 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
 	for _, enabled := range []bool{false, true} {
 		t.Run(map[bool]string{false: "previous opt-out", true: "previous automatic recovery"}[enabled], func(t *testing.T) {
 			ctx, endpoint, db := activityDatabase(t)
-			if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.collection_settings
+			if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.collection_settings
  ADD COLUMN default_request_timeout_seconds INTEGER NOT NULL DEFAULT 30,
  ADD COLUMN default_preview_pages INTEGER NOT NULL DEFAULT 3,
  ADD COLUMN default_max_pages INTEGER NOT NULL DEFAULT 0,
  ADD COLUMN default_max_duration_seconds INTEGER NOT NULL DEFAULT 0;
- DELETE FROM ingest.schema_migrations WHERE version IN (42,73,74); DROP TABLE ingest.runtime_settings`); err != nil {
+ DELETE FROM aiosources.schema_migrations WHERE version IN (42,73,74); DROP TABLE aiosources.runtime_settings`); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := db.pool.Exec(ctx, `UPDATE ingest.collection_settings SET workers=5,
+			if _, err := db.pool.Exec(ctx, `UPDATE aiosources.collection_settings SET workers=5,
  auto_resume_interrupted=$1,default_request_timeout_seconds=71,default_preview_pages=11,
  default_max_pages=9,default_max_duration_seconds=123,revision=7`, enabled); err != nil {
 				t.Fatal(err)
@@ -65,7 +65,7 @@ func TestFixedImportDefaultsMigrationPreservesRunSnapshotsAndSavedPolicies(t *te
 				t.Fatalf("stale draft accepted: %v", err)
 			}
 			var retired int
-			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='ingest' AND table_name='collection_settings' AND column_name IN ('default_request_timeout_seconds','default_preview_pages','default_max_pages','default_max_duration_seconds')`).Scan(&retired); err != nil || retired != 0 {
+			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='aiosources' AND table_name='collection_settings' AND column_name IN ('default_request_timeout_seconds','default_preview_pages','default_max_pages','default_max_duration_seconds')`).Scan(&retired); err != nil || retired != 0 {
 				t.Fatalf("retired storage: %d %v", retired, err)
 			}
 			db.Close()

@@ -161,7 +161,7 @@ func TestCollectionCrashWorker(t *testing.T) {
 		return
 	}
 	parsed, err := url.Parse(dsn)
-	if err != nil || !strings.HasPrefix(parsed.Path, "/ingest_test_") {
+	if err != nil || !strings.HasPrefix(parsed.Path, "/aiosources_test_") {
 		t.Fatal("crash worker requires an isolated test database")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

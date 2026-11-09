@@ -156,7 +156,7 @@ func TestExpiredResourceJoiningWarmRetryRechecksEveryCandidate(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("warm retry did not start")
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_resources SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_availability SET checked_at=now()-interval '4 days'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_resources SET checked_at=now()-interval '4 days'; UPDATE aiosources.aio_availability SET checked_at=now()-interval '4 days'`); err != nil {
 		t.Fatal(err)
 	}
 	type response struct {

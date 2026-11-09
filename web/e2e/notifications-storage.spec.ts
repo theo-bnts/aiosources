@@ -9,11 +9,11 @@ test('historical source errors, events and activity logs use sentence case witho
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,error,finished_at)
+    await db.query(`INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,error,finished_at)
       VALUES('historical-error','synthetic','Synthetic source','full','failed','','{}','source response could not be processed',now());
-      INSERT INTO ingest.events(run_id,kind,message,data)
+      INSERT INTO aiosources.events(run_id,kind,message,data)
       VALUES('historical-error','source_error','source pagination did not advance','{"failure_code":"stalled"}');
-      INSERT INTO ingest.activity_logs(event_id,level,kind,message)
+      INSERT INTO aiosources.activity_logs(event_id,level,kind,message)
       VALUES('historical-error','error','system.fixture','source response could not be processed')`)
     await page.goto('/runs/historical-error')
     await expect(page.getByRole('alert')).toContainText('Source response could not be processed')
@@ -21,12 +21,12 @@ test('historical source errors, events and activity logs use sentence case witho
     await expect(page.getByRole('table')).toContainText('Source pagination did not advance')
     await page.goto('/logs')
     await expect(page.getByRole('table')).toContainText('Source response could not be processed')
-    const stored = await db.query("SELECT error FROM ingest.runs WHERE id='historical-error'")
+    const stored = await db.query("SELECT error FROM aiosources.runs WHERE id='historical-error'")
     expect(stored.rows[0].error).toBe('source response could not be processed')
   } finally {
     try {
       await db.query(
-        "DELETE FROM ingest.events WHERE run_id='historical-error'; DELETE FROM ingest.runs WHERE id='historical-error'",
+        "DELETE FROM aiosources.events WHERE run_id='historical-error'; DELETE FROM aiosources.runs WHERE id='historical-error'",
       )
     } finally {
       await db.end()
@@ -99,7 +99,7 @@ test('manual action failures use notifications without replaying a rejected oper
   await db.connect()
   try {
     await db.query(
-      "INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','1001','tt1000001',ARRAY[2021])",
+      "INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','1001','tt1000001',ARRAY[2021])",
     )
   } finally {
     await db.end()

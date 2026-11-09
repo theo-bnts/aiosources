@@ -168,7 +168,7 @@ test('Stremio history distinguishes public streams, manifests and playback with 
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls)
+    await db.query(`INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls)
       VALUES(now(),'invalid','Manifest',2,'results',0,0,0,0,0,0,0,false,'[]','public','manifest','','[]'),
       (now(),'movie','imdb:tt1234567',20,'results',0,0,0,0,0,0,0,false,'[]','public','playback','torbox','[{"phase":"provider_playback","duration_ms":10,"http_status":200,"error_code":""}]'),
       (now(),'movie','imdb:tt1234567',20,'empty',0,0,0,0,0,0,0,false,'[]','private','stream','','[]')`)

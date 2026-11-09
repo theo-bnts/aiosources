@@ -27,10 +27,10 @@ func TestDeduplicatedArchivesKeepObservationIdentityBytesAndSearch(t *testing.T)
 			t.Fatalf("missing observation fixture: %+v %v", observations, err)
 		}
 		observation := observations.Items[0]
-		if _, err := db.pool.Exec(ctx, `UPDATE ingest.raw_records SET raw=$2,fields='{"title":"dedupe-marker","exact":9007199254740993}'::jsonb,payload_retained=TRUE WHERE id=$1`, observation.ID, raw); err != nil {
+		if _, err := db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET raw=$2,fields='{"title":"dedupe-marker","exact":9007199254740993}'::jsonb,payload_retained=TRUE WHERE id=$1`, observation.ID, raw); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.pool.Exec(ctx, `UPDATE ingest.pages SET body=$2,payload_retained=TRUE WHERE id=$1`, observation.PageID, body); err != nil {
+		if _, err := db.pool.Exec(ctx, `UPDATE aiosources.pages SET body=$2,payload_retained=TRUE WHERE id=$1`, observation.PageID, body); err != nil {
 			t.Fatal(err)
 		}
 		observation, err = db.Raw(ctx, observation.ID)
@@ -40,10 +40,10 @@ func TestDeduplicatedArchivesKeepObservationIdentityBytesAndSearch(t *testing.T)
 		records, runs = append(records, observation), append(runs, run)
 	}
 	keeper, duplicate := records[0], records[1]
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.raw_records SET payload_id=$2,raw=''::bytea,fields='{}'::jsonb WHERE id=$1`, duplicate.ID, keeper.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET payload_id=$2,raw=''::bytea,fields='{}'::jsonb WHERE id=$1`, duplicate.ID, keeper.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.pages SET payload_id=$2,body=''::bytea WHERE id=$1`, duplicate.PageID, keeper.PageID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.pages SET payload_id=$2,body=''::bytea WHERE id=$1`, duplicate.PageID, keeper.PageID); err != nil {
 		t.Fatal(err)
 	}
 	got, err := db.Raw(ctx, duplicate.ID)
@@ -59,10 +59,10 @@ func TestDeduplicatedArchivesKeepObservationIdentityBytesAndSearch(t *testing.T)
 		t.Fatalf("search lost referenced fields or returned the keeper's identity: %+v %v", matches, err)
 	}
 	var storedRaw, storedBodies int64
-	if err := db.pool.QueryRow(ctx, `SELECT sum(octet_length(raw)) FROM ingest.raw_records WHERE provider_id=$1`, provider.ID).Scan(&storedRaw); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT sum(octet_length(raw)) FROM aiosources.raw_records WHERE provider_id=$1`, provider.ID).Scan(&storedRaw); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.pool.QueryRow(ctx, `SELECT sum(octet_length(body)) FROM ingest.pages WHERE provider_id=$1`, provider.ID).Scan(&storedBodies); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT sum(octet_length(body)) FROM aiosources.pages WHERE provider_id=$1`, provider.ID).Scan(&storedBodies); err != nil {
 		t.Fatal(err)
 	}
 	if storedRaw != int64(len(raw)) || storedBodies != int64(len(body)) {

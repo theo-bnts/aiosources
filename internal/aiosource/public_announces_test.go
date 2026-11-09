@@ -104,7 +104,7 @@ func TestInvalidSourceDefinitionCannotAuthorizeVisitorDownloads(t *testing.T) {
 func assertNoVisitorData(t *testing.T, ctx context.Context, conn *pgx.Conn, private ...string) {
 	t.Helper()
 	for _, table := range []string{"settings", "secrets", "aio_public_access", "stremio_requests", "operation_runs", "operation_events", "operation_downloads", "aio_availability", "aio_shared_availability", "aio_resources", "aio_cleanup", "activity_logs"} {
-		rows, err := conn.Query(ctx, `SELECT row_to_json(t)::text FROM ingest.`+table+` t`)
+		rows, err := conn.Query(ctx, `SELECT row_to_json(t)::text FROM aiosources.`+table+` t`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -404,7 +404,7 @@ func TestVisitorAnnounceSeasonPacksNeverInventCachedEpisodeAvailability(t *testi
 	if err := s.DB.SaveAIOWork(ctx, work, []string{"example serial"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('private-one','pack',jsonb_build_object('title','Example.Serial.S02.COMPLETE.2020','imdb_id','tt1234567','info_hash',$1::text,'season',2))`, hash); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('private-one','pack',jsonb_build_object('title','Example.Serial.S02.COMPLETE.2020','imdb_id','tt1234567','info_hash',$1::text,'season',2))`, hash); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {

@@ -3,12 +3,12 @@ package store
 // Existing archives and immutable run snapshots remain untouched. PostgreSQL's
 // constant defaults mark historical payloads without rewriting their bytes.
 const metadataRetentionSchema = `
-ALTER TABLE ingest.runs DROP CONSTRAINT runs_mode_check;
-ALTER TABLE ingest.runs ADD CONSTRAINT runs_mode_check CHECK(mode IN ('preview','incremental','full','metadata'));
-ALTER TABLE ingest.pages ADD COLUMN payload_retained BOOLEAN NOT NULL DEFAULT TRUE;
-ALTER TABLE ingest.raw_records ADD COLUMN payload_retained BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE aiosources.runs DROP CONSTRAINT runs_mode_check;
+ALTER TABLE aiosources.runs ADD CONSTRAINT runs_mode_check CHECK(mode IN ('preview','incremental','full','metadata'));
+ALTER TABLE aiosources.pages ADD COLUMN payload_retained BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE aiosources.raw_records ADD COLUMN payload_retained BOOLEAN NOT NULL DEFAULT TRUE;
 
-CREATE OR REPLACE FUNCTION ingest.safe_activity_data(input JSONB) RETURNS JSONB LANGUAGE SQL IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION aiosources.safe_activity_data(input JSONB) RETURNS JSONB LANGUAGE SQL IMMUTABLE AS $$
  SELECT COALESCE(jsonb_object_agg(key,value),'{}'::jsonb) FROM jsonb_each(input)
  WHERE (key IN ('page_id','page','pages','records','auxiliary_records','errors','committed_pages','max_pages','attempts','status_code','duration_ms','workers','bytes') AND jsonb_typeof(value)='number')
     OR (key IN ('done','emitted','payload_retained') AND jsonb_typeof(value)='boolean')
@@ -20,7 +20,7 @@ CREATE OR REPLACE FUNCTION ingest.safe_activity_data(input JSONB) RETURNS JSONB 
     OR (key='health_code' AND value IN ('"storage_low"'::jsonb,'"source_stale"'::jsonb,'"authentication"'::jsonb,'"certificate"'::jsonb,'"run_stuck"'::jsonb,'"journal_growth"'::jsonb,'"database_unavailable"'::jsonb))
     OR (key='version' AND jsonb_typeof(value)='string' AND value #>> '{}' ~ '^(dev|v?[0-9]+[.][0-9]+[.][0-9]+([-+][A-Za-z0-9.-]+)?)$');
 $$;
-CREATE OR REPLACE FUNCTION ingest.activity_message(kind TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
+CREATE OR REPLACE FUNCTION aiosources.activity_message(kind TEXT) RETURNS TEXT LANGUAGE SQL IMMUTABLE AS $$
  SELECT CASE kind
  WHEN 'run.queued' THEN 'Collection queued'
  WHEN 'run.started' THEN 'Collection attempt started'

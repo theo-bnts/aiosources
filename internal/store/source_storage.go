@@ -30,15 +30,15 @@ func sourceStorageEstimates(ctx context.Context, tx pgx.Tx) ([]model.SourceStora
  CROSS JOIN LATERAL (
   SELECT attname FROM pg_attribute WHERE attrelid=c.oid AND attnum>0 AND NOT attisdropped
   AND attname IN ('provider_id','run_id') ORDER BY (attname='provider_id') DESC LIMIT 1
- ) a WHERE n.nspname='ingest' AND c.relkind='r' AND `+sourceStorageRelations+`
+ ) a WHERE n.nspname='aiosources' AND c.relkind='r' AND `+sourceStorageRelations+`
 ), distributions AS (
  SELECT rel.oid,rel.attname,d.value,d.frequency FROM relations rel
- JOIN pg_stats s ON s.schemaname='ingest' AND s.tablename=rel.relname AND s.attname=rel.attname AND NOT s.inherited
+ JOIN pg_stats s ON s.schemaname='aiosources' AND s.tablename=rel.relname AND s.attname=rel.attname AND NOT s.inherited
 `+storageDistributionSQL+`
 ), attributed AS (
  SELECT CASE WHEN d.attname='provider_id' THEN d.value ELSE r.provider_id END AS provider_id,
  pg_total_relation_size(d.oid)*GREATEST(d.frequency,0) AS bytes
- FROM distributions d LEFT JOIN ingest.runs r ON d.attname='run_id' AND r.id=d.value
+ FROM distributions d LEFT JOIN aiosources.runs r ON d.attname='run_id' AND r.id=d.value
 )
 SELECT provider_id,sum(bytes)::bigint FROM attributed
 WHERE provider_id IS NOT NULL AND provider_id<>'' GROUP BY provider_id ORDER BY provider_id`)

@@ -1,7 +1,7 @@
 package store
 
 const aioExperienceSchema = `
-CREATE FUNCTION ingest.aio_review_evidence(fields JSONB) RETURNS JSONB
+CREATE FUNCTION aiosources.aio_review_evidence(fields JSONB) RETURNS JSONB
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
  SELECT jsonb_strip_nulls(jsonb_build_object(
  'title',fields->'title','name',fields->'name',
@@ -13,19 +13,19 @@ LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
  'attributes',COALESCE((SELECT jsonb_object_agg(key,value) FROM jsonb_each(CASE WHEN jsonb_typeof(fields->'attributes')='object' THEN fields->'attributes' ELSE '{}'::jsonb END) WHERE key IN ('imdb','imdbid','tmdb','tmdbid','tvdb','tvdbid','mal','malid','season','episode')),'{}')
  ));
 $$;
-CREATE TABLE ingest.aio_match_reviews (
+CREATE TABLE aiosources.aio_match_reviews (
  provider_id TEXT NOT NULL,source_id TEXT NOT NULL,
  active BOOLEAN NOT NULL DEFAULT TRUE,revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0),
  fingerprint TEXT NOT NULL,evidence_fingerprint TEXT NOT NULL,media_type TEXT NOT NULL CHECK(media_type IN ('movie','tv')),
  tmdb_id TEXT NOT NULL,override_episode BOOLEAN NOT NULL DEFAULT FALSE,
  season INTEGER CHECK(season BETWEEN 0 AND 999),episode INTEGER CHECK(episode BETWEEN 1 AND 99999),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),PRIMARY KEY(provider_id,source_id),
- FOREIGN KEY(provider_id,source_id) REFERENCES ingest.torrents(provider_id,source_id) ON DELETE CASCADE,
+ FOREIGN KEY(provider_id,source_id) REFERENCES aiosources.torrents(provider_id,source_id) ON DELETE CASCADE,
  CHECK(episode IS NULL OR season IS NOT NULL),
  CHECK(media_type='tv' OR (season IS NULL AND episode IS NULL))
 );
-CREATE INDEX aio_match_reviews_work ON ingest.aio_match_reviews(media_type,tmdb_id) WHERE active;
-CREATE TABLE ingest.stremio_requests (
+CREATE INDEX aio_match_reviews_work ON aiosources.aio_match_reviews(media_type,tmdb_id) WHERE active;
+CREATE TABLE aiosources.stremio_requests (
  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  created_at TIMESTAMPTZ NOT NULL,media_type TEXT NOT NULL,resource TEXT NOT NULL,
  duration_ms BIGINT NOT NULL CHECK(duration_ms>=0),outcome TEXT NOT NULL CHECK(outcome IN ('results','empty','invalid','failed','cancelled','busy')),
@@ -35,5 +35,5 @@ CREATE TABLE ingest.stremio_requests (
  returned INTEGER NOT NULL CHECK(returned>=0),truncated BOOLEAN NOT NULL,
  results JSONB NOT NULL CHECK(jsonb_typeof(results)='array')
 );
-CREATE INDEX stremio_requests_recent ON ingest.stremio_requests(created_at DESC,id DESC);
+CREATE INDEX stremio_requests_recent ON aiosources.stremio_requests(created_at DESC,id DESC);
 `

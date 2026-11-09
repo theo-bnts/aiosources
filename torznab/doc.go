@@ -143,5 +143,5 @@
 //	})
 //
 // A runnable JSON Lines example lives in examples/crawl. This module is
-// independent of the adjacent ingestion service and has no database dependency.
+// independent of the adjacent collection service and has no database dependency.
 package torznab

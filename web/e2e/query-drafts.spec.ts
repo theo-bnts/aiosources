@@ -85,15 +85,15 @@ test('episode selection retains the next number and keyboard focus after submiss
   let id: string
   try {
     const work =
-      await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years,display_title)
+      await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years,display_title)
       VALUES('tv','321','tt0000321',ARRAY[2026],'Example Series') RETURNING id::text`)
     id = work.rows[0].id
-    await db.query(`INSERT INTO ingest.torrents(provider_id,source_id,fields)
+    await db.query(`INSERT INTO aiosources.torrents(provider_id,source_id,fields)
       VALUES('episode-source','episode-one','{"title":"Example.Series.S01E01","imdb_id":"tt0000321","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100}');
-      INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+      INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
       SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','Synthetic identifier'
-      FROM ingest.torrents t JOIN ingest.aio_works w ON w.imdb_id=t.fields->>'imdb_id';
-      DELETE FROM ingest.aio_match_queue;`)
+      FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.imdb_id=t.fields->>'imdb_id';
+      DELETE FROM aiosources.aio_match_queue;`)
   } finally {
     await db.end()
   }
@@ -127,7 +127,7 @@ test.describe('processed records', () => {
     const db = new pg.Client({ connectionString: server.databaseURL })
     await db.connect()
     try {
-      await db.query(`INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+      await db.query(`INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         VALUES('query-run','query-source','Query source','preview','succeeded','','{}',now())`)
     } finally {
       await db.end()

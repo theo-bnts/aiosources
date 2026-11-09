@@ -14,10 +14,10 @@ const aioDiagnosticStatus = `CASE WHEN m.provider_id IS NULL OR q.provider_id IS
  OR m.fingerprint IS DISTINCT FROM t.fields_fingerprint
  OR (m.status='matched' AND (w.id IS NULL OR m.revision IS DISTINCT FROM w.revision))
  THEN 'pending' ELSE m.status END`
-const aioDiagnosticJoins = ` LEFT JOIN ingest.aio_matches m USING(provider_id,source_id)
-LEFT JOIN ingest.aio_match_queue q USING(provider_id,source_id)
-LEFT JOIN ingest.aio_works w ON w.id=m.work_id`
-const aioDiagnosticSource = ` FROM ingest.torrents t` + aioDiagnosticJoins
+const aioDiagnosticJoins = ` LEFT JOIN aiosources.aio_matches m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`
+const aioDiagnosticSource = ` FROM aiosources.torrents t` + aioDiagnosticJoins
 
 func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOptions) (model.List[model.AIOMatchDiagnostic], error) {
 	status := opts.Status
@@ -57,8 +57,8 @@ ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(count
 		// work revision. Keep the ordered listing's original plan: restricting
 		// its joins here can make PostgreSQL sort all ambiguous rows before LIMIT.
 		current := ` FROM selected t
-JOIN ingest.aio_matches m USING(provider_id,source_id)
-LEFT JOIN ingest.aio_match_queue q USING(provider_id,source_id)
+JOIN aiosources.aio_matches m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
 WHERE m.status='ambiguous' AND m.fingerprint=t.fields_fingerprint AND q.provider_id IS NULL`
 		prefix := `WITH selected AS (` + selected + `)`
 		countSQL = prefix + ` SELECT count(*)` + current

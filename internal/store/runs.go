@@ -74,7 +74,7 @@ func (s *Store) createRun(ctx context.Context, run model.Run, resolveInitial boo
 	defer rollback(tx)
 	captureRetries := run.Policy == nil || resolveInitial
 	if run.Policy == nil || run.Config.RequestTimeout == "" {
-		settings, err := scanCollectionSettings(tx.QueryRow(ctx, "SELECT "+collectionSettingsColumns+" FROM ingest.collection_settings WHERE singleton"))
+		settings, err := scanCollectionSettings(tx.QueryRow(ctx, "SELECT "+collectionSettingsColumns+" FROM aiosources.collection_settings WHERE singleton"))
 		if err != nil {
 			return model.Run{}, err
 		}
@@ -105,8 +105,8 @@ func (s *Store) createRun(ctx context.Context, run model.Run, resolveInitial boo
 	if err := lockProviderSecrets(ctx, tx, run.Config); err != nil {
 		return model.Run{}, err
 	}
-	created, err := scanRun(tx.QueryRow(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,initial_full,storage_mode,storage_options)
-VALUES($1,$2,$3,$4,'queued',$5,$6,$7,$8,$9,(SELECT mode FROM ingest.storage_settings WHERE singleton),(SELECT options FROM ingest.storage_settings WHERE singleton)) RETURNING `+runColumns, id, run.ProviderID, run.ProviderName, run.Mode, run.MaxPages, run.Revision, config, policy, run.InitialFull))
+	created, err := scanRun(tx.QueryRow(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,policy,initial_full,storage_mode,storage_options)
+VALUES($1,$2,$3,$4,'queued',$5,$6,$7,$8,$9,(SELECT mode FROM aiosources.storage_settings WHERE singleton),(SELECT options FROM aiosources.storage_settings WHERE singleton)) RETURNING `+runColumns, id, run.ProviderID, run.ProviderName, run.Mode, run.MaxPages, run.Revision, config, policy, run.InitialFull))
 	if err != nil {
 		return model.Run{}, databaseError("create collection", err)
 	}
@@ -129,11 +129,11 @@ func captureSourceRetryPolicy(ctx context.Context, tx pgx.Tx, run *model.Run) er
 	policy := *run.Policy
 	policy.SourceRetries = model.DefaultSourceRetryPolicy()
 	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT to_regclass('ingest.runtime_settings') IS NOT NULL`).Scan(&exists); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT to_regclass('aiosources.runtime_settings') IS NOT NULL`).Scan(&exists); err != nil {
 		return databaseError("locate source retry settings", err)
 	}
 	if exists {
-		err := tx.QueryRow(ctx, `SELECT (values->>'retries')::int,(values->>'initial_seconds')::int,(values->>'maximum_seconds')::int FROM ingest.runtime_settings WHERE section='source_retries'`).Scan(&policy.SourceRetries.Retries, &policy.SourceRetries.InitialSeconds, &policy.SourceRetries.MaximumSeconds)
+		err := tx.QueryRow(ctx, `SELECT (values->>'retries')::int,(values->>'initial_seconds')::int,(values->>'maximum_seconds')::int FROM aiosources.runtime_settings WHERE section='source_retries'`).Scan(&policy.SourceRetries.Retries, &policy.SourceRetries.InitialSeconds, &policy.SourceRetries.MaximumSeconds)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return databaseError("capture source retry settings", err)
 		}
@@ -146,13 +146,13 @@ func captureSourceRetryPolicy(ctx context.Context, tx pgx.Tx, run *model.Run) er
 }
 
 func (s *Store) GetRun(ctx context.Context, id string) (model.Run, error) {
-	run, err := scanRun(s.pool.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1", id))
+	run, err := scanRun(s.pool.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1", id))
 	return run, databaseError("read collection", err)
 }
 
 func (s *Store) HasActiveRun(ctx context.Context, providerID string) (bool, error) {
 	var active bool
-	err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.runs WHERE provider_id=$1 AND status IN ('queued','running'))", providerID).Scan(&active)
+	err := s.pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM aiosources.runs WHERE provider_id=$1 AND status IN ('queued','running'))", providerID).Scan(&active)
 	return active, databaseError("check active provider collection", err)
 }
 
@@ -161,7 +161,7 @@ func (s *Store) LatestRuns(ctx context.Context, providerIDs []string) (map[strin
 	if len(providerIDs) == 0 {
 		return result, nil
 	}
-	rows, err := s.pool.Query(ctx, "SELECT DISTINCT ON (provider_id) "+runColumns+" FROM ingest.runs WHERE provider_id=ANY($1::text[]) ORDER BY provider_id,created_at DESC,id DESC", providerIDs)
+	rows, err := s.pool.Query(ctx, "SELECT DISTINCT ON (provider_id) "+runColumns+" FROM aiosources.runs WHERE provider_id=ANY($1::text[]) ORDER BY provider_id,created_at DESC,id DESC", providerIDs)
 	if err != nil {
 		return nil, databaseError("list latest provider collections", err)
 	}
@@ -190,7 +190,7 @@ func (s *Store) ListRuns(ctx context.Context, opts model.ListOptions) (model.Lis
 		return result, databaseError("begin collection listing", err)
 	}
 	defer rollback(tx)
-	filter := ` FROM ingest.runs WHERE ($1='' OR provider_id=ANY(string_to_array($1,','))) AND ($2='' OR status=ANY(string_to_array($2,','))) AND ($3='' OR id=$3)`
+	filter := ` FROM aiosources.runs WHERE ($1='' OR provider_id=ANY(string_to_array($1,','))) AND ($2='' OR status=ANY(string_to_array($2,','))) AND ($3='' OR id=$3)`
 	if opts.SourceKind == "remote" {
 		filter += " AND remote_catalog"
 	} else if opts.SourceKind == "source" {
@@ -262,11 +262,11 @@ func (s *Store) ClaimNext(ctx context.Context) (*model.Run, error) {
 		// Serialize admission with other claimers and settings updates. A lower
 		// limit holds queued work; it never interrupts already running attempts.
 		var limit, running int
-		if err := tx.QueryRow(ctx, "SELECT COALESCE(workers,$1) FROM ingest.collection_settings WHERE singleton FOR UPDATE", model.DefaultCollectionWorkers).Scan(&limit); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT COALESCE(workers,$1) FROM aiosources.collection_settings WHERE singleton FOR UPDATE", model.DefaultCollectionWorkers).Scan(&limit); err != nil {
 			rollback(tx)
 			return nil, databaseError("lock collection capacity", err)
 		}
-		if err := tx.QueryRow(ctx, "SELECT count(*) FROM ingest.runs WHERE status='running'").Scan(&running); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM aiosources.runs WHERE status='running'").Scan(&running); err != nil {
 			rollback(tx)
 			return nil, databaseError("read active collection count", err)
 		}
@@ -275,10 +275,10 @@ func (s *Store) ClaimNext(ctx context.Context) (*model.Run, error) {
 			return nil, nil
 		}
 		var candidateID, providerID string
-		err = tx.QueryRow(ctx, `SELECT id,provider_id FROM ingest.runs AS candidate
+		err = tx.QueryRow(ctx, `SELECT id,provider_id FROM aiosources.runs AS candidate
 WHERE status='queued' AND NOT pause_requested AND NOT (id=ANY($1::text[]))
 AND (trigger<>'scheduled' OR NOT EXISTS (
-    SELECT 1 FROM ingest.runs AS held WHERE held.provider_id=candidate.provider_id
+    SELECT 1 FROM aiosources.runs AS held WHERE held.provider_id=candidate.provider_id
     AND (held.pause_requested OR held.pause_reason IN ('manual','quota','no_progress'))))
 ORDER BY created_at,id LIMIT 1`, excluded).Scan(&candidateID, &providerID)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -296,10 +296,10 @@ ORDER BY created_at,id LIMIT 1`, excluded).Scan(&candidateID, &providerID)
 			rollback(tx)
 			return nil, databaseError("lock collection queue", err)
 		}
-		run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+` FROM ingest.runs AS candidate
+		run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+` FROM aiosources.runs AS candidate
 WHERE id=$1 AND status='queued' AND NOT pause_requested
 AND (trigger<>'scheduled' OR NOT EXISTS (
-    SELECT 1 FROM ingest.runs AS held WHERE held.provider_id=candidate.provider_id
+    SELECT 1 FROM aiosources.runs AS held WHERE held.provider_id=candidate.provider_id
     AND (held.pause_requested OR held.pause_reason IN ('manual','quota','no_progress'))))
 FOR UPDATE SKIP LOCKED`, candidateID))
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -330,7 +330,7 @@ FOR UPDATE SKIP LOCKED`, candidateID))
 			rollback(tx)
 			return nil, err
 		}
-		run, err = scanRun(tx.QueryRow(ctx, "UPDATE ingest.runs SET status='running',started_at=COALESCE(started_at,NOW()) WHERE id=$1 RETURNING "+runColumns, run.ID))
+		run, err = scanRun(tx.QueryRow(ctx, "UPDATE aiosources.runs SET status='running',started_at=COALESCE(started_at,NOW()) WHERE id=$1 RETURNING "+runColumns, run.ID))
 		if err != nil {
 			rollback(tx)
 			return nil, databaseError("claim collection", err)
@@ -360,7 +360,7 @@ FOR UPDATE SKIP LOCKED`, candidateID))
 func (s *Store) RecoverInterrupted(ctx context.Context, eligibleProviders map[string]bool) error {
 	// Reading candidates does not classify them: only a transaction that owns
 	// the provider lock may transition an orphaned running row.
-	rows, err := s.pool.Query(ctx, "SELECT id FROM ingest.runs WHERE status='running' OR (status='paused' AND pause_reason='interrupted') ORDER BY created_at,id")
+	rows, err := s.pool.Query(ctx, "SELECT id FROM aiosources.runs WHERE status='running' OR (status='paused' AND pause_reason='interrupted') ORDER BY created_at,id")
 	if err != nil {
 		return databaseError("list interrupted collections", err)
 	}
@@ -393,7 +393,7 @@ func (s *Store) recoverRun(ctx context.Context, id string, eligibleProviders map
 	}
 	defer rollback(tx)
 	var providerID string
-	if err := tx.QueryRow(ctx, "SELECT provider_id FROM ingest.runs WHERE id=$1", id).Scan(&providerID); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT provider_id FROM aiosources.runs WHERE id=$1", id).Scan(&providerID); err != nil {
 		return databaseError("read recovery provider", err)
 	}
 	// Recognize another process's live worker before waiting for its queue
@@ -409,7 +409,7 @@ func (s *Store) recoverRun(ctx context.Context, id string, eligibleProviders map
 	if err := lockProviderQueue(ctx, tx, providerID); err != nil {
 		return databaseError("lock recovery queue", err)
 	}
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 AND (status='running' OR (status='paused' AND pause_reason='interrupted')) FOR UPDATE SKIP LOCKED", id))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 AND (status='running' OR (status='paused' AND pause_reason='interrupted')) FOR UPDATE SKIP LOCKED", id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -441,7 +441,7 @@ func recoverRunTx(ctx context.Context, tx pgx.Tx, run model.Run, eligible bool) 
 	// Only the latest durable outcome counts. A successfully retried earlier
 	// authentication failure must not poison a later genuine interruption.
 	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT data->>'failure_code' IN ('authentication','certificate','configuration')
-FROM ingest.events WHERE run_id=$1 AND kind IN ('page_error','source_error','page_saved')
+FROM aiosources.events WHERE run_id=$1 AND kind IN ('page_error','source_error','page_saved')
 ORDER BY id DESC LIMIT 1),FALSE)`, run.ID).Scan(&unsafeFailure); err != nil {
 		return run, false, databaseError("read recovery safety", err)
 	}
@@ -456,7 +456,7 @@ ORDER BY id DESC LIMIT 1),FALSE)`, run.ID).Scan(&unsafeFailure); err != nil {
 		message = "Source configuration needs attention before this collection can resume"
 	} else if eligible {
 		var resume bool
-		if err := tx.QueryRow(ctx, "SELECT auto_resume_interrupted FROM ingest.collection_settings WHERE singleton").Scan(&resume); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT auto_resume_interrupted FROM aiosources.collection_settings WHERE singleton").Scan(&resume); err != nil {
 			return run, false, databaseError("read automatic recovery", err)
 		}
 		if !resume {
@@ -466,7 +466,7 @@ ORDER BY id DESC LIMIT 1),FALSE)`, run.ID).Scan(&unsafeFailure); err != nil {
 	if !run.RequiresManualResume() && !unsafeFailure && eligible {
 		status, reason = model.StatusQueued, ""
 		var active bool
-		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.runs WHERE provider_id=$1 AND id<>$2 AND status IN ('queued','running'))", run.ProviderID, run.ID).Scan(&active); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM aiosources.runs WHERE provider_id=$1 AND id<>$2 AND status IN ('queued','running'))", run.ProviderID, run.ID).Scan(&active); err != nil {
 			return run, false, databaseError("check recovery queue", err)
 		}
 		if active {
@@ -481,7 +481,7 @@ ORDER BY id DESC LIMIT 1),FALSE)`, run.ID).Scan(&unsafeFailure); err != nil {
 	if run.Status == model.StatusPaused && status == model.StatusPaused {
 		return run, false, nil
 	}
-	recovered, err := scanRun(tx.QueryRow(ctx, "UPDATE ingest.runs SET status=$2,cancel_requested=FALSE,pause_requested=(pause_requested AND $2='paused'),pause_reason=$4,finished_at=CASE WHEN $2='queued' THEN NULL ELSE NOW() END,error=CASE WHEN $2='queued' THEN '' ELSE $3 END WHERE id=$1 RETURNING "+runColumns, run.ID, status, message, reason))
+	recovered, err := scanRun(tx.QueryRow(ctx, "UPDATE aiosources.runs SET status=$2,cancel_requested=FALSE,pause_requested=(pause_requested AND $2='paused'),pause_reason=$4,finished_at=CASE WHEN $2='queued' THEN NULL ELSE NOW() END,error=CASE WHEN $2='queued' THEN '' ELSE $3 END WHERE id=$1 RETURNING "+runColumns, run.ID, status, message, reason))
 	if err != nil {
 		return run, false, databaseError("recover collection", err)
 	}
@@ -498,13 +498,13 @@ func (s *Store) ResumeRun(ctx context.Context, id string) (model.Run, error) {
 	}
 	defer rollback(tx)
 	var providerID string
-	if err := tx.QueryRow(ctx, "SELECT provider_id FROM ingest.runs WHERE id=$1", id).Scan(&providerID); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT provider_id FROM aiosources.runs WHERE id=$1", id).Scan(&providerID); err != nil {
 		return model.Run{}, databaseError("read collection provider", err)
 	}
 	if err := lockProviderQueue(ctx, tx, providerID); err != nil {
 		return model.Run{}, databaseError("lock collection queue", err)
 	}
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 FOR UPDATE", id))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", id))
 	if err != nil {
 		return model.Run{}, databaseError("read collection resume", err)
 	}
@@ -515,7 +515,7 @@ func (s *Store) ResumeRun(ctx context.Context, id string) (model.Run, error) {
 		return model.Run{}, err
 	}
 	previousStatus := run.Status
-	run, err = scanRun(tx.QueryRow(ctx, `UPDATE ingest.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,
+	run, err = scanRun(tx.QueryRow(ctx, `UPDATE aiosources.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,
 requests_without_new_ids=CASE WHEN pause_reason='no_progress' THEN 0 ELSE requests_without_new_ids END,
 progress_warning_sent=CASE WHEN pause_reason='no_progress' THEN FALSE ELSE progress_warning_sent END,
 pause_reason='',finished_at=NULL,error='' WHERE id=$1 RETURNING `+runColumns, id))
@@ -523,11 +523,11 @@ pause_reason='',finished_at=NULL,error='' WHERE id=$1 RETURNING `+runColumns, id
 		return model.Run{}, databaseError("resume collection", err)
 	}
 	var eventID string
-	if err := tx.QueryRow(ctx, "INSERT INTO ingest.events(run_id,kind,message,data) VALUES($1,'resumed','Collection queued for resume',jsonb_build_object('from_status',$2::text)) RETURNING id::text", id, previousStatus).Scan(&eventID); err != nil {
+	if err := tx.QueryRow(ctx, "INSERT INTO aiosources.events(run_id,kind,message,data) VALUES($1,'resumed','Collection queued for resume',jsonb_build_object('from_status',$2::text)) RETURNING id::text", id, previousStatus).Scan(&eventID); err != nil {
 		return model.Run{}, databaseError("record resume event", err)
 	}
 	if previousStatus == model.StatusFailed {
-		if _, err := tx.Exec(ctx, "UPDATE ingest.runs SET coverage_attempt=$2 WHERE id=$1", id, eventID); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE aiosources.runs SET coverage_attempt=$2 WHERE id=$1", id, eventID); err != nil {
 			return model.Run{}, databaseError("retain coverage attempt", err)
 		}
 	}
@@ -544,7 +544,7 @@ pause_reason='',finished_at=NULL,error='' WHERE id=$1 RETURNING `+runColumns, id
 // not after automatic budget continuation or interrupted-worker recovery.
 func (s *Store) CoverageAttempt(ctx context.Context, id string) (string, error) {
 	var attempt string
-	err := s.pool.QueryRow(ctx, `SELECT coverage_attempt FROM ingest.runs WHERE id=$1`, id).Scan(&attempt)
+	err := s.pool.QueryRow(ctx, `SELECT coverage_attempt FROM aiosources.runs WHERE id=$1`, id).Scan(&attempt)
 	return attempt, databaseError("read collection coverage attempt", err)
 }
 
@@ -558,13 +558,13 @@ func (s *Store) RequestPause(ctx context.Context, id string) (model.Run, error) 
 	}
 	defer rollback(tx)
 	var providerID string
-	if err := tx.QueryRow(ctx, "SELECT provider_id FROM ingest.runs WHERE id=$1", id).Scan(&providerID); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT provider_id FROM aiosources.runs WHERE id=$1", id).Scan(&providerID); err != nil {
 		return model.Run{}, databaseError("read collection provider", err)
 	}
 	if err := lockProviderQueue(ctx, tx, providerID); err != nil {
 		return model.Run{}, databaseError("lock collection queue", err)
 	}
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 FOR UPDATE", id))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", id))
 	if err != nil {
 		return model.Run{}, databaseError("read collection pause", err)
 	}
@@ -578,10 +578,10 @@ func (s *Store) RequestPause(ctx context.Context, id string) (model.Run, error) 
 		return model.Run{}, model.ErrConflict
 	}
 	kind, message := "pause_requested", "Pause requested; the current response checkpoint will be saved before stopping"
-	statement := "UPDATE ingest.runs SET pause_requested=TRUE,pause_reason='manual' WHERE id=$1 RETURNING "
+	statement := "UPDATE aiosources.runs SET pause_requested=TRUE,pause_reason='manual' WHERE id=$1 RETURNING "
 	if run.Status != model.StatusRunning {
 		kind, message = "paused", "Collection manually paused; resume from the last committed checkpoint"
-		statement = "UPDATE ingest.runs SET status='paused',pause_requested=TRUE,pause_reason='manual',finished_at=NOW(),error='' WHERE id=$1 RETURNING "
+		statement = "UPDATE aiosources.runs SET status='paused',pause_requested=TRUE,pause_reason='manual',finished_at=NOW(),error='' WHERE id=$1 RETURNING "
 	}
 	run, err = scanRun(tx.QueryRow(ctx, statement+runColumns, id))
 	if err != nil {
@@ -605,7 +605,7 @@ func (s *Store) RequestCancel(ctx context.Context, id string) (model.Run, error)
 		return model.Run{}, databaseError("begin collection cancellation", err)
 	}
 	defer rollback(tx)
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 FOR UPDATE", id))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", id))
 	if err != nil {
 		return model.Run{}, databaseError("read collection cancellation", err)
 	}
@@ -616,13 +616,13 @@ func (s *Store) RequestCancel(ctx context.Context, id string) (model.Run, error)
 			return run, nil
 		}
 		kind, message = "cancelled", "Collection cancelled"
-		statement = "UPDATE ingest.runs SET status='cancelled',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NOW(),error='' WHERE id=$1 RETURNING "
+		statement = "UPDATE aiosources.runs SET status='cancelled',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NOW(),error='' WHERE id=$1 RETURNING "
 	case model.StatusRunning:
 		if run.CancelRequested {
 			return run, nil
 		}
 		kind, message = "cancel_requested", "Cancellation requested"
-		statement = "UPDATE ingest.runs SET cancel_requested=TRUE,pause_requested=FALSE,pause_reason='' WHERE id=$1 RETURNING "
+		statement = "UPDATE aiosources.runs SET cancel_requested=TRUE,pause_requested=FALSE,pause_reason='' WHERE id=$1 RETURNING "
 	default:
 		return run, nil
 	}
@@ -663,13 +663,13 @@ func (s *Store) FinishRun(ctx context.Context, id string, status model.RunStatus
 	// Finalization may enqueue Metadata. Keep the same queue-before-row order
 	// as claim, pause, resume and scheduling, using the already-owned session.
 	var providerID string
-	if err := tx.QueryRow(ctx, "SELECT provider_id FROM ingest.runs WHERE id=$1", id).Scan(&providerID); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT provider_id FROM aiosources.runs WHERE id=$1", id).Scan(&providerID); err != nil {
 		return model.Run{}, databaseError("read finishing provider", err)
 	}
 	if err := lockProviderQueue(ctx, tx, providerID); err != nil {
 		return model.Run{}, databaseError("lock collection finish queue", err)
 	}
-	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM ingest.runs WHERE id=$1 FOR UPDATE", id))
+	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", id))
 	if err != nil {
 		return model.Run{}, databaseError("read collection finish", err)
 	}
@@ -701,17 +701,17 @@ func (s *Store) FinishRun(ctx context.Context, id string, status model.RunStatus
 	if status == model.StatusSucceeded && run.Mode != model.ModePreview && remoteCatalog(run.Config) {
 		// Metadata publication always takes its fence before torrent locks.
 		if run.Config.CatalogEntities.Metadata {
-			if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+			if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 				return model.Run{}, err
 			}
 		}
 		// Match the journal's table/statement lock order before checking ownership.
 		// Native publication cannot arrive between this check and replacement.
-		if _, err := tx.Exec(ctx, "LOCK TABLE ingest.torrents IN ROW EXCLUSIVE MODE; SELECT pg_advisory_xact_lock(1768843109,3)"); err != nil {
+		if _, err := tx.Exec(ctx, "LOCK TABLE aiosources.torrents IN ROW EXCLUSIVE MODE; SELECT pg_advisory_xact_lock(1768843109,3)"); err != nil {
 			return model.Run{}, databaseError("lock remote publication", err)
 		}
 		var native bool
-		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM ingest.torrents WHERE provider_id=$1 AND origin IS NULL)", run.ProviderID).Scan(&native); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM aiosources.torrents WHERE provider_id=$1 AND origin IS NULL)", run.ProviderID).Scan(&native); err != nil {
 			return model.Run{}, databaseError("check remote destination ownership", err)
 		}
 		if native {
@@ -727,14 +727,14 @@ func (s *Store) FinishRun(ctx context.Context, id string, status model.RunStatus
 		}
 	}
 	if status == model.StatusSucceeded && run.Mode != model.ModePreview {
-		if _, err := tx.Exec(ctx, "SELECT set_config('ingest.publication_run_id',$1,true)", run.ID); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT set_config('aiosources.publication_run_id',$1,true)", run.ID); err != nil {
 			return model.Run{}, databaseError("set final publication context", err)
 		}
 		if err := publishStaged(ctx, tx, run); err != nil {
 			return model.Run{}, err
 		}
 	}
-	run, err = scanRun(tx.QueryRow(ctx, "UPDATE ingest.runs SET status=$2,cancel_requested=FALSE,pause_requested=(pause_requested AND $2 IN ('paused','failed')),pause_reason=$4,finished_at=NOW(),error=$3 WHERE id=$1 RETURNING "+runColumns, id, status, errorMessage, reason))
+	run, err = scanRun(tx.QueryRow(ctx, "UPDATE aiosources.runs SET status=$2,cancel_requested=FALSE,pause_requested=(pause_requested AND $2 IN ('paused','failed')),pause_reason=$4,finished_at=NOW(),error=$3 WHERE id=$1 RETURNING "+runColumns, id, status, errorMessage, reason))
 	if err != nil {
 		return model.Run{}, databaseError("finish collection", err)
 	}
@@ -761,7 +761,7 @@ func (s *Store) FinishRun(ctx context.Context, id string, status model.RunStatus
 }
 
 func lifecycleEvent(ctx context.Context, tx pgx.Tx, id, kind, message string) error {
-	_, err := tx.Exec(ctx, "INSERT INTO ingest.events(run_id,kind,message) VALUES($1,$2,$3)", id, kind, message)
+	_, err := tx.Exec(ctx, "INSERT INTO aiosources.events(run_id,kind,message) VALUES($1,$2,$3)", id, kind, message)
 	return err
 }
 
@@ -770,7 +770,7 @@ func lifecycleEvent(ctx context.Context, tx pgx.Tx, id, kind, message string) er
 func (s *Store) RunRetryAt(ctx context.Context, id string) (time.Time, error) {
 	var value string
 	err := s.pool.QueryRow(ctx, `SELECT COALESCE(metadata->>'retry_at','')
-FROM (SELECT metadata FROM ingest.pages WHERE run_id=$1 ORDER BY id DESC LIMIT 1) latest`, id).Scan(&value)
+FROM (SELECT metadata FROM aiosources.pages WHERE run_id=$1 ORDER BY id DESC LIMIT 1) latest`, id).Scan(&value)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, nil
 	}

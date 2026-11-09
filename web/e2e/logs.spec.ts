@@ -10,17 +10,17 @@ test('logs preserve alert context, include debug on demand and filter services i
   try {
     for (const service of ['tmdb', 'alldebrid', 'torbox']) {
       await db.query(
-        `INSERT INTO ingest.activity_logs(event_id,level,kind,message,service)
+        `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,service)
          VALUES($1,'error','aiosource.incident',$2,$3)`,
         [`fixture-${service}`, `Failure fixture: ${service}`, service],
       )
     }
     await db.query(
-      `INSERT INTO ingest.activity_logs(event_id,level,kind,message,provider_id)
+      `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id)
        VALUES('fixture-source','info','service.started','Source fixture: tmdb','tmdb')`,
     )
     await db.query(
-      `INSERT INTO ingest.activity_logs(event_id,level,kind,title,message,data)
+      `INSERT INTO aiosources.activity_logs(event_id,level,kind,title,message,data)
        VALUES('fixture-alert','warn','aiosource.incident','Retained notification title','Information fixture: preserved context','{"retry":true}'),
              ('fixture-debug','debug','run.page','','Detailed request fixture','{}')`,
     )

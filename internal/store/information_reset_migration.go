@@ -4,11 +4,11 @@ package store
 // ON DELETE SET NULL has to find every referencing row, regardless of status.
 // The complete index also serves the existing matched-work lookups.
 const informationResetIndexSchema = `
-DROP INDEX ingest.aio_matches_work;
-CREATE INDEX aio_matches_work ON ingest.aio_matches(work_id);
+DROP INDEX aiosources.aio_matches_work;
+CREATE INDEX aio_matches_work ON aiosources.aio_matches(work_id);
 
-ALTER FUNCTION ingest.activity_message(TEXT) RENAME TO pre_information_reset_activity_message;
-CREATE FUNCTION ingest.activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+ALTER FUNCTION aiosources.activity_message(TEXT) RENAME TO pre_information_reset_activity_message;
+CREATE FUNCTION aiosources.activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
  SELECT CASE WHEN kind LIKE 'maintenance.%' THEN
    CASE split_part(split_part(kind,'.',2),'_',1)
     WHEN 'books' THEN 'Book information reset'
@@ -21,6 +21,6 @@ CREATE FUNCTION ingest.activity_message(kind TEXT) RETURNS TEXT LANGUAGE sql IMM
     WHEN 'completed' THEN ' completed'
     WHEN 'interrupted' THEN ' interrupted'
     ELSE ' failed' END
- ELSE ingest.pre_information_reset_activity_message(kind) END;
+ ELSE aiosources.pre_information_reset_activity_message(kind) END;
 $$;
 `

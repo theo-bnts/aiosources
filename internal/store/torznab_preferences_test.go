@@ -51,7 +51,7 @@ func TestTorznabCachedRequestsDoNotNeedAnExtraPoolConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rollback(blockTx)
-	if _, err = blockTx.Exec(ctx, `SELECT id FROM ingest.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
+	if _, err = blockTx.Exec(ctx, `SELECT id FROM aiosources.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	readContext, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -154,7 +154,7 @@ func TestTorznabPreferencesUpgradePreservesExistingKeysAndDefaultVisibility(t *t
 		t.Fatal(err)
 	}
 	grant := legacyShareFixture(t, ctx, db, model.ShareInput{Name: "Existing Torznab", Scope: "all", Enabled: true, Fields: CatalogFields()})
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET format='torznab',media_types=ARRAY['movie','tv'],requests_per_minute=19,max_concurrent_downloads=3 WHERE id=$1`, grant.Share.ID); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET format='torznab',media_types=ARRAY['movie','tv'],requests_per_minute=19,max_concurrent_downloads=3 WHERE id=$1`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {

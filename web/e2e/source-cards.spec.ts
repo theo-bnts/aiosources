@@ -29,7 +29,7 @@ test.describe('source cards', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at)
         VALUES('card-run','example','Example collection','full','succeeded',$1,$2,now())`,
         [revision, source],
       )
@@ -54,8 +54,8 @@ test.describe('source cards', () => {
       await expect(card.getByRole('link', { name: 'Edit', exact: true })).toBeVisible()
       await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeVisible()
 
-      await db.query(`UPDATE ingest.runs SET status='running',finished_at=NULL WHERE id='card-run';
-        UPDATE ingest.schedule_clocks SET last_error='An active collection prevented this scheduled attempt; the next scheduled tick will retry' WHERE provider_id='example'`)
+      await db.query(`UPDATE aiosources.runs SET status='running',finished_at=NULL WHERE id='card-run';
+        UPDATE aiosources.schedule_clocks SET last_error='An active collection prevented this scheduled attempt; the next scheduled tick will retry' WHERE provider_id='example'`)
       await page.reload()
       await expect(card.getByText('Running', { exact: true })).toBeVisible()
       await expect(card.getByText(/^Next:/)).toHaveCount(0)
@@ -66,14 +66,14 @@ test.describe('source cards', () => {
       ).toBeDisabled()
 
       await db.query(
-        `UPDATE ingest.runs SET status='succeeded',finished_at=now() WHERE id='card-run'`,
+        `UPDATE aiosources.runs SET status='succeeded',finished_at=now() WHERE id='card-run'`,
       )
       await page.reload()
       await expect(card.getByText(/^Next:/)).toBeVisible()
       await expect(card).not.toContainText('An active collection prevented')
 
       await db.query(
-        `UPDATE ingest.runs SET status='paused',pause_reason='manual' WHERE id='card-run'`,
+        `UPDATE aiosources.runs SET status='paused',pause_reason='manual' WHERE id='card-run'`,
       )
       await page.reload()
       await expect(card.getByText('Paused', { exact: true })).toBeVisible()
@@ -125,11 +125,11 @@ test('deleting an edited source removes its data, retains secrets and returns to
   await db.connect()
   try {
     await db.query(
-      `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at) VALUES('disposable-run','disposable','Disposable archive','full','paused','',$1,now())`,
+      `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at) VALUES('disposable-run','disposable','Disposable archive','full','paused','',$1,now())`,
       [source],
     )
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('disposable','one','{"title":"Synthetic release"}')`,
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('disposable','one','{"title":"Synthetic release"}')`,
     )
   } finally {
     await db.end()

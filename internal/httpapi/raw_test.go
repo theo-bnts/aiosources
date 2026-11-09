@@ -26,7 +26,7 @@ func TestImportDiagnosticsProcessingFiltersCountsAndPagination(t *testing.T) {
 		}
 		selectedRun = run.ID
 		var pageID int64
-		if err = conn.QueryRow(f.ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type,payload_retained) VALUES($1,$2,0,''::bytea,'application/json',false) RETURNING id`, run.ID, provider).Scan(&pageID); err != nil {
+		if err = conn.QueryRow(f.ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type,payload_retained) VALUES($1,$2,0,''::bytea,'application/json',false) RETURNING id`, run.ID, provider).Scan(&pageID); err != nil {
 			t.Fatal(err)
 		}
 		for _, item := range []struct {
@@ -35,7 +35,7 @@ func TestImportDiagnosticsProcessingFiltersCountsAndPagination(t *testing.T) {
 		}{
 			{"accepted", "", false, false}, {"error", "Missing ID", false, false}, {"ignored", "", true, false}, {"enrichment", "", true, true}, {"priority-error", "Invalid fields", true, true},
 		} {
-			if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained) VALUES($1,$2,$3,$4,0,''::bytea,'application/json','{"title":"Literal %_ sample"}',$5,$6,$7,false)`, run.ID, provider, item.id, pageID, item.problem, item.ignored, item.auxiliary); err != nil {
+			if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,fields,error,ignored,auxiliary,payload_retained) VALUES($1,$2,$3,$4,0,''::bytea,'application/json','{"title":"Literal %_ sample"}',$5,$6,$7,false)`, run.ID, provider, item.id, pageID, item.problem, item.ignored, item.auxiliary); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -103,11 +103,11 @@ func TestRawAPISeparatesUnstoredObservationsFromHistoricalArchives(t *testing.T)
 		var pageID, rawID int64
 		// Omitting payload_retained models historical rows: an empty archived
 		// payload is still a downloadable payload, unlike a new observation.
-		if err := conn.QueryRow(ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type)
+		if err := conn.QueryRow(ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type)
 			VALUES($1,$2,0,$3,'application/octet-stream') RETURNING id`, run.ID, run.ProviderID, body).Scan(&pageID); err != nil {
 			t.Fatal(err)
 		}
-		if err := conn.QueryRow(ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type)
+		if err := conn.QueryRow(ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type)
 			VALUES($1,$2,$3,$4,0,$5,'application/octet-stream') RETURNING id`, run.ID, run.ProviderID, sourceID, pageID, raw).Scan(&rawID); err != nil {
 			t.Fatal(err)
 		}

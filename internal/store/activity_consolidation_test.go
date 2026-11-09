@@ -22,11 +22,11 @@ func TestActivityConsolidationKeepsHistoryAndRetiresAllOutboundState(t *testing.
 	if err := db.PutSecret(ctx, "old-destination", []byte("private-encrypted-value")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,service) VALUES('legacy-incident','error','aiosource.incident','TMDB is unavailable.','tmdb');
-INSERT INTO ingest.notifications(activity_id,level,kind,title,message,service,created_at)
-SELECT id,level,kind,'TMDB unavailable',message,service,created_at FROM ingest.activity_logs WHERE event_id='legacy-incident';
-INSERT INTO ingest.webhooks(id,name,enabled,url_secret_ref,events) VALUES('old-hook','Private recipient',TRUE,'old-destination',ARRAY['run.failed']);
-INSERT INTO ingest.webhook_deliveries(id,webhook_id,event_id,event_type,body,status,attempts,last_status)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,service) VALUES('legacy-incident','error','aiosource.incident','TMDB is unavailable.','tmdb');
+INSERT INTO aiosources.notifications(activity_id,level,kind,title,message,service,created_at)
+SELECT id,level,kind,'TMDB unavailable',message,service,created_at FROM aiosources.activity_logs WHERE event_id='legacy-incident';
+INSERT INTO aiosources.webhooks(id,name,enabled,url_secret_ref,events) VALUES('old-hook','Private recipient',TRUE,'old-destination',ARRAY['run.failed']);
+INSERT INTO aiosources.webhook_deliveries(id,webhook_id,event_id,event_type,body,status,attempts,last_status)
 VALUES('delivered','old-hook','legacy-incident','run.failed',convert_to('https://private.example/never-log-token','UTF8'),'delivered',2,200),
 ('pending','old-hook','pending-event','run.failed',convert_to('never-log-token','UTF8'),'pending',1,NULL);`); err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ VALUES('delivered','old-hook','legacy-incident','run.failed',convert_to('https:/
 	}
 	for _, table := range []string{"notifications", "webhooks", "webhook_deliveries"} {
 		var exists bool
-		if err := db.pool.QueryRow(ctx, "SELECT to_regclass('ingest.'||$1) IS NOT NULL", table).Scan(&exists); err != nil || exists {
+		if err := db.pool.QueryRow(ctx, "SELECT to_regclass('aiosources.'||$1) IS NOT NULL", table).Scan(&exists); err != nil || exists {
 			t.Fatalf("retired table %s remains active: %t %v", table, exists, err)
 		}
 	}

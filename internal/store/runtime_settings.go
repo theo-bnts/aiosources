@@ -10,26 +10,26 @@ import (
 )
 
 const runtimePolicySchema = `
-CREATE TABLE ingest.runtime_settings (
+CREATE TABLE aiosources.runtime_settings (
  section TEXT PRIMARY KEY CHECK(section IN ('debrid','outgoing','connections','history')),
  revision BIGINT NOT NULL DEFAULT 1 CHECK(revision>0),
  values JSONB NOT NULL CHECK(jsonb_typeof(values)='object')
 );
-INSERT INTO ingest.runtime_settings(section,values) VALUES
+INSERT INTO aiosources.runtime_settings(section,values) VALUES
  ('debrid','{"cache_jobs":4,"download_jobs":4,"cleanup_jobs":4,"public_checks":1}'),
  ('outgoing','{"metadata_seconds":60,"debrid_seconds":60,"inventory_seconds":600}'),
  ('connections','{"stremio_seconds":70,"torznab_seconds":20,"catalog_seconds":20}'),
  ('history','{"days":7,"cleanup_seconds":30}');
 `
 
-const runtimeSettingsSchema = runtimePolicySchema + `ALTER TABLE ingest.collection_settings ADD COLUMN auto_resume_interrupted BOOLEAN NOT NULL DEFAULT TRUE;`
+const runtimeSettingsSchema = runtimePolicySchema + `ALTER TABLE aiosources.collection_settings ADD COLUMN auto_resume_interrupted BOOLEAN NOT NULL DEFAULT TRUE;`
 
 const extendedRuntimeSettingsSchema = `
-ALTER TABLE ingest.runtime_settings DROP CONSTRAINT runtime_settings_section_check;
-ALTER TABLE ingest.runtime_settings ADD CONSTRAINT runtime_settings_section_check CHECK(section IN
+ALTER TABLE aiosources.runtime_settings DROP CONSTRAINT runtime_settings_section_check;
+ALTER TABLE aiosources.runtime_settings ADD CONSTRAINT runtime_settings_section_check CHECK(section IN
  ('debrid','outgoing','connections','history','identification','matching','metadata','metadata_retries','source_retries','debrid_retries','downloads','security','payloads'));
-UPDATE ingest.runtime_settings SET values='{"batch_size":5000,"pass_seconds":10}'::jsonb || values,revision=revision+1 WHERE section='history';
-INSERT INTO ingest.runtime_settings(section,values) VALUES
+UPDATE aiosources.runtime_settings SET values='{"batch_size":5000,"pass_seconds":10}'::jsonb || values,revision=revision+1 WHERE section='history';
+INSERT INTO aiosources.runtime_settings(section,values) VALUES
  ('identification','{"workers":0,"queue_batch":250,"transaction_batch":25}'),
  ('matching','{"minimum_similarity":92,"ambiguity_margin":8}'),
  ('metadata','{"workers":16,"queue_batch":100,"publication_batch":16}'),
@@ -55,7 +55,7 @@ func (s *Store) RuntimeSection(ctx context.Context, section string) (model.Runti
 	}
 	var value model.RuntimeSection
 	var encoded []byte
-	err := s.pool.QueryRow(ctx, `SELECT revision,values FROM ingest.runtime_settings WHERE section=$1`, section).Scan(&value.Revision, &encoded)
+	err := s.pool.QueryRow(ctx, `SELECT revision,values FROM aiosources.runtime_settings WHERE section=$1`, section).Scan(&value.Revision, &encoded)
 	if err != nil {
 		return value, databaseError("read runtime settings", err)
 	}
@@ -82,14 +82,14 @@ func (s *Store) UpdateRuntimeSection(ctx context.Context, section string, input 
 	if section == "matching" {
 		// Fence publication before changing the decision policy. Existing manual
 		// reviews remain authoritative; automatic results are queued afresh.
-		if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+		if _, err := tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 			return databaseError("lock identification policy", err)
 		}
-		if err := tx.QueryRow(ctx, `SELECT values<>$1::jsonb FROM ingest.runtime_settings WHERE section='matching'`, encoded).Scan(&matchingChanged); err != nil {
+		if err := tx.QueryRow(ctx, `SELECT values<>$1::jsonb FROM aiosources.runtime_settings WHERE section='matching'`, encoded).Scan(&matchingChanged); err != nil {
 			return databaseError("read previous identification policy", err)
 		}
 	}
-	result, err := tx.Exec(ctx, `UPDATE ingest.runtime_settings SET values=$2,revision=revision+1 WHERE section=$1 AND revision=$3`, section, encoded, input.Revision)
+	result, err := tx.Exec(ctx, `UPDATE aiosources.runtime_settings SET values=$2,revision=revision+1 WHERE section=$1 AND revision=$3`, section, encoded, input.Revision)
 	if err != nil {
 		return databaseError("save runtime settings", err)
 	}
@@ -98,12 +98,12 @@ func (s *Store) UpdateRuntimeSection(ctx context.Context, section string, input 
 	}
 	if matchingChanged {
 		if _, err := tx.Exec(ctx, `
-DELETE FROM ingest.aio_matches m WHERE NOT EXISTS(SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=m.provider_id AND r.source_id=m.source_id AND r.active);
-INSERT INTO ingest.aio_match_queue(provider_id,source_id)
- SELECT t.provider_id,t.source_id FROM ingest.torrents t WHERE NOT EXISTS(
- SELECT 1 FROM ingest.aio_match_reviews r WHERE r.provider_id=t.provider_id AND r.source_id=t.source_id AND r.active)
- ON CONFLICT(provider_id,source_id) DO UPDATE SET version=ingest.aio_match_queue.version+1;
-UPDATE ingest.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL;`); err != nil {
+DELETE FROM aiosources.aio_matches m WHERE NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews r WHERE r.provider_id=m.provider_id AND r.source_id=m.source_id AND r.active);
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
+ SELECT t.provider_id,t.source_id FROM aiosources.torrents t WHERE NOT EXISTS(
+ SELECT 1 FROM aiosources.aio_match_reviews r WHERE r.provider_id=t.provider_id AND r.source_id=t.source_id AND r.active)
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1;
+UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL;`); err != nil {
 			return databaseError("queue identification policy review", err)
 		}
 	}
@@ -163,7 +163,7 @@ func (s *Store) RuntimeValue(ctx context.Context, section, key string) (int, err
 }
 
 func (s *Store) loadRuntimeSettings(ctx context.Context) (map[string]model.RuntimeSection, error) {
-	rows, err := s.pool.Query(ctx, `SELECT section,revision,values FROM ingest.runtime_settings`)
+	rows, err := s.pool.Query(ctx, `SELECT section,revision,values FROM aiosources.runtime_settings`)
 	if err != nil {
 		return nil, databaseError("load runtime policy", err)
 	}

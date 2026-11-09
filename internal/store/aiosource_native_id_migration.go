@@ -8,7 +8,7 @@ OR fields->'external_ids' ?| ARRAY['mal','mal_id']
 OR fields->'attributes' ?| ARRAY['mal','malid']`
 
 const aioNativeIDSchema = `
-CREATE FUNCTION ingest.aio_native_mal_candidates(fields JSONB) RETURNS TEXT[]
+CREATE FUNCTION aiosources.aio_native_mal_candidates(fields JSONB) RETURNS TEXT[]
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
     WITH RECURSIVE assertions(value) AS (
         SELECT value FROM (VALUES
@@ -28,6 +28,6 @@ LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
     SELECT COALESCE(array_agg(DISTINCT id),ARRAY[]::text[])
     FROM candidates WHERE id ~ '^[1-9][0-9]{0,15}$';
 $$;
-CREATE INDEX aio_torrents_native_mal ON ingest.torrents USING GIN((ingest.aio_native_mal_candidates(fields)))
+CREATE INDEX aio_torrents_native_mal ON aiosources.torrents USING GIN((aiosources.aio_native_mal_candidates(fields)))
 WHERE ` + aioMALAssertionPredicate + `;
 `

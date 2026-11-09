@@ -73,7 +73,7 @@ func TestCatalogAndStremioShareLanguageFilterAndLargestFirstOffline(t *testing.T
 	}{{"fr", "FRENCH", 300}, {"de", "GERMAN", 900}, {"multi", "MULTI", 500}, {"unknown", "1080p", 100}}
 	for i, row := range rows {
 		seedMovie(t, ctx, s, conn, "source", row.id, strings.Repeat(string(rune('a'+i)), 40))
-		if _, err := conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(jsonb_set(fields,'{title}',to_jsonb($1::text)),'{size}',to_jsonb($2::bigint)) WHERE source_id=$3`, "Example.Movie.2021."+row.lang, row.size, row.id); err != nil {
+		if _, err := conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(jsonb_set(fields,'{title}',to_jsonb($1::text)),'{size}',to_jsonb($2::bigint)) WHERE source_id=$3`, "Example.Movie.2021."+row.lang, row.size, row.id); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -133,7 +133,7 @@ func TestTMDBTranslationsKeepLanguageWithoutChangingAliases(t *testing.T) {
 
 func TestNativePresentationUsesWhitelistedFieldsWithoutSubtitleURLs(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resolution":2160,"codec":"HEVC","repack":true,"bitrate":15000000,"sublangs":["fr"],"subtitles":[{"lang":"en","url":"https://secret.invalid/private-subtitle-key"}],"release_group":"ExampleGroup","attributes":{"audiocodec":"TRUEHD","audiochannels":"7.1","hdr":"HDR10+","secret_key":"never-display"}}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","resolution":2160,"codec":"HEVC","repack":true,"bitrate":15000000,"sublangs":["fr"],"subtitles":[{"lang":"en","url":"https://secret.invalid/private-subtitle-key"}],"release_group":"ExampleGroup","attributes":{"audiocodec":"TRUEHD","audiochannels":"7.1","hdr":"HDR10+","secret_key":"never-display"}}')`); err != nil {
 		t.Fatal(err)
 	}
 	queued, err := s.DB.AIOMatchBatch(ctx, 1)

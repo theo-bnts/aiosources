@@ -15,14 +15,14 @@ func TestIdentificationDiagnosticsExcludeStaleDecisionsAndProtectFields(t *testi
 		publishSharingRow(t, ctx, db, "one", id, `{"title":"Release `+id+`","download_url":"https://source.invalid/synthetic-credential","arbitrary":"private-field"}`, nil)
 	}
 	publishSharingRow(t, ctx, db, "two", "pending", `{"title":"Other %_ release"}`, nil)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years,revision) VALUES('movie','1','tt1234567',ARRAY[2021],2);
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years,revision) VALUES('movie','1','tt1234567',ARRAY[2021],2);
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
  SELECT provider_id,source_id,CASE WHEN source_id='changed' THEN 'old' ELSE md5(fields::text) END,
- CASE WHEN source_id IN ('matched','revision') THEN (SELECT id FROM ingest.aio_works) ELSE NULL END,
+ CASE WHEN source_id IN ('matched','revision') THEN (SELECT id FROM aiosources.aio_works) ELSE NULL END,
  CASE WHEN source_id='matched' THEN 2 ELSE 1 END,
  CASE WHEN source_id IN ('ambiguous','queued') THEN 'ambiguous' WHEN source_id='unmatched' THEN 'unmatched' ELSE 'matched' END,
- 'stored explanation' FROM ingest.torrents WHERE provider_id='one' AND source_id<>'pending';
-DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
+ 'stored explanation' FROM aiosources.torrents WHERE provider_id='one' AND source_id<>'pending';
+DELETE FROM aiosources.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 		t.Fatal(err)
 	}
 	status, err := db.AIOStatus(ctx)
@@ -83,7 +83,7 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 	if _, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{Status: "unknown"}); !errors.Is(err, model.ErrInvalid) {
 		t.Fatalf("invalid status accepted: %v", err)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('one','matched')`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id) VALUES('one','matched')`); err != nil {
 		t.Fatal(err)
 	}
 	status, err = db.AIOStatus(ctx)
@@ -101,13 +101,13 @@ DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued'`); err != nil {
 
 func TestAmbiguousReviewFilterKeepsCurrentProofsAndPagination(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years,revision) VALUES('movie','101',ARRAY[2024],2);
-INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years,revision) VALUES('movie','101',ARRAY[2024],2);
+INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 SELECT 'example',id,jsonb_build_object('title','Example review '||id) FROM unnest(ARRAY['current-a','current-b','changed','queued']) id;
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
 SELECT provider_id,source_id,CASE WHEN source_id='changed' THEN 'old' ELSE fields_fingerprint END,
-(SELECT id FROM ingest.aio_works),1,'ambiguous','multiple plausible works' FROM ingest.torrents;
-DELETE FROM ingest.aio_match_queue WHERE source_id<>'queued';`); err != nil {
+(SELECT id FROM aiosources.aio_works),1,'ambiguous','multiple plausible works' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue WHERE source_id<>'queued';`); err != nil {
 		t.Fatal(err)
 	}
 	all, err := db.ListAIOMatchDiagnostics(ctx, model.ListOptions{})

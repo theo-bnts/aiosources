@@ -21,13 +21,13 @@ func TestLeecherRetirementPreservesFreshAndStaleIdentificationAndReviews(t *test
 		publishSharingRow(t, ctx, db, "fixture", id, `{"title":"Example Film 2026","size":9007199254740993,"leechers":12,"attributes":{"leechers":["12"],"imdbid":["tt123"]}}`, nil)
 	}
 	if _, err = db.pool.Exec(ctx, `
-INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','123','tt123',ARRAY[2026]);
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
- SELECT provider_id,source_id,CASE WHEN source_id='stale' THEN repeat('0',32) ELSE md5(fields::text) END,1,1,'matched','verified' FROM ingest.torrents;
-INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
- SELECT provider_id,source_id,md5(fields::text),md5(ingest.aio_review_evidence(fields)::text),'movie','123' FROM ingest.torrents;
-DELETE FROM ingest.aio_match_queue;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('fixture','queued');`); err != nil {
+INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','123','tt123',ARRAY[2026]);
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT provider_id,source_id,CASE WHEN source_id='stale' THEN repeat('0',32) ELSE md5(fields::text) END,1,1,'matched','verified' FROM aiosources.torrents;
+INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id)
+ SELECT provider_id,source_id,md5(fields::text),md5(aiosources.aio_review_evidence(fields)::text),'movie','123' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue;
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id) VALUES('fixture','queued');`); err != nil {
 		t.Fatal(err)
 	}
 	shares := []model.ShareCredential{}
@@ -35,7 +35,7 @@ INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('fixture','queu
 		share := legacyShareFixture(t, ctx, db, model.ShareInput{Name: name, Scope: "all", Fields: []string{"title"}})
 		shares = append(shares, share)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.shares SET enabled=TRUE,fields=CASE WHEN id=$1 THEN ARRAY['title','leechers'] ELSE ARRAY['leechers'] END WHERE id IN ($1,$2)`, shares[0].Share.ID, shares[1].Share.ID); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.shares SET enabled=TRUE,fields=CASE WHEN id=$1 THEN ARRAY['title','leechers'] ELSE ARRAY['leechers'] END WHERE id IN ($1,$2)`, shares[0].Share.ID, shares[1].Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {
@@ -52,7 +52,7 @@ INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('fixture','queu
 	}
 	for _, table := range []string{"torrents", "staged_torrents", "raw_records", "catalog_journal", "catalog_baselines", "torrent_history_baselines"} {
 		var count int
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table+` WHERE fields @? '$.**.leechers'`).Scan(&count); err != nil || count != 0 {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table+` WHERE fields @? '$.**.leechers'`).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("retired leechers remain in %s: %d %v", table, count, err)
 		}
 	}
@@ -75,7 +75,7 @@ INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('fixture','queu
 	}
 	publishSharingRow(t, ctx, db, "fixture", "new", `{"title":"New","leechers":99,"nested":[{"leechers":4,"kept":"value"}]}`, nil)
 	var exists bool
-	if err = db.pool.QueryRow(ctx, `SELECT fields @? '$.**.leechers' FROM ingest.torrents WHERE source_id='new'`).Scan(&exists); err != nil || exists {
+	if err = db.pool.QueryRow(ctx, `SELECT fields @? '$.**.leechers' FROM aiosources.torrents WHERE source_id='new'`).Scan(&exists); err != nil || exists {
 		t.Fatalf("storage boundary retained leechers: %v %v", exists, err)
 	}
 }

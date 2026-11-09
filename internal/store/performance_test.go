@@ -48,24 +48,24 @@ func BenchmarkCollectionPersistence(b *testing.B) {
 
 func BenchmarkCatalogReadPaths(b *testing.B) {
 	ctx, db := sharingDatabase(b)
-	_, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+	_, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
  SELECT 'movie',n::text,'tt'||(10000000+n)::text,ARRAY[2026] FROM generate_series(1,1000) n;
- INSERT INTO ingest.aio_titles(work_id,title,normalized)
- SELECT id,'Synthetic Documentary '||tmdb_id,'synthetic documentary '||tmdb_id FROM ingest.aio_works;
- INSERT INTO ingest.aio_works(media_type,openlibrary_id,display_title,years)
+ INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+ SELECT id,'Synthetic Documentary '||tmdb_id,'synthetic documentary '||tmdb_id FROM aiosources.aio_works;
+ INSERT INTO aiosources.aio_works(media_type,openlibrary_id,display_title,years)
  SELECT 'book','OL'||n||'W','Synthetic Book '||n,ARRAY[2026] FROM generate_series(1,20000) n;
- INSERT INTO ingest.ol_editions(id,work_keys,title,normalized)
+ INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized)
  SELECT 'OL'||n||'M',ARRAY['OL'||n||'W'],'Synthetic Book Edition '||n,'synthetic book edition '||n FROM generate_series(1,20000) n;
- INSERT INTO ingest.torrents(provider_id,source_id,fields)
+ INSERT INTO aiosources.torrents(provider_id,source_id,fields)
  SELECT 'synthetic-'||(n%3)::text,n::text,jsonb_build_object('title','Synthetic.Documentary.'||n||'.2026.1080p','info_hash',md5(n::text)||'12345678','size',123456789) FROM generate_series(1,120000) n;
- INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
  SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','synthetic fixture'
- FROM ingest.torrents t JOIN ingest.aio_works w ON w.tmdb_id=((t.source_id::int%1000)+1)::text;
- DELETE FROM ingest.aio_match_queue;
- INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files)
+ FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.tmdb_id=((t.source_id::int%1000)+1)::text;
+ DELETE FROM aiosources.aio_match_queue;
+ INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files)
  SELECT 'torbox',md5(n::text)||'12345678',true,now(),'[]'::jsonb FROM generate_series(1,10000) n;
- ANALYZE ingest.torrents; ANALYZE ingest.aio_matches; ANALYZE ingest.aio_works;
- ANALYZE ingest.aio_match_queue; ANALYZE ingest.aio_shared_availability;`)
+ ANALYZE aiosources.torrents; ANALYZE aiosources.aio_matches; ANALYZE aiosources.aio_works;
+ ANALYZE aiosources.aio_match_queue; ANALYZE aiosources.aio_shared_availability;`)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -112,13 +112,13 @@ func BenchmarkCatalogReadPaths(b *testing.B) {
 
 func BenchmarkAdministrationPaths(b *testing.B) {
 	ctx, db := sharingDatabase(b)
-	_, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	_, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
  SELECT 'synthetic',n::text,jsonb_build_object('title','Synthetic.Documentary.'||n||'.2026','size',123456789) FROM generate_series(1,30000) n;
- INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,traversal_done)
+ INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,traversal_done)
  VALUES('synthetic-history','synthetic','Synthetic source','preview','succeeded','','{}',true);
- INSERT INTO ingest.events(run_id,kind,message,data)
+ INSERT INTO aiosources.events(run_id,kind,message,data)
  SELECT 'synthetic-history','page_saved','Synthetic event','{}'::jsonb FROM generate_series(1,20000);
- ANALYZE ingest.torrents; ANALYZE ingest.runs; ANALYZE ingest.events; ANALYZE ingest.activity_logs;`)
+ ANALYZE aiosources.torrents; ANALYZE aiosources.runs; ANALYZE aiosources.events; ANALYZE aiosources.activity_logs;`)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func BenchmarkStorageChoices(b *testing.B) {
 			iteration := 0
 			allocated := func() int64 {
 				var size int64
-				if err := db.pool.QueryRow(ctx, `SELECT sum(pg_total_relation_size(name::regclass)) FROM unnest(ARRAY['ingest.torrents','ingest.raw_records','ingest.torrent_history']) name`).Scan(&size); err != nil {
+				if err := db.pool.QueryRow(ctx, `SELECT sum(pg_total_relation_size(name::regclass)) FROM unnest(ARRAY['aiosources.torrents','aiosources.raw_records','aiosources.torrent_history']) name`).Scan(&size); err != nil {
 					b.Fatal(err)
 				}
 				return size
@@ -225,7 +225,7 @@ func BenchmarkStorageChoices(b *testing.B) {
 			}
 			b.StopTimer()
 			var bytes int64
-			if err = db.pool.QueryRow(ctx, `SELECT COALESCE((SELECT sum(pg_column_size(t)) FROM ingest.torrents t),0)+COALESCE((SELECT sum(pg_column_size(r)) FROM ingest.raw_records r),0)+COALESCE((SELECT sum(pg_column_size(h)) FROM ingest.torrent_history h),0)`).Scan(&bytes); err != nil {
+			if err = db.pool.QueryRow(ctx, `SELECT COALESCE((SELECT sum(pg_column_size(t)) FROM aiosources.torrents t),0)+COALESCE((SELECT sum(pg_column_size(r)) FROM aiosources.raw_records r),0)+COALESCE((SELECT sum(pg_column_size(h)) FROM aiosources.torrent_history h),0)`).Scan(&bytes); err != nil {
 				b.Fatal(err)
 			}
 			b.ReportMetric(float64(bytes)/float64(iteration*len(items)), "row-B/record")

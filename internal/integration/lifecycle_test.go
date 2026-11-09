@@ -487,7 +487,7 @@ func TestLegacyImportIsAdditiveWithoutResurrectingFullDeletions(t *testing.T) {
 	// This scenario verifies the optional complete processing history.
 	useFullStorage(t, ctx, db)
 	// SQL is used only to model the pre-existing public legacy table, never to
-	// inspect or mutate implementation-owned ingest state.
+	// inspect or mutate implementation-owned aiosources state.
 	fixture, err := pgx.Connect(ctx, withoutPoolOptions(t, databaseURL))
 	if err != nil {
 		t.Fatal(err)

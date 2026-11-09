@@ -21,17 +21,17 @@ func ageCollectionHistory(t *testing.T, ctx context.Context, db *Store, id strin
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true)`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true)`); err != nil {
 		t.Fatal(err)
 	}
 	for _, query := range []string{
-		`UPDATE ingest.runs SET created_at=created_at-interval '8 days',started_at=started_at-interval '8 days',finished_at=finished_at-interval '8 days' WHERE id=$1`,
-		`UPDATE ingest.torrents SET first_seen_at=first_seen_at-interval '8 days',last_seen_at=last_seen_at-interval '8 days',collection_verified_at=collection_verified_at-interval '8 days' WHERE raw_id IN (SELECT id FROM ingest.raw_records WHERE run_id=$1)`,
-		`UPDATE ingest.pages SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
-		`UPDATE ingest.raw_records SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
-		`UPDATE ingest.events SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
-		`UPDATE ingest.activity_logs SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
-		`UPDATE ingest.torrent_history SET occurred_at=occurred_at-interval '8 days' WHERE run_id=$1`,
+		`UPDATE aiosources.runs SET created_at=created_at-interval '8 days',started_at=started_at-interval '8 days',finished_at=finished_at-interval '8 days' WHERE id=$1`,
+		`UPDATE aiosources.torrents SET first_seen_at=first_seen_at-interval '8 days',last_seen_at=last_seen_at-interval '8 days',collection_verified_at=collection_verified_at-interval '8 days' WHERE raw_id IN (SELECT id FROM aiosources.raw_records WHERE run_id=$1)`,
+		`UPDATE aiosources.pages SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
+		`UPDATE aiosources.raw_records SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
+		`UPDATE aiosources.events SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
+		`UPDATE aiosources.activity_logs SET created_at=created_at-interval '8 days' WHERE run_id=$1`,
+		`UPDATE aiosources.torrent_history SET occurred_at=occurred_at-interval '8 days' WHERE run_id=$1`,
 	} {
 		if _, err = tx.Exec(ctx, query, id); err != nil {
 			t.Fatal(err)
@@ -68,7 +68,7 @@ func TestHistoryRetentionPreservesPublishedDataAndCollectionBaseline(t *testing.
 	before := mirrorRows(t, ctx, db, provider.ID)["published"]
 	ageCollectionHistory(t, ctx, db, run.ID)
 	var queueBefore int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_match_queue`).Scan(&queueBefore); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_match_queue`).Scan(&queueBefore); err != nil {
 		t.Fatal(err)
 	}
 	drainHistory(t, ctx, db)
@@ -88,12 +88,12 @@ func TestHistoryRetentionPreservesPublishedDataAndCollectionBaseline(t *testing.
 		t.Fatalf("expiry restarted initial Full: %+v %v", next, err)
 	}
 	var queueAfter int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_match_queue`).Scan(&queueAfter); err != nil || queueAfter != queueBefore {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_match_queue`).Scan(&queueAfter); err != nil || queueAfter != queueBefore {
 		t.Fatalf("expiry created false identification work: %d %d %v", queueBefore, queueAfter, err)
 	}
 	for _, table := range []string{"raw_records", "pages", "events", "torrent_history"} {
 		var count int
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table).Scan(&count); err != nil || (table != "events" && count != 0) {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table).Scan(&count); err != nil || (table != "events" && count != 0) {
 			t.Fatalf("old %s retained: %d %v", table, count, err)
 		}
 	}
@@ -125,7 +125,7 @@ func TestHistoryRetentionPreservesOldFullRecoveryAndCoverage(t *testing.T) {
 				t.Fatal("cleanup published unfinished staging")
 			}
 			var staged, raw int
-			if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1 AND raw_id IS NULL),(SELECT count(*) FROM ingest.raw_records WHERE run_id=$1)`, run.ID).Scan(&staged, &raw); err != nil || staged != 1 || raw != 0 {
+			if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1 AND raw_id IS NULL),(SELECT count(*) FROM aiosources.raw_records WHERE run_id=$1)`, run.ID).Scan(&staged, &raw); err != nil || staged != 1 || raw != 0 {
 				t.Fatalf("staging or expired records changed: %d %d %v", staged, raw, err)
 			}
 			if complete, e := db.FilterComplete(ctx, run.ID, "root", []string{"root-filter"}); e != nil || !complete {
@@ -184,8 +184,8 @@ func TestHistoryRetentionIsBoundedAndCancellationRollsBack(t *testing.T) {
 	if _, err = db.FinishRun(ctx, run.ID, model.StatusPaused, "", model.PauseBudget); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,created_at)
- SELECT $1,'bounded',n::text,(SELECT id FROM ingest.pages WHERE run_id=$1 LIMIT 1),1,'','application/json',now() FROM generate_series(1,$2::int) n`, run.ID, historyBatchSize); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,created_at)
+ SELECT $1,'bounded',n::text,(SELECT id FROM aiosources.pages WHERE run_id=$1 LIMIT 1),1,'','application/json',now() FROM generate_series(1,$2::int) n`, run.ID, historyBatchSize); err != nil {
 		t.Fatal(err)
 	}
 	ageCollectionHistory(t, ctx, db, run.ID)
@@ -195,13 +195,13 @@ func TestHistoryRetentionIsBoundedAndCancellationRollsBack(t *testing.T) {
 		t.Fatalf("cancelled cleanup: %v", err)
 	}
 	var count int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.raw_records`).Scan(&count); err != nil || count != historyBatchSize+1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.raw_records`).Scan(&count); err != nil || count != historyBatchSize+1 {
 		t.Fatalf("cancelled cleanup removed content: %d %v", count, err)
 	}
 	if _, err = db.PruneHistory(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.raw_records`).Scan(&count); err != nil || count != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.raw_records`).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("cleanup exceeded its record batch: %d %v", count, err)
 	}
 	drainHistory(t, ctx, db)
@@ -257,7 +257,7 @@ func TestHistoryRetentionCompactsCatalogWithoutChangingRecentSnapshots(t *testin
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true); UPDATE ingest.catalog_journal SET recorded_at=now()-interval '8 days'`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true); UPDATE aiosources.catalog_journal SET recorded_at=now()-interval '8 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -284,10 +284,10 @@ func TestHistoryRetentionCompactsCatalogWithoutChangingRecentSnapshots(t *testin
 		t.Fatalf("recent delta changed: %+v", delta)
 	}
 	var count int
-	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.catalog_journal)+(SELECT count(*) FROM ingest.catalog_baselines)`).Scan(&count); err != nil || count != 4 {
+	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.catalog_journal)+(SELECT count(*) FROM aiosources.catalog_baselines)`).Scan(&count); err != nil || count != 4 {
 		t.Fatalf("old duplicate versions remain: %d %v", count, err)
 	}
-	if _, err = db.pool.Exec(ctx, `DELETE FROM ingest.catalog_journal`); err == nil {
+	if _, err = db.pool.Exec(ctx, `DELETE FROM aiosources.catalog_journal`); err == nil {
 		t.Fatal("cleanup left the journal mutable")
 	}
 }
@@ -297,10 +297,10 @@ func TestHistoryRetentionCatalogRemainsCompleteAcrossCleanupBatches(t *testing.T
 	grant := sharingGrant(t, ctx, db)
 	publishSharingRow(t, ctx, db, "shared", "a", `{"title":"A original"}`, nil)
 	publishSharingRow(t, ctx, db, "shared", "b", `{"title":"B original"}`, nil)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.catalog_journal(provider_id,source_id,origin,fields,deleted)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.catalog_journal(provider_id,source_id,origin,fields,deleted)
 SELECT 'shared','a',original.origin,jsonb_build_object('title','A version '||version),FALSE
 FROM generate_series(1,$1::integer) version CROSS JOIN LATERAL (
- SELECT origin FROM ingest.catalog_journal WHERE provider_id='shared' AND source_id='a' ORDER BY sequence LIMIT 1
+ SELECT origin FROM aiosources.catalog_journal WHERE provider_id='shared' AND source_id='a' ORDER BY sequence LIMIT 1
 ) original`, historyBatchSize); err != nil {
 		t.Fatal(err)
 	}
@@ -309,8 +309,8 @@ FROM generate_series(1,$1::integer) version CROSS JOIN LATERAL (
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT set_config('ingest.history_retention','on',true);
-UPDATE ingest.catalog_journal SET recorded_at=now()-interval '8 days'`); err != nil {
+	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true);
+UPDATE aiosources.catalog_journal SET recorded_at=now()-interval '8 days'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -322,7 +322,7 @@ UPDATE ingest.catalog_journal SET recorded_at=now()-interval '8 days'`); err != 
 		t.Fatal(err)
 	}
 	var remaining int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal WHERE recorded_at<now()-interval '7 days'`).Scan(&remaining); err != nil || remaining != 2 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal WHERE recorded_at<now()-interval '7 days'`).Scan(&remaining); err != nil || remaining != 2 {
 		t.Fatalf("first cleanup was not bounded: %d %v", remaining, err)
 	}
 	next := sharingPage(t, ctx, db, grant, CatalogPageRequest{Cursor: page.NextCursor})
@@ -334,7 +334,7 @@ UPDATE ingest.catalog_journal SET recorded_at=now()-interval '8 days'`); err != 
 	if len(full.Items) != 2 || full.Items[0].Fields["title"] != "B original" || full.Items[1].Fields["title"] != "A current" {
 		t.Fatalf("later cleanup lost a live catalog copy: %+v", full)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.catalog_baselines)+(SELECT count(*) FROM ingest.catalog_journal)`).Scan(&remaining); err != nil || remaining != 3 {
+	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.catalog_baselines)+(SELECT count(*) FROM aiosources.catalog_journal)`).Scan(&remaining); err != nil || remaining != 3 {
 		t.Fatalf("expired versions remain: %d %v", remaining, err)
 	}
 }
@@ -361,7 +361,7 @@ func TestHistoryRetentionExpiresOperationsLogsAndIdleStremioRequests(t *testing.
 	if err = db.RecordActivity(ctx, "info", "service.started", "", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.operation_runs SET created_at=created_at-interval '8 days',updated_at=updated_at-interval '8 days',finished_at=finished_at-interval '8 days'; UPDATE ingest.operation_events SET created_at=created_at-interval '8 days'; UPDATE ingest.activity_logs SET created_at=created_at-interval '8 days'; INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results) VALUES(now()-interval '8 days','movie','imdb:tt123',1,'empty',0,0,0,0,0,0,0,false,'[]')`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.operation_runs SET created_at=created_at-interval '8 days',updated_at=updated_at-interval '8 days',finished_at=finished_at-interval '8 days'; UPDATE aiosources.operation_events SET created_at=created_at-interval '8 days'; UPDATE aiosources.activity_logs SET created_at=created_at-interval '8 days'; INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results) VALUES(now()-interval '8 days','movie','imdb:tt123',1,'empty',0,0,0,0,0,0,0,false,'[]')`); err != nil {
 		t.Fatal(err)
 	}
 	drainHistory(t, ctx, db)
@@ -398,11 +398,11 @@ func TestHistoryRetentionMigrationKeepsLegacyAcceptanceEvidence(t *testing.T) {
 		// Seed using the historical schema, rather than a current writer that
 		// necessarily requires columns added by later migrations.
 		run := model.Run{ID: tc.id + "-legacy", ProviderID: tc.id}
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,revision,mode,status,config) VALUES($1,$2,$2,'','incremental','queued',jsonb_build_object('id',$2::text,'adapter','http_json'))`, run.ID, tc.id); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,revision,mode,status,config) VALUES($1,$2,$2,'','incremental','queued',jsonb_build_object('id',$2::text,'adapter','http_json'))`, run.ID, tc.id); err != nil {
 			t.Fatal(err)
 		}
 		var page int64
-		if err = db.pool.QueryRow(ctx, `INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,$2,1,'','application/json') RETURNING id`, run.ID, tc.id).Scan(&page); err != nil {
+		if err = db.pool.QueryRow(ctx, `INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type) VALUES($1,$2,1,'','application/json') RETURNING id`, run.ID, tc.id).Scan(&page); err != nil {
 			t.Fatal(err)
 		}
 		errorText := ""
@@ -413,10 +413,10 @@ func TestHistoryRetentionMigrationKeepsLegacyAcceptanceEvidence(t *testing.T) {
 			query string
 			args  []any
 		}{
-			{`INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,error) VALUES($1,$2,'accepted',$3,1,'','application/json',''),($1,$2,'rejected',$3,1,'','application/json',$4)`, []any{run.ID, tc.id, page, errorText}},
-			{`INSERT INTO ingest.run_record_identities(run_id,source_id) VALUES($1,'accepted')`, []any{run.ID}},
-			{`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,'accepted','{"title":"Legacy"}')`, []any{tc.id}},
-			{`UPDATE ingest.runs SET status='succeeded',finished_at=now(),errors=1 WHERE id=$1`, []any{run.ID}},
+			{`INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,error) VALUES($1,$2,'accepted',$3,1,'','application/json',''),($1,$2,'rejected',$3,1,'','application/json',$4)`, []any{run.ID, tc.id, page, errorText}},
+			{`INSERT INTO aiosources.run_record_identities(run_id,source_id) VALUES($1,'accepted')`, []any{run.ID}},
+			{`INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,'accepted','{"title":"Legacy"}')`, []any{tc.id}},
+			{`UPDATE aiosources.runs SET status='succeeded',finished_at=now(),errors=1 WHERE id=$1`, []any{run.ID}},
 		} {
 			if _, err = db.pool.Exec(ctx, statement.query, statement.args...); err != nil {
 				t.Fatal(err)
@@ -452,13 +452,13 @@ func TestHistoryRetentionDetachesRecentReferencesToExpiredArchives(t *testing.T)
 	}
 	mirrorFinish(t, ctx, db, old, model.StatusSucceeded)
 	var oldRaw, oldPage int64
-	if err = db.pool.QueryRow(ctx, `SELECT id,page_id FROM ingest.raw_records WHERE run_id=$1`, old.ID).Scan(&oldRaw, &oldPage); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT id,page_id FROM aiosources.raw_records WHERE run_id=$1`, old.ID).Scan(&oldRaw, &oldPage); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.raw_records SET raw='original',fields='{"title":"Original"}',payload_retained=TRUE WHERE id=$1`, oldRaw); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET raw='original',fields='{"title":"Original"}',payload_retained=TRUE WHERE id=$1`, oldRaw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.pages SET body='original',payload_retained=TRUE WHERE id=$1`, oldPage); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.pages SET body='original',payload_retained=TRUE WHERE id=$1`, oldPage); err != nil {
 		t.Fatal(err)
 	}
 	ageCollectionHistory(t, ctx, db, old.ID)
@@ -468,16 +468,16 @@ func TestHistoryRetentionDetachesRecentReferencesToExpiredArchives(t *testing.T)
 		t.Fatal(err)
 	}
 	mirrorFinish(t, ctx, db, recent, model.StatusSucceeded)
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.raw_records SET fields='{}',payload_id=$2,payload_retained=TRUE WHERE run_id=$1`, recent.ID, oldRaw); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.raw_records SET fields='{}',payload_id=$2,payload_retained=TRUE WHERE run_id=$1`, recent.ID, oldRaw); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.pages SET payload_id=$2,payload_retained=TRUE WHERE run_id=$1`, recent.ID, oldPage); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.pages SET payload_id=$2,payload_retained=TRUE WHERE run_id=$1`, recent.ID, oldPage); err != nil {
 		t.Fatal(err)
 	}
 	drainHistory(t, ctx, db)
 	for _, table := range []string{"raw_records", "pages"} {
 		var count int
-		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table+` WHERE run_id=$1 AND payload_id IS NULL AND NOT payload_retained`, recent.ID).Scan(&count); err != nil || count != 1 {
+		if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table+` WHERE run_id=$1 AND payload_id IS NULL AND NOT payload_retained`, recent.ID).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("recent %s lost its identity or retained an expired reference: %d %v", table, count, err)
 		}
 	}
@@ -516,12 +516,12 @@ func TestHistoryRetentionRollsBackWhenPublicationIsBusy(t *testing.T) {
 		t.Fatalf("blocked cleanup did not respect its deadline: %v", err)
 	}
 	var count int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.raw_records WHERE run_id=$1`, run.ID).Scan(&count); err != nil || count != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.raw_records WHERE run_id=$1`, run.ID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("interrupted cleanup partially committed: %d %v", count, err)
 	}
 	rollback(reader)
 	drainHistory(t, ctx, db)
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.raw_records WHERE run_id=$1`, run.ID).Scan(&count); err != nil || count != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.raw_records WHERE run_id=$1`, run.ID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("cleanup did not retry safely: %d %v", count, err)
 	}
 }

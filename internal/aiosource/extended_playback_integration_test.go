@@ -195,12 +195,12 @@ func TestExtendedDownloadsResumeAndReportDeletionWithoutRecreating(t *testing.T)
 			}
 			if service == "realdebrid" || service == "deepbrid" {
 				var retained bool
-				if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_availability WHERE service=$1 AND cached)`, service).Scan(&retained); err != nil || retained {
+				if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_availability WHERE service=$1 AND cached)`, service).Scan(&retained); err != nil || retained {
 					t.Fatal("deleted account item remained available", err)
 				}
 			}
 			var leaked bool
-			if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.operation_downloads WHERE input::text LIKE '%synthetic-key%') OR EXISTS(SELECT 1 FROM ingest.operation_events WHERE phase LIKE '%synthetic-key%')`).Scan(&leaked); err != nil || leaked {
+			if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.operation_downloads WHERE input::text LIKE '%synthetic-key%') OR EXISTS(SELECT 1 FROM aiosources.operation_events WHERE phase LIKE '%synthetic-key%')`).Scan(&leaked); err != nil || leaked {
 				t.Fatal("credential entered download history", err)
 			}
 		})
@@ -245,7 +245,7 @@ func TestExtendedPublicPlaybackNeverUsesAdministratorAnnouncesOrPersistsVisitorS
 				t.Fatalf("private cached playback started a new download: %s %v", link, err)
 			}
 			var retained int
-			if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_preparations)+(SELECT count(*) FROM ingest.aio_availability)+(SELECT count(*) FROM ingest.operation_downloads)`).Scan(&retained); err != nil || retained != 0 {
+			if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_preparations)+(SELECT count(*) FROM aiosources.aio_availability)+(SELECT count(*) FROM aiosources.operation_downloads)`).Scan(&retained); err != nil || retained != 0 {
 				t.Fatal("visitor account state persisted", err)
 			}
 			ready.Store(false)

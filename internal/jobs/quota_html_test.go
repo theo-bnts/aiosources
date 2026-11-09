@@ -47,7 +47,7 @@ func TestHTMLAfterQuotaPreservesStagingAndCheckpointUntilRecovery(t *testing.T) 
 					if err != nil || !bytes.Equal(held.Cursor, checkpoint.Cursor) || held.Pages != 1 || held.DistinctRecords != 1 {
 						t.Error("rejected response advanced the committed checkpoint")
 					}
-					if err := control.QueryRow(ctx, "SELECT count(*) FROM ingest.pages WHERE run_id=$1 AND error<>''", checkpoint.ID).Scan(&archived); err != nil || archived != int(n)-1 {
+					if err := control.QueryRow(ctx, "SELECT count(*) FROM aiosources.pages WHERE run_id=$1 AND error<>''", checkpoint.ID).Scan(&archived); err != nil || archived != int(n)-1 {
 						t.Error("response was replayed before committing its diagnostics")
 					}
 				}
@@ -89,12 +89,12 @@ func TestHTMLAfterQuotaPreservesStagingAndCheckpointUntilRecovery(t *testing.T) 
 				t.Fatalf("unbounded or unrecorded recovery: requests=%d errors=%d", requests.Load(), finished.Errors)
 			}
 			var htmlErrors int
-			if err := control.QueryRow(ctx, `SELECT count(*) FROM ingest.pages WHERE run_id=$1 AND metadata->>'http_status'='200' AND metadata->>'failure_code'='parse' AND NOT payload_retained AND body=''::bytea`, run.ID).Scan(&htmlErrors); err != nil || htmlErrors != failures-1 {
+			if err := control.QueryRow(ctx, `SELECT count(*) FROM aiosources.pages WHERE run_id=$1 AND metadata->>'http_status'='200' AND metadata->>'failure_code'='parse' AND NOT payload_retained AND body=''::bytea`, run.ID).Scan(&htmlErrors); err != nil || htmlErrors != failures-1 {
 				t.Fatalf("HTML diagnostics lost their cause or retained private bytes: count=%d error=%v", htmlErrors, err)
 			}
 			if !recover {
 				var staged, published int
-				if err := control.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1), (SELECT count(*) FROM ingest.torrents WHERE provider_id=$2)`, run.ID, p.ID).Scan(&staged, &published); err != nil || staged != 1 || published != 0 || !bytes.Equal(held.Cursor, finished.Cursor) || !strings.Contains(finished.Error, "HTML instead of JSON") || strings.Contains(finished.Error, "private") {
+				if err := control.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1), (SELECT count(*) FROM aiosources.torrents WHERE provider_id=$2)`, run.ID, p.ID).Scan(&staged, &published); err != nil || staged != 1 || published != 0 || !bytes.Equal(held.Cursor, finished.Cursor) || !strings.Contains(finished.Error, "HTML instead of JSON") || strings.Contains(finished.Error, "private") {
 					t.Fatalf("failure discarded staging or published incomplete data: staged=%d published=%d error=%v", staged, published, err)
 				}
 				resumed.Store(true)
@@ -105,7 +105,7 @@ func TestHTMLAfterQuotaPreservesStagingAndCheckpointUntilRecovery(t *testing.T) 
 				finished = collectScheduledAttempt(t, ctx, manager, db, run.ID, model.StatusSucceeded)
 			}
 			var published int
-			if err := control.QueryRow(ctx, "SELECT count(*) FROM ingest.torrents WHERE provider_id=$1", p.ID).Scan(&published); err != nil || published != 2 || finished.Pages != 2 || finished.DistinctRecords != 2 {
+			if err := control.QueryRow(ctx, "SELECT count(*) FROM aiosources.torrents WHERE provider_id=$1", p.ID).Scan(&published); err != nil || published != 2 || finished.Pages != 2 || finished.DistinctRecords != 2 {
 				t.Fatalf("recovery failed complete publication: count=%d run=%+v error=%v", published, finished, err)
 			}
 		})

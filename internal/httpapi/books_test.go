@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/moodiness/ingest/torznab"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/torznab"
 )
 
 func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *testing.T) {
@@ -26,12 +26,12 @@ func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *
 	if err := f.db.SetAIOConfig(f.ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
- INSERT INTO ingest.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_normalized,book_data) VALUES('book',NULL,'OL100W',ARRAY[2024],'The Amber Orchard','the amber orchard','{"author_keys":["OL200A"]}');
- INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,isbn,year) VALUES('OL300M',ARRAY['OL100W'],'The Amber Orchard','the amber orchard',ARRAY['9780306406157'],2025);
- INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) VALUES('OL301M',ARRAY['OL100W'],'Le Verger Ambré','le verger ambre');
- INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('book-fixture','one','{"title":"Morgan Vale - The Amber Orchard EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","isbn":"9780306406157","size":1024}');
- INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[{"path":"The Amber Orchard.epub","size":1024}]');`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.ol_authors(id,name,normalized) VALUES('OL200A','Morgan Vale','morgan vale');
+ INSERT INTO aiosources.aio_works(media_type,tmdb_id,openlibrary_id,years,display_title,book_normalized,book_data) VALUES('book',NULL,'OL100W',ARRAY[2024],'The Amber Orchard','the amber orchard','{"author_keys":["OL200A"]}');
+ INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,isbn,year) VALUES('OL300M',ARRAY['OL100W'],'The Amber Orchard','the amber orchard',ARRAY['9780306406157'],2025);
+ INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized) VALUES('OL301M',ARRAY['OL100W'],'Le Verger Ambré','le verger ambre');
+ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('book-fixture','one','{"title":"Morgan Vale - The Amber Orchard EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","isbn":"9780306406157","size":1024}');
+ INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[{"path":"The Amber Orchard.epub","size":1024}]');`); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.db.FinishOpenLibrary(f.ctx); err != nil {

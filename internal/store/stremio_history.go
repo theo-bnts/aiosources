@@ -76,7 +76,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	var cutoff time.Time
 	// Hot request paths need only three scalar values, not the entire history
 	// configuration decoded into maps on every request.
-	if err := s.pool.QueryRow(ctx, `SELECT request_limit,request_results,now()-make_interval(days=>`+stremioRetentionDays+`) FROM ingest.storage_retention_settings WHERE singleton`).Scan(&requestLimit, &requestResults, &cutoff); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT request_limit,request_results,now()-make_interval(days=>`+stremioRetentionDays+`) FROM aiosources.storage_retention_settings WHERE singleton`).Scan(&requestLimit, &requestResults, &cutoff); err != nil {
 		return databaseError("read Stremio retention", err)
 	}
 	if !requestResults && len(item.Results) > 0 {
@@ -100,13 +100,13 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, providerLockKey("stremio-history")); err != nil {
 		return databaseError("lock Stremio history", err)
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls,language_excluded)
+	_, err = tx.Exec(ctx, `INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls,language_excluded)
  SELECT created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results,origin,kind,service,calls,language_excluded
  FROM jsonb_to_record($1::jsonb) AS x(created_at timestamptz,media_type text,resource text,duration_ms bigint,outcome text,matched int,eligible int,invalid_hash int,wrong_episode int,private_unavailable int,file_unavailable int,returned int,truncated boolean,results jsonb,origin text,kind text,service text,calls jsonb,language_excluded int)`, encoded)
 	if err != nil {
 		return databaseError("save Stremio request", err)
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM ingest.stremio_requests WHERE id IN(SELECT id FROM ingest.stremio_requests WHERE created_at<$1 OR ($2>0 AND id<=COALESCE((SELECT id FROM ingest.stremio_requests ORDER BY id DESC OFFSET $2 LIMIT 1),0)) ORDER BY id LIMIT 5000)`, cutoff, requestLimit); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.stremio_requests WHERE id IN(SELECT id FROM aiosources.stremio_requests WHERE created_at<$1 OR ($2>0 AND id<=COALESCE((SELECT id FROM aiosources.stremio_requests ORDER BY id DESC OFFSET $2 LIMIT 1),0)) ORDER BY id LIMIT 5000)`, cutoff, requestLimit); err != nil {
 		return databaseError("bound Stremio history", err)
 	}
 	return databaseError("commit Stremio history", tx.Commit(ctx))
@@ -117,8 +117,8 @@ const stremioSummaryColumns = `id,created_at,media_type,resource,duration_ms,out
 // Reads and cleanup use the same group override; increasing the default must
 // not hide requests that are still retained by an explicit longer policy.
 const stremioRetentionDays = `COALESCE(
- NULLIF((SELECT (days->>'requests')::int FROM ingest.storage_retention_settings WHERE singleton),-1),
- (SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'))`
+ NULLIF((SELECT (days->>'requests')::int FROM aiosources.storage_retention_settings WHERE singleton),-1),
+ (SELECT (values->>'days')::int FROM aiosources.runtime_settings WHERE section='history'))`
 
 const stremioRetained = `created_at>=now()-make_interval(days=>` + stremioRetentionDays + `)`
 
@@ -163,10 +163,10 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 	}
 	defer rollback(tx)
 	const filter = ` WHERE ` + stremioRetained + ` AND ($1='' OR outcome=ANY(string_to_array($1,','))) AND ($2='' OR strpos(lower(resource),lower($2))>0) AND ($3='' OR origin=ANY(string_to_array($3,','))) AND ($4='' OR kind=ANY(string_to_array($4,',')))`
-	if err = tx.QueryRow(ctx, `SELECT count(*) FROM ingest.stremio_requests`+filter, opts.Status, opts.Query, origin, kind).Scan(&out.Total); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM aiosources.stremio_requests`+filter, opts.Status, opts.Query, origin, kind).Scan(&out.Total); err != nil {
 		return out, databaseError("count Stremio requests", err)
 	}
-	rows, err := tx.Query(ctx, `SELECT `+stremioSummaryColumns+` FROM ingest.stremio_requests`+filter+` ORDER BY created_at DESC,id DESC LIMIT $5 OFFSET $6`, opts.Status, opts.Query, origin, kind, opts.Limit, opts.Offset)
+	rows, err := tx.Query(ctx, `SELECT `+stremioSummaryColumns+` FROM aiosources.stremio_requests`+filter+` ORDER BY created_at DESC,id DESC LIMIT $5 OFFSET $6`, opts.Status, opts.Query, origin, kind, opts.Limit, opts.Offset)
 	if err != nil {
 		return out, databaseError("list Stremio requests", err)
 	}
@@ -187,7 +187,7 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 }
 
 func (s *Store) StremioRequest(ctx context.Context, id int64) (model.StremioRequest, error) {
-	item, err := scanStremioRequest(s.pool.QueryRow(ctx, `SELECT `+stremioSummaryColumns+`,results,calls FROM ingest.stremio_requests WHERE id=$1 AND `+stremioRetained, id), true)
+	item, err := scanStremioRequest(s.pool.QueryRow(ctx, `SELECT `+stremioSummaryColumns+`,results,calls FROM aiosources.stremio_requests WHERE id=$1 AND `+stremioRetained, id), true)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return item, model.ErrNotFound
 	}
@@ -196,6 +196,6 @@ func (s *Store) StremioRequest(ctx context.Context, id int64) (model.StremioRequ
 
 func (s *Store) StremioStatistics(ctx context.Context) (model.StremioStatistics, error) {
 	var out model.StremioStatistics
-	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome='empty'),count(*) FILTER(WHERE outcome IN ('failed','cancelled','invalid','busy')),COALESCE(sum(returned),0),COALESCE(avg(duration_ms),0)::bigint,min(created_at) FROM ingest.stremio_requests WHERE `+stremioRetained).Scan(&out.Requests, &out.Empty, &out.Failed, &out.Results, &out.AverageMS, &out.Since)
+	err := s.pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE outcome='empty'),count(*) FILTER(WHERE outcome IN ('failed','cancelled','invalid','busy')),COALESCE(sum(returned),0),COALESCE(avg(duration_ms),0)::bigint,min(created_at) FROM aiosources.stremio_requests WHERE `+stremioRetained).Scan(&out.Requests, &out.Empty, &out.Failed, &out.Results, &out.AverageMS, &out.Since)
 	return out, databaseError("read Stremio statistics", err)
 }

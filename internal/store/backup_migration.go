@@ -1,7 +1,7 @@
 package store
 
 const backupSchema = `
-CREATE TABLE ingest.backup_settings (
+CREATE TABLE aiosources.backup_settings (
  singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton),
  recipient TEXT NOT NULL DEFAULT '',
  enabled BOOLEAN NOT NULL DEFAULT FALSE,
@@ -12,8 +12,8 @@ CREATE TABLE ingest.backup_settings (
  last_failure_at TIMESTAMPTZ,
  CHECK(NOT enabled OR (recipient <> '' AND next_run_at IS NOT NULL))
 );
-INSERT INTO ingest.backup_settings(singleton) VALUES(TRUE);
-CREATE TABLE ingest.backup_jobs (
+INSERT INTO aiosources.backup_settings(singleton) VALUES(TRUE);
+CREATE TABLE aiosources.backup_jobs (
  id TEXT PRIMARY KEY,
  kind TEXT NOT NULL CHECK(kind IN ('backup','verify')),
  backup_id TEXT NOT NULL DEFAULT '',
@@ -32,6 +32,6 @@ CREATE TABLE ingest.backup_jobs (
  finished_at TIMESTAMPTZ,
  report JSONB NOT NULL DEFAULT '{}'
 );
-CREATE UNIQUE INDEX backup_one_active ON ingest.backup_jobs((TRUE)) WHERE status IN ('queued','running');
-CREATE INDEX backup_jobs_recent ON ingest.backup_jobs(created_at DESC,id DESC);
+CREATE UNIQUE INDEX backup_one_active ON aiosources.backup_jobs((TRUE)) WHERE status IN ('queued','running');
+CREATE INDEX backup_jobs_recent ON aiosources.backup_jobs(created_at DESC,id DESC);
 `

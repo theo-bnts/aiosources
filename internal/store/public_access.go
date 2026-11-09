@@ -15,23 +15,23 @@ import (
 var sharedHashRE = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
 const publicAccessSchema = `
-CREATE TABLE ingest.aio_public_access(singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton), revision BIGINT NOT NULL DEFAULT 1, enabled BOOLEAN NOT NULL DEFAULT FALSE, generation BIGINT NOT NULL DEFAULT 1);
-INSERT INTO ingest.aio_public_access(singleton) VALUES(TRUE);
-CREATE TABLE ingest.aio_shared_availability(service TEXT NOT NULL CHECK(service IN ('alldebrid','torbox')), hash TEXT NOT NULL, cached BOOLEAN NOT NULL, checked_at TIMESTAMPTZ NOT NULL, files JSONB NOT NULL CHECK(jsonb_typeof(files)='array'), PRIMARY KEY(service,hash));
-ALTER TABLE ingest.stremio_requests ADD COLUMN origin TEXT NOT NULL DEFAULT 'private' CHECK(origin IN ('private','public'));
-ALTER TABLE ingest.stremio_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'stream' CHECK(kind IN ('stream','manifest','playback'));
-ALTER TABLE ingest.stremio_requests ADD COLUMN service TEXT NOT NULL DEFAULT '' CHECK(service IN ('','alldebrid','torbox'));
-ALTER TABLE ingest.stremio_requests ADD COLUMN calls JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(calls)='array');
-ALTER TABLE ingest.stremio_requests DROP CONSTRAINT stremio_requests_outcome_check;
-ALTER TABLE ingest.stremio_requests ADD CHECK(outcome IN ('results','empty','invalid','failed','cancelled','busy','pending'));
-ALTER TABLE ingest.operation_events ADD COLUMN duration_ms BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE ingest.operation_events ADD COLUMN http_status INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE ingest.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT '';
+CREATE TABLE aiosources.aio_public_access(singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK(singleton), revision BIGINT NOT NULL DEFAULT 1, enabled BOOLEAN NOT NULL DEFAULT FALSE, generation BIGINT NOT NULL DEFAULT 1);
+INSERT INTO aiosources.aio_public_access(singleton) VALUES(TRUE);
+CREATE TABLE aiosources.aio_shared_availability(service TEXT NOT NULL CHECK(service IN ('alldebrid','torbox')), hash TEXT NOT NULL, cached BOOLEAN NOT NULL, checked_at TIMESTAMPTZ NOT NULL, files JSONB NOT NULL CHECK(jsonb_typeof(files)='array'), PRIMARY KEY(service,hash));
+ALTER TABLE aiosources.stremio_requests ADD COLUMN origin TEXT NOT NULL DEFAULT 'private' CHECK(origin IN ('private','public'));
+ALTER TABLE aiosources.stremio_requests ADD COLUMN kind TEXT NOT NULL DEFAULT 'stream' CHECK(kind IN ('stream','manifest','playback'));
+ALTER TABLE aiosources.stremio_requests ADD COLUMN service TEXT NOT NULL DEFAULT '' CHECK(service IN ('','alldebrid','torbox'));
+ALTER TABLE aiosources.stremio_requests ADD COLUMN calls JSONB NOT NULL DEFAULT '[]' CHECK(jsonb_typeof(calls)='array');
+ALTER TABLE aiosources.stremio_requests DROP CONSTRAINT stremio_requests_outcome_check;
+ALTER TABLE aiosources.stremio_requests ADD CHECK(outcome IN ('results','empty','invalid','failed','cancelled','busy','pending'));
+ALTER TABLE aiosources.operation_events ADD COLUMN duration_ms BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE aiosources.operation_events ADD COLUMN http_status INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE aiosources.operation_events ADD COLUMN error_code TEXT NOT NULL DEFAULT '';
 `
 
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
-	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation FROM ingest.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration)
+	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,expose_sources,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation FROM aiosources.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.ExposeSources, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration)
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
@@ -49,14 +49,14 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		return databaseError("lock public catalog publication policy", err)
 	}
 	var previous, previousDownloads, previousTorznab, previousSearch, previousStremio, previousCatalog bool
-	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled,search_enabled,stremio_enabled,catalog_enabled FROM ingest.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab, &previousSearch, &previousStremio, &previousCatalog)
+	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,torznab_enabled,search_enabled,stremio_enabled,catalog_enabled FROM aiosources.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousDownloads, &previousTorznab, &previousSearch, &previousStremio, &previousCatalog)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
 	if err != nil {
 		return databaseError("lock public access", err)
 	}
-	tag, err := tx.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END,search_enabled=$5,stremio_enabled=$6,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$6 THEN 1 ELSE 0 END  ,catalog_enabled=$7,catalog_generation=catalog_generation+CASE WHEN catalog_enabled<>$7 OR expose_sources<>$3 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled, value.CatalogEnabled)
+	tag, err := tx.Exec(ctx, `UPDATE aiosources.aio_public_access SET revision=revision+1,enabled=$1,expose_sources=$3,generation=generation+CASE WHEN enabled<>$1 THEN 1 ELSE 0 END,torznab_enabled=$4,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$4 THEN 1 ELSE 0 END,search_enabled=$5,stremio_enabled=$6,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$6 THEN 1 ELSE 0 END  ,catalog_enabled=$7,catalog_generation=catalog_generation+CASE WHEN catalog_enabled<>$7 OR expose_sources<>$3 THEN 1 ELSE 0 END WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.ExposeSources, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled, value.CatalogEnabled)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
@@ -120,7 +120,7 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 	return databaseError("commit public access change", tx.Commit(ctx))
 }
 func (s *Store) SharedAvailability(ctx context.Context, service string, hashes []string, after time.Time) ([]model.AIOAvailability, error) {
-	rows, err := s.pool.Query(ctx, `SELECT hash,cached,checked_at,files FROM ingest.aio_shared_availability WHERE service=$1 AND hash=ANY($2) AND checked_at>$3 AND checked_at<=now() AND (cached OR checked_at>now()-interval '15 minutes')`, service, hashes, after)
+	rows, err := s.pool.Query(ctx, `SELECT hash,cached,checked_at,files FROM aiosources.aio_shared_availability WHERE service=$1 AND hash=ANY($2) AND checked_at>$3 AND checked_at<=now() AND (cached OR checked_at>now()-interval '15 minutes')`, service, hashes, after)
 	if err != nil {
 		return nil, databaseError("read shared availability", err)
 	}
@@ -155,11 +155,11 @@ func (s *Store) SaveSharedAvailability(ctx context.Context, service string, a mo
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `WITH generation AS MATERIALIZED(SELECT 1 FROM ingest.aio_state WHERE cache_generation=$6 FOR SHARE)
-INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) SELECT $1,$2,$3,$4,$5 FROM generation ON CONFLICT(service,hash) DO UPDATE SET cached=EXCLUDED.cached,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files,catalog_import_source='' WHERE ingest.aio_shared_availability.catalog_import_source<>'' OR ingest.aio_shared_availability.checked_at<=EXCLUDED.checked_at`, service, strings.ToLower(a.Hash), a.Cached, a.CheckedAt, data, a.Generation)
+	_, err = s.pool.Exec(ctx, `WITH generation AS MATERIALIZED(SELECT 1 FROM aiosources.aio_state WHERE cache_generation=$6 FOR SHARE)
+INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) SELECT $1,$2,$3,$4,$5 FROM generation ON CONFLICT(service,hash) DO UPDATE SET cached=EXCLUDED.cached,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files,catalog_import_source='' WHERE aiosources.aio_shared_availability.catalog_import_source<>'' OR aiosources.aio_shared_availability.checked_at<=EXCLUDED.checked_at`, service, strings.ToLower(a.Hash), a.Cached, a.CheckedAt, data, a.Generation)
 	return databaseError("save shared availability", err)
 }
 func (s *Store) ForgetSharedAvailability(ctx context.Context, service, hash string, observed time.Time) error {
-	_, err := s.pool.Exec(ctx, `DELETE FROM ingest.aio_shared_availability WHERE service=$1 AND hash=$2 AND checked_at<=$3`, service, hash, observed)
+	_, err := s.pool.Exec(ctx, `DELETE FROM aiosources.aio_shared_availability WHERE service=$1 AND hash=$2 AND checked_at<=$3`, service, hash, observed)
 	return databaseError("invalidate shared availability", err)
 }

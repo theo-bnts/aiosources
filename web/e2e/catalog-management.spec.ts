@@ -164,16 +164,16 @@ test.describe('remote catalog history and ownership', () => {
     try {
       for (const source of [remote, native]) {
         await db.query(
-          `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at) VALUES($1,$2,$3,'full','paused','',$4,now())`,
+          `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,finished_at) VALUES($1,$2,$3,'full','paused','',$4,now())`,
           [`${source.id}-run`, source.id, source.name, source],
         )
         await db.query(
-          `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,'one','{"title":"Synthetic imported record"}')`,
+          `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,'one','{"title":"Synthetic imported record"}')`,
           [source.id],
         )
       }
       await db.query(
-        `INSERT INTO ingest.remote_checkpoints(provider_id,endpoint,checkpoint) VALUES('remote-copy',$1,'synthetic-checkpoint')`,
+        `INSERT INTO aiosources.remote_checkpoints(provider_id,endpoint,checkpoint) VALUES('remote-copy',$1,'synthetic-checkpoint')`,
         [remote.url],
       )
       await page.goto('/runs')
@@ -224,12 +224,12 @@ test.describe('remote catalog history and ownership', () => {
         card.getByRole('link', { name: 'View imported data', exact: true }),
       ).toHaveAttribute('href', '/torrents?provider=remote-copy')
       await db.query(
-        `UPDATE ingest.runs SET status='running',finished_at=NULL WHERE id='remote-copy-run'`,
+        `UPDATE aiosources.runs SET status='running',finished_at=NULL WHERE id='remote-copy-run'`,
       )
       await page.reload()
       await expect(card.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
       await db.query(
-        `UPDATE ingest.runs SET status='paused',finished_at=now() WHERE id='remote-copy-run'`,
+        `UPDATE aiosources.runs SET status='paused',finished_at=now() WHERE id='remote-copy-run'`,
       )
       await page.reload()
       await card.getByRole('button', { name: 'Delete', exact: true }).click()
@@ -251,7 +251,7 @@ test.describe('remote catalog history and ownership', () => {
         expect(
           (
             await db.query(
-              `SELECT count(*)::int AS count FROM ingest.${table} WHERE provider_id='remote-copy'`,
+              `SELECT count(*)::int AS count FROM aiosources.${table} WHERE provider_id='remote-copy'`,
             )
           ).rows,
           `Deleted remote data remained in ${table}`,
@@ -259,7 +259,7 @@ test.describe('remote catalog history and ownership', () => {
       expect(
         (
           await db.query(
-            `SELECT count(*)::int AS count FROM ingest.torrents WHERE provider_id='native'`,
+            `SELECT count(*)::int AS count FROM aiosources.torrents WHERE provider_id='native'`,
           )
         ).rows,
       ).toEqual([{ count: 1 }])

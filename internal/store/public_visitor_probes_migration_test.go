@@ -23,14 +23,14 @@ func TestVisitorProbeUpgradeRetiresMixedPlansWithoutResettingCacheOrCleanup(t *t
 	if err := db.AddAIOCleanup(ctx, model.AIOCleanup{Account: "synthetic", Hash: hash, ID: 77}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.schema_migrations WHERE version=85`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.schema_migrations WHERE version=85`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var plans, cache, cleanup int
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_resources),(SELECT count(*) FROM ingest.aio_shared_availability),(SELECT count(*) FROM ingest.aio_cleanup)`).Scan(&plans, &cache, &cleanup); err != nil || plans != 1 || cache != 2 || cleanup != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_resources),(SELECT count(*) FROM aiosources.aio_shared_availability),(SELECT count(*) FROM aiosources.aio_cleanup)`).Scan(&plans, &cache, &cleanup); err != nil || plans != 1 || cache != 2 || cleanup != 1 {
 		t.Fatal("migration removed availability or pending owned cleanup", plans, cache, cleanup, err)
 	}
 	if err := db.SaveAIOResource(ctx, model.AIOResource{Service: "alldebrid", Account: "synthetic", Key: "new-administrator-request", Hashes: []string{hash}, CheckedAt: time.Now(), LastAttempt: time.Now(), Generation: generation}); err != nil {

@@ -42,7 +42,7 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 		return result, model.ErrInvalid
 	}
 	filter, _, filterArgs, _ := torrentSearchSQL(opts)
-	filter = strings.Replace(filter, " FROM ingest.torrents", " FROM ingest.torrents AS t", 1)
+	filter = strings.Replace(filter, " FROM aiosources.torrents", " FROM aiosources.torrents AS t", 1)
 	args := slices.Clone(filterArgs)
 	bind := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	add := func(clause string) {
@@ -61,16 +61,16 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 		if availability == "" {
 			availability = `a.hash=t.search_info_hash AND a.service=ANY(` + bind(policy.Services) + `::text[]) AND a.checked_at>` + bind(policy.CacheAfter) + ` AND a.checked_at<=now()`
 		}
-		return `EXISTS(SELECT 1 FROM ingest.aio_shared_availability a WHERE ` + availability + condition + `)`
+		return `EXISTS(SELECT 1 FROM aiosources.aio_shared_availability a WHERE ` + availability + condition + `)`
 	}
 	if policy.Public {
 		// Private direct results require a verified file list. No provider or
 		// admin tracker credential is used to discover missing private entries.
-		publicCached := known(` AND a.cached AND ingest.catalog_has_download_file(a.files)`)
+		publicCached := known(` AND a.cached AND aiosources.catalog_has_download_file(a.files)`)
 		add(`(t.provider_id=ANY(` + bind(policy.UncachedSources) + `::text[]) OR ` + publicCached + `)`)
 	}
 	if policy.CachedOnly {
-		add(known(` AND a.cached AND (jsonb_array_length(a.files)=0 OR ingest.catalog_has_download_file(a.files))`))
+		add(known(` AND a.cached AND (jsonb_array_length(a.files)=0 OR aiosources.catalog_has_download_file(a.files))`))
 	}
 	countArgs := slices.Clone(args)
 	order := []string{}
@@ -148,14 +148,14 @@ func (s *Store) CatalogTorrent(ctx context.Context, occurrence string) (CatalogR
 	if !ValidOccurrenceID(occurrence) {
 		return result, model.ErrNotFound
 	}
-	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM ingest.torrents t WHERE t.occurrence_id=$1`, occurrence), ids: []any{&result.OccurrenceID}})
+	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.occurrence_id=$1`, occurrence), ids: []any{&result.OccurrenceID}})
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }
 
 func (s *Store) CatalogSourceTorrent(ctx context.Context, provider, source string) (CatalogRecord, error) {
 	var result CatalogRecord
-	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM ingest.torrents t WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), ids: []any{&result.OccurrenceID}})
+	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), ids: []any{&result.OccurrenceID}})
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }

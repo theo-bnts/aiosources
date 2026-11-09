@@ -25,15 +25,15 @@ async function seedInformation(page: Page, server: TestServer) {
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,openlibrary_id,display_title,years) VALUES
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,openlibrary_id,display_title,years) VALUES
       ('movie','101','','Example Film','{2024}'),('tv','202','','Example Series','{2025}'),('book',NULL,'OL100W','Example Book','{2023}');
-      INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,display_title,lower(display_title) FROM ingest.aio_works WHERE media_type IN ('movie','tv');
-      INSERT INTO ingest.ol_authors(id,name) VALUES('OL200A','Example Author');
-      INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) VALUES('OL300M',ARRAY['OL100W'],'Example Book','example book');
-      UPDATE ingest.ol_import_state SET complete=TRUE,data_complete=TRUE,position=1234,works=1,editions=1,authors=1,snapshot_at='2026-01-01',last_sync='2026-01-02';
-      UPDATE ingest.ol_changes_state SET anchor_id='100',anchor_at='2026-01-02',changes_through='2026-01-02',bootstrap_complete=TRUE;
-      UPDATE ingest.aio_state SET last_sync='2026-01-02',changes_through='2026-01-02',applied_through='2026-01-02',inventory_date='2026-01-01';
-      INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,processed,finished_at) VALUES
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,display_title,lower(display_title) FROM aiosources.aio_works WHERE media_type IN ('movie','tv');
+      INSERT INTO aiosources.ol_authors(id,name) VALUES('OL200A','Example Author');
+      INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized) VALUES('OL300M',ARRAY['OL100W'],'Example Book','example book');
+      UPDATE aiosources.ol_import_state SET complete=TRUE,data_complete=TRUE,position=1234,works=1,editions=1,authors=1,snapshot_at='2026-01-01',last_sync='2026-01-02';
+      UPDATE aiosources.ol_changes_state SET anchor_id='100',anchor_at='2026-01-02',changes_through='2026-01-02',bootstrap_complete=TRUE;
+      UPDATE aiosources.aio_state SET last_sync='2026-01-02',changes_through='2026-01-02',applied_through='2026-01-02',inventory_date='2026-01-01';
+      INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,processed,finished_at) VALUES
       ('video-update','metadata','tmdb','manual',0,'succeeded',2,now()),
       ('book-update','metadata','openlibrary','manual',0,'succeeded',1,now()),
       ('identification-update','matching','local','manual',0,'succeeded',3,now());`)
@@ -264,13 +264,13 @@ test('maintenance remains available during identification and acknowledges reset
     await route.continue()
   })
   try {
-    await db.query(`INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+    await db.query(`INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
       ('example','book','{"title":"Example Book EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
-      INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('example','book') ON CONFLICT DO NOTHING`)
+      INSERT INTO aiosources.aio_match_queue(provider_id,source_id) VALUES('example','book') ON CONFLICT DO NOTHING`)
     await db.query('BEGIN')
     // Matching takes a shared snapshot of this row. Keep its transaction
     // waiting so the real worker cannot finish before we inspect maintenance.
-    await db.query('SELECT metadata_generation FROM ingest.aio_state FOR UPDATE')
+    await db.query('SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE')
     await page.goto('/metadata/identification/settings#maintenance')
     await openDisclosure(page, 'Manual actions')
     pauseStatus()
@@ -327,7 +327,7 @@ test('maintenance remains available during identification and acknowledges reset
     expect(
       (
         await db.query(
-          "SELECT count(*)::int AS count FROM ingest.aio_works WHERE media_type='book'",
+          "SELECT count(*)::int AS count FROM aiosources.aio_works WHERE media_type='book'",
         )
       ).rows[0].count,
     ).toBe(1)

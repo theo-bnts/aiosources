@@ -125,7 +125,7 @@ func TestMetadataPipelineOverlapsRequestsAndPreservesQueueOnStop(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		var committed int
-		if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works`).Scan(&committed); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works`).Scan(&committed); err != nil {
 			t.Fatal(err)
 		}
 		if committed > 0 {
@@ -141,7 +141,7 @@ func TestMetadataPipelineOverlapsRequestsAndPreservesQueueOnStop(t *testing.T) {
 		t.Fatal("stop was ignored", err)
 	}
 	var committed, pending int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&committed, &pending); err != nil || committed == 0 || pending == 0 || committed+pending != len(ids) {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&committed, &pending); err != nil || committed == 0 || pending == 0 || committed+pending != len(ids) {
 		t.Fatalf("interruption lost work: committed=%d pending=%d %v", committed, pending, err)
 	}
 	if peak.Load() < 2 || peak.Load() > 16 {
@@ -150,7 +150,7 @@ func TestMetadataPipelineOverlapsRequestsAndPreservesQueueOnStop(t *testing.T) {
 	if err := s.Sync(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_metadata_jobs`).Scan(&pending); err != nil || pending != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_metadata_jobs`).Scan(&pending); err != nil || pending != 0 {
 		t.Fatal("stopped work did not resume", pending, err)
 	}
 }
@@ -188,14 +188,14 @@ func TestMetadataPipelineStopsOutageWithoutDiscardingRemainingJobs(t *testing.T)
 		t.Fatal("outage was reported as success")
 	}
 	var pending, deferred int
-	if err := conn.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE attempts=1 AND next_attempt>now()) FROM ingest.aio_metadata_jobs`).Scan(&pending, &deferred); err != nil || pending != 100 || deferred != 3 || requests.Load() >= 100 {
+	if err := conn.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE attempts=1 AND next_attempt>now()) FROM aiosources.aio_metadata_jobs`).Scan(&pending, &deferred); err != nil || pending != 100 || deferred != 3 || requests.Load() >= 100 {
 		t.Fatalf("outage drained the catalog or lost its retries: pending=%d deferred=%d requests=%d %v", pending, deferred, requests.Load(), err)
 	}
 }
 
 func TestTMDBSeasonsAreAppendedAndUnknownSourceSeasonIsIgnored(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_season_requests(tmdb_id,season) VALUES('202',1),('202',2),('202',99)`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_season_requests(tmdb_id,season) VALUES('202',1),('202',2),('202',99)`); err != nil {
 		t.Fatal(err)
 	}
 	var calls atomic.Int32

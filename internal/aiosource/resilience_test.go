@@ -67,7 +67,7 @@ func TestMetadataRepeatedFailuresAndRestartRetainPublishedMapping(t *testing.T) 
 			t.Fatalf("repeated failures erased the published IMDb correspondence: %+v %v", out, err)
 		}
 		var deferred bool
-		if err := conn.QueryRow(ctx, `SELECT next_attempt>now() FROM ingest.aio_metadata_jobs`).Scan(&deferred); err != nil || !deferred {
+		if err := conn.QueryRow(ctx, `SELECT next_attempt>now() FROM aiosources.aio_metadata_jobs`).Scan(&deferred); err != nil || !deferred {
 			t.Fatalf("failed metadata lost its retry deadline: %t %v", deferred, err)
 		}
 		if err := s.Close(ctx); err != nil {
@@ -83,7 +83,7 @@ func TestMetadataRepeatedFailuresAndRestartRetainPublishedMapping(t *testing.T) 
 			t.Fatal("restart changed the installation token", err)
 		}
 		// Advance the durable deadline instead of waiting for minutes in a test.
-		if _, err := conn.Exec(ctx, `UPDATE ingest.aio_metadata_jobs SET next_attempt=now()`); err != nil {
+		if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_metadata_jobs SET next_attempt=now()`); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -178,7 +178,7 @@ func TestCacheFailuresAndInterruptedCheckKeepPositiveObservationsAcrossRestart(t
 			}
 			due := func() {
 				t.Helper()
-				if _, err := conn.Exec(ctx, `UPDATE ingest.aio_resources SET last_attempt=now()-interval '49 hours'`); err != nil {
+				if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_resources SET last_attempt=now()-interval '49 hours'`); err != nil {
 					t.Fatal(err)
 				}
 			}

@@ -14,14 +14,14 @@ func importStorageEstimates(ctx context.Context, tx pgx.Tx) ([]model.ImportStora
 	rows, err := tx.Query(ctx, `WITH distributions AS (
  SELECT c.oid,d.value,d.frequency FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  JOIN pg_stats s ON s.schemaname=n.nspname AND s.tablename=c.relname AND s.attname='run_id' AND NOT s.inherited
-`+storageDistributionSQL+` WHERE n.nspname='ingest' AND c.relkind='r' AND (c.relname='staged_torrents' OR c.relname LIKE 'run_%')
+`+storageDistributionSQL+` WHERE n.nspname='aiosources' AND c.relkind='r' AND (c.relname='staged_torrents' OR c.relname LIKE 'run_%')
 ), sizes AS (
  SELECT value AS run_id,sum(pg_total_relation_size(oid)*GREATEST(frequency,0))::bigint AS bytes
  FROM distributions GROUP BY value
 ), retained AS (
  SELECT r.id,r.provider_id,r.provider_name,r.status,r.created_at,s.bytes
- FROM ingest.runs r LEFT JOIN sizes s ON s.run_id=r.id
- WHERE r.status<>'succeeded' AND EXISTS(SELECT 1 FROM ingest.staged_torrents t WHERE t.run_id=r.id)
+ FROM aiosources.runs r LEFT JOIN sizes s ON s.run_id=r.id
+ WHERE r.status<>'succeeded' AND EXISTS(SELECT 1 FROM aiosources.staged_torrents t WHERE t.run_id=r.id)
 )
 SELECT *,count(*) OVER(),count(*) FILTER(WHERE status='cancelled') OVER()
  FROM retained ORDER BY bytes DESC NULLS LAST,created_at,id LIMIT 20`)

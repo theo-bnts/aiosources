@@ -51,7 +51,7 @@ func TestBookFailuresUseTheSharedRetrySettings(t *testing.T) {
 		}
 		var retry time.Time
 		var failures int
-		if err := conn.QueryRow(ctx, `SELECT retry_at,sync_failures FROM ingest.ol_import_state`).Scan(&retry, &failures); err != nil || failures != attempt || time.Until(retry) < time.Duration(attempt*120-10)*time.Second || time.Until(retry) > time.Duration(attempt*120+1)*time.Second {
+		if err := conn.QueryRow(ctx, `SELECT retry_at,sync_failures FROM aiosources.ol_import_state`).Scan(&retry, &failures); err != nil || failures != attempt || time.Until(retry) < time.Duration(attempt*120-10)*time.Second || time.Until(retry) > time.Duration(attempt*120+1)*time.Second {
 			t.Fatal("book retry ignored the common policy", retry, failures, err)
 		}
 	}
@@ -62,7 +62,7 @@ func TestBookFailuresUseTheSharedRetrySettings(t *testing.T) {
 		t.Fatal("manual update could not recover before its automatic retry", err)
 	}
 	var failures int
-	if err := conn.QueryRow(ctx, `SELECT sync_failures FROM ingest.ol_import_state`).Scan(&failures); err != nil || failures != 0 {
+	if err := conn.QueryRow(ctx, `SELECT sync_failures FROM aiosources.ol_import_state`).Scan(&failures); err != nil || failures != 0 {
 		t.Fatal("successful recovery retained its failure count", failures, err)
 	}
 	f.mu.Lock()
@@ -75,7 +75,7 @@ func TestBookFailuresUseTheSharedRetrySettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	var next time.Time
-	if err := conn.QueryRow(ctx, `SELECT next_attempt FROM ingest.ol_change_jobs WHERE id='OL400W'`).Scan(&next); err != nil || time.Until(next) < 110*time.Second || time.Until(next) > 121*time.Second {
+	if err := conn.QueryRow(ctx, `SELECT next_attempt FROM aiosources.ol_change_jobs WHERE id='OL400W'`).Scan(&next); err != nil || time.Until(next) < 110*time.Second || time.Until(next) > 121*time.Second {
 		t.Fatal("individual book retries ignored the shared policy", next, err)
 	}
 }
@@ -106,7 +106,7 @@ func TestBookShortCooldownIsAbsoluteAndManualRetriesDoNotExtendIt(t *testing.T) 
 				t.Fatal("manual retries postponed the saved deadline", before, after, next, err, nextErr)
 			}
 			var attempts int
-			if err := conn.QueryRow(ctx, `SELECT sync_failures FROM ingest.ol_import_state`).Scan(&attempts); err != nil || attempts != 1 {
+			if err := conn.QueryRow(ctx, `SELECT sync_failures FROM aiosources.ol_import_state`).Scan(&attempts); err != nil || attempts != 1 {
 				t.Fatal("blocked clicks were counted as provider attempts", attempts, err)
 			}
 			f.mu.Lock()
@@ -137,7 +137,7 @@ func TestBookFeedFailureDoesNotBlockAlreadyQueuedDocuments(t *testing.T) {
 		t.Fatal("the invalid change feed was reported as successful")
 	}
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL400W'`).Scan(&title); err != nil || title != "The Azure Almanac" {
+	if err := conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL400W'`).Scan(&title); err != nil || title != "The Azure Almanac" {
 		t.Fatal("a feed-only error prevented useful document updates", title, err)
 	}
 	after, err := s.DB.BookChangesState(ctx)
@@ -160,7 +160,7 @@ func TestBookManualUpdateChecksForChangesWithoutWaitingForTheInterval(t *testing
 		t.Fatal(err)
 	}
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL400W'`).Scan(&title); err != nil || title != "The Azure Almanac" {
+	if err := conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL400W'`).Scan(&title); err != nil || title != "The Azure Almanac" {
 		t.Fatal("manual update silently waited for the automatic interval", title, err)
 	}
 	f.mu.Lock()
@@ -176,7 +176,7 @@ func TestBookAutomaticAdmissionRechecksSavedChoiceAndSchedule(t *testing.T) {
 	if err := s.SyncBooks(ctx, "automatic"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.ol_import_state SET complete=TRUE; UPDATE ingest.ol_changes_state SET bootstrap_complete=TRUE,checked_at=now()`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_import_state SET complete=TRUE; UPDATE aiosources.ol_changes_state SET bootstrap_complete=TRUE,checked_at=now()`); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
@@ -188,7 +188,7 @@ func TestBookAutomaticAdmissionRechecksSavedChoiceAndSchedule(t *testing.T) {
 		t.Fatal(err)
 	}
 	var operations int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_runs WHERE service='openlibrary'`).Scan(&operations); err != nil || operations != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.operation_runs WHERE service='openlibrary'`).Scan(&operations); err != nil || operations != 0 {
 		t.Fatal("inadmissible automatic work created a history attempt", operations, err)
 	}
 	f.mu.Lock()

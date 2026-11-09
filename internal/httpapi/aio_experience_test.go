@@ -17,9 +17,9 @@ func TestIdentificationReviewAndStremioHistoryRequireAdministratorAndCSRF(t *tes
 			t.Fatalf("admin-only history exposed at %s", path)
 		}
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('one','item','{"title":"Example Film","download_url":"https://synthetic.invalid/private-value"}');
- INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]);
- INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Example Film','example film' FROM ingest.aio_works`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('one','item','{"title":"Example Film","download_url":"https://synthetic.invalid/private-value"}');
+ INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]);
+ INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Example Film','example film' FROM aiosources.aio_works`); err != nil {
 		t.Fatal(err)
 	}
 	items, _ := f.db.ListAIOMatchDiagnostics(f.ctx, model.ListOptions{})

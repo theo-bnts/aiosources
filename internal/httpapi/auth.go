@@ -21,7 +21,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/vault"
 )
 
-const sessionCookie = "ingest_session"
+const sessionCookie = "aiosources_session"
 const maxPasswordProofBytes = 4096
 
 type session struct {
@@ -94,7 +94,7 @@ func csrfForToken(token string) string {
 }
 
 func (a *authentication) lookup(r *http.Request) (session, error) {
-	cookie, err := r.Cookie(sessionCookie)
+	cookie, err := requestSessionCookie(r)
 	if err != nil || len(cookie.Value) != 43 {
 		return session{}, store.ErrAuthentication
 	}
@@ -142,6 +142,10 @@ func (a *authentication) sessionHandler(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusServiceUnavailable, "Authentication storage is unavailable")
 		return
 	}
+	if cookie, err := requestSessionCookie(r); err == nil && cookie.Name == previousSessionCookie {
+		a.cookie(w, cookie.Value, value.expires, max(1, int(time.Until(value.expires).Seconds())))
+	}
+	a.retirePreviousSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": value.csrf})
 }
 
@@ -250,7 +254,7 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	lifetime := time.Duration(hours) * time.Hour
 	next := &store.SecuritySessionCreate{ID: hex.EncodeToString(rawID[:]), TokenHash: hash[:], UserAgent: safeUserAgent(r.UserAgent()), ExpiresAt: time.Now().Add(lifetime)}
-	if old, err := r.Cookie(sessionCookie); err == nil && len(old.Value) == 43 {
+	if old, err := requestSessionCookie(r); err == nil && len(old.Value) == 43 {
 		oldHash := sha256.Sum256([]byte(old.Value))
 		next.ReplaceTokenHash = oldHash[:]
 	}
@@ -271,6 +275,7 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cookie(w, token, next.ExpiresAt, int(lifetime.Seconds()))
+	a.retirePreviousSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": csrfForToken(token)})
 }
 
@@ -311,6 +316,7 @@ func (a *authentication) logoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cookie(w, "", time.Unix(1, 0), -1)
+	a.retirePreviousSessionCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -6,18 +6,18 @@ Requirements: PostgreSQL 18 command-line tools, Python 3.9+, the project's Go/No
 
 ```sh
 python3 tools/performance/run.py prepare --dump /path/to/private.dump
-python3 tools/performance/run.py run --binary bin/ingest --label baseline --save-baseline
+python3 tools/performance/run.py run --binary bin/aiosources --label baseline --save-baseline
 ```
 
-For PostgreSQL tools outside `PATH`, add `--pg-bin /path/to/postgresql/bin` to `prepare`. The default report/configuration workspace is `.ingest/performance`, which is ignored by Git. PostgreSQL files live in an owned system temporary directory outside synchronized folders. If the operating system removes that temporary database, prepare the snapshot again. The original dump is read only. Preparation disables automatic jobs and replaces stored secrets with synthetic values. It never accepts a production database URI.
+For PostgreSQL tools outside `PATH`, add `--pg-bin /path/to/postgresql/bin` to `prepare`. The default report/configuration workspace is `.aiosources/performance`, which is ignored by Git. PostgreSQL files live in an owned system temporary directory outside synchronized folders. If the operating system removes that temporary database, prepare the snapshot again. The original dump is read only. Preparation disables automatic jobs and replaces stored secrets with synthetic values. It never accepts a production database URI.
 
 After a passing baseline is saved, `make check` also builds the current code and runs the local performance gate. GitHub checks continue using synthetic data only. An explicit run is also available:
 
 ```sh
 make performance-check
 # or compare a candidate with a particular local report:
-python3 tools/performance/run.py run --binary bin/ingest --label candidate \
-  --baseline .ingest/performance/baseline.json
+python3 tools/performance/run.py run --binary bin/aiosources --label candidate \
+  --baseline .aiosources/performance/baseline.json
 ```
 
 The suite covers source HTTP/HTML/Torznab parsing and complete publication, metadata retrieval and change processing, matching, book imports and reconciliation, information resets, private/public Search (including direct torrent results without metadata matches), Stremio, Torznab and sharing, provider validation and download preparation, optional storage choices and index/retention settings, administration API reads, and desktop/mobile pages and optional sections. Provider-backed scenarios use loopback fixtures; no real provider account is required. The snapshot's public interface is prepared directly as a test fixture, without generating a duplicate bulk sharing journal. Public policy writes and exports are exercised by the synthetic end-to-end scenarios. Private catalog searches must return a known matching work: an empty response is not a performance success.

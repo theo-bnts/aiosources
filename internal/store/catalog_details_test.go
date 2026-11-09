@@ -121,7 +121,7 @@ func TestCatalogDetailOnlyUpdatesAreAtomicAndPermissionsRefreshTheMirror(t *test
 	}
 	apply(pages, model.StatusSucceeded)
 	checkpoint := pages[len(pages)-1].Checkpoint
-	if _, err := sender.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=(fields-'language')||'{"tmdb_id":"202","languages":["en"]}' WHERE provider_id='source'`); err != nil {
+	if _, err := sender.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=(fields-'language')||'{"tmdb_id":"202","languages":["en"]}' WHERE provider_id='source'`); err != nil {
 		t.Fatal(err)
 	}
 	delta := detailedCatalogPages(t, ctx, sender, grant, checkpoint, detailedCatalogEntities)
@@ -179,7 +179,7 @@ func TestCatalogDetailsLateCommitAndBaseVersionChangesAreNotSkipped(t *testing.T
 		t.Fatal(err)
 	}
 	defer rollback(writer)
-	if _, err = writer.Exec(ctx, `UPDATE ingest.torrents SET fields=fields||'{"language":"en"}' WHERE provider_id='source'`); err != nil {
+	if _, err = writer.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields||'{"language":"en"}' WHERE provider_id='source'`); err != nil {
 		t.Fatal(err)
 	}
 	before := detailedCatalogPages(t, ctx, db, grant, first[len(first)-1].Checkpoint, detailedCatalogEntities)
@@ -201,7 +201,7 @@ func TestCatalogDetailsLateCommitAndBaseVersionChangesAreNotSkipped(t *testing.T
 	}
 	// When the basic version changes, core pages also carry its matching facts.
 	// This covers a change between the journal and transaction watermarks.
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=fields||'{"title":"Updated Example","language":"de"}' WHERE provider_id='source'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields||'{"title":"Updated Example","language":"de"}' WHERE provider_id='source'`); err != nil {
 		t.Fatal(err)
 	}
 	changed := detailedCatalogPages(t, ctx, db, grant, after[len(after)-1].Checkpoint, detailedCatalogEntities)
@@ -260,7 +260,7 @@ func TestCatalogDetailsKeepAcknowledgementWhenOtherDataChoicesChange(t *testing.
 	selection.Metadata, selection.Availability = true, true
 	delta := detailedCatalogPages(t, ctx, db, grant, first[len(first)-1].Checkpoint, selection)
 	var key []byte
-	if err = db.pool.QueryRow(ctx, `SELECT signing_key FROM ingest.catalog_identity WHERE singleton`).Scan(&key); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT signing_key FROM aiosources.catalog_identity WHERE singleton`).Scan(&key); err != nil {
 		t.Fatal(err)
 	}
 	checkpoint, err := parseCatalogToken(key, first[len(first)-1].Checkpoint)
@@ -321,7 +321,7 @@ func TestCatalogDetailBatchesKeepVersionFencesAndProviderIsolation(t *testing.T)
 	err := db.pool.QueryRow(ctx, `SELECT
 count(*) FILTER(WHERE provider_id='remote' AND fields->>'language'='en'),
 count(*) FILTER(WHERE provider_id='remote' AND fields->>'language'='fr'),
-count(*) FILTER(WHERE provider_id='unrelated' AND fields->>'language'='fr') FROM ingest.torrents`).Scan(&updated, &unchanged, &unrelated)
+count(*) FILTER(WHERE provider_id='unrelated' AND fields->>'language'='fr') FROM aiosources.torrents`).Scan(&updated, &unchanged, &unrelated)
 	if err != nil || updated != 104 || unchanged != 1 || unrelated != 1 {
 		t.Fatalf("batch lost boundaries, version fences or provider isolation: %d %d %d %v", updated, unchanged, unrelated, err)
 	}

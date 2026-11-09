@@ -88,9 +88,9 @@ func TestSettingsRevisionMigrationsPreserveExistingValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := db.ListSecrets(ctx)
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.secrets DROP COLUMN revision;
-DROP SEQUENCE ingest.secret_revisions;
-DELETE FROM ingest.schema_migrations WHERE version=30`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.secrets DROP COLUMN revision;
+DROP SEQUENCE aiosources.secret_revisions;
+DELETE FROM aiosources.schema_migrations WHERE version=30`); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {

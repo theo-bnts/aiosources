@@ -12,7 +12,7 @@ func TestStremioHistoryRecordsActualSelectionWithoutCredentialOrPlaybackURLs(t *
 	ctx, s, conn := testService(t)
 	seedMovie(t, ctx, s, conn, "one", "1", strings.Repeat("a", 40))
 	seedMovie(t, ctx, s, conn, "two", "1", strings.Repeat("b", 40))
-	if _, err := conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{info_hash}','"invalid hash"') WHERE provider_id='two'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{info_hash}','"invalid hash"') WHERE provider_id='two'`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {

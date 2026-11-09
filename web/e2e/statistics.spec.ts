@@ -39,7 +39,7 @@ test('statistics are the first view, settings contain configuration and statuses
   await db.connect()
   try {
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES ('statistics-fixture','one','{"title":"Statistics release"}')`,
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES ('statistics-fixture','one','{"title":"Statistics release"}')`,
     )
   } finally {
     await db.end()

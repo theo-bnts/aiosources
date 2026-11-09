@@ -12,7 +12,7 @@ import (
 func (s *Store) StorageRetention(ctx context.Context) (model.StorageRetentionSettings, error) {
 	var result model.StorageRetentionSettings
 	var encoded []byte
-	err := s.pool.QueryRow(ctx, `SELECT revision,days,request_limit,request_results FROM ingest.storage_retention_settings WHERE singleton`).Scan(&result.Revision, &encoded, &result.RequestLimit, &result.RequestResults)
+	err := s.pool.QueryRow(ctx, `SELECT revision,days,request_limit,request_results FROM aiosources.storage_retention_settings WHERE singleton`).Scan(&result.Revision, &encoded, &result.RequestLimit, &result.RequestResults)
 	if err == nil {
 		err = json.Unmarshal(encoded, &result.Days)
 	}
@@ -29,7 +29,7 @@ func (s *Store) UpdateStorageRetention(ctx context.Context, value model.StorageR
 	if err != nil {
 		return model.ErrInvalid
 	}
-	result, err := s.pool.Exec(ctx, `UPDATE ingest.storage_retention_settings SET days=$1,revision=revision+1,request_limit=$3,request_results=$4 WHERE singleton AND revision=$2`, encoded, value.Revision, value.RequestLimit, value.RequestResults)
+	result, err := s.pool.Exec(ctx, `UPDATE aiosources.storage_retention_settings SET days=$1,revision=revision+1,request_limit=$3,request_results=$4 WHERE singleton AND revision=$2`, encoded, value.Revision, value.RequestLimit, value.RequestResults)
 	if err != nil {
 		return databaseError("save retention overrides", err)
 	}
@@ -42,7 +42,7 @@ func storageRetentionCutoffs(ctx context.Context, tx pgx.Tx) (map[string]time.Ti
 	var encoded []byte
 	var now time.Time
 	var fallback int
-	if err := tx.QueryRow(ctx, `SELECT now(),(SELECT (values->>'days')::int FROM ingest.runtime_settings WHERE section='history'),days FROM ingest.storage_retention_settings WHERE singleton`).Scan(&now, &fallback, &encoded); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT now(),(SELECT (values->>'days')::int FROM aiosources.runtime_settings WHERE section='history'),days FROM aiosources.storage_retention_settings WHERE singleton`).Scan(&now, &fallback, &encoded); err != nil {
 		return nil, err
 	}
 	var days map[string]int

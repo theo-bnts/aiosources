@@ -46,7 +46,7 @@ func TestIncrementalMetadataFollowupScopesNewAcceptedNativeIdentities(t *testing
 		t.Fatalf("claim parent: %+v %v", claimed, err)
 	}
 	parent := *claimed
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$2 WHERE provider_id=$1", provider.ID, parent.CreatedAt.Add(-time.Second)); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$2 WHERE provider_id=$1", provider.ID, parent.CreatedAt.Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	replaced, complete, partial := coverageRecord("11-replaced-hash"), coverageRecord("50-complete"), coverageRecord("30-partial")
@@ -62,10 +62,10 @@ func TestIncrementalMetadataFollowupScopesNewAcceptedNativeIdentities(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='20-boundary'", provider.ID, parent.CreatedAt); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='20-boundary'", provider.ID, parent.CreatedAt); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='90-future'", provider.ID, parent.CreatedAt.Add(time.Hour)); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='90-future'", provider.ID, parent.CreatedAt.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"60-ignored", "70-auxiliary", "80-unaccepted"} {
@@ -96,7 +96,7 @@ func TestIncrementalMetadataFollowupScopesNewAcceptedNativeIdentities(t *testing
 		t.Fatalf("linked keyset continuation changed scope: %+v %v", next, err)
 	}
 	var eventData []byte
-	if err := db.pool.QueryRow(ctx, "SELECT data FROM ingest.events WHERE run_id=$1 AND kind='metadata_queued'", parent.ID).Scan(&eventData); err != nil {
+	if err := db.pool.QueryRow(ctx, "SELECT data FROM aiosources.events WHERE run_id=$1 AND kind='metadata_queued'", parent.ID).Scan(&eventData); err != nil {
 		t.Fatal(err)
 	}
 	var data map[string]any
@@ -194,7 +194,7 @@ func TestIncrementalMetadataFollowupRequiresSuccessfulEligibleNewWork(t *testing
 				if tc.name == "future-only" {
 					firstSeen = parent.CreatedAt.Add(time.Hour)
 				}
-				if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$2 WHERE provider_id=$1", provider.ID, firstSeen); err != nil {
+				if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$2 WHERE provider_id=$1", provider.ID, firstSeen); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -263,10 +263,10 @@ func TestIncrementalMetadataFollowupRollsBackAndRecoversWithoutDuplicates(t *tes
 	}
 	// Fail after the child insert. Neither success nor the queued child may
 	// survive independently of the lifecycle event that links them.
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_metadata_event() RETURNS trigger LANGUAGE plpgsql AS $$
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_metadata_event() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN IF NEW.kind='metadata_queued' THEN RAISE EXCEPTION 'synthetic follow-up persistence failure'; END IF; RETURN NEW; END; $$;
-CREATE TRIGGER reject_metadata_event BEFORE INSERT ON ingest.events
-FOR EACH ROW EXECUTE FUNCTION ingest.reject_metadata_event()`); err != nil {
+CREATE TRIGGER reject_metadata_event BEFORE INSERT ON aiosources.events
+FOR EACH ROW EXECUTE FUNCTION aiosources.reject_metadata_event()`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.FinishRun(ctx, parent.ID, model.StatusSucceeded, "", ""); err == nil {
@@ -276,7 +276,7 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_metadata_event()`); err != nil {
 	if err != nil || stored.Status != model.StatusRunning || !stored.TraversalDone || len(metadataFollowups(t, ctx, db, parent)) != 0 {
 		t.Fatalf("failed completion left a partial parent/child transition: %+v %v", stored, err)
 	}
-	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_metadata_event ON ingest.events"); err != nil {
+	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_metadata_event ON aiosources.events"); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
@@ -333,7 +333,7 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_metadata_event()`); err != nil {
 		t.Fatalf("recovery or Metadata completion duplicated automatic work: %+v", children)
 	}
 	var events int
-	if err := restarted.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.events WHERE run_id=$1 AND kind='metadata_queued'", parent.ID).Scan(&events); err != nil || events != 1 {
+	if err := restarted.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.events WHERE run_id=$1 AND kind='metadata_queued'", parent.ID).Scan(&events); err != nil || events != 1 {
 		t.Fatalf("successful completion did not have exactly one durable parent event: %d %v", events, err)
 	}
 }

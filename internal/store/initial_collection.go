@@ -15,11 +15,11 @@ func initialCollectionMode(ctx context.Context, tx pgx.Tx, provider model.Provid
 		return requested, false, nil
 	}
 	var initialized bool
-	query := `SELECT EXISTS(SELECT 1 FROM ingest.collection_state WHERE provider_id=$1)`
+	query := `SELECT EXISTS(SELECT 1 FROM aiosources.collection_state WHERE provider_id=$1)`
 	args := []any{provider.ID}
 	if remoteCatalog(provider) {
 		// Remote deltas require a checkpoint for this exact publisher endpoint.
-		query = `SELECT EXISTS(SELECT 1 FROM ingest.remote_checkpoints
+		query = `SELECT EXISTS(SELECT 1 FROM aiosources.remote_checkpoints
 WHERE provider_id=$1 AND endpoint=$2 AND checkpoint<>'')`
 		args = append(args, provider.URL)
 	}
@@ -44,13 +44,13 @@ func initialFullEvent(ctx context.Context, tx pgx.Tx, run model.Run) error {
 // earliest trustworthy acceptance of each live identity remains a safe boundary.
 func retainCollectionBaseline(ctx context.Context, tx pgx.Tx, run model.Run) error {
 	if !remoteCatalog(run.Config) {
-		if _, err := tx.Exec(ctx, `INSERT INTO ingest.collection_state(provider_id,initialized_at)
+		if _, err := tx.Exec(ctx, `INSERT INTO aiosources.collection_state(provider_id,initialized_at)
 VALUES($1,$2) ON CONFLICT DO NOTHING`, run.ProviderID, run.FinishedAt); err != nil {
 			return databaseError("retain collection initialization", err)
 		}
 	}
-	_, err := tx.Exec(ctx, `UPDATE ingest.torrents t SET collection_verified_at=r.finished_at
-FROM ingest.runs r JOIN ingest.run_record_identities accepted ON accepted.run_id=r.id
+	_, err := tx.Exec(ctx, `UPDATE aiosources.torrents t SET collection_verified_at=r.finished_at
+FROM aiosources.runs r JOIN aiosources.run_record_identities accepted ON accepted.run_id=r.id
 WHERE r.id=$1 AND (r.mode='full' OR NOT r.rejected_primary)
 AND t.provider_id=r.provider_id AND t.source_id=accepted.source_id AND t.first_seen_at<=r.finished_at
 AND (t.collection_verified_at IS NULL OR t.collection_verified_at<t.first_seen_at)`, run.ID)

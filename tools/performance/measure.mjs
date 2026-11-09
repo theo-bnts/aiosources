@@ -109,32 +109,32 @@ async function discover() {
   try {
     await db.connect()
     const works = (
-      await db.query(`WITH ids AS MATERIALIZED(SELECT DISTINCT work_id FROM ingest.aio_matches WHERE status='matched' AND work_id IS NOT NULL)
+      await db.query(`WITH ids AS MATERIALIZED(SELECT DISTINCT work_id FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL)
       SELECT DISTINCT ON(w.media_type) w.id,w.media_type,w.imdb_id,w.tmdb_id,w.openlibrary_id,
       COALESCE(NULLIF(w.display_title,''),w.book_data->>'title',t.title) AS title
-      FROM ids JOIN ingest.aio_works w ON w.id=ids.work_id
-      LEFT JOIN LATERAL(SELECT title FROM ingest.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1)t ON true
+      FROM ids JOIN aiosources.aio_works w ON w.id=ids.work_id
+      LEFT JOIN LATERAL(SELECT title FROM aiosources.aio_titles WHERE work_id=w.id ORDER BY title LIMIT 1)t ON true
       WHERE NOT w.adult ORDER BY w.media_type,w.id`)
     ).rows
     const result = {
       works,
       sources: (
         await db.query(
-          `SELECT DISTINCT provider_id FROM ingest.runs WHERE config->>'id'<>'' ORDER BY provider_id`,
+          `SELECT DISTINCT provider_id FROM aiosources.runs WHERE config->>'id'<>'' ORDER BY provider_id`,
         )
       ).rows,
-      runs: (await db.query(`SELECT id FROM ingest.runs ORDER BY pages DESC,id LIMIT 2`)).rows,
+      runs: (await db.query(`SELECT id FROM aiosources.runs ORDER BY pages DESC,id LIMIT 2`)).rows,
       operations: (
         await db.query(
-          `SELECT DISTINCT ON(kind,service) id,kind,service FROM ingest.operation_runs ORDER BY kind,service,created_at DESC`,
+          `SELECT DISTINCT ON(kind,service) id,kind,service FROM aiosources.operation_runs ORDER BY kind,service,created_at DESC`,
         )
       ).rows,
       torrent: (
         await db.query(
-          `SELECT occurrence_id,fields->>'title' AS title,fields->>'info_hash' AS hash FROM ingest.torrents WHERE length(fields->>'title') BETWEEN 2 AND 500 ORDER BY provider_id,source_id LIMIT 1`,
+          `SELECT occurrence_id,fields->>'title' AS title,fields->>'info_hash' AS hash FROM aiosources.torrents WHERE length(fields->>'title') BETWEEN 2 AND 500 ORDER BY provider_id,source_id LIMIT 1`,
         )
       ).rows[0],
-      raw: (await db.query(`SELECT id FROM ingest.raw_records ORDER BY id DESC LIMIT 1`)).rows[0],
+      raw: (await db.query(`SELECT id FROM aiosources.raw_records ORDER BY id DESC LIMIT 1`)).rows[0],
     }
     await fs.writeFile(path.join(root, 'entities-private.json'), JSON.stringify(result), {
       mode: 0o600,

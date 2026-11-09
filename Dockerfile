@@ -17,7 +17,7 @@ COPY --from=panel /build/web/dist/ ./web/dist/
 ARG VERSION=2.3.0
 ARG TARGETOS
 ARG TARGETARCH
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags production -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /aiosource ./cmd/ingest \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags production -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /aiosource ./cmd/aiosources \
     && mkdir -p /runtime/data/providers /runtime/tmp \
     && chmod 700 /runtime/data /runtime/data/providers \
     && chmod 1777 /runtime/tmp

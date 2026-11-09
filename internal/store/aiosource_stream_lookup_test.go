@@ -31,10 +31,10 @@ func TestNativeMALLookupUsesTheSameAssertionsAsTheRecordDecoder(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.torrents`); err != nil {
+			if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.torrents`); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','1',$1)`, json.RawMessage(fields)); err != nil {
+			if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','1',$1)`, json.RawMessage(fields)); err != nil {
 				t.Fatal(err)
 			}
 			rows, err := db.AIOStreams(ctx, "mal", "21", "anime")
@@ -51,12 +51,12 @@ func TestNativeMALLookupUsesTheSameAssertionsAsTheRecordDecoder(t *testing.T) {
 
 func TestNativeMALIndexUpgradePreservesPublishedDataAndQueueVersions(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 VALUES('example','1','{"mal_id":"21","title":"Example.Anime - 03"}');
-UPDATE ingest.aio_match_queue SET version=9;
-DROP INDEX ingest.aio_torrents_native_mal;
-DROP FUNCTION ingest.aio_native_mal_candidates(JSONB);
-DELETE FROM ingest.schema_migrations WHERE version=35;`); err != nil {
+UPDATE aiosources.aio_match_queue SET version=9;
+DROP INDEX aiosources.aio_torrents_native_mal;
+DROP FUNCTION aiosources.aio_native_mal_candidates(JSONB);
+DELETE FROM aiosources.schema_migrations WHERE version=35;`); err != nil {
 		t.Fatal(err)
 	}
 	before, err := db.AIOTorrent(ctx, "example", "1")
@@ -71,7 +71,7 @@ DELETE FROM ingest.schema_migrations WHERE version=35;`); err != nil {
 		t.Fatal("native fields changed during index upgrade", before, after, err)
 	}
 	var version int
-	if err := db.pool.QueryRow(ctx, `SELECT version FROM ingest.aio_match_queue WHERE provider_id='example' AND source_id='1'`).Scan(&version); err != nil || version != 9 {
+	if err := db.pool.QueryRow(ctx, `SELECT version FROM aiosources.aio_match_queue WHERE provider_id='example' AND source_id='1'`).Scan(&version); err != nil || version != 9 {
 		t.Fatal("upgrade changed the existing queue version", version, err)
 	}
 	if err := db.Migrate(ctx); err != nil {
@@ -81,16 +81,16 @@ DELETE FROM ingest.schema_migrations WHERE version=35;`); err != nil {
 
 func BenchmarkNativeMALLookup(b *testing.B) {
 	ctx, db := sharingDatabase(b)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 SELECT 'example',n::text,jsonb_build_object('title','Example.Anime - 03','mal_id',(n+100)::text)
 FROM generate_series(1,100000) n;
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','target','{"title":"Example.Anime - 03","mal_id":"21"}');
-ANALYZE ingest.torrents;`); err != nil {
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','target','{"title":"Example.Anime - 03","mal_id":"21"}');
+ANALYZE aiosources.torrents;`); err != nil {
 		b.Fatal(err)
 	}
 	b.Run("previous", func(b *testing.B) {
 		for b.Loop() {
-			rows, err := db.pool.Query(ctx, `SELECT `+aioRecordColumns+` FROM ingest.torrents t WHERE regexp_replace(COALESCE(t.fields->>'mal_id',t.fields#>>'{external_ids,mal}',t.fields#>>'{external_ids,mal_id}',t.fields#>>'{attributes,malid,0}'),'^0+','')=$1 ORDER BY t.provider_id,t.source_id`, "21")
+			rows, err := db.pool.Query(ctx, `SELECT `+aioRecordColumns+` FROM aiosources.torrents t WHERE regexp_replace(COALESCE(t.fields->>'mal_id',t.fields#>>'{external_ids,mal}',t.fields#>>'{external_ids,mal_id}',t.fields#>>'{attributes,malid,0}'),'^0+','')=$1 ORDER BY t.provider_id,t.source_id`, "21")
 			out, err := collectAIORecords(rows, err, false)
 			if err != nil || len(out) != 1 {
 				b.Fatal("previous lookup fixture", out, err)
@@ -111,7 +111,7 @@ func TestStremioLookupReturnsNewestPublishedReleasesFirst(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	for i, date := range []string{"2021-01-01T00:00:00Z", "2026-01-01T00:00:00Z", "2024-01-01T00:00:00Z"} {
 		fields := fmt.Sprintf(`{"mal_id":"21","title":"Example.Anime - 03","info_hash":"%s","published_at":"%s"}`, strings.Repeat("a", 40), date)
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example',$1,$2)`, fmt.Sprint(i), json.RawMessage(fields)); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example',$1,$2)`, fmt.Sprint(i), json.RawMessage(fields)); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -1,4 +1,4 @@
-// Package model defines the shared contracts of the ingestion platform.
+// Package model defines the shared application contracts.
 package model
 
 import (

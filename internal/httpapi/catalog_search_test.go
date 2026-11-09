@@ -28,7 +28,7 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 	if err := f.db.SaveAIOWork(f.ctx, w, []string{"example movie new day"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567","private_note":"synthetic-source-secret","announce":"https://source.invalid/private-announce"}')`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567","private_note":"synthetic-source-secret","announce":"https://source.invalid/private-announce"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := addon.Match(f.ctx); err != nil {
@@ -41,7 +41,7 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 	}
 	workID := titles.Items[0].ID
 	var id string
-	if err := conn.QueryRow(f.ctx, `SELECT id::text FROM ingest.aio_works WHERE id=$1`, workID).Scan(&id); err != nil {
+	if err := conn.QueryRow(f.ctx, `SELECT id::text FROM aiosources.aio_works WHERE id=$1`, workID).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"/api/catalog/search?q=Example", "/api/catalog/torrents?q=Example", "/api/catalog/" + id, "/api/catalog/" + id + "/releases"} {
@@ -110,7 +110,7 @@ func TestCatalogSearchRequiresAdministrationAndDownloadCSRF(t *testing.T) {
 			t.Fatalf("invalid preparation accepted: %d", out.Code)
 		}
 	}
-	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM ingest.operation_runs WHERE kind='download'`).Scan(&operations); err != nil || operations != 0 {
+	if err := conn.QueryRow(f.ctx, `SELECT count(*) FROM aiosources.operation_runs WHERE kind='download'`).Scan(&operations); err != nil || operations != 0 {
 		t.Fatal("invalid request started a download", err)
 	}
 	if cache := res.Header().Get("Cache-Control"); !strings.Contains(cache, "no-store") {
@@ -126,7 +126,7 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 			if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", Titles: []string{"Example Film"}, Years: []int{2026}}, []string{"example film"}); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Film.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
+			if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Film.2026","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
 				t.Fatal(err)
 			}
 			if err := addon.Match(f.ctx); err != nil {
@@ -194,7 +194,7 @@ func TestCatalogDownloadHTTPReturnsReadyLinksAndPendingResponses(t *testing.T) {
 			defer upstream.Close()
 			addon.Providers.ADBase, addon.Providers.TBBase, addon.Providers.Client = upstream.URL, upstream.URL, upstream.Client()
 			var id int64
-			if err := conn.QueryRow(f.ctx, `SELECT id FROM ingest.aio_works`).Scan(&id); err != nil {
+			if err := conn.QueryRow(f.ctx, `SELECT id FROM aiosources.aio_works`).Scan(&id); err != nil {
 				t.Fatal(err)
 			}
 			rows, err := f.db.CatalogRecords(f.ctx, id)
@@ -265,7 +265,7 @@ func TestCatalogLocaleAndPreferenceTokensDoNotChangeAuthorization(t *testing.T) 
 	if err := f.db.SaveAIOWork(f.ctx, work, []string{"example movie new day"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026.FRENCH","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Movie.New.Day.2026.FRENCH","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt1234567"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := addon.Match(f.ctx); err != nil {

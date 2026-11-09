@@ -85,7 +85,7 @@ func seedMovie(t *testing.T, ctx context.Context, s *Service, conn *pgx.Conn, pr
 	}
 	fields := map[string]any{"title": "Example.Movie.2021.FRENCH.1080p.WEB-DL", "info_hash": hash, "size": int64(5000000000), "imdb_id": "1234567", "tmdb_id": "101"}
 	b, _ := json.Marshal(fields)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES($1,$2,$3)`, provider, id, b); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES($1,$2,$3)`, provider, id, b); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {
@@ -105,7 +105,7 @@ func TestLocalPublicationProvenanceAndStaleRevision(t *testing.T) {
 	if out[0].InfoHash != hash || !strings.Contains(out[0].Name, "🇫🇷") || out[0].Hints.Size != 5000000000 {
 		t.Fatal("missing stream metadata")
 	}
-	if _, err = conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Different.Movie.2021"') WHERE provider_id='one'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Different.Movie.2021"') WHERE provider_id='one'`); err != nil {
 		t.Fatal(err)
 	}
 	out, err = s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
@@ -141,7 +141,7 @@ func TestNewHomonymInvalidatesPublicationAndDeletionRematches(t *testing.T) {
 	ctx, s, conn := testService(t)
 	seedMovie(t, ctx, s, conn, "source", "1", strings.Repeat("a", 40))
 	// Remove supplied IDs so this decision depends on the complete title set.
-	if _, err := conn.Exec(ctx, `UPDATE ingest.torrents SET fields=fields-'imdb_id'-'tmdb_id'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields-'imdb_id'-'tmdb_id'`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {
@@ -164,7 +164,7 @@ func TestNewHomonymInvalidatesPublicationAndDeletionRematches(t *testing.T) {
 		t.Fatal(err)
 	}
 	var status string
-	if err := conn.QueryRow(ctx, `SELECT status FROM ingest.aio_matches`).Scan(&status); err != nil || status != "ambiguous" {
+	if err := conn.QueryRow(ctx, `SELECT status FROM aiosources.aio_matches`).Scan(&status); err != nil || status != "ambiguous" {
 		t.Fatalf("homonym decision %q: %v", status, err)
 	}
 	if err := s.DB.DeleteAIOWork(ctx, "movie", "102"); err != nil {
@@ -212,12 +212,12 @@ func TestMatchingQueueFollowsSourceTransactionsAndResets(t *testing.T) {
 	assertQueue := func(want int) {
 		t.Helper()
 		var n int
-		if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_match_queue`).Scan(&n); err != nil || n != want {
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_match_queue`).Scan(&n); err != nil || n != want {
 			t.Fatalf("matching queue %d, want %d: %v", n, want, err)
 		}
 	}
 	assertQueue(0)
-	if _, err := conn.Exec(ctx, `UPDATE ingest.torrents SET fields=fields`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields`); err != nil {
 		t.Fatal(err)
 	}
 	assertQueue(0)
@@ -225,14 +225,14 @@ func TestMatchingQueueFollowsSourceTransactionsAndResets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Wrong.Movie.2022"')`); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Wrong.Movie.2022"')`); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Rollback(ctx); err != nil {
 		t.Fatal(err)
 	}
 	assertQueue(0)
-	if _, err = conn.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Wrong.Movie.2022"')`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Wrong.Movie.2022"')`); err != nil {
 		t.Fatal(err)
 	}
 	assertQueue(1)
@@ -261,7 +261,7 @@ func TestMatchingQueueFollowsSourceTransactionsAndResets(t *testing.T) {
 	}
 	assertQueue(0)
 	var records int
-	if err = conn.QueryRow(ctx, `SELECT count(*) FROM ingest.torrents`).Scan(&records); err != nil || records != 1 {
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.torrents`).Scan(&records); err != nil || records != 1 {
 		t.Fatal("extension reset removed source provenance", err)
 	}
 }
@@ -420,7 +420,7 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 	mu.Unlock()
 	// Availability is now shared; simulate expiry before expecting the changed
 	// provider response to be discovered. Playback IDs remain account-specific.
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
 		t.Fatal(err)
 	}
 	out, err = s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")
@@ -455,7 +455,7 @@ func TestCacheAccountsRestartFreshnessAndDeferredPlayback(t *testing.T) {
 	mu.Lock()
 	cached = true
 	mu.Unlock()
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_resources SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_availability SET checked_at=now()-interval '4 days'; UPDATE ingest.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_resources SET checked_at=now()-interval '4 days'; UPDATE aiosources.aio_availability SET checked_at=now()-interval '4 days'; UPDATE aiosources.aio_shared_availability SET checked_at=now()-interval '4 days'`); err != nil {
 		t.Fatal(err)
 	}
 	out, err = s.Streams(ctx, "http://localhost", token, "movie", "tt1234567")

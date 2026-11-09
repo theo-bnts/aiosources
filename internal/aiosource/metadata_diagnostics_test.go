@@ -34,8 +34,8 @@ func TestInventoryImportDoesNotConsumeHTTPRequestTimeout(t *testing.T) {
 	if err := g.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `CREATE FUNCTION ingest.slow_inventory_batch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); RETURN NULL; END $$;
-CREATE TRIGGER slow_inventory_batch AFTER INSERT ON ingest.aio_inventory FOR EACH STATEMENT EXECUTE FUNCTION ingest.slow_inventory_batch()`); err != nil {
+	if _, err := conn.Exec(ctx, `CREATE FUNCTION aiosources.slow_inventory_batch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); RETURN NULL; END $$;
+CREATE TRIGGER slow_inventory_batch AFTER INSERT ON aiosources.aio_inventory FOR EACH STATEMENT EXECUTE FUNCTION aiosources.slow_inventory_batch()`); err != nil {
 		t.Fatal(err)
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -51,7 +51,7 @@ CREATE TRIGGER slow_inventory_batch AFTER INSERT ON ingest.aio_inventory FOR EAC
 		t.Fatalf("database processing consumed the download timeout: %v", err)
 	}
 	var count int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_inventory`).Scan(&count); err != nil || count != records {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_inventory`).Scan(&count); err != nil || count != records {
 		t.Fatalf("incomplete imported inventory: %d %v", count, err)
 	}
 	files, err := os.ReadDir(temp)
@@ -144,10 +144,10 @@ func TestInformationFailuresAreSpecificLoggedRepeatedlyAndRecover(t *testing.T) 
 		}
 	}
 	var failures, alerts int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='tmdb.sync_failed'`).Scan(&failures); err != nil || failures != 4 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='tmdb.sync_failed'`).Scan(&failures); err != nil || failures != 4 {
 		t.Fatalf("repeated failure disappeared from logs: %d %v", failures, err)
 	}
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE service='tmdb' AND kind='aiosource.incident'`).Scan(&alerts); err != nil || alerts != 1 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE service='tmdb' AND kind='aiosource.incident'`).Scan(&alerts); err != nil || alerts != 1 {
 		t.Fatalf("repeated failure created duplicate incident logs: %d %v", alerts, err)
 	}
 	phase.Store(3)
@@ -184,20 +184,20 @@ func TestInformationTimeoutAndStorageDiagnosticsDoNotBlameToken(t *testing.T) {
 	if !strings.Contains(status.SyncError, "timed out") || strings.Contains(status.SyncError, "token") {
 		t.Fatalf("incorrect timeout message: %s", status.SyncError)
 	}
-	if _, err := conn.Exec(ctx, `DROP TABLE ingest.aio_metadata_jobs`); err != nil {
+	if _, err := conn.Exec(ctx, `DROP TABLE aiosources.aio_metadata_jobs`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Sync(ctx, c); err == nil {
 		t.Fatal("missing database table was accepted")
 	}
-	if err := conn.QueryRow(ctx, `SELECT sync_error FROM ingest.aio_state`).Scan(&status.SyncError); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT sync_error FROM aiosources.aio_state`).Scan(&status.SyncError); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(status.SyncError, "local database") || strings.Contains(status.SyncError, "token") {
 		t.Fatalf("database failure incorrectly blamed TMDB: %s", status.SyncError)
 	}
 	var incidents int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE service='tmdb' AND kind='aiosource.incident'`).Scan(&incidents); err != nil || incidents != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE service='tmdb' AND kind='aiosource.incident'`).Scan(&incidents); err != nil || incidents != 0 {
 		t.Fatalf("local database failure incorrectly opened a TMDB incident: %d %v", incidents, err)
 	}
 }

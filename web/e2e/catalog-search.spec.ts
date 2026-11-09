@@ -54,21 +54,21 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years,display_title)
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years,display_title)
       VALUES('movie','101','tt1234567',ARRAY[2026],'Example Film: New Day'),('tv','202','tt2345678',ARRAY[2026],'Example Series');
-      INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,display_title,CASE WHEN media_type='movie' THEN 'example film new day' ELSE 'example series' END FROM ingest.aio_works;
-      INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,display_title,CASE WHEN media_type='movie' THEN 'example film new day' ELSE 'example series' END FROM aiosources.aio_works;
+      INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
       ('alpha','film-one','{"title":"Example-Film.New.Day.2026.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"imdb_id":"tt1234567"}'),
       ('zulu','film-two','{"title":"Example-Film.New.Day.2026.2160p","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200,"imdb_id":"tt1234567"}'),
       ('alpha','series-one','{"title":"Example.Series.S02E03.1080p","info_hash":"cccccccccccccccccccccccccccccccccccccccc","size":100,"imdb_id":"tt2345678"}');
-      INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-      SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','native identifier' FROM ingest.torrents t JOIN ingest.aio_works w ON w.imdb_id=t.fields->>'imdb_id';
-      DELETE FROM ingest.aio_match_queue;
-      INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
+      INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+      SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','native identifier' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.imdb_id=t.fields->>'imdb_id';
+      DELETE FROM aiosources.aio_match_queue;
+      INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES
       ('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[{"path":"Example.Film.New.Day.2026.mkv","size":100}]'),
       ('torbox','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',false,now(),'[]'),
       ('torbox','cccccccccccccccccccccccccccccccccccccccc',true,now(),'[{"path":"Example.Series.S02E03.mkv","size":100}]');`)
-    const works = await db.query('SELECT id,media_type FROM ingest.aio_works')
+    const works = await db.query('SELECT id,media_type FROM aiosources.aio_works')
     return Object.fromEntries(works.rows.map((row) => [row.media_type, String(row.id)])) as Record<
       string,
       string
@@ -86,14 +86,14 @@ test('Search displays the same release details as Stremio at desktop and mobile 
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`UPDATE ingest.torrents SET fields=fields||'{
+    await db.query(`UPDATE aiosources.torrents SET fields=fields||'{
       "title":"Example-Film.New.Day.2026.FRENCH.2160p.WEB-DL.H265.HDR10+.DTS.5.1.EXTENDED",
       "languages":["fra","eng"],"sublangs":["fra"],"duration":5400,
       "release_group":"ExampleGroup","published_at":"2026-10-09T12:00:00Z"
     }' WHERE provider_id='zulu' AND source_id='film-two';
-    UPDATE ingest.aio_matches m SET fingerprint=t.fields_fingerprint
-    FROM ingest.torrents t WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id;
-    DELETE FROM ingest.aio_match_queue;`)
+    UPDATE aiosources.aio_matches m SET fingerprint=t.fields_fingerprint
+    FROM aiosources.torrents t WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id;
+    DELETE FROM aiosources.aio_match_queue;`)
   } finally {
     await db.end()
   }
@@ -485,9 +485,9 @@ test('mobile download controls handle pending and ready responses without keepin
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Example.Series.S02E03.UPDATED.1080p"') WHERE source_id='series-one';
-      UPDATE ingest.aio_matches m SET fingerprint=t.fields_fingerprint FROM ingest.torrents t WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id;
-      DELETE FROM ingest.aio_match_queue;`)
+    await db.query(`UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Example.Series.S02E03.UPDATED.1080p"') WHERE source_id='series-one';
+      UPDATE aiosources.aio_matches m SET fingerprint=t.fields_fingerprint FROM aiosources.torrents t WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id;
+      DELETE FROM aiosources.aio_match_queue;`)
   } finally {
     await db.end()
   }
@@ -687,14 +687,14 @@ test('an added file can be followed and downloaded from its original history ope
   await db.connect()
   try {
     await db.query(
-      `INSERT INTO ingest.operation_runs(id,kind,service,trigger,resource,lock_key,status,phase,processed,finished_at) VALUES($1,'download','torbox','manual','movie:tt1234567',1,'succeeded','waiting',1,now());
+      `INSERT INTO aiosources.operation_runs(id,kind,service,trigger,resource,lock_key,status,phase,processed,finished_at) VALUES($1,'download','torbox','manual','movie:tt1234567',1,'succeeded','waiting',1,now());
     `,
       [operation],
     )
     await db.query(
-      `INSERT INTO ingest.operation_downloads(run_id,work_id,input,account)
+      `INSERT INTO aiosources.operation_downloads(run_id,work_id,input,account)
       SELECT $1,$2,jsonb_build_object('occurrence_id',occurrence_id,'fingerprint',fields_fingerprint,'service','torbox','allow_uncached',false,'preparation_id','7'),'synthetic-account'
-      FROM ingest.torrents WHERE source_id='film-two'`,
+      FROM aiosources.torrents WHERE source_id='film-two'`,
       [operation, ids.movie],
     )
     await page.clock.install()
@@ -710,7 +710,9 @@ test('an added file can be followed and downloaded from its original history ope
       expect(route.request().postDataJSON()).toEqual({})
       checks++
       if (checks > 1)
-        await db.query("UPDATE ingest.operation_runs SET phase='ready' WHERE id=$1", [operation])
+        await db.query("UPDATE aiosources.operation_runs SET phase='ready' WHERE id=$1", [
+          operation,
+        ])
       await route.fulfill({
         status: checks > 1 ? 200 : 202,
         json: {
@@ -769,7 +771,7 @@ test.describe('browser language preferences', () => {
     await db.connect()
     try {
       await db.query(
-        `UPDATE ingest.aio_works SET localized_titles='{"fr":"Long Métrage Exemple","en":"Example Feature"}' WHERE media_type='movie'`,
+        `UPDATE aiosources.aio_works SET localized_titles='{"fr":"Long Métrage Exemple","en":"Example Feature"}' WHERE media_type='movie'`,
       )
     } finally {
       await db.end()
@@ -798,13 +800,13 @@ test.describe('browser language preferences', () => {
     const db = new pg.Client({ connectionString: server.databaseURL })
     await db.connect()
     try {
-      await db.query(`UPDATE ingest.aio_works SET localized_titles='{"fr":"Film Exemple","en":"Example Film: New Day"}' WHERE media_type='movie';
-    INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+      await db.query(`UPDATE aiosources.aio_works SET localized_titles='{"fr":"Film Exemple","en":"Example Film: New Day"}' WHERE media_type='movie';
+    INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
      ('alpha','french','{"title":"Example.Film.New.Day.2026.FRENCH","info_hash":"dddddddddddddddddddddddddddddddddddddddd","size":500,"imdb_id":"tt1234567"}'),
      ('alpha','german','{"title":"Example.Film.New.Day.2026.GERMAN","info_hash":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","size":1000,"imdb_id":"tt1234567"}'),
      ('alpha','multi','{"title":"Example.Film.New.Day.2026.MULTI","info_hash":"ffffffffffffffffffffffffffffffffffffffff","size":300,"imdb_id":"tt1234567"}');
-    INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-     SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t JOIN ingest.aio_works w ON w.imdb_id=t.fields->>'imdb_id' WHERE t.source_id IN ('french','german','multi');DELETE FROM ingest.aio_match_queue;`)
+    INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+     SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.imdb_id=t.fields->>'imdb_id' WHERE t.source_id IN ('french','german','multi');DELETE FROM aiosources.aio_match_queue;`)
     } finally {
       await db.end()
     }
@@ -847,7 +849,7 @@ test('direct torrent Search is always reachable and reuses release formatting wi
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query('DELETE FROM ingest.aio_matches; DELETE FROM ingest.aio_match_queue;')
+    await db.query('DELETE FROM aiosources.aio_matches; DELETE FROM aiosources.aio_match_queue;')
   } finally {
     await db.end()
   }

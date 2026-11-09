@@ -40,13 +40,13 @@ func TestGranularStorageSnapshotsAndHistoryAreIndependent(t *testing.T) {
 	mirrorFinish(t, ctx, db, run, model.StatusSucceeded)
 	var description, discarded string
 	var copies, history int
-	if err = db.pool.QueryRow(ctx, `SELECT fields->>'description',COALESCE(fields->>'discarded','') FROM ingest.torrents`).Scan(&description, &discarded); err != nil || description != "selected" || discarded != "" {
+	if err = db.pool.QueryRow(ctx, `SELECT fields->>'description',COALESCE(fields->>'discarded','') FROM aiosources.torrents`).Scan(&description, &discarded); err != nil || description != "selected" || discarded != "" {
 		t.Fatal("snapshot selection lost", description, discarded, err)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.raw_records WHERE fields->>'description'='selected'`).Scan(&copies); err != nil || copies != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.raw_records WHERE fields->>'description'='selected'`).Scan(&copies); err != nil || copies != 1 {
 		t.Fatal("diagnostic choice not snapshotted", copies, err)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.torrent_history`).Scan(&history); err != nil || history != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.torrent_history`).Scan(&history); err != nil || history != 0 {
 		t.Fatal("disabled history kept new copies", history, err)
 	}
 	current, _ = db.StorageOverview(ctx)
@@ -55,7 +55,7 @@ func TestGranularStorageSnapshotsAndHistoryAreIndependent(t *testing.T) {
 		t.Fatal(err)
 	}
 	publishSharingRow(t, ctx, db, "fixture", "two", `{"title":"Second example"}`, nil)
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.torrent_history`).Scan(&history); err != nil || history != 1 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.torrent_history`).Scan(&history); err != nil || history != 1 {
 		t.Fatal("history did not resume", history, err)
 	}
 }
@@ -90,7 +90,7 @@ func TestRetentionOverridesDoNotErasePublishedDataOrBorrowOtherCutoffs(t *testin
 		t.Fatal("optional result details changed counts", detail, err)
 	}
 	var logs int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs`).Scan(&logs); err != nil || logs != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs`).Scan(&logs); err != nil || logs != 0 {
 		t.Fatal("zero retention did not clean logs", logs, err)
 	}
 	settings, _ = db.StorageRetention(ctx)

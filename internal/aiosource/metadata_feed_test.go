@@ -62,7 +62,7 @@ func TestTMDBFeedFailureStillAppliesOneRetainedBatchWithoutAdvancingFreshness(t 
 	}
 	c, _ := s.DB.AIOConfig(ctx)
 	c.TMDBSecret = "tmdb"
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET changes_through=now()-interval '1 hour',applied_through=now()-interval '1 hour',last_sync=now()-interval '1 hour'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET changes_through=now()-interval '1 hour',applied_through=now()-interval '1 hour',last_sync=now()-interval '1 hour'`); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := s.DB.AIOAutomationStatus(ctx)
@@ -88,7 +88,7 @@ func TestTMDBFeedFailureStillAppliesOneRetainedBatchWithoutAdvancingFreshness(t 
 		t.Fatal("a failed feed was reported as successful", err)
 	}
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title FROM ingest.aio_works WHERE media_type='movie' AND tmdb_id='101'`).Scan(&title); err != nil || title != "Renamed Synthetic Movie" || details.Load() != 1 {
+	if err := conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE media_type='movie' AND tmdb_id='101'`).Scan(&title); err != nil || title != "Renamed Synthetic Movie" || details.Load() != 1 {
 		t.Fatal("a failed feed starved retained information jobs", title, details.Load(), err)
 	}
 	after, err := s.DB.AIOAutomationStatus(ctx)

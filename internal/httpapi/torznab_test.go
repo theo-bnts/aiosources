@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/moodiness/ingest/torznab"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/store"
+	"github.com/theo-bnts/aiosources/torznab"
 )
 
 func TestTorznabAuthenticationCapabilitiesAndClientRoundTrip(t *testing.T) {
@@ -20,7 +20,7 @@ func TestTorznabAuthenticationCapabilitiesAndClientRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close(f.ctx)
-	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','one','{"title":"Example.Film.2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1024,"attributes":{"language":["French"],"unknown":"do-not-export"},"download_url":"https://private.invalid/do-not-export"}')`); err != nil {
+	if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','one','{"title":"Example.Film.2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":1024,"attributes":{"language":["French"],"unknown":"do-not-export"},"download_url":"https://private.invalid/do-not-export"}')`); err != nil {
 		t.Fatal(err)
 	}
 	body := `{"name":"External client","scope":"all","source_ids":[],"enabled":true}`
@@ -97,10 +97,10 @@ func TestTorznabSavedCacheFiltersSurviveManagementAndCannotBeOverridden(t *testi
 		t.Fatal(err)
 	}
 	defer conn.Close(f.ctx)
-	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('example','cached','{"title":"Example cached release","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
  ('example','uncached','{"title":"Example uncached release","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}');
- INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]')`); err != nil {
+ INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]')`); err != nil {
 		t.Fatal(err)
 	}
 	w := f.request("POST", "/api/torznab/endpoints", `{"name":"Cache filtered","scope":"all","enabled":true,"torznab_preferences":{"services":["torbox"],"cached_only":true}}`, true, "")
@@ -201,16 +201,16 @@ func TestTorznabEpisodePagesUsePacksAndCurrentManualNumbering(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close(f.ctx)
-	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('tv','123','tt7654321',ARRAY[2024]);
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('tv','123','tt7654321',ARRAY[2024]);
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
 ('fixture','episode','{"title":"Example.Series.S01E02","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
 ('fixture','pack','{"title":"Example.Series.S01.COMPLETE","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}'),
 ('fixture','other','{"title":"Example.Series.S02E02","info_hash":"cccccccccccccccccccccccccccccccccccccccc"}'),
 ('fixture','unknown','{"title":"Example.Series.2024","info_hash":"dddddddddddddddddddddddddddddddddddddddd"}'),
 ('fixture','review','{"title":"Example.Series.S01E02","season":1,"episode":2,"info_hash":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}');
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t CROSS JOIN ingest.aio_works w;
-DELETE FROM ingest.aio_match_queue;
-INSERT INTO ingest.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode) SELECT provider_id,source_id,fields_fingerprint,md5(ingest.aio_review_evidence(fields)::text),'tv','123',true,3,NULL FROM ingest.torrents WHERE source_id='review';`); err != nil {
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t CROSS JOIN aiosources.aio_works w;
+DELETE FROM aiosources.aio_match_queue;
+INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode) SELECT provider_id,source_id,fields_fingerprint,md5(aiosources.aio_review_evidence(fields)::text),'tv','123',true,3,NULL FROM aiosources.torrents WHERE source_id='review';`); err != nil {
 		t.Fatal(err)
 	}
 	g, err := f.db.CreateShare(f.ctx, model.ShareInput{Format: "torznab", Name: "Client", Scope: "all", Enabled: true, Fields: store.CatalogFields()})
@@ -243,10 +243,10 @@ func TestPrivateTorznabCachedOnlyReturnsNoAnnouncesAndExcludesExpiredCache(t *te
 		t.Fatal(err)
 	}
 	defer conn.Close(f.ctx)
-	if _, err = conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err = conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('fixture','cached','{"title":"Example Cached Film","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","announce_url":"https://announce.example.invalid/admin-private-passkey/announce","download_url":"https://private.example.invalid/admin-private-passkey/file"}'),
  ('fixture','uncached','{"title":"Example Uncached Film","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}');
- INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]');`); err != nil {
+ INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',true,now(),'[]');`); err != nil {
 		t.Fatal(err)
 	}
 	response := f.request("POST", "/api/torznab/endpoints", `{"name":"Cached client","scope":"all","enabled":true}`, true, "")
@@ -268,7 +268,7 @@ func TestPrivateTorznabCachedOnlyReturnsNoAnnouncesAndExcludesExpiredCache(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, config.CacheMinutes); err != nil {
+	if _, err = conn.Exec(f.ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, config.CacheMinutes); err != nil {
 		t.Fatal(err)
 	}
 	response = f.request("GET", path, "", false, "")

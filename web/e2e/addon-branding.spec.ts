@@ -7,10 +7,10 @@ test('installed addons advertise their public PNG without exposing administrator
   server,
 }) => {
   const versionSource = await readFile(
-    new URL('../../internal/aiosource/manifest.go', import.meta.url),
+    new URL('../../internal/buildinfo/version.go', import.meta.url),
     'utf8',
   )
-  const expectedVersion = versionSource.match(/^const Version = "([^"]+)"$/m)?.[1]
+  const expectedVersion = versionSource.match(/^const Release = "([^"]+)"$/m)?.[1]
   expect(expectedVersion, 'The addon version must be declared in the current source').toBeTruthy()
   const { manifestURL } = await createStremioAccess(page)
   const visitor = await browser.newContext({ baseURL: server.origin })

@@ -43,7 +43,7 @@ func TestManualIdentificationSurvivesMetadataUpdatesButRequiresReviewOfChangedSo
 		t.Fatalf("review crossed source identities: %+v %v", streams, err)
 	}
 	var native string
-	if err = db.pool.QueryRow(ctx, `SELECT fields->>'download_url' FROM ingest.torrents WHERE provider_id='one'`).Scan(&native); err != nil || native != "https://source.invalid/synthetic-private-value" {
+	if err = db.pool.QueryRow(ctx, `SELECT fields->>'download_url' FROM aiosources.torrents WHERE provider_id='one'`).Scan(&native); err != nil || native != "https://source.invalid/synthetic-private-value" {
 		t.Fatal("review rewrote source data", err)
 	}
 	work.Titles = append(work.Titles, "Example Alternative")
@@ -66,7 +66,7 @@ func TestManualIdentificationSurvivesMetadataUpdatesButRequiresReviewOfChangedSo
 			t.Fatalf("automatic update replaced review: %+v", result)
 		}
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{size}','1000') WHERE provider_id='one'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{size}','1000') WHERE provider_id='one'`); err != nil {
 		t.Fatal(err)
 	}
 	picks, _ = db.AIOMatchBatch(ctx, 10)
@@ -74,7 +74,7 @@ func TestManualIdentificationSurvivesMetadataUpdatesButRequiresReviewOfChangedSo
 	if err != nil || len(results) != 1 || results[0].Status != "matched" || results[0].Reason != "manually reviewed" {
 		t.Fatal("annex updates invalidated a reviewed identity", err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Changed release"') WHERE provider_id='one'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Changed release"') WHERE provider_id='one'`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.SaveAIOReview(ctx, occurrence, model.AIOReviewInput{Fingerprint: input.Fingerprint, Revision: 1, WorkID: w.ID, WorkRevision: w.Revision}); !errors.Is(err, model.ErrConflict) {

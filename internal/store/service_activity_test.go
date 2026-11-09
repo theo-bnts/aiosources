@@ -106,10 +106,10 @@ func TestServiceActivityMigrationRecoversExistingIncidentContext(t *testing.T) {
 	const message = "The service could not complete the operation. Check its credentials and status."
 	for _, service := range []string{"tmdb", "alldebrid", "torbox", "cleanup"} {
 		var id int64
-		if err := db.pool.QueryRow(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message) VALUES($1,'error','aiosource.incident',$2) RETURNING id`, "fixture-"+service, message).Scan(&id); err != nil {
+		if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message) VALUES($1,'error','aiosource.incident',$2) RETURNING id`, "fixture-"+service, message).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.notifications(activity_id,level,kind,title,message,created_at) VALUES($1,'error','aiosource.incident',$2,$3,now())`, id, service+" unavailable", message); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.notifications(activity_id,level,kind,title,message,created_at) VALUES($1,'error','aiosource.incident',$2,$3,now())`, id, service+" unavailable", message); err != nil {
 			t.Fatal(err)
 		}
 	}

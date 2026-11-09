@@ -131,7 +131,7 @@ test.describe('resetting source data with imports in progress', () => {
     const db = new pg.Client({ connectionString: server.databaseURL })
     await db.connect()
     try {
-      await db.query(`INSERT INTO ingest.runs
+      await db.query(`INSERT INTO aiosources.runs
         (id,provider_id,provider_name,mode,status,trigger,revision,config,started_at)
         VALUES('storage-active','example','Example source','full','running','manual','',
           '{"version":1,"id":"example","adapter":"http_json","enabled":false}',now())`)
@@ -158,11 +158,11 @@ test.describe('resetting source data with imports in progress', () => {
       })
       expect(blocked.status()).toBe(409)
       expect(
-        (await db.query("SELECT status FROM ingest.runs WHERE id='storage-active'")).rows,
+        (await db.query("SELECT status FROM aiosources.runs WHERE id='storage-active'")).rows,
       ).toEqual([{ status: 'running' }])
 
       await db.query(
-        "UPDATE ingest.runs SET status='paused',pause_reason='manual',finished_at=now() WHERE id='storage-active'",
+        "UPDATE aiosources.runs SET status='paused',pause_reason='manual',finished_at=now() WHERE id='storage-active'",
       )
       await expect(reset).toBeEnabled({ timeout: 40_000 })
       await expect(status).toHaveText('')
@@ -171,7 +171,7 @@ test.describe('resetting source data with imports in progress', () => {
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Reset source data', exact: true }).click()
       await expect(dialog).toBeHidden()
-      expect((await db.query('SELECT count(*)::int AS count FROM ingest.runs')).rows).toEqual([
+      expect((await db.query('SELECT count(*)::int AS count FROM aiosources.runs')).rows).toEqual([
         { count: 0 },
       ])
       expect(

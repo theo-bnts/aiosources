@@ -86,7 +86,7 @@ func TestProviderDiagnosticsUseAllowlistedValuesAndConcurrentFixedCaps(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.operation_events(run_id,phase,processed,errors) SELECT $1,'availability',0,0 FROM generate_series(1,998)`, run.ID); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.operation_events(run_id,phase,processed,errors) SELECT $1,'availability',0,0 FROM generate_series(1,998)`, run.ID); err != nil {
 		t.Fatal(err)
 	}
 	var checks sync.WaitGroup
@@ -137,7 +137,7 @@ func TestPublicAccessChangesAreLoggedAtomicallyWithoutVisitorData(t *testing.T) 
 	logCount := func() int64 {
 		t.Helper()
 		var count int64
-		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind IN ('security.public_access_enabled','security.public_access_disabled')`).Scan(&count); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind IN ('security.public_access_enabled','security.public_access_disabled')`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
 		return count
@@ -163,9 +163,9 @@ func TestPublicAccessChangesAreLoggedAtomicallyWithoutVisitorData(t *testing.T) 
 	}
 	// A storage failure must not expose the instance or revoke installations
 	// without committing the matching log in the same transaction.
-	if _, err = db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_public_access_log() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+	if _, err = db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_public_access_log() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN IF NEW.kind='security.public_access_disabled' THEN RAISE EXCEPTION 'synthetic log failure'; END IF; RETURN NEW; END; $$;
-CREATE TRIGGER reject_public_access_log BEFORE INSERT ON ingest.activity_logs FOR EACH ROW EXECUTE FUNCTION ingest.reject_public_access_log()`); err != nil {
+CREATE TRIGGER reject_public_access_log BEFORE INSERT ON aiosources.activity_logs FOR EACH ROW EXECUTE FUNCTION aiosources.reject_public_access_log()`); err != nil {
 		t.Fatal(err)
 	}
 	disable := unchanged
@@ -177,7 +177,7 @@ CREATE TRIGGER reject_public_access_log BEFORE INSERT ON ingest.activity_logs FO
 	if afterFailure != unchanged || logCount() != 1 {
 		t.Fatal("failed log did not roll back the access setting and generation")
 	}
-	if _, err = db.pool.Exec(ctx, `DROP TRIGGER reject_public_access_log ON ingest.activity_logs; DROP FUNCTION ingest.reject_public_access_log()`); err != nil {
+	if _, err = db.pool.Exec(ctx, `DROP TRIGGER reject_public_access_log ON aiosources.activity_logs; DROP FUNCTION aiosources.reject_public_access_log()`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.SetPublicAccess(ctx, disable); err != nil || logCount() != 2 {
@@ -202,16 +202,16 @@ func TestPublicAccessLogUpgradePreservesExistingAccessMessagesAndSettings(t *tes
 	}
 	// Simulate the function and migration stamp from the prior release. Other
 	// migrations and persistent public settings retain their original state.
-	oldFunction, _, ok := strings.Cut(consoleSimplificationSchema, "ALTER FUNCTION ingest.activity_message")
+	oldFunction, _, ok := strings.Cut(consoleSimplificationSchema, "ALTER FUNCTION aiosources.activity_message")
 	if !ok {
 		t.Fatal("could not identify the prior access-message definition")
 	}
 	oldFunction = strings.Replace(oldFunction, "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1)
-	if _, err = db.pool.Exec(ctx, oldFunction+`DELETE FROM ingest.schema_migrations WHERE version=50`); err != nil {
+	if _, err = db.pool.Exec(ctx, oldFunction+`DELETE FROM aiosources.schema_migrations WHERE version=50`); err != nil {
 		t.Fatal(err)
 	}
 	var previousMessages string
-	query := `SELECT jsonb_agg(jsonb_build_array(kind,ingest.activity_message(kind)) ORDER BY kind)::text
+	query := `SELECT jsonb_agg(jsonb_build_array(kind,aiosources.activity_message(kind)) ORDER BY kind)::text
 FROM unnest(ARRAY['security.mfa_enabled','security.mfa_disabled','security.recovery_rotated','security.session_revoked','security.sessions_revoked','share.created','share.permissions_changed','share.rotated','share.revoked']) kind`
 	if err = db.pool.QueryRow(ctx, query).Scan(&previousMessages); err != nil {
 		t.Fatal(err)

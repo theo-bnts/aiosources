@@ -36,7 +36,7 @@ func TestAIOMetadataBatchNoOpAndVersionedPublication(t *testing.T) {
 		t.Fatal(err)
 	}
 	var generation int64
-	if err := db.pool.QueryRow(ctx, `SELECT metadata_generation FROM ingest.aio_state`).Scan(&generation); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT metadata_generation FROM aiosources.aio_state`).Scan(&generation); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.QueueAIOMetadata(ctx, "movie", []string{"101"}, true); err != nil {
@@ -52,7 +52,7 @@ func TestAIOMetadataBatchNoOpAndVersionedPublication(t *testing.T) {
 	}
 	var revision, current int64
 	var pending, queued int
-	if err := db.pool.QueryRow(ctx, `SELECT revision,(SELECT metadata_generation FROM ingest.aio_state),(SELECT count(*) FROM ingest.aio_metadata_jobs),(SELECT count(*) FROM ingest.aio_match_queue) FROM ingest.aio_works`).Scan(&revision, &current, &pending, &queued); err != nil || revision != works[0].Revision || current != generation || pending != 1 || queued != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT revision,(SELECT metadata_generation FROM aiosources.aio_state),(SELECT count(*) FROM aiosources.aio_metadata_jobs),(SELECT count(*) FROM aiosources.aio_match_queue) FROM aiosources.aio_works`).Scan(&revision, &current, &pending, &queued); err != nil || revision != works[0].Revision || current != generation || pending != 1 || queued != 0 {
 		t.Fatalf("no-op withdrew streams or acknowledged a newer job: revision=%d generation=%d pending=%d queued=%d err=%v", revision, current, pending, queued, err)
 	}
 	streams, err := db.AIOStreams(ctx, "imdb", "tt1234567", "movie")
@@ -90,7 +90,7 @@ func TestAIOMatchingAndMetadataPublicationShareSmallPoolSafely(t *testing.T) {
 	if err := db.SaveAIOWork(ctx, w, []string{"example film"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 SELECT 'source',n::text,jsonb_build_object('title','Example.Film.2021') FROM generate_series(1,30) n`); err != nil {
 		t.Fatal(err)
 	}
@@ -123,29 +123,29 @@ SELECT 'source',n::text,jsonb_build_object('title','Example.Film.2021') FROM gen
 	})
 	group.Wait()
 	var matches, queue int
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_matches),(SELECT count(*) FROM ingest.aio_match_queue)`).Scan(&matches, &queue); err != nil || matches != 30 || queue != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_matches),(SELECT count(*) FROM aiosources.aio_match_queue)`).Scan(&matches, &queue); err != nil || matches != 30 || queue != 0 {
 		t.Fatal("pool contention lost matching work", matches, queue, err)
 	}
 }
 
 func TestAIOPerformanceUpgradeRequeuesOldMissesWithoutWithdrawingMatches(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years) VALUES('movie','101',ARRAY[2021]);
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','matched','{}'),('source','unmatched','{}'),('source','ambiguous','{}');
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM ingest.aio_works),1,source_id,'previous decision' FROM ingest.torrents;
-DELETE FROM ingest.aio_match_queue;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id,version) VALUES('source','ambiguous',9);
-ALTER TABLE ingest.aio_works DROP COLUMN adult;
-DROP INDEX ingest.aio_metadata_jobs_due,ingest.aio_works_refresh,ingest.aio_torrents_tmdb,ingest.aio_torrents_imdb,ingest.aio_torrents_tvdb;
-DELETE FROM ingest.schema_migrations WHERE version=34;`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) VALUES('movie','101',ARRAY[2021]);
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','matched','{}'),('source','unmatched','{}'),('source','ambiguous','{}');
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT provider_id,source_id,md5(fields::text),(SELECT id FROM aiosources.aio_works),1,source_id,'previous decision' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue;
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id,version) VALUES('source','ambiguous',9);
+ALTER TABLE aiosources.aio_works DROP COLUMN adult;
+DROP INDEX aiosources.aio_metadata_jobs_due,aiosources.aio_works_refresh,aiosources.aio_torrents_tmdb,aiosources.aio_torrents_imdb,aiosources.aio_torrents_tvdb;
+DELETE FROM aiosources.schema_migrations WHERE version=34;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var queue, version int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*),max(version) FROM ingest.aio_match_queue`).Scan(&queue, &version); err != nil || queue != 2 || version != 9 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*),max(version) FROM aiosources.aio_match_queue`).Scan(&queue, &version); err != nil || queue != 2 || version != 9 {
 		t.Fatal("upgrade lost an existing queue version or withdrew working streams", queue, version, err)
 	}
 	if err := db.Migrate(ctx); err != nil {
@@ -164,23 +164,23 @@ func TestAIOMetadataBatchRollsBackDetailsAndAcknowledgements(t *testing.T) {
 		j := job
 		inputs = append(inputs, AIOMetadataPublication{Work: model.AIOWork{Type: j.Type, TMDB: j.ID, Titles: []string{"A Film"}, Years: []int{2021}}, Normalized: []string{"a film"}, Job: &j})
 	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.aio_titles ADD CONSTRAINT synthetic_publication_failure CHECK(work_id<0)`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.aio_titles ADD CONSTRAINT synthetic_publication_failure CHECK(work_id<0)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.SaveAIOMetadataBatch(ctx, inputs); err == nil {
 		t.Fatal("storage failure was accepted")
 	}
 	var works, pending int
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&works, &pending); err != nil || works != 0 || pending != 2 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&works, &pending); err != nil || works != 0 || pending != 2 {
 		t.Fatalf("partially published metadata: %d %d %v", works, pending, err)
 	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.aio_titles DROP CONSTRAINT synthetic_publication_failure`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.aio_titles DROP CONSTRAINT synthetic_publication_failure`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.SaveAIOMetadataBatch(ctx, inputs); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&works, &pending); err != nil || works != 2 || pending != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&works, &pending); err != nil || works != 2 || pending != 0 {
 		t.Fatalf("publication did not recover: %d %d %v", works, pending, err)
 	}
 }
@@ -195,17 +195,17 @@ func TestAIOMatchBatchSeasonRequestsAreAtomicAndRejectStaleWork(t *testing.T) {
 	decide := func(r model.AIORecord, find AIOCandidateSearch) (model.AIOMatchResult, error) {
 		return model.AIOMatchResult{Record: r, Status: "unmatched", Reason: "pending episode year", Seasons: []model.AIOSeasonRequest{{TMDB: "202", Season: 1}}}, nil
 	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.aio_metadata_jobs ADD CONSTRAINT synthetic_request_failure CHECK(false)`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.aio_metadata_jobs ADD CONSTRAINT synthetic_request_failure CHECK(false)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.MatchAIOBatch(ctx, rows, decide); err == nil {
 		t.Fatal("season queue failure was accepted")
 	}
 	var matches, requests, queue int
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_matches),(SELECT count(*) FROM ingest.aio_season_requests),(SELECT count(*) FROM ingest.aio_match_queue)`).Scan(&matches, &requests, &queue); err != nil || matches != 0 || requests != 0 || queue != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_matches),(SELECT count(*) FROM aiosources.aio_season_requests),(SELECT count(*) FROM aiosources.aio_match_queue)`).Scan(&matches, &requests, &queue); err != nil || matches != 0 || requests != 0 || queue != 1 {
 		t.Fatalf("partial matching publication: %d %d %d %v", matches, requests, queue, err)
 	}
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.aio_metadata_jobs DROP CONSTRAINT synthetic_request_failure`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.aio_metadata_jobs DROP CONSTRAINT synthetic_request_failure`); err != nil {
 		t.Fatal(err)
 	}
 	works, _, _ := db.AIOCandidates(ctx, "example series", "", "", "")
@@ -227,11 +227,11 @@ func TestAIOMatchBatchSeasonRequestsAreAtomicAndRejectStaleWork(t *testing.T) {
 
 func TestAIOMatchCandidateEligibilityPrecedesOverflowLimit(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years)
 SELECT 'movie',n::text,ARRAY[2021] FROM generate_series(1,150) n;
-INSERT INTO ingest.aio_works(media_type,tmdb_id,years)
+INSERT INTO aiosources.aio_works(media_type,tmdb_id,years)
 SELECT 'tv',n::text,ARRAY[1990] FROM generate_series(151,300) n;
-INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Example Serial','example serial' FROM ingest.aio_works;`); err != nil {
+INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Example Serial','example serial' FROM aiosources.aio_works;`); err != nil {
 		t.Fatal(err)
 	}
 	w := model.AIOWork{Type: "tv", TMDB: "301", IMDb: "tt1234567", Titles: []string{"Example Serial"}, Years: []int{2018}, SeasonYears: map[int]int{1: 2019}, EpisodeYears: map[string]int{"1:2": 2021}}
@@ -253,10 +253,10 @@ INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Example Seria
 		t.Fatal(results, err)
 	}
 	// The safety cap still rejects a genuinely crowded eligible candidate set.
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years)
 SELECT 'tv',n::text,ARRAY[2021] FROM generate_series(302,411) n;
-INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Example Serial','example serial' FROM ingest.aio_works WHERE tmdb_id::int>=302;
-INSERT INTO ingest.aio_match_queue(provider_id,source_id) VALUES('source','1')`); err != nil {
+INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Example Serial','example serial' FROM aiosources.aio_works WHERE tmdb_id::int>=302;
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id) VALUES('source','1')`); err != nil {
 		t.Fatal(err)
 	}
 	_, err = db.MatchAIOBatch(ctx, rows, func(r model.AIORecord, find AIOCandidateSearch) (model.AIOMatchResult, error) {
@@ -295,7 +295,7 @@ func TestAIOMetadataDeletionKeepsNewerJobsAndNoOpRefresh(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.aio_works SET updated_at=now()-interval '31 days' WHERE tmdb_id='101'`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_works SET updated_at=now()-interval '31 days' WHERE tmdb_id='101'`); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {

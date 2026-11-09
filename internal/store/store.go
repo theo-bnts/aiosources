@@ -1,4 +1,4 @@
-// Package store persists ingestion checkpoints, observations and catalogue fields in PostgreSQL.
+// Package store persists collection checkpoints, observations and catalogue fields in PostgreSQL.
 package store
 
 import (
@@ -21,7 +21,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-const notificationChannel = "ingest_run_changes"
+const notificationChannel = "aiosources_run_changes"
 
 type Store struct {
 	runtime        runtimeSettingsCache
@@ -53,6 +53,13 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	}
 	if config.ConnConfig.ConnectTimeout == 0 {
 		config.ConnConfig.ConnectTimeout = 10 * time.Second
+	}
+	// Extensions may live beside the application tables, especially when the
+	// original database role and schema shared a name. Keep them resolvable after
+	// a namespace upgrade while preserving role, URL and server search paths.
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, `SELECT pg_catalog.set_config('search_path',$1||','||pg_catalog.current_setting('search_path'),false)`, applicationSchema)
+		return err
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -160,7 +167,7 @@ func closeConnection(conn *pgx.Conn) {
 }
 
 func providerLockKey(providerID string) int64 {
-	sum := sha256.Sum256([]byte("scraper.ingest.provider.v1\x00" + providerID))
+	sum := sha256.Sum256([]byte(providerLeaseDomain + providerID))
 	return int64(binary.BigEndian.Uint64(sum[:8]))
 }
 

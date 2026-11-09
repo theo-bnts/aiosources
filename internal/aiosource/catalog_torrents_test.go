@@ -11,7 +11,7 @@ import (
 
 func TestDirectCatalogResultsShareFormatterWithoutPrivatePayloads(t *testing.T) {
 	ctx, s, conn := testService(t)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Tales.EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"private_note":"synthetic-private-payload","announce":"https://secret.invalid/passkey"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','one','{"title":"Example.Tales.EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"private_note":"synthetic-private-payload","announce":"https://secret.invalid/passkey"}')`); err != nil {
 		t.Fatal(err)
 	}
 	page, err := s.CatalogTorrents(ctx, model.ListOptions{Query: "Example Tales"}, model.CatalogReleaseFilters{}, nil)
@@ -55,7 +55,7 @@ func TestDirectPublicFilePredicateMatchesDownloadSelection(t *testing.T) {
 	} {
 		encoded, _ := json.Marshal(files)
 		var allowed bool
-		if err := conn.QueryRow(ctx, `SELECT ingest.catalog_has_download_file($1::jsonb)`, encoded).Scan(&allowed); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT aiosources.catalog_has_download_file($1::jsonb)`, encoded).Scan(&allowed); err != nil {
 			t.Fatal(err)
 		}
 		if allowed != (len(resourceDownloadFiles(files, Resource{Type: "torrent"})) > 0) {
@@ -73,7 +73,7 @@ func TestDirectPublicResultsUseOnlySharedCacheOrVisitorAnnouncements(t *testing.
 		t.Fatal(err)
 	}
 	access, _ = s.DB.PublicAccess(ctx)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('private','one','{"title":"Example.Digital.EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),('private','two','{"title":"Example.Digital.PDF","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('private','one','{"title":"Example.Digital.EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),('private','two','{"title":"Example.Digital.PDF","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}')`); err != nil {
 		t.Fatal(err)
 	}
 	config, _ := s.DB.AIOConfig(ctx)
@@ -81,7 +81,7 @@ func TestDirectPublicResultsUseOnlySharedCacheOrVisitorAnnouncements(t *testing.
 	if err := s.SaveConfig(ctx, config); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',$1,true,now(),'[{"path":"Example.epub","size":10}]')`, strings.Repeat("a", 40)); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES('torbox',$1,true,now(),'[{"path":"Example.epub","size":10}]')`, strings.Repeat("a", 40)); err != nil {
 		t.Fatal(err)
 	}
 	visitor := &PublicInstallation{Services: map[string]string{"torbox": "synthetic-visitor-key"}, Generation: access.Generation, Audience: "https://addon.example"}
@@ -90,7 +90,7 @@ func TestDirectPublicResultsUseOnlySharedCacheOrVisitorAnnouncements(t *testing.
 	if err != nil || page.Total != 1 || len(page.Items) != 1 || len(page.Items[0].Services) != 1 || page.Items[0].Services[0].State != "cached" || page.Items[0].Provider != "" || page.Items[0].DownloadToken == "" {
 		t.Fatalf("public direct safety: %+v %v", page, err)
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=$1`, time.Now().Add(-365*24*time.Hour)); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=$1`, time.Now().Add(-365*24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	page, err = s.CatalogTorrents(ctx, model.ListOptions{Query: "Example"}, model.CatalogReleaseFilters{}, visitor)

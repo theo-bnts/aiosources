@@ -106,10 +106,10 @@ test.describe('historical response archives', () => {
     let pageID: string
     try {
       await db.query(
-        "INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config) VALUES('archive-fixture','fixture','Synthetic archive','preview','succeeded','','{}')",
+        "INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config) VALUES('archive-fixture','fixture','Synthetic archive','preview','succeeded','','{}')",
       )
       const result = await db.query(
-        "INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type) VALUES('archive-fixture','fixture',1,$1,'application/json') RETURNING id",
+        "INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type) VALUES('archive-fixture','fixture',1,$1,'application/json') RETURNING id",
         [Buffer.from('{"title":"Synthetic immutable response"}')],
       )
       pageID = String(result.rows[0].id)

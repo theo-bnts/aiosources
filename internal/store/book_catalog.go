@@ -9,20 +9,20 @@ import (
 // Work dates are often absent from the export. A known edition can supply
 // the first locally known publication year without rewriting every work.
 const bookWorkYears = `CASE WHEN w.media_type='book' AND cardinality(w.years)=0 THEN
- ARRAY(SELECT min(year) FROM ingest.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND year>0 HAVING min(year) IS NOT NULL)
+ ARRAY(SELECT min(year) FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND year>0 HAVING min(year) IS NOT NULL)
  ELSE w.years END`
 
 func bookLanguageSQL(locale string) string { return `ARRAY[split_part(` + locale + `,'-',1)]` }
 
 func bookEditionTitle(locale string) string {
-	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.title FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.languages && ` + bookLanguageSQL(locale) + `)
+	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.title FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.languages && ` + bookLanguageSQL(locale) + `)
  SELECT title FROM editions ORDER BY id LIMIT 1)`
 }
 
 // Resolve aliases once and select the work's editions before ordering. With a
 // global ORDER BY/LIMIT, a selective lookup can otherwise walk the edition
 // primary key and evaluate recursive redirects for millions of unrelated rows.
-const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM ingest.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(ingest.ol_aliases(w.openlibrary_id))) AND e.cover>0)
+const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
  SELECT cover FROM editions ORDER BY id LIMIT 1)`
 
 // Start with the edition's small set of work identifiers, then follow the same
@@ -33,11 +33,11 @@ const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FRO
 const bookEditionWorks = `JOIN LATERAL (
  WITH RECURSIVE targets(id,seen) AS (
  SELECT key,ARRAY[key] FROM unnest(e.work_keys) key
- UNION ALL SELECT r.target,t.seen||r.target FROM targets t JOIN ingest.ol_redirects r ON r.source=t.id
+ UNION ALL SELECT r.target,t.seen||r.target FROM targets t JOIN aiosources.ol_redirects r ON r.source=t.id
  WHERE cardinality(t.seen)<8 AND NOT r.target=ANY(t.seen)
  ) SELECT DISTINCT id FROM targets
 ) edition_work ON TRUE
-JOIN ingest.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=edition_work.id`
+JOIN aiosources.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=edition_work.id`
 
 func expandBookCategories(cats []int) []int {
 	out := append([]int{}, cats...)
@@ -66,7 +66,7 @@ func bookTitleSearchSQL(query string, bind func(any) string) string {
 		return raw
 	}
 	return `(` + raw + ` OR (` + strings.Join(work, " AND ") + `) OR EXISTS(
- SELECT 1 FROM ingest.ol_editions e WHERE e.work_keys && ingest.ol_aliases(w.openlibrary_id)
+ SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id)
  AND ` + strings.Join(edition, " AND ") + `))`
 }
 
@@ -77,12 +77,12 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 	if len(anchors) > 0 && anchors[0] != "" {
 		combined = bookCombinedCandidates(normalized, matching, anchors[0])
 	}
-	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized) FROM ingest.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
- UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM ingest.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=ingest.ol_resolve(` + query + `)
- UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=ingest.ol_resolve(` + query + `)
+	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized) FROM aiosources.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
+ UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=aiosources.ol_resolve(` + query + `)
+ UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=aiosources.ol_resolve(` + query + `)
  UNION ALL SELECT w.id,CASE WHEN e.normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,e.normalized)
- FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
- UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM ingest.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(ingest.ol_aliases(id)) FROM ingest.ol_authors WHERE ` + matching + `)` + combined
+ FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
+ UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM aiosources.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE ` + matching + `)` + combined
 	return sql
 }
 
@@ -91,16 +91,16 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 // or scanning the complete bibliographic catalog.
 func bookCombinedCandidates(normalized, matching, anchor string) string {
 	return ` UNION ALL SELECT id,2 AS precision,public.similarity(` + normalized + `,normalized) FROM (
- WITH author_keys AS MATERIALIZED(SELECT ARRAY(SELECT unnest(ingest.ol_aliases(id)) FROM ingest.ol_authors WHERE normalized LIKE ` + anchor + `) AS ids),
- author_works AS MATERIALIZED(SELECT id,openlibrary_id,book_normalized FROM ingest.aio_works w WHERE media_type='book' AND (book_data->'author_keys') ?| (SELECT ids FROM author_keys)),
+ WITH author_keys AS MATERIALIZED(SELECT ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE normalized LIKE ` + anchor + `) AS ids),
+ author_works AS MATERIALIZED(SELECT id,openlibrary_id,book_normalized FROM aiosources.aio_works w WHERE media_type='book' AND (book_data->'author_keys') ?| (SELECT ids FROM author_keys)),
  aliases AS (
- SELECT id,book_normalized AS title FROM ingest.aio_works WHERE media_type='book' AND book_normalized LIKE ` + anchor + `
+ SELECT id,book_normalized AS title FROM aiosources.aio_works WHERE media_type='book' AND book_normalized LIKE ` + anchor + `
  UNION SELECT id,book_normalized FROM author_works
- UNION SELECT w.id,e.normalized FROM ingest.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + `
- UNION SELECT w.id,e.normalized FROM author_works w JOIN ingest.ol_editions e ON e.work_keys && ingest.ol_aliases(w.openlibrary_id)
- ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM ingest.ol_authors a WHERE a.id=ANY(
- ARRAY(SELECT ingest.ol_resolve(key) FROM jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')) key)
+ UNION SELECT w.id,e.normalized FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + `
+ UNION SELECT w.id,e.normalized FROM author_works w JOIN aiosources.ol_editions e ON e.work_keys && aiosources.ol_aliases(w.openlibrary_id)
+ ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM aiosources.ol_authors a WHERE a.id=ANY(
+ ARRAY(SELECT aiosources.ol_resolve(key) FROM jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')) key)
  )),'') AS normalized
- FROM aliases JOIN ingest.aio_works w ON w.id=aliases.id
+ FROM aliases JOIN aiosources.aio_works w ON w.id=aliases.id
  ) combined_books WHERE ` + matching
 }

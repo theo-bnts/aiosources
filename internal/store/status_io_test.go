@@ -12,13 +12,13 @@ func TestAIOStatusAggregatesCurrentDecisionsWithoutRepeatedSpooling(t *testing.T
 	if err := db.SaveAIOWork(ctx, model.AIOWork{Type: "movie", TMDB: "1", Titles: []string{"Example Film"}}, []string{"example film"}); err != nil {
 		t.Fatal(err)
 	}
-	_, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	_, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 SELECT 'example',n::text,jsonb_build_object('title','Example Film','size',n) FROM generate_series(1,20000) n;
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
 SELECT provider_id,source_id,md5(fields::text),CASE WHEN source_id::int%4=1 THEN 1 END,1,
-CASE source_id::int%4 WHEN 2 THEN 'ambiguous' WHEN 3 THEN 'unmatched' ELSE 'matched' END,'synthetic test' FROM ingest.torrents;
-DELETE FROM ingest.aio_match_queue WHERE source_id::int%4<>0;
-ANALYZE ingest.torrents; ANALYZE ingest.aio_matches; ANALYZE ingest.aio_match_queue;`)
+CASE source_id::int%4 WHEN 2 THEN 'ambiguous' WHEN 3 THEN 'unmatched' ELSE 'matched' END,'synthetic test' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue WHERE source_id::int%4<>0;
+ANALYZE aiosources.torrents; ANALYZE aiosources.aio_matches; ANALYZE aiosources.aio_match_queue;`)
 	if err != nil {
 		t.Fatal(err)
 	}

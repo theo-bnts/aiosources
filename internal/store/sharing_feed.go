@@ -147,10 +147,10 @@ func projectCatalogFields(raw []byte, allowed []string) (map[string]any, error) 
 // touched original identity exactly once, including an old identity on change.
 const catalogPageSQL = `
 WITH states AS (
-    SELECT provider_id,source_id,origin,fields,deleted,sequence FROM ingest.catalog_journal
+    SELECT provider_id,source_id,origin,fields,deleted,sequence FROM aiosources.catalog_journal
     WHERE sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
     UNION ALL
-    SELECT provider_id,source_id,origin,fields,deleted,sequence FROM ingest.catalog_baselines
+    SELECT provider_id,source_id,origin,fields,deleted,sequence FROM aiosources.catalog_baselines
     WHERE sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
 ), copies AS (
     SELECT DISTINCT ON (provider_id,source_id,origin) provider_id,source_id,origin,fields,deleted,sequence
@@ -162,7 +162,7 @@ WITH states AS (
 )
 SELECT origin,fields,deleted,sequence,provider_id,source_id FROM chosen
 WHERE (($4='full' AND NOT deleted) OR ($4='incremental' AND origin IN (
-    SELECT origin FROM ingest.catalog_journal WHERE sequence>$5 AND sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
+    SELECT origin FROM aiosources.catalog_journal WHERE sequence>$5 AND sequence<=$1 AND ($2 OR provider_id=ANY($3::text[]))
 )))
 AND sequence > $6
 ORDER BY sequence
@@ -197,7 +197,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 	var entities []byte
 	// Recheck current policy for every page, including authenticated old cursors.
 	// Serialize permission changes with the export, never with network writes.
-	err = tx.QueryRow(ctx, `SELECT s.enabled,s.scope,s.source_ids,s.fields,s.revision,s.catalog_entities FROM ingest.shares s JOIN ingest.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp() FOR UPDATE OF s`, shareID, d.revision, d.id).Scan(&share.Enabled, &share.Scope, &share.SourceIDs, &share.Fields, &share.Revision, &entities)
+	err = tx.QueryRow(ctx, `SELECT s.enabled,s.scope,s.source_ids,s.fields,s.revision,s.catalog_entities FROM aiosources.shares s JOIN aiosources.share_requests r ON r.share_id=s.id WHERE s.id=$1 AND s.enabled AND s.revision=$2 AND (s.expires_at IS NULL OR s.expires_at>clock_timestamp()) AND r.id=$3 AND r.lease_until>clock_timestamp() FOR UPDATE OF s`, shareID, d.revision, d.id).Scan(&share.Enabled, &share.Scope, &share.SourceIDs, &share.Fields, &share.Revision, &entities)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrCatalogAuthentication
 	}
@@ -212,7 +212,7 @@ func (d *CatalogDownload) Page(ctx context.Context, request CatalogPageRequest) 
 		return result, err
 	}
 	more := result.NextCursor != ""
-	if _, err := tx.Exec(ctx, `UPDATE ingest.shares SET last_access_at=clock_timestamp(),last_sync_at=CASE WHEN $2 THEN clock_timestamp() ELSE last_sync_at END WHERE id=$1`, shareID, !more && !request.Head); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE aiosources.shares SET last_access_at=clock_timestamp(),last_sync_at=CASE WHEN $2 THEN clock_timestamp() ELSE last_sync_at END WHERE id=$1`, shareID, !more && !request.Head); err != nil {
 		return result, databaseError("record catalogue access", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -241,11 +241,11 @@ func catalogExportPage(ctx context.Context, tx pgx.Tx, share model.Share, shareI
 		result.Entities.Availability = result.Entities.Availability && slices.Contains(share.Fields, "info_hash")
 	}
 	var signingKey []byte
-	if err := tx.QueryRow(ctx, `SELECT instance_id,signing_key FROM ingest.catalog_identity WHERE singleton`).Scan(&result.InstanceID, &signingKey); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT instance_id,signing_key FROM aiosources.catalog_identity WHERE singleton`).Scan(&result.InstanceID, &signingKey); err != nil {
 		return result, databaseError("read catalogue identity", err)
 	}
 	var floor int64
-	if err := tx.QueryRow(ctx, "SELECT floor FROM ingest.catalog_retention WHERE singleton FOR SHARE").Scan(&floor); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT floor FROM aiosources.catalog_retention WHERE singleton FOR SHARE").Scan(&floor); err != nil {
 		return result, databaseError("read retained catalog boundary", err)
 	}
 	state := catalogToken{Version: 1, InstanceID: result.InstanceID, ShareID: shareID, Revision: share.Revision, Kind: "page", Mode: "full", Limit: request.Limit, Requested: request.Entities, Entities: result.Entities}
@@ -280,7 +280,7 @@ func catalogExportPage(ctx context.Context, tx pgx.Tx, share model.Share, shareI
 				}
 			}
 		}
-		if err := tx.QueryRow(ctx, "SELECT GREATEST(COALESCE(MAX(sequence),0),$1::bigint) FROM ingest.catalog_journal", floor).Scan(&state.High); err != nil {
+		if err := tx.QueryRow(ctx, "SELECT GREATEST(COALESCE(MAX(sequence),0),$1::bigint) FROM aiosources.catalog_journal", floor).Scan(&state.High); err != nil {
 			return result, databaseError("capture catalogue publication boundary", err)
 		}
 		if !state.Entities.Empty() {

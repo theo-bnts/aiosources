@@ -151,7 +151,7 @@ func sharingPasswordHash(id, password string) [32]byte {
 
 func (s *Store) CatalogInstanceID(ctx context.Context) (string, error) {
 	var id string
-	err := s.pool.QueryRow(ctx, "SELECT instance_id FROM ingest.catalog_identity WHERE singleton").Scan(&id)
+	err := s.pool.QueryRow(ctx, "SELECT instance_id FROM aiosources.catalog_identity WHERE singleton").Scan(&id)
 	return id, databaseError("read catalogue installation identity", err)
 }
 
@@ -163,7 +163,7 @@ func (s *Store) SharesByFormat(ctx context.Context, format string) ([]model.Shar
 	if format != "catalog" && format != "torznab" && format != "stremio" {
 		return nil, model.ErrInvalid
 	}
-	rows, err := s.pool.Query(ctx, "SELECT "+shareColumns+" FROM ingest.shares WHERE format=$1 ORDER BY created_at,id", format)
+	rows, err := s.pool.Query(ctx, "SELECT "+shareColumns+" FROM aiosources.shares WHERE format=$1 ORDER BY created_at,id", format)
 	if err != nil {
 		return nil, databaseError("list shares", err)
 	}
@@ -180,7 +180,7 @@ func (s *Store) SharesByFormat(ctx context.Context, format string) ([]model.Shar
 }
 
 func (s *Store) Share(ctx context.Context, id string) (model.Share, error) {
-	item, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+" FROM ingest.shares WHERE id=$1", id))
+	item, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+" FROM aiosources.shares WHERE id=$1", id))
 	return item, databaseError("read share", err)
 }
 
@@ -224,7 +224,7 @@ func (s *Store) CreateShare(ctx context.Context, input model.ShareInput) (model.
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
 		return model.ShareCredential{}, err
 	}
-	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO ingest.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences,catalog_entities) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14::jsonb,'{}'::jsonb),$15::jsonb) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
+	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO aiosources.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences,catalog_entities) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14::jsonb,'{}'::jsonb),$15::jsonb) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
 	if err != nil {
 		return model.ShareCredential{}, databaseError("create share", err)
 	}
@@ -251,7 +251,7 @@ func lockShareRevision(ctx context.Context, tx pgx.Tx, id string, expected int64
 		return databaseError("lock share publication policy", err)
 	}
 	var revision int64
-	if err := tx.QueryRow(ctx, "SELECT revision FROM ingest.shares WHERE id=$1 FOR UPDATE", id).Scan(&revision); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT revision FROM aiosources.shares WHERE id=$1 FOR UPDATE", id).Scan(&revision); err != nil {
 		return databaseError("lock share", err)
 	}
 	if revision != expected {
@@ -281,7 +281,7 @@ func (s *Store) UpdateShare(ctx context.Context, id string, input model.ShareInp
 	if input.MediaTypes == nil {
 		input.MediaTypes = []string{}
 	}
-	item, err := scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11,stream_preferences=$12,torznab_preferences=COALESCE($13::jsonb,torznab_preferences),catalog_entities=$14::jsonb WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
+	item, err := scanShare(tx.QueryRow(ctx, `UPDATE aiosources.shares SET name=$2,enabled=$3,scope=$4,source_ids=$5,fields=$6,expires_at=$7,requests_per_minute=$8,max_concurrent_downloads=$9,revision=revision+1,updated_at=NOW(),media_types=$11,stream_preferences=$12,torznab_preferences=COALESCE($13::jsonb,torznab_preferences),catalog_entities=$14::jsonb WHERE id=$1 AND format=$10 RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, input.ExpiresAt, *input.RequestsPerMinute, *input.MaxConcurrentDownloads, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
 	if err != nil {
 		return item, databaseError("update share", err)
 	}
@@ -308,7 +308,7 @@ func (s *Store) RotateShare(ctx context.Context, id string, revision int64) (mod
 	if err != nil {
 		return result, err
 	}
-	result.Share, err = scanShare(tx.QueryRow(ctx, `UPDATE ingest.shares SET password_hash=$2,revision=revision+1,updated_at=NOW() WHERE id=$1 RETURNING `+shareColumns, id, hash))
+	result.Share, err = scanShare(tx.QueryRow(ctx, `UPDATE aiosources.shares SET password_hash=$2,revision=revision+1,updated_at=NOW() WHERE id=$1 RETURNING `+shareColumns, id, hash))
 	if err != nil {
 		return model.ShareCredential{}, databaseError("rotate sharing password", err)
 	}
@@ -332,10 +332,10 @@ func (s *Store) DeleteShare(ctx context.Context, id string, revision int64) erro
 		return err
 	}
 	var format string
-	if err := tx.QueryRow(ctx, "SELECT format FROM ingest.shares WHERE id=$1", id).Scan(&format); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT format FROM aiosources.shares WHERE id=$1", id).Scan(&format); err != nil {
 		return databaseError("read access format", err)
 	}
-	if _, err := tx.Exec(ctx, "DELETE FROM ingest.shares WHERE id=$1", id); err != nil {
+	if _, err := tx.Exec(ctx, "DELETE FROM aiosources.shares WHERE id=$1", id); err != nil {
 		return databaseError("revoke share", err)
 	}
 	if err := recordAccessActivityTx(ctx, tx, shareActivity(format, "revoked"), id); err != nil {

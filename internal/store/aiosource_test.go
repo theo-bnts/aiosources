@@ -67,11 +67,11 @@ func TestAIOIncidentPersistence(t *testing.T) {
 	}
 	defer conn.Close(context.Background())
 	var count int
-	if err = conn.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='aiosource.incident'`).Scan(&count); err != nil || count != 3 {
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='aiosource.incident'`).Scan(&count); err != nil || count != 3 {
 		t.Fatalf("incident history %d %v", count, err)
 	}
 	var raw []byte
-	if err = conn.QueryRow(ctx, `SELECT data FROM ingest.activity_logs WHERE kind='aiosource.incident' LIMIT 1`).Scan(&raw); err != nil || !json.Valid(raw) {
+	if err = conn.QueryRow(ctx, `SELECT data FROM aiosources.activity_logs WHERE kind='aiosource.incident' LIMIT 1`).Scan(&raw); err != nil || !json.Valid(raw) {
 		t.Fatal("invalid incident metadata")
 	}
 }
@@ -133,7 +133,7 @@ func TestAIOInventoryDoesNotErasePostSnapshotMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_works SET updated_at=now()-interval '3 days' WHERE tmdb_id<>'3'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_works SET updated_at=now()-interval '3 days' WHERE tmdb_id<>'3'`); err != nil {
 		t.Fatal(err)
 	}
 	date := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
@@ -144,7 +144,7 @@ func TestAIOInventoryDoesNotErasePostSnapshotMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	var ids []string
-	if err = conn.QueryRow(ctx, `SELECT ARRAY(SELECT tmdb_id FROM ingest.aio_works ORDER BY tmdb_id)`).Scan(&ids); err != nil || strings.Join(ids, ",") != "2,3" {
+	if err = conn.QueryRow(ctx, `SELECT ARRAY(SELECT tmdb_id FROM aiosources.aio_works ORDER BY tmdb_id)`).Scan(&ids); err != nil || strings.Join(ids, ",") != "2,3" {
 		t.Fatalf("inventory retained %v: %v", ids, err)
 	}
 }
@@ -164,12 +164,12 @@ func TestAIOCandidateGenerationRejectsStaleDecision(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close(context.Background())
-	if _, err = conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','1','{"title":"Title"}')`); err != nil {
+	if _, err = conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','1','{"title":"Title"}')`); err != nil {
 		t.Fatal(err)
 	}
 	var r model.AIORecord
 	r.Provider, r.SourceID, r.Normalized = "source", "1", "title"
-	if err = conn.QueryRow(ctx, `SELECT md5(fields::text) FROM ingest.torrents`).Scan(&r.Fingerprint); err != nil {
+	if err = conn.QueryRow(ctx, `SELECT md5(fields::text) FROM aiosources.torrents`).Scan(&r.Fingerprint); err != nil {
 		t.Fatal(err)
 	}
 	r.CandidateGeneration, err = s.AIOCandidateGeneration(ctx)
@@ -183,7 +183,7 @@ func TestAIOCandidateGenerationRejectsStaleDecision(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err = conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches`).Scan(&n); err != nil || n != 0 {
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_matches`).Scan(&n); err != nil || n != 0 {
 		t.Fatal("stale candidate set was published", err)
 	}
 	r.CandidateGeneration, err = s.AIOCandidateGeneration(ctx)
@@ -193,7 +193,7 @@ func TestAIOCandidateGenerationRejectsStaleDecision(t *testing.T) {
 	if err = s.SaveAIOMatch(ctx, r, "unmatched", "current decision", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err = conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches`).Scan(&n); err != nil || n != 1 {
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_matches`).Scan(&n); err != nil || n != 1 {
 		t.Fatal("current generation rejected", err)
 	}
 }
@@ -213,9 +213,9 @@ func TestAIOCandidateSearchUsesIndexesAtCatalogScale(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close(context.Background())
-	if _, err = conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,years) SELECT 'movie',n::text,ARRAY[2021] FROM generate_series(1,50000) n;
-INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,md5(tmdb_id),md5(tmdb_id) FROM ingest.aio_works;
-ANALYZE ingest.aio_works;ANALYZE ingest.aio_titles;`); err != nil {
+	if _, err = conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years) SELECT 'movie',n::text,ARRAY[2021] FROM generate_series(1,50000) n;
+INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,md5(tmdb_id),md5(tmdb_id) FROM aiosources.aio_works;
+ANALYZE aiosources.aio_works;ANALYZE aiosources.aio_titles;`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.SaveAIOWork(ctx, model.AIOWork{Type: "movie", TMDB: "50001", IMDb: "tt8888888", Titles: []string{"Unique Target Film"}, Years: []int{2021}}, []string{"unique target film"}); err != nil {

@@ -79,7 +79,7 @@ func TestPublicADOwnershipFailuresAndCancellationNeverBorrowAdministratorKey(t *
 				t.Fatal("confirmed temporary entry was not cleaned", adds.Load(), deletes.Load())
 			}
 			var accountRows int
-			if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_resources)+(SELECT count(*) FROM ingest.aio_cleanup)+(SELECT count(*) FROM ingest.aio_availability)`).Scan(&accountRows); err != nil || accountRows != 0 {
+			if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_resources)+(SELECT count(*) FROM aiosources.aio_cleanup)+(SELECT count(*) FROM aiosources.aio_availability)`).Scan(&accountRows); err != nil || accountRows != 0 {
 				t.Fatal("visitor state was persisted for background work", accountRows, err)
 			}
 			shared, err := s.DB.SharedAvailability(ctx, "alldebrid", []string{hash}, time.Now().Add(-time.Minute))

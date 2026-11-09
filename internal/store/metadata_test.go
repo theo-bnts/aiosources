@@ -40,14 +40,14 @@ func TestMetadataCandidatesUsePublishedNativeKeysetAndCreationBoundary(t *testin
 	}
 	mirrorFinish(t, ctx, db, seed, model.StatusSucceeded)
 	// Explicit JSON null also needs enrichment; it differs from known emptiness.
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=fields || '{"metadata":null}'::jsonb WHERE provider_id=$1 AND source_id='40'`, provider.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=fields || '{"metadata":null}'::jsonb WHERE provider_id=$1 AND source_id='40'`, provider.ID); err != nil {
 		t.Fatal(err)
 	}
 	origin := model.CatalogOrigin{InstanceID: "friend", ProviderID: "remote", SourceID: "15"}
 	publishSharingRow(t, ctx, db, provider.ID, model.CatalogItemID(origin), `{"info_hash":"0123456789012345678901234567890123456789"}`, &origin)
 	run := mirrorClaim(t, ctx, db, provider, model.ModeMetadata)
 	publishSharingRow(t, ctx, db, provider.ID, "50", `{"info_hash":"0123456789012345678901234567890123456789"}`, nil)
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='50'", provider.ID, run.CreatedAt.Add(time.Second)); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$2 WHERE provider_id=$1 AND source_id='50'", provider.ID, run.CreatedAt.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	publishSharingRow(t, ctx, db, "another-provider", "05", `{"info_hash":"0123456789012345678901234567890123456789"}`, nil)

@@ -113,10 +113,10 @@ func TestTorrentSearchFragmentsAndQueryOperators(t *testing.T) {
 
 func BenchmarkTorrentSearchFragments(b *testing.B) {
 	ctx, db := sharingDatabase(b)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
         SELECT 'fixture',n::text,jsonb_build_object('title','Ordinary.Volume.'||n||'.2024.1080p.WEB.H265') FROM generate_series(1,100000) n;
-        INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','target','{"title":"Astronomical.Documentary.2024"}');
-        ANALYZE ingest.torrents;`); err != nil {
+        INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','target','{"title":"Astronomical.Documentary.2024"}');
+        ANALYZE aiosources.torrents;`); err != nil {
 		b.Fatal(err)
 	}
 	for _, test := range []struct{ name, query string }{
@@ -141,7 +141,7 @@ func TestTorrentSearchFragmentRelevanceAndPagination(t *testing.T) {
 		fields, _ := json.Marshal(map[string]string{"title": row.title})
 		publishSharingRow(t, ctx, db, "fixture", row.id, string(fields), nil)
 	}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET last_seen_at='2026-09-01T00:00:00Z'"); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET last_seen_at='2026-09-01T00:00:00Z'"); err != nil {
 		t.Fatal(err)
 	}
 	for offset, id := range []string{"exact", "prefix", "middle"} {

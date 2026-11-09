@@ -70,14 +70,14 @@ func TestStorageSavingPreservesMatchingAndPlaybackDataWithMuchSmallerRecords(t *
 				t.Fatalf("%s storage changed partial search or combined filters: %+v %v", mode, results, err)
 			}
 		}
-		record, err := scanAIORecord(db.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+` FROM ingest.torrents t WHERE provider_id=$1`, provider.ID))
+		record, err := scanAIORecord(db.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+` FROM aiosources.torrents t WHERE provider_id=$1`, provider.ID))
 		if err != nil {
 			t.Fatal(err)
 		}
 		record.Provider, record.Fingerprint = "", ""
 		records = append(records, record)
 		var size int
-		if err := db.pool.QueryRow(ctx, `SELECT octet_length(fields::text) FROM ingest.torrents WHERE provider_id=$1`, provider.ID).Scan(&size); err != nil {
+		if err := db.pool.QueryRow(ctx, `SELECT octet_length(fields::text) FROM aiosources.torrents WHERE provider_id=$1`, provider.ID).Scan(&size); err != nil {
 			t.Fatal(err)
 		}
 		sizes = append(sizes, size)
@@ -92,7 +92,7 @@ func TestStorageSavingPreservesMatchingAndPlaybackDataWithMuchSmallerRecords(t *
 		t.Fatal("source objects were mutated")
 	}
 	var compactObservations, fullObservations int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE provider_id='compact'),count(*) FILTER(WHERE provider_id='full') FROM ingest.raw_records`).Scan(&compactObservations, &fullObservations); err != nil || compactObservations != 0 || fullObservations != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FILTER(WHERE provider_id='compact'),count(*) FILTER(WHERE provider_id='full') FROM aiosources.raw_records`).Scan(&compactObservations, &fullObservations); err != nil || compactObservations != 0 || fullObservations != 1 {
 		t.Fatalf("successful observations were duplicated in compact mode: %d %d %v", compactObservations, fullObservations, err)
 	}
 }
@@ -109,7 +109,7 @@ func TestCompactStorageRetainsErrorsAndFilterEvidenceWithoutSuccessObservations(
 		t.Fatal(err)
 	}
 	var observations, filterIDs int
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.raw_records WHERE run_id=$1),(SELECT count(*) FROM ingest.run_filter_records WHERE page_id IN (SELECT id FROM ingest.pages WHERE run_id=$1))`, run.ID).Scan(&observations, &filterIDs); err != nil || observations != 0 || filterIDs != 2 {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.raw_records WHERE run_id=$1),(SELECT count(*) FROM aiosources.run_filter_records WHERE page_id IN (SELECT id FROM aiosources.pages WHERE run_id=$1))`, run.ID).Scan(&observations, &filterIDs); err != nil || observations != 0 || filterIDs != 2 {
 		t.Fatalf("durable filter evidence was lost: %d %d %v", observations, filterIDs, err)
 	}
 	complete, err := db.FilterComplete(ctx, run.ID, "scope", []string{"filter"})
@@ -225,7 +225,7 @@ func TestUnusedSharingKeepsNoSnapshotsAndActivationRemainsComplete(t *testing.T)
 	countSnapshots := func(want int64) {
 		t.Helper()
 		var count int64
-		if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.catalog_journal)+(SELECT count(*) FROM ingest.catalog_baselines)`).Scan(&count); err != nil || count != want {
+		if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.catalog_journal)+(SELECT count(*) FROM aiosources.catalog_baselines)`).Scan(&count); err != nil || count != want {
 			t.Fatalf("snapshots=%d want=%d: %v", count, want, err)
 		}
 	}
@@ -237,7 +237,7 @@ func TestUnusedSharingKeepsNoSnapshotsAndActivationRemainsComplete(t *testing.T)
 		t.Fatalf("first share missed existing catalog: %+v", page)
 	}
 	var fields []byte
-	if err := db.pool.QueryRow(ctx, `SELECT fields FROM ingest.catalog_journal LIMIT 1`).Scan(&fields); err != nil || strings.Contains(string(fields), "private") || strings.Contains(string(fields), "description") {
+	if err := db.pool.QueryRow(ctx, `SELECT fields FROM aiosources.catalog_journal LIMIT 1`).Scan(&fields); err != nil || strings.Contains(string(fields), "private") || strings.Contains(string(fields), "description") {
 		t.Fatalf("sharing copied private/unused fields: %s %v", fields, err)
 	}
 	second := sharingGrant(t, ctx, db)
@@ -261,7 +261,7 @@ func TestUnusedSharingKeepsNoSnapshotsAndActivationRemainsComplete(t *testing.T)
 		t.Fatalf("rebuilt continuation incomplete: %+v", last)
 	}
 	// Expiration is reconciled by the same recurring cleanup as other histories.
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.shares SET expires_at=now()-interval '1 minute' WHERE id=$1`, third.Share.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.shares SET expires_at=now()-interval '1 minute' WHERE id=$1`, third.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.PruneHistory(ctx); err != nil {
@@ -285,8 +285,8 @@ func TestSourceResetIsFencedAndRetainsConfigurationMetadataAndCache(t *testing.T
 	mirrorFinish(t, ctx, db, run, model.StatusSucceeded)
 	grant := sharingGrant(t, ctx, db)
 	before := sharingPage(t, ctx, db, grant, CatalogPageRequest{})
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('tv','42','tt1234567',ARRAY[2025]);
- INSERT INTO ingest.aio_availability(service,account,hash,cached,checked_at) VALUES('torbox','account','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',TRUE,now())`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('tv','42','tt1234567',ARRAY[2025]);
+ INSERT INTO aiosources.aio_availability(service,account,hash,cached,checked_at) VALUES('torbox','account','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',TRUE,now())`); err != nil {
 		t.Fatal(err)
 	}
 	// A queued attempt is removed, never silently resumed against old staging.
@@ -302,13 +302,13 @@ func TestSourceResetIsFencedAndRetainsConfigurationMetadataAndCache(t *testing.T
 	}
 	for _, table := range []string{"torrents", "raw_records", "pages", "runs", "events", "staged_torrents", "torrent_history", "run_scope_memberships", "aio_match_queue", "catalog_journal", "catalog_baselines", "collection_state"} {
 		var count int
-		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table).Scan(&count); err != nil || count != 0 {
+		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table).Scan(&count); err != nil || count != 0 {
 			t.Fatalf("%s survived reset: %d %v", table, count, err)
 		}
 	}
 	for _, table := range []string{"shares", "aio_works", "aio_availability"} {
 		var count int
-		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.`+table).Scan(&count); err != nil || count != 1 {
+		if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.`+table).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("useful %s was lost: %d %v", table, count, err)
 		}
 	}
@@ -327,7 +327,7 @@ func TestSourceResetIsFencedAndRetainsConfigurationMetadataAndCache(t *testing.T
 		t.Fatalf("reset retained old collection baseline: %+v %v", fresh, err)
 	}
 	var logged int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.activity_logs WHERE kind='storage.sources_reset' AND created_at>$1`, time.Now().Add(-time.Minute)).Scan(&logged); err != nil || logged != 1 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE kind='storage.sources_reset' AND created_at>$1`, time.Now().Add(-time.Minute)).Scan(&logged); err != nil || logged != 1 {
 		t.Fatalf("reset was not logged once: %d %v", logged, err)
 	}
 }
@@ -347,7 +347,7 @@ func TestStorageMigrationClearsUnusedSharingWithoutRewritingCatalogOrOldRunModes
 			fields := `{"title":"Legacy title","description":"` + strings.Repeat("old selected detail ", 1000) + `"}`
 			publishSharingRow(t, ctx, db, "legacy", "one", fields, nil)
 			publishSharingRow(t, ctx, db, "legacy", "two", fields, nil)
-			if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,revision,mode,status,config)
+			if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,revision,mode,status,config)
  VALUES('legacy-queued','legacy-run','Legacy','','full','queued','{"id":"legacy-run"}')`); err != nil {
 				t.Fatal(err)
 			}
@@ -369,7 +369,7 @@ func TestStorageMigrationClearsUnusedSharingWithoutRewritingCatalogOrOldRunModes
 				t.Fatal("upgrade rewrote published source fields")
 			}
 			var snapshots int
-			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal`).Scan(&snapshots); err != nil {
+			if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&snapshots); err != nil {
 				t.Fatal(err)
 			}
 			if active {
@@ -393,7 +393,7 @@ func TestSourceResetRollsBackDataAndSharingStateIfTheTransactionFails(t *testing
 	grant := sharingGrant(t, ctx, db)
 	before := sharingPage(t, ctx, db, grant, CatalogPageRequest{})
 	settings, _ := db.StorageOverview(ctx)
-	if _, err := db.pool.Exec(ctx, `ALTER TABLE ingest.activity_logs ADD CONSTRAINT test_reset_failure CHECK(kind<>'storage.sources_reset')`); err != nil {
+	if _, err := db.pool.Exec(ctx, `ALTER TABLE aiosources.activity_logs ADD CONSTRAINT test_reset_failure CHECK(kind<>'storage.sources_reset')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.ResetSourceData(ctx, settings.Settings.Revision); err == nil {
@@ -463,10 +463,10 @@ func TestSharingPolicyEditsCannotDeadlockAConcurrentSourceReset(t *testing.T) {
 	// A reset holding publication must still be able to take the recipient.
 	// NOWAIT makes an incorrect row-before-publication order fail immediately.
 	var revision int64
-	if err := publication.QueryRow(ctx, `SELECT revision FROM ingest.shares WHERE id=$1 FOR UPDATE NOWAIT`, grant.Share.ID).Scan(&revision); err != nil {
+	if err := publication.QueryRow(ctx, `SELECT revision FROM aiosources.shares WHERE id=$1 FOR UPDATE NOWAIT`, grant.Share.ID).Scan(&revision); err != nil {
 		t.Fatal("policy edit locked the recipient before publication:", err)
 	}
-	if _, err := publication.Exec(ctx, `UPDATE ingest.shares SET revision=revision+1 WHERE id=$1`, grant.Share.ID); err != nil {
+	if _, err := publication.Exec(ctx, `UPDATE aiosources.shares SET revision=revision+1 WHERE id=$1`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := publication.Commit(ctx); err != nil {
@@ -493,7 +493,7 @@ func TestSourceResetAndAnAdmittedCatalogExportCompleteWithoutALockCycle(t *testi
 		t.Fatal(err)
 	}
 	defer rollback(metadata)
-	if _, err := metadata.Exec(ctx, `SELECT metadata_generation FROM ingest.aio_state FOR UPDATE`); err != nil {
+	if _, err := metadata.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		t.Fatal(err)
 	}
 	settings, _ := db.StorageOverview(ctx)
@@ -501,7 +501,7 @@ func TestSourceResetAndAnAdmittedCatalogExportCompleteWithoutALockCycle(t *testi
 	go func() { reset <- db.ResetSourceData(ctx, settings.Settings.Revision) }()
 	// Reset has cleared the snapshot and is waiting for the metadata fence.
 	waitForStorageLock(t, ctx, db, `SELECT EXISTS(SELECT 1 FROM pg_locks
- WHERE relation='ingest.catalog_journal'::regclass AND mode='AccessExclusiveLock' AND granted)`)
+ WHERE relation='aiosources.catalog_journal'::regclass AND mode='AccessExclusiveLock' AND granted)`)
 	export := make(chan error, 1)
 	go func() {
 		_, err := download.Page(ctx, CatalogPageRequest{})
@@ -535,7 +535,7 @@ func TestSourceResetWaitsForHistoryCleanupBeforeTakingPublication(t *testing.T) 
 	defer rollback(retention)
 	// Model the cleanup's early table locks before it later takes publication.
 	if _, err := retention.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,4);
- LOCK TABLE ingest.raw_records IN ROW EXCLUSIVE MODE`); err != nil {
+ LOCK TABLE aiosources.raw_records IN ROW EXCLUSIVE MODE`); err != nil {
 		t.Fatal(err)
 	}
 	settings, _ := db.StorageOverview(ctx)

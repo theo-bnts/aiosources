@@ -41,7 +41,7 @@ func TestStremioCacheAliasesUsePublishedIdsWhenSourceSuppliesNone(t *testing.T) 
 	if err := s.DB.SaveAIOWork(ctx, work, []string{"example movie"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 VALUES('source','1',jsonb_build_object('title','Example.Movie.2021.1080p','info_hash',$1::text))`, strings.Repeat("a", 40)); err != nil {
 		t.Fatal(err)
 	}

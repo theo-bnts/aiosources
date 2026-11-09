@@ -30,12 +30,12 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if err := f.db.SetAIOConfig(f.ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('open-library','open','{"title":"Example Public Film","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'),
  ('private-library','cached','{"title":"Example Cached Film","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}'),
  ('private-library','uncached','{"title":"Example Uncached Film","info_hash":"cccccccccccccccccccccccccccccccccccccccc"}'),
  ('other-private','other','{"title":"Example Other Film","info_hash":"dddddddddddddddddddddddddddddddddddddddd"}');
- INSERT INTO ingest.aio_shared_availability(service,hash,cached,checked_at,files) VALUES ('torbox','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',true,now(),'[]');`); err != nil {
+ INSERT INTO aiosources.aio_shared_availability(service,hash,cached,checked_at,files) VALUES ('torbox','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',true,now(),'[]');`); err != nil {
 		t.Fatal(err)
 	}
 	access, _ := f.db.PublicAccess(f.ctx)
@@ -105,13 +105,13 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if cached := feed(cachedKey, "&cached_only=false"); cached.Code != 200 || !strings.Contains(cached.Body.String(), `total="1"`) || strings.Contains(cached.Body.String(), "tr=") {
 		t.Fatal("query widened the installation's cached-only option")
 	}
-	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, c.CacheMinutes); err != nil {
+	if _, err = conn.Exec(f.ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()-($1::int * interval '1 minute')-interval '1 minute'`, c.CacheMinutes); err != nil {
 		t.Fatal(err)
 	}
 	if stale := feed(cachedKey, ""); stale.Code != 200 || !strings.Contains(stale.Body.String(), `total="0"`) || strings.Contains(stale.Body.String(), "tr=") {
 		t.Fatal("expired cache fell back to an announce")
 	}
-	if _, err = conn.Exec(f.ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now()`); err != nil {
+	if _, err = conn.Exec(f.ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now()`); err != nil {
 		t.Fatal(err)
 	}
 	if feed(ownKey, "&sources=open-library").Code != 200 || !strings.Contains(feed(ownKey, "&sources=open-library").Body.String(), `total="0"`) {
@@ -150,12 +150,12 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	}
 	for _, table := range []string{"settings", "shares", "share_requests", "activity_logs"} {
 		var present bool
-		if err = conn.QueryRow(f.ctx, "SELECT EXISTS(SELECT 1 FROM ingest."+table+" record WHERE position($1 in to_jsonb(record)::text)>0)", "own-private-passkey").Scan(&present); err != nil || present {
+		if err = conn.QueryRow(f.ctx, "SELECT EXISTS(SELECT 1 FROM aiosources."+table+" record WHERE position($1 in to_jsonb(record)::text)>0)", "own-private-passkey").Scan(&present); err != nil || present {
 			t.Fatal("visitor secret persisted", table, err)
 		}
 	}
 	var grants, leases int
-	if err = conn.QueryRow(f.ctx, `SELECT (SELECT count(*) FROM ingest.shares),(SELECT count(*) FROM ingest.share_requests)`).Scan(&grants, &leases); err != nil || grants != 1 || leases != 0 {
+	if err = conn.QueryRow(f.ctx, `SELECT (SELECT count(*) FROM aiosources.shares),(SELECT count(*) FROM aiosources.share_requests)`).Scan(&grants, &leases); err != nil || grants != 1 || leases != 0 {
 		t.Fatal("public setup created visitor records", err)
 	}
 	generation := access.Generation

@@ -12,6 +12,18 @@ async function openAbout(page: Page) {
   await expect(
     dialog.getByRole('heading', { name: `AIOSources (${version})`, exact: true }),
   ).toBeVisible()
+  const build = /^\d+\.\d+\.\d+\.([0-9a-f]{12})$/.exec(version ?? '')?.[1]
+  const buildLink = dialog.getByRole('link', { name: build ?? 'dev', exact: true })
+  if (build) {
+    await expect(buildLink).toHaveAttribute(
+      'href',
+      `https://github.com/theo-bnts/aiosources/releases/tag/build-${build}`,
+    )
+    await expect(buildLink).toHaveAttribute('target', '_blank')
+    await expect(buildLink).toHaveAttribute('rel', 'noopener noreferrer')
+  } else {
+    await expect(buildLink).toHaveCount(0)
+  }
   for (const [name, href] of [
     ['GitHub Source code and releases', 'https://github.com/theo-bnts/aiosources'],
     ['Discord Help in French only', 'https://discord.gg/h3sja5XN8b'],

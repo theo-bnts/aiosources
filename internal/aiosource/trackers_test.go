@@ -136,7 +136,7 @@ func TestPublicClassificationIgnoresTheRetainedPrivateAnnounce(t *testing.T) {
 	if c.Trackers["source"].AnnounceSecret != reference {
 		t.Fatal("disabling the field discarded the saved selection")
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.secrets SET ciphertext='invalid'::bytea WHERE name=$1`, reference); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.secrets SET ciphertext='invalid'::bytea WHERE name=$1`, reference); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {

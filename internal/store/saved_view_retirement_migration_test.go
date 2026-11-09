@@ -19,7 +19,7 @@ func TestSavedViewRetirementPreservesPublishedRecordsAndSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	publishSharingRow(t, ctx, db, "fixture", "record", `{"title":"Example.Documentary.2024","size":9007199254740993}`, nil)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.saved_views(id,name,filters) VALUES('old-view','Documentaries','{"q":"documentary"}')`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.saved_views(id,name,filters) VALUES('old-view','Documentaries','{"q":"documentary"}')`); err != nil {
 		t.Fatal(err)
 	}
 	before, err := db.ListTorrents(ctx, model.ListOptions{Query: "docum"})
@@ -32,7 +32,7 @@ func TestSavedViewRetirementPreservesPublishedRecordsAndSearch(t *testing.T) {
 		}
 	}
 	var removed bool
-	if err := db.pool.QueryRow(ctx, `SELECT to_regclass('ingest.saved_views') IS NULL`).Scan(&removed); err != nil || !removed {
+	if err := db.pool.QueryRow(ctx, `SELECT to_regclass('aiosources.saved_views') IS NULL`).Scan(&removed); err != nil || !removed {
 		t.Fatalf("saved views still retained: %v %v", removed, err)
 	}
 	after, err := db.ListTorrents(ctx, model.ListOptions{Query: "docum"})

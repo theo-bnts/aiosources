@@ -18,7 +18,7 @@ func TestTorrentSearchPrecisionCombinedFiltersAndIndependentOccurrences(t *testi
 		publishSharingRow(t, ctx, db, pair[0], pair[1], `{"title":"Blue Ocean","size":9007199254740993,"seeders":"12","categories":["Films",2000],"published_at":"2026-09-01T12:00:00Z","info_hash":"`+hash+`"}`, nil)
 	}
 	publishSharingRow(t, ctx, db, "one", "malformed", `{"title":"Blue Ocean","size":"1e9999999999","seeders":{},"published_at":"2026-02-30T00:00:00Z","categories":null}`, nil)
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET last_seen_at='2026-09-01T00:00:00Z'"); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET last_seen_at='2026-09-01T00:00:00Z'"); err != nil {
 		t.Fatal(err)
 	}
 	options := model.ListOptions{Query: `"blue ocean"`, Providers: []string{"one", "two"}, Category: "fILMS", MinSize: "9007199254740993", MaxSize: "9007199254740993", PublishedAfter: "2026-09-01T00:00:00Z", PublishedBefore: "2026-09-02T00:00:00Z", InfoHash: hash, Sort: "relevance", Limit: 2}
@@ -138,7 +138,7 @@ func TestSemanticPublicationHistoryIgnoresStagingAndObservations(t *testing.T) {
 	if err != nil || history.Total != 2 || history.Items[0].Kind != "deleted" || history.Items[0].After != nil || history.Items[0].Before["arbitrary"] != json.Number("9007199254740993") || history.Items[0].Origin == nil {
 		t.Fatalf("deleted history missing exact before/provenance: %+v %v", history, err)
 	}
-	if _, err := db.pool.Exec(ctx, "DELETE FROM ingest.torrent_history"); err == nil {
+	if _, err := db.pool.Exec(ctx, "DELETE FROM aiosources.torrent_history"); err == nil {
 		t.Fatal("semantic history was mutable")
 	}
 }
@@ -150,15 +150,15 @@ func TestSemanticHistoryMigrationBaselineDoesNotInventTransitions(t *testing.T) 
 		t.Fatal(err)
 	}
 	defer db.Close()
-	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy','live','{"title":"Legacy"}'),('legacy','deleted','{"title":"Gone"}');
-DELETE FROM ingest.torrents WHERE source_id='deleted';`+searchHistorySchema+"COMMIT;")
+	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy','live','{"title":"Legacy"}'),('legacy','deleted','{"title":"Gone"}');
+DELETE FROM aiosources.torrents WHERE source_id='deleted';`+searchHistorySchema+"COMMIT;")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, source := range []string{"live", "deleted"} {
 		var id string
-		if err := db.pool.QueryRow(ctx, "SELECT ingest.torrent_occurrence_id('legacy',$1)", source).Scan(&id); err != nil {
+		if err := db.pool.QueryRow(ctx, "SELECT aiosources.torrent_occurrence_id('legacy',$1)", source).Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		history, err := db.TorrentHistory(ctx, id, model.ListOptions{})
@@ -190,8 +190,8 @@ func TestSearchHistoryMigrationPreservesMalformedTimestampOccurrences(t *testing
 	}
 	defer db.Close()
 	fields := `{"title":"Legacy malformed zone","published_at":"2026-09-01T00:00:00+99:00","size":9007199254740993,"arbitrary":{"keep":null},"info_hash":"` + strings.Repeat("b", 40) + `"}`
-	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA ingest;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy-one','same','`+fields+`'),('legacy-two','same','`+fields+`');`+searchHistorySchema+"COMMIT;")
+	_, err = db.pool.Exec(ctx, "BEGIN; CREATE SCHEMA aiosources;"+initialSchema+sharingSchema+catalogIdentityPrivacySchema+`
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('legacy-one','same','`+fields+`'),('legacy-two','same','`+fields+`');`+searchHistorySchema+"COMMIT;")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('legacy-one','s
 			t.Fatal(err)
 		}
 		var equal, unindexed bool
-		if err := db.pool.QueryRow(ctx, "SELECT $1::jsonb=$2::jsonb,search_published_at IS NULL FROM ingest.torrents WHERE occurrence_id=$3", encoded, fields, row.OccurrenceID).Scan(&equal, &unindexed); err != nil || !equal || !unindexed {
+		if err := db.pool.QueryRow(ctx, "SELECT $1::jsonb=$2::jsonb,search_published_at IS NULL FROM aiosources.torrents WHERE occurrence_id=$3", encoded, fields, row.OccurrenceID).Scan(&equal, &unindexed); err != nil || !equal || !unindexed {
 			t.Fatalf("invalid projection changed legacy fields: equal=%v unindexed=%v %v", equal, unindexed, err)
 		}
 		history, err := db.TorrentHistory(ctx, row.OccurrenceID, model.ListOptions{})

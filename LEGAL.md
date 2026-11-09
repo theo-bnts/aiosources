@@ -12,6 +12,6 @@ Keep credentials in Secrets and protect installation and sharing links. Public-i
 
 ## Credits and licensing
 
-Built on [Ingest](https://github.com/moodiness/ingest). Original copyrights and the bundled [third-party license notices](web/public/THIRD-PARTY-NOTICES.txt) are preserved.
+Original copyrights and the bundled [third-party license notices](web/public/THIRD-PARTY-NOTICES.txt) are preserved.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB. The official TMDB logo and notice appear in **About AIOSources**. TMDB branding and API data remain subject to TMDB's [attribution and usage terms](https://developer.themoviedb.org/docs/faq), including any applicable commercial license requirements. The logo is not relicensed under MIT.

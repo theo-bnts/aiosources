@@ -99,7 +99,7 @@ func TestBooksUseLocalMatchingSearchAndReviewWithoutVideoRegression(t *testing.T
 		t.Fatal(err)
 	}
 	fields, _ := json.Marshal(map[string]any{"title": "Morgan Vale - The Amber Orchard EPUB", "info_hash": strings.Repeat("b", 40), "size": 500, "categories": []int{7020}})
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','book',$1)`, fields); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','book',$1)`, fields); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DB.FinishOpenLibrary(ctx); err != nil {
@@ -135,7 +135,7 @@ func TestBooksUseLocalMatchingSearchAndReviewWithoutVideoRegression(t *testing.T
 		t.Fatalf("edition year lost: %+v %v", page, err)
 	}
 	var occurrence string
-	if err = conn.QueryRow(ctx, `SELECT occurrence_id FROM ingest.torrents WHERE provider_id='fixture' AND source_id='book'`).Scan(&occurrence); err != nil {
+	if err = conn.QueryRow(ctx, `SELECT occurrence_id FROM aiosources.torrents WHERE provider_id='fixture' AND source_id='book'`).Scan(&occurrence); err != nil {
 		t.Fatal(err)
 	}
 	detail, err := s.DB.AIOReviewDetail(ctx, occurrence)
@@ -148,7 +148,7 @@ func TestBooksUseLocalMatchingSearchAndReviewWithoutVideoRegression(t *testing.T
 	if err = s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Exec(ctx, `UPDATE ingest.aio_works SET years='{}' WHERE media_type='book'`); err != nil {
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.aio_works SET years='{}' WHERE media_type='book'`); err != nil {
 		t.Fatal(err)
 	}
 	dated, e := s.CatalogSearch(ctx, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"})
@@ -199,13 +199,13 @@ func TestBookEditionAliasesAndMergesDoNotLoseMatchesOrDuplicateWorks(t *testing.
 		t.Fatalf("live counts drifted: %+v %v", state, err)
 	}
 	var resolved string
-	if err = conn.QueryRow(ctx, `SELECT ingest.ol_resolve('OL400M')`).Scan(&resolved); err != nil || resolved != "OL500W" {
+	if err = conn.QueryRow(ctx, `SELECT aiosources.ol_resolve('OL400M')`).Scan(&resolved); err != nil || resolved != "OL500W" {
 		t.Fatal("edition redirect lost", err)
 	}
 	// Exact edition evidence must remain discoverable beyond the first 200 aliases.
-	if _, err = conn.Exec(ctx, `INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) SELECT 'OL'||(1000+n)||'M',ARRAY['OL100W'],'A Prior Edition '||n,'a prior edition '||n FROM generate_series(1,250)n;
- INSERT INTO ingest.ol_editions(id,work_keys,title,normalized,author_keys) VALUES('OL2000M',ARRAY['OL100W'],'Zither and Amber','zither and amber',ARRAY['OL200A']);
- INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','translated','{"title":"Morgan Vale - Zither and Amber EPUB","info_hash":"dddddddddddddddddddddddddddddddddddddddd"}');`); err != nil {
+	if _, err = conn.Exec(ctx, `INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized) SELECT 'OL'||(1000+n)||'M',ARRAY['OL100W'],'A Prior Edition '||n,'a prior edition '||n FROM generate_series(1,250)n;
+ INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,author_keys) VALUES('OL2000M',ARRAY['OL100W'],'Zither and Amber','zither and amber',ARRAY['OL200A']);
+ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','translated','{"title":"Morgan Vale - Zither and Amber EPUB","info_hash":"dddddddddddddddddddddddddddddddddddddddd"}');`); err != nil {
 		t.Fatal(err)
 	}
 	if err = s.DB.FinishOpenLibrary(ctx); err != nil {
@@ -223,7 +223,7 @@ func TestBookEditionAliasesAndMergesDoNotLoseMatchesOrDuplicateWorks(t *testing.
 		t.Fatal(err)
 	}
 	var works, editions, torrents int
-	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.ol_editions),(SELECT count(*) FROM ingest.torrents)`).Scan(&works, &editions, &torrents); err != nil || works != 1 || editions != 0 || torrents != 3 {
+	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.ol_editions),(SELECT count(*) FROM aiosources.torrents)`).Scan(&works, &editions, &torrents); err != nil || works != 1 || editions != 0 || torrents != 3 {
 		t.Fatalf("book reset touched video or source data: %d %d %d %v", works, editions, torrents, err)
 	}
 }
@@ -232,12 +232,12 @@ func TestBookSchemaKeepsVideoReviewEvidenceUnchanged(t *testing.T) {
 	ctx, _, conn := testService(t)
 	for _, fields := range []string{`{"title":"Example.Movie.2024.1080p","author":"Studio credit"}`, `{"title":"Example.Series.S01E02","external_ids":{"imdb":"tt1234567"},"attributes":{"language":["fr"]}}`} {
 		var same bool
-		if err := conn.QueryRow(ctx, `SELECT ingest.aio_review_evidence($1)=ingest.aio_video_review_evidence($1)`, fields).Scan(&same); err != nil || !same {
+		if err := conn.QueryRow(ctx, `SELECT aiosources.aio_review_evidence($1)=aiosources.aio_video_review_evidence($1)`, fields).Scan(&same); err != nil || !same {
 			t.Fatal("video review evidence changed", err)
 		}
 	}
 	var changed bool
-	if err := conn.QueryRow(ctx, `SELECT ingest.aio_review_evidence('{"title":"Example Book EPUB","attributes":{"isbn":["9780306406157"]}}')<>ingest.aio_review_evidence('{"title":"Example Book EPUB","attributes":{"isbn":["9780306406158"]}}')`).Scan(&changed); err != nil || !changed {
+	if err := conn.QueryRow(ctx, `SELECT aiosources.aio_review_evidence('{"title":"Example Book EPUB","attributes":{"isbn":["9780306406157"]}}')<>aiosources.aio_review_evidence('{"title":"Example Book EPUB","attributes":{"isbn":["9780306406158"]}}')`).Scan(&changed); err != nil || !changed {
 		t.Fatal("changed book identifiers did not invalidate the review", err)
 	}
 }
@@ -245,7 +245,7 @@ func TestBookSchemaKeepsVideoReviewEvidenceUnchanged(t *testing.T) {
 func TestInterruptedBookRefreshWithdrawsChangedEditionEvidence(t *testing.T) {
 	ctx, s, conn := testService(t)
 	seedTestBook(t, ctx, s, conn, "fixture")
-	if _, err := conn.Exec(ctx, `UPDATE ingest.ol_editions SET isbn=ARRAY['9780306406157'] WHERE id='OL300M';UPDATE ingest.torrents SET fields=fields||'{"isbn":"9780306406157"}' WHERE provider_id='fixture' AND source_id='book'`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_editions SET isbn=ARRAY['9780306406157'] WHERE id='OL300M';UPDATE aiosources.torrents SET fields=fields||'{"isbn":"9780306406157"}' WHERE provider_id='fixture' AND source_id='book'`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {
@@ -267,7 +267,7 @@ func TestInterruptedBookRefreshWithdrawsChangedEditionEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	var status string
-	if err := conn.QueryRow(ctx, `SELECT status FROM ingest.aio_matches WHERE provider_id='fixture' AND source_id='book'`).Scan(&status); err != nil || status != "unmatched" {
+	if err := conn.QueryRow(ctx, `SELECT status FROM aiosources.aio_matches WHERE provider_id='fixture' AND source_id='book'`).Scan(&status); err != nil || status != "unmatched" {
 		t.Fatal("removed ISBN stayed authoritative", err)
 	}
 }
@@ -289,7 +289,7 @@ func TestBookImportRespectsExportRetryAfter(t *testing.T) {
 		t.Fatal("rate-limited export succeeded")
 	}
 	var respected bool
-	if err := conn.QueryRow(ctx, `SELECT retry_at>clock_timestamp()+interval '59 minutes' FROM ingest.ol_import_state`).Scan(&respected); err != nil || !respected {
+	if err := conn.QueryRow(ctx, `SELECT retry_at>clock_timestamp()+interval '59 minutes' FROM aiosources.ol_import_state`).Scan(&respected); err != nil || !respected {
 		t.Fatal("export retry deadline ignored", err)
 	}
 	due, err := s.DB.OpenLibraryDue(ctx, 30)

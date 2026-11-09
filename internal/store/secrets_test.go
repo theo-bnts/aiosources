@@ -44,14 +44,14 @@ func TestDeleteSecretSeesAdmissionCommittedWhileWaiting(t *testing.T) {
 	}
 	defer rollback(tx)
 	var pid int32
-	if err := tx.QueryRow(ctx, `SELECT pg_backend_pid() FROM ingest.secrets WHERE name='credential' FOR KEY SHARE`).Scan(&pid); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT pg_backend_pid() FROM aiosources.secrets WHERE name='credential' FOR KEY SHARE`).Scan(&pid); err != nil {
 		t.Fatal(err)
 	}
 	deleted := make(chan error, 1)
 	go func() { deleted <- db.DeleteSecret(ctx, "credential") }()
 	waitForSecretLock(t, ctx, db, pid)
 	// Model the immutable snapshot commit at the end of an admitted request.
-	if _, err := tx.Exec(ctx, `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config)
+	if _, err := tx.Exec(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config)
 VALUES('admitted','source','Source','full','queued','','{"id":"source","auth":{"secret_ref":"credential"}}')`); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestCollectionAdmissionWaitsForSecretDeletion(t *testing.T) {
 	if err := tx.QueryRow(ctx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM ingest.secrets WHERE name='credential'`); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM aiosources.secrets WHERE name='credential'`); err != nil {
 		t.Fatal(err)
 	}
 	admitted := make(chan error, 1)

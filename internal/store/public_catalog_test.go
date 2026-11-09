@@ -12,7 +12,7 @@ import (
 
 func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('alpha','https://source.invalid/item?apikey=private-native-key','{"title":"Example Alpha","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","size":100,"download_url":"https://source.invalid/private-download?passkey=never-export","magnet":"magnet:?tr=https://private.invalid/announce"}'),
  ('beta','two','{"title":"Example Beta","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","size":200}')`); err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	var tracked int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
 		t.Fatal("source exposure was not required for tracking", tracked, err)
 	}
 	access, _ = db.PublicAccess(ctx)
@@ -57,13 +57,13 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 		}
 	}
 	var saved int
-	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.shares)+(SELECT count(*) FROM ingest.share_requests)`).Scan(&saved); err != nil || saved != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.shares)+(SELECT count(*) FROM aiosources.share_requests)`).Scan(&saved); err != nil || saved != 0 {
 		t.Fatal("visitor profiles were stored", saved, err)
 	}
 	if err = db.ValidatePublicCatalog(ctx, grant, revision); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.torrents SET fields=jsonb_set(fields,'{title}','"Example Alpha Updated"') WHERE provider_id='alpha'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{title}','"Example Alpha Updated"') WHERE provider_id='alpha'`); err != nil {
 		t.Fatal(err)
 	}
 	delta, _, err := db.PublicCatalogPage(ctx, grant, CatalogPageRequest{Checkpoint: second.Checkpoint})
@@ -97,7 +97,7 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 	if _, _, err = db.PublicCatalogPage(ctx, grant, CatalogPageRequest{}); !errors.Is(err, ErrCatalogAuthentication) {
 		t.Fatal("withdrawing source exposure did not revoke", err)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
 		t.Fatal("inactive public sharing retained snapshots", tracked, err)
 	}
 	access, _ = db.PublicAccess(ctx)
@@ -255,7 +255,7 @@ func TestPublicSharingByteBudgetKeepsAllContinuationRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"one", "two", "three", "four"} {
-		if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example',$1,jsonb_build_object('title',$2::text))`, id, strings.Repeat("A", 2<<20)); err != nil {
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example',$1,jsonb_build_object('title',$2::text))`, id, strings.Repeat("A", 2<<20)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -292,7 +292,7 @@ func TestPublicSharingByteBudgetKeepsAllContinuationRows(t *testing.T) {
 
 func TestPublicCatalogOriginsMatchNamedCatalogs(t *testing.T) {
 	ctx, db := sharingDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('alpha','one','{"title":"Example release","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('alpha','one','{"title":"Example release","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
 		t.Fatal(err)
 	}
 	access, _ := db.PublicAccess(ctx)

@@ -51,7 +51,7 @@ func BenchmarkAddonReadFlows(b *testing.B) {
 	if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{Type: "movie", TMDB: "101", IMDb: "tt1234567", DisplayTitle: "Synthetic Feature", Titles: []string{"Synthetic Feature"}, Years: []int{2024}}, []string{"synthetic feature"}); err != nil {
 		b.Fatal(err)
 	}
-	if _, err := conn.Exec(f.ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
   SELECT 'synthetic',n::text,jsonb_build_object('title','Synthetic.Feature.2024.1080p','info_hash',$1::text,'size',100,'imdb_id','tt1234567') FROM generate_series(1,20)n`, hash); err != nil {
 		b.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func BenchmarkAddonReadFlows(b *testing.B) {
 		b.Fatal(err)
 	}
 	var work int64
-	if err := conn.QueryRow(f.ctx, `SELECT id FROM ingest.aio_works WHERE tmdb_id='101'`).Scan(&work); err != nil {
+	if err := conn.QueryRow(f.ctx, `SELECT id FROM aiosources.aio_works WHERE tmdb_id='101'`).Scan(&work); err != nil {
 		b.Fatal(err)
 	}
 	generation, err := f.db.AIOCacheGeneration(f.ctx)

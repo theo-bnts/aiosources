@@ -175,8 +175,8 @@ func TestRemoteMirrorFailureCancellationAndCheckpointRollback(t *testing.T) {
 	mirrorCheckpoint(t, ctx, db, p, "baseline")
 	// Force the checkpoint write to fail after canonical SQL has executed. Both
 	// the copy and checkpoint must roll back in the same database transaction.
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_fixture_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture checkpoint failure'; END; $$;
-CREATE TRIGGER reject_fixture_checkpoint BEFORE UPDATE ON ingest.remote_checkpoints FOR EACH ROW EXECUTE FUNCTION ingest.reject_fixture_checkpoint()`); err != nil {
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_fixture_checkpoint() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture checkpoint failure'; END; $$;
+CREATE TRIGGER reject_fixture_checkpoint BEFORE UPDATE ON aiosources.remote_checkpoints FOR EACH ROW EXECUTE FUNCTION aiosources.reject_fixture_checkpoint()`); err != nil {
 		t.Fatal(err)
 	}
 	rollback := mirrorClaim(t, ctx, db, p, model.ModeIncremental)

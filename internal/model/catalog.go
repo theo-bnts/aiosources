@@ -22,6 +22,8 @@ type CatalogOrigin struct {
 // across repeated imports and does not depend on JSON escaping conventions.
 func CatalogItemID(origin CatalogOrigin) string {
 	hash := sha256.New()
+	// This protocol domain is immutable: changing it duplicates records already
+	// synchronized with other instances, including ones running older versions.
 	_, _ = io.WriteString(hash, "ingest.catalog.identity.v1\x00")
 	var size [8]byte
 	for _, value := range []string{origin.InstanceID, origin.ProviderID, origin.SourceID} {

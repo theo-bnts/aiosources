@@ -33,7 +33,7 @@ func BenchmarkBookImport(b *testing.B) {
 			b.Fatal("Book bootstrap lost selected information or completion", err)
 		}
 		var completed string
-		if err := conn.QueryRow(ctx, `SELECT status FROM ingest.operation_runs WHERE service='openlibrary' ORDER BY created_at DESC LIMIT 1`).Scan(&completed); err != nil || completed != "succeeded" {
+		if err := conn.QueryRow(ctx, `SELECT status FROM aiosources.operation_runs WHERE service='openlibrary' ORDER BY created_at DESC LIMIT 1`).Scan(&completed); err != nil || completed != "succeeded" {
 			b.Fatal("Book bootstrap did not finish its operation history", completed, err)
 		}
 	}
@@ -55,7 +55,7 @@ func BenchmarkBookChanges(b *testing.B) {
 		fixture.documents["OL100W"]["revision"] = i + 2
 		fixture.rows = append([]bookAPIEvent{{ID: fmt.Sprint(i + 101), Timestamp: fixture.time.Add(time.Duration(i+1) * time.Second).Format(time.RFC3339Nano), Changes: []map[string]any{{"key": "/works/OL100W", "revision": i + 2}}}}, fixture.rows...)
 		fixture.mu.Unlock()
-		if _, err := conn.Exec(ctx, `UPDATE ingest.ol_changes_state SET checked_at=NULL,retry_at=NULL`); err != nil {
+		if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_changes_state SET checked_at=NULL,retry_at=NULL`); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
@@ -63,11 +63,11 @@ func BenchmarkBookChanges(b *testing.B) {
 			b.Fatal(err)
 		}
 		var actual string
-		if err := conn.QueryRow(ctx, `SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&actual); err != nil || actual != title {
+		if err := conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&actual); err != nil || actual != title {
 			b.Fatal("Change feed did not update the saved work", err)
 		}
 		var completed string
-		if err := conn.QueryRow(ctx, `SELECT status FROM ingest.operation_runs WHERE service='openlibrary' ORDER BY created_at DESC LIMIT 1`).Scan(&completed); err != nil || completed != "succeeded" {
+		if err := conn.QueryRow(ctx, `SELECT status FROM aiosources.operation_runs WHERE service='openlibrary' ORDER BY created_at DESC LIMIT 1`).Scan(&completed); err != nil || completed != "succeeded" {
 			b.Fatal("Book changes did not finish their operation history", completed, err)
 		}
 	}
@@ -80,11 +80,11 @@ func BenchmarkInformationReset(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				b.StopTimer()
-				if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,openlibrary_id,book_normalized,display_title,years)
+				if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,openlibrary_id,book_normalized,display_title,years)
        SELECT 'book','OL'||n||'W','synthetic book '||n,'Synthetic Book '||n,ARRAY[2024] FROM generate_series(1,5000)n;
-      INSERT INTO ingest.ol_editions(id,work_keys,title,normalized) SELECT 'OL'||n||'M',ARRAY['OL'||n||'W'],'Synthetic Edition','synthetic edition' FROM generate_series(1,5000)n;
-      INSERT INTO ingest.aio_works(media_type,tmdb_id,display_title,years) SELECT 'movie',n::text,'Synthetic Movie',ARRAY[2024] FROM generate_series(1,5000)n;
-      INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,display_title,lower(display_title) FROM ingest.aio_works;`); err != nil {
+      INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized) SELECT 'OL'||n||'M',ARRAY['OL'||n||'W'],'Synthetic Edition','synthetic edition' FROM generate_series(1,5000)n;
+      INSERT INTO aiosources.aio_works(media_type,tmdb_id,display_title,years) SELECT 'movie',n::text,'Synthetic Movie',ARRAY[2024] FROM generate_series(1,5000)n;
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,display_title,lower(display_title) FROM aiosources.aio_works;`); err != nil {
 					b.Fatal(err)
 				}
 				b.StartTimer()
@@ -93,13 +93,13 @@ func BenchmarkInformationReset(b *testing.B) {
 				}
 				b.StopTimer()
 				var books, videos int
-				if err := conn.QueryRow(ctx, `SELECT count(*) FILTER(WHERE media_type='book'),count(*) FILTER(WHERE media_type='movie') FROM ingest.aio_works`).Scan(&books, &videos); err != nil {
+				if err := conn.QueryRow(ctx, `SELECT count(*) FILTER(WHERE media_type='book'),count(*) FILTER(WHERE media_type='movie') FROM aiosources.aio_works`).Scan(&books, &videos); err != nil {
 					b.Fatal(err)
 				}
 				if scope == "books" && (books != 0 || videos != 5000) || scope == "videos" && (videos != 0 || books != 5000) {
 					b.Fatal("Reset removed the wrong information", books, videos)
 				}
-				if _, err := conn.Exec(ctx, `TRUNCATE ingest.aio_titles,ingest.ol_editions,ingest.aio_works CASCADE`); err != nil {
+				if _, err := conn.Exec(ctx, `TRUNCATE aiosources.aio_titles,aiosources.ol_editions,aiosources.aio_works CASCADE`); err != nil {
 					b.Fatal(err)
 				}
 				b.StartTimer()

@@ -34,7 +34,7 @@ func (s *Store) ReserveProviderRequest(ctx context.Context, providerID string, l
 	if err := tx.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); err != nil {
 		return time.Time{}, databaseError("read provider request clock", err)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM ingest.provider_requests
+	if _, err := tx.Exec(ctx, `DELETE FROM aiosources.provider_requests
 WHERE provider_id=$1 AND admitted_at <= $2::timestamptz - INTERVAL '24 hours'`, providerID, now); err != nil {
 		return time.Time{}, databaseError("prune provider request history", err)
 	}
@@ -50,7 +50,7 @@ FROM (VALUES
     ($5::integer, INTERVAL '86400 seconds')
 ) AS quota(request_limit, duration)
 CROSS JOIN LATERAL (
-    SELECT admitted_at FROM ingest.provider_requests
+    SELECT admitted_at FROM aiosources.provider_requests
     WHERE provider_id=$1 AND admitted_at > $2::timestamptz - quota.duration
     ORDER BY admitted_at DESC
     LIMIT 1 OFFSET GREATEST(quota.request_limit - 1, 0)
@@ -59,7 +59,7 @@ WHERE quota.request_limit > 0`, providerID, now, limits.PerMinute, limits.PerHou
 		return time.Time{}, databaseError("check provider request limits", err)
 	}
 	if retryAt == nil {
-		if _, err := tx.Exec(ctx, "INSERT INTO ingest.provider_requests(provider_id,admitted_at) VALUES($1,$2)", providerID, now); err != nil {
+		if _, err := tx.Exec(ctx, "INSERT INTO aiosources.provider_requests(provider_id,admitted_at) VALUES($1,$2)", providerID, now); err != nil {
 			return time.Time{}, databaseError("reserve provider request", err)
 		}
 	}

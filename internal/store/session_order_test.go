@@ -4,7 +4,7 @@ import "testing"
 
 func TestActiveSessionsPinCurrentDeviceAndSortByRecentActivity(t *testing.T) {
 	ctx, _, db := scheduleDatabase(t)
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.admin_sessions(id,token_hash,user_agent,created_at,last_seen_at,expires_at)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.admin_sessions(id,token_hash,user_agent,created_at,last_seen_at,expires_at)
 VALUES
 (repeat('1',32),decode(repeat('1',64),'hex'),'Current device',now()-interval '10 days',now()-interval '30 minutes',now()+interval '1 day'),
 (repeat('2',32),decode(repeat('2',64),'hex'),'New but idle device',now()-interval '1 day',now()-interval '10 minutes',now()+interval '1 day'),

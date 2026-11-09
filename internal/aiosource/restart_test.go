@@ -125,7 +125,7 @@ func TestMetadataSurvivesHardRestartWithoutRefetchingCommittedDetails(t *testing
 	child, _ := restartWorker(t, endpoint, "metadata", server.URL)
 	waitForCommittedProgress(t, func() int {
 		var count int
-		if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works`).Scan(&count); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
 		return count
@@ -136,7 +136,7 @@ func TestMetadataSurvivesHardRestartWithoutRefetchingCommittedDetails(t *testing
 	_ = child.Wait()
 	var committed []string
 	var pending int
-	if err := conn.QueryRow(ctx, `SELECT ARRAY(SELECT tmdb_id FROM ingest.aio_works), (SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&committed, &pending); err != nil || len(committed)+pending != len(ids) {
+	if err := conn.QueryRow(ctx, `SELECT ARRAY(SELECT tmdb_id FROM aiosources.aio_works), (SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&committed, &pending); err != nil || len(committed)+pending != len(ids) {
 		t.Fatalf("hard stop lost metadata jobs: committed=%d pending=%d error=%v", len(committed), pending, err)
 	}
 	resumed.Store(true)
@@ -152,7 +152,7 @@ func TestMetadataSurvivesHardRestartWithoutRefetchingCommittedDetails(t *testing
 		}
 	}
 	var works, interrupted int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_metadata_jobs),(SELECT count(*) FROM ingest.operation_runs WHERE kind='metadata' AND status='interrupted')`).Scan(&works, &pending, &interrupted); err != nil || works != len(ids) || pending != 0 || interrupted != 1 {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_metadata_jobs),(SELECT count(*) FROM aiosources.operation_runs WHERE kind='metadata' AND status='interrupted')`).Scan(&works, &pending, &interrupted); err != nil || works != len(ids) || pending != 0 || interrupted != 1 {
 		t.Fatalf("restart did not finish durable work: works=%d pending=%d interrupted=%d error=%v", works, pending, interrupted, err)
 	}
 }
@@ -160,19 +160,19 @@ func TestMetadataSurvivesHardRestartWithoutRefetchingCommittedDetails(t *testing
 func TestMatchingSurvivesHardRestartWithoutRewritingCommittedResults(t *testing.T) {
 	ctx, _, conn := testService(t)
 	if _, err := conn.Exec(ctx, `
-INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]);
-INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Example Movie','example movie' FROM ingest.aio_works;
-INSERT INTO ingest.torrents(provider_id,source_id,fields)
+INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','101','tt1234567',ARRAY[2021]);
+INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Example Movie','example movie' FROM aiosources.aio_works;
+INSERT INTO aiosources.torrents(provider_id,source_id,fields)
  SELECT 'synthetic',n::text,jsonb_build_object('title','Example.Movie.2021.1080p','imdb_id','tt1234567') FROM generate_series(1,2000) n;
-CREATE FUNCTION ingest.slow_test_match() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.004); RETURN NEW; END $$;
-CREATE TRIGGER slow_test_match BEFORE INSERT ON ingest.aio_matches FOR EACH ROW EXECUTE FUNCTION ingest.slow_test_match();`); err != nil {
+CREATE FUNCTION aiosources.slow_test_match() RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.004); RETURN NEW; END $$;
+CREATE TRIGGER slow_test_match BEFORE INSERT ON aiosources.aio_matches FOR EACH ROW EXECUTE FUNCTION aiosources.slow_test_match();`); err != nil {
 		t.Fatal(err)
 	}
 	endpoint := conn.Config().ConnString()
 	child, _ := restartWorker(t, endpoint, "matching", "")
 	waitForCommittedProgress(t, func() int {
 		var count int
-		if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches`).Scan(&count); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_matches`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
 		return count
@@ -182,12 +182,12 @@ CREATE TRIGGER slow_test_match BEFORE INSERT ON ingest.aio_matches FOR EACH ROW 
 	}
 	_ = child.Wait()
 	var committed, pending int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_matches),(SELECT count(*) FROM ingest.aio_match_queue)`).Scan(&committed, &pending); err != nil || committed == 0 || pending == 0 || committed+pending != 2000 {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_matches),(SELECT count(*) FROM aiosources.aio_match_queue)`).Scan(&committed, &pending); err != nil || committed == 0 || pending == 0 || committed+pending != 2000 {
 		t.Fatalf("hard stop lost matching jobs: committed=%d pending=%d error=%v", committed, pending, err)
 	}
 	// Remember the actual committed rows after the process and its transactions
 	// are gone; the restart must not overwrite their publication timestamps.
-	if _, err := conn.Exec(ctx, `CREATE TABLE ingest.committed_test_matches AS SELECT provider_id,source_id,updated_at FROM ingest.aio_matches`); err != nil {
+	if _, err := conn.Exec(ctx, `CREATE TABLE aiosources.committed_test_matches AS SELECT provider_id,source_id,updated_at FROM aiosources.aio_matches`); err != nil {
 		t.Fatal(err)
 	}
 	child, output := restartWorker(t, endpoint, "matching", "")
@@ -195,7 +195,7 @@ CREATE TRIGGER slow_test_match BEFORE INSERT ON ingest.aio_matches FOR EACH ROW 
 		t.Fatalf("restart failed: %v %s", err, output)
 	}
 	var matched, rewritten, interrupted int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_matches WHERE status='matched'),(SELECT count(*) FROM ingest.aio_match_queue),(SELECT count(*) FROM ingest.committed_test_matches c JOIN ingest.aio_matches m USING(provider_id,source_id) WHERE c.updated_at<>m.updated_at),(SELECT count(*) FROM ingest.operation_runs WHERE kind='matching' AND status='interrupted')`).Scan(&matched, &pending, &rewritten, &interrupted); err != nil || matched != 2000 || pending != 0 || rewritten != 0 || interrupted != 1 {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_matches WHERE status='matched'),(SELECT count(*) FROM aiosources.aio_match_queue),(SELECT count(*) FROM aiosources.committed_test_matches c JOIN aiosources.aio_matches m USING(provider_id,source_id) WHERE c.updated_at<>m.updated_at),(SELECT count(*) FROM aiosources.operation_runs WHERE kind='matching' AND status='interrupted')`).Scan(&matched, &pending, &rewritten, &interrupted); err != nil || matched != 2000 || pending != 0 || rewritten != 0 || interrupted != 1 {
 		t.Fatalf("matching restart changed durable work: matched=%d pending=%d rewritten=%d interrupted=%d error=%v", matched, pending, rewritten, interrupted, err)
 	}
 }

@@ -61,24 +61,24 @@ test.describe('history order and shared pagination', () => {
     await db.connect()
     try {
       await db.query(
-        `INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,created_at,finished_at)
+        `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,created_at,finished_at)
         SELECT 'pagination-run-'||lpad(n::text,4,'0'),'pagination','Pagination source','preview','succeeded','',$1,
           now()-n*interval '1 second',now() FROM generate_series(1,103) n`,
         [JSON.stringify(definition)],
       )
-      await db.query(`INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,created_at,finished_at)
+      await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,created_at,finished_at)
         SELECT 'pagination-metadata-'||lpad(n::text,4,'0'),'matching','local','manual',0,'succeeded','identification',n,
           now()-n*interval '1 second',now() FROM generate_series(1,103) n;
-        INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,created_at,finished_at)
+        INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,processed,created_at,finished_at)
         SELECT 'pagination-debrid-'||lpad(n::text,4,'0'),'cache','torbox','playback',0,'succeeded','availability',n,
           now()-n*interval '1 second',now() FROM generate_series(1,103) n;
-        INSERT INTO ingest.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
+        INSERT INTO aiosources.stremio_requests(created_at,media_type,resource,duration_ms,outcome,matched,eligible,invalid_hash,wrong_episode,private_unavailable,file_unavailable,returned,truncated,results)
         SELECT now()-n*interval '1 second','movie','imdb:tt'||(1000000+n),1,'empty',0,0,0,0,0,0,0,false,'[]'
         FROM generate_series(1,103) n;
-        INSERT INTO ingest.activity_logs(event_id,level,kind,message,created_at)
+        INSERT INTO aiosources.activity_logs(event_id,level,kind,message,created_at)
         SELECT 'pagination-log-'||n,'info','system.fixture','Pagination log '||lpad(n::text,4,'0'),now()-n*interval '1 second'
         FROM generate_series(1,103) n;
-        INSERT INTO ingest.torrents(provider_id,source_id,fields,last_seen_at)
+        INSERT INTO aiosources.torrents(provider_id,source_id,fields,last_seen_at)
         SELECT 'pagination','item-'||lpad(n::text,4,'0'),jsonb_build_object('title','Pagination torrent '||lpad(n::text,4,'0')),
           now()-n*interval '1 second' FROM generate_series(1,103) n`)
     } finally {
@@ -134,9 +134,9 @@ test('operation errors remain in their history and manual controls without appea
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query('UPDATE ingest.aio_state SET sync_error=$1', [message])
+    await db.query('UPDATE aiosources.aio_state SET sync_error=$1', [message])
     await db.query(
-      `INSERT INTO ingest.operation_runs(id,kind,service,trigger,lock_key,status,phase,error,finished_at)
+      `INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,phase,error,finished_at)
       VALUES('interrupted-update','metadata','tmdb','automatic',0,'interrupted','details',$1,now())`,
       [message],
     )

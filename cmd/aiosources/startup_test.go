@@ -48,7 +48,7 @@ func TestStartupMigrationCanOutlastConnectionTimeout(t *testing.T) {
 		t.Fatal("startup did not finish after the migration lock was released")
 	}
 	var version int
-	if err := conn.QueryRow(ctx, "SELECT max(version) FROM ingest.schema_migrations").Scan(&version); err != nil || version != store.LatestSchemaVersion() {
+	if err := conn.QueryRow(ctx, "SELECT max(version) FROM aiosources.schema_migrations").Scan(&version); err != nil || version != store.LatestSchemaVersion() {
 		t.Fatalf("startup did not complete the schema upgrade: %d %v", version, err)
 	}
 }

@@ -76,7 +76,7 @@ func TestStremioEpisodeNeedsFileEvidenceForCachedMarker(t *testing.T) {
 	if err := s.DB.SaveAIOWork(ctx, work, []string{"example serial"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('source','1',jsonb_build_object('title','Example.Serial.S01.COMPLETE.2020','info_hash',$1::text,'size',1000))`, hash); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('source','1',jsonb_build_object('title','Example.Serial.S01.COMPLETE.2020','info_hash',$1::text,'size',1000))`, hash); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Match(ctx); err != nil {

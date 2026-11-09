@@ -19,7 +19,7 @@ func TestInformationAutomationDefaultsPreserveSavedManualSettings(t *testing.T) 
 	if err != nil || saved.AutoSync || saved.AutoMatch || saved.AutoCache || saved.Revision != c.Revision+1 {
 		t.Fatalf("saved manual settings were overridden: %+v %v", saved, err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.settings SET value=(value::jsonb-'auto_cache')::text WHERE key='aiosource.config.v2'`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.settings SET value=(value::jsonb-'auto_cache')::text WHERE key='aiosource.config.v2'`); err != nil {
 		t.Fatal(err)
 	}
 	upgraded, err := db.AIOConfig(ctx)

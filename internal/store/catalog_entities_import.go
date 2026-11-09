@@ -14,7 +14,7 @@ func stageCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, supplem
 		return model.ErrInvalid
 	}
 	if reset {
-		if _, err := tx.Exec(ctx, `DELETE FROM ingest.run_catalog_entities WHERE run_id=$1`, run.ID); err != nil {
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.run_catalog_entities WHERE run_id=$1`, run.ID); err != nil {
 			return err
 		}
 	}
@@ -23,10 +23,10 @@ func stageCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, supplem
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO ingest.run_catalog_entities(run_id,kind,identity,data) VALUES($1,$2,$3,$4)
+		_, err = tx.Exec(ctx, `INSERT INTO aiosources.run_catalog_entities(run_id,kind,identity,data) VALUES($1,$2,$3,$4)
 ON CONFLICT(run_id,kind,identity) DO UPDATE SET data=EXCLUDED.data
-WHERE CASE WHEN EXCLUDED.kind='torrent' THEN TRUE WHEN EXCLUDED.kind='metadata' THEN (EXCLUDED.data->>'updated_at')::timestamptz>=(ingest.run_catalog_entities.data->>'updated_at')::timestamptz
-ELSE (EXCLUDED.data->>'checked_at')::timestamptz>=(ingest.run_catalog_entities.data->>'checked_at')::timestamptz END`, run.ID, kind, key, body)
+WHERE CASE WHEN EXCLUDED.kind='torrent' THEN TRUE WHEN EXCLUDED.kind='metadata' THEN (EXCLUDED.data->>'updated_at')::timestamptz>=(aiosources.run_catalog_entities.data->>'updated_at')::timestamptz
+ELSE (EXCLUDED.data->>'checked_at')::timestamptz>=(aiosources.run_catalog_entities.data->>'checked_at')::timestamptz END`, run.ID, kind, key, body)
 		return databaseError("stage shared data", err)
 	}
 	for _, m := range supplement.Metadata {
@@ -55,7 +55,7 @@ func publishCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, state
 	if run.Config.CatalogEntities.Metadata {
 		after := ""
 		for {
-			rows, err := tx.Query(ctx, `SELECT identity,data FROM ingest.run_catalog_entities WHERE run_id=$1 AND kind='metadata' AND identity>$2 ORDER BY identity LIMIT 32`, run.ID, after)
+			rows, err := tx.Query(ctx, `SELECT identity,data FROM aiosources.run_catalog_entities WHERE run_id=$1 AND kind='metadata' AND identity>$2 ORDER BY identity LIMIT 32`, run.ID, after)
 			if err != nil {
 				return err
 			}
@@ -85,8 +85,8 @@ func publishCatalogEntities(ctx context.Context, tx pgx.Tx, run model.Run, state
 			accepted := []model.CatalogMetadata{}
 			for _, m := range entries {
 				var accept bool
-				err = tx.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM ingest.aio_works WHERE media_type=$1 AND tmdb_id=$2)
-OR EXISTS(SELECT 1 FROM ingest.aio_works WHERE media_type=$1 AND tmdb_id=$2 AND catalog_import_source=$3 AND catalog_import_updated_at<$4)`, m.Type, m.TMDB, run.ProviderID, m.UpdatedAt).Scan(&accept)
+				err = tx.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM aiosources.aio_works WHERE media_type=$1 AND tmdb_id=$2)
+OR EXISTS(SELECT 1 FROM aiosources.aio_works WHERE media_type=$1 AND tmdb_id=$2 AND catalog_import_source=$3 AND catalog_import_updated_at<$4)`, m.Type, m.TMDB, run.ProviderID, m.UpdatedAt).Scan(&accept)
 				if err != nil {
 					return err
 				}
@@ -104,7 +104,7 @@ OR EXISTS(SELECT 1 FROM ingest.aio_works WHERE media_type=$1 AND tmdb_id=$2 AND 
 				return err
 			}
 			for _, m := range accepted {
-				if _, err = tx.Exec(ctx, `UPDATE ingest.aio_works SET catalog_import_updated_at=$3,updated_at=$3 WHERE media_type=$1 AND tmdb_id=$2 AND catalog_import_source=$4`, m.Type, m.TMDB, m.UpdatedAt, run.ProviderID); err != nil {
+				if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_works SET catalog_import_updated_at=$3,updated_at=$3 WHERE media_type=$1 AND tmdb_id=$2 AND catalog_import_source=$4`, m.Type, m.TMDB, m.UpdatedAt, run.ProviderID); err != nil {
 					return err
 				}
 			}
@@ -116,13 +116,13 @@ OR EXISTS(SELECT 1 FROM ingest.aio_works WHERE media_type=$1 AND tmdb_id=$2 AND 
 		if err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `INSERT INTO ingest.aio_shared_availability AS previous(service,hash,cached,checked_at,files,catalog_import_source)
+		tag, err := tx.Exec(ctx, `INSERT INTO aiosources.aio_shared_availability AS previous(service,hash,cached,checked_at,files,catalog_import_source)
 SELECT e.data->>'service',e.data->>'hash',TRUE,(e.data->>'checked_at')::timestamptz,e.data->'files',$2
-FROM ingest.run_catalog_entities e CROSS JOIN ingest.aio_state s
+FROM aiosources.run_catalog_entities e CROSS JOIN aiosources.aio_state s
 WHERE e.run_id=$1 AND e.kind='availability' AND s.cache_generation=$3
 AND (e.data->>'checked_at')::timestamptz>now()-make_interval(mins=>$4)
 AND (e.data->>'checked_at')::timestamptz<=now()
-AND EXISTS(SELECT 1 FROM ingest.torrents t WHERE t.provider_id=$2 AND t.search_info_hash=e.data->>'hash')
+AND EXISTS(SELECT 1 FROM aiosources.torrents t WHERE t.provider_id=$2 AND t.search_info_hash=e.data->>'hash')
 ON CONFLICT(service,hash) DO UPDATE SET cached=TRUE,checked_at=EXCLUDED.checked_at,files=EXCLUDED.files,catalog_import_source=EXCLUDED.catalog_import_source
 WHERE previous.checked_at<EXCLUDED.checked_at AND (previous.catalog_import_source<>'' OR previous.checked_at<now()-make_interval(mins=>CASE WHEN previous.cached THEN $4 ELSE LEAST($4,15) END))`, run.ID, run.ProviderID, state.CacheGeneration, config.CacheMinutes)
 		if err != nil {
@@ -132,10 +132,10 @@ WHERE previous.checked_at<EXCLUDED.checked_at AND (previous.catalog_import_sourc
 	}
 	if metadataCount+cacheCount > 0 {
 		body, _ := json.Marshal(map[string]int64{"metadata": metadataCount, "cache_observations": cacheCount})
-		if _, err := tx.Exec(ctx, `INSERT INTO ingest.events(run_id,kind,message,data) VALUES($1,'shared_data','Shared metadata and cache observations imported',$2)`, run.ID, body); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO aiosources.events(run_id,kind,message,data) VALUES($1,'shared_data','Shared metadata and cache observations imported',$2)`, run.ID, body); err != nil {
 			return err
 		}
 	}
-	_, err := tx.Exec(ctx, `DELETE FROM ingest.run_catalog_entities WHERE run_id=$1`, run.ID)
+	_, err := tx.Exec(ctx, `DELETE FROM aiosources.run_catalog_entities WHERE run_id=$1`, run.ID)
 	return databaseError("release shared data staging", err)
 }

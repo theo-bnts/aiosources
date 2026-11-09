@@ -8,7 +8,7 @@ const nativeBookAssertionPredicate = `fields ?| ARRAY['isbn','isbn_10','isbn_13'
  OR fields->>'title' ~* '[0-9][0-9 -]{8,}[0-9X]'`
 
 const nativeBookIdentifiersSchema = `
-CREATE FUNCTION ingest.aio_native_book_candidates(fields JSONB) RETURNS TEXT[]
+CREATE FUNCTION aiosources.aio_native_book_candidates(fields JSONB) RETURNS TEXT[]
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
  WITH RECURSIVE objects(value) AS (
   SELECT fields WHERE jsonb_typeof(fields)='object'
@@ -30,7 +30,7 @@ LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
   UNION SELECT 'ol:'||regexp_replace(value,'^.*/','') FROM raw WHERE regexp_replace(value,'^.*/','') ~ '^OL[1-9][0-9]{0,14}[WM]$'
  ) SELECT COALESCE(array_agg(DISTINCT value),ARRAY[]::text[]) FROM keys;
 $$;
-CREATE INDEX aio_torrents_native_books ON ingest.torrents USING gin((ingest.aio_native_book_candidates(fields)))
+CREATE INDEX aio_torrents_native_books ON aiosources.torrents USING gin((aiosources.aio_native_book_candidates(fields)))
 WHERE ` + nativeBookAssertionPredicate + `;
-CREATE INDEX ol_editions_authors ON ingest.ol_editions USING gin(author_keys);
+CREATE INDEX ol_editions_authors ON aiosources.ol_editions USING gin(author_keys);
 `

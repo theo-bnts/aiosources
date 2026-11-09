@@ -17,8 +17,8 @@ func TestBookRetryUpgradePreservesQuotaAndSavedProgress(t *testing.T) {
 	if err = db.migrateThrough(ctx, 80); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `UPDATE ingest.ol_changes_state SET retry_at=now()+interval '1 hour';
- UPDATE ingest.ol_import_state SET position=1234,complete=TRUE,data_complete=TRUE,works=1;`); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET retry_at=now()+interval '1 hour';
+ UPDATE aiosources.ol_import_state SET position=1234,complete=TRUE,data_complete=TRUE,works=1;`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Migrate(ctx); err != nil {

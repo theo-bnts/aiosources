@@ -35,7 +35,7 @@ func (s *Store) RecordPlaybackFailure(ctx context.Context, service, stage, code 
 		return err
 	}
 	message := model.ServiceName(service) + " playback failed while " + operation + ". " + reason
-	_, err = s.pool.Exec(ctx, `INSERT INTO ingest.activity_logs(event_id,level,kind,message,service,data)
+	_, err = s.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,service,data)
 VALUES($1,'error','debrid.playback_failed',$2,$3,jsonb_build_object('operation',$4::text,'failure_code',$5::text))`, "activity-"+id, message, service, stage, code)
 	return databaseError("record playback failure", err)
 }

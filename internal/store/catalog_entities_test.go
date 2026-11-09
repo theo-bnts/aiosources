@@ -23,8 +23,8 @@ func catalogEntityFixture(t *testing.T, ctx context.Context, db *Store) model.Sh
 	for _, id := range []string{"one", "two"} {
 		publishSharingRow(t, ctx, db, "allowed", id, `{"title":"Example.Film.2020","info_hash":"`+catalogTestHash+`","size":123}`, nil)
 	}
-	if _, err := db.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','verified' FROM ingest.torrents t CROSS JOIN ingest.aio_works w WHERE t.provider_id='allowed';DELETE FROM ingest.aio_match_queue`); err != nil {
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','verified' FROM aiosources.torrents t CROSS JOIN aiosources.aio_works w WHERE t.provider_id='allowed';DELETE FROM aiosources.aio_match_queue`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{Generation: 1, Hash: catalogTestHash, Cached: true, CheckedAt: time.Now().Add(-time.Minute), Files: []model.AIOFile{{Path: "Example.mkv", Size: 123, ID: 555, Link: "https://private.invalid/download?key=must-not-travel"}}}); err != nil {
@@ -83,7 +83,7 @@ func applyCatalogEntityPage(t *testing.T, ctx context.Context, db *Store, run mo
 
 func catalogEntityCounts(t *testing.T, ctx context.Context, db *Store) (works, cache int) {
 	t.Helper()
-	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_works),(SELECT count(*) FROM ingest.aio_shared_availability)`).Scan(&works, &cache); err != nil {
+	if err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works),(SELECT count(*) FROM aiosources.aio_shared_availability)`).Scan(&works, &cache); err != nil {
 		t.Fatal(err)
 	}
 	return
@@ -203,12 +203,12 @@ func TestCatalogEntitiesPublishAtomicallyDeduplicateAndPreserveLocalWork(t *test
 	}
 	mirrorFinish(t, ctx, receiver, run, model.StatusSucceeded)
 	var title, owner string
-	if err := receiver.pool.QueryRow(ctx, `SELECT display_title,catalog_import_source FROM ingest.aio_works`).Scan(&title, &owner); err != nil || title != "Local authoritative title" || owner != "" {
+	if err := receiver.pool.QueryRow(ctx, `SELECT display_title,catalog_import_source FROM aiosources.aio_works`).Scan(&title, &owner); err != nil || title != "Local authoritative title" || owner != "" {
 		t.Fatalf("local metadata replaced: %q %q %v", title, owner, err)
 	}
 	// Decisions are never imported: each receiver must identify its own records.
 	var matches int
-	if err := receiver.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches`).Scan(&matches); err != nil || matches != 0 {
+	if err := receiver.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_matches`).Scan(&matches); err != nil || matches != 0 {
 		t.Fatal("remote identification decisions were trusted")
 	}
 }
@@ -253,7 +253,7 @@ func TestCatalogEntitiesPrivateAndMalformedDataCannotEnterStaging(t *testing.T) 
 		t.Fatalf("account-only proof accepted: %v", err)
 	}
 	var pages int
-	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.pages WHERE run_id=$1`, run.ID).Scan(&pages); err != nil || pages != 0 {
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.pages WHERE run_id=$1`, run.ID).Scan(&pages); err != nil || pages != 0 {
 		t.Fatal("invalid page advanced")
 	}
 }
@@ -267,12 +267,12 @@ func TestCatalogEntitiesLateCommitCannotFallBehindCheckpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `UPDATE ingest.aio_shared_availability SET checked_at=now(),files='[{"path":"Later.mkv","size":123}]' WHERE service='torbox' AND hash=$1`, catalogTestHash); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=now(),files='[{"path":"Later.mkv","size":123}]' WHERE service='torbox' AND hash=$1`, catalogTestHash); err != nil {
 		t.Fatal(err)
 	}
 	// An unrelated, newer committed transaction must not acknowledge the older
 	// writer's uncommitted cache update.
-	if _, err = db.pool.Exec(ctx, `INSERT INTO ingest.settings(key,value) VALUES('catalog.fixture','value')`); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('catalog.fixture','value')`); err != nil {
 		t.Fatal(err)
 	}
 	before := catalogEntityPages(t, ctx, db, grant, first[len(first)-1].Checkpoint)
@@ -307,7 +307,7 @@ func TestCatalogEntitiesMetadataUpdatesAndRemoteDataAreNotForwarded(t *testing.T
 	}
 	mirrorFinish(t, ctx, receiver, run, model.StatusSucceeded)
 	// Enrich a translation without changing the torrent or its match revision.
-	if _, err := sender.pool.Exec(ctx, `UPDATE ingest.aio_works SET localized_titles='{"fr":"Titre amélioré"}',updated_at=now()`); err != nil {
+	if _, err := sender.pool.Exec(ctx, `UPDATE aiosources.aio_works SET localized_titles='{"fr":"Titre amélioré"}',updated_at=now()`); err != nil {
 		t.Fatal(err)
 	}
 	delta := catalogEntityPages(t, ctx, sender, grant, first[len(first)-1].Checkpoint)
@@ -327,12 +327,12 @@ func TestCatalogEntitiesMetadataUpdatesAndRemoteDataAreNotForwarded(t *testing.T
 	}
 	mirrorFinish(t, ctx, receiver, run, model.StatusSucceeded)
 	var title string
-	if err := receiver.pool.QueryRow(ctx, `SELECT localized_titles->>'fr' FROM ingest.aio_works`).Scan(&title); err != nil || title != "Titre amélioré" {
+	if err := receiver.pool.QueryRow(ctx, `SELECT localized_titles->>'fr' FROM aiosources.aio_works`).Scan(&title); err != nil || title != "Titre amélioré" {
 		t.Fatalf("remote metadata did not update: %q %v", title, err)
 	}
 	// Even after local identification, foreign assertions are not amplified.
-	if _, err := receiver.pool.Exec(ctx, `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','verified' FROM ingest.torrents t CROSS JOIN ingest.aio_works w;DELETE FROM ingest.aio_match_queue`); err != nil {
+	if _, err := receiver.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','verified' FROM aiosources.torrents t CROSS JOIN aiosources.aio_works w;DELETE FROM aiosources.aio_match_queue`); err != nil {
 		t.Fatal(err)
 	}
 	outgoing, err := receiver.CreateShare(ctx, model.ShareInput{Name: "Another recipient", Scope: "all", Enabled: true, Fields: CatalogFields(), CatalogEntities: allCatalogEntities})
@@ -363,7 +363,7 @@ func TestCatalogEntitiesFreshLocalNegativeCacheWins(t *testing.T) {
 	mirrorFinish(t, ctx, receiver, run, model.StatusSucceeded)
 	var cached bool
 	var owner string
-	if err := receiver.pool.QueryRow(ctx, `SELECT cached,catalog_import_source FROM ingest.aio_shared_availability`).Scan(&cached, &owner); err != nil || cached || owner != "" {
+	if err := receiver.pool.QueryRow(ctx, `SELECT cached,catalog_import_source FROM aiosources.aio_shared_availability`).Scan(&cached, &owner); err != nil || cached || owner != "" {
 		t.Fatal("remote observation replaced a fresh local negative check")
 	}
 }
@@ -382,7 +382,7 @@ func TestCatalogEntitiesEnablingShareIncludesEarlierInFlightMetadata(t *testing.
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(ctx, `UPDATE ingest.aio_works SET localized_titles='{"fr":"Titre en cours"}',updated_at=now()`); err != nil {
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_works SET localized_titles='{"fr":"Titre en cours"}',updated_at=now()`); err != nil {
 		t.Fatal(err)
 	}
 	deadline, cancel := context.WithTimeout(ctx, 5*time.Second)

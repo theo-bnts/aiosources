@@ -230,10 +230,10 @@ func TestScheduleClockAndRunRollbackTogether(t *testing.T) {
 	}
 	// Reject the clock update after the run insert. A split transaction would
 	// leave a queued run behind and lose atomic ownership of this due slot.
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_schedule_advance() RETURNS trigger LANGUAGE plpgsql AS $$
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_schedule_advance() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'synthetic schedule persistence failure'; END; $$;
-CREATE TRIGGER reject_schedule_advance BEFORE UPDATE ON ingest.schedule_clocks
-FOR EACH ROW EXECUTE FUNCTION ingest.reject_schedule_advance()`); err != nil {
+CREATE TRIGGER reject_schedule_advance BEFORE UPDATE ON aiosources.schedule_clocks
+FOR EACH ROW EXECUTE FUNCTION aiosources.reject_schedule_advance()`); err != nil {
 		t.Fatal(err)
 	}
 	due := start.Add(time.Minute)
@@ -244,7 +244,7 @@ FOR EACH ROW EXECUTE FUNCTION ingest.reject_schedule_advance()`); err != nil {
 	if err != nil || runs.Total != 0 {
 		t.Fatalf("failed clock transaction left a queued run: total=%d err=%v", runs.Total, err)
 	}
-	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_schedule_advance ON ingest.schedule_clocks"); err != nil {
+	if _, err := db.pool.Exec(ctx, "DROP TRIGGER reject_schedule_advance ON aiosources.schedule_clocks"); err != nil {
 		t.Fatal(err)
 	}
 	_, queued, err := db.AttemptSchedule(ctx, source, due, nil)

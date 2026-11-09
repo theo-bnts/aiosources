@@ -180,7 +180,7 @@ func torrentSearchSQL(options model.ListOptions) (string, string, []any, []any) 
 			continue
 		}
 		parameter := bind(filter.value) + "::text::numeric"
-		clauses = append(clauses, "(ingest.torrent_integer_key("+filter.column+") COLLATE \"C\") "+filter.operator+" (ingest.torrent_integer_key("+parameter+") COLLATE \"C\") AND "+filter.column+" "+filter.operator+" "+parameter)
+		clauses = append(clauses, "(aiosources.torrent_integer_key("+filter.column+") COLLATE \"C\") "+filter.operator+" (aiosources.torrent_integer_key("+parameter+") COLLATE \"C\") AND "+filter.column+" "+filter.operator+" "+parameter)
 	}
 	if options.PublishedAfter != "" {
 		clauses = append(clauses, "search_published_at >= "+bind(options.PublishedAfter)+"::text::timestamptz")
@@ -191,7 +191,7 @@ func torrentSearchSQL(options model.ListOptions) (string, string, []any, []any) 
 	if options.InfoHash != "" {
 		clauses = append(clauses, "search_info_hash="+bind(options.InfoHash))
 	}
-	filter := " FROM ingest.torrents"
+	filter := " FROM aiosources.torrents"
 	if len(clauses) > 0 {
 		filter += " WHERE " + strings.Join(clauses, " AND ")
 	}

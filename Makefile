@@ -12,10 +12,10 @@ web:
 	$(NPM) --prefix web run build
 
 build: web
-	$(GO) build -tags production -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/ingest ./cmd/ingest
+	$(GO) build -tags production -trimpath -ldflags "-X main.version=$(VERSION)" -o bin/aiosources ./cmd/aiosources
 
 dev: web
-	$(GO) run ./cmd/ingest serve
+	$(GO) run ./cmd/aiosources serve
 
 check: web
 	$(NPM) --prefix web run format:check
@@ -30,14 +30,14 @@ check: web
 # Private data and reports stay local. A configured baseline makes the normal
 # local check include this gate; CI never imports or uploads an instance dump.
 performance-if-configured:
-	@if [ -z "$$CI" ] && [ -f .ingest/performance/baseline.json ]; then \
+	@if [ -z "$$CI" ] && python3 tools/performance/run.py configured; then \
 		$(MAKE) performance-check; \
 	fi
 
 performance-check:
 	$(NPM) --prefix web run build
-	$(GO) build -tags production -ldflags "-X main.version=$(VERSION)" -o .ingest/performance/current-app ./cmd/ingest
-	python3 tools/performance/run.py check --binary .ingest/performance/current-app
+	$(GO) build -tags production -ldflags "-X main.version=$(VERSION)" -o bin/aiosources-performance ./cmd/aiosources
+	python3 tools/performance/run.py check --binary bin/aiosources-performance
 
 # Uses a prebuilt production binary and a mandatory disposable PostgreSQL DSN.
 # Keep browser execution separate from the existing database-optional checks.
@@ -58,10 +58,10 @@ compose-check:
 
 # These images are local only; this target never pushes or retags a release.
 image-check:
-	docker buildx build --load --build-arg VERSION=$(VERSION) --tag ingest-local:check .
-	docker run --rm --network none ingest-local:check version
-	docker run --rm --network none ingest-local:check help
-	docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$(VERSION) --tag ingest-local:check --output type=cacheonly .
+	docker buildx build --load --build-arg VERSION=$(VERSION) --tag aiosources-local:check .
+	docker run --rm --network none aiosources-local:check version
+	docker run --rm --network none aiosources-local:check help
+	docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$(VERSION) --tag aiosources-local:check --output type=cacheonly .
 	$(MAKE) image-security
 
 # Scan only the built image archive: never expose the Docker socket or private state.
@@ -69,7 +69,7 @@ image-security:
 	@set -eu; \
 	scan_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$scan_dir"' EXIT HUP INT TERM; \
-	docker image save --output "$$scan_dir/image.tar" ingest-local:check; \
+	docker image save --output "$$scan_dir/image.tar" aiosources-local:check; \
 	docker run --rm --mount type=bind,src="$$scan_dir",dst=/scan,readonly \
 		$(TRIVY_IMAGE) image --input /scan/image.tar --scanners vuln \
 		--severity HIGH,CRITICAL --exit-code 1 --no-progress
@@ -77,5 +77,5 @@ image-security:
 # Requires a disposable TEST_DATABASE_URL and installed Playwright Chromium.
 # Runs the release gates locally without publishing or touching a Compose deployment.
 release-check: check security build compose-check
-	E2E_BINARY=../bin/ingest $(MAKE) e2e
+	E2E_BINARY=../bin/aiosources $(MAKE) e2e
 	$(MAKE) image-check

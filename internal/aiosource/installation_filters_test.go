@@ -127,7 +127,7 @@ func TestInstallationFiltersNeverContactAnUnselectedProvider(t *testing.T) {
 			}
 		}
 	})
-	if _, err := conn.Exec(ctx, `UPDATE ingest.secrets SET ciphertext='invalid'::bytea WHERE name IN ('ad-key','tb-key')`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.secrets SET ciphertext='invalid'::bytea WHERE name IN ('ad-key','tb-key')`); err != nil {
 		t.Fatal(err)
 	}
 	setTestInstallationPreferences(t, ctx, s, token, model.StreamPreferences{Mode: "all", Services: []string{"direct"}})
@@ -136,7 +136,7 @@ func TestInstallationFiltersNeverContactAnUnselectedProvider(t *testing.T) {
 		t.Fatal("direct-only request checked a debrid service", len(streams), calls.Load(), err)
 	}
 	var jobs int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_runs WHERE kind='cache'`).Scan(&jobs); err != nil || jobs != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.operation_runs WHERE kind='cache'`).Scan(&jobs); err != nil || jobs != 0 {
 		t.Fatal("direct-only request scheduled a cache check", jobs, err)
 	}
 }

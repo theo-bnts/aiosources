@@ -34,7 +34,7 @@ func TestInvalidCatalogCredentialsDoNotWaitForAnActiveDownloadLock(t *testing.T)
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
-	if _, err := tx.Exec(ctx, `SELECT id FROM ingest.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT id FROM aiosources.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	bounded, cancel := context.WithTimeout(ctx, time.Second)
@@ -43,7 +43,7 @@ func TestInvalidCatalogCredentialsDoNotWaitForAnActiveDownloadLock(t *testing.T)
 		t.Fatalf("invalid credentials occupied a connection waiting for the share lock: %v", err)
 	}
 	var charged int
-	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM ingest.share_requests WHERE share_id=$1`, grant.Share.ID).Scan(&charged); err != nil || charged != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.share_requests WHERE share_id=$1`, grant.Share.ID).Scan(&charged); err != nil || charged != 0 {
 		t.Fatalf("unauthenticated requests consumed the recipient quota: %d %v", charged, err)
 	}
 }
@@ -61,7 +61,7 @@ func TestCatalogAdmissionRechecksRevocationAfterWaitingForItsLock(t *testing.T) 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = tx.Rollback(context.Background()) })
-	if _, err := tx.Exec(ctx, `SELECT id FROM ingest.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT id FROM aiosources.shares WHERE id=$1 FOR UPDATE`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	result := make(chan error, 1)
@@ -90,7 +90,7 @@ func TestCatalogAdmissionRechecksRevocationAfterWaitingForItsLock(t *testing.T) 
 			t.Fatal("admission never waited for the recipient lock")
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE ingest.shares SET enabled=false,revision=revision+1 WHERE id=$1`, grant.Share.ID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE aiosources.shares SET enabled=false,revision=revision+1 WHERE id=$1`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -179,7 +179,7 @@ func TestCatalogAdmissionIsSharedAndOnlyChargesAuthenticatedRequests(t *testing.
 		t.Fatalf("authenticated sliding-minute quota was not enforced: %v", err)
 	}
 	// Advance stored history rather than sleeping through the minute boundary.
-	if _, err := first.pool.Exec(ctx, `UPDATE ingest.share_requests SET requested_at=clock_timestamp()-interval '61 seconds' WHERE share_id=$1`, grant.Share.ID); err != nil {
+	if _, err := first.pool.Exec(ctx, `UPDATE aiosources.share_requests SET requested_at=clock_timestamp()-interval '61 seconds' WHERE share_id=$1`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	sharingPage(t, ctx, second, grant, CatalogPageRequest{})
@@ -197,7 +197,7 @@ func TestCatalogCrashedLeaseExpiresAndCannotResume(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = abandoned.Close() })
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.share_requests SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1`, abandoned.id); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.share_requests SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1`, abandoned.id); err != nil {
 		t.Fatal(err)
 	}
 	sharingPage(t, ctx, db, grant, CatalogPageRequest{})
@@ -219,7 +219,7 @@ func TestCatalogExpiryRejectsOldContinuationsAndAdmittedDownloads(t *testing.T) 
 	}
 	t.Cleanup(func() { _ = admitted.Close() })
 	// Simulate time passing without changing the signed cursor's revision.
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.shares SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, grant.Share.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.shares SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, grant.Share.ID); err != nil {
 		t.Fatal(err)
 	}
 	for _, request := range []CatalogPageRequest{{Cursor: page.NextCursor}, {Checkpoint: snapshot.Checkpoint}, {Head: true}} {
@@ -238,7 +238,7 @@ func TestCatalogExpiryRejectsOldContinuationsAndAdmittedDownloads(t *testing.T) 
 func TestShareMutationsRollBackWhenActivityCannotBeWritten(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	grant := sharingGrant(t, ctx, db)
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_share_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'unavailable activity'; END $$; CREATE TRIGGER reject_share_activity BEFORE INSERT ON ingest.activity_logs FOR EACH ROW EXECUTE FUNCTION ingest.reject_share_activity();`); err != nil {
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_share_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'unavailable activity'; END $$; CREATE TRIGGER reject_share_activity BEFORE INSERT ON aiosources.activity_logs FOR EACH ROW EXECUTE FUNCTION aiosources.reject_share_activity();`); err != nil {
 		t.Fatal(err)
 	}
 	input := model.ShareInput{Name: "Unlogged", Enabled: true, Scope: "all", Fields: []string{"title"}, RequestsPerMinute: &grant.Share.RequestsPerMinute, MaxConcurrentDownloads: &grant.Share.MaxConcurrentDownloads}

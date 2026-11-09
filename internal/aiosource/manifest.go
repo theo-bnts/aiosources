@@ -1,6 +1,8 @@
 package aiosource
 
-const Version = "2.3.0"
+import "github.com/theo-bnts/aiosources/internal/buildinfo"
+
+const Version = buildinfo.Release
 
 // Client image loaders may not reach a private Docker hostname or pass an
 // instance's access gateway. Keep the public brand asset independent of both

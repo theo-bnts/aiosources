@@ -72,7 +72,7 @@ func TestCollectionPolicySnapshotsSurviveSettingsChangesAndResume(t *testing.T) 
 		t.Fatalf("scheduled explicit unlimited budget or new defaults lost: %+v %v", scheduled, err)
 	}
 	// A legacy NULL policy retains old execution semantics, not today's defaults.
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.runs SET policy=NULL WHERE id=$1", direct.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.runs SET policy=NULL WHERE id=$1", direct.ID); err != nil {
 		t.Fatal(err)
 	}
 	legacy, err := db.GetRun(ctx, direct.ID)

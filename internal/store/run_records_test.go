@@ -66,9 +66,9 @@ func TestDistinctRecordsMigrationPreservesHistoryAndResume(t *testing.T) {
 	// Recreate the immediately preceding schema while retaining its original
 	// archives, checkpoints and raw counters. Migration must rebuild evidence
 	// for previews as well as only the latest accepted full-run generation.
-	if _, err := db.pool.Exec(ctx, `DROP TABLE ingest.run_record_identities;
-ALTER TABLE ingest.runs DROP COLUMN distinct_records;
-DELETE FROM ingest.schema_migrations WHERE version=14`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DROP TABLE aiosources.run_record_identities;
+ALTER TABLE aiosources.runs DROP COLUMN distinct_records;
+DELETE FROM aiosources.schema_migrations WHERE version=14`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Migrate(ctx); err != nil {
@@ -137,7 +137,7 @@ func TestKnownIDsKeepRunCreationBaselineAcrossWritesAndResume(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, "UPDATE ingest.torrents SET first_seen_at=$1 WHERE provider_id=$2 AND source_id='boundary'", run.CreatedAt, provider.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=$1 WHERE provider_id=$2 AND source_id='boundary'", run.CreatedAt, provider.ID); err != nil {
 		t.Fatal(err)
 	}
 	assertBaseline := func(database *Store, baseline model.Run) {

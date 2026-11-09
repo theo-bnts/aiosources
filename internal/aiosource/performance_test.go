@@ -50,10 +50,10 @@ func BenchmarkMetadataRetrieval(b *testing.B) {
 		if err := s.DB.ResetAIOMetadata(ctx); err != nil {
 			b.Fatal(err)
 		}
-		if _, err := conn.Exec(ctx, `UPDATE ingest.aio_state SET inventory_date=$1,changes_through=now()`, time.Now().UTC().Add(-24*time.Hour).Format("2006-01-02")); err != nil {
+		if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_state SET inventory_date=$1,changes_through=now()`, time.Now().UTC().Add(-24*time.Hour).Format("2006-01-02")); err != nil {
 			b.Fatal(err)
 		}
-		if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_metadata_jobs(media_type,tmdb_id) SELECT 'movie',n::text FROM generate_series(1,100) n`); err != nil {
+		if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id) SELECT 'movie',n::text FROM generate_series(1,100) n`); err != nil {
 			b.Fatal(err)
 		}
 		b.StartTimer()
@@ -63,7 +63,7 @@ func BenchmarkMetadataRetrieval(b *testing.B) {
 	}
 	b.StopTimer()
 	var imported int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_works WHERE media_type='movie'`).Scan(&imported); err != nil || imported != 100 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_works WHERE media_type='movie'`).Scan(&imported); err != nil || imported != 100 {
 		b.Fatal("metadata retrieval lost records", imported, err)
 	}
 	b.ReportMetric(float64(peak.Load()), "max-inflight")
@@ -73,15 +73,15 @@ func BenchmarkMetadataRetrieval(b *testing.B) {
 func BenchmarkMatchingDenseCatalog(b *testing.B) {
 	ctx, s, conn := testService(b)
 	if _, err := conn.Exec(ctx, `
-	INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+	INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
 	SELECT 'movie',n::text,'tt'||(10000000+n)::text,ARRAY[1990] FROM generate_series(1,10000) n;
-	INSERT INTO ingest.aio_titles(work_id,title,normalized)
-	SELECT id,'Whispers of the Forest '||substring(md5(tmdb_id),1,8),'whispers of the forest '||substring(md5(tmdb_id),1,8) FROM ingest.aio_works;
-	INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','10001','tt1234567',ARRAY[2021]);
-	INSERT INTO ingest.aio_titles(work_id,title,normalized) SELECT id,'Whispers of the Forest','whispers of the forest' FROM ingest.aio_works WHERE tmdb_id='10001';
-	INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+	SELECT id,'Whispers of the Forest '||substring(md5(tmdb_id),1,8),'whispers of the forest '||substring(md5(tmdb_id),1,8) FROM aiosources.aio_works;
+	INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES('movie','10001','tt1234567',ARRAY[2021]);
+	INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Whispers of the Forest','whispers of the forest' FROM aiosources.aio_works WHERE tmdb_id='10001';
+	INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 	SELECT 'synthetic',n::text,jsonb_build_object('title','Whispers.of.the.Forest.2021.1080p','imdb_id','tt1234567','info_hash',md5(n::text)||'12345678') FROM generate_series(1,200) n;
-	ANALYZE ingest.aio_works; ANALYZE ingest.aio_titles; ANALYZE ingest.torrents;`); err != nil {
+	ANALYZE aiosources.aio_works; ANALYZE aiosources.aio_titles; ANALYZE aiosources.torrents;`); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
@@ -97,7 +97,7 @@ func BenchmarkMatchingDenseCatalog(b *testing.B) {
 	}
 	b.StopTimer()
 	var matched int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.aio_matches WHERE status='matched'`).Scan(&matched); err != nil || matched != 200 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_matches WHERE status='matched'`).Scan(&matched); err != nil || matched != 200 {
 		b.Fatal("dense matching lost reliable results", matched, err)
 	}
 	b.ReportMetric(float64(matched), "matched/200")
@@ -105,9 +105,9 @@ func BenchmarkMatchingDenseCatalog(b *testing.B) {
 
 func BenchmarkMetadataSeasonLookup(b *testing.B) {
 	ctx, s, conn := testService(b)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields)
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields)
 	SELECT 'synthetic',n::text,jsonb_build_object('title','Synthetic.Serial.S01E01.2021','season',1,'tmdb_id',n::text,'imdb_id','tt'||(10000000+n)::text,'tvdb_id',n::text) FROM generate_series(1,100000) n;
-	ANALYZE ingest.torrents;`); err != nil {
+	ANALYZE aiosources.torrents;`); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
@@ -142,7 +142,7 @@ func BenchmarkMetadataInventoryReplay(b *testing.B) {
 	}
 	b.StopTimer()
 	var inventory, jobs int
-	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM ingest.aio_inventory),(SELECT count(*) FROM ingest.aio_metadata_jobs)`).Scan(&inventory, &jobs); err != nil || inventory != len(ids) || jobs != len(ids) {
+	if err := conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_inventory),(SELECT count(*) FROM aiosources.aio_metadata_jobs)`).Scan(&inventory, &jobs); err != nil || inventory != len(ids) || jobs != len(ids) {
 		b.Fatal("inventory replay lost or duplicated durable jobs", inventory, jobs, err)
 	}
 }
@@ -151,13 +151,13 @@ func BenchmarkMetadataInventoryReplay(b *testing.B) {
 // This measures the no-reuse path, including episodic and season-pack requests.
 func BenchmarkMatchingVariedCatalog(b *testing.B) {
 	ctx, s, conn := testService(b)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
  SELECT CASE WHEN n%3=0 THEN 'movie' ELSE 'tv' END,n::text,'tt'||(10000000+n)::text,ARRAY[2021] FROM generate_series(1,90) n;
- INSERT INTO ingest.aio_titles(work_id,title,normalized)
- SELECT id,'Synthetic Adventure '||tmdb_id,'synthetic adventure '||tmdb_id FROM ingest.aio_works;
- INSERT INTO ingest.torrents(provider_id,source_id,fields)
+ INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+ SELECT id,'Synthetic Adventure '||tmdb_id,'synthetic adventure '||tmdb_id FROM aiosources.aio_works;
+ INSERT INTO aiosources.torrents(provider_id,source_id,fields)
  SELECT 'synthetic',n::text,jsonb_build_object('title','Synthetic.Adventure.'||n||CASE n%3 WHEN 0 THEN '.2021.1080p' WHEN 1 THEN '.S01E03.2021.1080p' ELSE '.S01.COMPLETE.2021.1080p' END,'tmdb_id',n::text,'info_hash',md5(n::text)||'12345678') FROM generate_series(1,90) n;
- ANALYZE ingest.aio_works; ANALYZE ingest.aio_titles; ANALYZE ingest.torrents;`); err != nil {
+ ANALYZE aiosources.aio_works; ANALYZE aiosources.aio_titles; ANALYZE aiosources.torrents;`); err != nil {
 		b.Fatal(err)
 	}
 	b.ResetTimer()
@@ -173,7 +173,7 @@ func BenchmarkMatchingVariedCatalog(b *testing.B) {
 	}
 	b.StopTimer()
 	var matched int
-	if err := conn.QueryRow(ctx, "SELECT count(*) FROM ingest.aio_matches WHERE status='matched'").Scan(&matched); err != nil || matched != 90 {
+	if err := conn.QueryRow(ctx, "SELECT count(*) FROM aiosources.aio_matches WHERE status='matched'").Scan(&matched); err != nil || matched != 90 {
 		b.Fatal("varied decisions changed", matched, err)
 	}
 	b.ReportMetric(float64(matched), "matched/90")

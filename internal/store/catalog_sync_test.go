@@ -22,7 +22,7 @@ func TestCatalogClockUpgradePreservesNativeDeadlinesAndPublishedCopy(t *testing.
 		t.Fatal(err)
 	}
 	publishSharingRow(t, ctx, db, p.ID, "retained", `{"title":"Retained remote copy","size":9007199254740993}`, nil)
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.schedule_clocks SET profile='source',next_run_at=$2,full_due_at=$2 WHERE provider_id=$1`, p.ID, start.Add(24*time.Hour)); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.schedule_clocks SET profile='source',next_run_at=$2,full_due_at=$2 WHERE provider_id=$1`, p.ID, start.Add(24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	now := start.Add(30 * time.Second)
@@ -64,7 +64,7 @@ func TestCatalogIntervalUpgradeResumesLegacyFullWithOriginalCheckpoint(t *testin
 	}
 	// Simulate an immutable run created by the old scheduled Full dispatcher.
 	// CreateRun deliberately always uses a manual trigger.
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.runs SET trigger='scheduled' WHERE id=$1`, created.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runs SET trigger='scheduled' WHERE id=$1`, created.ID); err != nil {
 		t.Fatal(err)
 	}
 	run, err := db.ClaimNext(ctx)
@@ -76,7 +76,7 @@ func TestCatalogIntervalUpgradeResumesLegacyFullWithOriginalCheckpoint(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.schedule_clocks SET profile='source' WHERE provider_id=$1`, p.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.schedule_clocks SET profile='source' WHERE provider_id=$1`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()

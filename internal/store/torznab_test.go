@@ -28,12 +28,12 @@ func TestTorznabPublishedFiltersTotalsAndStorageIsolation(t *testing.T) {
 		publishSharingRow(t, ctx, db, row.provider, row.id, `{"title":"`+row.title+`","info_hash":"`+strings.Repeat("a", 40)+`","size":100,"download_url":"https://private.invalid/secret","magnet_url":"magnet:?tr=private"}`, nil)
 	}
 	for _, pair := range []struct{ id, typ string }{{"one", "movie"}, {"two", "tv"}} {
-		if _, err := db.pool.Exec(ctx, `WITH work AS(INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years) VALUES($2,$1,'tt1234567',ARRAY[2024]) RETURNING id,revision)
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM ingest.torrents t CROSS JOIN work w WHERE provider_id='alpha' AND source_id=$1`, pair.id, pair.typ); err != nil {
+		if _, err := db.pool.Exec(ctx, `WITH work AS(INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years) VALUES($2,$1,'tt1234567',ARRAY[2024]) RETURNING id,revision)
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture' FROM aiosources.torrents t CROSS JOIN work w WHERE provider_id='alpha' AND source_id=$1`, pair.id, pair.typ); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.pool.Exec(ctx, `DELETE FROM ingest.aio_match_queue`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue`); err != nil {
 		t.Fatal(err)
 	}
 	grant := torznabGrant(t, ctx, db)
@@ -72,7 +72,7 @@ INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revisio
 	}
 	var tracking bool
 	var journal int
-	if err := db.pool.QueryRow(ctx, `SELECT enabled,(SELECT count(*) FROM ingest.catalog_journal) FROM ingest.catalog_tracking`).Scan(&tracking, &journal); err != nil || tracking || journal != 0 {
+	if err := db.pool.QueryRow(ctx, `SELECT enabled,(SELECT count(*) FROM aiosources.catalog_journal) FROM aiosources.catalog_tracking`).Scan(&tracking, &journal); err != nil || tracking || journal != 0 {
 		t.Fatal("Torznab enabled synchronization retention", tracking, journal, err)
 	}
 	if catalog, err := db.Shares(ctx); err != nil || len(catalog) != 0 {

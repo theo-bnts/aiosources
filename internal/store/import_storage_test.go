@@ -22,10 +22,10 @@ func TestStorageBreakdownExposesAllocatedPartsAndRetainedCancelledImports(t *tes
 		t.Fatal(err)
 	}
 	mirrorFinish(t, ctx, db, run, model.StatusCancelled)
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.runs SET created_at=now()-interval '10 days',finished_at=now()-interval '9 days' WHERE id=$1`, run.ID); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runs SET created_at=now()-interval '10 days',finished_at=now()-interval '9 days' WHERE id=$1`, run.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, "ANALYZE ingest.runs; ANALYZE ingest.staged_torrents; ANALYZE ingest.run_record_identities;"); err != nil {
+	if _, err := db.pool.Exec(ctx, "ANALYZE aiosources.runs; ANALYZE aiosources.staged_torrents; ANALYZE aiosources.run_record_identities;"); err != nil {
 		t.Fatal(err)
 	}
 	report, err := db.MeasureHealth(ctx, model.HealthDisk{})
@@ -52,7 +52,7 @@ func TestStorageBreakdownExposesAllocatedPartsAndRetainedCancelledImports(t *tes
 		t.Fatalf("storage report leaked payloads: %s %v", encoded, err)
 	}
 	var staged int
-	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 10 {
+	if err := db.pool.QueryRow(ctx, "SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1", run.ID).Scan(&staged); err != nil || staged != 10 {
 		t.Fatal("measurement mutated preparation", staged, err)
 	}
 }

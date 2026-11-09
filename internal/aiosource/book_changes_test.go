@@ -188,7 +188,7 @@ func newBookAPIFixture(t testing.TB, s *Service) *bookAPIFixture {
 
 func bookFeedDue(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	t.Helper()
-	if _, err := conn.Exec(ctx, `UPDATE ingest.ol_changes_state SET checked_at=NULL,retry_at=NULL;UPDATE ingest.ol_import_state SET retry_at=NULL`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_changes_state SET checked_at=NULL,retry_at=NULL;UPDATE aiosources.ol_import_state SET retry_at=NULL`); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -196,7 +196,7 @@ func bookFeedDue(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 func TestBookChangesUpdateTheLocalCatalogWithoutAnotherDump(t *testing.T) {
 	ctx, s, conn := testService(t)
 	f := newBookAPIFixture(t, s)
-	if _, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('fixture','future','{"title":"Morgan Vale - The Azure Almanac EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','future','{"title":"Morgan Vale - The Azure Almanac EPUB","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SyncBooks(ctx, "manual"); err != nil {
@@ -223,14 +223,14 @@ func TestBookChangesUpdateTheLocalCatalogWithoutAnotherDump(t *testing.T) {
 		t.Fatal(err)
 	}
 	var title, author string
-	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT name FROM ingest.ol_authors WHERE id='OL200A') FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &author); err != nil || title != "The Amber Orchard Revised" || author != "Morgan Vale Updated" {
+	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT name FROM aiosources.ol_authors WHERE id='OL200A') FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &author); err != nil || title != "The Amber Orchard Revised" || author != "Morgan Vale Updated" {
 		t.Fatalf("renamed evidence was not updated: %q %q %v", title, author, err)
 	}
 	if err := s.Match(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var decision string
-	if err := conn.QueryRow(ctx, `SELECT status FROM ingest.aio_matches WHERE provider_id='fixture' AND source_id='future'`).Scan(&decision); err != nil || decision != "matched" {
+	if err := conn.QueryRow(ctx, `SELECT status FROM aiosources.aio_matches WHERE provider_id='fixture' AND source_id='future'`).Scan(&decision); err != nil || decision != "matched" {
 		t.Fatal("new book did not requeue a formerly unmatched torrent", decision, err)
 	}
 	after, _ := s.DB.OpenLibraryStatus(ctx)
@@ -265,7 +265,7 @@ func TestBookPendingRevisionsSurviveAnInterruptedUpdate(t *testing.T) {
 		t.Fatalf("unapplied work advanced the safe checkpoint: %+v", pending)
 	}
 	var kind string
-	if err := conn.QueryRow(ctx, `SELECT kind FROM ingest.activity_logs WHERE service='openlibrary' ORDER BY id DESC LIMIT 1`).Scan(&kind); err != nil || kind != "openlibrary.sync_pending" {
+	if err := conn.QueryRow(ctx, `SELECT kind FROM aiosources.activity_logs WHERE service='openlibrary' ORDER BY id DESC LIMIT 1`).Scan(&kind); err != nil || kind != "openlibrary.sync_pending" {
 		t.Fatal("deferred API work was reported as a skipped export record", kind, err)
 	}
 	f.mu.Lock()
@@ -273,7 +273,7 @@ func TestBookPendingRevisionsSurviveAnInterruptedUpdate(t *testing.T) {
 	f.documents["OL100W"]["revision"] = 2
 	f.documents["OL100W"]["title"] = "The Amber Orchard Updated"
 	f.mu.Unlock()
-	if _, err := conn.Exec(ctx, `UPDATE ingest.ol_change_jobs SET next_attempt=now()`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_change_jobs SET next_attempt=now()`); err != nil {
 		t.Fatal(err)
 	}
 	restarted, err := New(ctx, s.DB, s.Vault, nil)
@@ -351,7 +351,7 @@ func TestBookSnapshotKeepsNewerAPIDataAndPrunesMissingEntries(t *testing.T) {
 	}
 	var title string
 	var editions, authors int
-	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM ingest.ol_editions),(SELECT count(*) FROM ingest.ol_authors) FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &editions, &authors); err != nil || title != "A Newer API Title" || editions != 0 || authors != 0 {
+	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM aiosources.ol_editions),(SELECT count(*) FROM aiosources.ol_authors) FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &editions, &authors); err != nil || title != "A Newer API Title" || editions != 0 || authors != 0 {
 		t.Fatal("snapshot reconciliation regressed fresh data or retained missing entries", title, editions, authors, err)
 	}
 }
@@ -428,7 +428,7 @@ func TestBookFeedGapWaitsForANewerDumpWhileStillApplyingNewChanges(t *testing.T)
 	}
 	gap, _ := s.DB.OpenLibraryStatus(ctx)
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title); err != nil || title != "A Title Updated After The Gap" {
+	if err := conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title); err != nil || title != "A Title Updated After The Gap" {
 		t.Fatal("live updates stopped during recovery", title, err)
 	}
 	if !gap.NeedsExport || gap.Generation != before.Generation || gap.ChangesThrough == nil || !gap.ChangesThrough.Equal(*before.ChangesThrough) {
@@ -470,7 +470,7 @@ func TestBookCatchupCannotSucceedBeyondTheProviderCapOrWithoutItsBoundary(t *tes
 			}
 			f.ignoreOffsets = scenario == "repeated"
 			f.mu.Unlock()
-			if _, err := conn.Exec(ctx, `UPDATE ingest.ol_changes_state SET bootstrap_complete=FALSE,bootstrap_day=$1,tail_since=$2,tail_start_id='100'`, f.day, f.day.Add(time.Hour)); err != nil {
+			if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_changes_state SET bootstrap_complete=FALSE,bootstrap_day=$1,tail_since=$2,tail_start_id='100'`, f.day, f.day.Add(time.Hour)); err != nil {
 				t.Fatal(err)
 			}
 			h, err := s.beginOperation(ctx, "metadata", "openlibrary", "manual", "", "openlibrary")
@@ -522,7 +522,7 @@ func TestBookProviderCooldownSurvivesRestartAndProtectsTheDump(t *testing.T) {
 		t.Fatal("restart contacted the provider while blocked", calls, dumps)
 	}
 	var logged int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM ingest.operation_events WHERE phase='book_changes' AND http_status=429`).Scan(&logged); err != nil || logged != 1 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.operation_events WHERE phase='book_changes' AND http_status=429`).Scan(&logged); err != nil || logged != 1 {
 		t.Fatal("book API call was missing from ordinary history", logged, err)
 	}
 }
@@ -555,17 +555,17 @@ func TestBookMissingDocumentMustBeConfirmedAndCanLaterBeRestored(t *testing.T) {
 		t.Fatal(err)
 	}
 	var present bool
-	if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_works WHERE openlibrary_id='OL100W')`).Scan(&present); err != nil || !present {
+	if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_works WHERE openlibrary_id='OL100W')`).Scan(&present); err != nil || !present {
 		t.Fatal("one transient 404 removed the local record", err)
 	}
-	if _, err := conn.Exec(ctx, `UPDATE ingest.ol_change_jobs SET next_attempt=now()`); err != nil {
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.ol_change_jobs SET next_attempt=now()`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SyncBooks(ctx, "manual"); err != nil {
 		t.Fatal(err)
 	}
 	var deleted int
-	if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_works WHERE openlibrary_id='OL100W'),(SELECT ol_revision FROM ingest.ol_deleted WHERE id='OL100W')`).Scan(&present, &deleted); err != nil || present || deleted != 2 {
+	if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_works WHERE openlibrary_id='OL100W'),(SELECT ol_revision FROM aiosources.ol_deleted WHERE id='OL100W')`).Scan(&present, &deleted); err != nil || present || deleted != 2 {
 		t.Fatal("confirmed absence was not applied", present, deleted, err)
 	}
 	f.mu.Lock()
@@ -577,7 +577,7 @@ func TestBookMissingDocumentMustBeConfirmedAndCanLaterBeRestored(t *testing.T) {
 		t.Fatal(err)
 	}
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM ingest.ol_deleted WHERE id='OL100W') FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &deleted); err != nil || title != "The Restored Amber Orchard" || deleted != 0 {
+	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM aiosources.ol_deleted WHERE id='OL100W') FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &deleted); err != nil || title != "The Restored Amber Orchard" || deleted != 0 {
 		t.Fatal("a later upstream restoration was blocked", title, deleted, err)
 	}
 }
@@ -600,7 +600,7 @@ func TestBookMergeFetchesItsTargetAndDoesNotTouchVideoInformation(t *testing.T) 
 	}
 	var target, title string
 	var old, videos int
-	if err := conn.QueryRow(ctx, `SELECT ingest.ol_resolve('OL100W'),(SELECT display_title FROM ingest.aio_works WHERE openlibrary_id='OL500W'),(SELECT count(*) FROM ingest.aio_works WHERE openlibrary_id='OL100W'),(SELECT count(*) FROM ingest.aio_works WHERE media_type='movie')`).Scan(&target, &title, &old, &videos); err != nil || target != "OL500W" || title != "The Canonical Amber Orchard" || old != 0 || videos != 1 {
+	if err := conn.QueryRow(ctx, `SELECT aiosources.ol_resolve('OL100W'),(SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL500W'),(SELECT count(*) FROM aiosources.aio_works WHERE openlibrary_id='OL100W'),(SELECT count(*) FROM aiosources.aio_works WHERE media_type='movie')`).Scan(&target, &title, &old, &videos); err != nil || target != "OL500W" || title != "The Canonical Amber Orchard" || old != 0 || videos != 1 {
 		t.Fatal("merge lost its canonical target or changed video data", target, title, old, videos, err)
 	}
 }
@@ -643,7 +643,7 @@ func TestBookLiveCollectorKeepsCompactJobsWhileTheCatalogIsBusy(t *testing.T) {
 	stop()
 	var pending int
 	var title string
-	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM ingest.ol_change_jobs) FROM ingest.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &pending); err != nil || title != "The Amber Orchard" || pending != 1 {
+	if err := conn.QueryRow(ctx, `SELECT display_title,(SELECT count(*) FROM aiosources.ol_change_jobs) FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title, &pending); err != nil || title != "The Amber Orchard" || pending != 1 {
 		t.Fatal("collector mutated the snapshot instead of recording durable jobs", title, pending, err)
 	}
 }
@@ -654,7 +654,7 @@ func TestBookNewInformationReconsidersNativeIdentifiersAfterDependenciesArrive(t
 	if err := s.SyncBooks(ctx, "manual"); err != nil {
 		t.Fatal(err)
 	}
-	_, err := conn.Exec(ctx, `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+	_, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('fixture','isbn10','{"title":"An Unrelated Filename EPUB","attributes":{"isbn10":["1861972717"]}}'),
  ('fixture','explicit','{"title":"An Unrelated Filename EPUB","openlibrary_id":"/works/OL500W"}'),
  ('fixture','filename','{"title":"Opaque ISBN 9781861972712 EPUB"}'),
@@ -683,9 +683,9 @@ func TestBookNewInformationReconsidersNativeIdentifiersAfterDependenciesArrive(t
 		t.Fatal(err)
 	}
 	var matched, invalid int
-	if err := conn.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='matched'),count(*) FILTER(WHERE source_id='invalid' AND status='matched') FROM ingest.aio_matches WHERE provider_id='fixture'`).Scan(&matched, &invalid); err != nil || matched != 3 || invalid != 0 {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FILTER(WHERE status='matched'),count(*) FILTER(WHERE source_id='invalid' AND status='matched') FROM aiosources.aio_matches WHERE provider_id='fixture'`).Scan(&matched, &invalid); err != nil || matched != 3 || invalid != 0 {
 		var decisions string
-		_ = conn.QueryRow(ctx, `SELECT string_agg(source_id||':'||status||':'||reason,', ' ORDER BY source_id) FROM ingest.aio_matches WHERE provider_id='fixture'`).Scan(&decisions)
+		_ = conn.QueryRow(ctx, `SELECT string_agg(source_id||':'||status||':'||reason,', ' ORDER BY source_id) FROM aiosources.aio_matches WHERE provider_id='fixture'`).Scan(&decisions)
 		t.Fatal("new identifier evidence was missed or an invalid checksum was accepted", matched, invalid, err, decisions)
 	}
 }

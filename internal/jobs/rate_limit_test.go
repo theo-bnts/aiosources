@@ -58,7 +58,7 @@ func TestRateLimitedCollectionsSaveDiagnosticsBeforeRetry(t *testing.T) {
 						tooEarly.Store(true)
 					}
 					var count int
-					if err := control.QueryRow(ctx, `SELECT count(*) FROM ingest.pages WHERE metadata->>'http_status'='429' AND octet_length(body)=0 AND NOT payload_retained`).Scan(&count); err == nil && count == 1 {
+					if err := control.QueryRow(ctx, `SELECT count(*) FROM aiosources.pages WHERE metadata->>'http_status'='429' AND octet_length(body)=0 AND NOT payload_retained`).Scan(&count); err == nil && count == 1 {
 						recordedBeforeRetry.Store(true)
 					}
 				}
@@ -100,7 +100,7 @@ func TestRateLimitedCollectionsSaveDiagnosticsBeforeRetry(t *testing.T) {
 				t.Fatalf("quota retry lost its diagnostics, deadline or checkpoint: early=%t recorded=%t run=%+v", tooEarly.Load(), recordedBeforeRetry.Load(), finished)
 			}
 			var published int
-			if err := control.QueryRow(ctx, "SELECT count(*) FROM ingest.torrents WHERE provider_id=$1 AND source_id='native-1'", p.ID).Scan(&published); err != nil || published != 1 {
+			if err := control.QueryRow(ctx, "SELECT count(*) FROM aiosources.torrents WHERE provider_id=$1 AND source_id='native-1'", p.ID).Scan(&published); err != nil || published != 1 {
 				t.Fatalf("recovered native release was not published: count=%d error=%v", published, err)
 			}
 		})
@@ -221,8 +221,8 @@ func TestTransientFailurePreservesCommittedCheckpoint(t *testing.T) {
 					held, readErr := db.GetRun(ctx, saved.ID)
 					var archived, staged int
 					archiveErr := control.QueryRow(ctx, `SELECT
-						(SELECT count(*) FROM ingest.pages WHERE run_id=$1 AND error<>'' AND metadata->>'http_status'='504'),
-						(SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1 AND source_id='before')`, saved.ID).Scan(&archived, &staged)
+						(SELECT count(*) FROM aiosources.pages WHERE run_id=$1 AND error<>'' AND metadata->>'http_status'='504'),
+						(SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1 AND source_id='before')`, saved.ID).Scan(&archived, &staged)
 					if readErr == nil && archiveErr == nil && archived == int(attempt)-1 && staged == 1 &&
 						held.Pages == saved.Pages && held.Errors == int(attempt)-1 &&
 						held.DistinctRecords == saved.DistinctRecords && bytes.Equal(held.Cursor, saved.Cursor) {
@@ -279,8 +279,8 @@ func TestTransientFailurePreservesCommittedCheckpoint(t *testing.T) {
 				}
 				var staged, published int
 				if err := control.QueryRow(ctx, `SELECT
-					(SELECT count(*) FROM ingest.staged_torrents WHERE run_id=$1 AND source_id='before'),
-					(SELECT count(*) FROM ingest.torrents WHERE provider_id=$2)`, run.ID, p.ID).Scan(&staged, &published); err != nil || staged != 1 || published != 0 {
+					(SELECT count(*) FROM aiosources.staged_torrents WHERE run_id=$1 AND source_id='before'),
+					(SELECT count(*) FROM aiosources.torrents WHERE provider_id=$2)`, run.ID, p.ID).Scan(&staged, &published); err != nil || staged != 1 || published != 0 {
 					t.Fatalf("exhaustion discarded staging or published an incomplete Full: staged=%d published=%d error=%v", staged, published, err)
 				}
 				resumeRecovery.Store(true)
@@ -295,7 +295,7 @@ func TestTransientFailurePreservesCommittedCheckpoint(t *testing.T) {
 				assertTransientObservations(t, ctx, control, run.ID, http.StatusGatewayTimeout, 4, false)
 			}
 			var published int
-			if err := control.QueryRow(ctx, "SELECT count(*) FROM ingest.torrents WHERE provider_id=$1 AND source_id IN ('before','after')", p.ID).Scan(&published); err != nil || published != 2 {
+			if err := control.QueryRow(ctx, "SELECT count(*) FROM aiosources.torrents WHERE provider_id=$1 AND source_id IN ('before','after')", p.ID).Scan(&published); err != nil || published != 2 {
 				t.Fatalf("successful retry failed Full publication: published=%d error=%v", published, err)
 			}
 		})
@@ -412,7 +412,7 @@ waitForArchive:
 
 func assertTransientObservations(t *testing.T, ctx context.Context, control *pgx.Conn, runID string, status, attempts int, lastRetry bool) {
 	t.Helper()
-	rows, err := control.Query(ctx, "SELECT metadata,body,payload_retained,error FROM ingest.pages WHERE run_id=$1 AND error<>'' ORDER BY id", runID)
+	rows, err := control.Query(ctx, "SELECT metadata,body,payload_retained,error FROM aiosources.pages WHERE run_id=$1 AND error<>'' ORDER BY id", runID)
 	if err != nil {
 		t.Fatal(err)
 	}

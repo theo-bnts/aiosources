@@ -101,21 +101,21 @@ test('long catalog title headings remain readable with their return navigation o
   let id = ''
   try {
     const result = await db.query(
-      `INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years,display_title) VALUES('movie','101','tt0000101',ARRAY[2026],$1) RETURNING id`,
+      `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years,display_title) VALUES('movie','101','tt0000101',ARRAY[2026],$1) RETURNING id`,
       [title],
     )
     id = String(result.rows[0].id)
-    await db.query(`INSERT INTO ingest.aio_titles(work_id,title,normalized) VALUES($1,$2,$3)`, [
+    await db.query(`INSERT INTO aiosources.aio_titles(work_id,title,normalized) VALUES($1,$2,$3)`, [
       id,
       title,
       title.toLowerCase(),
     ])
     await db.query(
-      `INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES('example','one',$1)`,
+      `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('example','one',$1)`,
       [JSON.stringify({ title, imdb_id: 'tt0000101', info_hash: 'a'.repeat(40), size: 100 })],
     )
     await db.query(
-      `INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','synthetic identifier' FROM ingest.torrents t CROSS JOIN ingest.aio_works w; DELETE FROM ingest.aio_match_queue`,
+      `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason) SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','synthetic identifier' FROM aiosources.torrents t CROSS JOIN aiosources.aio_works w; DELETE FROM aiosources.aio_match_queue`,
     )
   } finally {
     await db.end()

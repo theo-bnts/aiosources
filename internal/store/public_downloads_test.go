@@ -18,7 +18,7 @@ func TestVisitorAnnounceUpgradeIsOptInAndAccessChangesAreAtomic(t *testing.T) {
 	if err := db.migrateThrough(ctx, 51); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.pool.Exec(ctx, `UPDATE ingest.aio_public_access SET revision=7,enabled=true,generation=9`); err != nil {
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET revision=7,enabled=true,generation=9`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Migrate(ctx); err != nil {
@@ -39,9 +39,9 @@ func TestVisitorAnnounceUpgradeIsOptInAndAccessChangesAreAtomic(t *testing.T) {
 	if !current.ExposeSources || current.Generation != 9 || current.Revision != 8 {
 		t.Fatal("optional permission revoked ordinary cached installations")
 	}
-	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION ingest.reject_download_permission_log() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+	if _, err := db.pool.Exec(ctx, `CREATE FUNCTION aiosources.reject_download_permission_log() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN IF NEW.kind='security.public_source_downloads_disabled' THEN RAISE EXCEPTION 'synthetic log failure'; END IF; RETURN NEW; END; $$;
-CREATE TRIGGER reject_download_permission_log BEFORE INSERT ON ingest.activity_logs FOR EACH ROW EXECUTE FUNCTION ingest.reject_download_permission_log()`); err != nil {
+CREATE TRIGGER reject_download_permission_log BEFORE INSERT ON aiosources.activity_logs FOR EACH ROW EXECUTE FUNCTION aiosources.reject_download_permission_log()`); err != nil {
 		t.Fatal(err)
 	}
 	disabled := current
@@ -53,7 +53,7 @@ CREATE TRIGGER reject_download_permission_log BEFORE INSERT ON ingest.activity_l
 	if afterFailure != current {
 		t.Fatal("failed log did not roll back permission, revision and generation")
 	}
-	if _, err := db.pool.Exec(ctx, `DROP TRIGGER reject_download_permission_log ON ingest.activity_logs; DROP FUNCTION ingest.reject_download_permission_log()`); err != nil {
+	if _, err := db.pool.Exec(ctx, `DROP TRIGGER reject_download_permission_log ON aiosources.activity_logs; DROP FUNCTION aiosources.reject_download_permission_log()`); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.SetPublicAccess(ctx, disabled); err != nil {

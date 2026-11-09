@@ -60,7 +60,7 @@ func scanPublicCatalogPolicy(row scanner) (model.PublicCatalogPolicy, error) {
 const publicCatalogPolicyColumns = "p.revision,p.source_ids,p.fields,p.catalog_entities"
 
 func (s *Store) PublicCatalogPolicy(ctx context.Context) (model.PublicCatalogPolicy, error) {
-	value, err := scanPublicCatalogPolicy(s.pool.QueryRow(ctx, `SELECT `+publicCatalogPolicyColumns+` FROM ingest.public_catalog_policy p WHERE singleton`))
+	value, err := scanPublicCatalogPolicy(s.pool.QueryRow(ctx, `SELECT `+publicCatalogPolicyColumns+` FROM aiosources.public_catalog_policy p WHERE singleton`))
 	return value, databaseError("read public catalog policy", err)
 }
 func (s *Store) SetPublicCatalogPolicy(ctx context.Context, value model.PublicCatalogPolicy) error {
@@ -82,7 +82,7 @@ func (s *Store) SetPublicCatalogPolicy(ctx context.Context, value model.PublicCa
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
 		return err
 	}
-	tag, err := tx.Exec(ctx, `UPDATE ingest.public_catalog_policy SET revision=revision+1,source_ids=$1,fields=$2,catalog_entities=$3 WHERE singleton AND revision=$4`, value.Sources, value.Fields, catalogEntitiesJSON(value.CatalogEntities), value.Revision)
+	tag, err := tx.Exec(ctx, `UPDATE aiosources.public_catalog_policy SET revision=revision+1,source_ids=$1,fields=$2,catalog_entities=$3 WHERE singleton AND revision=$4`, value.Sources, value.Fields, catalogEntitiesJSON(value.CatalogEntities), value.Revision)
 	if err != nil {
 		return databaseError("save public catalog policy", err)
 	}
@@ -152,14 +152,14 @@ func (s *Store) PublicCatalogPage(ctx context.Context, grant model.PublicCatalog
 	// locking SELECT does not guarantee this order when both rows change.
 	var enabled, exposed, catalogEnabled bool
 	var generation, catalogGeneration int64
-	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,catalog_enabled,generation,catalog_generation FROM ingest.aio_public_access WHERE singleton FOR SHARE`).Scan(&enabled, &exposed, &catalogEnabled, &generation, &catalogGeneration)
+	err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,catalog_enabled,generation,catalog_generation FROM aiosources.aio_public_access WHERE singleton FOR SHARE`).Scan(&enabled, &exposed, &catalogEnabled, &generation, &catalogGeneration)
 	if err != nil {
 		return model.CatalogEnvelope{}, 0, databaseError("authorize public catalog export", err)
 	}
 	if !enabled || !exposed || !catalogEnabled || grant.Generation != generation || grant.CatalogGeneration != catalogGeneration {
 		return model.CatalogEnvelope{}, 0, ErrCatalogAuthentication
 	}
-	policy, err := scanPublicCatalogPolicy(tx.QueryRow(ctx, `SELECT `+publicCatalogPolicyColumns+` FROM ingest.public_catalog_policy p WHERE singleton FOR SHARE`))
+	policy, err := scanPublicCatalogPolicy(tx.QueryRow(ctx, `SELECT `+publicCatalogPolicyColumns+` FROM aiosources.public_catalog_policy p WHERE singleton FOR SHARE`))
 	if err != nil {
 		return model.CatalogEnvelope{}, 0, databaseError("read public catalog export policy", err)
 	}
@@ -181,7 +181,7 @@ func (s *Store) PublicCatalogPage(ctx context.Context, grant model.PublicCatalog
 }
 func (s *Store) ValidatePublicCatalog(ctx context.Context, grant model.PublicCatalogGrant, revision int64) error {
 	var valid bool
-	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ingest.aio_public_access a CROSS JOIN ingest.public_catalog_policy p WHERE a.singleton AND p.singleton AND a.enabled AND a.expose_sources AND a.catalog_enabled AND a.generation=$1 AND a.catalog_generation=$2 AND p.revision=$3)`, grant.Generation, grant.CatalogGeneration, revision).Scan(&valid)
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_public_access a CROSS JOIN aiosources.public_catalog_policy p WHERE a.singleton AND p.singleton AND a.enabled AND a.expose_sources AND a.catalog_enabled AND a.generation=$1 AND a.catalog_generation=$2 AND p.revision=$3)`, grant.Generation, grant.CatalogGeneration, revision).Scan(&valid)
 	if err != nil {
 		return databaseError("validate public catalog delivery", err)
 	}

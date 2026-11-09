@@ -15,7 +15,7 @@ func catalogEntitiesJSON(value model.CatalogEntities) []byte {
 }
 
 func lockCatalogEntityWrites(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, `SELECT ingest.lock_catalog_entity_writes()`)
+	_, err := tx.Exec(ctx, `SELECT aiosources.lock_catalog_entity_writes()`)
 	return databaseError("lock shared data publication", err)
 }
 
@@ -27,9 +27,9 @@ func seedCatalogEntities(ctx context.Context, tx pgx.Tx, share model.Share) erro
 		return err
 	}
 	if share.CatalogEntities.Metadata {
-		_, err := tx.Exec(ctx, `INSERT INTO ingest.catalog_entity_changes(kind,identity,changed_tx)
-SELECT 'metadata',w.media_type||':'||w.tmdb_id,pg_current_xact_id()::text::bigint FROM ingest.aio_works w
-WHERE w.catalog_import_source='' AND w.media_type<>'book' AND EXISTS(SELECT 1 FROM ingest.aio_matches m JOIN ingest.torrents t USING(provider_id,source_id)
+		_, err := tx.Exec(ctx, `INSERT INTO aiosources.catalog_entity_changes(kind,identity,changed_tx)
+SELECT 'metadata',w.media_type||':'||w.tmdb_id,pg_current_xact_id()::text::bigint FROM aiosources.aio_works w
+WHERE w.catalog_import_source='' AND w.media_type<>'book' AND EXISTS(SELECT 1 FROM aiosources.aio_matches m JOIN aiosources.torrents t USING(provider_id,source_id)
 WHERE m.work_id=w.id AND `+aioPublishedMatch+` AND ($1 OR t.provider_id=ANY($2::text[]))) ON CONFLICT DO NOTHING`, share.Scope == "all", share.SourceIDs)
 		if err != nil {
 			return databaseError("initialize shared metadata", err)
@@ -44,11 +44,11 @@ WHERE m.work_id=w.id AND `+aioPublishedMatch+` AND ($1 OR t.provider_id=ANY($2::
 // an older still-running writer can never publish behind the checkpoint.
 func catalogEntityPage(ctx context.Context, tx pgx.Tx, share model.Share, state *catalogToken, result *model.CatalogEnvelope) (bool, error) {
 	limit := min(state.Limit, 100)
-	rows, err := tx.Query(ctx, `SELECT c.kind,c.identity,c.changed_tx FROM ingest.catalog_entity_changes c
+	rows, err := tx.Query(ctx, `SELECT c.kind,c.identity,c.changed_tx FROM aiosources.catalog_entity_changes c
 WHERE c.changed_tx>$1 AND c.changed_tx<=$2 AND (c.changed_tx,c.kind||':'||c.identity)>($3,$4)
-AND (c.kind='metadata' AND $5 AND EXISTS(SELECT 1 FROM ingest.aio_works w
+AND (c.kind='metadata' AND $5 AND EXISTS(SELECT 1 FROM aiosources.aio_works w
  WHERE w.media_type=split_part(c.identity,':',1) AND w.tmdb_id=split_part(c.identity,':',2) AND w.catalog_import_source='' AND EXISTS(
- SELECT 1 FROM ingest.aio_matches m JOIN ingest.torrents t USING(provider_id,source_id) WHERE m.work_id=w.id AND `+aioPublishedMatch+` AND ($6 OR t.provider_id=ANY($7::text[])))))
+ SELECT 1 FROM aiosources.aio_matches m JOIN aiosources.torrents t USING(provider_id,source_id) WHERE m.work_id=w.id AND `+aioPublishedMatch+` AND ($6 OR t.provider_id=ANY($7::text[])))))
 ORDER BY c.changed_tx,c.kind||':'||c.identity LIMIT $8`, state.AuxLow, state.AuxUpper, state.AuxAfter, state.AuxIdentity, state.Entities.Metadata, share.Scope == "all", share.SourceIDs, limit+1)
 	if err != nil {
 		return false, databaseError("read shared data changes", err)
@@ -79,7 +79,7 @@ ORDER BY c.changed_tx,c.kind||':'||c.identity LIMIT $8`, state.AuxLow, state.Aux
 	for _, e := range entries {
 		if e.kind == "metadata" {
 			var updated time.Time
-			row := tx.QueryRow(ctx, `SELECT `+aioWorkColumns+`,w.updated_at FROM ingest.aio_works w WHERE w.media_type=split_part($1,':',1) AND w.tmdb_id=split_part($1,':',2) AND w.catalog_import_source=''`, e.key)
+			row := tx.QueryRow(ctx, `SELECT `+aioWorkColumns+`,w.updated_at FROM aiosources.aio_works w WHERE w.media_type=split_part($1,':',1) AND w.tmdb_id=split_part($1,':',2) AND w.catalog_import_source=''`, e.key)
 			w, err := scanAIOWork(catalogMetadataRow{Row: row, updated: &updated})
 			if err != nil {
 				if err == pgx.ErrNoRows {

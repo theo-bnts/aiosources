@@ -56,9 +56,9 @@ test('source counts separate current decisions and incomplete imports with worki
   const db = new pg.Client({ connectionString: server.databaseURL })
   await db.connect()
   try {
-    await db.query(`INSERT INTO ingest.aio_works(media_type,tmdb_id,imdb_id,years)
+    await db.query(`INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,years)
 VALUES('movie','1','tt1234567',ARRAY[2021]);
-INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
+INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
 ('alpha','matched','{"title":"Alpha identified release","download_url":"https://source.invalid/private-path"}'),
 ('alpha','unmatched','{"title":"Alpha unmatched release"}'),
 ('alpha','ambiguous','{"title":"Alpha review release"}'),
@@ -66,22 +66,22 @@ INSERT INTO ingest.torrents(provider_id,source_id,fields) VALUES
 ('alpha','queued','{"title":"Alpha queued release"}'),
 ('beta','matched','{"title":"Beta identified release"}'),
 ('remote','matched','{"title":"Remote identified release"}');
-INSERT INTO ingest.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
 SELECT provider_id,source_id,md5(fields::text),
-CASE WHEN source_id IN ('matched','queued') THEN (SELECT id FROM ingest.aio_works) ELSE NULL END,1,
+CASE WHEN source_id IN ('matched','queued') THEN (SELECT id FROM aiosources.aio_works) ELSE NULL END,1,
 CASE WHEN source_id='ambiguous' THEN 'ambiguous' WHEN source_id='unmatched' THEN 'unmatched' ELSE 'matched' END,
 CASE WHEN source_id='ambiguous' THEN 'multiple plausible works' WHEN source_id='unmatched' THEN 'year conflict' ELSE 'exact alias with compatible evidence' END
-FROM ingest.torrents WHERE source_id<>'pending';
-DELETE FROM ingest.aio_match_queue WHERE source_id NOT IN ('pending','queued');
-INSERT INTO ingest.runs(id,provider_id,provider_name,mode,status,revision,config,pause_reason)
+FROM aiosources.torrents WHERE source_id<>'pending';
+DELETE FROM aiosources.aio_match_queue WHERE source_id NOT IN ('pending','queued');
+INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,revision,config,pause_reason)
 VALUES('synthetic-full','alpha','Alpha source','full','paused','fixture','{"id":"alpha","adapter":"http_json"}','manual');
-INSERT INTO ingest.pages(run_id,provider_id,page_index,body,content_type,payload_retained)
+INSERT INTO aiosources.pages(run_id,provider_id,page_index,body,content_type,payload_retained)
 VALUES('synthetic-full','alpha',1,''::bytea,'application/json',false);
-INSERT INTO ingest.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,payload_retained)
+INSERT INTO aiosources.raw_records(run_id,provider_id,source_id,page_id,page_index,raw,content_type,payload_retained)
 SELECT 'synthetic-full','alpha',source_id,id,1,''::bytea,'application/json',false
-FROM ingest.pages CROSS JOIN (VALUES('matched'),('new')) AS items(source_id) WHERE run_id='synthetic-full';
-INSERT INTO ingest.staged_torrents(run_id,provider_id,source_id,fields,raw_id)
-SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM ingest.raw_records WHERE run_id='synthetic-full';`)
+FROM aiosources.pages CROSS JOIN (VALUES('matched'),('new')) AS items(source_id) WHERE run_id='synthetic-full';
+INSERT INTO aiosources.staged_torrents(run_id,provider_id,source_id,fields,raw_id)
+SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records WHERE run_id='synthetic-full';`)
   } finally {
     await db.end()
   }

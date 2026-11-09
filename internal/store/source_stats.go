@@ -24,15 +24,15 @@ func (s *Store) SourceTorrentStats(ctx context.Context, providers []string) (mod
 ), counts AS (
  SELECT provider_id,result,count(*) AS total FROM decisions GROUP BY provider_id,result
 ), latest_import AS (
- SELECT DISTINCT ON (provider_id) provider_id,id,status FROM ingest.runs
+ SELECT DISTINCT ON (provider_id) provider_id,id,status FROM aiosources.runs
  WHERE mode<>'preview'
  AND (mode='full' OR (config->>'adapter' IN ('json','http_json') AND config->'http'->>'catalog'='true'))
  ORDER BY provider_id,(status IN ('queued','running')) DESC,created_at DESC,id DESC
 ), progress AS (
  SELECT r.provider_id,r.id,count(*) AS torrents,
- count(*) FILTER(WHERE EXISTS(SELECT 1 FROM ingest.torrents published
+ count(*) FILTER(WHERE EXISTS(SELECT 1 FROM aiosources.torrents published
   WHERE published.provider_id=r.provider_id AND published.source_id=t.source_id)) AS updates FROM latest_import r
- JOIN ingest.staged_torrents t ON t.run_id=r.id
+ JOIN aiosources.staged_torrents t ON t.run_id=r.id
  WHERE r.status IN ('queued','running','paused','failed') AND NOT t.deleted
  GROUP BY r.provider_id,r.id
 )
