@@ -172,7 +172,9 @@ func TestGamesImportLocalSearchReviewAndIsolatedReset(t *testing.T) {
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','game','{"title":"Synthetic.Odyssey.PC.v1.2.3","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","categories":[4050],"size":1024}');`); err != nil {
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','game','{"title":"Synthetic.Odyssey.PC.v1.2.3","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","category":"Jeux PC","size":1024}');
+INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,status,reason,normalized) SELECT provider_id,source_id,fields_fingerprint,'unmatched','insufficient evidence','synthetic odyssey pc' FROM aiosources.torrents;
+DELETE FROM aiosources.aio_match_queue;`); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SyncGames(ctx, "manual"); err != nil {
@@ -361,4 +363,39 @@ func BenchmarkGameMatching(b *testing.B) {
 		b.Fatal("game matching lost reliable results", err)
 	}
 	b.ReportMetric(100, "matched/100")
+}
+
+func TestGamesBackfillOlderCatalogsOnceWithoutRepeatingIdentification(t *testing.T) {
+	ctx, s, conn := testService(t)
+	state, err := s.DB.BeginGameUpdate(ctx, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.DB.CompleteGameUpdate(ctx, state); err != nil {
+		t.Fatal(err)
+	}
+	_, err = conn.Exec(ctx, `DELETE FROM aiosources.settings WHERE key='igdb.matching.v1';
+ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','legacy-game','{"title":"Synthetic Odyssey PC","category":"Jeux PC"}');
+ INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,status,reason,normalized) SELECT provider_id,source_id,fields_fingerprint,'unmatched','insufficient evidence','synthetic odyssey pc' FROM aiosources.torrents;
+ DELETE FROM aiosources.aio_match_queue;`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pass := 0; pass < 2; pass++ {
+		state, err = s.DB.BeginGameUpdate(ctx, 7)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if state.Phase != "changes" {
+			t.Fatal("fixture did not use the incremental path")
+		}
+		if err = s.DB.CompleteGameUpdate(ctx, state); err != nil {
+			t.Fatal(err)
+		}
+		var version int64
+		err = conn.QueryRow(ctx, `SELECT version FROM aiosources.aio_match_queue WHERE source_id='legacy-game'`).Scan(&version)
+		if err != nil || version != 1 {
+			t.Fatal("older catalog was skipped or repeatedly queued", pass, version, err)
+		}
+	}
 }

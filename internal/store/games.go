@@ -197,8 +197,14 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		return err
 	}
-	if state.Phase == "initial" {
-		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT t.provider_id,t.source_id FROM aiosources.torrents t WHERE COALESCE(t.fields->>'media_type',t.fields->>'type','') IN ('game','games','videogame') OR t.fields ?| ARRAY['igdb','igdb_id'] OR t.fields->'external_ids' ?| ARRAY['igdb','igdb_id'] OR t.fields->'attributes' ?| ARRAY['igdb','igdbid','igdb_id'] OR COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m(1[0-9]{3}|4050)\M' OR COALESCE(t.fields->>'category_name','') ~* '\m(games?|jeux)\M' OR t.fields->>'title' ~* '\m(PS[1-5]|Nintendo[ ._-]?Switch|NSW|Win32|Win64|XBOX[ ._-]?(360|ONE))\M' OR t.fields->>'title' ~* '-(CODEX|RUNE|TENOKE|FLT|SKIDROW|RELOADED|GOG|DARKSIDERS|TINYISO|DINOBYTES|PLAZA|EMPRESS|ELAMIGOS|FITGIRL|DODI)\M' ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`); err != nil {
+	// A one-time discovery also covers catalogs populated by an earlier
+	// preview. It does not repeatedly queue unchanged records on every poll.
+	backfill, err := tx.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('igdb.matching.v1','1') ON CONFLICT DO NOTHING`)
+	if err != nil {
+		return err
+	}
+	if state.Phase == "initial" || backfill.RowsAffected() == 1 {
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT t.provider_id,t.source_id FROM aiosources.torrents t WHERE lower(COALESCE(t.fields->>'media_type',t.fields->>'type','')) IN ('game','games','videogame','video game','video_game') OR t.fields ?| ARRAY['igdb','igdb_id'] OR t.fields->'external_ids' ?| ARRAY['igdb','igdb_id'] OR t.fields->'attributes' ?| ARRAY['igdb','igdbid','igdb_id'] OR COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m(1[0-9]{3}|4050)\M' OR concat_ws(' ',t.fields->>'category_name',t.fields->>'subcategory_name',t.fields->>'category',t.fields->>'categories',t.fields#>>'{attributes,category}',t.fields#>>'{attributes,categories}') ~* '(games?|jeux|consoles?)' OR t.fields->>'title' ~* '\m(PS[1-5]|PSP|PS[ ._-]?Vita|Nintendo[ ._-]?(Switch|3DS|DS)|N3DS|NDS|3DS|NSW|Win32|Win64|XBOX[ ._-]?(360|ONE))\M' OR t.fields->>'title' ~* '-(CODEX|RUNE|TENOKE|FLT|SKIDROW|RELOADED|GOG|DARKSIDERS|TINYISO|DINOBYTES|PLAZA|EMPRESS|ELAMIGOS|FITGIRL|DODI)\M' ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`); err != nil {
 			return err
 		}
 	}
