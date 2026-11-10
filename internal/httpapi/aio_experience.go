@@ -19,6 +19,8 @@ func (s *server) aioReviewDetail(w http.ResponseWriter, r *http.Request) {
 	if title, year, book := aiosource.BookSuggestion(detail.Record); book {
 		detail.SuggestedQuery, detail.SuggestedYear = title, year
 		detail.BookEvidence = detail.Record.BookHints
+	} else if game := aiosource.ParseGameRelease(detail.Record); game.Game {
+		detail.SuggestedQuery, detail.SuggestedYear = game.Title, game.Year
 	}
 	writeJSON(w, 200, detail)
 }

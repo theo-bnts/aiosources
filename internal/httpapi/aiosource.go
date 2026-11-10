@@ -185,11 +185,30 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		books.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
+	games, err := s.options.Store.GameStatus(r.Context())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	games.Running = s.options.AIOSource.GameState()
+	if c.IGDBEnabled && !games.Running {
+		next := time.Now()
+		if games.LastSync != nil {
+			next = games.LastSync.Add(time.Duration(c.IGDBMinutes) * time.Minute)
+		}
+		if games.StartedAt != nil {
+			next = time.Now()
+		}
+		if games.RetryAt != nil && games.RetryAt.After(next) {
+			next = *games.RetryAt
+		}
+		games.NextUpdate = &next
+	}
+	writeJSON(w, 200, map[string]any{"games": games, "books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
-	c := model.AIOConfig{AutoCache: defaults.AutoCache, OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
+	c := model.AIOConfig{AutoCache: defaults.AutoCache, IGDBMinutes: defaults.IGDBMinutes, IGDBRequestsPerSecond: defaults.IGDBRequestsPerSecond, IGDBReconcileDays: defaults.IGDBReconcileDays, OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
 	if !decodeJSON(w, r, &c) {
 		return
 	}
@@ -202,6 +221,12 @@ func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.PathValue("action") {
+	case "sync-games":
+		err = s.options.AIOSource.StartGames(r.Context(), "manual")
+	case "stop-games":
+		s.options.AIOSource.StopGames()
+	case "reset-games":
+		err = s.options.AIOSource.StartReset("games")
 	case "sync-books":
 		err = s.options.AIOSource.StartBooks("manual")
 	case "stop-books":

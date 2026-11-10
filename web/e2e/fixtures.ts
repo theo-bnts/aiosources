@@ -41,7 +41,7 @@ export const test = base.extend<{ server: TestServer; collectionSource: boolean 
       await page.getByLabel('Administrator password', { exact: true }).fill(server.password)
       await page.getByRole('button', { name: 'Sign in', exact: true }).click()
       await expect(
-        page.getByRole('heading', { name: 'Sources', exact: true, level: 1 }),
+        page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 }),
       ).toBeVisible()
     } catch {
       // Playwright action errors can include fill arguments. Do not let a login

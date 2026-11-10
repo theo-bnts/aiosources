@@ -71,8 +71,12 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 	if book := ParseBookRelease(r); book.Kind != "" {
 		return decideBook(r, book, find)
 	}
+	if game := ParseGameRelease(r); game.Game {
+		return decideGame(r, game, find)
+	}
 	p := withSourceNumbering(ParseRelease(r.Title), SourceEpisode{r.Season, r.Episode})
 	r.Normalized = p.Normalized
+	r.IdentificationType = p.Type
 	// Categories corroborate an otherwise untyped title; they do not replace
 	// explicit episode evidence or turn inconsistent categories into certainty.
 	if p.Type == "" && p.Year == nil && r.TMDB == "" && r.IMDb == "" && r.TVDB == "" && r.VideoType != "conflict" {

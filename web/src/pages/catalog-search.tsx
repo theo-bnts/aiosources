@@ -48,7 +48,14 @@ import {
 function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?: boolean }) {
   return (
     <p className={`help break-words ${compact ? 'line-clamp-3' : ''}`}>
-      {title.type === 'movie' ? 'Movie' : title.type === 'book' ? 'Book' : 'Series'}
+      {title.type === 'movie'
+        ? 'Movie'
+        : title.type === 'book'
+          ? 'Book'
+          : title.type === 'game'
+            ? 'Game'
+            : 'Series'}
+      {!!title.platforms?.length && ` · ${title.platforms.map((p) => p.name).join(', ')}`}
       {!!title.authors?.length && ` · ${title.authors.join(', ')}`}
       {title.years.length > 0 && ` · ${title.years.join(', ')}`}
       {title.imdb && ` · ${title.imdb}`}
@@ -118,7 +125,7 @@ export function CatalogSearchPage() {
             minLength={2}
             maxLength={500}
             required
-            placeholder="Search movies, series and books"
+            placeholder="Search movies, series, games and books"
           />
         </div>
         <Disclosure title="Filters">
@@ -134,6 +141,7 @@ export function CatalogSearchPage() {
                 options={[
                   { value: 'movie', label: 'Movies' },
                   { value: 'tv', label: 'Series' },
+                  { value: 'game', label: 'Games' },
                   { value: 'ebook', label: 'Ebooks' },
                   { value: 'audiobook', label: 'Audiobooks' },
                   { value: 'book', label: 'Other books' },
@@ -198,7 +206,11 @@ export function CatalogSearchPage() {
                       <TableRow key={title.id}>
                         <TableCell className="whitespace-normal">
                           <div className="flex min-w-0 items-start gap-3">
-                            <CatalogCover src={title.cover} book={title.type === 'book'} />
+                            <CatalogCover
+                              src={title.cover}
+                              book={title.type === 'book'}
+                              game={title.type === 'game'}
+                            />
                             <div className="min-w-0">
                               <Link
                                 to={`${searchPath}/${title.id}?${params({ q })}`}
@@ -369,7 +381,12 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
         title.data && (
           <>
             <div className="flex min-w-0 items-start gap-4">
-              <CatalogCover src={title.data.cover} book={title.data.type === 'book'} large />
+              <CatalogCover
+                src={title.data.cover}
+                book={title.data.type === 'book'}
+                game={title.data.type === 'game'}
+                large
+              />
               <div className="min-w-0 space-y-2">
                 <TitleDetails title={title.data} compact={false} />
                 {title.data.openlibrary && (

@@ -363,7 +363,7 @@ test('expired visitor keys clear only public credentials and preserve an adminis
     await page.evaluate(() => localStorage.getItem('aiosources.public.credentials')),
   ).toBeNull()
   await page.getByRole('link', { name: 'Administration', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Sources', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Torrents', level: 1, exact: true })).toBeVisible()
   expect((await page.request.get('/api/providers')).status()).toBe(200)
 })
 

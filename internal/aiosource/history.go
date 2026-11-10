@@ -47,6 +47,9 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 		switch h.run.Kind {
 		case "metadata":
 			h.run.Error = metadataDiagnostic(h.run.Phase, err).Message()
+			if h.run.Service == "igdb" {
+				h.run.Error = "Game information update failed. Saved progress is preserved."
+			}
 			if h.run.Service == "openlibrary" {
 				h.run.Error = "Book information update failed. Saved progress is preserved."
 			}

@@ -253,7 +253,7 @@ test('browser display defaults ignore retired preferences and stay separate from
   )
   await page.goto('/settings')
   await expect(page).toHaveURL(/\/providers\/settings$/)
-  await expect(page.getByRole('heading', { name: 'Sources', exact: true, level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 })).toBeVisible()
   await expect(page.getByLabel('Display timezone', { exact: true })).toHaveCount(0)
   await page.goto('/torrents?limit=100')
   await expect(page.getByLabel('Rows per page', { exact: true })).toHaveCount(0)

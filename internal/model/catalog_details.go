@@ -74,7 +74,7 @@ var catalogDetailGroups = map[string]string{
 	"imdb": "identifiers", "imdb_id": "identifiers", "imdbid": "identifiers", "tt_id": "identifiers",
 	"tmdb": "identifiers", "tmdb_id": "identifiers", "tmdbid": "identifiers",
 	"tvdb": "identifiers", "tvdb_id": "identifiers", "tvdbid": "identifiers",
-	"mal": "identifiers", "mal_id": "identifiers", "malid": "identifiers", "igdb_id": "identifiers",
+	"mal": "identifiers", "mal_id": "identifiers", "malid": "identifiers", "igdb_id": "identifiers", "igdb": "identifiers", "igdbid": "identifiers", "platform": "identifiers", "platforms": "identifiers", "game_platform": "identifiers",
 	"category_id": "identifiers", "subcategory_id": "identifiers", "category_name": "identifiers",
 	"type": "identifiers", "media_type": "identifiers", "year": "identifiers",
 	"season": "identifiers", "seasons": "identifiers", "episode": "identifiers", "episodes": "identifiers",

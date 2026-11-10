@@ -73,6 +73,15 @@ func (s *Service) CatalogTitle(ctx context.Context, workID int64, locales ...str
 }
 
 func catalogResource(title model.CatalogTitle, selection model.CatalogSelection) (Resource, string, error) {
+	if title.Type == "game" {
+		if selection.Season != nil || selection.Episode != nil || len(selection.File) > 4096 {
+			return Resource{}, "", model.ErrInvalid
+		}
+		id := "igdb:" + title.IGDB
+		r, err := ParseID(id, "game")
+		r.File = selection.File
+		return r, id, err
+	}
 	if title.Type == "book" {
 		if selection.Season != nil || selection.Episode != nil || len(selection.File) > 4096 {
 			return Resource{}, "", model.ErrInvalid
@@ -272,13 +281,13 @@ func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resour
 				if observed.Cached {
 					file, found := SelectFile(observed.Files, r)
 					state.State = "cached"
-					if r.Type == "book" || r.Type == "torrent" {
+					if r.Type == "book" || r.Type == "torrent" || r.Type == "game" {
 						state.FileCount = len(resourceDownloadFiles(observed.Files, r))
 					}
 					if found {
 						state.Filename = file.Path
 						state.Size = file.Size
-					} else if (r.Type == "book" || r.Type == "torrent") && state.FileCount > 1 {
+					} else if (r.Type == "book" || r.Type == "torrent" || r.Type == "game") && state.FileCount > 1 {
 						// The recipient chooses a format or audio track before downloading.
 					} else if len(observed.Files) > 0 {
 						if r.Type == "torrent" && canAdd {
@@ -464,7 +473,7 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	if visitor != nil {
 		policy.Preferences = &visitor.Preferences
 	}
-	if (title.Type == "book" || title.Type == "torrent") && input.File == "" && input.PreparationID == "" && !input.AllowUncached {
+	if (title.Type == "book" || title.Type == "torrent" || title.Type == "game") && input.File == "" && input.PreparationID == "" && !input.AllowUncached {
 		observed, e := s.DB.SharedAvailability(ctx, input.Service, []string{selected.Hash}, time.Now().Add(-time.Duration(config.CacheMinutes)*time.Minute))
 		if e != nil {
 			return result, e

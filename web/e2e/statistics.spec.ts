@@ -46,8 +46,9 @@ test('statistics are the first view, settings contain configuration and statuses
   }
 
   for (const [path, heading, statistic] of [
-    ['/providers', 'Sources', 'Imported torrents'],
+    ['/providers', 'Torrents', 'Imported torrents'],
     ['/metadata/videos', 'Videos', 'Catalog entries'],
+    ['/metadata/games', 'Games', 'Catalog entries'],
     ['/metadata/books', 'Books', 'Catalog entries'],
     ['/debrid', 'Debrid', 'Configured services'],
   ]) {

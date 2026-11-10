@@ -6,7 +6,7 @@ A source is a service or website you are authorized to collect from. AIOSources 
 
 ## Choose a template
 
-Open **Sources → Settings → Add source**.
+Open **Sources → Indexers → Torrents → Settings → Add source**.
 
 | Template | Use it for |
 | --- | --- |
@@ -54,6 +54,6 @@ Saving a changed source does not alter a run already in progress. Start a new ru
 
 ## Manage a source
 
-Source cards show its schedule and recent run, with **View imported data** opening its records in **Torrents**. Use **History** to inspect a particular import and its related events.
+Source cards show its schedule and recent run, with **View imported data** opening its records in **Files**. Use **History** to inspect a particular import and its related events.
 
-**Sources → Settings → Import execution** contains less common import and recovery controls. **Delete** removes the source and its associated imported data and history; reusable Secrets remain available. Pause or finish active work before deleting.
+**Sources → Indexers → Torrents → Settings → Import execution** contains less common import and recovery controls. **Delete** removes the source and its associated imported data and history; reusable Secrets remain available. Pause or finish active work before deleting.

@@ -4,7 +4,7 @@
 
 **Your sources, together. Find a title, choose a version and watch or download it.**
 
-AIOSources brings your own source catalogs into one searchable library. Connect it to Stremio, Nuvio, AIOStreams or a Torznab-compatible application, or use its web interface. Once configured, imports, film, series and book identification, and availability checks can run automatically.
+AIOSources brings your own source catalogs into one searchable library. Connect it to Stremio, Nuvio, AIOStreams or a Torznab-compatible application, or use its web interface. Once configured, imports, film, series, game and book identification, and availability checks can run automatically.
 
 AIOSources is open source and self-hosted. It includes no sources or media: connect services you are authorized to use and share only information you have the right to share.
 
@@ -12,7 +12,7 @@ AIOSources is open source and self-hosted. It includes no sources or media: conn
 
 ## What you can do
 
-- **Find the right version.** Search films, series and books by their familiar titles or authors, choose an episode or book file and compare releases. Filter by year, language, source or cached availability.
+- **Find the right version.** Search films, series, games and books by their familiar titles or authors, choose an episode or file and compare releases. Filter by year, language, source or cached availability.
 - **Connect your own sources.** Use Torznab, HTML, JSON or UNIT3D templates. Configure them visually or import your own JSON, preview the results and schedule updates.
 - **Watch and download.** Connect your player, download a ready file from the browser or add a release to your debrid account and follow its preparation.
 - **Choose your debrid services.** AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox are supported. Availability features vary by service.
@@ -29,6 +29,7 @@ Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INS
 - A server or computer running Docker with Docker Compose. Linux `amd64` and `arm64` images are available.
 - Access to compatible sources you are authorized to use. Source configurations are supplied by you.
 - A [TMDB API read access token](https://www.themoviedb.org/settings/api) for film and series identification. Book identification uses Open Library and needs no API key. Its optional catalog uses relevance filters by default to reduce storage; you can also limit edition languages.
+- For game identification, a [Twitch developer application](https://dev.twitch.tv/console/apps) with its client ID and client secret. [Set up games](docs/GAMES.md).
 - Optionally, an account with a supported debrid service for debrid playback and downloads.
 - An HTTPS address for use over the internet. HTTP is suitable for a trusted local network.
 
@@ -87,18 +88,21 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. 
 
 ## First steps
 
-1. **Add a source** in **Sources → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
+1. **Add a source** in **Sources → Indexers → Torrents → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
 2. **Set up film and series information** in **Metadata → Videos → Settings** with your TMDB token and enable automatic updates.
 3. **For books**, choose your catalog filters and enable Open Library updates in **Metadata → Books → Settings**. The default keeps digital, audio and locally referenced editions; language filtering is optional and starts disabled. The first import can take hours; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
-4. **Review identification** in **Metadata → Identification** for both videos and books. Adjust automatic identification in its **Settings** tab. Videos, Books and Identification each keep their own history.
-5. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
-6. **Open Search** to find a title, or create a connection for your preferred application below.
+4. **For games**, add your Twitch client ID and client secret in **Metadata → Games → Settings**, then enable IGDB updates. [Game setup](docs/GAMES.md).
+5. **Review identification** in **Metadata → Identification** for videos, games and books. Adjust automatic identification in its **Settings** tab. Videos, Games, Books and Identification each keep their own history.
+6. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
+7. **Open Search** to find a title, or create a connection for your preferred application below.
 
 A new source becomes available after its first successful complete import. A paused import can usually resume; its history explains whether it is waiting for a limit, a source response or an action from you.
 
 ## Connect your apps
 
 ### Stremio, Nuvio and AIOStreams
+
+These connections play films and series. Use the web interface or Torznab for games and books.
 
 1. Open **Connections → Stremio → Settings** and choose **Create access**.
 2. Give the connection a name. Optionally choose **Filters**, up to three **Sorting** priorities, or adjust **Request limits** and **Expiration**.
@@ -113,7 +117,7 @@ Open **Connections → Torznab**, create and enable an access, then copy its URL
 
 ## Search, share and manage
 
-**Search** finds identified films, series and books. Open a title to compare releases, select a ready download or add one to your debrid service. **Torrents** searches imported source records directly. Both search your local catalog; they do not send your search text to TMDB, Open Library or your sources. Posters and book covers load from the providers’ image services without being stored on your instance. [Set up books](docs/BOOKS.md).
+**Search** finds identified films, series, games and books. Open a title to compare releases, select a ready download or add one to your debrid service. **Sources → Files** searches imported source records directly. Both search your local catalog; they do not send your search text to TMDB, IGDB, Open Library or your sources. Posters and covers load from the providers’ image services without being stored on your instance. [Set up books](docs/BOOKS.md).
 
 **Connections → Shared catalogs** lets you grant another instance access to selected data. **Sources → Remote catalogs** imports a catalog shared with you. Optional shared details, film and series information, and reusable cache observations require permission on both sides. Credentials and private announce URLs are never included. See [catalog sharing](docs/SHARING.md).
 
@@ -140,7 +144,7 @@ To test a prerelease, replace `:stable` with `:preview` and run the same command
 
 ## Environment settings
 
-Most options are configured in the application. These are the supported AIOSources environment variables; source, TMDB and debrid keys belong in **Secrets**.
+Most options are configured in the application. These are the supported AIOSources environment variables; source, metadata and debrid keys belong in **Secrets**.
 
 | Variable | Purpose |
 | --- | --- |
@@ -157,7 +161,7 @@ See [installation settings](docs/SETTINGS.md) before changing paths, passwords o
 ## Documentation
 
 - [Sources and schedules](docs/CONFIGURATION.md) · [HTML source setup](docs/HTML_SOURCES.md)
-- [Books and audiobooks](docs/BOOKS.md) · [Search, identification, history and storage](docs/OPERATIONS.md)
+- [Games](docs/GAMES.md) · [Books and audiobooks](docs/BOOKS.md) · [Search, identification, history and storage](docs/OPERATIONS.md)
 - [Debrid services and downloads](docs/DEBRID.md)
 - [Stremio, Nuvio and public instances](docs/PUBLIC_INSTANCES.md) · [Torznab](docs/TORZNAB.md)
 - [Shared and remote catalogs](docs/SHARING.md)
@@ -177,7 +181,7 @@ AIOSources is distributed under the [MIT license](LICENSE). Use it only with con
 
 [Licenses and third-party notices](web/public/THIRD-PARTY-NOTICES.txt). Original copyrights are preserved.
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Book information and covers are provided by [Open Library](https://openlibrary.org).
+This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Game information and covers are provided by [IGDB](https://www.igdb.com); book information and covers by [Open Library](https://openlibrary.org).
 
 ## Star History
 

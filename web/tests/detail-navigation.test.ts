@@ -9,7 +9,7 @@ test('detail return links retain the complete public list view and direct links 
       listViewState({ pathname: '/runs', search: '?provider=example&limit=25&offset=50' }),
       fallback,
     ),
-    { to: '/runs?provider=example&limit=25&offset=50', label: 'Sources history' },
+    { to: '/runs?provider=example&limit=25&offset=50', label: 'Torrent history' },
   )
   assert.equal(detailBackLink(null, fallback), fallback)
   assert.equal(detailBackLink({ returnView: { pathname: '/', search: '' } }), undefined)
@@ -25,7 +25,7 @@ test('detail return links retain the complete public list view and direct links 
     { to: '/runs/run-one?tab=raw&raw_status=error&raw_offset=50', label: 'Processed records' },
   )
   for (const [pathname, search, label] of [
-    ['/torrents', '?q=example&provider=source&sort=oldest', 'Torrents'],
+    ['/torrents', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/search', '?q=example&type=tv&offset=50', 'Search'],
     ['/public/search', '?q=example&type=tv&year=2026&offset=50', 'Search'],
     ['/search/torrents', '?q=example&provider=source&offset=50', 'Search torrents'],
@@ -74,7 +74,7 @@ test('nested details retain the original filtered view on each return', () => {
   assert.deepEqual(back.state, history)
   assert.deepEqual(detailBackLink(back.state, { to: '/runs', label: 'History' }), {
     to: '/runs?provider=example&status=failed',
-    label: 'Sources history',
+    label: 'Torrent history',
   })
 })
 

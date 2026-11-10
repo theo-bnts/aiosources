@@ -23,6 +23,14 @@ type Service struct {
 	Providers                 *ProviderHTTP
 	TMDBBase, ExportBase      string
 	MetadataHTTP              *http.Client
+	GameHTTP                  *http.Client
+	IGDBBase, IGDBTokenURL    string
+	gameRate                  metadataRequestLimiter
+	gameTokenMu               sync.Mutex
+	gameToken                 igdbToken
+	gamesRunning              bool
+	gamesCancel               context.CancelFunc
+	gamesDone                 <-chan struct{}
 	BookHTTP                  *http.Client
 	BookExportURL             string
 	BookAPIURL                string
@@ -68,6 +76,9 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	life, cancel := context.WithCancel(ctx)
 	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}}
 	s.Network = &outbound.Router{Settings: db.NetworkSettings, Secrets: v.Resolve}
+	s.IGDBBase, s.IGDBTokenURL = "https://api.igdb.com/v4", "https://id.twitch.tv/oauth2/token"
+	s.GameHTTP = &http.Client{Transport: s.Network.Transport("metadata:igdb", outbound.HTTPTransport()), CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	s.gameRate.setRate(3)
 	s.bookRate.setRate(1)
 	s.BookHTTP = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}
 	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
@@ -112,6 +123,9 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 	return err
 }
 func (s *Service) Close(ctx context.Context) error {
+	if s.GameHTTP != nil {
+		defer s.GameHTTP.CloseIdleConnections()
+	}
 	if s.BookHTTP != nil {
 		defer s.BookHTTP.CloseIdleConnections()
 	}
@@ -172,6 +186,9 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 			return model.ErrBusy
 		}
 		defer release()
+	}
+	if len(c.IGDBClientID) > 128 || strings.ContainsAny(c.IGDBClientID, "\r\n\x00 ") || c.IGDBMinutes < 5 || c.IGDBMinutes > 1440 || c.IGDBRequestsPerSecond < 1 || c.IGDBRequestsPerSecond > 4 || c.IGDBReconcileDays < 1 || c.IGDBReconcileDays > 30 || c.IGDBEnabled && (c.IGDBClientID == "" || c.IGDBSecret == "") {
+		return model.ErrInvalid
 	}
 	if c.OpenLibraryMinutes < 5 || c.OpenLibraryMinutes > 1440 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 5 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {
 		return model.ErrInvalid

@@ -230,7 +230,7 @@ const router = createBrowserRouter(
         <Route
           element={
             <WorkspaceLayout
-              title="Sources"
+              title="Torrents"
               tabs={[
                 { path: '/providers', label: 'Statistics', icon: ChartBarIcon },
                 {
@@ -264,7 +264,7 @@ const router = createBrowserRouter(
         <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
         <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
         <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
-        {(['videos', 'books'] as const).map((section) => {
+        {(['videos', 'games', 'books'] as const).map((section) => {
           const { path, label } = metadataSections[section]
           return (
             <Route
@@ -457,6 +457,7 @@ const router = createBrowserRouter(
         <Route path="network/limits" element={<Navigate to="/public-access/limits" replace />} />
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
+        <Route path="indexers" element={<Navigate to="/providers" replace />} />
         <Route path="torrents" element={<TorrentsPage />} />
         <Route path="search" element={<CatalogSearchPage />} />
         <Route path="search/torrents" element={<CatalogTorrentsPage />} />

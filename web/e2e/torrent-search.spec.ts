@@ -63,7 +63,7 @@ test('torrents combines title and ID fragments, filters and URL state through th
   const search = page.getByLabel('Search text', { exact: true })
   const searchButton = page.getByRole('button', { name: 'Search', exact: true })
   const sourceFilter = page
-    .getByRole('form', { name: 'Torrents', exact: true })
+    .getByRole('form', { name: 'Files', exact: true })
     .getByRole('button', { name: 'Sources', exact: true })
   const results = page.locator('main tbody tr')
   await expect(results).toHaveCount(6)

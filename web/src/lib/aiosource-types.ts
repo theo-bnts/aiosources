@@ -1,6 +1,12 @@
 export type Tracker = { private: boolean; announce_secret: string }
 export type Config = {
   revision: number
+  igdb_client_id: string
+  igdb_secret: string
+  igdb_enabled: boolean
+  igdb_minutes: number
+  igdb_requests_per_second: number
+  igdb_reconcile_days: number
   tmdb_secret: string
   alldebrid_secret: string
   torbox_secret: string
@@ -42,10 +48,26 @@ export type BookStatus = {
   running: boolean
   next_update?: string | null
 }
+export type GameStatus = {
+  pending: boolean
+  running: boolean
+  complete: boolean
+  works: number
+  processed: number
+  total: number
+  phase: string
+  last_sync: string | null
+  changes_through: string | null
+  last_reconciliation: string | null
+  next_update: string | null
+  retry_at: string | null
+  error?: string
+}
 export type Status = {
+  games?: GameStatus
   books?: BookStatus
   maintenance?: {
-    scope: 'books' | 'videos' | 'metadata' | 'mapping' | 'cache' | ''
+    scope: 'books' | 'videos' | 'games' | 'metadata' | 'mapping' | 'cache' | ''
     status: 'running' | 'succeeded' | 'failed' | ''
     phase?: 'stopping' | 'resetting'
     error?: string
@@ -119,7 +141,9 @@ export type MatchDiagnostic = {
 export type ReviewWork = {
   display_title?: string
   id: number
-  type: 'movie' | 'tv' | 'book'
+  type: 'movie' | 'tv' | 'book' | 'game'
+  igdb?: string
+  game?: { platforms?: { id: number; name: string; slug: string }[] }
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
   tmdb: string
@@ -134,7 +158,9 @@ export type MatchReview = {
   active: boolean
   revision: number
   fingerprint: string
-  type: 'movie' | 'tv' | 'book'
+  type: 'movie' | 'tv' | 'book' | 'game'
+  igdb?: string
+  game?: { platforms?: { id: number; name: string; slug: string }[] }
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
   tmdb: string
@@ -148,6 +174,7 @@ export type ReviewDetail = {
   suggested_year: number | null
   record: {
     title: string
+    igdb?: string
     provider: string
     source_id: string
     fingerprint: string

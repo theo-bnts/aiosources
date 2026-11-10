@@ -27,17 +27,29 @@ function WorkSummary({ work }: { work: ReviewWork }) {
   const title =
     work.display_title ||
     work.titles[0] ||
-    (work.type === 'book' ? work.openlibrary || 'Untitled book' : `TMDB ${work.tmdb}`)
+    (work.type === 'book'
+      ? work.openlibrary || 'Untitled book'
+      : work.type === 'game'
+        ? `IGDB ${work.igdb}`
+        : `TMDB ${work.tmdb}`)
   const aliases = work.titles.filter((alias) => alias !== title).slice(0, 2)
   return (
     <div className="min-w-0 space-y-1">
       <p className="break-words font-medium">{title}</p>
       <p className="help">
-        {work.type === 'movie' ? 'Movie' : work.type === 'book' ? 'Book' : 'Series'} ·{' '}
-        {work.years.join(', ') || 'Year unknown'}
+        {work.type === 'movie'
+          ? 'Movie'
+          : work.type === 'book'
+            ? 'Book'
+            : work.type === 'game'
+              ? 'Game'
+              : 'Series'}{' '}
+        · {work.years.join(', ') || 'Year unknown'}
       </p>
       <p className="mono break-words text-xs">
-        {work.type === 'book' ? (
+        {work.type === 'game' ? (
+          `IGDB ${work.igdb} · ${work.game?.platforms?.map((p) => p.name).join(', ') || 'Platform unknown'}`
+        ) : work.type === 'book' ? (
           [work.book?.authors?.join(', '), work.openlibrary].filter(Boolean).join(' · ')
         ) : (
           <>
@@ -211,6 +223,7 @@ function ReviewForm({
           <h3 className="font-medium">Source identifiers</h3>
           <p className="mono break-words text-xs">
             {[
+              detail.record.igdb && `IGDB ${detail.record.igdb}`,
               detail.record.imdb,
               detail.record.tmdb && `TMDB ${detail.record.tmdb}`,
               detail.record.tvdb && `TVDB ${detail.record.tvdb}`,
@@ -253,6 +266,7 @@ function ReviewForm({
             options={[
               { value: 'movie', label: 'Movies' },
               { value: 'tv', label: 'Series' },
+              { value: 'game', label: 'Games' },
               { value: 'book', label: 'Books' },
             ]}
           />

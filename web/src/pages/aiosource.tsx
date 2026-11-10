@@ -33,9 +33,12 @@ type FormScope =
   | 'videos-updates'
   | 'books-updates'
   | 'identification-updates'
+  | 'games-updates'
+  | 'games-requests'
   | 'videos-requests'
 const sectionForms: Record<MainScope, FormScope[]> = {
   videos: ['videos', 'videos-updates', 'videos-requests'],
+  games: ['games', 'games-updates', 'games-requests'],
   books: ['books', 'book-catalog', 'books-updates'],
   identification: ['identification', 'identification-updates'],
   debrid: ['debrid', 'cache-availability'],
@@ -45,6 +48,7 @@ type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
 }
 type Draft = { base: Config; changes: Changes }
 const resetScopes = {
+  'reset-games': 'games',
   'reset-books': 'books',
   'reset-videos': 'videos',
   'reset-metadata': 'metadata',
@@ -88,7 +92,7 @@ export default function AIOSourcePage({
   section: MetadataSection | 'debrid' | 'stremio'
 }) {
   const location = useLocation()
-  const usesSecrets = section === 'videos' || section === 'debrid'
+  const usesSecrets = section === 'games' || section === 'videos' || section === 'debrid'
   const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
@@ -110,7 +114,11 @@ export default function AIOSourcePage({
   const [feedback, setFeedback] = useState<
     Partial<Record<FormScope, { error?: unknown; saved?: boolean }>>
   >({})
-  const metadata = section === 'videos' || section === 'books' || section === 'identification'
+  const metadata =
+    section === 'games' ||
+    section === 'videos' ||
+    section === 'books' ||
+    section === 'identification'
   const scope = section === 'stremio' ? 'debrid' : section
   const formConfig = (form: FormScope) => {
     const draft = drafts[form]
@@ -120,11 +128,13 @@ export default function AIOSourcePage({
   const forms = sectionForms[scope]
   const dirty = forms.some((form) => Boolean(drafts[form]))
   const automaticScope =
-    section === 'books'
-      ? 'books-updates'
-      : section === 'identification'
-        ? 'identification-updates'
-        : 'videos-updates'
+    section === 'games'
+      ? 'games-updates'
+      : section === 'books'
+        ? 'books-updates'
+        : section === 'identification'
+          ? 'identification-updates'
+          : 'videos-updates'
   const trackersDraft = drafts.trackers
   const trackersConfig = trackersDraft
     ? applyChanges(trackersDraft.base, trackersDraft.changes)
@@ -190,7 +200,13 @@ export default function AIOSourcePage({
     mutationFn: (name: string) => api(`/aiosource/${name}`, { method: 'POST' }),
     onSuccess: async (_, name) => {
       const resetScope = resetScopes[name as keyof typeof resetScopes]
-      if (resetScope || name === 'sync' || name === 'match' || name === 'sync-books') {
+      if (
+        resetScope ||
+        name === 'sync' ||
+        name === 'match' ||
+        name === 'sync-books' ||
+        name === 'sync-games'
+      ) {
         await queryClient.cancelQueries({ queryKey: ['aiosource', 'controls'], exact: true })
         queryClient.setQueryData<Controls>(['aiosource', 'controls'], (current) => {
           if (!current) return current
@@ -202,11 +218,18 @@ export default function AIOSourcePage({
                 status: 'running',
                 phase:
                   resetScope !== 'cache' &&
-                  (current.syncing || current.matching || current.books?.running)
+                  (current.syncing ||
+                    current.matching ||
+                    current.books?.running ||
+                    current.games?.running)
                     ? 'stopping'
                     : 'resetting',
               },
             }
+          if (name === 'sync-games')
+            return current.games
+              ? { ...current, games: { ...current.games, running: true } }
+              : current
           if (name === 'sync') return { ...current, syncing: true }
           if (name === 'match') return { ...current, matching: true }
           return current.books
@@ -249,15 +272,25 @@ export default function AIOSourcePage({
       return next
     })
   }
-  const secret = (label: string, key: 'tmdb_secret' | DebridSecret, help?: ReactNode) => (
+  const secret = (
+    label: string,
+    key: 'tmdb_secret' | 'igdb_secret' | DebridSecret,
+    help?: ReactNode,
+  ) => (
     <SecretPicker
       inputId={key}
       label={label}
       help={help}
       value={config?.[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
-      prefix={key === 'tmdb_secret' ? 'tmdb_api_token' : `${key.replace('_secret', '')}_api_key`}
-      addLabel={`Add ${key === 'tmdb_secret' ? 'TMDB token' : `${debridProviders.find((provider) => provider.secret === key)?.name} key`}`}
+      prefix={
+        key === 'igdb_secret'
+          ? 'igdb_client_secret'
+          : key === 'tmdb_secret'
+            ? 'tmdb_api_token'
+            : `${key.replace('_secret', '')}_api_key`
+      }
+      addLabel={`Add ${key === 'igdb_secret' ? 'Twitch client secret' : key === 'tmdb_secret' ? 'TMDB token' : `${debridProviders.find((provider) => provider.secret === key)?.name} key`}`}
       valueLabel={label}
       disabled={save.isPending}
     />
@@ -270,6 +303,9 @@ export default function AIOSourcePage({
       | 'tmdb_requests_per_second'
       | 'cache_minutes'
       | 'response_seconds'
+      | 'igdb_minutes'
+      | 'igdb_requests_per_second'
+      | 'igdb_reconcile_days'
       | 'openlibrary_minutes',
     min: number,
     max: number,
@@ -294,7 +330,7 @@ export default function AIOSourcePage({
   )
   const toggle = (
     label: string,
-    key: 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
+    key: 'igdb_enabled' | 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
     form: FormScope = scope,
     help?: ReactNode,
   ) => (
@@ -394,14 +430,31 @@ export default function AIOSourcePage({
                 : 'Debrid settings'
             }
             help={
-              section === 'books'
-                ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
-                : undefined
+              section === 'games'
+                ? 'IGDB supplies game titles, platforms and cover references. Use a confidential Twitch application; no OAuth redirect or browser sign-in is required. Images stay remote.'
+                : section === 'books'
+                  ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
+                  : undefined
             }
           >
             {section === 'videos' && (
               <div className="grid gap-5 md:grid-cols-2">
                 {secret('TMDB read access token', 'tmdb_secret')}
+              </div>
+            )}
+            {section === 'games' && (
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="field">
+                  <Label htmlFor="igdb-client-id">Twitch client ID</Label>
+                  <Input
+                    id="igdb-client-id"
+                    autoComplete="off"
+                    maxLength={128}
+                    value={config.igdb_client_id ?? ''}
+                    onChange={(e) => update(scope, { igdb_client_id: e.target.value.trim() })}
+                  />
+                </div>
+                {secret('Twitch client secret', 'igdb_secret')}
               </div>
             )}
             {section === 'debrid' && (
@@ -419,6 +472,7 @@ export default function AIOSourcePage({
             )}
             {section === 'videos' &&
               toggle('Automatically update film & series information', 'auto_sync')}
+            {section === 'games' && toggle('Automatically update game information', 'igdb_enabled')}
             {section === 'books' &&
               toggle('Automatically update book information', 'openlibrary_enabled')}
             {section === 'identification' &&
@@ -470,7 +524,7 @@ export default function AIOSourcePage({
             title="Automatic updates"
             help={
               section === 'identification'
-                ? 'Pending work and timing survive restarts. This interval applies to videos and books; manual actions run immediately.'
+                ? 'Pending work and timing survive restarts. This interval applies to videos, games and books; manual actions run immediately.'
                 : undefined
             }
           >
@@ -490,6 +544,23 @@ export default function AIOSourcePage({
                   1440,
                   automaticScope,
                 )}
+              {section === 'games' &&
+                number(
+                  'Game information update interval (minutes)',
+                  'igdb_minutes',
+                  5,
+                  1440,
+                  automaticScope,
+                )}
+              {section === 'games' &&
+                number(
+                  'Full catalog reconciliation (days)',
+                  'igdb_reconcile_days',
+                  1,
+                  30,
+                  automaticScope,
+                  'Refresh all game details periodically to catch deleted records and changes to related information. Progress resumes after an interruption.',
+                )}
               {section === 'books' &&
                 number(
                   'Book information update interval (minutes)',
@@ -507,6 +578,28 @@ export default function AIOSourcePage({
                   automaticScope,
                 )}
               {footer(automaticScope)}
+            </form>
+          </Disclosure>
+        )}
+        {section === 'games' && (
+          <Disclosure title="Request limits">
+            <form
+              aria-label="Games request limits"
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault()
+                submit('games-requests')
+              }}
+            >
+              {number(
+                'IGDB requests per second',
+                'igdb_requests_per_second',
+                1,
+                4,
+                'games-requests',
+                'IGDB allows up to four requests per second per application. Use a lower limit if this Twitch application is shared with other services.',
+              )}
+              {footer('games-requests')}
             </form>
           </Disclosure>
         )}
@@ -570,6 +663,21 @@ export default function AIOSourcePage({
                   <Button variant="destructive" disabled={maintenanceBusy}>
                     <TrashIcon />
                     Reset video information
+                  </Button>
+                }
+              />
+            )}
+            {section === 'games' && (
+              <ConfirmAction
+                title="Reset game information?"
+                description="Information updates and identification will be stopped first. IGDB information, related automatic and manual identifications, availability observations and game operation history will be removed. Source files, video and book information, settings and files in your debrid accounts are retained. Automatic game updates can import the catalog again."
+                label="Reset game information"
+                variant="destructive"
+                action={() => action.mutateAsync('reset-games')}
+                trigger={
+                  <Button variant="destructive" disabled={maintenanceBusy}>
+                    <TrashIcon />
+                    Reset game information
                   </Button>
                 }
               />
@@ -647,10 +755,10 @@ export default function AIOSourcePage({
           {settingsForm}
           <SettingsSections>
             {section === 'videos' && <RuntimeSettingsPanel section="metadata" />}
-            {(section === 'videos' || section === 'books') && (
+            {(section === 'videos' || section === 'books' || section === 'games') && (
               <RuntimeSettingsPanel
                 section="metadata_retries"
-                scopeHelp="These settings apply to both video and book information updates."
+                scopeHelp="These settings apply to video, game and book information updates."
               />
             )}
             {section === 'identification' && (
@@ -700,17 +808,21 @@ export default function AIOSourcePage({
               {Boolean(
                 section === 'videos'
                   ? status.status.sync_error
-                  : section === 'books'
-                    ? status.books?.error
-                    : status.matching_error,
+                  : section === 'games'
+                    ? status.games?.error
+                    : section === 'books'
+                      ? status.books?.error
+                      : status.matching_error,
               ) && (
                 <p role="status" className="notice notice-warning">
                   {messageText(
                     section === 'videos'
                       ? status.status.sync_error
-                      : section === 'books'
-                        ? status.books?.error || ''
-                        : status.matching_error || '',
+                      : section === 'games'
+                        ? status.games?.error || ''
+                        : section === 'books'
+                          ? status.books?.error || ''
+                          : status.matching_error || '',
                   )}{' '}
                   <Link className="data-link" to={`${metadataSections[section].path}/history`}>
                     View history
@@ -742,6 +854,34 @@ export default function AIOSourcePage({
                       >
                         <StopIcon />
                         Stop film & series information update
+                      </Button>
+                    )}
+                  </>
+                )}
+                {section === 'games' && (
+                  <>
+                    <Button
+                      disabled={Boolean(
+                        status.games?.running ||
+                        resetting ||
+                        action.isPending ||
+                        dirty ||
+                        !status.config.igdb_client_id ||
+                        !status.config.igdb_secret,
+                      )}
+                      onClick={() => action.mutate('sync-games')}
+                    >
+                      <ArrowClockwiseIcon />
+                      Update game information
+                    </Button>
+                    {status.games?.running && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-games')}
+                      >
+                        <StopIcon />
+                        Stop game information update
                       </Button>
                     )}
                   </>

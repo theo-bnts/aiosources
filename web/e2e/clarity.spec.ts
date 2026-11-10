@@ -77,7 +77,7 @@ test('source configuration navigation preserves unsaved edits and saving release
   await page.getByLabel('Display name', { exact: true }).fill('Unsaved source name')
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Sources', exact: true })
+    .getByRole('link', { name: 'Torrents', exact: true })
     .click()
   const prompt = page.getByRole('alertdialog')
   await expect(prompt).toContainText('source configuration')
@@ -89,9 +89,9 @@ test('source configuration navigation preserves unsaved edits and saving release
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Sources', exact: true })
+    .getByRole('link', { name: 'Torrents', exact: true })
     .click()
-  await expect(page.getByRole('heading', { name: 'Sources', exact: true, level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 })).toBeVisible()
   await expect(prompt).toHaveCount(0)
 })
 
@@ -102,7 +102,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await page.goto('/logs')
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Sources', exact: true })
+    .getByRole('link', { name: 'Torrents', exact: true })
     .click()
   const prompt = page.getByRole('alertdialog')
   const beforeSettings = await page.evaluate(() => history.state.idx)
@@ -139,7 +139,7 @@ test('unsaved forms survive navigation, browser Back and reload until explicitly
   await expect(page.getByRole('heading', { name: 'Logs', exact: true })).toBeVisible()
   await page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Sources', exact: true })
+    .getByRole('link', { name: 'Torrents', exact: true })
     .click()
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await openDisclosure(page, 'Import execution')

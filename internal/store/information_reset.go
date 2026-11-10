@@ -21,8 +21,15 @@ func (s *Store) resetInformation(ctx context.Context, scope string) error {
 		} else {
 			types, services, resources = append(types, "movie", "tv"), append(services, "tmdb"), append(resources, videoResources...)
 		}
+	} else if scope == "games" {
+		types, services, resources = []string{"game"}, []string{"igdb"}, []string{"game", "igdb"}
 	} else if scope != "books" {
 		return model.ErrInvalid
+	}
+	if scope == "metadata" {
+		types = append(types, "game")
+		services = append(services, "igdb")
+		resources = append(resources, "game", "igdb")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -134,7 +141,7 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 		{`DELETE FROM aiosources.aio_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
 		{`DELETE FROM aiosources.aio_shared_availability WHERE hash IN(SELECT hash FROM reset_information_hashes)`, nil},
 		{`DELETE FROM aiosources.aio_resources r WHERE split_part(resource,':',1)=ANY($1::text[]) OR EXISTS(SELECT 1 FROM reset_information_hashes h WHERE h.hash=ANY(r.hashes))`, []any{resources}},
-		{`DELETE FROM aiosources.stremio_requests WHERE $1 AND kind<>'manifest' AND media_type IN ('movie','series','anime')`, []any{scope != "books"}},
+		{`DELETE FROM aiosources.stremio_requests WHERE $1 AND kind<>'manifest' AND media_type IN ('movie','series','anime')`, []any{scope == "videos" || scope == "metadata"}},
 		{`DELETE FROM aiosources.aio_match_reviews r WHERE r.media_type=ANY($1::text[]) OR (r.media_type='' AND (r.provider_id,r.source_id) IN(SELECT provider_id,source_id FROM reset_information_records))`, []any{types}},
 		{`DELETE FROM aiosources.aio_matches WHERE (provider_id,source_id) IN(SELECT provider_id,source_id FROM reset_information_records)`, nil},
 		{`INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM reset_information_records ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, nil},
@@ -147,19 +154,24 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 			return databaseError("remove related information data", err)
 		}
 	}
-	if scope != "videos" {
+	if scope == "books" || scope == "metadata" {
 		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.ol_authors,aiosources.ol_editions,aiosources.ol_redirects;
 UPDATE aiosources.ol_import_state SET snapshot='',etag='',position=0,imported=0,works=0,editions=0,authors=0,skipped=0,last_sync=NULL,checked_at=NULL,retry_at=NULL,error='',complete=FALSE WHERE singleton;`+resetBookChangesSQL); err != nil {
 			return databaseError("reset book information", err)
 		}
 	}
-	if scope != "books" {
+	if scope == "videos" || scope == "metadata" {
 		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.aio_metadata_jobs,aiosources.aio_season_requests,aiosources.aio_inventory;
 DELETE FROM aiosources.catalog_entity_changes WHERE kind='metadata';
 UPDATE aiosources.aio_state SET last_sync=NULL,changes_through=NULL,inventory_date='',
 sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at END,
 sync_failures=0,sync_error='',recovery_started_at=NULL,applied_through=NULL;`); err != nil {
 			return databaseError("reset video information", err)
+		}
+	}
+	if scope == "games" || scope == "metadata" {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.igdb_state SET complete=FALSE,works=0,processed=0,total=0,phase='initial',after_id=0,generation=generation+1,started_at=NULL,last_sync=NULL,changes_through=NULL,last_reconciliation=NULL,retry_at=NULL,error='' WHERE singleton`); err != nil {
+			return err
 		}
 	}
 	if scope == "metadata" {
@@ -186,7 +198,7 @@ func selectResetInformationRecords(ctx context.Context, tx pgx.Tx, types []strin
 	// retained between batches and the surrounding transaction owns the fence.
 	if _, err := tx.Exec(ctx, `SET LOCAL cursor_tuple_fraction=1.0;
 DECLARE reset_information_cursor NO SCROLL CURSOR FOR
-SELECT `+aioRecordColumns+`,COALESCE(CASE WHEN r.active THEN NULLIF(r.media_type,'') END,w.media_type,''),m.provider_id IS NOT NULL
+SELECT `+aioRecordColumns+`,COALESCE(CASE WHEN r.active THEN NULLIF(r.media_type,'') END,w.media_type,NULLIF(m.media_hint,''),''),m.provider_id IS NOT NULL
 FROM reset_information_candidates c JOIN aiosources.torrents t USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id) LEFT JOIN aiosources.aio_matches m USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
@@ -211,6 +223,8 @@ LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 			if kind == "" {
 				if books.ParseRecord(record).Kind != "" {
 					kind = "book"
+				} else if record.IGDB != "" || record.GameHints.Kind == "game" {
+					kind = "game"
 				} else if decision || record.IMDb != "" || record.TMDB != "" || record.TVDB != "" || record.MAL != "" {
 					kind = "movie"
 				}

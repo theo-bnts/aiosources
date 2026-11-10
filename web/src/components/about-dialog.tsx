@@ -141,6 +141,18 @@ export function AboutDialog() {
             </a>
             .
           </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Game information and covers:{' '}
+            <a
+              href="https://www.igdb.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              IGDB
+            </a>
+            .
+          </p>
           <a
             href="/THIRD-PARTY-NOTICES.txt"
             target="_blank"

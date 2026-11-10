@@ -5,24 +5,27 @@ test('navigation and page tabs remain coherent on every current and legacy route
 }) => {
   test.setTimeout(90_000)
   const destinations = [
-    ['Sources', 'Sources', '/providers'],
-    ['Sources', 'Sources', '/providers/settings'],
-    ['Sources', 'Sources', '/schedules'],
-    ['Sources', 'Sources', '/settings'],
-    ['Sources', 'Sources', '/'],
-    ['Sources', 'Sources', '/import-settings'],
-    ['Sources', 'Sources', '/providers/new'],
-    ['Sources', 'Sources', '/runs'],
-    ['Sources', 'Sources', '/raw'],
-    ['Sources', 'Sources', '/raw/999999'],
-    ['Sources', 'Sources', '/pages/999999'],
-    ['Sources', 'Sources', '/runs/missing'],
-    ['Sources', 'Torrents', '/torrents'],
+    ['Sources', 'Torrents', '/providers'],
+    ['Sources', 'Torrents', '/providers/settings'],
+    ['Sources', 'Torrents', '/schedules'],
+    ['Sources', 'Torrents', '/settings'],
+    ['Sources', 'Torrents', '/'],
+    ['Sources', 'Torrents', '/import-settings'],
+    ['Sources', 'Torrents', '/providers/new'],
+    ['Sources', 'Torrents', '/runs'],
+    ['Sources', 'Torrents', '/raw'],
+    ['Sources', 'Torrents', '/raw/999999'],
+    ['Sources', 'Torrents', '/pages/999999'],
+    ['Sources', 'Torrents', '/runs/missing'],
+    ['Sources', 'Files', '/torrents'],
     ['Metadata', 'Videos', '/metadata'],
     ['Metadata', 'Videos', '/metadata/settings'],
     ['Metadata', 'Videos', '/metadata/videos'],
     ['Metadata', 'Videos', '/metadata/videos/settings'],
     ['Metadata', 'Videos', '/metadata/videos/history'],
+    ['Metadata', 'Games', '/metadata/games'],
+    ['Metadata', 'Games', '/metadata/games/settings'],
+    ['Metadata', 'Games', '/metadata/games/history'],
     ['Metadata', 'Books', '/metadata/books'],
     ['Metadata', 'Books', '/metadata/books/settings'],
     ['Metadata', 'Books', '/metadata/books/history'],
@@ -70,11 +73,13 @@ test('navigation and page tabs remain coherent on every current and legacy route
       page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
     ).toHaveText(
       ['Sources', 'Metadata', 'Connections', 'Administration'].includes(group)
-        ? ['Incoming', 'Outgoing'].includes(label)
-          ? [`${group}/`, 'Network/', label]
-          : ['Statistics', 'Secrets', 'Sign-in protection', 'Active sessions'].includes(label)
-            ? [`${group}/`, 'Security/', label]
-            : [`${group}/`, label]
+        ? label === 'Torrents'
+          ? ['Sources/', 'Indexers/', label]
+          : ['Incoming', 'Outgoing'].includes(label)
+            ? [`${group}/`, 'Network/', label]
+            : ['Statistics', 'Secrets', 'Sign-in protection', 'Active sessions'].includes(label)
+              ? [`${group}/`, 'Security/', label]
+              : [`${group}/`, label]
         : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -108,6 +113,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
   if ((await network.getAttribute('aria-expanded')) === 'true') await network.click()
   await expect(navigation.getByRole('button')).toHaveText([
     'Sources',
+    'Indexers',
     'Metadata',
     'Connections',
     'Administration',
@@ -115,10 +121,11 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Network',
   ])
   await expect(navigation.getByRole('link')).toHaveText([
-    'Sources',
-    'Remote catalogs',
     'Torrents',
+    'Remote catalogs',
+    'Files',
     'Videos',
+    'Games',
     'Books',
     'Identification',
     'Debrid',
@@ -143,7 +150,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     await expect(navigation.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /notification/i })).toHaveCount(0)
   await expect(
-    page.getByRole('tablist', { name: 'Sources views', exact: true }).getByRole('tab'),
+    page.getByRole('tablist', { name: 'Torrents views', exact: true }).getByRole('tab'),
   ).toHaveText(['Statistics', 'Settings', 'History'])
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   await expect(page).toHaveURL(/\/runs$/)

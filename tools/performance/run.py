@@ -31,6 +31,7 @@ REQUIRED_BENCHMARKS = {
     "synthetic.store.BenchmarkCatalogReadPaths/title-search", "synthetic.store.BenchmarkAdministrationPaths/catalog-export",
     "synthetic.aiosource.BenchmarkMatchingDenseCatalog", "synthetic.aiosource.BenchmarkMatchingVariedCatalog",
     "synthetic.aiosource.BenchmarkMetadataRetrieval", "synthetic.aiosource.BenchmarkMetadataInventoryReplay",
+    "synthetic.aiosource.BenchmarkGameInformation", "synthetic.aiosource.BenchmarkGameMatching",
     "synthetic.aiosource.BenchmarkBookImport", "synthetic.aiosource.BenchmarkBookChanges",
     "synthetic.aiosource.BenchmarkInformationReset/books", "synthetic.aiosource.BenchmarkInformationReset/videos",
     "synthetic.httpapi.BenchmarkAddonReadFlows/private-stremio", "synthetic.httpapi.BenchmarkAddonReadFlows/public-stremio",

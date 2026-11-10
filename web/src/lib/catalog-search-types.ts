@@ -1,7 +1,9 @@
 import type { DebridService } from '@/lib/debrid'
 export type CatalogTitle = {
   id: number
-  type: 'movie' | 'tv' | 'book'
+  type: 'movie' | 'tv' | 'book' | 'game'
+  igdb?: string
+  platforms?: { id: number; name: string; slug: string }[]
   cover?: string
   openlibrary?: string
   authors?: string[]

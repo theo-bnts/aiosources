@@ -385,7 +385,7 @@ func (s *Store) FailOpenLibrary(ctx context.Context, message string, retryAt tim
 // Metadata identifiers stay in their own namespace. In particular, an OL ID
 // can never be returned to a client in an IMDb or TMDB field.
 func validBookQueryType(s string) bool {
-	return s == "" || s == "book" || s == "ebook" || s == "audiobook" || s == "movie" || s == "tv"
+	return s == "" || s == "book" || s == "ebook" || s == "audiobook" || s == "movie" || s == "tv" || s == "game"
 }
 
 func bookReleaseKindSQL(alias string) string {

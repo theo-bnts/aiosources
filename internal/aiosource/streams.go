@@ -75,7 +75,7 @@ func (s *Service) Streams(ctx context.Context, base, token, mediaType, id string
 	return s.streams(ctx, base, token, mediaType, id, nil)
 }
 func (s *Service) streams(ctx context.Context, base, token, mediaType, id string, visitor *PublicInstallation) (streams []Stream, streamErr error) {
-	if mediaType == "book" {
+	if mediaType == "book" || mediaType == "game" {
 		return []Stream{}, model.ErrInvalid
 	}
 	history := newStremioHistory(mediaType, id)
@@ -515,7 +515,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			if len(items) == 1 && items[0].Cached {
 				observed = items[0]
 				_, cachedOnly = SelectFile(observed.Files, r)
-				if (r.Type == "book" || r.Type == "torrent") && r.File == "" && len(resourceDownloadFiles(observed.Files, r)) > 1 {
+				if (r.Type == "book" || r.Type == "torrent" || r.Type == "game") && r.File == "" && len(resourceDownloadFiles(observed.Files, r)) > 1 {
 					cachedOnly = true
 				}
 				if !cachedOnly && len(observed.Files) > 0 {

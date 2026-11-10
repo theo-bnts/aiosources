@@ -1,20 +1,25 @@
 import { useState } from 'react'
-import { BookOpenIcon, FilmStripIcon } from '@phosphor-icons/react'
+import { BookOpenIcon, FilmStripIcon, GameControllerIcon } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
 export function CatalogCover({
   src,
   book = false,
+  game = false,
   large = false,
 }: {
   src?: string
   book?: boolean
+  game?: boolean
   large?: boolean
 }) {
   const [failed, setFailed] = useState('')
   const allowed =
-    src && /^https:\/\/(?:image\.tmdb\.org\/t\/p\/|covers\.openlibrary\.org\/b\/id\/)/.test(src)
-  const Icon = book ? BookOpenIcon : FilmStripIcon
+    src &&
+    /^https:\/\/(?:image\.tmdb\.org\/t\/p\/|covers\.openlibrary\.org\/b\/id\/|images\.igdb\.com\/igdb\/image\/upload\/t_cover_big\/)/.test(
+      src,
+    )
+  const Icon = game ? GameControllerIcon : book ? BookOpenIcon : FilmStripIcon
   return (
     <div
       className={cn(

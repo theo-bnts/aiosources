@@ -18,6 +18,8 @@ type CatalogReleaseFilters struct {
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
+	IGDB        string           `json:"igdb,omitempty"`
+	Platforms   []GamePlatform   `json:"platforms,omitempty"`
 	OpenLibrary string           `json:"openlibrary,omitempty"`
 	Cover       string           `json:"cover,omitempty"`
 	Authors     []string         `json:"authors,omitempty"`

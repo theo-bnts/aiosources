@@ -25,6 +25,15 @@ var resourceRE = regexp.MustCompile(`(?i)^(tt|imdb|tmdb|tvdb|mal|kitsu|anilist)[
 
 func ParseID(id, mediaType string) (Resource, error) {
 	r := Resource{Type: mediaType}
+	if mediaType == "game" {
+		key, ok := strings.CutPrefix(id, "igdb:")
+		n, err := strconv.ParseUint(key, 10, 53)
+		if !ok || err != nil || n == 0 || strconv.FormatUint(n, 10) != key {
+			return r, errors.New("invalid game resource")
+		}
+		r.Kind, r.ID = "igdb", key
+		return r, nil
+	}
 	if mediaType == "book" {
 		key, ok := strings.CutPrefix(id, "openlibrary:")
 		if !ok || !books.WorkKey(key) {
@@ -360,7 +369,7 @@ func fileNumbering(path string) Release {
 }
 
 func SelectFile(files []model.AIOFile, r Resource) (model.AIOFile, bool) {
-	if r.Type == "torrent" {
+	if r.Type == "torrent" || r.Type == "game" {
 		return selectDownloadFile(files, r)
 	}
 	if r.Type == "book" {

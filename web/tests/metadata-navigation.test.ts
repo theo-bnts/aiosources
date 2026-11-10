@@ -9,6 +9,8 @@ import { settingByID, settingURL } from '../src/lib/settings-catalog.ts'
 
 test('metadata histories separate video, book and shared identification operations', () => {
   assert.equal(metadataOperationSection('metadata', 'tmdb'), 'videos')
+  assert.equal(metadataOperationSection('metadata', 'igdb'), 'games')
+  assert.equal(metadataHistoryPath('games'), '/metadata/games/history')
   assert.equal(metadataOperationSection('metadata', 'openlibrary'), 'books')
   assert.equal(metadataOperationSection('matching', 'local'), 'identification')
   assert.equal(metadataHistoryPath('books'), '/metadata/books/history')
@@ -36,6 +38,13 @@ test('existing settings identifiers point to their separated metadata workspace'
     'runtime.metadata.workers',
   ])
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/videos/settings#'))
+  for (const id of [
+    'metadata.games-client',
+    'metadata.games-key',
+    'metadata.games-auto',
+    'metadata.games-interval',
+  ])
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/games/settings#'))
   for (const id of ['metadata.books', 'metadata.book-interval'])
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/books/settings#'))
   for (const id of [

@@ -547,6 +547,15 @@ export function NetworkRoutingPage() {
                   onChange={(value) => route('metadata:tmdb', value)}
                 />
                 <ConnectionSelect
+                  id="network-metadata:igdb"
+                  label="IGDB"
+                  value={settings.overrides['metadata:igdb'] ?? ''}
+                  settings={settings}
+                  inherit="Use default connection"
+                  disabled={save.isPending}
+                  onChange={(value) => route('metadata:igdb', value)}
+                />
+                <ConnectionSelect
                   id="network-metadata:openlibrary"
                   label="Open Library"
                   value={settings.overrides['metadata:openlibrary'] ?? ''}

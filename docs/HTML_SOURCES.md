@@ -6,7 +6,7 @@ Use the **HTML** template for a website whose listings are present in the page H
 
 ## Build the listing
 
-1. In **Sources → Settings → Add source**, choose **HTML** and enter the listing address.
+1. In **Sources → Indexers → Torrents → Settings → Add source**, choose **HTML** and enter the listing address.
 2. Set the selector for one result row. Choose an element that repeats once per record and excludes headers, adverts and navigation.
 3. Select the record's title and stable identifier. Read the appropriate text or link attribute. If the identifier comes from a URL, ensure it stays the same when the title changes.
 4. Add the fields available on the listing: size, publication date, categories, info hash or magnet link, and other useful details.

@@ -126,7 +126,7 @@ test('long selections stay inside Stremio, Torznab, sharing and torrent-search f
   }
   await page.goto('/torrents')
   await openDisclosure(page, 'Filters')
-  const form = page.getByRole('form', { name: 'Torrents', exact: true })
+  const form = page.getByRole('form', { name: 'Files', exact: true })
   const sources = form.getByRole('button', { name: 'Sources', exact: true })
   await selectEveryOption(page, sources)
   for (const width of [320, 390, 1440]) {

@@ -63,7 +63,7 @@ func (c AIOConfig) DebridSecrets() map[string]string {
 }
 
 func (c AIOConfig) SecretReferences() []string {
-	refs := []string{c.TMDBSecret}
+	refs := []string{c.TMDBSecret, c.IGDBSecret}
 	for _, provider := range DebridProviders() {
 		refs = append(refs, c.DebridSecret(provider.ID))
 	}

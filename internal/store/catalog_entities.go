@@ -29,7 +29,7 @@ func seedCatalogEntities(ctx context.Context, tx pgx.Tx, share model.Share) erro
 	if share.CatalogEntities.Metadata {
 		_, err := tx.Exec(ctx, `INSERT INTO aiosources.catalog_entity_changes(kind,identity,changed_tx)
 SELECT 'metadata',w.media_type||':'||w.tmdb_id,pg_current_xact_id()::text::bigint FROM aiosources.aio_works w
-WHERE w.catalog_import_source='' AND w.media_type<>'book' AND EXISTS(SELECT 1 FROM aiosources.aio_matches m JOIN aiosources.torrents t USING(provider_id,source_id)
+WHERE w.catalog_import_source='' AND w.media_type IN ('movie','tv') AND EXISTS(SELECT 1 FROM aiosources.aio_matches m JOIN aiosources.torrents t USING(provider_id,source_id)
 WHERE m.work_id=w.id AND `+aioPublishedMatch+` AND ($1 OR t.provider_id=ANY($2::text[]))) ON CONFLICT DO NOTHING`, share.Scope == "all", share.SourceIDs)
 		if err != nil {
 			return databaseError("initialize shared metadata", err)

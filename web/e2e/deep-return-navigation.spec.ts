@@ -34,7 +34,7 @@ test('returning through a processed record and its run retains the original hist
   await expect(page).toHaveURL(/\/runs\/nested-run\?tab=raw$/)
   await page
     .locator('main')
-    .getByRole('link', { name: /^(Sources history|History)$/ })
+    .getByRole('link', { name: /^(Torrent history|History)$/ })
     .click()
   await expect(page).toHaveURL(origin)
 })

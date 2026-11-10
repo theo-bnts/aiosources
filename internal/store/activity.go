@@ -25,7 +25,7 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	if err := validateActivityPage(options.ListOptions); err != nil {
 		return result, err
 	}
-	if options.Service != "" && options.Service != "tmdb" && options.Service != "openlibrary" && !model.IsDebridService(options.Service) && options.Service != "network" {
+	if options.Service != "" && options.Service != "igdb" && options.Service != "tmdb" && options.Service != "openlibrary" && !model.IsDebridService(options.Service) && options.Service != "network" {
 		return result, model.ErrInvalid
 	}
 	if len(options.Scopes) > 100 {
@@ -33,7 +33,7 @@ func (s *Store) Logs(ctx context.Context, options model.LogOptions) (model.List[
 	}
 	for _, scope := range options.Scopes {
 		prefix, id, ok := strings.Cut(scope, ":")
-		if !ok || !activityIdentity.MatchString(id) || (prefix != "source" && (prefix != "service" || (id != "tmdb" && id != "openlibrary" && id != "network" && !model.IsDebridService(id)))) {
+		if !ok || !activityIdentity.MatchString(id) || (prefix != "source" && (prefix != "service" || (id != "igdb" && id != "tmdb" && id != "openlibrary" && id != "network" && !model.IsDebridService(id)))) {
 			return result, model.ErrInvalid
 		}
 	}
@@ -113,6 +113,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	}
 	switch kind {
 	case "maintenance.books_completed", "maintenance.books_failed", "maintenance.books_interrupted",
+		"maintenance.games_completed", "maintenance.games_failed", "maintenance.games_interrupted",
 		"maintenance.videos_completed", "maintenance.videos_failed", "maintenance.videos_interrupted",
 		"maintenance.metadata_completed", "maintenance.metadata_failed", "maintenance.metadata_interrupted",
 		"maintenance.mapping_completed", "maintenance.mapping_failed", "maintenance.mapping_interrupted",
@@ -157,6 +158,8 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'openlibrary')`
 	} else if strings.HasPrefix(kind, "maintenance.videos_") {
 		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'tmdb')`
+	} else if strings.HasPrefix(kind, "maintenance.games_") {
+		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'igdb')`
 	}
 	_, err = tx.Exec(ctx, query, "activity-"+id, level, kind, providerID, runID, encoded)
 	if err != nil {

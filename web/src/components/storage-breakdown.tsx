@@ -251,7 +251,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
             {(report.retained_import_count ?? 0) > (report.retained_imports?.length ?? 0) && (
               <p className="help">
                 The 20 largest estimates are shown. All imports remain available in Sources →
-                History.
+                Indexers → Torrents → History.
               </p>
             )}
           </>

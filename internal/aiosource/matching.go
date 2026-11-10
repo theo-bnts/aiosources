@@ -223,6 +223,9 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 }
 func WorkCandidate(w model.AIOWork) Candidate {
 	source, id := "tmdb", w.TMDB
+	if w.Type == "game" {
+		source, id = "igdb", w.IGDB
+	}
 	if w.Type == "book" {
 		source, id = "openlibrary", w.OpenLibrary
 	}

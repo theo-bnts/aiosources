@@ -41,6 +41,7 @@ import {
   UsersThreeIcon,
   FilmStripIcon,
   BookOpenIcon,
+  GameControllerIcon,
   KeyIcon,
   DevicesIcon,
 } from '@phosphor-icons/react'
@@ -121,10 +122,18 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/providers',
-        label: 'Sources',
-        description: 'Source connections and automatic imports.',
+        to: '/indexers',
+        label: 'Indexers',
+        description: 'Manage your indexer connections.',
         icon: PlugsConnectedIcon,
+        children: [
+          {
+            to: '/providers',
+            label: 'Torrents',
+            description: 'Torrent source connections and automatic imports.',
+            icon: DownloadSimpleIcon,
+          },
+        ],
       },
       {
         to: '/remotes',
@@ -134,7 +143,7 @@ const navigationGroups: NavigationGroup[] = [
       },
       {
         to: '/torrents',
-        label: 'Torrents',
+        label: 'Files',
         description: 'Search torrents imported from your sources.',
         icon: ListMagnifyingGlassIcon,
       },
@@ -151,6 +160,12 @@ const navigationGroups: NavigationGroup[] = [
         label: 'Videos',
         description: 'Film and series information, updates and history.',
         icon: FilmStripIcon,
+      },
+      {
+        to: '/metadata/games',
+        label: 'Games',
+        description: 'Game information, updates and history.',
+        icon: GameControllerIcon,
       },
       {
         to: '/metadata/books',
@@ -305,7 +320,8 @@ const publicSearchNavigation: NavigationGroup = {
     {
       to: '/public/search',
       label: 'Search',
-      description: 'Find films, series and books and download through your own debrid accounts.',
+      description:
+        'Find films, series, games and books and download through your own debrid accounts.',
       icon: MagnifyingGlassIcon,
     },
   ],

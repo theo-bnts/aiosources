@@ -197,7 +197,7 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible()
       await page.getByRole('link', { name: 'Administration', exact: true }).click()
       await expect(
-        page.getByRole('heading', { name: 'Sources', exact: true, level: 1 }),
+        page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 }),
       ).toBeVisible()
       await checkAtSamePosition(page, anchor)
     }

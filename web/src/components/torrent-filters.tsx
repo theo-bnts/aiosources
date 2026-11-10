@@ -44,7 +44,7 @@ export function TorrentSearchForm({
     <form
       ref={form}
       className="space-y-4 rounded-md border border-border p-4"
-      aria-label="Torrents"
+      aria-label="Files"
       onSubmit={(event) => {
         event.preventDefault()
         setError(null)

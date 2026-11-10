@@ -22,6 +22,8 @@ Availability filters use the selected cache services. Direct torrent-only connec
 
 Books are available alongside films and series. Choose **Books**, **Ebooks** or **Audiobooks** in the media filters. Compatible clients can search by title, author or ISBN and use standard Books, EBook, Comics and Audio/Audiobook categories. Book identification must be set up in [Metadata](BOOKS.md).
 
+Choose **Games** for identified game releases, using standard Console and PC/Games categories. Set up [IGDB information](GAMES.md) to identify them locally.
+
 Private-source downloads need an authorized announce URL. Treat a private Torznab key as a credential and give it only to clients you trust. Catalog-sharing passwords and Stremio links are separate and cannot replace it.
 
 ## Public Torznab

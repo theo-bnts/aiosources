@@ -15,7 +15,7 @@ func (s *server) operationHistory(w http.ResponseWriter, r *http.Request) {
 	if (filter.Group != "" && filter.Group != "metadata" && filter.Group != "debrid") || !model.ValidSelection(filter.Kind, func(value string) bool {
 		return value == "metadata" || value == "matching" || value == "cache" || value == "cleanup" || value == "download"
 	}) || !model.ValidSelection(filter.Service, func(value string) bool {
-		return value == "tmdb" || value == "openlibrary" || value == "local" || model.IsDebridService(value)
+		return value == "igdb" || value == "tmdb" || value == "openlibrary" || value == "local" || model.IsDebridService(value)
 	}) || !model.ValidSelection(opts.Status, func(value string) bool {
 		return value == "running" || value == "succeeded" || value == "failed" || value == "cancelled" || value == "interrupted"
 	}) {

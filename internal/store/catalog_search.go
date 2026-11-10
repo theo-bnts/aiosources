@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -31,7 +32,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id)`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id),w.igdb_id,w.game_data->'platforms'`
 }
 
 func catalogYearFilter(year string) string {
@@ -46,7 +47,11 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	var title model.CatalogTitle
 	var poster string
 	var cover int64
-	err := row.Scan(&title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors)
+	var platforms []byte
+	err := row.Scan(&title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms)
+	if err == nil && len(platforms) > 0 && string(platforms) != "null" {
+		err = json.Unmarshal(platforms, &title.Platforms)
+	}
 	title.Cover = model.CoverURL(title.Type, poster, cover)
 	return title, err
 }
@@ -111,7 +116,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
- SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1
+ SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
  public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))

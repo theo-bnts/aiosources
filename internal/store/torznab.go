@@ -143,7 +143,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, cached)
 		}
 	}
-	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("m") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 WHEN ` + bookReleaseKindSQL("m") + `='ebook' THEN 7020 ELSE 7000 END ELSE 8000 END`
+	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'game' THEN CASE WHEN t.fields->>'title' ~* '\m(PS[1-5]|Switch|NSW|Wii|XBOX)\M' OR EXISTS(SELECT 1 FROM unnest(t.search_categories) c WHERE c ~ '^1[0-9]{3}$') THEN 1000 ELSE 4050 END WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("m") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 WHEN ` + bookReleaseKindSQL("m") + `='ebook' THEN 7020 ELSE 7000 END ELSE 8000 END`
 	if len(media) > 0 {
 		// Release format and Torznab category are separate: a known comic
 		// category does not turn an unclassified release into an ebook.
@@ -169,7 +169,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		clauses = append(clauses, "w.media_type='tv'")
 	}
 	if q.Categories != nil {
-		clauses = append(clauses, category+"=ANY("+bind(expandBookCategories(q.Categories))+"::int[])")
+		clauses = append(clauses, category+"=ANY("+bind(expandTorznabCategories(q.Categories))+"::int[])")
 	}
 	if len(q.MediaTypes) > 0 {
 		types := []int{}
@@ -177,6 +177,8 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			switch typ {
 			case "movie":
 				types = append(types, 2000)
+			case "game":
+				types = append(types, 1000, 4050)
 			case "tv":
 				types = append(types, 5000)
 			case "book":

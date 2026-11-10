@@ -17,20 +17,20 @@ var auxiliaryBookFile = regexp.MustCompile(`(?i)^(?:read[ ._-]?me(?:[ ._-]?first
 func (e *bookFileChoice) Error() string { return "choose a file" }
 func (e *bookFileChoice) Unwrap() error { return ErrPending }
 func fileSelectionError(files []model.AIOFile, r Resource) error {
-	if (r.Type == "book" || r.Type == "torrent") && r.File == "" {
+	if (r.Type == "book" || r.Type == "torrent" || r.Type == "game") && r.File == "" {
 		valid := resourceDownloadFiles(files, r)
 		if len(valid) > 1 {
 			return &bookFileChoice{Files: valid}
 		}
 	}
-	if r.Type != "book" && r.Type != "torrent" {
+	if r.Type != "book" && r.Type != "torrent" && r.Type != "game" {
 		return errors.New("no unambiguous matching video")
 	}
 	return newProviderError("not_found", "")
 }
 
 func resourceDownloadFiles(files []model.AIOFile, r Resource) []model.AIOFile {
-	if r.Type != "torrent" {
+	if r.Type != "torrent" && r.Type != "game" {
 		return bookFiles(files)
 	}
 	result := []model.AIOFile{}

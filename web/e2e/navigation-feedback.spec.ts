@@ -73,7 +73,7 @@ test('invalid search ranges keep the applied results and the editable draft with
     await db.end()
   }
   await page.goto('/torrents?q=original')
-  const form = page.getByRole('form', { name: 'Torrents', exact: true })
+  const form = page.getByRole('form', { name: 'Files', exact: true })
   await expect(form.getByLabel('Search text', { exact: true })).toHaveValue('original')
   await expect(page.getByRole('navigation', { name: 'Pagination', exact: true })).toBeVisible()
   let requests = 0
@@ -323,7 +323,7 @@ test.describe('return navigation', () => {
     await page.getByRole('link', { name: 'Open processed record for record', exact: true }).click()
     await expect(page).toHaveURL(/\/raw\/[0-9]+$/)
     await page.reload()
-    await page.locator('main').getByRole('link', { name: 'Torrents', exact: true }).click()
+    await page.locator('main').getByRole('link', { name: 'Files', exact: true }).click()
     await expect(page).toHaveURL(origin)
     await expect(page.getByLabel('Search text', { exact: true })).toHaveValue('example')
   })

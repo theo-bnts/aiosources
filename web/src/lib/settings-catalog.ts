@@ -55,11 +55,11 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   payloads: ['/network/incoming', 'Administration / Network / Incoming'],
   history: ['/health/settings', 'Administration / Storage'],
   security: ['/security/verification', 'Administration / Security / Sign-in protection'],
-  source_retries: ['/providers/settings', 'Sources / Sources'],
+  source_retries: ['/providers/settings', 'Sources / Indexers / Torrents'],
   identification: ['/metadata/identification/settings', 'Metadata / Identification'],
   matching: ['/metadata/identification/settings', 'Metadata / Identification'],
   metadata: ['/metadata/videos/settings', 'Metadata / Videos'],
-  metadata_retries: ['/metadata/videos/settings', 'Metadata / Videos & Books'],
+  metadata_retries: ['/metadata/videos/settings', 'Metadata / Videos, Games & Books'],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
   const definition = runtimeSections[section]
@@ -80,7 +80,7 @@ for (const [key, field] of Object.entries(importNumberFields))
     id: `imports.${key}`,
     title: field.label,
     route: '/providers/settings',
-    group: `Sources / Sources / Import execution / ${importCategory(key)}`,
+    group: `Sources / Indexers / Torrents / Import execution / ${importCategory(key)}`,
     control: `collection-${key}`,
     reveal: ['Import execution', importCategory(key)],
     keywords: field.help,
@@ -88,7 +88,7 @@ for (const [key, field] of Object.entries(importNumberFields))
 add(
   {
     route: '/providers/settings',
-    group: 'Sources / Sources / Import execution',
+    group: 'Sources / Indexers / Torrents / Import execution',
     reveal: ['Import execution'],
   },
   [
@@ -115,6 +115,21 @@ add(
       'Information update interval (minutes)',
       'schedule frequency cadence intervalle',
     ],
+  ],
+)
+add(
+  {
+    route: '/metadata/games/settings',
+    group: 'Metadata / Games / Settings',
+    keywords: 'IGDB Twitch games jeux video metadata',
+  },
+  [
+    ['metadata.games-client', 'Twitch client ID'],
+    ['metadata.games-key', 'Twitch client secret', 'IGDB API key'],
+    ['metadata.games-auto', 'Automatically update game information'],
+    ['metadata.games-interval', 'Game information update interval (minutes)'],
+    ['metadata.games-rate', 'IGDB requests per second'],
+    ['metadata.games-reconcile', 'Full catalog reconciliation (days)'],
   ],
 )
 add(
@@ -353,6 +368,7 @@ add(
   [
     ['routing.default', 'Outgoing connections', 'default connection'],
     ['routing.tmdb', 'TMDB'],
+    ['routing.igdb', 'IGDB'],
     ['routing.openlibrary', 'Open Library'],
     ...debridProviders.map((p) => [`routing.${providerSettingSuffix(p.id)}`, p.name] as const),
     ['routing.downloads', 'Browser downloads'],
@@ -571,7 +587,7 @@ function source(
   add(
     {
       route: '/providers/settings',
-      group: `Sources / Sources / ${stage === 'collection' ? 'Imports' : stage.charAt(0).toUpperCase() + stage.slice(1)}`,
+      group: `Sources / Indexers / Torrents / ${stage === 'collection' ? 'Imports' : stage.charAt(0).toUpperCase() + stage.slice(1)}`,
       entity: 'source',
       stage,
       adapters,

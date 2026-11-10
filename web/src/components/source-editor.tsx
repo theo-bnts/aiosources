@@ -624,6 +624,8 @@ function MappingSettings() {
           'published_at',
           'imdb_id',
           'tmdb_id',
+          'igdb_id',
+          'platform',
           'tvdb_id',
           'isbn',
           'author',

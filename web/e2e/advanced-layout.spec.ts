@@ -150,7 +150,7 @@ test('search pages start with closed optional panels and no implicit result rest
       } else if (route === '/torrents') {
         await expect(
           page
-            .getByRole('form', { name: 'Torrents', exact: true })
+            .getByRole('form', { name: 'Files', exact: true })
             .getByRole('button', { name: 'Sources', exact: true }),
         ).toBeHidden()
         await expect(page.getByLabel('Minimum size (bytes)', { exact: true })).toHaveValue('')

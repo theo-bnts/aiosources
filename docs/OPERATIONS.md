@@ -6,11 +6,11 @@
 
 | Page | Use it to |
 | --- | --- |
-| Search | Find identified films, series and books, choose an episode or file and compare releases. |
-| Torrents | Search records directly as imported from your sources or remote catalogs. |
-| Metadata → Identification | Review uncertain records, choose the correct film, series or book, and manage automatic identification and its history. |
-| Sources | Add sources, schedule imports and inspect their history. |
-| Metadata → Videos / Books | Each has its own statistics, update settings and history. |
+| Search | Find identified films, series, games and books, choose an episode or file and compare releases. |
+| Files | Search records directly as imported from your sources or remote catalogs. |
+| Metadata → Identification | Review uncertain records, choose the correct film, series, game or book, and manage automatic identification and its history. |
+| Sources → Indexers → Torrents | Add sources, schedule imports and inspect their history. |
+| Metadata → Videos / Games / Books | Each has its own statistics, update settings and history. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |
@@ -21,7 +21,7 @@ Each settings block has its own **Save**. Saving the main settings does not appl
 
 ## Search and choose a release
 
-Search uses your imported information, including local titles and aliases. It does not contact TMDB, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
+Search uses your imported information, including local titles and aliases. It does not contact TMDB, IGDB, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
 
 Optional **Filters** and **Sorting** start closed. New searches include all results unless you choose a restriction. Use type and year filters to narrow titles; a series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
 
@@ -59,7 +59,7 @@ Historical error counts include earlier attempts and do not necessarily mean the
 
 ## Storage and retention
 
-**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series and book information and shared caches are counted separately.
+**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series, game and book information and shared caches are counted separately.
 
 In **Storage → Settings**, choose what to retain in **Torrent data**. Required search, identification and playback information is always kept. Extra source fields can be selected individually; successful processed records, their field copies and published-change history are separate choices. Each option shows its relative storage and performance impact.
 

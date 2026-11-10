@@ -24,6 +24,8 @@ const fieldNames: Record<string, string> = {
   categories: 'Categories',
   imdb_id: 'IMDb ID',
   tmdb_id: 'TMDB ID',
+  igdb_id: 'IGDB ID',
+  platform: 'Game platform',
   tvdb_id: 'TVDB ID',
   isbn: 'ISBN',
   author: 'Author',

@@ -12,7 +12,7 @@ AIOSources can identify ebooks, comics and audiobooks already present in your im
 4. Enable **Automatically update book information**, then **Save** in **Information settings**. No Open Library account or API key is required. Allow the first import to finish; it can take hours. Only selected editions and their related books and authors are stored. The exports still need to be read, so connection speed and server capacity affect the duration.
 5. Open **Metadata → Identification → Settings** to enable automatic identification, or use **Manual actions → Identify torrents** there after the book information import finishes.
 
-Catalog filters are checked before saving bibliographic information and also apply to later updates. A book is included if at least one edition passes all enabled filters. Digital evidence is not a guarantee that a source offers that edition; some useful editions have no such evidence and can be excluded. All source records remain available in **Torrents**.
+Catalog filters are checked before saving bibliographic information and also apply to later updates. A book is included if at least one edition passes all enabled filters. Digital evidence is not a guarantee that a source offers that edition; some useful editions have no such evidence and can be excluded. All source records remain available in **Files**.
 
 Stop any running book update before changing the filters. Saving a different selection starts a new resumable import. Existing entries outside the new selection are removed after it finishes; source records and film and series information are kept. **Statistics → Import details** distinguishes records excluded by filters from unreadable records.
 
@@ -58,7 +58,7 @@ Search works the same way on an enabled public instance, using the visitor's own
 
 In **Identification**, open **Review**, choose **Books** and search the local catalog by title, author or ISBN. Confirm the correct work. Invalid identifiers, conflicting authors, homonyms and multi-book collections are kept for review rather than guessed.
 
-A collection is not automatically assigned to every book it may contain. A manual choice associates that source record with the selected work. Open Library does not describe every edition; unmatched records remain accessible in **Torrents**.
+A collection is not automatically assigned to every book it may contain. A manual choice associates that source record with the selected work. Open Library does not describe every edition; unmatched records remain accessible in **Files**.
 
 ## Connect another application
 

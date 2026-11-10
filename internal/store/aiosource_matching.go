@@ -16,7 +16,31 @@ const aioCandidateLimit = 100
 // Keep batches small so metadata publication can acquire its exclusive fence.
 const AIOMaxMatchBatchSize = 100
 
+// Keep year selectivity from turning a handful of exact aliases into a scan
+// of every book, video and game. Each candidate uses the work primary key.
+const gameCandidatesQuery = `WITH candidate_ids AS (
+ SELECT id FROM aiosources.aio_works WHERE igdb_id<>'' AND igdb_id=$1 AND $1<>''
+ UNION SELECT work_id FROM aiosources.aio_titles WHERE $1='' AND normalized=$2 AND normalized<>''
+) SELECT ` + aioWorkColumns + ` FROM candidate_ids c CROSS JOIN LATERAL (SELECT * FROM aiosources.aio_works WHERE id=c.id OFFSET 0) w
+WHERE w.media_type='game' AND NOT w.adult AND ($3::int IS NULL OR $3=ANY(w.years)) ORDER BY w.id LIMIT 101`
+
 func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
+	if filter.Type == "game" {
+		rows, err := tx.Query(ctx, gameCandidatesQuery, filter.IGDB, filter.Title, filter.Year)
+		if err != nil {
+			return nil, false, err
+		}
+		defer rows.Close()
+		out := []model.AIOWork{}
+		for rows.Next() {
+			w, e := scanAIOWork(rows)
+			if e != nil {
+				return nil, false, e
+			}
+			out = append(out, w)
+		}
+		return out, len(out) > 100, rows.Err()
+	}
 	if filter.Type == "book" {
 		return searchBookCandidates(ctx, tx, filter)
 	}
@@ -75,7 +99,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	}
 	rows, err := tx.Query(ctx, `SELECT `+aioRecordColumns+`,q.version,
  r.active IS TRUE,COALESCE(r.revision,0),COALESCE(r.fingerprint,''),COALESCE(r.media_type,''),COALESCE(r.tmdb_id,''),r.season,r.episode,
- COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),
+ COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),COALESCE(r.igdb_id,''),
  CASE WHEN r.active THEN r.evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) ELSE FALSE END
 FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id)
@@ -88,7 +112,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	reviews := []*model.AIOMatchReview{}
 	for rows.Next() {
 		var review model.AIOMatchReview
-		r, err := scanAIORecordQueue(aioStreamRow{scanner: rows, ids: []any{&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.SourceChanged}}, true)
+		r, err := scanAIORecordQueue(aioStreamRow{scanner: rows, ids: []any{&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged}}, true)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -162,9 +186,9 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		if result.Work != nil {
 			workID, revision = result.Work.ID, result.Work.Revision
 		}
-		batch.Queue(`INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(provider_id,source_id) DO UPDATE SET
-fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, workID, revision, result.Status, result.Reason, r.Normalized, matchedBookKind(r, result.Work))
+		batch.Queue(`INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,media_hint)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider_id,source_id) DO UPDATE SET
+fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, workID, revision, result.Status, result.Reason, r.Normalized, matchedBookKind(r, result.Work), matchedMediaType(r, result.Work))
 		batch.Queue(`DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1 AND source_id=$2 AND version=$3`, r.Provider, r.SourceID, r.QueueVersion)
 	}
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {

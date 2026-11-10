@@ -144,7 +144,12 @@ export function SourceStatisticsPage() {
   )
 }
 
-export function AIOStatisticsPage({ section }: { section: 'videos' | 'books' | 'debrid' }) {
+export function AIOStatisticsPage({
+  section,
+}: {
+  section: 'videos' | 'games' | 'books' | 'debrid'
+}) {
+  if (section === 'games') return <GameStatisticsPage />
   return section === 'debrid' ? (
     <DebridStatisticsPage />
   ) : (
@@ -340,6 +345,94 @@ function DebridStatisticsPage() {
                 .
               </p>
             )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+function GameStatisticsPage() {
+  const date = useDate()
+  const query = useQuery({
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+  })
+  const status = query.data,
+    games = status?.games
+  const resetting =
+    status?.maintenance?.status === 'running' &&
+    (status.maintenance.scope === 'games' || status.maintenance.scope === 'metadata')
+  const sync = resetting
+    ? 'Resetting information'
+    : games?.running
+      ? 'Updating'
+      : games?.error
+        ? 'Needs attention'
+        : games?.pending
+          ? 'Update incomplete'
+          : !games?.complete
+            ? 'Initial import needed'
+            : 'Up to date'
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading label="Loading statistics" />
+      ) : (
+        games && (
+          <>
+            <dl className="grid grid-cols-2 gap-3">
+              <Statistic label="Catalog entries" value={games.works} />
+              <Statistic
+                label="Synchronization"
+                value={sync}
+                size="sm"
+                to="/metadata/games/settings"
+              />
+            </dl>
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Statistic
+                label="Last successful update"
+                value={games.last_sync ? date(games.last_sync) : 'No completed update'}
+                size="sm"
+                to="/metadata/games/history"
+              />
+              <Statistic
+                label="Changes applied through"
+                value={games.changes_through ? date(games.changes_through) : 'Not established'}
+                size="sm"
+              />
+              <Statistic
+                label="Next automatic update"
+                value={
+                  resetting
+                    ? 'Waiting for reset'
+                    : games.running
+                      ? 'Running'
+                      : !status?.config.igdb_enabled
+                        ? 'Disabled'
+                        : games.next_update
+                          ? date(games.next_update)
+                          : 'Waiting'
+                }
+                size="sm"
+                to="/metadata/games/settings"
+              />
+            </dl>
+            <Disclosure title="Synchronization details">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <Statistic label="Records processed in current update" value={games.processed} />
+                <Statistic
+                  label="Last full reconciliation"
+                  value={
+                    games.last_reconciliation ? date(games.last_reconciliation) : 'Not established'
+                  }
+                  size="sm"
+                />
+              </dl>
+            </Disclosure>
           </>
         )
       )}

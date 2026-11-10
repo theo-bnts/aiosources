@@ -4,6 +4,7 @@ import "time"
 
 // Reviews are separate from imported fields and may be undone independently.
 type AIOMatchReview struct {
+	IGDB            string    `json:"igdb,omitempty"`
 	OpenLibrary     string    `json:"openlibrary,omitempty"`
 	SourceChanged   bool      `json:"source_changed"`
 	Active          bool      `json:"active"`

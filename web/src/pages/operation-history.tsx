@@ -57,6 +57,7 @@ const kinds = {
   download: 'Download preparation',
 }
 const services: Record<string, string> = {
+  igdb: 'IGDB',
   tmdb: 'TMDB',
   openlibrary: 'Open Library',
   local: 'Local identification',
@@ -74,6 +75,9 @@ const phases: Record<string, string> = {
   configuration: 'Starting',
   changes: 'Downloading information changes',
   inventory: 'Importing film & series inventory',
+  game_initial: 'Importing game information',
+  game_changes: 'Updating game information',
+  game_reconciliation: 'Reconciling game catalog',
   book_import: 'Importing book information',
   book_import_editions: 'Selecting book editions',
   book_import_redirects: 'Importing related redirects',

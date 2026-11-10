@@ -4,10 +4,10 @@ import { isSourceSettingsPath } from './source-navigation.ts'
 
 const viewLabels: Record<string, string> = {
   '/': 'Sources',
-  '/providers': 'Source statistics',
+  '/providers': 'Torrent statistics',
   '/providers/settings': 'All sources',
-  '/runs': 'Sources history',
-  '/torrents': 'Torrents',
+  '/runs': 'Torrent history',
+  '/torrents': 'Files',
   '/search': 'Search',
   '/public/search': 'Search',
   '/search/torrents': 'Search torrents',
@@ -20,6 +20,7 @@ const viewLabels: Record<string, string> = {
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',
   '/metadata/videos/history': 'Video history',
+  '/metadata/games/history': 'Game history',
   '/metadata/books/history': 'Book history',
   '/metadata/identification/history': 'Identification history',
   '/debrid/history': 'Debrid history',

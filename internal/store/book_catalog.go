@@ -46,7 +46,7 @@ const bookEditionWorks = `JOIN LATERAL (
 ) edition_work ON TRUE
 JOIN aiosources.aio_works w ON w.media_type='book' AND w.openlibrary_id<>'' AND w.openlibrary_id=edition_work.id`
 
-func expandBookCategories(cats []int) []int {
+func expandTorznabCategories(cats []int) []int {
 	out := append([]int{}, cats...)
 	for _, c := range cats {
 		if c == 7000 {
@@ -54,6 +54,9 @@ func expandBookCategories(cats []int) []int {
 		}
 		if c == 3000 {
 			out = append(out, 3030)
+		}
+		if c == 4000 {
+			out = append(out, 4050)
 		}
 	}
 	return out

@@ -48,7 +48,7 @@ const indexes = [
     'Torrent category filters',
     'low',
     'high',
-    'Speeds up category filtering in Torrents and Torznab.',
+    'Speeds up category filtering in Files and Torznab.',
   ],
   [
     'torrents_size',

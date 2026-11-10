@@ -443,7 +443,7 @@ export function RawDetailPage() {
   if (!detail.data)
     return (
       <div className="page">
-        <PageHeader title="Processed record" back={{ to: '/runs', label: 'Sources history' }} />
+        <PageHeader title="Processed record" back={{ to: '/runs', label: 'Torrent history' }} />
         <ErrorNotice error={detail.error} retry={() => void detail.refetch()} />
       </div>
     )
@@ -622,7 +622,7 @@ export function RawPageView() {
       <PageHeader
         title={`Original page #${id}`}
         description="Historical response archive. New response bodies are not stored."
-        back={{ to: '/runs', label: 'Sources history' }}
+        back={{ to: '/runs', label: 'Torrent history' }}
         actions={
           page.data && (
             <DownloadButton

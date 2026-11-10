@@ -45,7 +45,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 	if v.Has("media") {
 		q.MediaTypes = strings.Split(v.Get("media"), ",")
 		for _, typ := range q.MediaTypes {
-			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "other"}, typ) {
+			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "other"}, typ) {
 				return q, v, model.ErrInvalid
 			}
 		}
@@ -283,6 +283,9 @@ func torznabCaps(share model.Share, origin string) torznabCapabilities {
 			v.Categories = append(v.Categories, torznabCategory{ID: cat.id, Name: cat.name})
 		}
 	}
+	if allowed("game") {
+		v.Categories = append(v.Categories, torznabCategory{ID: 1000, Name: "Console"}, torznabCategory{ID: 4000, Name: "PC", Subcategories: []torznabCategory{{ID: 4050, Name: "Games"}}})
+	}
 	if allowed("ebook") || slices.Contains(share.MediaTypes, "book") {
 		v.Categories = append(v.Categories, torznabCategory{ID: 7000, Name: "Books", Subcategories: []torznabCategory{{ID: 7020, Name: "EBook"}, {ID: 7030, Name: "Comics"}}})
 	}
@@ -367,6 +370,9 @@ func torznabResults(result model.List[model.TorznabRecord], names map[string]str
 		}
 		if rec.Category == 3030 {
 			attr("category", "3000")
+		}
+		if rec.Category == 4050 {
+			attr("category", "4000")
 		}
 		attr("infohash", rec.Hash)
 		attr("magneturl", magnet)

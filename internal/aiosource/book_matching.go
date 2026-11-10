@@ -19,6 +19,7 @@ func authorSignature(s string) string {
 
 func decideBook(r model.AIORecord, p books.Release, find store.AIOCandidateSearch) (model.AIOMatchResult, error) {
 	r.Normalized = Normalize(p.Title)
+	r.IdentificationType = "book"
 	result := model.AIOMatchResult{Record: r, Status: "unmatched", Reason: "insufficient bibliographic evidence"}
 	policy := r.MatchingPolicy
 	if policy == (model.MatchingPolicy{}) {

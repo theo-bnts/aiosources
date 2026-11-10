@@ -43,7 +43,7 @@ Public exports use the same source identities as named shares, so copying throug
 
 Optional groups are off by default and must be allowed by both sender and receiver. The connection's **Data received** shows what the last successful sync included. An older instance may provide only the basic torrent catalog.
 
-Book torrent records can be shared too; book information and their identification are built locally through Open Library.
+Book and game torrent records can be shared too; their metadata and identification are built locally through Open Library and IGDB.
 
 Remote identification decisions and manual reviews are not imported: identification runs locally. Film and series information is combined by its identifiers without duplicating the same work; directly acquired local information takes priority. Cached observations expire normally and do not provide service access without your own credentials. Import extra information only from an owner you trust.
 
@@ -51,7 +51,7 @@ Remote identification decisions and manual reviews are not imported: identificat
 
 ## Follow or remove a connection
 
-**Statistics** shows imported and pending records. **History** contains remote imports separately from native source imports. **View imported data** opens **Torrents** filtered to that catalog.
+**Statistics** shows imported and pending records. **History** contains remote imports separately from native source imports. **View imported data** opens **Files** filtered to that catalog.
 
 **Delete** removes the remote connection, its local torrent copy, import progress, history and local identifications. Reusable Secrets, metadata and debrid caches remain available. Finish or pause active work before deleting.
 

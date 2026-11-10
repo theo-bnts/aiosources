@@ -7,6 +7,12 @@ import "time"
 type AIOConfig struct {
 	Revision                int64                 `json:"revision"`
 	TMDBSecret              string                `json:"tmdb_secret"`
+	IGDBClientID            string                `json:"igdb_client_id"`
+	IGDBSecret              string                `json:"igdb_secret"`
+	IGDBEnabled             bool                  `json:"igdb_enabled"`
+	IGDBMinutes             int                   `json:"igdb_minutes"`
+	IGDBRequestsPerSecond   int                   `json:"igdb_requests_per_second"`
+	IGDBReconcileDays       int                   `json:"igdb_reconcile_days"`
 	AllDebridSecret         string                `json:"alldebrid_secret"`
 	TorBoxSecret            string                `json:"torbox_secret"`
 	DebridLinkSecret        string                `json:"debridlink_secret"`
@@ -36,6 +42,8 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
+	IGDB             string            `json:"igdb,omitempty"`
+	Game             GameInformation   `json:"game,omitzero"`
 	LocalizedPosters map[string]string `json:"localized_posters,omitempty"`
 	OpenLibrary      string            `json:"openlibrary,omitempty"`
 	PosterPath       string            `json:"poster_path,omitempty"`
@@ -55,6 +63,9 @@ type AIOWork struct {
 	Revision         int64             `json:"revision"`
 }
 type AIORecord struct {
+	IdentificationType     string              `json:"-"`
+	GameHints              GameHints           `json:"-"`
+	IGDB                   string              `json:"igdb,omitempty"`
 	VideoType              string              `json:"-"`
 	BookInformationPending bool                `json:"-"`
 	BookHints              BookHints           `json:"-"`
@@ -86,6 +97,7 @@ type AIORecord struct {
 // Eligibility belongs in candidate discovery, before the bounded safety cap.
 // Otherwise impossible homonyms can hide the one year-compatible work.
 type AIOCandidateFilter struct {
+	IGDB                          string
 	Titles                        []string
 	BookTitleParts                []BookTitlePart
 	BookAuthor                    string

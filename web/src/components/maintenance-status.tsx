@@ -3,9 +3,10 @@ import { ErrorNotice } from '@/components/common'
 import type { Status } from '@/lib/aiosource-types'
 
 const labels = {
+  games: 'Game information',
   books: 'Book information',
   videos: 'Video information',
-  metadata: 'Video and book information',
+  metadata: 'Video, game and book information',
   mapping: 'Automatic identifications',
   cache: 'Cache observations',
 }

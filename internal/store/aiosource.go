@@ -17,7 +17,7 @@ import (
 )
 
 func DefaultAIOConfig() model.AIOConfig {
-	return model.AIOConfig{Revision: 1, OpenLibraryMinutes: 15, OpenLibraryRelevantOnly: true, OpenLibraryLanguages: []string{}, AutoSync: true, AutoMatch: true, AutoCache: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
+	return model.AIOConfig{Revision: 1, IGDBMinutes: 15, IGDBRequestsPerSecond: 3, IGDBReconcileDays: 7, OpenLibraryMinutes: 15, OpenLibraryRelevantOnly: true, OpenLibraryLanguages: []string{}, AutoSync: true, AutoMatch: true, AutoCache: true, SyncMinutes: 15, MatchSeconds: 30, TMDBRequestsPerSecond: 35, CacheMinutes: 4320, ResponseSeconds: 5, Trackers: map[string]model.AIOTracker{}}
 }
 func (s *Store) AIOConfig(ctx context.Context) (model.AIOConfig, error) {
 	return readAIOConfig(ctx, s.pool)
@@ -139,7 +139,7 @@ COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM gr
 ), video_counts AS MATERIALIZED (
 ` + aioVideoCount + `
 ) SELECT
-video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton),video_counts.total,
+video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton)+(SELECT works FROM aiosources.igdb_state WHERE singleton),video_counts.total,
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
 ` + aioUpdateStatusColumns + ` FROM aiosources.aio_state CROSS JOIN counts CROSS JOIN video_counts`
 
@@ -161,7 +161,7 @@ func (s *Store) AIOInformationStatus(ctx context.Context) (model.AIOStatus, erro
 	var v model.AIOStatus
 	targets := append([]any{&v.Works, &v.VideoWorks}, aioUpdateStatusTargets(&v)...)
 	err := s.pool.QueryRow(ctx, `WITH video_counts AS (`+aioVideoCount+`)
-SELECT video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton),video_counts.total,`+aioUpdateStatusColumns+`
+SELECT video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton)+(SELECT works FROM aiosources.igdb_state WHERE singleton),video_counts.total,`+aioUpdateStatusColumns+`
 FROM aiosources.aio_state CROSS JOIN video_counts`).Scan(targets...)
 	return v, databaseError("read information statistics", err)
 }
@@ -178,12 +178,12 @@ ARRAY(SELECT title FROM aiosources.aio_titles WHERE work_id=w.id UNION SELECT w.
 COALESCE((SELECT jsonb_object_agg(season,year) FROM aiosources.aio_seasons WHERE work_id=w.id),'{}'),
 COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,w.localized_posters,
 w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM aiosources.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
-'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0))`
+'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0)),w.igdb_id,w.game_data`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork
-	var seasons, episodes, book []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book)
+	var seasons, episodes, book, game []byte
+	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book, &w.IGDB, &game)
 	if err != nil {
 		return w, err
 	}
@@ -192,6 +192,9 @@ func scanAIOWork(row scanner) (model.AIOWork, error) {
 	}
 	if err == nil && w.Type == "book" {
 		err = json.Unmarshal(book, &w.Book)
+	}
+	if err == nil && w.Type == "game" {
+		err = json.Unmarshal(game, &w.Game)
 	}
 	return w, err
 }
@@ -204,7 +207,7 @@ const aioCandidatesQuery = `WITH candidate_ids AS (
  UNION SELECT work_id FROM aiosources.aio_titles WHERE normalized=ANY($10::text[])
  UNION SELECT work_id FROM aiosources.aio_titles WHERE NOT $9::boolean AND normalized OPERATOR(public.%) $1 AND public.similarity(normalized,$1)>=0.5
 ) SELECT ` + aioWorkColumns + ` FROM candidate_ids c JOIN aiosources.aio_works w ON w.id=c.id
-WHERE NOT w.adult AND w.media_type<>'book' AND ($5='' OR w.media_type=$5) AND ($6::int IS NULL OR $6=ANY(w.years)
+WHERE NOT w.adult AND w.media_type IN ('movie','tv') AND ($5='' OR w.media_type=$5) AND ($6::int IS NULL OR $6=ANY(w.years)
 OR (w.media_type='tv' AND EXISTS(SELECT 1 FROM aiosources.aio_seasons s WHERE s.work_id=w.id AND s.season=ANY($7::int[]) AND s.year=$6))
 OR (w.media_type='tv' AND EXISTS(SELECT 1 FROM aiosources.aio_episodes e WHERE e.work_id=w.id AND e.season=ANY($7::int[]) AND e.year=$6 AND ($8::int IS NULL OR (cardinality($7::int[])=1 AND e.episode=$8)))))
 ORDER BY w.id LIMIT 101`
@@ -253,6 +256,7 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 	r.Title = text("title", "name")
 	r.VideoType = model.VideoTypeEvidence(f)
 	r.BookHints = model.BookSourceHints(f)
+	r.GameHints = model.GameSourceHints(f)
 	r.Hash = strings.ToLower(text("info_hash", "hash", "infohash"))
 	r.Size, _ = strconv.ParseInt(text("size"), 10, 64)
 	if published, err := time.Parse(time.RFC3339Nano, text("published_at")); err == nil {
@@ -262,7 +266,7 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 	if seconds, err := strconv.ParseFloat(text("duration"), 64); err == nil && seconds > 0 && !math.IsInf(seconds, 0) && seconds <= float64(1<<53-1)/1000 {
 		r.DurationSeconds = seconds
 	}
-	for kind, dst := range map[string]*string{"imdb": &r.IMDb, "tmdb": &r.TMDB, "tvdb": &r.TVDB, "mal": &r.MAL} {
+	for kind, dst := range map[string]*string{"imdb": &r.IMDb, "tmdb": &r.TMDB, "tvdb": &r.TVDB, "mal": &r.MAL, "igdb": &r.IGDB} {
 		values := []any{f[kind+"_id"], f[kind]}
 		if kind == "imdb" {
 			values = append(values, f["tt_id"])
@@ -272,6 +276,9 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 		}
 		if attrs, ok := f["attributes"].(map[string]any); ok {
 			values = append(values, attrs[kind], attrs[kind+"id"])
+			if kind == "igdb" {
+				values = append(values, attrs["igdb_id"])
+			}
 		}
 		established := ""
 		for _, value := range values {
@@ -314,6 +321,7 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 		i := int(n)
 		return &i
 	}
+	r.GameHints.IGDB = r.IGDB
 	r.Season = index("season")
 	r.Episode = index("episode")
 	// Source adapters use both ordinary fields and Torznab attributes. Only
@@ -429,7 +437,7 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized, matchedBookKind(r, work))
+	_, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,media_hint) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized, matchedBookKind(r, work), matchedMediaType(r, work))
 	if err != nil {
 		return databaseError("save correspondence", err)
 	}
@@ -440,9 +448,9 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 }
 func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]model.AIORecord, error) {
 	// The identifier column is selected from a closed allowlist, never user SQL.
-	column := map[string]string{"imdb": "imdb_id", "tmdb": "tmdb_id", "tvdb": "tvdb_id", "openlibrary": "openlibrary_id"}[kind]
+	column := map[string]string{"imdb": "imdb_id", "tmdb": "tmdb_id", "tvdb": "tvdb_id", "openlibrary": "openlibrary_id", "igdb": "igdb_id"}[kind]
 	typ := "tv"
-	if mediaType == "movie" || mediaType == "book" {
+	if mediaType == "movie" || mediaType == "book" || mediaType == "game" {
 		typ = mediaType
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`

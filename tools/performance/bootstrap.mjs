@@ -61,6 +61,7 @@ try {
       config.auto_match =
       config.auto_cache =
       config.openlibrary_enabled =
+      config.igdb_enabled =
         false;
     for (const key of Object.keys(config))
       if (key.endsWith("_secret")) config[key] = "";

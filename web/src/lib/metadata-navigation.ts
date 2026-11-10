@@ -1,7 +1,8 @@
-export type MetadataSection = 'videos' | 'books' | 'identification'
+export type MetadataSection = 'videos' | 'games' | 'books' | 'identification'
 
 export const metadataSections = {
   videos: { label: 'Videos', path: '/metadata/videos', service: 'tmdb' },
+  games: { label: 'Games', path: '/metadata/games', service: 'igdb' },
   books: { label: 'Books', path: '/metadata/books', service: 'openlibrary' },
   identification: {
     label: 'Identification',
@@ -12,7 +13,7 @@ export const metadataSections = {
 
 export function metadataOperationSection(kind: string, service: string): MetadataSection {
   if (kind === 'matching') return 'identification'
-  return service === 'openlibrary' ? 'books' : 'videos'
+  return service === 'igdb' ? 'games' : service === 'openlibrary' ? 'books' : 'videos'
 }
 
 export function metadataHistoryPath(section: MetadataSection) {
