@@ -1,5 +1,5 @@
 import { SourceFilter } from '@/components/source-filter'
-import { MultiSelect } from '@/components/ui/multi-select'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 
@@ -14,7 +14,7 @@ export function MediaTypeFilter({
 }: {
   id: string
   value: string[]
-  options: { value: string; label: string }[]
+  options: MultiSelectOption[]
   onChange: (value: string[]) => void
 }) {
   return (
@@ -26,6 +26,7 @@ export function MediaTypeFilter({
         allLabel="All media"
         value={value}
         options={options}
+        selectGroups
         onChange={onChange}
       />
     </div>
@@ -49,7 +50,7 @@ export function ConnectionFilterFields({
 }: {
   id: string
   media: string[]
-  mediaOptions: { value: string; label: string }[]
+  mediaOptions: MultiSelectOption[]
   onMediaChange: (value: string[]) => void
   sources: { id: string; name: string }[]
   sourceIDs: string[]

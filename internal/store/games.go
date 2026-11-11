@@ -199,7 +199,7 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 	}
 	// A one-time discovery also covers catalogs populated by an earlier
 	// preview. It does not repeatedly queue unchanged records on every poll.
-	backfill, err := tx.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('igdb.matching.v1','1') ON CONFLICT DO NOTHING`)
+	backfill, err := tx.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('igdb.matching.v2','1') ON CONFLICT DO NOTHING`)
 	if err != nil {
 		return err
 	}

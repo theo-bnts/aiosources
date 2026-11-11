@@ -1,10 +1,16 @@
 import { DropdownMenu } from 'radix-ui'
 import { useEffect, useRef, useState } from 'react'
-import { CheckIcon, CaretDownIcon } from '@phosphor-icons/react'
+import { CheckIcon, CaretDownIcon, MinusIcon } from '@phosphor-icons/react'
 import { popupLayer } from '@/lib/popup-layer'
 import { Button } from '@/components/ui/button'
+import {
+  selectionGroupState,
+  selectionLabels,
+  toggleSelectionGroup,
+  type MultiSelectOption,
+} from '@/lib/multi-select-values'
 
-export type MultiSelectOption = { value: string; label: string; group?: string }
+export type { MultiSelectOption } from '@/lib/multi-select-values'
 
 // The caller defines the empty selection. Source selectors use all sources,
 // including future entries; optional-field selectors use required fields only.
@@ -17,6 +23,7 @@ export function MultiSelect({
   onChange,
   name,
   disabled = false,
+  selectGroups = false,
 }: {
   id: string
   label: string
@@ -26,6 +33,7 @@ export function MultiSelect({
   onChange: (value: string[]) => void
   name?: string
   disabled?: boolean
+  selectGroups?: boolean
 }) {
   const trigger = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -34,9 +42,7 @@ export function MultiSelect({
   }, [disabled])
   const [insideDialog, setInsideDialog] = useState(false)
   const [topBoundary, setTopBoundary] = useState(8)
-  const selected = value.length
-    ? value.map((item) => options.find((option) => option.value === item)?.label ?? item).join(', ')
-    : allLabel
+  const selected = value.length ? selectionLabels(value, options, selectGroups) : allLabel
   const groups = [...new Set(options.map((option) => option.group ?? ''))]
   return (
     <>
@@ -86,16 +92,38 @@ export function MultiSelect({
               {allLabel}
             </DropdownMenu.Item>
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
-            {groups.map((group) => (
-              <DropdownMenu.Group key={group} aria-label={group || undefined}>
-                {group && (
-                  <DropdownMenu.Label className="px-3 py-2 text-xs font-medium text-muted-foreground">
-                    {group}
-                  </DropdownMenu.Label>
-                )}
-                {options
-                  .filter((option) => (option.group ?? '') === group)
-                  .map((option) => (
+            {groups.map((group) => {
+              const members = options.filter((option) => (option.group ?? '') === group)
+              const parent =
+                !!group && (!selectGroups || members.length !== 1 || members[0].label !== group)
+              const checked = selectionGroupState(value, members)
+              return (
+                <DropdownMenu.Group key={group} aria-label={group || undefined}>
+                  {parent && selectGroups ? (
+                    <DropdownMenu.CheckboxItem
+                      data-group={group}
+                      checked={checked}
+                      onCheckedChange={(next) =>
+                        onChange(toggleSelectionGroup(value, members, next === true))
+                      }
+                      onSelect={(event) => event.preventDefault()}
+                      className="relative flex min-h-(--control-height) cursor-pointer items-center rounded-sm py-2 pr-3 pl-8 text-sm font-medium outline-none data-[highlighted]:bg-accent"
+                    >
+                      <DropdownMenu.ItemIndicator className="absolute inset-y-0 left-2 flex items-center">
+                        {checked === 'indeterminate' ? (
+                          <MinusIcon aria-hidden="true" />
+                        ) : (
+                          <CheckIcon aria-hidden="true" />
+                        )}
+                      </DropdownMenu.ItemIndicator>
+                      <span>{group}</span>
+                    </DropdownMenu.CheckboxItem>
+                  ) : parent ? (
+                    <DropdownMenu.Label className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                      {group}
+                    </DropdownMenu.Label>
+                  ) : null}
+                  {members.map((option) => (
                     <DropdownMenu.CheckboxItem
                       key={option.value}
                       data-value={option.value}
@@ -108,16 +136,19 @@ export function MultiSelect({
                         )
                       }
                       onSelect={(event) => event.preventDefault()}
-                      className="relative flex min-h-(--control-height) cursor-pointer items-center rounded-sm py-2 pr-3 pl-8 text-sm outline-none data-[highlighted]:bg-accent"
+                      className={`relative flex min-h-(--control-height) cursor-pointer items-center rounded-sm py-2 pr-3 ${parent && selectGroups ? 'pl-12' : 'pl-8'} text-sm outline-none data-[highlighted]:bg-accent`}
                     >
-                      <DropdownMenu.ItemIndicator className="absolute inset-y-0 left-2 flex items-center">
+                      <DropdownMenu.ItemIndicator
+                        className={`absolute inset-y-0 ${parent && selectGroups ? 'left-6' : 'left-2'} flex items-center`}
+                      >
                         <CheckIcon aria-hidden="true" />
                       </DropdownMenu.ItemIndicator>
                       <span className="break-words">{option.label}</span>
                     </DropdownMenu.CheckboxItem>
                   ))}
-              </DropdownMenu.Group>
-            ))}
+                </DropdownMenu.Group>
+              )
+            })}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>

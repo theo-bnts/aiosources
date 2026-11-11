@@ -78,6 +78,72 @@ async function seedCatalog(page: Page, server: TestServer, debrid = false) {
   }
 }
 
+test('catalog covers contain every artwork shape in square areas on desktop and mobile', async ({
+  page,
+  server,
+}) => {
+  const ids = await seedCatalog(page, server)
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(`UPDATE aiosources.aio_works SET poster_path=CASE WHEN media_type='movie' THEN '/portrait.jpg' ELSE '/landscape.jpg' END;
+      INSERT INTO aiosources.aio_works(media_type,igdb_id,years,display_title,poster_path)
+      VALUES('game','303',ARRAY[2026],'Example Game','syntheticSquare');
+      INSERT INTO aiosources.aio_titles(work_id,title,normalized)
+      SELECT id,display_title,'example game' FROM aiosources.aio_works WHERE media_type='game';
+      INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
+      ('zulu','game-one','{"title":"Example.Game.Windows.v1.2.3","info_hash":"dddddddddddddddddddddddddddddddddddddddd","size":300,"igdb_id":"303"}');
+      INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+      SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','native identifier' FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.igdb_id=t.fields->>'igdb_id' WHERE w.media_type='game';
+      UPDATE aiosources.aio_matches m SET revision=w.revision FROM aiosources.aio_works w WHERE w.id=m.work_id;
+      DELETE FROM aiosources.aio_match_queue;`)
+  } finally {
+    await db.end()
+  }
+  await page.route(/https:\/\/(image\.tmdb\.org|images\.igdb\.com)\//, async (route) => {
+    const url = route.request().url()
+    const [width, height] = url.includes('portrait')
+      ? [96, 144]
+      : url.includes('landscape')
+        ? [144, 96]
+        : [96, 96]
+    await route.fulfill({
+      contentType: 'image/svg+xml',
+      body: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#80c6b6"/></svg>`,
+    })
+  })
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('/search?q=example')
+    const covers = page.locator('[data-slot="catalog-cover"] img')
+    await expect(covers).toHaveCount(3)
+    await expect
+      .poll(() =>
+        covers.evaluateAll((images) =>
+          images.every((image) => (image as HTMLImageElement).naturalWidth > 0),
+        ),
+      )
+      .toBe(true)
+    for (const cover of await covers.all()) {
+      expect(
+        await cover.evaluate((image) => {
+          const box = image.parentElement!.getBoundingClientRect()
+          return {
+            square: Math.abs(box.width - box.height) < 1,
+            fit: getComputedStyle(image).objectFit,
+          }
+        }),
+      ).toEqual({ square: true, fit: 'contain' })
+    }
+    await page.goto(`/search/${ids.movie}`)
+    const cover = page.locator('[data-slot="catalog-cover"]')
+    await expect(cover.locator('img')).toBeVisible()
+    const box = await cover.boundingBox()
+    expect(box && Math.abs(box.width - box.height) < 1).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  }
+})
+
 test('Search displays the same release details as Stremio at desktop and mobile widths', async ({
   page,
   server,
@@ -161,7 +227,7 @@ test('search and settings inputs match on mobile and combined filters stay usabl
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
     await page.reload()
-    await expect(page.getByLabel('Type', { exact: true })).toHaveText('Movies, Series')
+    await expect(page.getByLabel('Type', { exact: true })).toHaveText('Videos')
     await page.goto(`/search/${ids.movie}`)
     await openDisclosure(page, 'Filters')
     await selectMultiple(page, 'Source', ['alpha', 'zulu'])

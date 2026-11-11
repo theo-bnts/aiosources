@@ -172,27 +172,6 @@ export function PublicAccessSettings() {
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Switch
-                    id="public-stremio-enabled"
-                    checked={current.stremio_enabled}
-                    disabled={busy || !current.enabled}
-                    onCheckedChange={(stremio_enabled) => change({ stremio_enabled })}
-                  />
-                  <Label
-                    htmlFor="public-stremio-enabled"
-                    help={
-                      <>
-                        Visitors can create installation links for Stremio and AIOStreams. Disabling
-                        this option revokes those links without affecting other public features.
-                      </>
-                    }
-                  >
-                    Allow public Stremio connections
-                  </Label>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
                     id="public-torznab-enabled"
                     checked={current.torznab_enabled}
                     disabled={busy || !current.enabled}
@@ -208,6 +187,27 @@ export function PublicAccessSettings() {
                     }
                   >
                     Allow public Torznab connections
+                  </Label>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="public-stremio-enabled"
+                    checked={current.stremio_enabled}
+                    disabled={busy || !current.enabled}
+                    onCheckedChange={(stremio_enabled) => change({ stremio_enabled })}
+                  />
+                  <Label
+                    htmlFor="public-stremio-enabled"
+                    help={
+                      <>
+                        Visitors can create installation links for Stremio and AIOStreams. Disabling
+                        this option revokes those links without affecting other public features.
+                      </>
+                    }
+                  >
+                    Allow public Stremio connections
                   </Label>
                 </div>
               </div>

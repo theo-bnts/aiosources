@@ -64,7 +64,7 @@ test('Torznab saves cache and media filters with its access key and removes dupl
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()
   await expect(dialog.getByRole('button', { name: 'Services', exact: true })).toHaveText('TorBox')
   await expect(dialog.getByRole('button', { name: 'Media types', exact: true })).toHaveText(
-    'Movies, Series',
+    'Videos',
   )
   await expect(
     dialog.getByRole('switch', { name: 'Cached results only', exact: true }),

@@ -13,6 +13,7 @@ export function FilterSelect({
   defaultValue = '',
   onChange,
   name,
+  selectGroups = false,
 }: {
   id: string
   label: string
@@ -22,6 +23,7 @@ export function FilterSelect({
   defaultValue?: string
   onChange?: (value: string) => void
   name?: string
+  selectGroups?: boolean
 }) {
   const [draft, setDraft] = useState(defaultValue)
   const input = useRef<HTMLInputElement>(null)
@@ -51,6 +53,7 @@ export function FilterSelect({
         label={label}
         allLabel={allLabel}
         options={choices}
+        selectGroups={selectGroups}
         value={selected}
         onChange={(values) => {
           const next = values.join(',')

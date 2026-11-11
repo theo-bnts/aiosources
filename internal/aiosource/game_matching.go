@@ -17,9 +17,14 @@ type GameRelease struct {
 	Game, Conflict    bool
 }
 
-var gameGroupRE = regexp.MustCompile(`(?i)-(?:CODEX|RUNE|TENOKE|FLT|SKIDROW|RELOADED|GOG|DARKSiDERS|TiNYiSO|DINOByTES|PLAZA|EMPRESS|ElAmigos|FitGirl|DODI)(?:\b.*)?$`)
-var gameVersionRE = regexp.MustCompile(`(?i)\b(?:v\d+(?:[ ._-]\d+)+|build[ ._-]?\d+|repack|portable|multi\d*|french|english|german|spanish|italian|russian|japanese|digital[ ._-]?download|DRM[ ._-]?FREE)\b`)
-var gamePlatformRE = regexp.MustCompile(`(?i)\b(?:Windows|Win32|Win64|Linux|macOS|OSX|PC|PS[1-5]|PSP|PS[ ._-]?Vita|PlayStation[ ._-]?(?:[1-5]|Portable|Vita)|Nintendo[ ._-]?(?:Switch|3DS|DS)|Switch|N3DS|NDS|3DS|WiiU?|XBOX[ ._-]?(?:360|ONE|SERIES[ ._-]?[XS])|NSW)\b`)
+var gameGroupRE = regexp.MustCompile(`(?i)(?:-[\[(]?|[\[(])(?:CODEX|RUNE|TENOKE|FLT|SKIDROW|RELOADED|GOG|DARKSiDERS|TiNYiSO|DINOByTES|PLAZA|EMPRESS|ElAmigos|FitGirl|DODI)(?:\b.*)?$`)
+
+// These labels are removed only after independent game evidence is present.
+// An arbitrary hyphenated suffix must never turn a different title into a match.
+var gameExtraGroupRE = regexp.MustCompile(`(?i)(?:-[\[(]?|[\[(])(?:Mephisto|voices38|KaOs|InsaneRamZes|SeleZen|HardwareMining|Notag)(?:\b.*)?$`)
+var gameVersionRE = regexp.MustCompile(`(?i)\b(?:v[ ._-]?\d+(?:[ ._-]\d+)+|v\d{6,12}|build[ ._-]?\d+|repack|portable|multi\d*|french|english|german|spanish|italian|russian|japanese|digital[ ._-]?download|DRM[ ._-]?FREE)\b`)
+var gameArchitectureRE = regexp.MustCompile(`(?i)\b(?:x86[ ._-]64|x64|x86|preactivated|preactived|preinstalled)\b`)
+var gamePlatformRE = regexp.MustCompile(`(?i)\b(?:Windows|Win32|Win64|Win[ ._-]+(?:x86[ ._-]64|x64|x86|32|64)|Linux|macOS|OSX|PC|PS[1-5]|PSP|PS[ ._-]?Vita|PlayStation[ ._-]?(?:[1-5]|Portable|Vita)|Nintendo[ ._-]?(?:Switch(?:[ ._-]?2)?|3DS|DS)|Switch(?:[ ._-]?2)?|N3DS|NDS|3DS|WiiU?|XBOX[ ._-]?(?:360|ONE|SERIES[ ._-]?[XS])|NSW)\b`)
 var gamePackageRE = regexp.MustCompile(`(?i)\b(?:NSP|NSZ|XCI|XCZ|ISO|ROM)\b`)
 var gameYearRE = regexp.MustCompile(`(?:\((?:19|20|21)[0-9]{2}\)|\[(?:19|20|21)[0-9]{2}\])`)
 var gameCollectionRE = regexp.MustCompile(`(?i)\b(?:collection|anthology|mega[ ._-]?pack|games[ ._-]?pack)\b`)
@@ -27,7 +32,7 @@ var gameCollectionRE = regexp.MustCompile(`(?i)\b(?:collection|anthology|mega[ .
 func gamePlatform(value string) string {
 	v := Normalize(value)
 	switch v {
-	case "pc", "windows", "win32", "win64", "pc microsoft windows":
+	case "pc", "windows", "win32", "win64", "win x64", "win x86", "win x86 64", "win 32", "win 64", "pc microsoft windows":
 		return "windows"
 	case "linux", "steamos":
 		return "linux"
@@ -53,6 +58,8 @@ func gamePlatform(value string) string {
 		return "3ds"
 	case "switch", "nintendo switch", "nsw":
 		return "switch"
+	case "switch2", "switch 2", "nintendo switch2", "nintendo switch 2":
+		return "switch-2"
 	case "xbox 360", "xbox360":
 		return "xbox360"
 	case "xbox one", "xboxone":
@@ -97,7 +104,9 @@ func ParseGameRelease(r model.AIORecord) GameRelease {
 	strongPlatform := false
 	for _, marker := range markers {
 		v := gamePlatform(marker)
-		strongPlatform = strongPlatform || v != "windows" && v != "mac" && v != "linux" && !strings.EqualFold(marker, "switch")
+		label := Normalize(marker)
+		genericSwitch := label == "switch" || label == "switch 2" || label == "switch2"
+		strongPlatform = strongPlatform || v != "windows" && v != "mac" && v != "linux" && !genericSwitch
 	}
 	if (strongPlatform || gameGroupRE.MatchString(s)) && r.VideoType == "" && r.IMDb == "" && r.TMDB == "" && r.TVDB == "" {
 		p.Game = true
@@ -121,8 +130,10 @@ func ParseGameRelease(r model.AIORecord) GameRelease {
 		}
 	}
 	s = gameGroupRE.ReplaceAllString(s, "")
+	s = gameExtraGroupRE.ReplaceAllString(s, "")
 	s = gameVersionRE.ReplaceAllString(s, "")
 	s = gamePlatformRE.ReplaceAllString(s, "")
+	s = gameArchitectureRE.ReplaceAllString(s, "")
 	s = gamePackageRE.ReplaceAllString(s, "")
 	if at := gameYearRE.FindStringIndex(s); at != nil && len(strings.TrimSpace(s[:at[0]])) > 1 {
 		year, _ := strconv.Atoi(strings.Trim(s[at[0]:at[1]], "()[]"))

@@ -28,10 +28,13 @@ catalog_book_authors AS MATERIALIZED(
 
 func catalogBookCandidates(query, normalized, matching, anchor string) string {
 	workMatching := strings.ReplaceAll(matching, "normalized ", "book_normalized ")
+	// This input is identical for every candidate. An InitPlan resolves it once,
+	// instead of repeating the recursive lookup for each locally known edition.
+	identity := `(SELECT aiosources.ol_resolve(` + query + `))`
 	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized)
  FROM catalog_books WHERE ` + workMatching + `
- UNION ALL SELECT id,5,1::real FROM catalog_books WHERE openlibrary_id<>'' AND openlibrary_id=aiosources.ol_resolve(` + query + `)
- UNION ALL SELECT work_id,5,1::real FROM catalog_book_editions WHERE isbn @> ARRAY[` + query + `::text] OR id=aiosources.ol_resolve(` + query + `)
+ UNION ALL SELECT id,5,1::real FROM catalog_books WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
+ UNION ALL SELECT work_id,5,1::real FROM catalog_book_editions WHERE isbn @> ARRAY[` + query + `::text] OR id=` + identity + `
  UNION ALL SELECT work_id,CASE WHEN normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,normalized)
  FROM catalog_book_editions WHERE ` + matching + `
  UNION ALL SELECT work_id,1,0.6::real FROM catalog_book_authors WHERE ` + matching

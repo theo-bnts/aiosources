@@ -2,6 +2,7 @@ import { CatalogCover } from '@/components/catalog-cover'
 import { useLayoutEffect, useState } from 'react'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
 import { FilterSelect } from '@/components/filter-select'
+import { catalogMediaTypes } from '@/lib/connection-options'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
 import { readResultSorting } from '@/lib/result-preferences'
@@ -138,14 +139,8 @@ export function CatalogSearchPage() {
                 label="Type"
                 allLabel="All media"
                 defaultValue={kind}
-                options={[
-                  { value: 'movie', label: 'Movies' },
-                  { value: 'tv', label: 'Series' },
-                  { value: 'game', label: 'Games' },
-                  { value: 'ebook', label: 'Ebooks' },
-                  { value: 'audiobook', label: 'Audiobooks' },
-                  { value: 'book', label: 'Other books' },
-                ]}
+                options={catalogMediaTypes}
+                selectGroups
               />
             </div>
             <div className="field min-w-0">

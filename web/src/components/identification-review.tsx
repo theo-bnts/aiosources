@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FilterSelect } from '@/components/filter-select'
+import { reviewMediaTypes } from '@/lib/connection-options'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, params, queryClient, refreshData } from '@/lib/api'
 import { browserLanguage } from '@/lib/language-preferences'
@@ -263,12 +264,8 @@ function ReviewForm({
             allLabel="All media"
             value={kind}
             onChange={setKind}
-            options={[
-              { value: 'movie', label: 'Movies' },
-              { value: 'tv', label: 'Series' },
-              { value: 'game', label: 'Games' },
-              { value: 'book', label: 'Books' },
-            ]}
+            options={reviewMediaTypes}
+            selectGroups
           />
         </div>
         <div className="field w-28">

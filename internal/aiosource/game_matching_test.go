@@ -46,7 +46,7 @@ func TestGameIdentificationKeepsPlatformsSequelsAndOtherMediaSeparate(t *testing
 	if p := ParseGameRelease(model.AIORecord{Title: "Synthetic Odyssey S01E02 1080p", GameHints: model.GameHints{Categories: []int{5000}}}); p.Game {
 		t.Fatal("ordinary series became a game")
 	}
-	for _, title := range []string{"The.Switch.2024.1080p", "Synthetic.Reloaded.2024.720p", "An.Ancient.Rune.2024", "Synthetic.Windows.2024"} {
+	for _, title := range []string{"The.Switch.2024.1080p", "Example.Switch.2.2026.1080p", "Synthetic.Reloaded.2024.720p", "An.Ancient.Rune.2024", "Synthetic.Windows.2024"} {
 		if p := ParseGameRelease(model.AIORecord{Title: title}); p.Game {
 			t.Fatal("an ordinary title word became game evidence", title)
 		}
@@ -90,5 +90,41 @@ func TestGameArchivesUseFileSelectionWithoutBecomingVideos(t *testing.T) {
 	}
 	if _, err = ParseID("igdb:101:1", "game"); err == nil {
 		t.Fatal("game accepted video numbering")
+	}
+}
+
+func TestGameReleaseTechnicalLabelsPreserveExactIdentity(t *testing.T) {
+	work := model.AIOWork{Type: "game", IGDB: "101", Titles: []string{"Example Odyssey"}, Game: model.GameInformation{Platforms: []model.GamePlatform{{Name: "PC (Microsoft Windows)"}}}}
+	for _, suffix := range []string{
+		".v.1.2.3.Portable.FRENCH.MULTI10.x86_64-InsaneRamZes",
+		" (V12345678) [WIN X64 MULTI PORTABLE] [PREACTIVATED]",
+		".Windows.x64.Multi.Repack-FitGirl",
+		".v1.2.3-[FitGirl-Repack]",
+		".[FitGirl.Repack]",
+		".MULTI14.REPACK-KaOs",
+		"-Mephisto",
+	} {
+		r := model.AIORecord{Title: "Example.Odyssey" + suffix, GameHints: model.GameHints{Kind: "game"}}
+		parsed := ParseGameRelease(r)
+		result, err := decideGame(r, parsed, func(model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
+			return []model.AIOWork{work}, false, nil
+		})
+		if err != nil || result.Status != "matched" || parsed.Normalized != "example odyssey" {
+			t.Fatalf("technical suffix %q changed the identity: %+v, %s, %v", suffix, parsed, result.Status, err)
+		}
+	}
+	for _, suffix := range []string{".2.WIN.X64", ".Deluxe.Edition.WIN.X64", ".Update.v1.2.3-ElAmigos", ".DLC.v1.2.3-RUNE", "-UnknownGroup", ".Linux.x64"} {
+		r := model.AIORecord{Title: "Example.Odyssey" + suffix, GameHints: model.GameHints{Kind: "game"}}
+		result, err := decideGame(r, ParseGameRelease(r), func(model.AIOCandidateFilter) ([]model.AIOWork, bool, error) {
+			return []model.AIOWork{work}, false, nil
+		})
+		if err != nil || result.Status == "matched" {
+			t.Fatalf("distinct or incompatible release %q became the base game: %s, %v", suffix, result.Status, err)
+		}
+	}
+	for _, title := range []string{"Example.Odyssey-Notag", "Example.Win.x64", "Example.Odyssey-Mephisto"} {
+		if parsed := ParseGameRelease(model.AIORecord{Title: title}); parsed.Game {
+			t.Fatal("a weak label became independent game evidence", title)
+		}
 	}
 }

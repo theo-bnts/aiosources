@@ -22,9 +22,10 @@ export function CatalogCover({
   const Icon = game ? GameControllerIcon : book ? BookOpenIcon : FilmStripIcon
   return (
     <div
+      data-slot="catalog-cover"
       className={cn(
         'flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-muted-foreground',
-        large ? 'h-36 w-24' : 'h-18 w-12',
+        large ? 'size-36' : 'size-18',
       )}
       aria-hidden="true"
     >
@@ -32,12 +33,12 @@ export function CatalogCover({
         <img
           src={src}
           alt=""
-          width={large ? 96 : 48}
+          width={large ? 144 : 72}
           height={large ? 144 : 72}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
           onError={() => setFailed(src)}
         />
       ) : (

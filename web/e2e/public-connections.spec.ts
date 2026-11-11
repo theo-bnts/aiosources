@@ -54,7 +54,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await visitor.goto('/')
     const navigation = visitor.getByRole('navigation', { name: 'Main navigation' })
-    await expect(navigation.getByRole('link')).toHaveText(['Stremio', 'Torznab'])
+    await expect(navigation.getByRole('link')).toHaveText(['Torznab', 'Stremio'])
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(
       'Connections',
     )
@@ -73,7 +73,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     const key = visitor.getByLabel('API key', { exact: true })
     await expect(key).toHaveAttribute('type', 'password')
     await expect(key).not.toHaveValue('')
-    await expect(visitor.getByLabel('Media types', { exact: true })).toHaveText('Movies, Series')
+    await expect(visitor.getByLabel('Media types', { exact: true })).toHaveText('Videos')
     await expect(visitor.getByLabel('Services', { exact: true })).toHaveText('TorBox, AllDebrid')
     await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeChecked()
     let credential = await key.inputValue()
@@ -168,8 +168,8 @@ test('public connections share the shell and encrypted Torznab filters without v
     )
     await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
     await expect(visitor.getByRole('dialog').getByRole('link')).toHaveText([
-      'Stremio',
       'Torznab',
+      'Stremio',
       'Admin login',
     ])
     await visitor.getByRole('button', { name: 'Close navigation', exact: true }).click()

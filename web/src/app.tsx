@@ -218,16 +218,16 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/addon',
-        label: 'Stremio',
-        description: 'Connect your catalog to Stremio or AIOStreams.',
-        icon: PlayCircleIcon,
-      },
-      {
         to: '/torznab',
         label: 'Torznab',
         description: 'Connect external applications to your published catalog.',
         icon: BroadcastIcon,
+      },
+      {
+        to: '/addon',
+        label: 'Stremio',
+        description: 'Connect your catalog to Stremio or AIOStreams.',
+        icon: PlayCircleIcon,
       },
       {
         to: '/sharing',
@@ -334,16 +334,16 @@ const publicNavigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/public',
-        label: 'Stremio',
-        description: 'Connect Stremio or AIOStreams with your own debrid accounts.',
-        icon: PlayCircleIcon,
-      },
-      {
         to: '/public/torznab',
         label: 'Torznab',
         description: 'Connect a Torznab client with your own optional announce URLs.',
         icon: BroadcastIcon,
+      },
+      {
+        to: '/public',
+        label: 'Stremio',
+        description: 'Connect Stremio or AIOStreams with your own debrid accounts.',
+        icon: PlayCircleIcon,
       },
       {
         to: '/public/sharing',

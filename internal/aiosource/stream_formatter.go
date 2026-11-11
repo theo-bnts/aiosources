@@ -70,6 +70,7 @@ func formatStream(stream Stream, rec model.AIORecord) Stream {
 // may be shown; this formatter never falls back to a private source identity.
 func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.ReleasePresentation {
 	presentation := model.ReleasePresentation{Details: []string{}}
+	presentation.Details = append(presentation.Details, releaseContentDetails(rec)...)
 	// Prefer the selected file for episode-specific tags; the folder supplies
 	// release metadata absent from otherwise bare episode filenames.
 	technical := rec.Title[presentationMetadataStart(rec.Title):]

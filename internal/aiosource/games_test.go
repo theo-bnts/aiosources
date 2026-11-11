@@ -374,7 +374,8 @@ func TestGamesBackfillOlderCatalogsOnceWithoutRepeatingIdentification(t *testing
 	if err = s.DB.CompleteGameUpdate(ctx, state); err != nil {
 		t.Fatal(err)
 	}
-	_, err = conn.Exec(ctx, `DELETE FROM aiosources.settings WHERE key='igdb.matching.v1';
+	_, err = conn.Exec(ctx, `DELETE FROM aiosources.settings WHERE key='igdb.matching.v2';
+ INSERT INTO aiosources.settings(key,value) VALUES('igdb.matching.v1','1') ON CONFLICT DO NOTHING;
  INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('fixture','legacy-game','{"title":"Synthetic Odyssey PC","category":"Jeux PC"}');
  INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,status,reason,normalized) SELECT provider_id,source_id,fields_fingerprint,'unmatched','insufficient evidence','synthetic odyssey pc' FROM aiosources.torrents;
  DELETE FROM aiosources.aio_match_queue;`)

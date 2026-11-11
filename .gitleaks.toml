@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The game backfill regression uses these public setting identifiers, not API credentials."
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^internal/aiosource/games_test\.go$''']
+regexTarget = "secret"
+regexes = ['''^igdb\.matching\.v[12]$''']

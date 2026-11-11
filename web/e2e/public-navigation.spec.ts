@@ -44,6 +44,10 @@ test('public navigation only offers enabled connections and follows policy chang
     await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
     await save()
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toBeVisible()
+    await expect(nav.getByRole('link', { name: /^(Torznab|Stremio)$/ })).toHaveText([
+      'Torznab',
+      'Stremio',
+    ])
     await nav.getByRole('link', { name: 'Torznab', exact: true }).click()
     await expect(
       visitor.getByRole('button', { name: 'Create connection link', exact: true }),

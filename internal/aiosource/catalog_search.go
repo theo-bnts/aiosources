@@ -325,7 +325,9 @@ func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resour
 				item.ProviderName = row.Provider
 			}
 		}
-		item.Presentation = formatReleasePresentation(row.AIORecord, releaseBehavior(row.AIORecord, item.ProviderName))
+		presentation := row.AIORecord
+		presentation.IdentificationType = r.Type
+		item.Presentation = formatReleasePresentation(presentation, releaseBehavior(row.AIORecord, item.ProviderName))
 		rank := ranks[row.OccurrenceID]
 		rank.cached = 0
 		for _, service := range item.Services {

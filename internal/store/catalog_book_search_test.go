@@ -44,7 +44,7 @@ SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched',
 		}
 		return values
 	}
-	for _, query := range []string{"example", "amber", "silver field", "old author", "morgan vale", "other author", "orchard morgan", "morgan silver field", "cycle", "unpublished", "OL200M", "OL104W", "9780306406157"} {
+	for _, query := range []string{"example", "amber", "silver field", "old author", "morgan vale", "other author", "orchard morgan", "morgan silver field", "cycle", "unpublished", "OL200M", "OL104W", "9780306406157", "or", "ex morgan"} {
 		args := []any{query, strings.ToLower(query)}
 		terms := []string{}
 		anchor := ""
