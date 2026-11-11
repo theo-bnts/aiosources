@@ -1,4 +1,3 @@
-
 name: Tests CI
 
 on:
@@ -43,16 +42,30 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix web ci --no-audit --no-fund
       - name: Build embedded application
-        run: make build
+        run: CGO_ENABLED=0 make build
       - name: Tests with race detection
         run: |
           go test -race -count=1 ./...
           go -C torznab test -race -count=1 ./...
-      - name: Install browser
-        working-directory: web
-        run: npx playwright install --with-deps chromium
       - name: Browser regressions
-        run: make e2e
+        env:
+          BROWSER_IMAGE: mcr.microsoft.com/playwright:v1.63.0-resolute@sha256:b022639ae9197f864040f92eef7b57c6d4b47db2190f77c909d8a5d902dd4b7e
+        run: |
+          set -euo pipefail
+          playwright_version="$(node -p "require('./web/node_modules/@playwright/test/package.json').version")"
+          case "$BROWSER_IMAGE" in
+            "mcr.microsoft.com/playwright:v${playwright_version}-resolute@sha256:"*) ;;
+            *) echo "::error::The pinned browser image must match the installed Playwright version."; exit 1 ;;
+          esac
+          docker run --rm --init --network host --shm-size=1g \
+            --user "$(id -u):$(id -g)" \
+            --env CI=true \
+            --env TEST_DATABASE_URL \
+            --env HOME=/tmp/aiosources-browser-home \
+            --mount "type=bind,source=${GITHUB_WORKSPACE},target=/work" \
+            --workdir /work \
+            "$BROWSER_IMAGE" \
+            sh -c 'mkdir -p "$HOME" && npm --prefix web run e2e'
       - name: Compile both Linux architectures
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags production -trimpath -o /tmp/aiosource-amd64 ./cmd/aiosources
