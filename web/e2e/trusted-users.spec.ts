@@ -25,7 +25,7 @@ test('trusted users have the visitor workspace with instance services and no adm
     .locator('details')
     .filter({ has: page.locator('summary').getByText('Permissions', { exact: true }) })
   await expect(permissions).not.toHaveAttribute('open', '')
-  await permissions.locator('summary').click()
+  await permissions.locator('summary').getByText('Permissions', { exact: true }).click()
   await expect(
     dialog.getByRole('switch', { name: 'Allow shared catalogs', exact: true }),
   ).toBeDisabled()
@@ -119,7 +119,17 @@ test('trusted account controls fit on mobile and saved permissions remain explic
   } catch {
     throw new Error('Could not fill the isolated trusted-user credential.')
   }
-  await dialog.locator('summary').filter({ hasText: 'Permissions' }).click()
+  const permissions = dialog.locator('details').filter({
+    has: page.locator('summary').getByText('Permissions', { exact: true }),
+  })
+  // Help and disclosure are distinct actions. A summary's center can land on
+  // the help icon at narrow widths, depending on the platform's font metrics.
+  await dialog.getByRole('button', { name: 'About Permissions', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'About Permissions', exact: true })).toBeVisible()
+  await expect(permissions).not.toHaveAttribute('open', '')
+  await page.keyboard.press('Escape')
+  await permissions.locator('summary').getByText('Permissions', { exact: true }).click()
+  await expect(permissions).toHaveAttribute('open', '')
   await dialog.getByRole('switch', { name: 'Allow Torznab connections', exact: true }).check()
   // Credential managers can populate the native field without a React event.
   try {
@@ -186,7 +196,7 @@ test('trusted personal credentials reuse the public forms and remember announces
   await editor.getByLabel('Email', { exact: true }).fill('personal.reader@example.invalid')
   await editor.getByLabel('Password', { exact: true }).fill('synthetic personal password')
   await editor.getByRole('switch', { name: 'Enable account', exact: true }).check()
-  await editor.locator('summary').filter({ hasText: 'Permissions' }).click()
+  await editor.locator('summary').getByText('Permissions', { exact: true }).click()
   for (const name of [
     'Allow Search',
     'Allow Torznab connections',
