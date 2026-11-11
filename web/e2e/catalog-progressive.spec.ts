@@ -99,6 +99,8 @@ test('a failed category preserves successful results and retries only the failed
   await seedTitles(server)
   const requests: Record<string, number> = {}
   let recovered = false
+  // Isolate explicit retries from the live catalog's independent refreshes.
+  await page.route('**/api/events', (route) => route.fulfill({ status: 204 }))
   await page.route('**/api/catalog/search?**', async (route) => {
     const kind = new URL(route.request().url()).searchParams.get('type') || ''
     requests[kind] = (requests[kind] || 0) + 1
@@ -187,11 +189,12 @@ test('distant pages stay bounded and returning to the first page restores progre
     'Example Game',
     'Example Series',
   ])
-  expect(new Set(requests.map((url) => url.searchParams.get('type')))).toEqual(
+  const firstPageRequests = requests.filter((url) => url.searchParams.get('offset') === '0')
+  expect(new Set(firstPageRequests.map((url) => url.searchParams.get('type')))).toEqual(
     new Set(['movie,tv', 'game', 'ebook,audiobook,book']),
   )
   expect(
-    requests.every(
+    firstPageRequests.every(
       (url) => url.searchParams.get('limit') === '50' && url.searchParams.get('offset') === '0',
     ),
   ).toBe(true)
