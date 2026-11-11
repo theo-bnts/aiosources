@@ -65,6 +65,15 @@ func (r countedCatalogRow) Scan(values ...any) error {
 	return r.row.Scan(append([]any{r.total}, values...)...)
 }
 
+type rankedCatalogRow struct {
+	row  scanner
+	rank *model.CatalogSearchRanking
+}
+
+func (r rankedCatalogRow) Scan(values ...any) error {
+	return r.row.Scan(append([]any{&r.rank.Precision, &r.rank.Relevance, &r.rank.Year}, values...)...)
+}
+
 func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
@@ -143,16 +152,18 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	args = append(args, locale, opts.Limit, opts.Offset)
 	// The total and visible page share the same candidate search. In particular,
 	// book editions/aliases must not be materialized twice for every search.
-	rows, err := tx.Query(ctx, bookScope+`SELECT count(*) OVER(),`+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
+	rows, err := tx.Query(ctx, bookScope+`SELECT count(*) OVER(),candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,`+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
 	}
 	for rows.Next() {
-		title, e := scanCatalogTitle(countedCatalogRow{row: rows, total: &result.Total})
+		rank := &model.CatalogSearchRanking{}
+		title, e := scanCatalogTitle(rankedCatalogRow{row: countedCatalogRow{row: rows, total: &result.Total}, rank: rank})
 		if e != nil {
 			rows.Close()
 			return result, databaseError("read catalog title", e)
 		}
+		title.Ranking = rank
 		result.Items = append(result.Items, title)
 	}
 	err = rows.Err()

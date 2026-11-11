@@ -24,7 +24,7 @@ export function CatalogCover({
     <div
       data-slot="catalog-cover"
       className={cn(
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted text-muted-foreground',
+        'flex shrink-0 items-center justify-center text-muted-foreground',
         large ? 'size-36' : 'size-18',
       )}
       aria-hidden="true"
@@ -33,12 +33,10 @@ export function CatalogCover({
         <img
           src={src}
           alt=""
-          width={large ? 144 : 72}
-          height={large ? 144 : 72}
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="h-full w-full object-contain"
+          className="block h-auto max-h-full w-auto max-w-full rounded-md border border-border bg-muted object-contain"
           onError={() => setFailed(src)}
         />
       ) : (

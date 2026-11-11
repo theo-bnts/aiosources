@@ -18,21 +18,30 @@ type CatalogReleaseFilters struct {
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
-	IGDB        string           `json:"igdb,omitempty"`
-	Platforms   []GamePlatform   `json:"platforms,omitempty"`
-	OpenLibrary string           `json:"openlibrary,omitempty"`
-	Cover       string           `json:"cover,omitempty"`
-	Authors     []string         `json:"authors,omitempty"`
-	Selection   CatalogSelection `json:"selection"`
-	Seasons     []int            `json:"seasons"`
-	ID          int64            `json:"id"`
-	Type        string           `json:"type"`
-	Title       string           `json:"title"`
-	Years       []int            `json:"years"`
-	TMDB        string           `json:"tmdb"`
-	IMDb        string           `json:"imdb"`
-	Releases    int64            `json:"releases"`
-	Providers   []string         `json:"providers"`
+	Ranking     *CatalogSearchRanking `json:"ranking,omitempty"`
+	IGDB        string                `json:"igdb,omitempty"`
+	Platforms   []GamePlatform        `json:"platforms,omitempty"`
+	OpenLibrary string                `json:"openlibrary,omitempty"`
+	Cover       string                `json:"cover,omitempty"`
+	Authors     []string              `json:"authors,omitempty"`
+	Selection   CatalogSelection      `json:"selection"`
+	Seasons     []int                 `json:"seasons"`
+	ID          int64                 `json:"id"`
+	Type        string                `json:"type"`
+	Title       string                `json:"title"`
+	Years       []int                 `json:"years"`
+	TMDB        string                `json:"tmdb"`
+	IMDb        string                `json:"imdb"`
+	Releases    int64                 `json:"releases"`
+	Providers   []string              `json:"providers"`
+}
+
+// Ranking mirrors the catalog's SQL ordering so independently completed media
+// searches can be combined without changing relevance or relying on labels.
+type CatalogSearchRanking struct {
+	Precision int     `json:"precision"`
+	Relevance float32 `json:"relevance"`
+	Year      int     `json:"year"`
 }
 
 type CatalogRelease struct {

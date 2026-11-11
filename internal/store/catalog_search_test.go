@@ -2,12 +2,134 @@ package store
 
 import (
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+func TestCatalogCategoryPagesKeepGlobalRankingAndTotals(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	// Repeated ranking keys exercise the identifier tie-breaker across categories.
+	for i := range 90 {
+		kind := []string{"movie", "tv", "game", "book"}[i%4]
+		var id int64
+		var tmdb any
+		igdb, openlibrary := "", ""
+		switch kind {
+		case "movie", "tv":
+			tmdb = fmt.Sprint(1000 + i)
+		case "game":
+			igdb = fmt.Sprint(2000 + i)
+		case "book":
+			openlibrary = fmt.Sprintf("OL%dW", 3000+i)
+		}
+		if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,igdb_id,openlibrary_id,display_title,book_normalized,years)
+VALUES($1,$2,$3,$4,'Example Journey','example journey',$5) RETURNING id`, kind, tmdb, igdb, openlibrary, []int{2000 + i%7}).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_titles(work_id,title,normalized) VALUES($1,'Example Journey',$2)`, id, []string{"example journey", "example journey home", "example journey"}[i%3]); err != nil {
+			t.Fatal(err)
+		}
+		source := fmt.Sprint(id)
+		publishSharingRow(t, ctx, db, "fixture", source, `{"title":"Example.Journey","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind)
+SELECT provider_id,source_id,fields_fingerprint,$1,1,'matched','fixture',$3 FROM aiosources.torrents WHERE source_id=$2`, id, source, []string{"ebook", "audiobook", "book"}[i%3]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		query               string
+		year, limit, offset int
+		families            []string
+	}{
+		{"example journey", 0, 25, 0, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+		{"example journey", 0, 25, 25, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+		{"example journey", 0, 50, 50, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+		{"example journey", 2004, 25, 0, []string{"movie", "ebook,audiobook"}},
+		{"example journey", 0, 25, 100, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+		{"1000", 0, 25, 0, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+		{"no result", 0, 25, 0, []string{"movie,tv", "game", "ebook,audiobook,book"}},
+	} {
+		selection := strings.Join(tc.families, ",")
+		global, err := db.CatalogTitles(ctx, model.ListOptions{Query: tc.query, Limit: tc.limit, Offset: tc.offset}, tc.query, model.CatalogSearchFilters{Type: selection, Year: tc.year, Language: "fr"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var items []model.CatalogTitle
+		var total int64
+		for _, family := range tc.families {
+			page, err := db.CatalogTitles(ctx, model.ListOptions{Query: tc.query, Limit: tc.limit + tc.offset}, tc.query, model.CatalogSearchFilters{Type: family, Year: tc.year, Language: "fr"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			items = append(items, page.Items...)
+			total += page.Total
+		}
+		slices.SortFunc(items, func(a, b model.CatalogTitle) int {
+			if a.Ranking == nil || b.Ranking == nil {
+				t.Fatal("search omitted ranking")
+			}
+			if d := b.Ranking.Precision - a.Ranking.Precision; d != 0 {
+				return d
+			}
+			if a.Ranking.Relevance != b.Ranking.Relevance {
+				if a.Ranking.Relevance > b.Ranking.Relevance {
+					return -1
+				}
+				return 1
+			}
+			if d := b.Ranking.Year - a.Ranking.Year; d != 0 {
+				return d
+			}
+			if a.ID < b.ID {
+				return -1
+			}
+			if a.ID > b.ID {
+				return 1
+			}
+			return 0
+		})
+		items = items[min(tc.offset, len(items)):min(tc.offset+tc.limit, len(items))]
+		if total != global.Total || len(items) != len(global.Items) {
+			t.Fatal("category totals or page length differ", tc, total, global.Total)
+		}
+		for i, item := range items {
+			if item.ID != global.Items[i].ID || *item.Ranking != *global.Items[i].Ranking {
+				t.Fatal("category ordering differs from global query", tc, i)
+			}
+		}
+	}
+	var id int64
+	if err := db.pool.QueryRow(ctx, `SELECT id FROM aiosources.aio_works WHERE media_type='book' ORDER BY id LIMIT 1`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_works SET years='{}' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized,year) SELECT 'OL9999M',ARRAY[openlibrary_id],'Example Journey','example journey',2099 FROM aiosources.aio_works WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	page, err := db.CatalogTitles(ctx, model.ListOptions{Query: "example journey"}, "example journey", model.CatalogSearchFilters{Type: "ebook,audiobook,book"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range page.Items {
+		if item.ID == id && (item.Ranking == nil || item.Ranking.Year != 0 || !slices.Equal(item.Years, []int{2099})) {
+			t.Fatal("displayed edition year changed the global rank", item)
+		}
+	}
+	detail, err := db.CatalogTitle(ctx, id)
+	if err != nil || detail.Ranking != nil {
+		t.Fatal("detail should not include search-only ordering keys", err)
+	}
+}
 
 func TestBookFormatFiltersAreDisjointAndCombineWithoutLosingTitles(t *testing.T) {
 	ctx, db := sharingDatabase(t)

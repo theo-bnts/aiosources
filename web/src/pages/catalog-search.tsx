@@ -1,4 +1,5 @@
 import { CatalogCover } from '@/components/catalog-cover'
+import { useCatalogSearch } from '@/lib/use-catalog-search'
 import { useLayoutEffect, useState } from 'react'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
 import { FilterSelect } from '@/components/filter-select'
@@ -78,27 +79,13 @@ export function CatalogSearchPage() {
   useLayoutEffect(() => setDraftQuery(q), [q])
   const kind = search.get('type') || ''
   const year = search.get('year') || ''
-  const query = useQuery({
-    queryKey: visitor
-      ? [
-          'public-catalog',
-          visitor.scope,
-          'search',
-          q,
-          kind,
-          year,
-          language,
-          pagination.limit,
-          pagination.offset,
-        ]
-      : ['catalog-search', q, kind, year, language, pagination.limit, pagination.offset],
-    queryFn: ({ signal }) => {
-      const path = `/catalog/search?${params({ q, type: kind, year, language, limit: pagination.limit, offset: pagination.offset })}`
-      return visitor
-        ? publicAPI<Page<CatalogTitle>>(path, visitor.configuration, { signal }, visitor.credential)
-        : api<Page<CatalogTitle>>(path, { signal })
-    },
-    enabled: q.trim().length >= 2,
+  const query = useCatalogSearch({
+    q,
+    type: kind,
+    year,
+    language,
+    limit: pagination.limit,
+    offset: pagination.offset,
   })
   return (
     <div className={visitor ? 'space-y-6' : 'page'}>
@@ -171,89 +158,103 @@ export function CatalogSearchPage() {
           />
         </div>
       </form>
-      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      <ErrorNotice error={query.error} retry={query.refetch} />
       {q.trim().length < 2 ? (
         <Empty
           title="Find a title"
           description="Search your identified catalog, then choose a version to download through your debrid services."
           icon={MagnifyingGlassIcon}
         />
-      ) : query.isPending ? (
-        <Loading label="Searching titles" />
       ) : (
-        query.data && (
-          <>
+        <>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <ResultCount total={query.data.total} label="titles" />
-            {query.data.items?.length ? (
-              <div className="table-frame">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead className="text-right">Source releases</TableHead>
-                      <TableHead>
-                        <span className="sr-only">Open</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {query.data.items?.map((title) => (
-                      <TableRow key={title.id}>
-                        <TableCell className="whitespace-normal">
-                          <div className="flex min-w-0 items-start gap-3">
-                            <CatalogCover
-                              src={title.cover}
-                              book={title.type === 'book'}
-                              game={title.type === 'game'}
-                            />
-                            <div className="min-w-0">
-                              <Link
-                                to={`${searchPath}/${title.id}?${params({ q })}`}
-                                state={listState}
-                                className="font-medium break-words"
-                              >
-                                {title.title}
-                              </Link>
-                              <TitleDetails title={title} />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right mono">{number(title.releases)}</TableCell>
-                        <TableCell>
-                          <Button asChild size="icon-sm" variant="ghost">
+            <p
+              className="help"
+              role="status"
+              aria-label="Category search progress"
+              data-search-complete={query.complete}
+              title={query.categoryStatus}
+            >
+              · {query.completedCategories}/{query.totalCategories}{' '}
+              {query.totalCategories === 1 ? 'category' : 'categories'} complete
+            </p>
+          </div>
+          {query.data.items?.length ? (
+            <div className="table-frame">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead className="text-right">Source releases</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Open</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {query.data.items?.map((title) => (
+                    <TableRow key={title.id}>
+                      <TableCell className="whitespace-normal">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <CatalogCover
+                            src={title.cover}
+                            book={title.type === 'book'}
+                            game={title.type === 'game'}
+                          />
+                          <div className="min-w-0">
                             <Link
                               to={`${searchPath}/${title.id}?${params({ q })}`}
                               state={listState}
-                              aria-label={`Show releases for ${title.title}`}
+                              className="font-medium break-words"
                             >
-                              <ArrowRightIcon />
+                              {title.title}
                             </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <Empty
-                title="No matching titles"
-                description={
-                  visitor
+                            <TitleDetails title={title} />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right mono">{number(title.releases)}</TableCell>
+                      <TableCell>
+                        <Button asChild size="icon-sm" variant="ghost">
+                          <Link
+                            to={`${searchPath}/${title.id}?${params({ q })}`}
+                            state={listState}
+                            aria-label={`Show releases for ${title.title}`}
+                          >
+                            <ArrowRightIcon />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : query.isPending ? (
+            <Loading label="Searching titles" />
+          ) : !query.error ? (
+            <Empty
+              title={query.data.total > 0 ? 'No titles on this page' : 'No matching titles'}
+              description={
+                query.data.total > 0
+                  ? 'Use the pagination controls to return to the available titles.'
+                  : visitor
                     ? 'No identified titles match this search.'
                     : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing.'
-                }
-              />
-            )}
+              }
+            />
+          ) : null}
+          {(query.complete || Boolean(query.data.items?.length)) && (
             <Pager
               total={query.data.total}
               limit={query.data.limit}
               offset={query.data.offset}
               onChange={pagination.setOffset}
-              busy={query.isFetching}
+              busy={query.isFetching || !query.complete}
             />
-          </>
-        )
+          )}
+        </>
       )}
       <div className="flex flex-wrap justify-center gap-2">
         <Button asChild variant="outline">

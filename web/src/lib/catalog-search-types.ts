@@ -1,5 +1,6 @@
 import type { DebridService } from '@/lib/debrid'
 export type CatalogTitle = {
+  ranking?: { precision: number; relevance: number; year: number }
   id: number
   type: 'movie' | 'tv' | 'book' | 'game'
   igdb?: string
