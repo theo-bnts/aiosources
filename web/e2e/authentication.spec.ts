@@ -60,3 +60,30 @@ test('password-manager form values work for sign-in and verification without cha
     await context.close()
   }
 })
+
+test('switching sign-in roles clears credentials and verification fields', async ({
+  browser,
+  server,
+}) => {
+  const context = await browser.newContext({ baseURL: server.origin })
+  const visitor = await context.newPage()
+  try {
+    await visitor.goto('/user-login')
+    await visitor.getByLabel('Email', { exact: true }).fill('reader@example.invalid')
+    await visitor.getByLabel('Password', { exact: true }).fill('synthetic personal password')
+    await visitor.getByRole('link', { name: 'Administrator sign-in', exact: true }).click()
+    await expect(visitor.getByLabel('Administrator password', { exact: true })).toHaveValue('')
+    await visitor
+      .getByLabel('Administrator password', { exact: true })
+      .fill('synthetic admin password')
+    await visitor.getByLabel('Authenticator or recovery code', { exact: true }).fill('123456')
+    await visitor.getByRole('link', { name: 'Trusted user sign-in', exact: true }).click()
+    await expect(visitor.getByLabel('Email', { exact: true })).toHaveValue('')
+    await expect(visitor.getByLabel('Password', { exact: true })).toHaveValue('')
+    await expect(visitor.getByLabel('Authenticator or recovery code', { exact: true })).toHaveCount(
+      0,
+    )
+  } finally {
+    await context.close()
+  }
+})

@@ -33,6 +33,7 @@ var PublicProviders = func() []PublicProvider {
 }()
 
 type PublicInstallation struct {
+	Trusted           *model.TrustedGrant     `json:"-"`
 	Preferences       model.StreamPreferences `json:"-"`
 	Version           int                     `json:"version"`
 	Generation        int64                   `json:"generation"`
@@ -157,22 +158,54 @@ func (s *Service) validatePublicAnnounces(ctx context.Context, access model.Publ
 	return nil
 }
 
-// Re-read the policy for every stream/playback request. Existing encrypted links
-// keep cached playback when the administrator withdraws uncached permission.
+// Re-read permissions for every stream/playback request. Instance credentials
+// are resolved only under a live grant; encrypted URLs never carry their values.
 func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visitor *PublicInstallation) (map[string]string, error) {
-	if visitor == nil || len(visitor.Announces) == 0 {
+	if visitor == nil {
 		return nil, nil
 	}
-	access, err := s.DB.PublicAccess(ctx)
-	if err != nil {
-		return nil, err
+	var access model.PublicAccess
+	var err error
+	if visitor.Trusted == nil {
+		access, err = s.DB.PublicAccess(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// A bare-hash cache lookup requires no tracker credentials at all.
+		if !access.UseInstanceAnnounces && len(visitor.Announces) == 0 {
+			return nil, nil
+		}
+		if !access.Enabled || access.Generation != visitor.Generation {
+			return nil, ErrAuth
+		}
+	} else {
+		access, err = s.visitorCredentialAccess(ctx, visitor)
+		if err != nil {
+			return nil, err
+		}
 	}
-	if !access.Enabled || access.Generation != visitor.Generation || !validPublicAnnounces(visitor.Announces) {
+	if access.UseInstanceAnnounces {
+		announces := map[string]string{}
+		for id, tracker := range c.Trackers {
+			if !tracker.Private || tracker.AnnounceSecret == "" {
+				continue
+			}
+			value, e := s.key(ctx, tracker.AnnounceSecret)
+			if e != nil {
+				clear(announces)
+				return nil, e
+			}
+			announces[id] = value
+		}
+		return announces, nil
+	}
+	if !validPublicAnnounces(visitor.Announces) {
 		return nil, ErrAuth
 	}
-	if !access.ExposeSources {
+	if !access.ExposeSources || len(visitor.Announces) == 0 {
 		return nil, nil
 	}
+
 	sources, err := s.publicPrivateSources(c)
 	if err != nil {
 		// An unreadable definition cannot authorize an uncached download, but
@@ -212,8 +245,8 @@ func (s *Service) CreatePublicInstallation(ctx context.Context, audience string,
 	return s.createPublicInstallation(ctx, audience, keys, announces, true)
 }
 
-// Search uses the same visitor-owned credentials without granting an addon
-// connection when Stremio has been disabled independently.
+// Search uses the same credential policy without granting an addon connection
+// when Stremio has been disabled independently.
 func (s *Service) CreatePublicSearchCredential(ctx context.Context, audience string, keys, announces map[string]string) (string, error) {
 	return s.createPublicInstallation(ctx, audience, keys, announces, false)
 }
@@ -226,14 +259,14 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if !access.Enabled || stremio && !access.StremioEnabled || !stremio && !access.SearchEnabled {
 		return "", model.ErrNotFound
 	}
-	if !validPublicKeys(keys) || audience == "" {
+	if (!access.UseInstanceDebrid && !validPublicKeys(keys) || len(keys) > 0 && !validPublicKeys(keys)) || audience == "" {
 		return "", model.ErrInvalid
 	}
 	if err = s.validatePublicAnnounces(ctx, access, announces); err != nil {
 		return "", err
 	}
 	for _, provider := range PublicProviders {
-		if key, ok := keys[provider.ID]; ok {
+		if key, ok := keys[provider.ID]; ok && !access.UseInstanceDebrid {
 			if err = s.Providers.ValidateKey(ctx, provider.ID, key); err != nil {
 				return "", err
 			}
@@ -254,6 +287,12 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if err = s.validatePublicAnnounces(ctx, latest, announces); err != nil {
 		return "", err
 	}
+	if access.UseInstanceDebrid {
+		keys = nil
+	}
+	if access.UseInstanceAnnounces {
+		announces = nil
+	}
 	installation := PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces}
 	if stremio {
 		installation.StremioGeneration = access.StremioGeneration
@@ -264,6 +303,10 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 // Old installation links had no protocol counter. They remain valid only until
 // the first Stremio policy change. Browser credentials deliberately ignore it.
 func (s *Service) CheckPublicStremio(ctx context.Context, visitor *PublicInstallation) error {
+	if visitor != nil && visitor.Trusted != nil {
+		_, err := s.visitorAccess(ctx, visitor, "stremio")
+		return err
+	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return err
@@ -307,7 +350,20 @@ func (s *Service) CheckPublicConfigurationSize(ctx context.Context, format, conf
 }
 
 func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value string) (*PublicInstallation, error) {
-	return s.openPublicCredential(ctx, audience, value, true)
+	visitor, err := s.openPublicCredential(ctx, audience, value, true)
+	if err != nil {
+		return nil, err
+	}
+	access, err := s.visitorCredentialAccess(ctx, visitor)
+	if err == nil {
+		err = s.resolveVisitorServices(ctx, visitor, access.CredentialPolicy)
+	}
+	if err != nil {
+		clear(visitor.Services)
+		clear(visitor.Announces)
+		return nil, err
+	}
+	return visitor, nil
 }
 
 func (s *Service) openPublicCredential(ctx context.Context, audience, value string, requireServices bool) (*PublicInstallation, error) {
@@ -335,7 +391,7 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 	}
 	defer clear(data)
 	var out PublicInstallation
-	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || (requireServices || len(out.Services) > 0) && !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
+	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || (requireServices && !access.UseInstanceDebrid || len(out.Services) > 0) && !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
 		clear(out.Services)
 		clear(out.Announces)
 		return nil, ErrAuth
@@ -348,8 +404,16 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 	return &out, nil
 }
 func (s *Service) PublicStreams(ctx context.Context, base, configuration, mediaType, id string, visitor *PublicInstallation) ([]Stream, error) {
-	if visitor == nil || !validPublicKeys(visitor.Services) {
+	if visitor == nil {
 		return nil, ErrAuth
+	}
+	if visitor.Trusted == nil && !validPublicKeys(visitor.Services) {
+		access, err := s.visitorCredentialAccess(ctx, visitor)
+		// A live instance-credential grant remains valid while no service is
+		// configured. Return an empty result rather than invalidating its URL.
+		if err != nil || !access.UseInstanceDebrid || len(visitor.Services) != 0 {
+			return nil, ErrAuth
+		}
 	}
 	return s.streams(ctx, base, configuration, mediaType, id, visitor)
 }

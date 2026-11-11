@@ -34,7 +34,7 @@ export function PublicCredentialsForm({
   onConfigured?: (value: PublicInstallation) => void
   children?: ReactNode
 }) {
-  const saved = usePublicCredential()
+  const saved = usePublicCredential(info.credential_scope)
   const [removed, setRemoved] = useState<string[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -53,7 +53,11 @@ export function PublicCredentialsForm({
       const key = String(values.get(provider.id) ?? '').trim()
       if (key) services[provider.id] = key
     }
-    if (!Object.keys(services).length && !saved?.services.some((id) => !removed.includes(id))) {
+    if (
+      !info.use_instance_debrid &&
+      !Object.keys(services).length &&
+      !saved?.services.some((id) => !removed.includes(id))
+    ) {
       setError(new Error('Enter at least one service key.'))
       return
     }
@@ -68,7 +72,7 @@ export function PublicCredentialsForm({
     onStart?.()
     try {
       const result = await api<PublicInstallation>(
-        connection === 'search' ? '/public/credentials' : '/public/install',
+        `/${info.trusted ? 'trusted' : 'public'}/${connection === 'search' ? 'credentials' : 'install'}`,
         {
           method: 'POST',
           cache: 'no-store',
@@ -85,14 +89,20 @@ export function PublicCredentialsForm({
           }),
         },
       )
-      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
-        savePublicCredential(result)
+      if (
+        !controller.signal.aborted &&
+        isCurrentPublicCredential(saved?.credential, info.credential_scope)
+      ) {
+        savePublicCredential(result, info.credential_scope)
         onConfigured?.(result)
       }
     } catch (caught) {
-      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
+      if (
+        !controller.signal.aborted &&
+        isCurrentPublicCredential(saved?.credential, info.credential_scope)
+      ) {
         if (caught instanceof ApiError && caught.status === 401)
-          forgetPublicCredential(saved?.credential)
+          forgetPublicCredential(saved?.credential, info.credential_scope)
         setError(caught)
       }
     } finally {
@@ -115,54 +125,59 @@ export function PublicCredentialsForm({
     >
       <fieldset disabled={pending} className="space-y-5">
         <div className="grid items-start gap-5 md:grid-cols-2">
-          {info.providers.map((provider) => {
-            const details = debridProviders.find((item) => item.id === provider.id)
-            const retained = saved?.services.includes(provider.id) && !removed.includes(provider.id)
-            return (
-              <div className="field" key={provider.id}>
-                <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-                <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                  <Input
-                    key={retained ? 'remembered' : 'new'}
-                    id={`public-${provider.id}`}
-                    name={provider.id}
-                    type="password"
-                    revealLabel={`${provider.name} API key`}
-                    autoComplete="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    maxLength={512}
-                    autoFocus={removed.includes(provider.id)}
-                    placeholder={
-                      retained ? 'Saved on this browser · enter a key to replace it' : undefined
-                    }
-                  />
-                  {retained && (saved?.services.length ?? 0) > 1 && (
-                    <Button
-                      type="button"
-                      variant="warning"
-                      size="sm"
-                      className="self-start sm:self-auto"
-                      onClick={() =>
-                        setRemoved((ids) =>
-                          ids.includes(provider.id) ? ids : [...ids, provider.id],
-                        )
+          {!info.use_instance_debrid &&
+            info.providers.map((provider) => {
+              const details = debridProviders.find((item) => item.id === provider.id)
+              const retained =
+                saved?.services.includes(provider.id) && !removed.includes(provider.id)
+              return (
+                <div className="field" key={provider.id}>
+                  <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                    <Input
+                      key={retained ? 'remembered' : 'new'}
+                      id={`public-${provider.id}`}
+                      name={provider.id}
+                      type="password"
+                      revealLabel={`${provider.name} API key`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      maxLength={512}
+                      autoFocus={removed.includes(provider.id)}
+                      placeholder={
+                        retained ? 'Saved on this browser · enter a key to replace it' : undefined
                       }
-                    >
-                      Remove key
-                    </Button>
-                  )}
+                    />
+                    {retained && (saved?.services.length ?? 0) > 1 && (
+                      <Button
+                        type="button"
+                        variant="warning"
+                        size="sm"
+                        className="self-start sm:self-auto"
+                        onClick={() =>
+                          setRemoved((ids) =>
+                            ids.includes(provider.id) ? ids : [...ids, provider.id],
+                          )
+                        }
+                      >
+                        Remove key
+                      </Button>
+                    )}
+                  </div>
+                  {details && 'hint' in details && <p className="help">{details.hint}</p>}
                 </div>
-                {details && 'hint' in details && <p className="help">{details.hint}</p>}
-              </div>
-            )
-          })}
+              )
+            })}
         </div>
         <p className="help">
-          Enter at least one key. Your keys and optional announce URLs are remembered automatically
-          on this browser in an encrypted configuration, shared between Search, Stremio and Torznab.
-          The server does not save them. Request history retains media, results and errors for the
-          instance’s configured retention period without identifying you.
+          {info.use_instance_debrid
+            ? 'Debrid requests use the instance’s configured accounts. '
+            : 'Enter at least one key. '}
+          Your personal keys and optional announce URLs are remembered automatically on this browser
+          in an encrypted configuration, shared between Search, Stremio and Torznab. The server does
+          not save them. Request history retains media, results and errors for the instance’s
+          configured retention period without identifying you.
         </p>
         {children}
       </fieldset>
@@ -179,7 +194,7 @@ export function PublicCredentialsForm({
             disabled={pending}
             onClick={() => {
               if (formRef.current) clearPublicCredentials(formRef.current)
-              forgetPublicCredential()
+              forgetPublicCredential(undefined, info.credential_scope)
               setError(null)
             }}
           >

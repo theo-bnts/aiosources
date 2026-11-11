@@ -30,7 +30,7 @@ Private-source downloads need an authorized announce URL. Treat a private Torzna
 
 If an instance offers public Torznab, open **Connections → Torznab** on its visitor page and generate your configuration. The connection options are carried in the generated access; visitor API keys are not saved in the server database.
 
-When the administrator allows source exposure, optional private-source announce URLs are entered under **Private source playback**. The administrator's announces are never supplied to visitors. Public Torznab accepts no debrid account keys; see the [public-instance guide](PUBLIC_INSTANCES.md).
+When the administrator allows source exposure, optional private-source announce URLs are entered under **Private source playback**. Instance announces are used only when the administrator explicitly enables **Use instance announce URLs**; clients then receive them in magnets. Otherwise only personal announces are used. Torznab performs no debrid account calls; see the [public-instance guide](PUBLIC_INSTANCES.md).
 
 ## Troubleshooting
 

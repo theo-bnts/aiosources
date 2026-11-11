@@ -11,7 +11,7 @@ test('public downloads discard a missing preparation before an explicit retry', 
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Allow public Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
@@ -118,7 +118,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -461,7 +461,7 @@ test('public direct torrent Search keeps visitor credentials and uses the same r
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Allow public Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()

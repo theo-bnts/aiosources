@@ -94,7 +94,7 @@ func baselineTableState(t *testing.T, ctx context.Context, db *Store, namespace 
 	}
 	for name, prefix := range state {
 		var data string
-		if err = db.pool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(j ORDER BY j::text),'[]'::jsonb)::text FROM (SELECT to_jsonb(t)-'localized_posters'-'storage_options'`+map[bool]string{true: "-'options'"}[name == "storage_settings"]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t) items`).Scan(&data); err != nil {
+		if err = db.pool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(j ORDER BY j::text),'[]'::jsonb)::text FROM (SELECT to_jsonb(t)-'localized_posters'-'storage_options'`+map[string]string{"storage_settings": "-'options'", "aio_public_access": "-'use_instance_debrid'-'use_instance_announces'"}[name]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t) items`).Scan(&data); err != nil {
 			t.Fatal(err)
 		}
 		state[name] = prefix + data
@@ -119,6 +119,12 @@ INSERT INTO aiosources.secrets(name,ciphertext) VALUES('example-secret',decode('
 				before := baselineTableState(t, ctx, db, namespace)
 				if err := db.Migrate(ctx); err != nil {
 					t.Fatal(err)
+				}
+				// Newly introduced credential permissions must never authorize
+				// instance accounts or announces on an existing public instance.
+				access, err := db.PublicAccess(ctx)
+				if err != nil || access.UseInstanceDebrid || access.UseInstanceAnnounces {
+					t.Fatal("upgrade enabled instance credentials for public visitors", err)
 				}
 				after := baselineTableState(t, ctx, db, applicationSchema)
 				for name, state := range before {

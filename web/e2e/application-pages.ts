@@ -38,6 +38,7 @@ export const applicationPages = [
   ['network.proxies', '/network/outgoing'],
   ['network.routing', '/network/outgoing/routing'],
   ['public.settings', '/public-access'],
+  ['trusted.settings', '/trusted-users'],
   ['public.limits', '/public-access/limits'],
   ['storage.statistics', '/health'],
   ['storage.settings', '/health/settings'],

@@ -10,9 +10,10 @@ import (
 // Only authenticated ciphertext and non-secret field identifiers are returned.
 // The application stores no visitor profile; the browser carries this value.
 type PublicBrowserCredential struct {
-	Credential string   `json:"credential"`
-	Services   []string `json:"services"`
-	Announces  []string `json:"announces"`
+	Credential       string   `json:"credential"`
+	InstanceServices bool     `json:"instance_services,omitempty"`
+	Services         []string `json:"services"`
+	Announces        []string `json:"announces"`
 }
 
 type PublicCredentialChanges struct {
@@ -39,29 +40,30 @@ func (s *Service) ResolvePublicCredential(ctx context.Context, audience string, 
 		if err != nil {
 			return nil, err
 		}
-		c, readErr := s.DB.AIOConfig(ctx)
-		if readErr != nil {
-			clear(saved.Services)
-			clear(saved.Announces)
-			return nil, readErr
-		}
-		permitted, readErr := s.visitorAnnounces(ctx, c, saved)
+		retained, e := s.retainedPersonalAnnounces(ctx, access, saved.Announces)
 		clear(saved.Announces)
-		if readErr != nil {
+		if e != nil {
 			clear(saved.Services)
-			return nil, readErr
+			return nil, e
 		}
-		saved.Announces = permitted
+		saved.Announces = retained
 	}
-	valid := false
-	defer func() {
-		if !valid {
-			clear(saved.Services)
-			clear(saved.Announces)
-		}
-	}()
+	if err := applyCredentialChanges(saved, changes); err != nil {
+		clear(saved.Services)
+		clear(saved.Announces)
+		return nil, err
+	}
+	if err := s.personalCredentials(ctx, access, saved); err != nil {
+		clear(saved.Services)
+		clear(saved.Announces)
+		return nil, err
+	}
+	return saved, nil
+}
+
+func applyCredentialChanges(saved *PublicInstallation, changes PublicCredentialChanges) error {
 	if len(changes.RemoveServices) > len(PublicProviders) || len(changes.RemoveAnnounces) > 128 {
-		return nil, model.ErrInvalid
+		return model.ErrInvalid
 	}
 	for _, service := range changes.RemoveServices {
 		known := false
@@ -69,13 +71,13 @@ func (s *Service) ResolvePublicCredential(ctx context.Context, audience string, 
 			known = known || service == provider.ID
 		}
 		if !known {
-			return nil, model.ErrInvalid
+			return model.ErrInvalid
 		}
 		delete(saved.Services, service)
 	}
 	for _, source := range changes.RemoveAnnounces {
 		if !model.ValidSourceID(source) {
-			return nil, model.ErrInvalid
+			return model.ErrInvalid
 		}
 		delete(saved.Announces, source)
 	}
@@ -91,20 +93,23 @@ func (s *Service) ResolvePublicCredential(ctx context.Context, audience string, 
 	for source, value := range changes.Announces {
 		saved.Announces[source] = value
 	}
-	valid = true
-	return saved, nil
+	return nil
 }
 
-// Empty-service credentials can remember Torznab announces, but cannot authorize
-// Stremio or Search: those entry points still require a validated service key.
+// Browser credentials can remember announces without a service key. Search and
+// Stremio additionally require personal keys or an explicit instance-account grant.
 func (s *Service) PublicBrowserCredential(ctx context.Context, audience string, installation *PublicInstallation) (PublicBrowserCredential, error) {
 	result := PublicBrowserCredential{Services: []string{}, Announces: []string{}}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return result, err
 	}
+	result.InstanceServices = access.UseInstanceDebrid
 	if installation == nil || !access.Enabled || access.Generation != installation.Generation || audience == "" || installation.Audience != audience {
 		return result, ErrAuth
+	}
+	if err := s.personalCredentials(ctx, access, installation); err != nil {
+		return result, err
 	}
 	if len(installation.Services) > 0 && !validPublicKeys(installation.Services) {
 		return result, model.ErrInvalid
@@ -121,7 +126,7 @@ func (s *Service) PublicBrowserCredential(ctx context.Context, audience string, 
 		result.Announces = append(result.Announces, source)
 	}
 	sort.Strings(result.Announces)
-	if len(result.Services) == 0 && len(result.Announces) == 0 {
+	if len(result.Services) == 0 && len(result.Announces) == 0 && !access.UseInstanceDebrid {
 		return result, nil
 	}
 	profile := *installation

@@ -14,7 +14,7 @@ Open **Network → Incoming** when using Cloudflare, a tunnel or another reverse
 
 Trust only proxies you control or explicitly authorize, and prevent direct access that bypasses their protections. Missing or invalid headers use the direct connection address. Both IPv4 and IPv6 are supported. The trusted-proxy setting does not provide HTTPS or replace sign-in.
 
-Public quotas are configured separately in **Administration → Public access → Request limits**. Each limit can be disabled independently. Correct incoming-proxy settings prevent all visitors being counted as one address.
+Public quotas are configured separately in **Administration → Users → Public → Request limits**. Each limit can be disabled independently. Correct incoming-proxy settings prevent all visitors being counted as one address.
 
 ## Outgoing proxies
 

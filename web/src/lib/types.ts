@@ -305,6 +305,8 @@ export interface Page<T> extends Items<T> {
 export interface Session {
   authenticated: boolean
   csrf_token?: string
+  role?: 'trusted'
+  user?: import('./trusted-users').TrustedUser
 }
 export interface Health {
   database: 'ok'

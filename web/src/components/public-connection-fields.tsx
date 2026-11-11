@@ -13,6 +13,10 @@ export function clearPublicCredentials(form: HTMLFormElement) {
   }
 }
 export type PublicInfo = {
+  trusted?: boolean
+  credential_scope?: string
+  use_instance_debrid?: boolean
+  use_instance_announces?: boolean
   stremio_enabled?: boolean
   torznab_enabled?: boolean
   search_enabled?: boolean
@@ -30,12 +34,14 @@ export function PublicAnnounceFields({
   sources,
   pending,
   torznab = false,
+  scope,
 }: {
   sources: { id: string; name: string }[]
   pending: boolean
   torznab?: boolean
+  scope?: string
 }) {
-  const saved = usePublicCredential()
+  const saved = usePublicCredential(scope)
   const [removed, setRemoved] = useState<string[]>([])
   useEffect(() => setRemoved([]), [saved])
   if (!sources.length) return null

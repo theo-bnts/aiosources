@@ -18,6 +18,7 @@ const publicTorznabPurpose = "public-torznab-v1"
 const MaxPublicTorznabSize = 6000 // Reserve space for standard client query parameters.
 
 type PublicTorznabInstallation struct {
+	Trusted            *model.TrustedGrant        `json:"-"`
 	Version            int                        `json:"version"`
 	Generation         int64                      `json:"generation"`
 	ProtocolGeneration int64                      `json:"protocol_generation"`
@@ -122,7 +123,7 @@ func (s *Service) PublicTorznabPolicy(ctx context.Context, v *PublicTorznabInsta
 	if err != nil {
 		return store.TorznabVisibility{}, nil, err
 	}
-	announces, err := s.visitorAnnounces(ctx, c, &PublicInstallation{Generation: v.Generation, Announces: v.Announces})
+	announces, err := s.visitorAnnounces(ctx, c, &PublicInstallation{Generation: v.Generation, Announces: v.Announces, Trusted: v.Trusted})
 	if err != nil {
 		return store.TorznabVisibility{}, nil, err
 	}
@@ -141,6 +142,10 @@ func (s *Service) PublicTorznabPolicy(ctx context.Context, v *PublicTorznabInsta
 }
 
 func (s *Service) ValidatePublicTorznab(ctx context.Context, v *PublicTorznabInstallation) error {
+	if v != nil && v.Trusted != nil {
+		_, err := s.visitorAccess(ctx, &PublicInstallation{Trusted: v.Trusted}, "torznab")
+		return err
+	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return err

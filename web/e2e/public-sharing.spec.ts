@@ -8,7 +8,7 @@ test('public shared catalogs follow administrator permissions without saving vis
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   const catalog = access.getByRole('switch', { name: 'Allow public shared catalogs', exact: true })
   await expect(catalog).toBeDisabled()
   await access.getByRole('switch', { name: 'Enable public access', exact: true }).check()
@@ -177,7 +177,7 @@ test('public sharing data choices clear stale output and follow live ceilings', 
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Expose source names and filters', { exact: true }).check()
   await access.getByLabel('Allow public shared catalogs', { exact: true }).check()

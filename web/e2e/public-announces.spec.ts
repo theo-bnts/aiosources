@@ -28,7 +28,7 @@ test('visitor announce fields are opt-in, use source names and clear personal in
   // No playback-settings save: new sources already default to private in the
   // administrator interface and must offer the same optional visitor field.
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -127,7 +127,7 @@ test('reviewing concurrent public settings preserves only fields edited locally'
   const session = await (await page.request.get('/api/session')).json()
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   const saved = await (await page.request.get('/api/public-access')).json()
   expect(

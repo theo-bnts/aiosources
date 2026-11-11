@@ -135,6 +135,15 @@ func (a *authentication) cookie(w http.ResponseWriter, value string, expires tim
 func (a *authentication) sessionHandler(w http.ResponseWriter, r *http.Request) {
 	value, err := a.lookup(r)
 	if errors.Is(err, store.ErrAuthentication) {
+		trusted, trustedErr := a.lookupTrusted(r)
+		if trustedErr == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "role": "trusted", "csrf_token": trusted.CSRF, "user": trusted.User})
+			return
+		}
+		if !errors.Is(trustedErr, store.ErrAuthentication) {
+			writeError(w, http.StatusServiceUnavailable, "Authentication storage is unavailable")
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"authenticated": false})
 		return
 	}
@@ -275,6 +284,9 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.cookie(w, token, next.ExpiresAt, int(lifetime.Seconds()))
+	if _, err := r.Cookie(trustedSessionCookie); err == nil {
+		a.trustedCookie(w, "", time.Unix(1, 0), -1)
+	}
 	a.retirePreviousSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": csrfForToken(token)})
 }

@@ -23,7 +23,7 @@ import {
 } from '@/components/public-connection-fields'
 
 export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
-  const saved = usePublicCredential()
+  const saved = usePublicCredential(info.credential_scope)
   const [options, setOptions] = useState<TorznabOptions>({})
   const [connection, setConnection] = useState<{ url: string; api_key: string }>()
   const [pending, setPending] = useState(false)
@@ -68,7 +68,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     setConnection(undefined)
     try {
       const result = await api<PublicCredential & { url: string; api_key: string }>(
-        '/public/torznab/install',
+        `/${info.trusted ? 'trusted' : 'public'}/torznab/install`,
         {
           method: 'POST',
           cache: 'no-store',
@@ -83,15 +83,22 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
           signal: controller.signal,
         },
       )
-      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
+      if (
+        !controller.signal.aborted &&
+        isCurrentPublicCredential(saved?.credential, info.credential_scope)
+      ) {
         connectionCredential.current = result.credential
-        if (result.credential) savePublicCredential(result)
-        else forgetPublicCredential()
+        if (result.credential) savePublicCredential(result, info.credential_scope)
+        else forgetPublicCredential(undefined, info.credential_scope)
         setConnection(result)
       }
     } catch (e) {
-      if (!controller.signal.aborted && isCurrentPublicCredential(saved?.credential)) {
-        if (e instanceof ApiError && e.status === 401) forgetPublicCredential(saved?.credential)
+      if (
+        !controller.signal.aborted &&
+        isCurrentPublicCredential(saved?.credential, info.credential_scope)
+      ) {
+        if (e instanceof ApiError && e.status === 401)
+          forgetPublicCredential(saved?.credential, info.credential_scope)
         setError(e)
       }
     } finally {
@@ -133,12 +140,19 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
               sources={Boolean(info.sources)}
               defaultOrder="newest first"
             />
-            <PublicAnnounceFields sources={info.private_sources ?? []} pending={pending} torznab />
+            <PublicAnnounceFields
+              sources={info.private_sources ?? []}
+              pending={pending}
+              torznab
+              scope={info.credential_scope}
+            />
           </fieldset>
           <p className="help">
             Availability uses the shared cache already known by this instance. Configure debrid
-            accounts in your download client. Private sources without your own announce URL are
-            limited to known cached results.
+            accounts in your download client.{' '}
+            {info.use_instance_announces
+              ? 'Private downloads use the instance’s announce URLs.'
+              : 'Private sources without your own announce URL are limited to known cached results.'}
           </p>
           <ErrorNotice error={error} />
           {preferenceError && (
@@ -157,7 +171,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
                 disabled={pending}
                 onClick={() => {
                   if (formRef.current) clearPublicCredentials(formRef.current)
-                  forgetPublicCredential()
+                  forgetPublicCredential(undefined, info.credential_scope)
                   setError(undefined)
                 }}
               >

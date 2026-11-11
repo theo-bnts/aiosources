@@ -79,7 +79,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 		return []Stream{}, model.ErrInvalid
 	}
 	history := newStremioHistory(mediaType, id)
-	if visitor != nil {
+	if visitor != nil && visitor.Trusted == nil {
 		history.Origin = "public"
 	}
 	names := map[string]string{}
@@ -199,7 +199,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	names = s.sourceNames()
 	exposeNames := true
 	if visitor != nil {
-		access, e := s.DB.PublicAccess(ctx)
+		access, e := s.visitorAccess(ctx, visitor, "stremio")
 		if e != nil {
 			return nil, e
 		}
@@ -340,6 +340,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 					return nil, e
 				}
 				segments = []string{"public", "stremio", token, "play", service, locator, mediaType, id}
+				if visitor.Trusted != nil {
+					segments[0] = "trusted"
+				}
 				if tracker.Private {
 					stream.InfoHash = ""
 				}

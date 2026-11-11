@@ -24,6 +24,15 @@ export type Setting = {
 }
 
 const settings: Setting[] = []
+settings.push({
+  id: 'trusted.accounts',
+  title: 'Trusted',
+  label: 'Add user',
+  route: '/trusted-users',
+  group: 'Administration / Users / Trusted',
+  keywords:
+    'trusted user account email password permissions enable disable utilisateur confiance mot de passe',
+})
 const importCategory = (key: string) =>
   key === 'workers'
     ? 'Concurrency'
@@ -284,7 +293,7 @@ add(
 add(
   {
     route: '/public-access/limits',
-    group: 'Administration / Public access / Request limits',
+    group: 'Administration / Users / Public / Request limits',
     keywords: 'public rate limit quota limite requetes',
   },
   [
@@ -296,7 +305,7 @@ add(
 add(
   {
     route: '/public-access',
-    group: 'Administration / Public access / Settings',
+    group: 'Administration / Users / Public / Settings',
     keywords: 'public access acces',
   },
   [
@@ -315,7 +324,19 @@ add(
 add(
   {
     route: '/public-access',
-    group: 'Administration / Public access / Shared catalog data',
+    group: 'Administration / Users / Public / Credentials',
+    reveal: ['Credentials'],
+    keywords: 'admin instance credentials keys announces debrid identifiants cles',
+  },
+  [
+    ['public.credentials.debrid', 'Use instance debrid accounts'],
+    ['public.credentials.announces', 'Use instance announce URLs'],
+  ],
+)
+add(
+  {
+    route: '/public-access',
+    group: 'Administration / Users / Public / Shared catalog data',
     reveal: ['Shared catalog data', 'Filters'],
     keywords: 'public sharing catalog permissions',
   },
@@ -335,7 +356,7 @@ for (const [id, title, category] of [
     title,
     label: title,
     route: '/public-access',
-    group: `Administration / Public access / Shared catalog data / ${category}`,
+    group: `Administration / Users / Public / Shared catalog data / ${category}`,
     reveal: ['Shared catalog data', 'Shared data', category],
     keywords: 'public sharing permissions',
   })

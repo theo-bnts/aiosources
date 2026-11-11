@@ -7,7 +7,7 @@ test('public access preserves the access proxy cookie without an administrator s
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -88,7 +88,7 @@ test('public access is opt-in and visitors get a private link without administra
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   const enabled = access.getByLabel('Enable public access', { exact: true })
   await expect(enabled).not.toBeChecked()
   await enabled.check()

@@ -12,11 +12,14 @@ import (
 )
 
 func (s *Service) PublicSearchAccess(ctx context.Context, visitor *PublicInstallation) (model.PublicAccess, error) {
+	if visitor != nil && visitor.Trusted != nil {
+		return s.visitorAccess(ctx, visitor, "search")
+	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return access, err
 	}
-	if visitor == nil || !validPublicKeys(visitor.Services) || !access.Enabled || !access.SearchEnabled || access.Generation != visitor.Generation {
+	if visitor == nil || !access.UseInstanceDebrid && !validPublicKeys(visitor.Services) || !access.Enabled || !access.SearchEnabled || access.Generation != visitor.Generation {
 		return access, ErrAuth
 	}
 	return access, nil
@@ -77,6 +80,7 @@ func (s *Service) sealPublicCatalogSource(workID int64, row store.CatalogRecord)
 // Readiness is carried by the visitor, not by a saved credential or background
 // job. Provider object IDs and the account binding stay inside this sealed blob.
 type publicCatalogPreparation struct {
+	TrustedID   string                 `json:"trusted_user,omitempty"`
 	WorkID      int64                  `json:"work"`
 	Source      publicCatalogSource    `json:"source"`
 	Selection   model.CatalogSelection `json:"selection"`
@@ -120,7 +124,7 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 			return model.CatalogDownload{}, err
 		}
 		now := time.Now().Unix()
-		if preparation.WorkID != workID || preparation.Audience != visitor.Audience || preparation.Generation != visitor.Generation || preparation.Expires <= now || preparation.Expires > now+7*24*3600 || preparation.OperationID == "" || visitor.Services[preparation.Service] == "" || fingerprint(visitor.Services[preparation.Service]) != preparation.Account {
+		if preparation.TrustedID != trustedVisitorID(visitor) || preparation.WorkID != workID || preparation.Audience != visitor.Audience || preparation.Generation != visitor.Generation || preparation.Expires <= now || preparation.Expires > now+7*24*3600 || preparation.OperationID == "" || visitor.Services[preparation.Service] == "" || fingerprint(visitor.Services[preparation.Service]) != preparation.Account {
 			return model.CatalogDownload{}, model.ErrConflict
 		}
 		source = preparation.Source
@@ -169,7 +173,7 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 	input.AllowUncached = input.AllowUncached && !visitor.Preferences.CachedOnly
 	result, downloadErr = s.catalogDownload(ctx, workID, input, operation, account, visitor)
 	if errors.Is(downloadErr, ErrPending) {
-		data, err := json.Marshal(publicCatalogPreparation{WorkID: workID, Source: source, Selection: input.CatalogSelection, Service: input.Service, OperationID: result.OperationID, PreparedID: result.PreparationID, Account: fingerprint(visitor.Services[input.Service]), Audience: visitor.Audience, Generation: visitor.Generation, Expires: time.Now().Add(7 * 24 * time.Hour).Unix()})
+		data, err := json.Marshal(publicCatalogPreparation{TrustedID: trustedVisitorID(visitor), WorkID: workID, Source: source, Selection: input.CatalogSelection, Service: input.Service, OperationID: result.OperationID, PreparedID: result.PreparationID, Account: fingerprint(visitor.Services[input.Service]), Audience: visitor.Audience, Generation: visitor.Generation, Expires: time.Now().Add(7 * 24 * time.Hour).Unix()})
 		if err != nil {
 			return model.CatalogDownload{}, err
 		}

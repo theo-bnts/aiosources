@@ -112,6 +112,8 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		return model.ErrInvalid
 	}
 	switch kind {
+	case "security.trusted_user_changed", "security.trusted_user_deleted", "security.public_credentials_changed":
+	case "catalog.trusted_exported", "catalog.trusted_failed":
 	case "maintenance.books_completed", "maintenance.books_failed", "maintenance.books_interrupted",
 		"maintenance.games_completed", "maintenance.games_failed", "maintenance.games_interrupted",
 		"maintenance.videos_completed", "maintenance.videos_failed", "maintenance.videos_interrupted",
@@ -152,6 +154,21 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	// Keep ordinary activity compatible with the earlier catalog migrations.
 	// Network events are only emitted after the network schema is installed.
 	query := `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6))`
+	if kind == "security.public_credentials_changed" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Public credential policy changed'", 1)
+	}
+	if kind == "security.trusted_user_changed" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user account updated'", 1)
+	}
+	if kind == "security.trusted_user_deleted" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user account deleted'", 1)
+	}
+	if kind == "catalog.trusted_exported" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user catalog exported'", 1)
+	}
+	if kind == "catalog.trusted_failed" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user catalog export failed'", 1)
+	}
 	if strings.HasPrefix(kind, "network.") {
 		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'network')`
 	} else if strings.HasPrefix(kind, "maintenance.books_") {

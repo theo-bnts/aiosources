@@ -102,7 +102,10 @@ export function PublicCatalogSettings() {
   )
   useUnsavedChanges(dirty, 'Shared catalog data', save.isPending)
   return (
-    <Disclosure title="Shared catalog data">
+    <Disclosure
+      title="Shared catalog data"
+      help="Applies to public and trusted-user catalog connections. Recipients can narrow these permissions. Credentials and announce URLs are never exported."
+    >
       <form
         className="space-y-5"
         aria-label="Shared catalog data"

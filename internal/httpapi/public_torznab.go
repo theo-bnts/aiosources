@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
@@ -80,11 +81,19 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 405, 202, "Read-only endpoint")
 		return
 	}
-	if !s.publicOriginAllowed() {
+	trusted := strings.HasPrefix(r.URL.Path, "/trusted/")
+	if (!trusted && !s.publicOriginAllowed()) || (trusted && s.connectionOrigin() == "") {
 		torznabError(w, 401, 100, "Invalid public configuration")
 		return
 	}
-	release, retry, admissionErr := s.public.reserve(r, publicAddon)
+	var release func()
+	var retry int
+	var admissionErr error
+	if trusted {
+		release, retry, admissionErr = s.reserveTrusted()
+	} else {
+		release, retry, admissionErr = s.public.reserve(r, publicAddon)
+	}
 	if admissionErr != nil {
 		torznabError(w, 503, 910, "Public access settings are unavailable")
 		return
@@ -113,7 +122,20 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 400, 201, "Incorrect parameter")
 		return
 	}
-	visitor, err := s.options.AIOSource.OpenPublicTorznab(ctx, s.auth.origin, values.Get("apikey"))
+	var visitor *aiosource.PublicTorznabInstallation
+	var err error
+	if trusted {
+		var connection aiosource.TrustedConnection
+		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "torznab", values.Get("apikey"))
+		if err == nil {
+			grant := model.TrustedGrant{UserID: connection.UserID, Generation: connection.Generation}
+			user, e := s.options.Store.TrustedUser(ctx, grant)
+			err = e
+			visitor = &aiosource.PublicTorznabInstallation{Trusted: &grant, Announces: connection.Announces, Generation: connection.Generation, Audience: s.connectionOrigin(), Options: connection.Torznab, Access: model.PublicAccess{ExposeSources: user.ExposeSources}}
+		}
+	} else {
+		visitor, err = s.options.AIOSource.OpenPublicTorznab(ctx, s.auth.origin, values.Get("apikey"))
+	}
 	if err != nil {
 		torznabError(w, 401, 100, "Invalid public configuration")
 		return
@@ -155,6 +177,9 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		names := map[string]string{}
 		if visitor.Access.ExposeSources {
 			list, e := s.options.AIOSource.PublicSources(ctx)
+			if visitor.Trusted != nil {
+				list, e = s.options.AIOSource.TrustedSources(ctx, *visitor.Trusted)
+			}
 			if e != nil {
 				torznabError(w, 503, 910, "Search unavailable")
 				return
@@ -166,7 +191,11 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		q.SourceNames = names
 		result, e := s.options.Store.PublicTorznabCatalog(ctx, q, visitor.Options.Sources, visitor.Options.MediaTypes, policy, func(rec model.AIORecord) bool { return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode) })
 		if e != nil {
-			_ = s.options.Store.RecordActivity(ctx, "warn", "torznab.public_failed", "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(start).Milliseconds()})
+			kind := "torznab.public_failed"
+			if trusted {
+				kind = "torznab.failed"
+			}
+			_ = s.options.Store.RecordActivity(ctx, "warn", kind, "", "", "", map[string]any{"status_code": 503, "duration_ms": time.Since(start).Milliseconds()})
 			torznabError(w, 503, 910, "Search unavailable; try again later")
 			return
 		}
@@ -174,7 +203,11 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 			announces = nil
 		}
 		response = torznabResults(result, names, s.auth.origin, announces)
-		if e = s.options.Store.RecordActivity(ctx, "debug", "torznab.public_searched", "", "", "", map[string]any{"records": len(result.Items), "duration_ms": time.Since(start).Milliseconds()}); e != nil {
+		kind := "torznab.public_searched"
+		if trusted {
+			kind = "torznab.searched"
+		}
+		if e = s.options.Store.RecordActivity(ctx, "debug", kind, "", "", "", map[string]any{"records": len(result.Items), "duration_ms": time.Since(start).Milliseconds()}); e != nil {
 			torznabError(w, 503, 910, "Could not record request")
 			return
 		}

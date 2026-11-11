@@ -32,7 +32,7 @@ The HTML template has a [dedicated setup guide](HTML_SOURCES.md). A site can res
 
 Enable **Private source** if downloading requires a personal announce URL. Store the announce URL through Secrets. Without an announce URL, uncached private-source torrents are not offered for direct downloading. Cached playback still depends on your debrid service.
 
-Public visitors never receive your announce URL. A visitor can supply their own only if you enable that option in [Public access](PUBLIC_INSTANCES.md).
+Public visitors use personal announces by default, when source exposure is enabled. **Use instance announce URLs** can authorize yours explicitly; Torznab clients then receive them in magnets. See [Public](PUBLIC_INSTANCES.md).
 
 ## Choose automatic updates
 

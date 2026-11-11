@@ -18,8 +18,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
 import { number } from '@/lib/format'
-import { usePublicSearch } from '@/lib/public-search'
-import { publicAPI } from '@/lib/public-credentials'
+import { usePublicSearch, visitorAPI } from '@/lib/public-search'
 import { useSourceNames } from '@/lib/source-names'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
@@ -67,7 +66,7 @@ function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?
 
 export function CatalogSearchPage() {
   const visitor = usePublicSearch()
-  const searchPath = visitor ? '/public/search' : '/search'
+  const searchPath = visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
   const language = browserLanguage()
   const [search, setSearch] = useViewSearchParams()
   const listState = useListViewState()
@@ -273,7 +272,7 @@ export function CatalogSearchPage() {
 
 export function CatalogTitlePage({ publicID }: { publicID?: string }) {
   const visitor = usePublicSearch()
-  const searchPath = visitor ? '/public/search' : '/search'
+  const searchPath = visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
   const [preferences, setPreferences] = useLanguagePreferences()
   const language = resolvedLanguage(preferences)
   const titleLanguage = browserLanguage()
@@ -293,7 +292,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     queryFn: ({ signal }) => {
       const path = `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`
       return visitor
-        ? publicAPI<CatalogTitle>(path, visitor.configuration, { signal }, visitor.credential)
+        ? visitorAPI<CatalogTitle>(path, visitor, { signal })
         : api<CatalogTitle>(path, { signal })
     },
   })
@@ -344,12 +343,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
       : ['catalog-releases', id, query],
     queryFn: ({ signal }) =>
       visitor
-        ? publicAPI<Page<CatalogRelease>>(
-            `/catalog/${id}/releases?${query}`,
-            visitor.configuration,
-            { signal },
-            visitor.credential,
-          )
+        ? visitorAPI<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, visitor, { signal })
         : api<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, { signal }),
     enabled: Boolean(title.data),
   })

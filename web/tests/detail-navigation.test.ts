@@ -2,6 +2,24 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { detailBackLink, listViewState } from '../src/lib/detail-navigation.ts'
 
+test('trusted Search return links preserve the user workspace and applied filters', () => {
+  const list = listViewState({
+    pathname: '/trusted/search',
+    search: '?q=Example&type=book&limit=25',
+  })
+  const detail = listViewState(
+    { pathname: '/trusted/search/101', search: '?cached_only=true' },
+    list,
+  )
+  const back = detailBackLink(detail, { to: '/trusted/search', label: 'Search' })!
+  assert.equal(back.to, '/trusted/search/101?cached_only=true')
+  assert.equal(
+    detailBackLink(back.state, { to: '/trusted/search', label: 'Search' })?.to,
+    '/trusted/search?q=Example&type=book&limit=25',
+  )
+  assert.equal(listViewState({ pathname: '/trusted/administration', search: '' }), undefined)
+})
+
 test('detail return links retain the complete public list view and direct links keep their fallback', () => {
   const fallback = { to: '/runs', label: 'All runs' }
   assert.deepEqual(

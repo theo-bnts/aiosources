@@ -1,7 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { api, params } from './api'
-import { publicAPI } from './public-credentials'
-import { usePublicSearch } from './public-search'
+import { usePublicSearch, visitorAPI } from './public-search'
 import { catalogSearchPlan, hasCatalogRanking, mergeCatalogPages } from './catalog-search-results'
 import type { CatalogTitle } from './catalog-search-types'
 import type { Page } from './types'
@@ -28,7 +27,7 @@ export function useCatalogSearch({
   function read(type: string, limit: number, offset: number, signal: AbortSignal) {
     const path = `/catalog/search?${params({ q, type, year, language, limit, offset })}`
     return visitor
-      ? publicAPI<Page<CatalogTitle>>(path, visitor.configuration, { signal }, visitor.credential)
+      ? visitorAPI<Page<CatalogTitle>>(path, visitor, { signal })
       : api<Page<CatalogTitle>>(path, { signal })
   }
   const queries = useQueries({

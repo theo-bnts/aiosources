@@ -108,11 +108,12 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 405, "Shared catalogs are read-only")
 		return
 	}
-	if !s.publicOriginAllowed() {
+	trusted := strings.HasPrefix(r.URL.Path, "/trusted/")
+	if (!trusted && !s.publicOriginAllowed()) || (trusted && s.connectionOrigin() == "") {
 		writeError(w, 404, "Public access is disabled")
 		return
 	}
-	release, ok := s.public.enter(w, r, publicAddon)
+	release, ok := s.enterConnection(w, r, trusted)
 	if !ok {
 		return
 	}
@@ -140,7 +141,21 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "Catalog delivery is unavailable")
 		return
 	}
-	grant, err := s.options.AIOSource.OpenPublicCatalog(ctx, s.auth.origin, r.PathValue("configuration"), parts[1])
+	var grant model.PublicCatalogGrant
+	if trusted {
+		var connection aiosource.TrustedConnection
+		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "catalog", parts[1])
+		if err == nil {
+			configuration, e := aiosource.EncodePublicCatalogOptions(connection.Catalog)
+			if e != nil || configuration != r.PathValue("configuration") {
+				err = aiosource.ErrAuth
+			} else {
+				grant = model.PublicCatalogGrant{PublicCatalogOptions: connection.Catalog, Trusted: &model.TrustedGrant{UserID: connection.UserID, Generation: connection.Generation}}
+			}
+		}
+	} else {
+		grant, err = s.options.AIOSource.OpenPublicCatalog(ctx, s.auth.origin, r.PathValue("configuration"), parts[1])
+	}
 	if err != nil {
 		if errors.Is(err, aiosource.ErrAuth) || errors.Is(err, model.ErrNotFound) {
 			catalogFeedError(w, store.ErrCatalogAuthentication)
@@ -156,7 +171,11 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	result, revision, err := s.options.Store.PublicCatalogPage(ctx, grant, request)
 	if err != nil {
-		_ = s.options.Store.RecordActivity(ctx, "warn", "catalog.public_failed", "", "", "", map[string]any{"duration_ms": time.Since(start).Milliseconds()})
+		kind := "catalog.public_failed"
+		if trusted {
+			kind = "catalog.trusted_failed"
+		}
+		_ = s.options.Store.RecordActivity(ctx, "warn", kind, "", "", "", map[string]any{"duration_ms": time.Since(start).Milliseconds()})
 		catalogFeedError(w, err)
 		return
 	}
@@ -172,7 +191,11 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 	if request.Head {
 		records = 0
 	}
-	if err = s.options.Store.RecordActivity(ctx, "debug", "catalog.public_exported", "", "", "", map[string]any{"records": records, "duration_ms": time.Since(start).Milliseconds(), "done": result.NextCursor == ""}); err != nil {
+	kind := "catalog.public_exported"
+	if trusted {
+		kind = "catalog.trusted_exported"
+	}
+	if err = s.options.Store.RecordActivity(ctx, "debug", kind, "", "", "", map[string]any{"records": records, "duration_ms": time.Since(start).Milliseconds(), "done": result.NextCursor == ""}); err != nil {
 		respondError(w, err)
 		return
 	}

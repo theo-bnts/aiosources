@@ -163,7 +163,7 @@ test('one About entry stays in the same place on public, sign-in and administrat
     }
 
     await page.goto('/public-access')
-    const access = page.getByRole('form', { name: 'Public access', exact: true })
+    const access = page.getByRole('form', { name: 'Public', exact: true })
     await access.getByLabel('Enable public access', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()

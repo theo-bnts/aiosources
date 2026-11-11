@@ -243,7 +243,7 @@ test('public Search uses the same progressive ranking and only public authentica
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Allow public Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()

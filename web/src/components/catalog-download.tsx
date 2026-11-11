@@ -4,8 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { DownloadSimpleIcon, PlusIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import { api, ApiError, queryClient } from '@/lib/api'
-import { usePublicSearch } from '@/lib/public-search'
-import { publicAPI } from '@/lib/public-credentials'
+import { usePublicSearch, visitorAPI } from '@/lib/public-search'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import { prepareBrowserDownload } from '@/lib/browser-download'
@@ -72,25 +71,20 @@ export function DownloadAction({
     mutationFn: (allowUncached: boolean) => {
       controller.current = new AbortController()
       if (visitor) {
-        return publicAPI<CatalogDownload>(
-          `/catalog/${workID}/download`,
-          visitor.configuration,
-          {
-            method: 'POST',
-            signal: controller.current.signal,
-            body: JSON.stringify(
-              preparation.current && !allowUncached
-                ? { preparation_id: preparation.current, file: selectedFile || undefined }
-                : {
-                    ...fileSelection,
-                    download_token: release.download_token,
-                    service: service.service,
-                    allow_uncached: allowUncached,
-                  },
-            ),
-          },
-          visitor.credential,
-        )
+        return visitorAPI<CatalogDownload>(`/catalog/${workID}/download`, visitor, {
+          method: 'POST',
+          signal: controller.current.signal,
+          body: JSON.stringify(
+            preparation.current && !allowUncached
+              ? { preparation_id: preparation.current, file: selectedFile || undefined }
+              : {
+                  ...fileSelection,
+                  download_token: release.download_token,
+                  service: service.service,
+                  allow_uncached: allowUncached,
+                },
+          ),
+        })
       }
       const continuation = operationID || (!allowUncached ? preparationOperation.current : '')
       return api<CatalogDownload>(

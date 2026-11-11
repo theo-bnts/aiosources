@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
-import { publicAPI } from '@/lib/public-credentials'
-import { usePublicSearch } from '@/lib/public-search'
+import { usePublicSearch, visitorAPI } from '@/lib/public-search'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
 import { browserLanguage } from '@/lib/language-preferences'
@@ -29,7 +28,7 @@ import { Button } from '@/components/ui/button'
 
 export function CatalogTorrentsPage() {
   const visitor = usePublicSearch()
-  const searchPath = visitor ? '/public/search' : '/search'
+  const searchPath = visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
   const [search, setSearch] = useViewSearchParams()
   const pagination = useURLPagination()
   const q = search.get('q') || ''
@@ -65,12 +64,7 @@ export function CatalogTorrentsPage() {
     enabled: q.trim().length >= 2,
     queryFn: ({ signal }) =>
       visitor
-        ? publicAPI<Page<CatalogRelease>>(
-            `/catalog/torrents?${queryParams}`,
-            visitor.configuration,
-            { signal },
-            visitor.credential,
-          )
+        ? visitorAPI<Page<CatalogRelease>>(`/catalog/torrents?${queryParams}`, visitor, { signal })
         : api<Page<CatalogRelease>>(`/catalog/torrents?${queryParams}`, { signal }),
   })
   function filter(key: string, value: string) {

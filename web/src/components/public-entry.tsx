@@ -82,9 +82,9 @@ export function PublicEntry({
   return layout(<PublicStremioEntry info={info.data} />)
 }
 
-function PublicStremioEntry({ info }: { info: PublicInfo }) {
+export function PublicStremioEntry({ info }: { info: PublicInfo }) {
   const location = useLocation()
-  const credential = usePublicCredential()
+  const credential = usePublicCredential(info.credential_scope)
   const [preferences, setPreferences] = useLanguagePreferences()
   const [installationOptions, setInstallationOptions] = useState<InstallationOptions>({})
   const [manifest, setManifest] = useState('')
@@ -115,7 +115,9 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
   return (
     <div className="page max-w-4xl">
       <section className="section-card">
-        <h2 className="section-title">Connect your debrid services</h2>
+        <h2 className="section-title">
+          {info.use_instance_debrid ? 'Create installation link' : 'Connect your debrid services'}
+        </h2>
         <PublicCredentialsForm
           info={info}
           submitLabel="Create installation link"
@@ -166,7 +168,11 @@ function PublicStremioEntry({ info }: { info: PublicInfo }) {
               )
             }}
           />
-          <PublicAnnounceFields sources={info.private_sources ?? []} pending={false} />
+          <PublicAnnounceFields
+            sources={info.private_sources ?? []}
+            pending={false}
+            scope={info.credential_scope}
+          />
           {manifestError && (
             <p className="text-sm text-destructive" role="alert">
               {manifestError}

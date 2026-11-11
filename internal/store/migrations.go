@@ -33,6 +33,7 @@ var migrations = []struct {
 	{93, `COMMENT ON SCHEMA aiosources IS 'AIOSources application data';`},
 	{94, localizedPostersSchema},
 	{95, gamesSchema},
+	{96, trustedUsersSchema},
 }
 
 func schemaChecksum(sql string) string {

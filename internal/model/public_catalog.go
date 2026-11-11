@@ -17,6 +17,7 @@ type PublicCatalogPolicy struct {
 // The HTTP service constructs this grant only after authenticating its sealed
 // public configuration. Storage rechecks the live policy for every page.
 type PublicCatalogGrant struct {
+	Trusted *TrustedGrant
 	PublicCatalogOptions
 	Generation        int64
 	CatalogGeneration int64

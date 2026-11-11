@@ -58,7 +58,13 @@ async function loadEntities(entity: SettingsEntity, signal: AbortSignal): Promis
   return result.items ?? []
 }
 
-export function SettingsSearch({ visibility }: { visibility: SettingsVisibility }) {
+export function SettingsSearch({
+  visibility,
+  trusted = false,
+}: {
+  visibility: SettingsVisibility
+  trusted?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Setting | null>(null)
@@ -76,7 +82,13 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
   const id = useId()
   // Only static labels enter the index. Typing never sends a network request.
   const index = useMemo(
-    () => createSettingsIndex(visibleSettings(visibility)),
+    () =>
+      createSettingsIndex(
+        visibleSettings(visibility).filter(
+          (setting) =>
+            !trusted || (!setting.title.endsWith('API key') && !setting.id.endsWith('.announces')),
+        ),
+      ),
     [
       visibility.admin,
       visibility.search,
@@ -87,6 +99,7 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
       visibility.sources,
       visibility.announces,
       visibility.services?.join(','),
+      trusted,
     ],
   )
   const matches = useMemo(() => searchSettings(index, query), [index, query])
@@ -149,10 +162,11 @@ export function SettingsSearch({ visibility }: { visibility: SettingsVisibility 
     if (results.current) results.current.scrollTop = 0
   }, [query, selected])
   function go(setting: Setting, entity?: string, create = false) {
-    const target =
+    let target =
       setting.public === 'interface'
         ? `${location.pathname}${location.search}${settingURL(setting).slice(1)}`
         : settingURL(setting, entity, create)
+    if (trusted) target = target.replace(/^\/public(?=\/|#|\?|$)/, '/trusted')
     const resetSourceEditor =
       setting.entity === 'source' &&
       Boolean(document.querySelector('[data-settings-editor="source"][data-settings-draft="true"]'))

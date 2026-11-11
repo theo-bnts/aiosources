@@ -11,7 +11,7 @@ A debrid service can prepare a torrent and provide a playable or downloadable fi
 3. Choose your availability-check and cleanup preferences. Optional controls, including **Private source playback** and **Operation capacity**, have their own collapsible sections.
 4. Select the services you want when creating a Stremio or Torznab connection. You can use several services together.
 
-Only configured services appear as download choices for the administrator. Public visitors use their own keys. Use accounts and access methods permitted by each service.
+Only configured services appear as download choices for the administrator. Public visitors use personal keys by default; the administrator can explicitly enable instance accounts under **Users → Public → Credentials**. Use accounts and access methods permitted by each service.
 
 ## Understand availability
 
@@ -38,7 +38,7 @@ An uncached private-source release requires an announce URL authorized for that 
 
 ## Control checks and cleanup
 
-In **Debrid → Settings**, **Automatically recheck availability** starts enabled for administrator accounts. While a requested title's cache window is valid, it retries incomplete checks with increasing delays. Disable it to stop automatic rechecks; explicit searches, playback and temporary-item cleanup still work. Public visitor requests always have automatic rechecks disabled: they use the visitor's own credentials only for the current request, never the administrator's account.
+In **Debrid → Settings**, **Automatically recheck availability** starts enabled for administrator accounts. While a requested title's cache window is valid, it retries incomplete checks with increasing delays. Disable it to stop automatic rechecks; explicit searches, playback and temporary-item cleanup still work. Public and trusted visitor requests have background rechecks disabled: they use the credentials authorized for that access during the current request. Turning off instance accounts never falls back to an administrator key.
 
 Connection **Filters** can restrict results to cached files or set result and cache-check limits. With a maximum cached-results target, existing local observations are reused; new checks stop after reaching the target. Unchecked releases remain **Unknown**. These settings do not guarantee that a provider will return a particular number of files.
 

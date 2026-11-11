@@ -14,7 +14,13 @@ import { ErrorNotice } from '@/components/common'
 type Options = { sources?: string[]; fields?: string[]; catalog_entities?: CatalogEntities }
 type Connection = { url: string; password: string }
 
-export function PublicSharedCatalogEntry({ info }: { info: PublicInfo }) {
+export function PublicSharedCatalogEntry({
+  info,
+  trusted = false,
+}: {
+  info: PublicInfo
+  trusted?: boolean
+}) {
   const [options, setOptions] = useState<Options>({})
   const [connection, setConnection] = useState<Connection>()
   const [pending, setPending] = useState(false)
@@ -34,12 +40,15 @@ export function PublicSharedCatalogEntry({ info }: { info: PublicInfo }) {
     setError(undefined)
     setConnection(undefined)
     try {
-      const result = await api<Connection>('/public/catalogs/install', {
-        method: 'POST',
-        cache: 'no-store',
-        body: JSON.stringify(options),
-        signal: controller.signal,
-      })
+      const result = await api<Connection>(
+        trusted ? '/trusted/connections/catalog' : '/public/catalogs/install',
+        {
+          method: 'POST',
+          cache: 'no-store',
+          body: JSON.stringify(trusted ? { catalog: options } : options),
+          signal: controller.signal,
+        },
+      )
       if (!controller.signal.aborted) setConnection(result)
     } catch (error) {
       if (!controller.signal.aborted) setError(error)
@@ -98,7 +107,8 @@ export function PublicSharedCatalogEntry({ info }: { info: PublicInfo }) {
           </fieldset>
           <p className="help">
             Copy the catalog to your own instance and keep it up to date automatically. Playback
-            uses your own accounts and private-source announce URLs. No visitor account is created.
+            uses the receiving instance’s accounts and private-source announce URLs. No service key
+            or announce URL is shared.
           </p>
           <ErrorNotice error={error} />
           <Button type="submit" disabled={pending}>

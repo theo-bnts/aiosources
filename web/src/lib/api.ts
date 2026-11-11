@@ -85,7 +85,12 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
       if (error instanceof Error && error.name === 'AbortError') throw error
       /* A proxy may return a non-JSON error. */
     }
-    if (response.status === 401 && path !== '/login' && !path.startsWith('/public/')) {
+    if (
+      response.status === 401 &&
+      path !== '/login' &&
+      path !== '/trusted/login' &&
+      !path.startsWith('/public/')
+    ) {
       setCSRF()
       window.dispatchEvent(new Event('session-expired'))
     }

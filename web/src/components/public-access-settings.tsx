@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
+import { CredentialPolicyControls } from './credential-policy-controls'
+import { Disclosure } from './ui/disclosure'
 import { FormStatus } from '@/components/form-status'
 type Access = {
   revision: number
@@ -16,6 +18,8 @@ type Access = {
   expose_sources: boolean
   torznab_enabled: boolean
   catalog_enabled: boolean
+  use_instance_debrid: boolean
+  use_instance_announces: boolean
 }
 type Draft = { base: Access; value: Access }
 function normalizeAccess(value: Access): Access {
@@ -32,6 +36,8 @@ export function PublicAccessSettings() {
   const dirty = Boolean(
     draft &&
     (draft.value.enabled !== query.data?.enabled ||
+      draft.value.use_instance_debrid !== query.data?.use_instance_debrid ||
+      draft.value.use_instance_announces !== query.data?.use_instance_announces ||
       draft.value.search_enabled !== query.data?.search_enabled ||
       draft.value.stremio_enabled !== query.data?.stremio_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
@@ -67,6 +73,14 @@ export function PublicAccessSettings() {
               base: latest,
               value: normalizeAccess({
                 ...latest,
+                use_instance_debrid:
+                  draft.value.use_instance_debrid !== draft.base.use_instance_debrid
+                    ? draft.value.use_instance_debrid
+                    : latest.use_instance_debrid,
+                use_instance_announces:
+                  draft.value.use_instance_announces !== draft.base.use_instance_announces
+                    ? draft.value.use_instance_announces
+                    : latest.use_instance_announces,
                 enabled:
                   draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
                 search_enabled:
@@ -102,11 +116,11 @@ export function PublicAccessSettings() {
       (save.error instanceof ApiError && save.error.status === 409)),
   )
   const busy = save.isPending || review.isPending
-  useUnsavedChanges(dirty, 'Public access', save.isPending)
+  useUnsavedChanges(dirty, 'Public', save.isPending)
   return (
     <form
       className="section-card"
-      aria-label="Public access"
+      aria-label="Public"
       onSubmit={(e) => {
         e.preventDefault()
         if (dirty && current && !conflict && !busy) save.mutate(current)
@@ -130,10 +144,10 @@ export function PublicAccessSettings() {
                   htmlFor="public-access-enabled"
                   help={
                     <>
-                      Visitors use the features enabled below. Playback uses their own keys. The
-                      server does not save these keys, and administration stays protected. Turning
-                      this off revokes public links. Availability checks use visitors’ own keys and
-                      reuse the shared cache.
+                      Visitors use the features enabled below. Choose personal or instance
+                      credentials in Credentials. Personal keys are not saved by the server, and
+                      administration stays protected. Turning this off revokes public links.
+                      Availability checks reuse the shared cache.
                     </>
                   }
                 >
@@ -155,10 +169,10 @@ export function PublicAccessSettings() {
                     htmlFor="public-search-enabled"
                     help={
                       <>
-                        Visitors can search the identified catalog and download using their own
-                        debrid services. Source visibility and private download permissions follow
-                        the same rules as Stremio. Browser downloads pass through this instance and
-                        use its bandwidth.
+                        Visitors can search the identified catalog and download using the permitted
+                        debrid credentials. Source visibility and private download permissions
+                        follow the same rules as Stremio. Browser downloads pass through this
+                        instance and use its bandwidth.
                       </>
                     }
                   >
@@ -250,10 +264,10 @@ export function PublicAccessSettings() {
                     help={
                       <>
                         Applies to all public features, including Shared catalogs. Visitors can
-                        select sources and supply their own announce URLs for private sources. Your
-                        source definitions and announce URLs stay private. When off, source names
-                        and source filters are hidden and private sources require known cached
-                        availability.
+                        select sources and supply their own announce URLs for private sources.
+                        Source definitions stay private. When off, source names and filters are
+                        hidden and personal announce fields are unavailable. Using instance announce
+                        URLs remains a separate explicit permission in Credentials.
                       </>
                     }
                   >
@@ -262,6 +276,14 @@ export function PublicAccessSettings() {
                 </div>
               </div>
             </fieldset>
+            <Disclosure title="Credentials">
+              <CredentialPolicyControls
+                id="public-credentials"
+                value={current}
+                onChange={change}
+                disabled={busy || !current.enabled}
+              />
+            </Disclosure>
             {conflict && (
               <div className="notice notice-warning space-y-3" role="status">
                 <p>

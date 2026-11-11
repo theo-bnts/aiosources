@@ -95,7 +95,12 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 }
 
 func (s *server) registerPublicCatalog(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/public/catalog/torrents", s.publicCatalogHandler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	s.registerVisitorCatalog(mux, "/api/public", s.publicCatalogHandler)
+	mux.HandleFunc("GET /api/public/catalog-downloads/{token}", s.publicCatalogFile)
+}
+
+func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handler func(time.Duration, publicCatalogAction) http.HandlerFunc) {
+	mux.HandleFunc("GET "+prefix+"/catalog/torrents", handler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, selection, filters, ok := catalogReleaseInput(w, r)
 		if !ok {
 			return nil, nil
@@ -105,14 +110,14 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 		}
 		return s.options.AIOSource.CatalogTorrents(r.Context(), opts, filters, visitor)
 	}))
-	mux.HandleFunc("GET /api/public/catalog/search", s.publicCatalogHandler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/search", handler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, filters, ok := catalogSearchInput(w, r)
 		if !ok {
 			return nil, nil
 		}
 		return s.options.AIOSource.PublicCatalogSearch(r.Context(), visitor, opts, filters)
 	}))
-	mux.HandleFunc("GET /api/public/catalog/{id}", s.publicCatalogHandler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/{id}", handler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
@@ -122,7 +127,7 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 		}
 		return s.options.AIOSource.PublicCatalogTitle(r.Context(), visitor, id, catalogLanguage(r), aiosource.Normalize(r.URL.Query().Get("q")))
 	}))
-	mux.HandleFunc("GET /api/public/catalog/{id}/releases", s.publicCatalogHandler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/{id}/releases", handler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
@@ -133,7 +138,7 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 		}
 		return s.options.AIOSource.PublicCatalogReleases(r.Context(), visitor, id, selection, opts, filters)
 	}))
-	mux.HandleFunc("POST /api/public/catalog/{id}/download", s.publicCatalogHandler(65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("POST "+prefix+"/catalog/{id}/download", handler(65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
@@ -155,7 +160,7 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 			if e != nil {
 				return nil, e
 			}
-			data, e := json.Marshal(publicCatalogFileTicket{Service: result.Service, URL: result.URL, Audience: s.auth.origin, Generation: visitor.Generation, Expires: expires})
+			data, e := json.Marshal(publicCatalogFileTicket{Trusted: visitor.Trusted, Service: result.Service, URL: result.URL, Audience: s.auth.origin, Generation: visitor.Generation, Expires: expires})
 			if e != nil {
 				return nil, e
 			}
@@ -169,27 +174,22 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 		}
 		return result, err
 	}))
-	mux.HandleFunc("GET /api/public/catalog-downloads/{token}", s.publicCatalogFile)
 }
 
 type publicCatalogFileTicket struct {
-	Service    string `json:"service"`
-	URL        string `json:"url"`
-	Audience   string `json:"audience"`
-	Generation int64  `json:"generation"`
-	Expires    int64  `json:"expires"`
+	Trusted    *model.TrustedGrant `json:"trusted,omitempty"`
+	Service    string              `json:"service"`
+	URL        string              `json:"url"`
+	Audience   string              `json:"audience"`
+	Generation int64               `json:"generation"`
+	Expires    int64               `json:"expires"`
 }
 
 func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
-	if !s.publicOriginAllowed() || len(r.PathValue("token")) > 14000 {
+	if len(r.PathValue("token")) > 14000 {
 		respondError(w, model.ErrNotFound)
 		return
 	}
-	release, ok := s.public.enter(w, r, publicAddon)
-	if !ok {
-		return
-	}
-	defer release()
 	sealed, err := base64.RawURLEncoding.DecodeString(r.PathValue("token"))
 	if err != nil {
 		respondError(w, model.ErrNotFound)
@@ -207,7 +207,22 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
+	release, ok := s.enterConnection(w, r, ticket.Trusted != nil)
+	if !ok {
+		return
+	}
+	defer release()
 	authorize := func(ctx context.Context) error {
+		if ticket.Trusted != nil {
+			user, err := s.options.Store.TrustedUser(ctx, *ticket.Trusted)
+			if err != nil || !user.SearchEnabled {
+				return model.ErrNotFound
+			}
+			return nil
+		}
+		if !s.publicOriginAllowed() {
+			return model.ErrNotFound
+		}
 		access, e := s.options.Store.PublicAccess(ctx)
 		if e != nil {
 			return e

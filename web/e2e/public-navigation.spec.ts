@@ -6,7 +6,7 @@ test('public navigation only offers enabled connections and follows policy chang
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Allow public Search', { exact: true }).check()
   await access.getByLabel('Allow public Stremio connections', { exact: true }).uncheck()

@@ -52,7 +52,7 @@ Open a title to compare its source releases and debrid availability. When severa
 
 Book titles use your browser language when a suitable local edition is known, with other local title and English fallbacks. Covers load directly from Open Library; movie and series posters load from TMDB. Missing images use a placeholder.
 
-Search works the same way on an enabled public instance, using the visitor's own debrid credentials and the instance's access rules. Private-source announces and administrator keys are never borrowed for visitor downloads.
+Search works the same way on an enabled public instance. Personal credentials are the default; the administrator may explicitly authorize instance debrid accounts or announce URLs independently. The same private-source and cached-only rules apply.
 
 ## Check uncertain identifications
 

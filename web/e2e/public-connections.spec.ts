@@ -47,7 +47,7 @@ test('public connections share the shell and encrypted Torznab filters without v
       `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('private-example','one','{"title":"Example Feature 2024","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')`,
     )
     await page.goto('/public-access')
-    const access = page.getByRole('form', { name: 'Public access', exact: true })
+    const access = page.getByRole('form', { name: 'Public', exact: true })
     await access.getByLabel('Enable public access', { exact: true }).check()
     await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
@@ -170,6 +170,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(visitor.getByRole('dialog').getByRole('link')).toHaveText([
       'Torznab',
       'Stremio',
+      'User login',
       'Admin login',
     ])
     await visitor.getByRole('button', { name: 'Close navigation', exact: true }).click()

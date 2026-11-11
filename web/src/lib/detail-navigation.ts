@@ -10,8 +10,10 @@ const viewLabels: Record<string, string> = {
   '/torrents': 'Files',
   '/search': 'Search',
   '/public/search': 'Search',
+  '/trusted/search': 'Search',
   '/search/torrents': 'Search torrents',
   '/public/search/torrents': 'Search torrents',
+  '/trusted/search/torrents': 'Search torrents',
   '/remotes': 'Remote catalogs',
   '/remotes/settings': 'Remote catalogs',
   '/remotes/history': 'Remote catalog history',
@@ -33,7 +35,8 @@ function viewLabel(pathname: string) {
   if (/^\/(?:runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(pathname))
     return 'Processed records'
   if (isSourceSettingsPath(pathname)) return 'Source settings'
-  if (/^\/(?:public\/)?search\/[1-9][0-9]{0,15}$/.test(pathname)) return 'Source releases'
+  if (/^\/(?:(?:public|trusted)\/)?search\/[1-9][0-9]{0,15}$/.test(pathname))
+    return 'Source releases'
   return undefined
 }
 

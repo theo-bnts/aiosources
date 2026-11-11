@@ -96,7 +96,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled && value.ExposeSources}
+		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled && value.ExposeSources}
 		if enabled && value.ExposeSources {
 			allSources, e := s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
@@ -109,9 +109,23 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				respondError(w, err)
 				return
 			}
-			if len(sources) > 0 {
+			if len(sources) > 0 && !value.UseInstanceAnnounces {
 				info["private_sources"] = sources
 			}
+		}
+		if enabled && value.UseInstanceDebrid {
+			config, e := s.options.Store.AIOConfig(ctx)
+			if e != nil {
+				respondError(w, e)
+				return
+			}
+			providers := []aiosource.PublicProvider{}
+			for _, provider := range aiosource.PublicProviders {
+				if config.DebridSecret(provider.ID) != "" {
+					providers = append(providers, provider)
+				}
+			}
+			info["providers"] = providers
 		}
 		if enabled && value.ExposeSources && value.CatalogEnabled {
 			policy, e := s.options.Store.PublicCatalogPolicy(ctx)
@@ -314,6 +328,8 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 func publicCredentialError(w http.ResponseWriter, err error) {
 	if errors.Is(err, aiosource.ErrAuth) {
 		writeError(w, 401, "Your saved credentials are no longer available. Enter them again.")
+	} else if errors.Is(err, model.ErrInvalid) {
+		writeError(w, 400, "Check the service keys and complete announce URLs for the permitted private sources.")
 	} else {
 		respondError(w, err)
 	}

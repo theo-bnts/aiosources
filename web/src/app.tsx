@@ -67,6 +67,7 @@ import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/
 import { Login } from '@/components/login'
 import type { PublicInfo } from '@/components/public-connection-fields'
 import { PublicEntry } from '@/components/public-entry'
+import { TrustedEntry } from '@/components/trusted-entry'
 
 export class RootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
@@ -290,10 +291,24 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/public-access',
-        label: 'Public access',
-        description: 'Visitor access, source visibility and public connections.',
+        to: '/users',
+        label: 'Users',
+        description: 'Trusted user accounts and visitor access.',
         icon: UsersThreeIcon,
+        children: [
+          {
+            to: '/trusted-users',
+            label: 'Trusted',
+            description: 'Manage user accounts, feature permissions and credentials.',
+            icon: UsersThreeIcon,
+          },
+          {
+            to: '/public-access',
+            label: 'Public',
+            description: 'Visitor access, source visibility and public connections.',
+            icon: GlobeIcon,
+          },
+        ],
       },
       {
         to: '/health',
@@ -516,6 +531,25 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       </div>
     )
+  if (location.pathname === '/user-login') return <Login key="trusted" trusted />
+  if (session.data.role === 'trusted' && location.pathname === '/login')
+    return <Login key="admin" />
+  if (session.data.role === 'trusted' && location.pathname !== '/login')
+    return (
+      <TrustedEntry
+        layout={(content) => (
+          <AppShell publicMode trustedMode>
+            {content}
+          </AppShell>
+        )}
+      />
+    )
+  if (
+    location.pathname.startsWith('/trusted') &&
+    !location.pathname.startsWith('/trusted-users') &&
+    !session.data.authenticated
+  )
+    return <Login key="trusted" trusted />
   if (location.pathname === '/public' || location.pathname.startsWith('/public/'))
     return (
       <PublicEntry
@@ -528,7 +562,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
     )
   if (!session.data.authenticated)
     return location.pathname === '/login' ? (
-      <Login />
+      <Login key="admin" />
     ) : (
       <PublicEntry layout={(content) => <AppShell publicMode>{content}</AppShell>} />
     )
@@ -572,21 +606,27 @@ function useLiveUpdates(enabled = true) {
 
 export function AppShell({
   publicMode = false,
+  trustedMode = false,
   authenticated = false,
   children,
 }: {
   publicMode?: boolean
+  trustedMode?: boolean
   authenticated?: boolean
   children?: ReactNode
 }) {
   const publicInfo = useQuery({
-    queryKey: ['public-config'],
-    queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
+    queryKey: trustedMode ? ['trusted-config'] : ['public-config'],
+    queryFn: ({ signal }) =>
+      api<PublicInfo>(trustedMode ? '/trusted/config' : '/public/config', {
+        signal,
+        cache: 'no-store',
+      }),
     enabled: publicMode,
     refetchInterval: LIVE_REFRESH_INTERVAL,
     retry: false,
   })
-  const groups = publicMode
+  const baseGroups = publicMode
     ? [
         ...(publicInfo.data?.search_enabled ? [publicSearchNavigation] : []),
         ...publicNavigationGroups
@@ -603,12 +643,24 @@ export function AppShell({
           .filter((group) => group.items.length > 0),
       ]
     : navigationGroups
+  const groups = trustedMode
+    ? baseGroups.map((group) => ({
+        ...group,
+        items: group.items.map((item) => ({
+          ...item,
+          to: item.to.replace(/^\/public(?=\/|$)/, '/trusted'),
+          description: item.description
+            .replace('your own debrid accounts', 'the instance’s debrid accounts')
+            .replace('your own optional announce URLs', 'the instance’s permitted sources'),
+        })),
+      }))
+    : baseGroups
   const items = groups.flatMap((group) => navigationItems(group.items))
   const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
   useLiveUpdates(!publicMode)
   const location = useLocation()
-  const navigationPath = publicMode
+  let navigationPath = publicMode
     ? location.pathname.startsWith('/public/search')
       ? '/public/search'
       : location.pathname === '/public/torznab'
@@ -631,6 +683,14 @@ export function AppShell({
                 location.pathname.startsWith('/metadata/history')
               ? '/metadata/videos'
               : location.pathname
+  if (trustedMode)
+    navigationPath = location.pathname.startsWith('/trusted/search')
+      ? '/trusted/search'
+      : location.pathname === '/trusted/torznab'
+        ? '/trusted/torznab'
+        : location.pathname === '/trusted/sharing'
+          ? '/trusted/sharing'
+          : '/trusted'
   const activeItem = [...items]
     .sort((a, b) => b.to.length - a.to.length)
     .find(
@@ -729,7 +789,7 @@ export function AppShell({
     return () => desktop.removeEventListener('change', closeOnDesktop)
   }, [])
   const logout = useMutation({
-    mutationFn: () => api<void>('/logout', { method: 'POST' }),
+    mutationFn: () => api<void>(trustedMode ? '/trusted/logout' : '/logout', { method: 'POST' }),
     onSuccess: () => {
       setCSRF()
       window.dispatchEvent(new Event('session-expired'))
@@ -756,28 +816,34 @@ export function AppShell({
       <span className="text-2xl leading-none font-semibold tracking-tight">AIOSources</span>
     </>
   )
-  const footer = publicMode ? (
-    <div className="shrink-0 p-3">
-      <Button variant="outline" className="w-full" asChild>
-        <Link to={authenticated ? '/providers' : '/login'}>
-          {authenticated ? 'Administration' : 'Admin login'}
-        </Link>
-      </Button>
-    </div>
-  ) : (
-    <div className="shrink-0 space-y-3 p-3">
-      <ErrorNotice error={logout.error} scope="action" />
-      <Button
-        variant="warning"
-        className="w-full justify-center"
-        disabled={logout.isPending}
-        onClick={() => discard(() => logout.mutate())}
-      >
-        <SignOutIcon />
-        {logout.isPending ? 'Signing out…' : 'Sign out'}
-      </Button>
-    </div>
-  )
+  const footer =
+    publicMode && !trustedMode ? (
+      <div className="shrink-0 space-y-2 p-3">
+        {!authenticated && (
+          <Button variant="outline" className="w-full" asChild>
+            <Link to="/user-login">User login</Link>
+          </Button>
+        )}
+        <Button variant="outline" className="w-full" asChild>
+          <Link to={authenticated ? '/providers' : '/login'}>
+            {authenticated ? 'Administration' : 'Admin login'}
+          </Link>
+        </Button>
+      </div>
+    ) : (
+      <div className="shrink-0 space-y-3 p-3">
+        <ErrorNotice error={logout.error} scope="action" />
+        <Button
+          variant="warning"
+          className="w-full justify-center"
+          disabled={logout.isPending}
+          onClick={() => discard(() => logout.mutate())}
+        >
+          <SignOutIcon />
+          {logout.isPending ? 'Signing out…' : 'Sign out'}
+        </Button>
+      </div>
+    )
   return (
     <Dialog
       open={mobileOpen}
@@ -855,6 +921,7 @@ export function AppShell({
             </div>
             <div className="order-last w-full basis-full lg:order-none lg:w-auto lg:basis-auto">
               <SettingsSearch
+                trusted={trustedMode}
                 visibility={{
                   admin: !publicMode,
                   search: publicInfo.data?.search_enabled,

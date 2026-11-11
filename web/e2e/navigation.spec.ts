@@ -45,7 +45,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Connections', 'Stremio', '/addon/history'],
     ['Connections', 'Shared catalogs', '/sharing'],
     ['Connections', 'Torznab', '/torznab'],
-    ['Administration', 'Public access', '/public-access'],
+    ['Administration', 'Public', '/public-access'],
+    ['Administration', 'Trusted', '/trusted-users'],
     ['Sources', 'Remote catalogs', '/sharing/remotes'],
     ['Sources', 'Remote catalogs', '/remotes'],
     ['Sources', 'Remote catalogs', '/remotes/settings'],
@@ -53,7 +54,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Remote catalogs', '/remotes/history/missing'],
     ['Connections', 'Shared catalogs', '/sharing/settings'],
     ['Administration', 'Incoming', '/network'],
-    ['Administration', 'Public access', '/network/limits'],
+    ['Administration', 'Public', '/network/limits'],
     ['Administration', 'Outgoing', '/network/proxies'],
     ['Administration', 'Outgoing', '/network/routing'],
     ['Administration', 'Incoming', '/network/incoming'],
@@ -79,7 +80,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
             ? [`${group}/`, 'Network/', label]
             : ['Statistics', 'Secrets', 'Sign-in protection', 'Active sessions'].includes(label)
               ? [`${group}/`, 'Security/', label]
-              : [`${group}/`, label]
+              : ['Public', 'Trusted'].includes(label)
+                ? [`${group}/`, 'Users/', label]
+                : [`${group}/`, label]
         : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -111,6 +114,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
   if ((await security.getAttribute('aria-expanded')) === 'true') await security.click()
   const network = navigation.getByRole('button', { name: 'Network', exact: true })
   if ((await network.getAttribute('aria-expanded')) === 'true') await network.click()
+  const users = navigation.getByRole('button', { name: 'Users', exact: true })
+  if ((await users.getAttribute('aria-expanded')) !== 'true') await users.click()
   await expect(navigation.getByRole('button')).toHaveText([
     'Sources',
     'Indexers',
@@ -119,6 +124,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Administration',
     'Security',
     'Network',
+    'Users',
   ])
   await expect(navigation.getByRole('link')).toHaveText([
     'Torrents',
@@ -133,7 +139,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Torznab',
     'Stremio',
     'Shared catalogs',
-    'Public access',
+    'Trusted',
+    'Public',
     'Storage',
     'Logs',
   ])

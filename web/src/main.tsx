@@ -85,6 +85,7 @@ const SharedCatalogStatisticsPage = lazy(() =>
   import('@/pages/sharing').then((m) => ({ default: m.SharedCatalogStatisticsPage })),
 )
 const PublicAccessPage = lazy(() => import('@/pages/public-access'))
+const TrustedUsersPage = lazy(() => import('@/pages/trusted-users'))
 const TorznabPage = lazy(() => import('@/pages/torznab'))
 const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
 const StorageSettingsPage = lazy(() =>
@@ -365,6 +366,8 @@ const router = createBrowserRouter(
         <Route path="security/secrets" element={<SecuritySecretsPage />} />
         <Route path="security/verification" element={<SecurityVerificationPage />} />
         <Route path="security/sessions" element={<SecuritySessionsPage />} />
+        <Route path="users" element={<Navigate to="/trusted-users" replace />} />
+        <Route path="trusted-users" element={<TrustedUsersPage />} />
         <Route
           element={
             <WorkspaceLayout
@@ -420,7 +423,7 @@ const router = createBrowserRouter(
         <Route
           element={
             <WorkspaceLayout
-              title="Public access"
+              title="Public"
               tabs={[
                 { path: '/public-access', label: 'Settings', icon: GearSixIcon },
                 { path: '/public-access/limits', label: 'Request limits', icon: GaugeIcon },

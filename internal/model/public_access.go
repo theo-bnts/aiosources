@@ -1,7 +1,15 @@
 package model
 
 // PublicAccess contains no visitor or administrator credentials.
+// CredentialPolicy selects server-resolved instance credentials independently
+// from feature permissions. Secret values never accompany this policy.
+type CredentialPolicy struct {
+	UseInstanceDebrid    bool `json:"use_instance_debrid"`
+	UseInstanceAnnounces bool `json:"use_instance_announces"`
+}
+
 type PublicAccess struct {
+	CredentialPolicy
 	Revision          int64 `json:"revision"`
 	Enabled           bool  `json:"enabled"`
 	SearchEnabled     bool  `json:"search_enabled"`

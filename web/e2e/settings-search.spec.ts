@@ -370,7 +370,7 @@ test('public settings search follows enabled features and never fetches administ
   browser,
 }) => {
   await page.goto('/public-access')
-  const access = page.getByRole('form', { name: 'Public access', exact: true })
+  const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()

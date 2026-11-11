@@ -2,12 +2,17 @@ import { debridProviders, isDebridService } from './debrid'
 import { useSyncExternalStore } from 'react'
 import { api, ApiError, queryClient } from './api'
 
-export type PublicCredential = { credential: string; services: string[]; announces?: string[] }
+export type PublicCredential = {
+  credential: string
+  services: string[]
+  announces?: string[]
+  instance_services?: boolean
+}
 export type PublicInstallation = PublicCredential & { manifest_url: string }
 const storageKey = 'aiosources.public.credentials'
+const scopedKey = (scope = '') => (scope ? `${storageKey}.${scope}` : storageKey)
 const listeners = new Set<() => void>()
-let current: PublicCredential | null = null
-let loaded = false
+const records = new Map<string, PublicCredential | null>()
 
 function parse(value: unknown): PublicCredential | null {
   if (!value || typeof value !== 'object') return null
@@ -24,27 +29,31 @@ function parse(value: unknown): PublicCredential | null {
         !item.announces.every(
           (id) => typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id),
         ))) ||
-    (!item.services.length && !(item.announces as string[] | undefined)?.length)
+    (!item.services.length &&
+      !(item.announces as string[] | undefined)?.length &&
+      item.instance_services !== true) ||
+    (item.instance_services !== undefined && typeof item.instance_services !== 'boolean')
   )
     return null
   return {
     credential: item.credential,
+    ...(item.instance_services === true ? { instance_services: true } : {}),
     services: [...new Set(item.services as string[])],
     announces: [...new Set((item.announces ?? []) as string[])],
   }
 }
 
-function read() {
-  if (!loaded) {
-    loaded = true
-    current = null
+function read(scope = '') {
+  if (!records.has(scope)) {
+    let value: PublicCredential | null = null
     try {
-      current = parse(JSON.parse(localStorage.getItem(storageKey) || 'null'))
+      value = parse(JSON.parse(localStorage.getItem(scopedKey(scope)) || 'null'))
     } catch {
       /* Storage is optional. */
     }
+    records.set(scope, value)
   }
-  return current
+  return records.get(scope) ?? null
 }
 
 function notify() {
@@ -52,8 +61,8 @@ function notify() {
 }
 
 function changedStorage(event: StorageEvent) {
-  if (event.key !== storageKey && event.key !== null) return
-  loaded = false
+  if (event.key !== null && !event.key.startsWith(storageKey)) return
+  records.clear()
   clearPublicSearch()
   notify()
 }
@@ -69,23 +78,26 @@ function subscribe(listener: () => void) {
   }
 }
 
-export function usePublicCredential() {
-  return useSyncExternalStore(subscribe, read, () => null)
+export function usePublicCredential(scope = '') {
+  return useSyncExternalStore(
+    subscribe,
+    () => read(scope),
+    () => null,
+  )
 }
 
-export function isCurrentPublicCredential(expected?: string) {
-  return read()?.credential === expected
+export function isCurrentPublicCredential(expected?: string, scope = '') {
+  return read(scope)?.credential === expected
 }
 
-export function savePublicCredential(value: PublicCredential) {
+export function savePublicCredential(value: PublicCredential, scope = '') {
   const next = parse(value)
   if (!next) throw new Error('The server returned an invalid service configuration.')
-  current = next
-  loaded = true
+  records.set(scope, next)
   // Only server-sealed credentials and field identifiers are persisted. Personal
   // keys and announce URLs never enter localStorage or query-cache entries in plaintext.
   try {
-    localStorage.setItem(storageKey, JSON.stringify(next))
+    localStorage.setItem(scopedKey(scope), JSON.stringify(next))
   } catch {
     /* Keep this tab usable. */
   }
@@ -98,12 +110,11 @@ function clearPublicSearch() {
   queryClient.removeQueries({ queryKey: ['public-catalog'] })
 }
 
-export function forgetPublicCredential(expected?: string) {
-  if (expected && read()?.credential !== expected) return
-  current = null
-  loaded = true
+export function forgetPublicCredential(expected?: string, scope = '') {
+  if (expected && read(scope)?.credential !== expected) return
+  records.set(scope, null)
   try {
-    localStorage.removeItem(storageKey)
+    localStorage.removeItem(scopedKey(scope))
   } catch {
     /* Clear memory regardless. */
   }

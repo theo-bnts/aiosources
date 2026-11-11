@@ -6,7 +6,7 @@ test('Public access separates Search and connection settings, while Network expa
   page,
 }) => {
   await page.goto('/public-access')
-  const form = page.getByRole('form', { name: 'Public access', exact: true })
+  const form = page.getByRole('form', { name: 'Public', exact: true })
   const search = form.getByRole('group', { name: 'Search', exact: true })
   const connections = form.getByRole('group', { name: 'Connections', exact: true })
   await expect(
@@ -254,7 +254,11 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveCount(0)
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
-    .getByRole('link', { name: 'Public access', exact: true })
+    .getByRole('button', { name: 'Users', exact: true })
+    .click()
+  await page
+    .getByRole('navigation', { name: 'Main navigation', exact: true })
+    .getByRole('link', { name: 'Public', exact: true })
     .click()
   await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   await expect(page.getByLabel('IP address header', { exact: true })).toHaveCount(0)
@@ -309,7 +313,7 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   await page.goto('/public-access')
   await expect(
     page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
-  ).toHaveText(['Administration/', 'Public access'])
+  ).toHaveText(['Administration/', 'Users/', 'Public'])
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveCount(0)
 })
 
@@ -323,6 +327,10 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
       const network = navigation.getByRole('button', { name: 'Network', exact: true })
       if ((await network.getAttribute('aria-expanded')) !== 'true') await network.click()
     }
+    if (label === 'Public') {
+      const users = navigation.getByRole('button', { name: 'Users', exact: true })
+      if ((await users.getAttribute('aria-expanded')) !== 'true') await users.click()
+    }
     await navigation.getByRole('link', { name: label, exact: true }).click()
   }
   await page.setViewportSize({ width: 390, height: 844 })
@@ -331,7 +339,7 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page
     .getByLabel('Trusted proxy addresses', { exact: true })
     .fill('2001:db8:1234:5678:90ab:cdef:1234:5678\n10.0.0.0/24')
-  await openSection('Public access')
+  await openSection('Public')
   const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
@@ -339,7 +347,7 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await openSection('Public access')
+  await openSection('Public')
   await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   await page.getByLabel('Public requests per minute', { exact: true }).fill('80')
@@ -358,7 +366,7 @@ test('public access saves preserve network quotas and concurrent request limit e
   page,
 }) => {
   await page.goto('/public-access')
-  const exposure = page.getByRole('form', { name: 'Public access', exact: true })
+  const exposure = page.getByRole('form', { name: 'Public', exact: true })
   await exposure.getByRole('switch', { name: 'Enable public access', exact: true }).click()
   const network = await settings(page)
   const response = await page.request.put('/api/settings/network', {

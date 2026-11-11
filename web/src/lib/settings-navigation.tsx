@@ -10,6 +10,10 @@ export function useSettingDestination() {
   if (!setting) return undefined
   if (setting.public === 'interface') return setting
   const path = setting.route.split('?')[0]
+  if (setting.public && location.pathname.startsWith('/trusted')) {
+    const route = setting.route.replace(/^\/public(?=\/|$)/, '/trusted')
+    return route === location.pathname ? { ...setting, route } : undefined
+  }
   if (setting.entity === 'source')
     return isSourceSettingsPath(location.pathname) ? setting : undefined
   return path === location.pathname ? setting : undefined

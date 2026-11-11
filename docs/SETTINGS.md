@@ -63,6 +63,6 @@ Use the settings search at the top of the application to find a control directly
 - **Storage → Settings:** retained torrent fields, optional search indexes, history retention and maintenance.
 - **Security:** Secrets, two-step verification and signed-in sessions.
 - **Network:** trusted incoming proxies and outgoing connections.
-- **Public access:** offered visitor pages and request limits.
+- **Users → Public:** offered visitor pages and request limits.
 
 Page size, date display and refresh preferences are available from the application's browser settings. They apply to that browser. Leave defaults in place unless you need different behavior.
