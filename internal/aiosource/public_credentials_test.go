@@ -15,7 +15,7 @@ func TestBrowserCredentialsShareOnlyPersonalAnnouncesAndServices(t *testing.T) {
 	ctx, s, conn := testService(t)
 	visitorSourceRegistry(t, s)
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.TorznabEnabled = true, true, true
+	access.Enabled, access.TorznabEnabled = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -91,16 +91,15 @@ func TestBrowserCredentialsShareOnlyPersonalAnnouncesAndServices(t *testing.T) {
 		t.Fatal("Remembered personal configuration crossed origins", err)
 	}
 	access, _ = s.DB.PublicAccess(ctx)
-	access.ExposeSources = false
 	if err = s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	retired, err := s.ResolvePublicCredential(ctx, origin, PublicCredentialChanges{Credential: browser.Credential})
-	if err != nil || len(retired.Announces) != 0 || retired.Services["torbox"] != key {
-		t.Fatal("Withdrawn permission retained an announce or removed the service key", err)
+	if err != nil || retired.Announces["unspecified"] != own || retired.Services["torbox"] != key {
+		t.Fatal("Remembered personal credentials changed unexpectedly", err)
 	}
 	if _, err := s.CreatePublicInstallation(ctx, origin, retired.Services, retired.Announces); err != nil {
-		t.Fatal("Withdrawal prevented cached-only setup", err)
+		t.Fatal("Remembered configuration prevented setup", err)
 	}
 	assertNoVisitorData(t, ctx, conn, own, replacement, key, browser.Credential, installation, torznab)
 }

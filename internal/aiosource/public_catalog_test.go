@@ -23,7 +23,7 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 		t.Fatal(err)
 	}
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.SearchEnabled, access.ExposeSources = true, true, true
+	access.Enabled, access.SearchEnabled = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -80,25 +80,25 @@ func TestPublicCatalogPrivateAnnouncementsAreOptionalPersonalAndRevocable(t *tes
 	if err != nil || rows.Total != 0 {
 		t.Fatal("Keys-only configuration inherited an announce", err)
 	}
+	visitor.Preferences.CachedOnly = true
 	access, _ = s.DB.PublicAccess(ctx)
-	access.ExposeSources = false
 	if err = s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	rows, err = s.PublicCatalogReleases(ctx, visitor, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
 	if err != nil || rows.Total != 0 {
-		t.Fatal("Withdrawn announcement permission remained active", err)
+		t.Fatal("Cached-only preference advertised an uncached release", err)
 	}
 	if err = s.DB.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{Hash: hash, Cached: true, CheckedAt: time.Now(), Generation: generation, Files: []model.AIOFile{{Path: "Example.Movie.2021.mkv", Size: 100}}}); err != nil {
 		t.Fatal(err)
 	}
 	rows, err = s.PublicCatalogReleases(ctx, visitor, work, model.CatalogSelection{}, model.ListOptions{}, model.CatalogReleaseFilters{})
-	if err != nil || rows.Total != 1 || rows.Items[0].Provider != "" || rows.Items[0].ProviderName != "" {
+	if err != nil || rows.Total != 1 || rows.Items[0].Provider != "private-one" || rows.Items[0].ProviderName != "Example Library" {
 		t.Fatal("Cached private release lost or identity revealed", err)
 	}
 	formatted := strings.Join(rows.Items[0].Presentation.Details, "\n")
-	if strings.Contains(formatted, "Example Library") || strings.Contains(formatted, "private-one") || strings.Contains(formatted, "🧭") {
-		t.Fatal("the shared formatter revealed a source while source disclosure was disabled")
+	if !strings.Contains(formatted, "🧭 Example Library") {
+		t.Fatal("the shared formatter omitted the source display name")
 	}
 	for _, files := range [][]model.AIOFile{nil, {{Path: "readme.txt", Size: 100}}} {
 		if err = s.DB.SaveSharedAvailability(ctx, "torbox", model.AIOAvailability{Hash: hash, Cached: true, CheckedAt: time.Now(), Generation: generation, Files: files}); err != nil {
@@ -139,7 +139,7 @@ func TestPublicCatalogCachedOnlyDoesNotOfferUncachedActions(t *testing.T) {
 		seedMovie(t, ctx, s, conn, provider, "one", hash)
 	}
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.SearchEnabled, access.ExposeSources = true, true, true
+	access.Enabled, access.SearchEnabled = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}

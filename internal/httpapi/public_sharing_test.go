@@ -29,16 +29,15 @@ func TestPublicSharingRoutesRequireTheirOwnCredentialAndPreservePrivateData(t *t
 		t.Fatal("disabled catalog setup", response.Code)
 	}
 	access, _ := f.db.PublicAccess(f.ctx)
-	access.Enabled, access.CatalogEnabled = true, true
+	access.Enabled, access.CatalogEnabled = true, false
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	response := f.request("GET", "/api/public/config", "", false, "")
 	if strings.Contains(response.Body.String(), `"catalog_enabled":true`) || strings.Contains(response.Body.String(), `"catalog_fields"`) {
-		t.Fatal("catalog exposed without source permission")
+		t.Fatal("disabled catalog permission was ignored")
 	}
 	access, _ = f.db.PublicAccess(f.ctx)
-	access.ExposeSources = true
 	access.CatalogEnabled = true
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
@@ -124,12 +123,12 @@ func TestPublicSharingRoutesRequireTheirOwnCredentialAndPreservePrivateData(t *t
 		t.Fatal("safe catalog diagnostics missing or leaking configuration")
 	}
 	access, _ = f.db.PublicAccess(f.ctx)
-	access.ExposeSources = false
+	access.CatalogEnabled = false
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	if response = f.request("GET", endpoint.Path, "", false, connection.Password); response.Code != 401 {
-		t.Fatal("source exposure revocation did not block issued links", response.Code)
+		t.Fatal("catalog permission revocation did not block issued links", response.Code)
 	}
 }
 

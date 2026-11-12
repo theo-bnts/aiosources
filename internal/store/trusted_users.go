@@ -98,13 +98,15 @@ func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, pa
 		return model.TrustedUser{}, model.ErrInvalid
 	}
 	value.Email = email
-	value.CatalogEnabled = value.CatalogEnabled && value.ExposeSources
 	permissions, _ := json.Marshal(value.TrustedPermissions)
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return model.TrustedUser{}, err
 	}
 	defer rollback(tx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+		return model.TrustedUser{}, databaseError("lock trusted catalog policy", err)
+	}
 	if value.ID == "" {
 		if value.Revision != 0 || passwordHash == "" {
 			return model.TrustedUser{}, model.ErrInvalid
@@ -142,6 +144,9 @@ func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64
 		return err
 	}
 	defer rollback(tx)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+		return databaseError("lock trusted catalog policy", err)
+	}
 	tag, err := tx.Exec(ctx, `DELETE FROM aiosources.trusted_users WHERE id=$1 AND revision=$2`, id, revision)
 	if err != nil {
 		return databaseError("delete trusted user", err)

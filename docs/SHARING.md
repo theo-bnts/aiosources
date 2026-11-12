@@ -25,9 +25,9 @@ The first sync imports the available catalog; later syncs fetch changes. **Full 
 
 ## Offer a public catalog
 
-In **Administration → Users → Public → Settings**, enable public access, **Expose source names and filters**, and **Allow public shared catalogs**. Choose what may be copied under **Shared catalog data**. Visitors use **Connections → Shared catalogs** to generate a URL and sharing password, then follow the same remote-import steps above on their own instance. No visitor account, debrid key or announce URL is needed.
+In **Administration → Users → Public → Settings**, enable public access and select **Allow shared catalogs** in **Permissions**. Choose what may be copied under **Shared catalog data**. Visitors use **Connections → Shared catalogs** to generate a URL and sharing password, then follow the same remote-import steps above on their own instance. No visitor account, debrid key or announce URL is needed.
 
-Public exports use the same source identities as named shares, so copying through either route does not create new identities. Your permissions apply to every page and sync. Turning off public sharing or source exposure revokes public links while leaving named shares unaffected. Copies already received remain with their recipients.
+Public exports use the same source identities as named shares, so copying through either route does not create new identities. Your permissions apply to every page and sync. Turning off public sharing revokes public links while leaving named shares unaffected. Copies already received remain with their recipients.
 
 ## What can be shared?
 

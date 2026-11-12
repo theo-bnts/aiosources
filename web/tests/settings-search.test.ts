@@ -126,3 +126,19 @@ test('catalog sharing and reception expose the same data menu and exact searchab
   }
   assert.deepEqual(settingByID('share.fields')?.reveal, ['Shared data', 'Torrents'])
 })
+
+test('instance credential settings do not offer personal keys while optional own announces remain searchable', () => {
+  const entries = visibleSettings({
+    admin: false,
+    search: true,
+    stremio: true,
+    torznab: true,
+    sources: true,
+    services: [],
+    announces: true,
+  })
+  assert.ok(entries.every((setting) => !setting.title.endsWith('API key')))
+  assert.ok(entries.some((setting) => setting.id === 'visitor.search.announces'))
+  assert.ok(entries.some((setting) => setting.id === 'visitor.stremio.announces'))
+  assert.ok(entries.some((setting) => setting.id === 'visitor.torznab.announces'))
+})

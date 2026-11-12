@@ -38,7 +38,7 @@ func RuntimeFields(section string) map[string]RuntimeField {
 	case "downloads":
 		return map[string]RuntimeField{"duration_hours": {24, 1, 168}, "ticket_minutes": {10, 1, MaxDownloadTicketMinutes}}
 	case "security":
-		return map[string]RuntimeField{"session_hours": {12, 1, 168}, "login_per_minute": {10, 1, 60}, "login_global_per_minute": {60, 1, 600}, "session_limit": {256, 1, 1024}, "enrollment_minutes": {10, 5, 30}}
+		return map[string]RuntimeField{"session_hours": {12, 1, 168}, "login_per_minute": {10, 1, 60}, "login_global_per_minute": {60, 1, 600}, "session_limit": {256, 1, 1024}}
 	case "payloads":
 		return map[string]RuntimeField{"source_kib": {128, 16, 128}, "public_stremio_bytes": {8192, 1024, 8192}, "public_torznab_bytes": {6000, 1024, 6000}}
 	}

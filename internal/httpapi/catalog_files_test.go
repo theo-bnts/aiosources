@@ -41,7 +41,7 @@ func TestCatalogFileDestinationGuardPrecedesProxyConnection(t *testing.T) {
 
 func TestCatalogFileAttachmentsAreSessionBoundAndStreamWithoutProviderCredentials(t *testing.T) {
 	f, addon, _ := addonAPI(t)
-	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db, addon.Vault)
+	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db)
 	if err != nil {
 		t.Fatal(err)
 	}

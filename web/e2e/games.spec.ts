@@ -68,6 +68,11 @@ test('IGDB credentials use the shared secret editor and never appear in configur
     .getByRole('button', { name: 'Save', exact: true })
     .click()
   await expect(
+    page
+      .getByRole('form', { name: 'Games configuration', exact: true })
+      .getByRole('button', { name: 'Save', exact: true }),
+  ).toBeDisabled()
+  await expect(
     page.getByRole('button', { name: 'Replace Twitch client secret', exact: true }),
   ).toBeVisible()
   const response = await page.request.get('/api/aiosource/controls')

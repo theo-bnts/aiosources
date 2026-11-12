@@ -9,23 +9,15 @@ test('public shared catalogs follow administrator permissions without saving vis
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
-  const catalog = access.getByRole('switch', { name: 'Allow public shared catalogs', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
+  const catalog = access.getByRole('switch', { name: 'Allow shared catalogs', exact: true })
   await expect(catalog).toBeDisabled()
+  await expect(catalog).toBeChecked()
   await access.getByRole('switch', { name: 'Enable public access', exact: true }).check()
-  await expect(catalog).toBeDisabled()
-  await access.getByRole('switch', { name: 'Expose source names and filters', exact: true }).check()
-  await catalog.check()
-  await access
-    .getByRole('switch', { name: 'Expose source names and filters', exact: true })
-    .uncheck()
-  await expect(catalog).not.toBeChecked()
-  await expect(catalog).toBeDisabled()
-  await access.getByRole('switch', { name: 'Expose source names and filters', exact: true }).check()
-  await expect(catalog).not.toBeChecked()
-  await catalog.check()
-  await access
-    .getByRole('switch', { name: 'Allow public Stremio connections', exact: true })
-    .uncheck()
+  await expect(catalog).toBeEnabled()
+  await access.getByLabel('Allow Search', { exact: true }).uncheck()
+  await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
+  await access.getByRole('switch', { name: 'Allow Stremio connections', exact: true }).uncheck()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
@@ -116,9 +108,7 @@ test('public shared catalogs follow administrator permissions without saving vis
     await catalog.uncheck()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-    await expect(
-      visitor.getByRole('heading', { name: 'Administrator sign-in', exact: true }),
-    ).toBeVisible()
+    await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toBeVisible()
     expect(
       (
         await context.request.get(endpoint, { headers: { Authorization: `Bearer ${password}` } })
@@ -178,9 +168,9 @@ test('public sharing data choices clear stale output and follow live ceilings', 
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Expose source names and filters', { exact: true }).check()
-  await access.getByLabel('Allow public shared catalogs', { exact: true }).check()
+  await access.getByLabel('Allow shared catalogs', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })

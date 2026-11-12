@@ -121,11 +121,11 @@ Open **Connections → Torznab**, create and enable an access, then copy its URL
 
 **Connections → Shared catalogs** lets you grant another instance access to selected data. **Sources → Remote catalogs** imports a catalog shared with you. Optional shared details, film and series information, and reusable cache observations require permission on both sides. Credentials and private announce URLs are never included. See [catalog sharing](docs/SHARING.md).
 
-**Administration → Users → Public** lets you offer Search, Stremio, Torznab and Shared catalogs independently. Visitors cannot open administration. By default, visitors use personal credentials remembered in their encrypted browser configuration without server storage. The administrator can separately authorize instance debrid accounts or announce URLs. Public catalog sharing requires source exposure and includes only the data you allow. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
+**Administration → Users → Public** lets you offer Search, Stremio, Torznab and Shared catalogs independently. Visitors cannot open administration. By default, visitors use personal credentials remembered in their encrypted browser configuration without server storage. The administrator can separately authorize instance debrid accounts or announce URLs. Public catalog sharing includes only the data you allow. Source names and filters are available in all enabled visitor features. See [public instances](docs/PUBLIC_INSTANCES.md) for privacy and hosting choices.
 
 **Trusted users** can use the instance’s debrid accounts and private sources without administration access. Create their email and password under **Administration → Users → Trusted**, then choose its features and whether it uses instance or personal debrid accounts and announces. Accounts start disabled. The administrator replaces forgotten passwords; no email recovery is required. See the [trusted user guide](docs/TRUSTED_USERS.md).
 
-Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, two-step verification and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options in collapsed sections.
+Use **History** and **Logs** to follow work, **Storage** to see what takes space, and **Security** for secrets, sign-in settings and sessions. **Network** manages trusted incoming proxies and outgoing WARP or compatible proxies. The settings search takes you directly to a control, including options in collapsed sections.
 
 ## Update or try a preview
 

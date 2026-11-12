@@ -244,8 +244,9 @@ test('public Search uses the same progressive ranking and only public authentica
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Search', { exact: true }).check()
+  await access.getByLabel('Allow Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const credential = 'synthetic-sealed-browser-credential-without-secrets-012345'

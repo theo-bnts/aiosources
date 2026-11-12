@@ -45,7 +45,7 @@ func TestVisitorCredentialPoliciesAreIndependentAndNeverEmbedInstanceSecrets(t *
 			for _, instanceAnnounce := range []bool{false, true} {
 				t.Run(fmt.Sprintf("trusted=%t/debrid=%t/announces=%t", trusted, instanceDebrid, instanceAnnounce), func(t *testing.T) {
 					access, _ := s.DB.PublicAccess(ctx)
-					access.Enabled, access.StremioEnabled, access.TorznabEnabled, access.SearchEnabled, access.ExposeSources = true, true, true, true, true
+					access.Enabled, access.StremioEnabled, access.TorznabEnabled, access.SearchEnabled = true, true, true, true
 					access.CredentialPolicy = model.CredentialPolicy{UseInstanceDebrid: instanceDebrid, UseInstanceAnnounces: instanceAnnounce}
 					if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 						t.Fatal(err)
@@ -64,7 +64,7 @@ func TestVisitorCredentialPoliciesAreIndependentAndNeverEmbedInstanceSecrets(t *
 					var err error
 					var grant model.TrustedGrant
 					if trusted {
-						user, e := s.DB.SaveTrustedUser(ctx, model.TrustedUser{Email: fmt.Sprintf("reader-%t-%t@example.invalid", instanceDebrid, instanceAnnounce), Enabled: true, TrustedPermissions: model.TrustedPermissions{CredentialPolicy: access.CredentialPolicy, SearchEnabled: true, StremioEnabled: true, TorznabEnabled: true, ExposeSources: true}}, "opaque-hash")
+						user, e := s.DB.SaveTrustedUser(ctx, model.TrustedUser{Email: fmt.Sprintf("reader-%t-%t@example.invalid", instanceDebrid, instanceAnnounce), Enabled: true, TrustedPermissions: model.TrustedPermissions{CredentialPolicy: access.CredentialPolicy, SearchEnabled: true, StremioEnabled: true, TorznabEnabled: true}}, "opaque-hash")
 						if e != nil {
 							t.Fatal(e)
 						}

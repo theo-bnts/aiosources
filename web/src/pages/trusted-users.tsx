@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { PlusIcon, PencilSimpleIcon, TrashIcon } from '@phosphor-icons/react'
 import { api, queryClient } from '@/lib/api'
 import type { TrustedUser } from '@/lib/trusted-users'
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 import { PageActions } from '@/components/page-actions'
+import { AccessPermissions } from '@/components/access-permissions'
 import { CredentialPolicyControls } from '@/components/credential-policy-controls'
 import { PublicCatalogSettings } from '@/components/public-catalog-settings'
 
@@ -28,11 +29,10 @@ const emptyUser: TrustedUser = {
   revision: 0,
   created_at: '',
   updated_at: '',
-  search_enabled: false,
-  torznab_enabled: false,
-  stremio_enabled: false,
-  catalog_enabled: false,
-  expose_sources: false,
+  search_enabled: true,
+  torznab_enabled: true,
+  stremio_enabled: true,
+  catalog_enabled: true,
   use_instance_debrid: true,
   use_instance_announces: true,
 }
@@ -44,6 +44,14 @@ export default function TrustedUsersPage() {
   })
   const [editing, setEditing] = useState<TrustedUser | null>(null)
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['trusted-users'] })
+  const toggle = useMutation({
+    mutationFn: ({ user, enabled }: { user: TrustedUser; enabled: boolean }) =>
+      api(`/trusted-users/${encodeURIComponent(user.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...user, enabled }),
+      }),
+    onSuccess: refresh,
+  })
   return (
     <div className="page">
       <PageActions>
@@ -52,6 +60,7 @@ export default function TrustedUsersPage() {
           Add user
         </Button>
       </PageActions>
+      <ErrorNotice error={toggle.error} scope="action" />
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
       {query.isPending ? (
         <Loading label="Loading trusted users" />
@@ -69,18 +78,22 @@ export default function TrustedUsersPage() {
                 <section className="section-card" key={user.id}>
                   <div className="flex min-w-0 items-center justify-between gap-4">
                     <h2 className="section-title min-w-0 break-all">{user.email}</h2>
-                    <span
-                      className={
-                        user.enabled ? 'text-sm text-primary' : 'text-sm text-muted-foreground'
-                      }
-                    >
-                      {user.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
+                    <Switch
+                      aria-label={`Enable ${user.email}`}
+                      checked={user.enabled}
+                      disabled={toggle.isPending}
+                      onCheckedChange={(enabled) => toggle.mutate({ user, enabled })}
+                    />
                   </div>
                   <p className="help">
                     {trustedPermissionControls
-                      .filter(([key]) => key !== 'expose_sources' && user[key])
-                      .map(([, label]) => label.replace(/^Allow /, '').replace(/ connections$/, ''))
+                      .filter(([key]) => user[key])
+                      .map(([, label]) =>
+                        label
+                          .replace(/^Allow /, '')
+                          .replace(/ connections$/, '')
+                          .replace(/^./, (value) => value.toUpperCase()),
+                      )
                       .join(' · ') || 'No features enabled'}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -168,7 +181,6 @@ function UserEditor({
             stremio_enabled: value.stremio_enabled,
             torznab_enabled: value.torznab_enabled,
             catalog_enabled: value.catalog_enabled,
-            expose_sources: value.expose_sources,
             use_instance_debrid: value.use_instance_debrid,
             use_instance_announces: value.use_instance_announces,
             ...(proof ? { password: proof } : {}),
@@ -198,7 +210,15 @@ function UserEditor({
     >
       <DialogContent aria-describedby={undefined} showCloseButton={!pending}>
         <DialogHeader>
-          <DialogTitle>{original.id ? 'Edit trusted user' : 'Add trusted user'}</DialogTitle>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <DialogTitle>{original.id ? 'Edit trusted user' : 'Add trusted user'}</DialogTitle>
+            <Switch
+              aria-label="Enable account"
+              checked={value.enabled}
+              disabled={pending}
+              onCheckedChange={(enabled) => setValue({ ...value, enabled })}
+            />
+          </div>
         </DialogHeader>
         <form
           className="space-y-5"
@@ -245,37 +265,15 @@ function UserEditor({
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="trusted-enabled"
-                checked={value.enabled}
-                onCheckedChange={(enabled) => setValue({ ...value, enabled })}
-              />
-              <Label htmlFor="trusted-enabled">Enable account</Label>
-            </div>
             <Disclosure
               title="Permissions"
               help="Accounts never have administration access. Saving changes revokes existing sessions and connection links; the user signs in again to create new links."
             >
-              {trustedPermissionControls.map(([key, label, help]) => (
-                <div className="flex items-start gap-3" key={key}>
-                  <Switch
-                    id={`trusted-${key}`}
-                    checked={value[key]}
-                    disabled={key === 'catalog_enabled' && !value.expose_sources}
-                    onCheckedChange={(checked) =>
-                      setValue({
-                        ...value,
-                        [key]: checked,
-                        ...(key === 'expose_sources' && !checked ? { catalog_enabled: false } : {}),
-                      })
-                    }
-                  />
-                  <Label htmlFor={`trusted-${key}`} help={help}>
-                    {label}
-                  </Label>
-                </div>
-              ))}
+              <AccessPermissions
+                id="trusted"
+                value={value}
+                onChange={(change) => setValue({ ...value, ...change })}
+              />
             </Disclosure>
             <Disclosure title="Credentials">
               <CredentialPolicyControls

@@ -28,28 +28,20 @@ func (s *Service) PublicSearchAccess(ctx context.Context, visitor *PublicInstall
 // Only the identified metadata DTO crosses this boundary. Raw observations,
 // source definitions, native identities and credentials never accompany titles.
 func (s *Service) PublicCatalogSearch(ctx context.Context, visitor *PublicInstallation, opts model.ListOptions, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
-	access, err := s.PublicSearchAccess(ctx, visitor)
+	_, err := s.PublicSearchAccess(ctx, visitor)
 	if err != nil {
 		return model.List[model.CatalogTitle]{}, err
 	}
 	result, err := s.CatalogSearch(ctx, opts, filters)
-	if !access.ExposeSources {
-		for i := range result.Items {
-			result.Items[i].Providers = []string{}
-		}
-	}
 	return result, err
 }
 
 func (s *Service) PublicCatalogTitle(ctx context.Context, visitor *PublicInstallation, workID int64, locales ...string) (model.CatalogTitle, error) {
-	access, err := s.PublicSearchAccess(ctx, visitor)
+	_, err := s.PublicSearchAccess(ctx, visitor)
 	if err != nil {
 		return model.CatalogTitle{}, err
 	}
 	title, err := s.CatalogTitle(ctx, workID, locales...)
-	if !access.ExposeSources {
-		title.Providers = []string{}
-	}
 	return title, err
 }
 

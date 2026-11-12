@@ -93,8 +93,8 @@ func TestTrustedPlaybackUsesCurrentInstanceCredentialsWithoutEmbeddingThem(t *te
 		t.Fatal("trusted Stremio did not check the instance account", err, len(streams), checks.Load())
 	}
 	data, _ := json.Marshal(streams)
-	if strings.Contains(string(data), key) || strings.Contains(string(data), announce) || strings.Contains(string(data), "Example Library") || !strings.Contains(streams[0].URL, "/trusted/stremio/") {
-		t.Fatal("trusted presentation exposed hidden credentials or source names")
+	if strings.Contains(string(data), key) || strings.Contains(string(data), announce) || !strings.Contains(string(data), "Example Library") || !strings.Contains(streams[0].URL, "/trusted/stremio/") {
+		t.Fatal("trusted presentation exposed credentials or omitted its source name")
 	}
 	parts := strings.Split(strings.Trim(strings.TrimPrefix(streams[0].URL, "https://addon.example"), "/"), "/")
 	if len(parts) != 8 {

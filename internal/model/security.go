@@ -10,9 +10,3 @@ type AdminSession struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 	Current    bool      `json:"current"`
 }
-
-type SecurityStatus struct {
-	MFAEnabled             bool       `json:"mfa_enabled"`
-	RecoveryCodesRemaining int        `json:"recovery_codes_remaining"`
-	PendingExpiresAt       *time.Time `json:"pending_expires_at,omitempty"`
-}

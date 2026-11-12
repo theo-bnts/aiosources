@@ -48,13 +48,19 @@ test('public connections share the shell and encrypted Torznab filters without v
     )
     await page.goto('/public-access')
     const access = page.getByRole('form', { name: 'Public', exact: true })
+    await access.locator('summary').getByText('Permissions', { exact: true }).click()
     await access.getByLabel('Enable public access', { exact: true }).check()
-    await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
+    await access.getByLabel('Allow Torznab connections', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     await visitor.goto('/')
     const navigation = visitor.getByRole('navigation', { name: 'Main navigation' })
-    await expect(navigation.getByRole('link')).toHaveText(['Torznab', 'Stremio'])
+    await expect(navigation.getByRole('link')).toHaveText([
+      'Search',
+      'Torznab',
+      'Stremio',
+      'Shared catalogs',
+    ])
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toContainText(
       'Connections',
     )
@@ -63,7 +69,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await expect(
       visitor.getByRole('heading', { name: 'Torznab', exact: true, level: 1 }),
     ).toBeVisible()
-    await expect(visitor.getByLabel('Sources', { exact: true })).toHaveCount(0)
+    await expect(visitor.getByLabel('Sources', { exact: true })).toBeHidden()
     await expect(visitor.getByLabel('Media types', { exact: true })).toBeHidden()
     await visitor.locator('summary', { hasText: 'Filters' }).click()
     await selectMultiple(visitor, 'Media types', ['movie', 'tv'])
@@ -82,8 +88,6 @@ test('public connections share the shell and encrypted Torznab filters without v
     let result = await feed(credential)
     expect(result.status()).toBe(200)
     expect(await result.text()).toContain('total="0"')
-    await access.getByLabel('Expose source names and filters', { exact: true }).check()
-    await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(visitor.getByLabel('Sources', { exact: true })).toBeVisible()
     await selectMultiple(visitor, 'Media types', [])
     await visitor.getByLabel('Cached results only', { exact: true }).uncheck()
@@ -168,10 +172,11 @@ test('public connections share the shell and encrypted Torznab filters without v
     )
     await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
     await expect(visitor.getByRole('dialog').getByRole('link')).toHaveText([
+      'Search',
       'Torznab',
       'Stremio',
-      'User login',
-      'Admin login',
+      'Shared catalogs',
+      'Login',
     ])
     await visitor.getByRole('button', { name: 'Close navigation', exact: true }).click()
     await visitor.screenshot({
@@ -179,13 +184,7 @@ test('public connections share the shell and encrypted Torznab filters without v
       fullPage: true,
       animations: 'disabled',
     })
-    await access.getByLabel('Expose source names and filters', { exact: true }).uncheck()
-    await access.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
-    result = await feed(credential)
-    expect(result.status()).toBe(200)
-    expect(await result.text()).toContain('total="0"')
-    await access.getByLabel('Allow public Torznab connections', { exact: true }).uncheck()
+    await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     expect((await feed(credential)).status()).toBe(401)

@@ -257,9 +257,9 @@ const navigationGroups: NavigationGroup[] = [
             icon: KeyIcon,
           },
           {
-            to: '/security/verification',
-            label: 'Sign-in protection',
-            description: 'Protect administrator sign-in and manage recovery codes.',
+            to: '/security/settings',
+            label: 'Settings',
+            description: 'Configure sign-in limits and sessions.',
             icon: ShieldCheckIcon,
           },
           {
@@ -531,9 +531,8 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       </div>
     )
-  if (location.pathname === '/user-login') return <Login key="trusted" trusted />
-  if (session.data.role === 'trusted' && location.pathname === '/login')
-    return <Login key="admin" />
+  if (location.pathname === '/user-login') return <Navigate to="/login" replace />
+  if (session.data.role === 'trusted' && location.pathname === '/login') return <Login />
   if (session.data.role === 'trusted' && location.pathname !== '/login')
     return (
       <TrustedEntry
@@ -549,7 +548,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
     !location.pathname.startsWith('/trusted-users') &&
     !session.data.authenticated
   )
-    return <Login key="trusted" trusted />
+    return <Login />
   if (location.pathname === '/public' || location.pathname.startsWith('/public/'))
     return (
       <PublicEntry
@@ -562,7 +561,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
     )
   if (!session.data.authenticated)
     return location.pathname === '/login' ? (
-      <Login key="admin" />
+      <Login />
     ) : (
       <PublicEntry layout={(content) => <AppShell publicMode>{content}</AppShell>} />
     )
@@ -819,14 +818,9 @@ export function AppShell({
   const footer =
     publicMode && !trustedMode ? (
       <div className="shrink-0 space-y-2 p-3">
-        {!authenticated && (
-          <Button variant="outline" className="w-full" asChild>
-            <Link to="/user-login">User login</Link>
-          </Button>
-        )}
         <Button variant="outline" className="w-full" asChild>
           <Link to={authenticated ? '/providers' : '/login'}>
-            {authenticated ? 'Administration' : 'Admin login'}
+            {authenticated ? 'Administration' : 'Login'}
           </Link>
         </Button>
       </div>
@@ -929,9 +923,11 @@ export function AppShell({
                   torznab: publicInfo.data?.torznab_enabled,
                   catalog: publicInfo.data?.catalog_enabled,
                   catalogEntities: publicInfo.data?.catalog_entities,
-                  sources: Boolean(publicInfo.data?.sources?.length),
+                  sources: Boolean(publicInfo.data?.sources),
                   announces: Boolean(publicInfo.data?.private_sources?.length),
-                  services: publicInfo.data?.providers.map((service) => service.id),
+                  services: publicInfo.data?.use_instance_debrid
+                    ? []
+                    : publicInfo.data?.providers.map((service) => service.id),
                 }}
               />
             </div>

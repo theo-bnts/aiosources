@@ -111,7 +111,7 @@ func TestPublicAndAdministratorSearchUseTheSameLocalCoverWithoutProviderCalls(t 
 			t.Fatal("administrator search", err)
 		}
 		public, err := s.PublicCatalogSearch(ctx, visitor, opts, filters)
-		if err != nil || len(public.Items) != 1 || public.Items[0].Cover != admin.Items[0].Cover || len(public.Items[0].Providers) != 0 {
+		if err != nil || len(public.Items) != 1 || public.Items[0].Cover != admin.Items[0].Cover || len(public.Items[0].Providers) != 1 {
 			t.Fatal("public image differs or reveals a source", err)
 		}
 		detail, err := s.PublicCatalogTitle(ctx, visitor, public.Items[0].ID, language)

@@ -29,6 +29,7 @@ test('visitor announce fields are opt-in, use source names and clear personal in
   // administrator interface and must offer the same optional visitor field.
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -62,19 +63,9 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     await expect(
       visitor.getByRole('heading', { name: 'Connect your debrid services' }),
     ).toBeVisible()
-    await expect(visitor.locator('summary', { hasText: 'Private source playback' })).toHaveCount(0)
-    const permission = access.getByLabel('Expose source names and filters', { exact: true })
-    await expect(permission).not.toBeChecked()
-    await permission.check()
-    await access
-      .getByRole('button', { name: 'About Expose source names and filters', exact: true })
-      .click()
-    await expect(
-      page.getByRole('dialog', { name: 'About Expose source names and filters', exact: true }),
-    ).toContainText('Applies to all public features, including Shared catalogs')
-    await page.keyboard.press('Escape')
-    await access.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+    await expect(access.getByLabel('Expose source names and filters', { exact: true })).toHaveCount(
+      0,
+    )
     await expect(visitor.locator('summary', { hasText: 'Private source playback' })).toBeVisible()
     expect(await visitor.locator('summary').allTextContents()).toEqual([
       'Filters',
@@ -111,10 +102,6 @@ test('visitor announce fields are opt-in, use source names and clear personal in
     )
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
     await visitor.screenshot({ path: testInfo.outputPath('public-mobile.png'), fullPage: true })
-    await permission.uncheck()
-    await access.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(announce).toHaveCount(0)
-    await expect(visitor.getByLabel('Manifest URL', { exact: true })).toBeVisible()
   } finally {
     await context.close()
   }
@@ -128,13 +115,14 @@ test('reviewing concurrent public settings preserves only fields edited locally'
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
   const saved = await (await page.request.get('/api/public-access')).json()
   expect(
     (
       await page.request.put('/api/public-access', {
         headers,
-        data: { ...saved, expose_sources: true },
+        data: { ...saved, torznab_enabled: false },
       })
     ).status(),
   ).toBe(204)
@@ -142,11 +130,11 @@ test('reviewing concurrent public settings preserves only fields edited locally'
   // administrator's optional field instead of silently reverting it to false.
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await access.getByRole('button', { name: 'Load latest settings', exact: true }).click()
-  await expect(access.getByLabel('Expose source names and filters', { exact: true })).toBeChecked()
+  await expect(access.getByLabel('Allow Torznab connections', { exact: true })).not.toBeChecked()
   await expect(access.getByLabel('Enable public access', { exact: true })).toBeChecked()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const after = await (await page.request.get('/api/public-access')).json()
   expect(after.enabled).toBe(true)
-  expect(after.expose_sources).toBe(true)
+  expect(after.torznab_enabled).toBe(false)
 })

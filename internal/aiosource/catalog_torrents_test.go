@@ -87,7 +87,7 @@ func TestDirectPublicResultsUseOnlySharedCacheOrVisitorAnnouncements(t *testing.
 	visitor := &PublicInstallation{Services: map[string]string{"torbox": "synthetic-visitor-key"}, Generation: access.Generation, Audience: "https://addon.example"}
 	// Existing shared availability must not be retried with an admin credential.
 	page, err := s.CatalogTorrents(ctx, model.ListOptions{Query: "Example"}, model.CatalogReleaseFilters{}, visitor)
-	if err != nil || page.Total != 1 || len(page.Items) != 1 || len(page.Items[0].Services) != 1 || page.Items[0].Services[0].State != "cached" || page.Items[0].Provider != "" || page.Items[0].DownloadToken == "" {
+	if err != nil || page.Total != 1 || len(page.Items) != 1 || len(page.Items[0].Services) != 1 || page.Items[0].Services[0].State != "cached" || page.Items[0].Provider != "private" || page.Items[0].DownloadToken == "" {
 		t.Fatalf("public direct safety: %+v %v", page, err)
 	}
 	if _, err := conn.Exec(ctx, `UPDATE aiosources.aio_shared_availability SET checked_at=$1`, time.Now().Add(-365*24*time.Hour)); err != nil {

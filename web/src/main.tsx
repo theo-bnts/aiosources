@@ -94,8 +94,8 @@ const StorageSettingsPage = lazy(() =>
 const SecuritySecretsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecuritySecretsPage })),
 )
-const SecurityVerificationPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecurityVerificationPage })),
+const SecuritySettingsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecuritySettingsPage })),
 )
 const SecuritySessionsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecuritySessionsPage })),
@@ -109,11 +109,27 @@ function LegacySecuritySettings() {
     : location.hash === '#sessions'
       ? '/security/sessions'
       : location.hash === '#verification' || location.hash.startsWith('#runtime-security')
-        ? '/security/verification'
+        ? '/security/settings'
         : '/security/secrets'
   return (
     <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
   )
+}
+function SecuritySettingsRoute() {
+  const location = useLocation()
+  const setting = settingFromHash(location.hash)
+  const target = setting?.route.startsWith('/security/')
+    ? setting.route
+    : location.hash === '#secrets'
+      ? '/security/secrets'
+      : location.hash === '#sessions'
+        ? '/security/sessions'
+        : ''
+  if (target && target !== '/security/settings')
+    return (
+      <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
+    )
+  return <SecuritySettingsPage />
 }
 function LegacyImportSettings() {
   const location = useLocation()
@@ -362,9 +378,12 @@ const router = createBrowserRouter(
           <Route path="health/settings" element={<StorageSettingsPage />} />
         </Route>
         <Route path="security" element={<LegacySecuritySettings />} />
-        <Route path="security/settings" element={<LegacySecuritySettings />} />
+        <Route path="security/settings" element={<SecuritySettingsRoute />} />
         <Route path="security/secrets" element={<SecuritySecretsPage />} />
-        <Route path="security/verification" element={<SecurityVerificationPage />} />
+        <Route
+          path="security/verification"
+          element={<Navigate to="/security/settings" replace />}
+        />
         <Route path="security/sessions" element={<SecuritySessionsPage />} />
         <Route path="users" element={<Navigate to="/trusted-users" replace />} />
         <Route path="trusted-users" element={<TrustedUsersPage />} />

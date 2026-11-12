@@ -369,7 +369,7 @@ test('secret JSON help has its own collapsed section and settings search reveals
     if (['POST', 'PUT', 'DELETE'].includes(request.method()))
       writes.push(new URL(request.url()).pathname)
   })
-  await page.goto('/security/settings')
+  await page.goto('/security/secrets')
   const help = page.locator('#secret-reference-help')
   await expect(help.locator('xpath=ancestor::details')).toHaveCount(0)
   await expect(help.locator(':scope > summary')).toBeVisible()

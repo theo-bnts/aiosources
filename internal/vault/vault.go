@@ -53,7 +53,7 @@ func New(ctx context.Context, db *store.Store, key []byte) (*Vault, error) {
 	_, err = db.Setting(ctx, fingerprintSetting)
 	if errors.Is(err, model.ErrNotFound) {
 		// A lost fingerprint must not silently authorize a new key against an
-		// existing encrypted vault or MFA state. Recovery requires its setting.
+		// existing encrypted vault. Recovery requires its setting.
 		existing, inspectErr := db.HasEncryptedMaterial(ctx)
 		if inspectErr != nil {
 			return nil, fmt.Errorf("cannot inspect vault initialization")

@@ -349,8 +349,8 @@ test('remote catalogs, shares and proxy authentication use their existing editor
 test('mobile section links remain visible below the responsive sticky header', async ({ page }) => {
   for (const width of [320, 768, 1024, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 })
-    await page.goto('/security/settings#verification')
-    const section = page.locator('#verification')
+    await page.goto('/security/sessions#sessions')
+    const section = page.locator('#sessions')
     await expect(section).toBeInViewport()
     await expect
       .poll(() =>
@@ -371,8 +371,9 @@ test('public settings search follows enabled features and never fetches administ
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
+  await access.getByLabel('Allow Torznab connections', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })
@@ -396,7 +397,7 @@ test('public settings search follows enabled features and never fetches administ
     await search.getByRole('combobox').fill('minimum close title similarity')
     await expect(search.getByRole('option')).toHaveCount(0)
     await search.getByRole('combobox').fill('sources')
-    await expect(search.getByRole('option')).toHaveCount(0)
+    await expect(search.getByRole('option').first()).toBeVisible()
     await search.getByRole('combobox').fill('torznab cached')
     await search.getByRole('option').first().click()
     await expect(visitor.getByLabel('Cached results only', { exact: true })).toBeFocused()

@@ -69,7 +69,6 @@ func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *
 	access, _ := f.db.PublicAccess(f.ctx)
 	access.Enabled = true
 	access.TorznabEnabled = true
-	access.ExposeSources = false
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +80,7 @@ func TestBooksTorznabUsesStandardSearchAndNeverLeaksAdministratorCredentials(t *
 	if r.Code != 200 || !strings.Contains(r.Body.String(), `total="1"`) {
 		t.Fatal("public book search failed", r.Code)
 	}
-	for _, private := range []string{"administrator-passkey", "private.example.invalid", "tr=", "Example books", "book-fixture"} {
+	for _, private := range []string{"administrator-passkey", "private.example.invalid", "tr="} {
 		if strings.Contains(r.Body.String(), private) {
 			t.Fatal("public book feed exposed private data")
 		}

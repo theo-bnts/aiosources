@@ -50,9 +50,3 @@ func (p ResultPreferences) ResultLimit(cachedOnly bool) int {
 	}
 	return p.MaxResults
 }
-
-// WithHiddenSources removes name-based ordering when source disclosure is withdrawn.
-func (p ResultPreferences) WithHiddenSources() ResultPreferences {
-	p.Sorting = slices.DeleteFunc(slices.Clone(p.Sorting), func(rule ResultSort) bool { return rule.Field == "source" })
-	return p
-}

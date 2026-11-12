@@ -102,13 +102,12 @@ export const runtimeSections = {
   },
   security: {
     title: 'Authentication settings',
-    help: 'Session duration applies to new sign-ins. Reducing the session limit does not revoke existing sessions. Sign-in limits apply per minute across application replicas; global capacity must cover the per-address limit. Two-step enrollment duration applies to new setups. Password, CSRF and factor replay protections remain enforced.',
+    help: 'Session duration applies to new sign-ins. Reducing the session limit does not revoke existing sessions. Sign-in limits apply per minute across application replicas; global capacity must cover the per-address limit. Password and CSRF protections remain enforced.',
     fields: [
       ['session_hours', 'New administrator session duration (hours)', 1, 168],
       ['session_limit', 'Maximum active administrator sessions', 1, 1024],
       ['login_per_minute', 'Sign-in attempts per address per minute', 1, 60],
       ['login_global_per_minute', 'Total sign-in attempts per minute', 1, 600],
-      ['enrollment_minutes', 'Two-step setup validity (minutes)', 5, 30],
     ],
   },
   payloads: {

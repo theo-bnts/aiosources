@@ -16,7 +16,7 @@ func TestPublicSharingCredentialsAreStatelessScopedAndIndependentlyRevocable(t *
 		t.Fatal("disabled setup accepted", err)
 	}
 	access, _ := s.DB.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.CatalogEnabled = true, true, true
+	access.Enabled, access.CatalogEnabled = true, true
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}

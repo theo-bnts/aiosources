@@ -73,7 +73,7 @@ func BenchmarkAddonReadFlows(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	access.Enabled, access.SearchEnabled, access.StremioEnabled, access.TorznabEnabled, access.ExposeSources, access.CatalogEnabled = true, true, true, true, true, true
+	access.Enabled, access.SearchEnabled, access.StremioEnabled, access.TorznabEnabled, access.CatalogEnabled = true, true, true, true, true
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		b.Fatal(err)
 	}

@@ -82,13 +82,7 @@ export function SettingsSearch({
   const id = useId()
   // Only static labels enter the index. Typing never sends a network request.
   const index = useMemo(
-    () =>
-      createSettingsIndex(
-        visibleSettings(visibility).filter(
-          (setting) =>
-            !trusted || (!setting.title.endsWith('API key') && !setting.id.endsWith('.announces')),
-        ),
-      ),
+    () => createSettingsIndex(visibleSettings(visibility)),
     [
       visibility.admin,
       visibility.search,

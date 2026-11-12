@@ -18,7 +18,6 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/inbound"
 	"github.com/theo-bnts/aiosources/internal/store"
-	"github.com/theo-bnts/aiosources/internal/vault"
 )
 
 const sessionCookie = "aiosources_session"
@@ -43,18 +42,17 @@ type authentication struct {
 	origin           string
 	secure           bool
 	db               *store.Store
-	vault            *vault.Vault
 	attempts         map[string]loginWindow
 	passwordChecks   chan struct{}
 	passwordRequests chan struct{}
 	clientAddress    func(*http.Request) string
 }
 
-func newAuthentication(password, publicURL string, db *store.Store, secretVault *vault.Vault) (*authentication, error) {
+func newAuthentication(password, publicURL string, db *store.Store) (*authentication, error) {
 	if len(password) < 12 || len(password) > 72 {
 		return nil, errors.New("ADMIN_PASSWORD must contain 12 to 72 bytes")
 	}
-	if db == nil || secretVault == nil {
+	if db == nil {
 		return nil, errors.New("persistent authentication dependencies are required")
 	}
 	origin := ""
@@ -77,7 +75,7 @@ func newAuthentication(password, publicURL string, db *store.Store, secretVault 
 	if err != nil {
 		return nil, errors.New("could not initialize persistent administrator authentication")
 	}
-	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, vault: secretVault, attempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2), passwordRequests: make(chan struct{}, 8)}, nil
+	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, attempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2), passwordRequests: make(chan struct{}, 8)}, nil
 }
 
 func randomToken() (string, error) {
@@ -235,14 +233,13 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var input struct {
 		Password string `json:"password"`
-		Code     string `json:"code"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxPasswordProofBytes)
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if len(input.Code) > 64 || !a.checkPassword(r, input.Password) {
-		writeError(w, http.StatusUnauthorized, "Incorrect password or verification code")
+	if !a.checkPassword(r, input.Password) {
+		writeError(w, http.StatusUnauthorized, "Incorrect administrator password")
 		return
 	}
 	token, err := randomToken()
@@ -267,16 +264,9 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		oldHash := sha256.Sum256([]byte(old.Value))
 		next.ReplaceTokenHash = oldHash[:]
 	}
-	err = a.db.SecurityUpdate(r.Context(), "", a.passwordHash, func(state *store.SecurityState) (store.SecurityChange, error) {
-		if len(state.ActiveSecret) > 0 {
-			if err := a.consumeFactor(state, input.Code); err != nil {
-				return store.SecurityChange{}, err
-			}
-		}
-		return store.SecurityChange{NewSession: next}, nil
-	})
+	err = a.db.CreateAdminSession(r.Context(), a.passwordHash, next)
 	if errors.Is(err, store.ErrAuthentication) {
-		writeError(w, http.StatusUnauthorized, "Incorrect password or verification code")
+		writeError(w, http.StatusUnauthorized, "Incorrect administrator password")
 		return
 	}
 	if err != nil {

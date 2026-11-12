@@ -62,7 +62,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Administration', 'Secrets', '/security'],
     ['Administration', 'Secrets', '/secrets'],
     ['Administration', 'Secrets', '/security/secrets'],
-    ['Administration', 'Sign-in protection', '/security/verification'],
+    ['Administration', 'Settings', '/security/settings'],
     ['Administration', 'Active sessions', '/security/sessions'],
     ['Administration', 'Logs', '/logs'],
     ['Administration', 'Logs', '/notifications'],
@@ -78,7 +78,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
           ? ['Sources/', 'Indexers/', label]
           : ['Incoming', 'Outgoing'].includes(label)
             ? [`${group}/`, 'Network/', label]
-            : ['Statistics', 'Secrets', 'Sign-in protection', 'Active sessions'].includes(label)
+            : ['Statistics', 'Secrets', 'Settings', 'Active sessions'].includes(label)
               ? [`${group}/`, 'Security/', label]
               : ['Public', 'Trusted'].includes(label)
                 ? [`${group}/`, 'Users/', label]

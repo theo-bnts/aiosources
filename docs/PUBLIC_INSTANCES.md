@@ -33,25 +33,24 @@ Availability checks use the credentials explicitly allowed by the administrator.
 
 1. Configure the external HTTPS address in `PUBLIC_URL`. See [installation settings](SETTINGS.md).
 2. Open **Administration → Users → Public → Settings** and enable public access.
-3. In **Search** and **Connections**, enable each page you want to offer: Search, Stremio, Torznab and Shared catalogs are independent.
-4. Choose whether to expose source names and source filters. Leave that switch off if you want source names kept private.
-5. In **Credentials**, choose whether visitors use their own debrid accounts and announces (the default) or those of the instance. These permissions are independent. Changing either revokes old public configurations. **Use instance announce URLs** permits Torznab to transmit those URLs to clients.
-6. Review **Public → Request limits**, and [trusted incoming proxies](NETWORK.md#incoming-proxies) if you are behind Cloudflare, a tunnel or another reverse proxy.
+3. In **Permissions**, choose the pages to offer. Search, Torznab, Stremio and Shared catalogs are preselected on new installations; public access itself stays disabled. Existing choices are preserved when upgrading. Source names and filters are available in every enabled feature; source definitions and credentials stay protected.
+4. In **Credentials**, choose whether visitors use their own debrid accounts and announces (the default) or those of the instance. These permissions are independent. Changing either revokes old public configurations. **Use instance announce URLs** permits Torznab to transmit those URLs to clients.
+5. Review **Public → Request limits**, and [trusted incoming proxies](NETWORK.md#incoming-proxies) if you are behind Cloudflare, a tunnel or another reverse proxy.
 
 Disabled pages do not appear in the public menu. Disabling a public connection blocks its requests and revokes its existing public access; turning it on again does not restore revoked links. Private administrator-created connections are managed separately.
 
-Public **Shared catalogs** also requires **Expose source names and filters**, because copies preserve source identity to avoid duplicates. In **Shared catalog data**, restrict the sources, published fields and optional information visitors may copy. Visitors may narrow these choices further. Optional data groups start off on the visitor page and must also be enabled by the receiving instance. Disabling source exposure also turns off public sharing and revokes its links. Sharing must be enabled explicitly again after restoring source exposure. No visitor configuration or sharing password is saved on the hosting instance; safe request diagnostics follow the normal log retention.
+Public **Shared catalogs** preserves source identity to avoid duplicates. In **Shared catalog data**, restrict the sources, published fields and optional information visitors may copy. Visitors may narrow these choices further. Optional data groups start off on the visitor page and must also be enabled by the receiving instance. No visitor configuration or sharing password is saved on the hosting instance; safe request diagnostics follow the normal log retention.
 
 ## Private sources
 
-With source exposure enabled, visitors can see the permitted source controls. **Private source playback** accepts their personal announce URLs for private sources when that option is available. The URLs are remembered with their browser configuration.
+Visitors can select sources in Filters. **Private source playback** accepts their personal announce URLs for private sources when that option is available. The URLs are remembered with their browser configuration.
 
-In Search, Stremio and Torznab, without an authorized announce URL, private-source results are restricted to cached playback. The instance’s announce URL is used only when **Use instance announce URLs** is explicitly enabled. Cached-only connections never return an announce. Public-source uncached results can be offered when the connection permits them; hiding source names does not make public-source torrents private.
+In Search, Stremio and Torznab, without an authorized announce URL, private-source results are restricted to cached playback. The instance’s announce URL is used only when **Use instance announce URLs** is explicitly enabled. Cached-only connections never return an announce. Public-source uncached results can be offered when the connection permits them.
 
 Stremio visitors receive playback information for the authorized debrid accounts. Torznab returns permitted torrent results for their download client. Neither connection grants access to administration or Secrets. Instance debrid API keys remain server-side; Torznab exposes instance announces only when explicitly authorized above.
 
 ## Filters and limits
 
-Visitors can choose the options allowed by the instance, including media types, services, languages, sorting and result limits. Source-specific controls appear only when source exposure is enabled. **Filters** contains optional result restrictions; **Sorting** sets the result order. These sections start closed, with no optional restrictions selected for new connections.
+Visitors can choose the options allowed by the instance, including media types, services, languages, sorting and result limits. **Filters** contains optional result restrictions; **Sorting** sets the result order. These sections start closed, with no optional restrictions selected for new connections.
 
 Public request limits can be enabled or disabled independently. If a visitor is repeatedly rate-limited, check the instance's trusted proxy configuration so different visitors are recognized separately. Service account limits and request timeouts still apply.

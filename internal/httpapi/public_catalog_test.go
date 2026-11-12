@@ -126,14 +126,14 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 	if direct.Code != 200 || json.Unmarshal(direct.Body.Bytes(), &directRows) != nil || directRows.Total != 1 || len(directRows.Items) != 1 {
 		t.Fatal("public direct Search failed", direct.Code)
 	}
-	for _, private := range []string{"hidden-source", "native-id", hash, key} {
+	for _, private := range []string{"native-id", hash, key} {
 		if strings.Contains(direct.Body.String(), private) {
 			t.Fatal("Direct Search exposed private data")
 		}
 	}
 	response = send("GET", "/api/public/catalog/search?q=Example.Movie&year=2021", "", installed.Credential)
 	var titles model.List[model.CatalogTitle]
-	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &titles) != nil || titles.Total != 1 || len(titles.Items[0].Providers) != 0 {
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &titles) != nil || titles.Total != 1 || len(titles.Items[0].Providers) != 1 {
 		t.Fatal("Public offline search failed or exposed sources", response.Code, response.Body)
 	}
 	path := fmt.Sprintf("/api/public/catalog/%d", titles.Items[0].ID)
@@ -143,17 +143,17 @@ func TestPublicSearchCredentialReusePrivacyAndDownloadReadiness(t *testing.T) {
 		t.Fatalf("Public release service: %v", detailErr)
 	}
 	var releases model.List[model.CatalogRelease]
-	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &releases) != nil || releases.Total != 1 || len(releases.Items) != 1 || releases.Items[0].Provider != "" || releases.Items[0].Fingerprint != "" || releases.Items[0].DownloadToken == "" || releases.Items[0].Services[0].CanAdd {
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &releases) != nil || releases.Total != 1 || len(releases.Items) != 1 || releases.Items[0].Provider != "hidden-source" || releases.Items[0].Fingerprint != "" || releases.Items[0].DownloadToken == "" || releases.Items[0].Services[0].CanAdd {
 		t.Fatal("Private uncached row or identity exposed", response.Code, response.Body)
 	}
-	for _, private := range []string{"hidden-source", "native-id", hash, key} {
+	for _, private := range []string{"native-id", hash, key} {
 		if strings.Contains(response.Body.String(), private) {
 			t.Fatal("Private release data exposed", private)
 		}
 	}
 	for _, query := range []string{"provider=hidden-source", "sort=source"} {
-		if got := send("GET", path+"/releases?"+query, "", installed.Credential); got.Code != 422 {
-			t.Fatal("Unconsented source filter accepted", got.Code)
+		if got := send("GET", path+"/releases?"+query, "", installed.Credential); got.Code != 200 {
+			t.Fatal("Public source filter rejected", got.Code)
 		}
 	}
 	body, _ := json.Marshal(model.CatalogDownloadInput{DownloadToken: releases.Items[0].DownloadToken, Service: "torbox", AllowUncached: true})
@@ -218,14 +218,14 @@ func TestPublicSearchRechecksPermissionsBeforeReturningSlowResults(t *testing.T)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"success":true,"data":{"id":1}}`) }))
 	defer upstream.Close()
 	addon.Providers.TBBase = upstream.URL
-	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db, addon.Vault)
+	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, change := range []string{"search", "sources", "generation"} {
+	for _, change := range []string{"search", "generation"} {
 		t.Run(change, func(t *testing.T) {
 			access, _ := f.db.PublicAccess(f.ctx)
-			access.Enabled, access.SearchEnabled, access.ExposeSources = true, true, true
+			access.Enabled, access.SearchEnabled = true, true
 			if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 				t.Fatal(err)
 			}
@@ -239,8 +239,6 @@ func TestPublicSearchRechecksPermissionsBeforeReturningSlowResults(t *testing.T)
 				switch change {
 				case "search":
 					current.SearchEnabled = false
-				case "sources":
-					current.ExposeSources = false
 				case "generation":
 					current.Enabled = false
 				}
@@ -261,9 +259,7 @@ func TestPublicSearchRechecksPermissionsBeforeReturningSlowResults(t *testing.T)
 			out := httptest.NewRecorder()
 			handler(out, req)
 			want := 404
-			if change == "sources" {
-				want = 409
-			} else if change == "generation" {
+			if change == "generation" {
 				want = 401
 			}
 			if out.Code != want || strings.Contains(out.Body.String(), "must-not-escape") {
@@ -275,7 +271,7 @@ func TestPublicSearchRechecksPermissionsBeforeReturningSlowResults(t *testing.T)
 
 func TestPublicSearchFileTicketsExpireAndRecheckAccessWithoutForwardingKeys(t *testing.T) {
 	f, addon, _ := addonAPI(t)
-	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db, addon.Vault)
+	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db)
 	if err != nil {
 		t.Fatal(err)
 	}

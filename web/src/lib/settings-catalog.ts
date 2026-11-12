@@ -63,7 +63,7 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   downloads: ['/network/incoming', 'Administration / Network / Incoming'],
   payloads: ['/network/incoming', 'Administration / Network / Incoming'],
   history: ['/health/settings', 'Administration / Storage'],
-  security: ['/security/verification', 'Administration / Security / Sign-in protection'],
+  security: ['/security/settings', 'Administration / Security / Settings'],
   source_retries: ['/providers/settings', 'Sources / Indexers / Torrents'],
   identification: ['/metadata/identification/settings', 'Metadata / Identification'],
   matching: ['/metadata/identification/settings', 'Metadata / Identification'],
@@ -308,17 +308,20 @@ add(
     group: 'Administration / Users / Public / Settings',
     keywords: 'public access acces',
   },
+  [['public.enabled', 'Enable public access']],
+)
+add(
+  {
+    route: '/public-access',
+    group: 'Administration / Users / Public / Settings',
+    reveal: ['Permissions'],
+    keywords: 'public access acces',
+  },
   [
-    ['public.enabled', 'Enable public access'],
-    ['public.search', 'Allow public Search'],
-    ['public.stremio', 'Allow public Stremio connections'],
-    ['public.torznab', 'Allow public Torznab connections'],
-    ['public.catalog', 'Allow public shared catalogs'],
-    [
-      'public.sources',
-      'Expose source names and filters',
-      'announce private privacy names sources visible visibilite',
-    ],
+    ['public.search', 'Allow Search'],
+    ['public.stremio', 'Allow Stremio connections'],
+    ['public.torznab', 'Allow Torznab connections'],
+    ['public.catalog', 'Allow shared catalogs'],
   ],
 )
 add(
@@ -439,14 +442,7 @@ settings.push(
     control: 'secrets',
     keywords: 'password credential key token mot de passe cle',
   },
-  {
-    id: 'security.mfa',
-    title: 'Two-step verification',
-    route: '/security/verification',
-    group: 'Administration / Security / Sign-in protection',
-    control: 'verification',
-    keywords: '2FA MFA TOTP authenticator recovery codes securite authentification',
-  },
+
   {
     id: 'security.sessions',
     title: 'Active sessions',

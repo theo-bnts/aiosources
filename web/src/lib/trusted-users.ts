@@ -3,7 +3,6 @@ export type TrustedPermissions = {
   stremio_enabled: boolean
   torznab_enabled: boolean
   catalog_enabled: boolean
-  expose_sources: boolean
   use_instance_debrid: boolean
   use_instance_announces: boolean
 }
@@ -34,11 +33,6 @@ export const trustedPermissionControls = [
   [
     'catalog_enabled',
     'Allow shared catalogs',
-    'Export read-only catalog data within the shared catalog data permissions. Source names and filters must also be enabled.',
-  ],
-  [
-    'expose_sources',
-    'Expose source names and filters',
-    'Show source names and allow source selection. Definitions and debrid API keys remain private.',
+    'Export read-only catalog data within the shared catalog data permissions. Source definitions and credentials remain private.',
   ],
 ] as const satisfies readonly (readonly [keyof TrustedPermissions, string, string])[]

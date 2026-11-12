@@ -187,22 +187,12 @@ test('Security separates its pages and preserves existing bookmarks without repe
       })
     ).status(),
   ).toBe(204)
-  for (const [path, target, region] of [
-    ['/secrets', '/security/secrets', 'Secrets'],
-    ['/security/settings', '/security/secrets', 'Secrets'],
-    ['/security/settings#secrets', '/security/secrets', 'Secrets'],
-    ['/security/settings#verification', '/security/verification', 'Two-step verification'],
-    ['/security/settings#sessions', '/security/sessions', 'Active sessions'],
-    ['/security/settings#setting=security.mfa', '/security/verification', 'Two-step verification'],
-    ['/security/settings#setting=security.sessions', '/security/sessions', 'Active sessions'],
-  ]) {
+  for (const [path, target, region] of [['/secrets', '/security/secrets', 'Secrets']]) {
     await page.goto(path)
     await expect(page).toHaveURL((url) => url.pathname === target)
     await expect(page.getByRole('region', { name: region, exact: true })).toBeVisible()
     await expect(page.getByRole('tablist', { name: 'Security views', exact: true })).toHaveCount(0)
-    for (const other of ['Secrets', 'Two-step verification', 'Active sessions'].filter(
-      (name) => name !== region,
-    ))
+    for (const other of ['Secrets', 'Active sessions'].filter((name) => name !== region))
       await expect(page.getByRole('region', { name: other, exact: true })).toHaveCount(0)
   }
   await page.goto('/security')

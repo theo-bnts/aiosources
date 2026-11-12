@@ -124,68 +124,72 @@ export function PublicCredentialsForm({
       }}
     >
       <fieldset disabled={pending} className="space-y-5">
-        <div className="grid items-start gap-5 md:grid-cols-2">
-          {!info.use_instance_debrid &&
-            info.providers.map((provider) => {
-              const details = debridProviders.find((item) => item.id === provider.id)
-              const retained =
-                saved?.services.includes(provider.id) && !removed.includes(provider.id)
-              return (
-                <div className="field" key={provider.id}>
-                  <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                    <Input
-                      key={retained ? 'remembered' : 'new'}
-                      id={`public-${provider.id}`}
-                      name={provider.id}
-                      type="password"
-                      revealLabel={`${provider.name} API key`}
-                      autoComplete="off"
-                      spellCheck={false}
-                      autoCapitalize="off"
-                      maxLength={512}
-                      autoFocus={removed.includes(provider.id)}
-                      placeholder={
-                        retained ? 'Saved on this browser · enter a key to replace it' : undefined
-                      }
-                    />
-                    {retained && (saved?.services.length ?? 0) > 1 && (
-                      <Button
-                        type="button"
-                        variant="warning"
-                        size="sm"
-                        className="self-start sm:self-auto"
-                        onClick={() =>
-                          setRemoved((ids) =>
-                            ids.includes(provider.id) ? ids : [...ids, provider.id],
-                          )
+        {!info.use_instance_debrid && (
+          <div className="grid items-start gap-5 md:grid-cols-2">
+            {!info.use_instance_debrid &&
+              info.providers.map((provider) => {
+                const details = debridProviders.find((item) => item.id === provider.id)
+                const retained =
+                  saved?.services.includes(provider.id) && !removed.includes(provider.id)
+                return (
+                  <div className="field" key={provider.id}>
+                    <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                      <Input
+                        key={retained ? 'remembered' : 'new'}
+                        id={`public-${provider.id}`}
+                        name={provider.id}
+                        type="password"
+                        revealLabel={`${provider.name} API key`}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        maxLength={512}
+                        autoFocus={removed.includes(provider.id)}
+                        placeholder={
+                          retained ? 'Saved on this browser · enter a key to replace it' : undefined
                         }
-                      >
-                        Remove key
-                      </Button>
-                    )}
+                      />
+                      {retained && (saved?.services.length ?? 0) > 1 && (
+                        <Button
+                          type="button"
+                          variant="warning"
+                          size="sm"
+                          className="self-start sm:self-auto"
+                          onClick={() =>
+                            setRemoved((ids) =>
+                              ids.includes(provider.id) ? ids : [...ids, provider.id],
+                            )
+                          }
+                        >
+                          Remove key
+                        </Button>
+                      )}
+                    </div>
+                    {details && 'hint' in details && <p className="help">{details.hint}</p>}
                   </div>
-                  {details && 'hint' in details && <p className="help">{details.hint}</p>}
-                </div>
-              )
-            })}
-        </div>
-        <p className="help">
-          {info.use_instance_debrid
-            ? 'Debrid requests use the instance’s configured accounts. '
-            : 'Enter at least one key. '}
-          Your personal keys and optional announce URLs are remembered automatically on this browser
-          in an encrypted configuration, shared between Search, Stremio and Torznab. The server does
-          not save them. Request history retains media, results and errors for the instance’s
-          configured retention period without identifying you.
-        </p>
+                )
+              })}
+          </div>
+        )}
+        {!info.use_instance_debrid && (
+          <p className="help">
+            {info.use_instance_debrid
+              ? 'Debrid requests use the instance’s configured accounts. '
+              : 'Enter at least one key. '}
+            Your personal keys and optional announce URLs are remembered automatically on this
+            browser in an encrypted configuration, shared between Search, Stremio and Torznab. The
+            server does not save them. Request history retains media, results and errors for the
+            instance’s configured retention period without identifying you.
+          </p>
+        )}
         {children}
       </fieldset>
       {removed.length > 0 && <p className="help">Apply your changes to remove these saved keys.</p>}
       <ErrorNotice error={error} />
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={pending || disabled}>
-          {pending ? 'Checking services…' : submitLabel}
+          {pending ? (info.use_instance_debrid ? 'Saving…' : 'Checking services…') : submitLabel}
         </Button>
         {saved && (
           <Button

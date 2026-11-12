@@ -169,7 +169,7 @@ test('public Stremio and Torznab keep long source selections bounded on mobile a
     (
       await page.request.put('/api/public-access', {
         headers,
-        data: { ...access, enabled: true, torznab_enabled: true, expose_sources: true },
+        data: { ...access, enabled: true, torznab_enabled: true },
       })
     ).status(),
   ).toBe(204)

@@ -123,15 +123,11 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	}
 	offset := max(0, opts.Offset)
 	result := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}
-	var access model.PublicAccess
 	if visitor != nil {
 		var err error
-		access, err = s.PublicSearchAccess(ctx, visitor)
+		_, err = s.PublicSearchAccess(ctx, visitor)
 		if err != nil {
 			return result, err
-		}
-		if !access.ExposeSources && (opts.ProviderID != "" || opts.Sort == "source") {
-			return result, model.ErrInvalid
 		}
 	}
 	if opts.Sort != "" && opts.Sort != "recent" && opts.Sort != "size_desc" && opts.Sort != "source" {
@@ -158,12 +154,12 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 			return !hashRE.MatchString(rec.Hash) || !AllowsInstallation(visitor.Preferences, rec.Provider, "", r.Type)
 		})
 	}
-	return s.catalogReleasePage(ctx, workID, r, rows, opts, visitor, access, options...)
+	return s.catalogReleasePage(ctx, workID, r, rows, opts, visitor, options...)
 }
 
 // Metadata-backed and direct torrent searches share formatting, availability,
 // private-source safeguards and download actions.
-func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resource, rows []store.CatalogRecord, opts model.ListOptions, visitor *PublicInstallation, access model.PublicAccess, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resource, rows []store.CatalogRecord, opts model.ListOptions, visitor *PublicInstallation, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
 	limit := opts.Limit
 	if limit < 1 || limit > 200 {
 		limit = 50
@@ -191,9 +187,6 @@ func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resour
 		case "source":
 			rules = []model.ResultSort{{Field: "source", Direction: "asc"}}
 		}
-	}
-	if visitor != nil && !access.ExposeSources && slices.ContainsFunc(rules, func(rule model.ResultSort) bool { return rule.Field == "source" }) {
-		return result, model.ErrInvalid
 	}
 	names := s.sourceNames()
 	ranks := make(map[string]resultRank, len(rows))
@@ -315,15 +308,10 @@ func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resour
 				return result, err
 			}
 			item.Fingerprint = ""
-			if !access.ExposeSources {
-				item.Provider = ""
-			}
 		}
-		if visitor == nil || access.ExposeSources {
-			item.ProviderName = names[row.Provider]
-			if item.ProviderName == "" {
-				item.ProviderName = row.Provider
-			}
+		item.ProviderName = names[row.Provider]
+		if item.ProviderName == "" {
+			item.ProviderName = row.Provider
 		}
 		presentation := row.AIORecord
 		presentation.IdentificationType = r.Type

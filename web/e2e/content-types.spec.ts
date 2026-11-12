@@ -43,9 +43,10 @@ test('public connections use the same selectable content families and show Torzn
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
-  await access.getByLabel('Allow public Stremio connections', { exact: true }).check()
+  await access.getByLabel('Allow Torznab connections', { exact: true }).check()
+  await access.getByLabel('Allow Stremio connections', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })

@@ -15,31 +15,12 @@ import (
 var ErrAuthentication = errors.New("authentication failed")
 var ErrSecurityLimit = errors.New("security limit reached")
 
-// SecurityState contains only ciphertext, one-way hashes and nonsecret state.
-// SecurityUpdate holds the singleton row lock through verification and commit,
-// so factor replay, session creation, revocation and activity logs are atomic.
-type SecurityState struct {
-	ActiveSecret     []byte
-	PendingSecret    []byte
-	PendingExpiresAt *time.Time
-	PendingSessionID *string
-	LastStep         int64
-	RecoveryHashes   []string
-}
-
 type SecuritySessionCreate struct {
 	ID               string
 	TokenHash        []byte
 	UserAgent        string
 	ExpiresAt        time.Time
 	ReplaceTokenHash []byte
-}
-
-type SecurityChange struct {
-	NewSession      *SecuritySessionCreate
-	RevokeOthers    bool
-	ActivityKind    string
-	ActivitySubject string
 }
 
 // InitializeAdminPassword keeps bcrypt's random salt stable across restarts.
@@ -55,7 +36,7 @@ func (s *Store) InitializeAdminPassword(ctx context.Context, password string, ca
 		return nil, databaseError("read authentication verifier", err)
 	}
 	if stored == nil || bcrypt.CompareHashAndPassword(stored, []byte(password)) != nil {
-		if _, err = tx.Exec(ctx, `UPDATE aiosources.admin_security SET password_hash=$1,pending_secret=NULL,pending_expires_at=NULL,pending_session_id=NULL WHERE singleton`, candidate); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.admin_security SET password_hash=$1 WHERE singleton`, candidate); err != nil {
 			return nil, databaseError("update authentication verifier", err)
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions`); err != nil {
@@ -74,50 +55,25 @@ func (s *Store) InitializeAdminPassword(ctx context.Context, password string, ca
 	return stored, nil
 }
 
-func (s *Store) SecurityUpdate(ctx context.Context, currentID string, passwordHash []byte, apply func(*SecurityState) (SecurityChange, error)) error {
+// CreateAdminSession serializes password changes and session creation. A stale
+// application process cannot create a session after the password is replaced.
+func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, next *SecuritySessionCreate) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return databaseError("begin security operation", err)
+		return databaseError("begin sign-in", err)
 	}
 	defer tx.Rollback(ctx)
-	var state SecurityState
 	var configuredHash []byte
-	err = tx.QueryRow(ctx, `SELECT active_secret,pending_secret,pending_expires_at,pending_session_id,last_step,recovery_hashes,password_hash FROM aiosources.admin_security WHERE singleton FOR UPDATE`).Scan(&state.ActiveSecret, &state.PendingSecret, &state.PendingExpiresAt, &state.PendingSessionID, &state.LastStep, &state.RecoveryHashes, &configuredHash)
-	if err != nil {
-		return databaseError("read security state", err)
+	if err = tx.QueryRow(ctx, `SELECT password_hash FROM aiosources.admin_security WHERE singleton FOR UPDATE`).Scan(&configuredHash); err != nil {
+		return databaseError("read authentication verifier", err)
 	}
 	if string(configuredHash) != string(passwordHash) {
 		return ErrAuthentication
 	}
-	if currentID != "" {
-		var valid bool
-		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.admin_sessions WHERE id=$1 AND expires_at>now())`, currentID).Scan(&valid); err != nil {
-			return databaseError("verify current session", err)
-		}
-		if !valid {
-			return ErrAuthentication
-		}
-	}
-	change, err := apply(&state)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `UPDATE aiosources.admin_security SET active_secret=$1,pending_secret=$2,pending_expires_at=$3,pending_session_id=$4,last_step=$5,recovery_hashes=$6 WHERE singleton`, state.ActiveSecret, state.PendingSecret, state.PendingExpiresAt, state.PendingSessionID, state.LastStep, state.RecoveryHashes)
-	if err != nil {
-		return databaseError("save security state", err)
-	}
 	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE expires_at<=now()`); err != nil {
 		return databaseError("expire sessions", err)
 	}
-	if change.RevokeOthers {
-		if currentID == "" {
-			return model.ErrInvalid
-		}
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE id<>$1`, currentID); err != nil {
-			return databaseError("revoke sessions", err)
-		}
-	}
-	if next := change.NewSession; next != nil {
+	if next != nil {
 		if len(next.ReplaceTokenHash) == 32 {
 			if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE token_hash=$1`, next.ReplaceTokenHash); err != nil {
 				return databaseError("replace session", err)
@@ -138,11 +94,6 @@ func (s *Store) SecurityUpdate(ctx context.Context, currentID string, passwordHa
 			return databaseError("create session", err)
 		}
 	}
-	if change.ActivityKind != "" {
-		if err = recordAccessActivityTx(ctx, tx, change.ActivityKind, change.ActivitySubject); err != nil {
-			return err
-		}
-	}
 	return databaseError("commit security operation", tx.Commit(ctx))
 }
 
@@ -160,12 +111,6 @@ func (s *Store) AdminSession(ctx context.Context, tokenHash []byte, passwordHash
 		return value, ErrAuthentication
 	}
 	return value, databaseError("read session", err)
-}
-
-func (s *Store) SecurityStatus(ctx context.Context, currentID string) (model.SecurityStatus, error) {
-	var value model.SecurityStatus
-	err := s.pool.QueryRow(ctx, `SELECT active_secret IS NOT NULL,cardinality(recovery_hashes),CASE WHEN pending_session_id=$1 AND pending_expires_at>now() THEN pending_expires_at END FROM aiosources.admin_security WHERE singleton`, currentID).Scan(&value.MFAEnabled, &value.RecoveryCodesRemaining, &value.PendingExpiresAt)
-	return value, databaseError("read security status", err)
 }
 
 func (s *Store) ListAdminSessions(ctx context.Context, currentID string) ([]model.AdminSession, error) {
@@ -269,7 +214,7 @@ func validAccessActivity(action, targetID string) bool {
 	switch action {
 	case "security.trusted_user_changed", "security.trusted_user_deleted", "security.public_credentials_changed":
 		return true
-	case "security.public_catalog_enabled", "security.public_catalog_disabled", "security.public_catalog_permissions_changed", "security.public_stremio_enabled", "security.public_stremio_disabled", "security.public_search_enabled", "security.public_search_disabled", "security.mfa_enabled", "security.mfa_disabled", "security.recovery_rotated", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "security.public_source_downloads_enabled", "security.public_source_downloads_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
+	case "security.public_catalog_enabled", "security.public_catalog_disabled", "security.public_catalog_permissions_changed", "security.public_stremio_enabled", "security.public_stremio_disabled", "security.public_search_enabled", "security.public_search_disabled", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
 		return true
 	default:
 		return false

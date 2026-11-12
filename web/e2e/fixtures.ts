@@ -38,6 +38,7 @@ export const test = base.extend<{ server: TestServer; collectionSource: boolean 
     })
     try {
       await page.goto('/providers/settings')
+      await page.getByRole('tab', { name: 'Administrator', exact: true }).click()
       await page.getByLabel('Administrator password', { exact: true }).fill(server.password)
       await page.getByRole('button', { name: 'Sign in', exact: true }).click()
       await expect(

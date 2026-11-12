@@ -39,7 +39,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 			}
 			connection, err := s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "stremio", r.PathValue("configuration"))
 			if err != nil {
-				writeError(w, 401, "Invalid installation token")
+				respondError(w, err)
 				return
 			}
 			grant := model.TrustedGrant{UserID: connection.UserID, Generation: connection.Generation}
@@ -47,7 +47,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 			if !manifest {
 				visitor, err = s.options.AIOSource.TrustedVisitorWithCredentials(ctx, grant, s.connectionOrigin(), "stremio", connection.Preferences, connection.Services, connection.Announces)
 				if err != nil {
-					writeError(w, 401, "Invalid installation token")
+					respondError(w, err)
 					return
 				}
 			}
@@ -74,7 +74,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 			return
 		}
 		if err = s.options.AIOSource.CheckPublicStremio(r.Context(), v); err != nil {
-			writeError(w, 401, "Invalid installation token")
+			respondError(w, err)
 			return
 		}
 		writeJSON(w, 200, map[string]any{"streams": streams})
@@ -93,7 +93,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 			return
 		}
 		if err = s.options.AIOSource.CheckPublicStremio(r.Context(), v); err != nil {
-			writeError(w, 401, "Invalid installation token")
+			respondError(w, err)
 			return
 		}
 		http.Redirect(w, r, link, http.StatusTemporaryRedirect)

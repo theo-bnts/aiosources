@@ -81,13 +81,12 @@ try {
     UPDATE aiosources.runs SET status='paused',pause_reason='manual' WHERE status IN('queued','running');
     UPDATE aiosources.operation_runs SET status='cancelled',finished_at=now() WHERE status IN('queued','running');
     ALTER TABLE aiosources.aio_public_access DISABLE TRIGGER USER;
-    UPDATE aiosources.aio_public_access SET enabled=true,expose_sources=true,
+    UPDATE aiosources.aio_public_access SET enabled=true,
       stremio_enabled=true,torznab_enabled=true,search_enabled=true,catalog_enabled=true;
     ALTER TABLE aiosources.aio_public_access ENABLE TRIGGER USER;
     UPDATE aiosources.catalog_tracking SET enabled=true WHERE singleton;
     UPDATE aiosources.runtime_settings SET values=values || '{"days":3650,"cleanup_seconds":3600}'::jsonb WHERE section='history';
-    UPDATE aiosources.admin_security SET password_hash=NULL,active_secret=NULL,pending_secret=NULL,
-      pending_expires_at=NULL,pending_session_id=NULL,recovery_hashes='{}';
+    UPDATE aiosources.admin_security SET password_hash=NULL;
     DELETE FROM aiosources.admin_sessions; DELETE FROM aiosources.security_attempts;
     UPDATE aiosources.network_settings SET default_route='performance-offline',
       proxies='[{"id":"performance-offline","name":"Offline measurement","url":"http://127.0.0.1:9","enabled":true}]',

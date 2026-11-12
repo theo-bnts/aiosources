@@ -24,7 +24,7 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const location = useLocation()
   const configuration =
     saved && (saved.services.length || info.use_instance_debrid) ? saved.credential : ''
-  const canSearch = Boolean(configuration || (info.trusted && info.use_instance_debrid))
+  const canSearch = Boolean(configuration || info.use_instance_debrid)
   const scope = useMemo(() => randomID(), [configuration])
   const base = info.trusted ? '/trusted' : '/public'
   const id = new RegExp(`^${base}/search/([0-9]+)$`).exec(location.pathname)?.[1]
@@ -32,7 +32,9 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
     <PublicCredentialsForm
       info={info}
       connection="search"
-      submitLabel={configuration ? 'Update services' : 'Start searching'}
+      submitLabel={
+        info.use_instance_debrid ? 'Save' : configuration ? 'Update services' : 'Start searching'
+      }
     >
       <PublicAnnounceFields
         sources={info.private_sources ?? []}
@@ -61,9 +63,15 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
       }}
     >
       <div className="page">
-        <section className="section-card">
-          <Disclosure title="Debrid services">{form}</Disclosure>
-        </section>
+        {(!info.use_instance_debrid || Boolean(info.private_sources?.length)) && (
+          <section className="section-card">
+            {info.use_instance_debrid ? (
+              form
+            ) : (
+              <Disclosure title="Debrid services">{form}</Disclosure>
+            )}
+          </section>
+        )}
         <Suspense fallback={<Loading label="Loading Search" />}>
           {location.pathname === `${base}/search/torrents` ? (
             <CatalogTorrentsPage />

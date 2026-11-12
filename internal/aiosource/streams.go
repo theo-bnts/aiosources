@@ -197,13 +197,11 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	// Resolve names once for the whole response, including remote catalogs.
 	// Presentation must not prevent playback if a definition becomes unreadable.
 	names = s.sourceNames()
-	exposeNames := true
 	if visitor != nil {
-		access, e := s.visitorAccess(ctx, visitor, "stremio")
+		_, e := s.visitorAccess(ctx, visitor, "stremio")
 		if e != nil {
 			return nil, e
 		}
-		exposeNames = access.ExposeSources
 	}
 	var plan *availabilityPlan
 	if preferences.SkipCacheCheck || preferences.MaxResults > 0 || preferences.MaxCached > 0 || slices.ContainsFunc(preferences.Sorting, func(rule model.ResultSort) bool { return rule.Field == "cached" }) {
@@ -216,9 +214,6 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	keys := make(map[string]resultRank, len(eligible))
 	for _, rec := range eligible {
 		name := names[rec.Provider]
-		if !exposeNames {
-			name = ""
-		}
 		rank := recordRank(rec, name, sortingLanguage(preferences))
 		if plan != nil {
 			rank.cached = rankCache(rec.Hash, plan.states)
@@ -264,10 +259,6 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	for _, rec := range eligible {
 		displayRecord := rec
 		sourceName := names[rec.Provider]
-		if !exposeNames {
-			displayRecord.Provider = ""
-			sourceName = ""
-		}
 		stream := baseStream(displayRecord, r, sourceName)
 		if visitor == nil && len(availability) == 0 {
 			if !AllowsInstallation(preferences, "", "direct", mediaType) || preferences.CachedOnly {

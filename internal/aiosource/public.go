@@ -43,7 +43,7 @@ type PublicInstallation struct {
 	Announces         map[string]string       `json:"announces,omitempty"`
 }
 
-// This is a consented list of source names, never a source definition or secret
+// This list contains source names, never a source definition or secret
 // reference. Unclassified sources are private, as in playback and the settings UI.
 type PublicPrivateSource struct {
 	ID   string `json:"id"`
@@ -78,13 +78,13 @@ func (s *Service) publicPrivateSources(c model.AIOConfig) ([]PublicPrivateSource
 	return out, nil
 }
 
-// PublicSources discloses names only under the shared explicit admin policy.
+// PublicSources returns source names for enabled public features, never definitions.
 func (s *Service) PublicSources(ctx context.Context) ([]PublicPrivateSource, error) {
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !access.Enabled || !access.ExposeSources || s.sources == nil {
+	if !access.Enabled || s.sources == nil {
 		return nil, nil
 	}
 	list, err := s.sources.List()
@@ -105,7 +105,7 @@ func (s *Service) PublicPrivateSources(ctx context.Context) ([]PublicPrivateSour
 	if err != nil {
 		return nil, err
 	}
-	if !access.Enabled || !access.ExposeSources {
+	if !access.Enabled {
 		return nil, nil
 	}
 	c, err := s.DB.AIOConfig(ctx)
@@ -135,7 +135,7 @@ func (s *Service) validatePublicAnnounces(ctx context.Context, access model.Publ
 	if len(announces) == 0 {
 		return nil
 	}
-	if !access.ExposeSources || !validPublicAnnounces(announces) {
+	if !validPublicAnnounces(announces) {
 		return model.ErrInvalid
 	}
 	c, err := s.DB.AIOConfig(ctx)
@@ -202,7 +202,7 @@ func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visit
 	if !validPublicAnnounces(visitor.Announces) {
 		return nil, ErrAuth
 	}
-	if !access.ExposeSources || len(visitor.Announces) == 0 {
+	if len(visitor.Announces) == 0 {
 		return nil, nil
 	}
 
@@ -395,10 +395,6 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 		clear(out.Services)
 		clear(out.Announces)
 		return nil, ErrAuth
-	}
-	if !access.ExposeSources {
-		preferences.Sources = nil
-		preferences.ResultPreferences = preferences.ResultPreferences.WithHiddenSources()
 	}
 	out.Preferences = preferences
 	return &out, nil

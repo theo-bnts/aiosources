@@ -66,12 +66,10 @@ func (s *Store) ListSecrets(ctx context.Context) ([]model.SecretInfo, error) {
 	return secrets, nil
 }
 
-// HasEncryptedMaterial includes MFA factors, which use the same vault key as
-// named secrets even when no provider credentials are configured.
+// HasEncryptedMaterial checks whether a missing vault key would lose saved secrets.
 func (s *Store) HasEncryptedMaterial(ctx context.Context) (bool, error) {
 	var exists bool
-	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.secrets)
-OR EXISTS(SELECT 1 FROM aiosources.admin_security WHERE active_secret IS NOT NULL OR pending_secret IS NOT NULL)`).Scan(&exists)
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.secrets)`).Scan(&exists)
 	return exists, databaseError("inspect encrypted material", err)
 }
 

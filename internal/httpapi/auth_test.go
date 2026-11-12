@@ -72,7 +72,7 @@ func TestLoginRejectsExcessRequestsBeforeReadingTheirBodies(t *testing.T) {
 func TestPasswordProofBodiesHaveASeparateSmallLimit(t *testing.T) {
 	f := newSecurityFixture(t)
 	cookie := f.login(t, "")
-	for _, path := range []string{"/api/login", "/api/security/mfa/enroll"} {
+	for _, path := range []string{"/api/login"} {
 		r := httptest.NewRequest(http.MethodPost, "https://admin.example.test"+path, strings.NewReader(strings.Repeat(" ", 8192)+`{"password":"synthetic-test-password"}`)).WithContext(f.ctx)
 		r.RemoteAddr = "192.0.2.2:1234"
 		r.Header.Set("Origin", "https://admin.example.test")
@@ -89,7 +89,7 @@ func TestPasswordProofBodiesHaveASeparateSmallLimit(t *testing.T) {
 
 func TestDirectHTTPDeploymentIgnoresForwardedIdentityAndKeepsMutationProtection(t *testing.T) {
 	fixture := newSecurityFixture(t)
-	auth, err := newAuthentication("synthetic-test-password", "", fixture.db, fixture.vault)
+	auth, err := newAuthentication("synthetic-test-password", "", fixture.db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestSessionRequiresCSRFAndSameOriginAndLogoutRevokesIt(t *testing.T) {
 	}
 	// Restarting authentication keeps the durable session usable without
 	// keeping a plaintext token or an in-memory session map on the server.
-	restarted, err := newAuthentication("synthetic-test-password", "https://admin.example.test", fixture.db, fixture.vault)
+	restarted, err := newAuthentication("synthetic-test-password", "https://admin.example.test", fixture.db)
 	if err != nil {
 		t.Fatal(err)
 	}

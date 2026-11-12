@@ -102,7 +102,7 @@ for (const width of [390, 1440]) {
       '/torznab',
       '/sharing/settings',
       '/security/secrets',
-      '/security/verification',
+      '/security/settings',
       '/security/sessions',
       '/health/settings',
       '/network/incoming',

@@ -96,8 +96,8 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled && value.ExposeSources}
-		if enabled && value.ExposeSources {
+		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled}
+		if enabled {
 			allSources, e := s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
 				respondError(w, e)
@@ -127,7 +127,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			}
 			info["providers"] = providers
 		}
-		if enabled && value.ExposeSources && value.CatalogEnabled {
+		if enabled && value.CatalogEnabled {
 			policy, e := s.options.Store.PublicCatalogPolicy(ctx)
 			if e != nil {
 				respondError(w, e)

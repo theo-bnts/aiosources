@@ -12,15 +12,11 @@ import (
 
 func (s *Service) CatalogTorrents(ctx context.Context, opts model.ListOptions, filters model.CatalogReleaseFilters, visitor *PublicInstallation) (model.List[model.CatalogRelease], error) {
 	empty := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: opts.Limit, Offset: opts.Offset}
-	var access model.PublicAccess
 	var err error
 	if visitor != nil {
-		access, err = s.PublicSearchAccess(ctx, visitor)
+		_, err = s.PublicSearchAccess(ctx, visitor)
 		if err != nil {
 			return empty, err
-		}
-		if !access.ExposeSources && (opts.ProviderID != "" || len(opts.Providers) > 0 || slices.ContainsFunc(filters.StreamPreferences.Sorting, func(r model.ResultSort) bool { return r.Field == "source" })) {
-			return empty, model.ErrInvalid
 		}
 	}
 	if !ValidStreamPreferences(filters.StreamPreferences) || filters.StreamPreferences.Mode != "" || slices.ContainsFunc(filters.StreamPreferences.Sorting, func(r model.ResultSort) bool { return r.Field == "language" }) {
@@ -78,7 +74,7 @@ func (s *Service) CatalogTorrents(ctx context.Context, opts model.ListOptions, f
 	pageOpts := opts
 	pageOpts.Limit = page.Limit
 	pageOpts.Offset = 0
-	result, err := s.catalogReleasePage(ctx, 0, Resource{Type: "torrent", Kind: "torrent", ID: Normalize(opts.Query)}, page.Items, pageOpts, visitor, access, filters)
+	result, err := s.catalogReleasePage(ctx, 0, Resource{Type: "torrent", Kind: "torrent", ID: Normalize(opts.Query)}, page.Items, pageOpts, visitor, filters)
 	result.Limit, result.Offset, result.Total = page.Limit, page.Offset, page.Total
 	return result, err
 }

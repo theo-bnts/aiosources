@@ -26,16 +26,15 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 		t.Fatal("disabled public export admitted", err)
 	}
 	access.Enabled = true
-	access.CatalogEnabled = true
+	access.CatalogEnabled = false
 	if err = db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	var tracked int
 	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
-		t.Fatal("source exposure was not required for tracking", tracked, err)
+		t.Fatal("disabled catalog permission still tracked records", tracked, err)
 	}
 	access, _ = db.PublicAccess(ctx)
-	access.ExposeSources = true
 	access.CatalogEnabled = true
 	if err = db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
@@ -90,18 +89,17 @@ func TestPublicCatalogGatesScopesContinuationsAndNoVisitorRows(t *testing.T) {
 		t.Fatal("an empty intersection broadened access", err)
 	}
 	access, _ = db.PublicAccess(ctx)
-	access.ExposeSources = false
+	access.CatalogEnabled = false
 	if err = db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err = db.PublicCatalogPage(ctx, grant, CatalogPageRequest{}); !errors.Is(err, ErrCatalogAuthentication) {
-		t.Fatal("withdrawing source exposure did not revoke", err)
+		t.Fatal("withdrawing catalog permission did not revoke", err)
 	}
 	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.catalog_journal`).Scan(&tracked); err != nil || tracked != 0 {
 		t.Fatal("inactive public sharing retained snapshots", tracked, err)
 	}
 	access, _ = db.PublicAccess(ctx)
-	access.ExposeSources = true
 	if err = db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +116,7 @@ func TestPublicSharingDataUsesExistingSafeProjectionsAndSeedsMetadata(t *testing
 	}
 	// No named recipient remains to keep the metadata change index alive.
 	access, _ := db.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.CatalogEnabled = true, true, true
+	access.Enabled, access.CatalogEnabled = true, true
 	if err := db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +192,7 @@ func TestPublicSharingDataUsesExistingSafeProjectionsAndSeedsMetadata(t *testing
 func TestPublicSharingResetRequiresAuthoritativeFullWithoutRevivingOldRows(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	access, _ := db.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.CatalogEnabled = true, true, true
+	access.Enabled, access.CatalogEnabled = true, true
 	if err := db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +224,7 @@ func TestPublicSharingSelectedSourceDeletionNeverBecomesAllSources(t *testing.T)
 		t.Fatal(err)
 	}
 	access, _ := db.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.CatalogEnabled = true, true, true
+	access.Enabled, access.CatalogEnabled = true, true
 	if err := db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +237,7 @@ func TestPublicSharingSelectedSourceDeletionNeverBecomesAllSources(t *testing.T)
 		t.Fatal("removed last allowed source widened export", err)
 	}
 	current, _ := db.PublicAccess(ctx)
-	if current.CatalogEnabled || !current.Enabled || !current.ExposeSources {
+	if current.CatalogEnabled || !current.Enabled {
 		t.Fatal("source deletion did not revoke only catalog access")
 	}
 	if err := db.SetPublicAccess(ctx, access); !errors.Is(err, model.ErrConflict) {
@@ -250,7 +248,7 @@ func TestPublicSharingSelectedSourceDeletionNeverBecomesAllSources(t *testing.T)
 func TestPublicSharingByteBudgetKeepsAllContinuationRows(t *testing.T) {
 	ctx, db := sharingDatabase(t)
 	access, _ := db.PublicAccess(ctx)
-	access.Enabled, access.ExposeSources, access.CatalogEnabled = true, true, true
+	access.Enabled, access.CatalogEnabled = true, true
 	if err := db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +295,6 @@ func TestPublicCatalogOriginsMatchNamedCatalogs(t *testing.T) {
 	}
 	access, _ := db.PublicAccess(ctx)
 	access.Enabled = true
-	access.ExposeSources = true
 	access.CatalogEnabled = true
 	if err := db.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)

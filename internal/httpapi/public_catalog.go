@@ -43,11 +43,16 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			return
 		}
 		authorization := r.Header.Values("Authorization")
-		if len(authorization) != 1 || !strings.HasPrefix(authorization[0], "Bearer ") {
-			writeError(w, 401, "Enter your debrid service keys to use Search.")
-			return
+		var visitor *aiosource.PublicInstallation
+		if len(authorization) == 0 && access.UseInstanceDebrid {
+			visitor, err = s.options.AIOSource.PublicInstanceSearch(ctx, s.auth.origin)
+		} else {
+			if len(authorization) != 1 || !strings.HasPrefix(authorization[0], "Bearer ") {
+				writeError(w, 401, "Enter your debrid service keys to use Search.")
+				return
+			}
+			visitor, err = s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, strings.TrimPrefix(authorization[0], "Bearer "))
 		}
-		visitor, err := s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, strings.TrimPrefix(authorization[0], "Bearer "))
 		if err != nil {
 			if errors.Is(err, aiosource.ErrAuth) {
 				writeError(w, 401, "Your saved service configuration is no longer available. Enter your keys again.")
@@ -63,7 +68,7 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			return
 		}
 		// A slow provider response cannot outlive the permission that authorized
-		// this page or reveal names after source disclosure was withdrawn.
+		// this page.
 		latest, err := s.options.Store.PublicAccess(ctx)
 		if err != nil {
 			respondError(w, err)
@@ -75,10 +80,6 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 		}
 		if latest.Generation != visitor.Generation {
 			writeError(w, 401, "Your saved service configuration is no longer available. Enter your keys again.")
-			return
-		}
-		if access.ExposeSources && !latest.ExposeSources {
-			writeError(w, 409, "Public source visibility changed. Search again.")
 			return
 		}
 		if actionErr != nil && !errors.Is(actionErr, aiosource.ErrPending) {

@@ -60,7 +60,7 @@ func New(options Options) (http.Handler, error) {
 	if options.Store == nil || options.Providers == nil || options.Jobs == nil || options.Vault == nil || options.Frontend == nil {
 		return nil, errors.New("API dependencies and compiled frontend are required")
 	}
-	auth, err := newAuthentication(options.AdminPassword, options.PublicURL, options.Store, options.Vault)
+	auth, err := newAuthentication(options.AdminPassword, options.PublicURL, options.Store)
 	if err != nil {
 		return nil, err
 	}

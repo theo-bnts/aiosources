@@ -14,10 +14,10 @@ import (
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-func TestAuthenticationPolicyControlsNewSessionsAndEnrollment(t *testing.T) {
+func TestAuthenticationPolicyControlsNewSessions(t *testing.T) {
 	f := newSecurityFixture(t)
 	policy, _ := f.db.RuntimeSection(f.ctx, "security")
-	policy.Values["session_hours"], policy.Values["session_limit"], policy.Values["enrollment_minutes"] = 1, 1, 5
+	policy.Values["session_hours"], policy.Values["session_limit"] = 1, 1
 	if err := f.db.UpdateRuntimeSection(f.ctx, "security", policy); err != nil {
 		t.Fatal(err)
 	}
@@ -35,13 +35,7 @@ func TestAuthenticationPolicyControlsNewSessionsAndEnrollment(t *testing.T) {
 	if response := f.request(http.MethodGet, "/api/session", nil, cookie); !strings.Contains(response.Body.String(), `"authenticated":true`) {
 		t.Fatal("reducing capacity revoked an existing session")
 	}
-	response := f.request(http.MethodPost, "/api/security/mfa/enroll", map[string]string{"password": "synthetic-test-password"}, cookie)
-	var enrollment struct {
-		Expires time.Time `json:"expires_at"`
-	}
-	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &enrollment) != nil || time.Until(enrollment.Expires) < 298*time.Second || time.Until(enrollment.Expires) > 5*time.Minute {
-		t.Fatal("setup validity ignored", response.Code)
-	}
+
 }
 
 func TestConfiguredSignInLimitIsEnforcedBeforePasswordWork(t *testing.T) {
@@ -67,7 +61,7 @@ func TestGlobalSignInLimitIsSharedBetweenAuthenticationInstances(t *testing.T) {
 	if err := f.db.UpdateRuntimeSection(f.ctx, "security", policy); err != nil {
 		t.Fatal(err)
 	}
-	other, err := newAuthentication("synthetic-test-password", "https://admin.example.test", f.db, f.vault)
+	other, err := newAuthentication("synthetic-test-password", "https://admin.example.test", f.db)
 	if err != nil {
 		t.Fatal(err)
 	}

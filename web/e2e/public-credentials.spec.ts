@@ -18,7 +18,6 @@ test('personal announces follow encrypted services across public Search, Stremio
           stremio_enabled: true,
           search_enabled: true,
           torznab_enabled: true,
-          expose_sources: true,
         },
       })
     ).status(),

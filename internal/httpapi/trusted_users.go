@@ -28,6 +28,10 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 	save := s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			model.TrustedUser
+			SearchEnabled        *bool  `json:"search_enabled"`
+			TorznabEnabled       *bool  `json:"torznab_enabled"`
+			StremioEnabled       *bool  `json:"stremio_enabled"`
+			CatalogEnabled       *bool  `json:"catalog_enabled"`
 			Password             string `json:"password"`
 			UseInstanceDebrid    *bool  `json:"use_instance_debrid"`
 			UseInstanceAnnounces *bool  `json:"use_instance_announces"`
@@ -37,6 +41,26 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 			return
 		}
 		input.ID = r.PathValue("id")
+		if input.SearchEnabled == nil {
+			input.TrustedUser.SearchEnabled = input.ID == ""
+		} else {
+			input.TrustedUser.SearchEnabled = *input.SearchEnabled
+		}
+		if input.TorznabEnabled == nil {
+			input.TrustedUser.TorznabEnabled = input.ID == ""
+		} else {
+			input.TrustedUser.TorznabEnabled = *input.TorznabEnabled
+		}
+		if input.StremioEnabled == nil {
+			input.TrustedUser.StremioEnabled = input.ID == ""
+		} else {
+			input.TrustedUser.StremioEnabled = *input.StremioEnabled
+		}
+		if input.CatalogEnabled == nil {
+			input.TrustedUser.CatalogEnabled = input.ID == ""
+		} else {
+			input.TrustedUser.CatalogEnabled = *input.CatalogEnabled
+		}
 		if input.UseInstanceDebrid == nil {
 			input.TrustedUser.UseInstanceDebrid = input.ID == ""
 		} else {
@@ -158,36 +182,34 @@ func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog")}
-	if user.ExposeSources {
-		sources, e := s.options.AIOSource.TrustedSources(r.Context(), trustedGrant(r))
+	sources, e := s.options.AIOSource.TrustedSources(r.Context(), trustedGrant(r))
+	if e != nil {
+		respondError(w, e)
+		return
+	}
+	info["sources"] = sources
+	if !user.UseInstanceAnnounces {
+		private, e := s.options.AIOSource.TrustedPrivateSources(r.Context(), trustedGrant(r))
 		if e != nil {
 			respondError(w, e)
 			return
 		}
-		info["sources"] = sources
-		if !user.UseInstanceAnnounces {
-			private, e := s.options.AIOSource.TrustedPrivateSources(r.Context(), trustedGrant(r))
-			if e != nil {
-				respondError(w, e)
-				return
-			}
-			info["private_sources"] = private
+		info["private_sources"] = private
+	}
+	if user.CatalogEnabled {
+		policy, e := s.options.Store.PublicCatalogPolicy(r.Context())
+		if e != nil {
+			respondError(w, e)
+			return
 		}
-		if user.CatalogEnabled {
-			policy, e := s.options.Store.PublicCatalogPolicy(r.Context())
-			if e != nil {
-				respondError(w, e)
-				return
+		info["catalog_fields"], info["catalog_entities"], info["catalog_revision"] = policy.Fields, policy.CatalogEntities, policy.Revision
+		permitted := []aiosource.PublicPrivateSource{}
+		for _, source := range sources {
+			if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
+				permitted = append(permitted, source)
 			}
-			info["catalog_fields"], info["catalog_entities"], info["catalog_revision"] = policy.Fields, policy.CatalogEntities, policy.Revision
-			permitted := []aiosource.PublicPrivateSource{}
-			for _, source := range sources {
-				if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
-					permitted = append(permitted, source)
-				}
-			}
-			info["catalog_sources"] = permitted
 		}
+		info["catalog_sources"] = permitted
 	}
 	writeJSON(w, 200, info)
 }
@@ -293,7 +315,11 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 			return
 		}
 		if _, e := s.options.Store.TrustedUser(ctx, grant); e != nil {
-			writeError(w, 401, "Your account changed. Sign in again.")
+			if errors.Is(e, store.ErrAuthentication) {
+				writeError(w, 401, "Your account changed. Sign in again.")
+			} else {
+				respondError(w, e)
+			}
 			return
 		}
 		if err != nil && !errors.Is(err, aiosource.ErrPending) {

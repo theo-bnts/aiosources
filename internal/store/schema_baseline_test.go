@@ -94,7 +94,7 @@ func baselineTableState(t *testing.T, ctx context.Context, db *Store, namespace 
 	}
 	for name, prefix := range state {
 		var data string
-		if err = db.pool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(j ORDER BY j::text),'[]'::jsonb)::text FROM (SELECT to_jsonb(t)-'localized_posters'-'storage_options'`+map[string]string{"storage_settings": "-'options'", "aio_public_access": "-'use_instance_debrid'-'use_instance_announces'"}[name]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t) items`).Scan(&data); err != nil {
+		if err = db.pool.QueryRow(ctx, `SELECT COALESCE(jsonb_agg(j ORDER BY j::text),'[]'::jsonb)::text FROM (SELECT CASE WHEN '`+name+`'='runtime_settings' AND to_jsonb(t)->>'section'='security' THEN jsonb_set(to_jsonb(t)-'revision','{values}',(to_jsonb(t)->'values')-'enrollment_minutes') ELSE to_jsonb(t) END-'localized_posters'-'storage_options'`+map[string]string{"storage_settings": "-'options'", "aio_public_access": "-'use_instance_debrid'-'use_instance_announces'-'expose_sources'", "admin_security": "-'active_secret'-'pending_secret'-'pending_expires_at'-'pending_session_id'-'last_step'-'recovery_hashes'"}[name]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t) items`).Scan(&data); err != nil {
 			t.Fatal(err)
 		}
 		state[name] = prefix + data

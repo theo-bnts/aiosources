@@ -150,7 +150,7 @@ func (s *Store) PublicCatalogPage(ctx context.Context, grant model.PublicCatalog
 	defer rollback(tx)
 	// Lock the access gate before its policy, matching revocation. One joined
 	// locking SELECT does not guarantee this order when both rows change.
-	var enabled, exposed, catalogEnabled bool
+	var enabled, catalogEnabled bool
 	var generation, catalogGeneration int64
 	if grant.Trusted != nil {
 		var permissions []byte
@@ -159,17 +159,17 @@ func (s *Store) PublicCatalogPage(ctx context.Context, grant model.PublicCatalog
 		if err == nil {
 			err = json.Unmarshal(permissions, &p)
 		}
-		exposed, catalogEnabled = p.ExposeSources, p.CatalogEnabled
+		catalogEnabled = p.CatalogEnabled
 		if generation != grant.Trusted.Generation {
 			enabled = false
 		}
 	} else {
-		err = tx.QueryRow(ctx, `SELECT enabled,expose_sources,catalog_enabled,generation,catalog_generation FROM aiosources.aio_public_access WHERE singleton FOR SHARE`).Scan(&enabled, &exposed, &catalogEnabled, &generation, &catalogGeneration)
+		err = tx.QueryRow(ctx, `SELECT enabled,catalog_enabled,generation,catalog_generation FROM aiosources.aio_public_access WHERE singleton FOR SHARE`).Scan(&enabled, &catalogEnabled, &generation, &catalogGeneration)
 	}
 	if err != nil {
 		return model.CatalogEnvelope{}, 0, databaseError("authorize public catalog export", err)
 	}
-	if !enabled || !exposed || !catalogEnabled || (grant.Trusted == nil && (grant.Generation != generation || grant.CatalogGeneration != catalogGeneration)) {
+	if !enabled || !catalogEnabled || (grant.Trusted == nil && (grant.Generation != generation || grant.CatalogGeneration != catalogGeneration)) {
 		return model.CatalogEnvelope{}, 0, ErrCatalogAuthentication
 	}
 	policy, err := scanPublicCatalogPolicy(tx.QueryRow(ctx, `SELECT `+publicCatalogPolicyColumns+` FROM aiosources.public_catalog_policy p WHERE singleton FOR SHARE`))
@@ -196,9 +196,9 @@ func (s *Store) ValidatePublicCatalog(ctx context.Context, grant model.PublicCat
 	var valid bool
 	var err error
 	if grant.Trusted != nil {
-		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.trusted_users u CROSS JOIN aiosources.public_catalog_policy p WHERE u.id=$1 AND u.generation=$2 AND u.enabled AND u.permissions->>'expose_sources'='true' AND u.permissions->>'catalog_enabled'='true' AND p.singleton AND p.revision=$3)`, grant.Trusted.UserID, grant.Trusted.Generation, revision).Scan(&valid)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.trusted_users u CROSS JOIN aiosources.public_catalog_policy p WHERE u.id=$1 AND u.generation=$2 AND u.enabled AND u.permissions->>'catalog_enabled'='true' AND p.singleton AND p.revision=$3)`, grant.Trusted.UserID, grant.Trusted.Generation, revision).Scan(&valid)
 	} else {
-		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_public_access a CROSS JOIN aiosources.public_catalog_policy p WHERE a.singleton AND p.singleton AND a.enabled AND a.expose_sources AND a.catalog_enabled AND a.generation=$1 AND a.catalog_generation=$2 AND p.revision=$3)`, grant.Generation, grant.CatalogGeneration, revision).Scan(&valid)
+		err = s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_public_access a CROSS JOIN aiosources.public_catalog_policy p WHERE a.singleton AND p.singleton AND a.enabled AND a.catalog_enabled AND a.generation=$1 AND a.catalog_generation=$2 AND p.revision=$3)`, grant.Generation, grant.CatalogGeneration, revision).Scan(&valid)
 	}
 	if err != nil {
 		return databaseError("validate public catalog delivery", err)

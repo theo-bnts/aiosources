@@ -7,9 +7,12 @@ test('public navigation only offers enabled connections and follows policy chang
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Search', { exact: true }).check()
-  await access.getByLabel('Allow public Stremio connections', { exact: true }).uncheck()
+  await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
+  await access.getByLabel('Allow shared catalogs', { exact: true }).uncheck()
+  await access.getByLabel('Allow Search', { exact: true }).check()
+  await access.getByLabel('Allow Stremio connections', { exact: true }).uncheck()
   const save = async () => {
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -31,7 +34,7 @@ test('public navigation only offers enabled connections and follows policy chang
     await expect(
       visitor.getByRole('button', { name: 'Start searching', exact: true }),
     ).toBeVisible()
-    await access.getByLabel('Allow public Stremio connections', { exact: true }).check()
+    await access.getByLabel('Allow Stremio connections', { exact: true }).check()
     await save()
     await expect(nav.getByRole('link', { name: 'Stremio', exact: true })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toHaveCount(0)
@@ -41,7 +44,7 @@ test('public navigation only offers enabled connections and follows policy chang
     await expect(connections).toHaveAttribute('aria-expanded', 'false')
     await connections.click()
     await expect(connections).toHaveAttribute('aria-expanded', 'true')
-    await access.getByLabel('Allow public Torznab connections', { exact: true }).check()
+    await access.getByLabel('Allow Torznab connections', { exact: true }).check()
     await save()
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toBeVisible()
     await expect(nav.getByRole('link', { name: /^(Torznab|Stremio)$/ })).toHaveText([
@@ -52,12 +55,12 @@ test('public navigation only offers enabled connections and follows policy chang
     await expect(
       visitor.getByRole('button', { name: 'Create connection link', exact: true }),
     ).toBeVisible()
-    await access.getByLabel('Allow public Stremio connections', { exact: true }).uncheck()
+    await access.getByLabel('Allow Stremio connections', { exact: true }).uncheck()
     await save()
     await expect(nav.getByRole('link', { name: 'Stremio', exact: true })).toHaveCount(0)
     await expect(connections).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toBeVisible()
-    await access.getByLabel('Allow public Torznab connections', { exact: true }).uncheck()
+    await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
     await save()
     await expect(visitor).toHaveURL(/\/public\/search$/)
     await expect(connections).toHaveCount(0)
@@ -65,11 +68,9 @@ test('public navigation only offers enabled connections and follows policy chang
     expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
-    await access.getByLabel('Allow public Search', { exact: true }).uncheck()
+    await access.getByLabel('Allow Search', { exact: true }).uncheck()
     await save()
-    await expect(
-      visitor.getByRole('heading', { name: 'Administrator sign-in', exact: true }),
-    ).toBeVisible()
+    await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toBeVisible()
     await expect(visitor.getByRole('button', { name: 'Start searching', exact: true })).toHaveCount(
       0,
     )

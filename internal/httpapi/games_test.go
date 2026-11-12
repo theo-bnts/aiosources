@@ -57,7 +57,7 @@ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('game-fixtu
 		t.Fatal("parent PC category omitted a game", r.Code)
 	}
 	access, _ := f.db.PublicAccess(f.ctx)
-	access.Enabled, access.TorznabEnabled, access.ExposeSources = true, true, false
+	access.Enabled, access.TorznabEnabled = true, true
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('game-fixtu
 	if r.Code != 200 || !strings.Contains(r.Body.String(), `total="1"`) {
 		t.Fatal("cached public game unavailable", r.Code)
 	}
-	for _, private := range []string{"administrator-passkey", "private.example.invalid", "game-fixture", "Example games", "tr=", "tmdbid"} {
+	for _, private := range []string{"administrator-passkey", "private.example.invalid", "tr=", "tmdbid"} {
 		if strings.Contains(r.Body.String(), private) {
 			t.Fatal("game feed exposed private or misnamed data")
 		}

@@ -15,9 +15,9 @@ func (s *Service) visitorCredentialAccess(ctx context.Context, visitor *PublicIn
 	if visitor.Trusted != nil {
 		user, err := s.DB.TrustedUser(ctx, *visitor.Trusted)
 		if err != nil {
-			return model.PublicAccess{}, ErrAuth
+			return model.PublicAccess{}, trustedAccessError(err)
 		}
-		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, ExposeSources: user.ExposeSources, Generation: user.Generation}, nil
+		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, Generation: user.Generation}, nil
 	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *Service) personalCredentials(ctx context.Context, access model.PublicAc
 // Retain only personal announces still permitted by live source definitions.
 // This never resolves an instance secret, even when instance credentials are enabled.
 func (s *Service) retainedPersonalAnnounces(ctx context.Context, access model.PublicAccess, announces map[string]string) (map[string]string, error) {
-	if !access.ExposeSources || access.UseInstanceAnnounces || len(announces) == 0 {
+	if access.UseInstanceAnnounces || len(announces) == 0 {
 		return map[string]string{}, nil
 	}
 	config, err := s.DB.AIOConfig(ctx)
@@ -89,4 +89,19 @@ func (s *Service) retainedPersonalAnnounces(ctx context.Context, access model.Pu
 		}
 	}
 	return retained, nil
+}
+
+func (s *Service) PublicInstanceSearch(ctx context.Context, audience string) (*PublicInstallation, error) {
+	access, err := s.DB.PublicAccess(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !access.Enabled || !access.SearchEnabled || !access.UseInstanceDebrid {
+		return nil, ErrAuth
+	}
+	visitor := &PublicInstallation{Generation: access.Generation, Audience: audience, Services: map[string]string{}}
+	if err = s.resolveVisitorServices(ctx, visitor, access.CredentialPolicy); err != nil {
+		return nil, err
+	}
+	return visitor, nil
 }

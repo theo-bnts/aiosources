@@ -130,7 +130,7 @@ test('public Stremio and Torznab use the same optional controls without creating
       ).toBeVisible()
       await expect(
         visitor.getByLabel('Sort by', { exact: true }).locator('option[value=source]'),
-      ).toHaveCount(0)
+      ).toHaveCount(1)
       await visitor.setViewportSize({ width: 320, height: 1000 })
       expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,

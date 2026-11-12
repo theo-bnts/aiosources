@@ -155,7 +155,7 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await visitor.setViewportSize({ width, height: 950 })
       const anchor = await position(page)
       await visitor.goto('/')
-      const password = visitor.getByLabel('Administrator password', { exact: true })
+      const password = visitor.getByLabel('Password', { exact: true })
       await expect(password).toBeVisible()
       await password.fill('synthetic-form-draft')
       await checkAtSamePosition(visitor, anchor)
@@ -164,6 +164,7 @@ test('one About entry stays in the same place on public, sign-in and administrat
 
     await page.goto('/public-access')
     const access = page.getByRole('form', { name: 'Public', exact: true })
+    await access.locator('summary').getByText('Permissions', { exact: true }).click()
     await access.getByLabel('Enable public access', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -186,7 +187,8 @@ test('one About entry stays in the same place on public, sign-in and administrat
 
       if (width < 1024)
         await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
-      await visitor.getByRole('link', { name: 'Admin login', exact: true }).click()
+      await visitor.getByRole('link', { name: 'Login', exact: true }).click()
+      await visitor.getByRole('tab', { name: 'Administrator', exact: true }).click()
       await expect(visitor.getByLabel('Administrator password', { exact: true })).toBeVisible()
       await checkAtSamePosition(visitor, anchor)
 

@@ -42,5 +42,5 @@ func internalPurpose(purpose string) bool {
 	if purpose == "trusted-connection-v1" {
 		return true
 	}
-	return purpose == "public-catalog-v1" || purpose == "provider-preparation-v1" || purpose == "public-catalog-source-v1" || purpose == "public-catalog-preparation-v1" || purpose == "public-catalog-file-v1" || purpose == "catalog-browser-download-v1" || purpose == "admin-mfa-pending-v1" || purpose == "admin-mfa-active-v1" || purpose == "public-installation-v1" || purpose == "public-playback-v1" || purpose == "public-torznab-v1"
+	return purpose == "public-catalog-v1" || purpose == "provider-preparation-v1" || purpose == "public-catalog-source-v1" || purpose == "public-catalog-preparation-v1" || purpose == "public-catalog-file-v1" || purpose == "catalog-browser-download-v1" || purpose == "public-installation-v1" || purpose == "public-playback-v1" || purpose == "public-torznab-v1"
 }

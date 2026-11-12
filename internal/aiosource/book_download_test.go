@@ -176,7 +176,6 @@ func TestPublicBooksKeepCachedOnlyAndSourcePrivacy(t *testing.T) {
 	access, _ := s.DB.PublicAccess(ctx)
 	access.Enabled = true
 	access.SearchEnabled = true
-	access.ExposeSources = false
 	if err := s.DB.SetPublicAccess(ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +187,7 @@ func TestPublicBooksKeepCachedOnlyAndSourcePrivacy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page, err := s.PublicCatalogSearch(ctx, visitor, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"}); err != nil || page.Total != 1 || len(page.Items[0].Providers) != 0 || page.Items[0].Cover == "" {
+	if page, err := s.PublicCatalogSearch(ctx, visitor, model.ListOptions{Query: "Orchard"}, model.CatalogSearchFilters{Type: "book,ebook,audiobook"}); err != nil || page.Total != 1 || len(page.Items[0].Providers) != 1 || page.Items[0].Cover == "" {
 		t.Fatalf("public book search: %+v %v", page, err)
 	}
 	generation, _ := s.DB.AIOCacheGeneration(ctx)
@@ -214,7 +213,7 @@ func TestPublicBooksKeepCachedOnlyAndSourcePrivacy(t *testing.T) {
 				row  model.CatalogRelease
 			}{{work, rows.Items[0]}, {0, direct.Items[0]}} {
 				row := item.row
-				if row.Provider != "" || row.ProviderName != "" || row.DownloadToken == "" || row.Services[0].CanAdd {
+				if row.Provider != "private-one" || row.ProviderName != "Example Library" || row.DownloadToken == "" || row.Services[0].CanAdd {
 					t.Fatal("source privacy or private uncached access changed")
 				}
 				pending, e := s.PublicCatalogDownload(ctx, visitor, item.work, model.CatalogDownloadInput{DownloadToken: row.DownloadToken, Service: "torbox"})

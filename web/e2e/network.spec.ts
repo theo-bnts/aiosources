@@ -2,24 +2,27 @@ import type { Page } from '@playwright/test'
 import type { NetworkSettings } from '../src/lib/network-types'
 import { test, expect } from './fixtures'
 
-test('Public access separates Search and connection settings, while Network expands into Incoming and Outgoing', async ({
+test('Public permissions share one optional section, while Network expands into Incoming and Outgoing', async ({
   page,
 }) => {
   await page.goto('/public-access')
   const form = page.getByRole('form', { name: 'Public', exact: true })
-  const search = form.getByRole('group', { name: 'Search', exact: true })
-  const connections = form.getByRole('group', { name: 'Connections', exact: true })
-  await expect(
-    search.getByRole('switch', { name: 'Allow public Search', exact: true }),
-  ).toBeVisible()
-  await expect(connections.getByRole('switch')).toHaveCount(3)
+  await form.locator('summary').getByText('Permissions', { exact: true }).click()
+  const permissions = form
+    .locator('details')
+    .filter({ has: page.locator('summary').getByText('Permissions', { exact: true }) })
+  await expect(permissions.getByRole('switch')).toHaveCount(4)
   for (const name of [
-    'Allow public Stremio connections',
-    'Allow public Torznab connections',
-    'Allow public shared catalogs',
-  ])
-    await expect(connections.getByRole('switch', { name, exact: true })).toBeVisible()
-  await expect(connections.getByText('Allow public Search', { exact: true })).toHaveCount(0)
+    'Allow Search',
+    'Allow Torznab connections',
+    'Allow Stremio connections',
+    'Allow shared catalogs',
+  ]) {
+    await expect(permissions.getByRole('switch', { name, exact: true })).toBeVisible()
+    await expect(permissions.getByRole('switch', { name, exact: true })).toBeChecked()
+  }
+  await expect(form.getByRole('group', { name: 'Search', exact: true })).toHaveCount(0)
+  await expect(form.getByRole('group', { name: 'Connections', exact: true })).toHaveCount(0)
   if (process.env.QA_DIRECTORY)
     await page.screenshot({
       path: `${process.env.QA_DIRECTORY}/public-access-settings-desktop.png`,

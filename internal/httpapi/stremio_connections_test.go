@@ -242,7 +242,7 @@ func TestStremioConnectionsSaveIndependentSettingsAndPreserveLegacyLinks(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	access.Enabled, access.TorznabEnabled = true, true
+	access.Enabled, access.TorznabEnabled, access.CatalogEnabled = true, true, false
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}

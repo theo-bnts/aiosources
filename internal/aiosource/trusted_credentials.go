@@ -12,17 +12,20 @@ import (
 func (s *Service) ResolveTrustedCredential(ctx context.Context, grant model.TrustedGrant, audience string, changes PublicCredentialChanges) (*PublicInstallation, error) {
 	user, err := s.DB.TrustedUser(ctx, grant)
 	if err != nil {
-		return nil, ErrAuth
+		return nil, trustedAccessError(err)
 	}
 	copy := grant
 	visitor := &PublicInstallation{Trusted: &copy, Version: 1, Audience: audience, Generation: grant.Generation, Services: map[string]string{}, Announces: map[string]string{}}
 	if changes.Credential != "" {
 		value, e := s.OpenTrustedConnection(ctx, audience, "credentials", changes.Credential)
-		if e != nil || value.UserID != grant.UserID || value.Generation != grant.Generation {
+		if e != nil {
+			return nil, e
+		}
+		if value.UserID != grant.UserID || value.Generation != grant.Generation {
 			return nil, ErrAuth
 		}
 		visitor.Services = value.Services
-		visitor.Announces, err = s.retainedPersonalAnnounces(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy, ExposeSources: user.ExposeSources}, value.Announces)
+		visitor.Announces, err = s.retainedPersonalAnnounces(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy}, value.Announces)
 		clear(value.Announces)
 		if err != nil {
 			clear(visitor.Services)
@@ -30,7 +33,7 @@ func (s *Service) ResolveTrustedCredential(ctx context.Context, grant model.Trus
 		}
 	}
 	if err = applyCredentialChanges(visitor, changes); err == nil {
-		err = s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy, ExposeSources: user.ExposeSources}, visitor)
+		err = s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy}, visitor)
 	}
 	if err != nil {
 		clear(visitor.Services)
@@ -44,7 +47,7 @@ func (s *Service) TrustedBrowserCredential(ctx context.Context, grant model.Trus
 	result := PublicBrowserCredential{Services: []string{}, Announces: []string{}}
 	user, err := s.DB.TrustedUser(ctx, grant)
 	if err != nil {
-		return result, ErrAuth
+		return result, trustedAccessError(err)
 	}
 	result.InstanceServices = user.UseInstanceDebrid
 	for _, p := range PublicProviders {

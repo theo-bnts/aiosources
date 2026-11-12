@@ -2,11 +2,13 @@ package httpapi
 
 import (
 	"encoding/json"
+	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -46,7 +48,7 @@ func TestTrustedPasswordHashUsesArgon2idAndRejectsInvalidProofs(t *testing.T) {
 
 func TestTrustedUsersIsolationConnectionsAndRevocation(t *testing.T) {
 	f, _, conn := addonAPI(t)
-	body := `{"email":"Reader@Example.Invalid","password":"synthetic trusted password","enabled":true,"search_enabled":true,"stremio_enabled":true,"torznab_enabled":true,"catalog_enabled":true,"expose_sources":true}`
+	body := `{"email":"Reader@Example.Invalid","password":"synthetic trusted password","enabled":true,"search_enabled":true,"stremio_enabled":true,"torznab_enabled":true,"catalog_enabled":true}`
 	created := f.request("POST", "/api/trusted-users", body, true, "")
 	var user model.TrustedUser
 	if created.Code != 201 || json.Unmarshal(created.Body.Bytes(), &user) != nil || user.Email != "reader@example.invalid" || strings.Contains(created.Body.String(), "password") {
@@ -147,11 +149,11 @@ func TestTrustedUsersIsolationConnectionsAndRevocation(t *testing.T) {
 
 func TestTrustedUserPermissionsAndPasswordReplacement(t *testing.T) {
 	f, _, _ := addonAPI(t)
-	created := f.request("POST", "/api/trusted-users", `{"email":"reader@example.invalid","password":"synthetic trusted password","enabled":true,"search_enabled":true,"catalog_enabled":true}`, true, "")
+	created := f.request("POST", "/api/trusted-users", `{"email":"reader@example.invalid","password":"synthetic trusted password","enabled":true,"search_enabled":true,"stremio_enabled":false,"torznab_enabled":false,"catalog_enabled":false}`, true, "")
 	var user model.TrustedUser
 	_ = json.Unmarshal(created.Body.Bytes(), &user)
 	if created.Code != 201 || user.CatalogEnabled {
-		t.Fatal("catalog permission did not require source exposure")
+		t.Fatal("explicit feature permissions were not preserved")
 	}
 	login := trustedRequest(f, nil, "POST", "/api/trusted/login", `{"email":"reader@example.invalid","password":"synthetic trusted password"}`)
 	var cookie *http.Cookie
@@ -186,5 +188,51 @@ func TestTrustedUserPermissionsAndPasswordReplacement(t *testing.T) {
 	}
 	if got := trustedRequest(f, nil, "POST", "/api/trusted/login", `{"email":"reader@example.invalid","password":"replacement synthetic password"}`); got.Code != 200 {
 		t.Fatal("new password not accepted", got.Code, got.Body)
+	}
+}
+
+func TestTrustedSearchTimeoutDoesNotInvalidateSession(t *testing.T) {
+	f, addon, _ := addonAPI(t)
+	created := f.request("POST", "/api/trusted-users", `{"email":"reader@example.invalid","password":"synthetic trusted password","enabled":true}`, true, "")
+	if created.Code != 201 {
+		t.Fatal("create account", created.Code)
+	}
+	login := trustedRequest(f, nil, "POST", "/api/trusted/login", `{"email":"reader@example.invalid","password":"synthetic trusted password"}`)
+	var cookie *http.Cookie
+	for _, c := range login.Result().Cookies() {
+		if c.Name == trustedSessionCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil {
+		t.Fatal("no trusted session")
+	}
+	auth, err := newAuthentication("synthetic-admin-password", "https://addon.example", f.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &server{auth: auth, options: Options{Store: f.db, AIOSource: addon}, streams: make(chan struct{}, 1)}
+	handler := s.trustedCatalogHandler(20*time.Millisecond, func(_ http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) (any, error) {
+		<-r.Context().Done()
+		return map[string]string{"title": "must-not-be-returned"}, r.Context().Err()
+	})
+	request := httptest.NewRequest("GET", "https://addon.example/api/trusted/catalog/search?q=Example", nil).WithContext(f.ctx)
+	request.AddCookie(cookie)
+	out := httptest.NewRecorder()
+	handler(out, request)
+	if out.Code != 503 || strings.Contains(out.Body.String(), "must-not-be-returned") {
+		t.Fatal("timeout incorrectly treated as expired login", out.Code)
+	}
+	if got := trustedRequest(f, cookie, "GET", "/api/trusted/config", ""); got.Code != 200 {
+		t.Fatal("valid session was lost", got.Code)
+	}
+}
+
+func TestNewTrustedAccountsDefaultToAllFeaturesWithoutEnablingAccount(t *testing.T) {
+	f, _, _ := addonAPI(t)
+	created := f.request("POST", "/api/trusted-users", `{"email":"reader@example.invalid","password":"synthetic trusted password"}`, true, "")
+	var user model.TrustedUser
+	if created.Code != 201 || json.Unmarshal(created.Body.Bytes(), &user) != nil || user.Enabled || !user.SearchEnabled || !user.TorznabEnabled || !user.StremioEnabled || !user.CatalogEnabled || !user.UseInstanceDebrid || !user.UseInstanceAnnounces {
+		t.Fatal("inconsistent account defaults", created.Code, user)
 	}
 }

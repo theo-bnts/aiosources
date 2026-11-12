@@ -32,7 +32,7 @@ export const applicationPages = [
   ['sharing.statistics', '/sharing'],
   ['sharing.settings', '/sharing/settings'],
   ['security.secrets', '/security/secrets'],
-  ['security.verification', '/security/verification'],
+  ['security.settings', '/security/settings'],
   ['security.sessions', '/security/sessions'],
   ['network.incoming', '/network/incoming'],
   ['network.proxies', '/network/outgoing'],

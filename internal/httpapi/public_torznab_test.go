@@ -40,6 +40,7 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	}
 	access, _ := f.db.PublicAccess(f.ctx)
 	access.Enabled = true
+	access.TorznabEnabled = false
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,7 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="2"`) {
 		t.Fatal("public visibility is incorrect", response.Code, response.Body.String())
 	}
-	for _, secret := range []string{"Example Uncached Film", "Example Other Film", "admin.example.invalid", "Display private-library", `name="indexer"`, "tr="} {
+	for _, secret := range []string{"Example Uncached Film", "Example Other Film", "admin.example.invalid", "tr="} {
 		if strings.Contains(response.Body.String(), secret) {
 			t.Fatal("hidden source or uncached private data escaped", secret)
 		}
@@ -75,11 +76,10 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="0"`) {
 		t.Fatal("service caches contaminated")
 	}
-	if feed(key, "&sources=private-library").Code != 400 {
-		t.Fatal("source filter accepted while sources hidden")
+	if feed(key, "&sources=private-library").Code != 200 {
+		t.Fatal("valid public source filter rejected")
 	}
 	access, _ = f.db.PublicAccess(f.ctx)
-	access.ExposeSources = true
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
@@ -140,13 +140,12 @@ func TestPublicTorznabPrivacyURLScopesAndRevocation(t *testing.T) {
 		t.Fatal("public key opened administration")
 	}
 	access, _ = f.db.PublicAccess(f.ctx)
-	access.ExposeSources = false
 	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
 	response = feed(ownKey, "")
-	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="2"`) || strings.Contains(response.Body.String(), "tr=") || strings.Contains(response.Body.String(), `name="indexer"`) {
-		t.Fatal("withdrawing visibility did not restore anonymous cached-only private access", response.Code)
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `total="2"`) || !strings.Contains(response.Body.String(), "own-private-passkey") || !strings.Contains(response.Body.String(), `name="indexer"`) {
+		t.Fatal("unchanged access settings lost source filters or personal announces", response.Code)
 	}
 	for _, table := range []string{"settings", "shares", "share_requests", "activity_logs"} {
 		var present bool
@@ -208,7 +207,7 @@ func TestPublicTorznabSetupOriginAndCredentialBoundaries(t *testing.T) {
 	if r := setup("https://unrelated.example", `{"options":{}}`); r.Code != http.StatusForbidden {
 		t.Fatal("cross-origin configuration accepted", r.Code)
 	}
-	for _, body := range []string{`{"services":{"torbox":"must-not-accept-provider-credentials"}}`, `{"options":{"sources":["hidden-source"]}}`, `{"options":{"services":["unsupported"]}}`, `{"announces":{"hidden-source":"https://announce.example.invalid/own"}}`} {
+	for _, body := range []string{`{"services":{"torbox":"must-not-accept-provider-credentials"}}`, `{"options":{"services":["unsupported"]}}`, `{"announces":{"hidden-source":"https://announce.example.invalid/own"}}`} {
 		if r := setup("https://addon.example", body); r.Code != 400 {
 			t.Fatal("invalid or hidden configuration accepted", r.Code)
 		}

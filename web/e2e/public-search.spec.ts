@@ -12,8 +12,9 @@ test('public downloads discard a missing preparation before an explicit retry', 
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Search', { exact: true }).check()
+  await access.getByLabel('Allow Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })
@@ -119,7 +120,9 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
+  await access.getByLabel('Allow Search', { exact: true }).uncheck()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({ baseURL: server.origin })
@@ -244,7 +247,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
         .getByRole('navigation', { name: 'Main navigation' })
         .getByRole('link', { name: 'Search', exact: true }),
     ).toHaveCount(0)
-    await access.getByLabel('Allow public Search', { exact: true }).check()
+    await access.getByLabel('Allow Search', { exact: true }).check()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     const searchLink = visitor
@@ -271,8 +274,10 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     await expect(
       visitor.locator('main').getByRole('link', { name: 'Search', exact: true }),
     ).toHaveAttribute('href', '/public/search?q=example+film')
-    await expect(visitor.getByLabel('Source', { exact: true })).toHaveCount(0)
-    await expect(visitor.getByRole('option', { name: 'Source name', exact: true })).toHaveCount(0)
+    await expect(visitor.getByLabel('Source', { exact: true })).toBeHidden()
+    await expect(
+      visitor.getByLabel('Sort by', { exact: true }).locator('option[value=source]'),
+    ).toHaveCount(1)
     const download = visitor.waitForEvent('download')
     await visitor.getByRole('button', { name: 'Download', exact: true }).click()
     expect((await download).suggestedFilename()).toBe('example.mkv')
@@ -287,12 +292,13 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     )
     await expect(visitor.getByRole('button', { name: 'Download', exact: true })).toBeVisible()
     await visitor.locator('summary', { hasText: /^Sorting$/ }).click()
-    await expect(visitor.getByLabel('Sort by', { exact: true })).toHaveValue('size')
+    await expect(visitor.getByLabel('Sort by', { exact: true })).toHaveValue('source')
+    await expect
+      .poll(() => releaseRequests.at(-1)?.searchParams.get('provider'))
+      .toBe('hidden-source')
     const applied = releaseRequests.at(-1)!
-    expect(applied.searchParams.get('provider')).toBeNull()
-    expect(JSON.parse(applied.searchParams.get('sorting')!)).toEqual([
-      { field: 'size', direction: 'desc' },
-    ])
+    expect(applied.searchParams.get('provider')).toBe('hidden-source')
+    expect(JSON.parse(applied.searchParams.get('sorting')!)).toEqual(savedSorting)
     await visitor
       .getByRole('navigation', { name: 'Main navigation' })
       .getByRole('link', { name: 'Stremio', exact: true })
@@ -462,8 +468,9 @@ test('public direct torrent Search keeps visitor credentials and uses the same r
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
-  await access.getByLabel('Allow public Search', { exact: true }).check()
+  await access.getByLabel('Allow Search', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({
@@ -539,7 +546,7 @@ test('public direct torrent Search keeps visitor credentials and uses the same r
     const downloading = visitor.waitForEvent('download')
     await visitor.getByRole('button', { name: 'Download', exact: true }).click()
     expect(await (await downloading).failure()).toBeNull()
-    await expect(visitor.getByLabel('Sources', { exact: true })).toHaveCount(0)
+    await expect(visitor.getByLabel('Sources', { exact: true })).toBeHidden()
     expect(unexpected).toEqual([])
     expect(context.pages()).toHaveLength(1)
     expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

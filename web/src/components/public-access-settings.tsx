@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CredentialPolicyControls } from './credential-policy-controls'
+import { AccessPermissions } from './access-permissions'
 import { Disclosure } from './ui/disclosure'
 import { FormStatus } from '@/components/form-status'
 type Access = {
@@ -15,20 +16,16 @@ type Access = {
   enabled: boolean
   search_enabled: boolean
   stremio_enabled: boolean
-  expose_sources: boolean
   torznab_enabled: boolean
   catalog_enabled: boolean
   use_instance_debrid: boolean
   use_instance_announces: boolean
 }
 type Draft = { base: Access; value: Access }
-function normalizeAccess(value: Access): Access {
-  return { ...value, catalog_enabled: value.catalog_enabled && value.expose_sources }
-}
 export function PublicAccessSettings() {
   const query = useQuery({
     queryKey: ['public-access'],
-    queryFn: async ({ signal }) => normalizeAccess(await api<Access>('/public-access', { signal })),
+    queryFn: ({ signal }) => api<Access>('/public-access', { signal }),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
   const [draft, setDraft] = useState<Draft>()
@@ -41,13 +38,12 @@ export function PublicAccessSettings() {
       draft.value.search_enabled !== query.data?.search_enabled ||
       draft.value.stremio_enabled !== query.data?.stremio_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
-      draft.value.catalog_enabled !== query.data?.catalog_enabled ||
-      draft.value.expose_sources !== query.data?.expose_sources),
+      draft.value.catalog_enabled !== query.data?.catalog_enabled),
   )
   function change(value: Partial<Omit<Access, 'revision'>>) {
     setDraft((draft) => ({
       base: draft?.base || query.data!,
-      value: normalizeAccess({ ...(draft?.value || query.data!), ...value }),
+      value: { ...(draft?.value || query.data!), ...value },
     }))
     save.reset()
     review.reset()
@@ -63,7 +59,7 @@ export function PublicAccessSettings() {
     },
   })
   const review = useMutation({
-    mutationFn: async () => normalizeAccess(await api<Access>('/public-access')),
+    mutationFn: () => api<Access>('/public-access'),
     onSuccess: async (latest) => {
       await queryClient.cancelQueries({ queryKey: ['public-access'] })
       queryClient.setQueryData(['public-access'], latest)
@@ -71,7 +67,7 @@ export function PublicAccessSettings() {
         draft
           ? {
               base: latest,
-              value: normalizeAccess({
+              value: {
                 ...latest,
                 use_instance_debrid:
                   draft.value.use_instance_debrid !== draft.base.use_instance_debrid
@@ -99,11 +95,7 @@ export function PublicAccessSettings() {
                   draft.value.catalog_enabled !== draft.base.catalog_enabled
                     ? draft.value.catalog_enabled
                     : latest.catalog_enabled,
-                expose_sources:
-                  draft.value.expose_sources !== draft.base.expose_sources
-                    ? draft.value.expose_sources
-                    : latest.expose_sources,
-              }),
+              },
             }
           : undefined,
       )
@@ -132,150 +124,29 @@ export function PublicAccessSettings() {
       ) : (
         current && (
           <>
-            <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h2 className="section-title">Public access</h2>
               <div className="flex items-center gap-3">
+                <Label htmlFor="public-access-enabled">Enable public access</Label>
                 <Switch
                   id="public-access-enabled"
                   checked={current.enabled}
                   disabled={busy}
                   onCheckedChange={(enabled) => change({ enabled })}
                 />
-                <Label
-                  htmlFor="public-access-enabled"
-                  help={
-                    <>
-                      Visitors use the features enabled below. Choose personal or instance
-                      credentials in Credentials. Personal keys are not saved by the server, and
-                      administration stays protected. Turning this off revokes public links.
-                      Availability checks reuse the shared cache.
-                    </>
-                  }
-                >
-                  Enable public access
-                </Label>
               </div>
             </div>
-            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-              <legend className="pr-3 text-sm font-medium">Search</legend>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="public-search-enabled"
-                    checked={current.search_enabled}
-                    disabled={busy || !current.enabled}
-                    onCheckedChange={(search_enabled) => change({ search_enabled })}
-                  />
-                  <Label
-                    htmlFor="public-search-enabled"
-                    help={
-                      <>
-                        Visitors can search the identified catalog and download using the permitted
-                        debrid credentials. Source visibility and private download permissions
-                        follow the same rules as Stremio. Browser downloads pass through this
-                        instance and use its bandwidth.
-                      </>
-                    }
-                  >
-                    Allow public Search
-                  </Label>
-                </div>
-              </div>
-            </fieldset>
-            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-              <legend className="pr-3 text-sm font-medium">Connections</legend>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="public-torznab-enabled"
-                    checked={current.torznab_enabled}
-                    disabled={busy || !current.enabled}
-                    onCheckedChange={(torznab_enabled) => change({ torznab_enabled })}
-                  />
-                  <Label
-                    htmlFor="public-torznab-enabled"
-                    help={
-                      <>
-                        Visitors can create encrypted Torznab configurations without an account.
-                        Disabling this option revokes those links.
-                      </>
-                    }
-                  >
-                    Allow public Torznab connections
-                  </Label>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="public-stremio-enabled"
-                    checked={current.stremio_enabled}
-                    disabled={busy || !current.enabled}
-                    onCheckedChange={(stremio_enabled) => change({ stremio_enabled })}
-                  />
-                  <Label
-                    htmlFor="public-stremio-enabled"
-                    help={
-                      <>
-                        Visitors can create installation links for Stremio and AIOStreams. Disabling
-                        this option revokes those links without affecting other public features.
-                      </>
-                    }
-                  >
-                    Allow public Stremio connections
-                  </Label>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="public-catalog-enabled"
-                    checked={current.catalog_enabled}
-                    disabled={busy || !current.enabled || !current.expose_sources}
-                    onCheckedChange={(catalog_enabled) => change({ catalog_enabled })}
-                  />
-                  <Label
-                    htmlFor="public-catalog-enabled"
-                    help={
-                      <>
-                        Visitors can sync a read-only catalog to another AIOSources instance. Choose
-                        the allowed data in Shared catalog data below. Expose source names and
-                        filters must be enabled. Disabling either option revokes public catalog
-                        links.
-                      </>
-                    }
-                  >
-                    Allow public shared catalogs
-                  </Label>
-                </div>
-              </div>
-            </fieldset>
-            <fieldset className="min-w-0 space-y-4 border-t border-border pt-5">
-              <legend className="pr-3 text-sm font-medium">Sources and privacy</legend>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    id="public-private-downloads"
-                    checked={current.expose_sources}
-                    disabled={busy || !current.enabled}
-                    onCheckedChange={(expose_sources) => change({ expose_sources })}
-                  />
-                  <Label
-                    htmlFor="public-private-downloads"
-                    help={
-                      <>
-                        Applies to all public features, including Shared catalogs. Visitors can
-                        select sources and supply their own announce URLs for private sources.
-                        Source definitions stay private. When off, source names and filters are
-                        hidden and personal announce fields are unavailable. Using instance announce
-                        URLs remains a separate explicit permission in Credentials.
-                      </>
-                    }
-                  >
-                    Expose source names and filters
-                  </Label>
-                </div>
-              </div>
-            </fieldset>
+            <Disclosure
+              title="Permissions"
+              help="Visitors can use these features without an account. Administration and source definitions stay protected. Disabling public access revokes public links."
+            >
+              <AccessPermissions
+                id="public"
+                value={current}
+                onChange={change}
+                disabled={busy || !current.enabled}
+              />
+            </Disclosure>
             <Disclosure title="Credentials">
               <CredentialPolicyControls
                 id="public-credentials"

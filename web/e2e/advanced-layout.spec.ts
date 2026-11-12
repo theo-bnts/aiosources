@@ -78,7 +78,7 @@ test('optional sections start closed at the same level and maintenance bookmarks
       '/metadata/identification/settings',
       '/debrid/settings',
       '/health/settings',
-      '/security/verification',
+      '/security/settings',
       '/network/incoming',
       '/network/outgoing',
     ]) {

@@ -452,7 +452,6 @@ try {
       'stremio_enabled',
       'torznab_enabled',
       'catalog_enabled',
-      'expose_sources',
     ].every((key) => publicAccess[key])
   )
     throw new Error('The isolated public interface fixture is incomplete')

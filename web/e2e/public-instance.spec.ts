@@ -8,6 +8,7 @@ test('public access preserves the access proxy cookie without an administrator s
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -62,7 +63,7 @@ test('public access preserves the access proxy cookie without an administrator s
       visitor.getByRole('heading', { name: 'Connect your debrid services' }),
     ).toBeVisible()
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
-    await expect(visitor.getByRole('link', { name: 'Admin login', exact: true })).toBeVisible()
+    await expect(visitor.getByRole('link', { name: 'Login', exact: true })).toBeVisible()
     await visitor.getByLabel('TorBox API key', { exact: true }).fill('synthetic-visitor-key')
     await visitor.getByRole('button', { name: 'Create installation link' }).click()
     await expect(visitor.getByLabel('Manifest URL', { exact: true })).toHaveValue(
@@ -89,6 +90,7 @@ test('public access is opt-in and visitors get a private link without administra
 }) => {
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
+  await access.locator('summary').getByText('Permissions', { exact: true }).click()
   const enabled = access.getByLabel('Enable public access', { exact: true })
   await expect(enabled).not.toBeChecked()
   await enabled.check()
@@ -124,7 +126,7 @@ test('public access is opt-in and visitors get a private link without administra
       visitor.getByRole('heading', { name: 'Connect your debrid services' }),
     ).toBeVisible()
     await expect(visitor.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible()
-    await expect(visitor.getByRole('link', { name: 'Admin login', exact: true })).toBeVisible()
+    await expect(visitor.getByRole('link', { name: 'Login', exact: true })).toBeVisible()
     await expect(visitor.getByLabel('AllDebrid API key', { exact: true })).toHaveAttribute(
       'type',
       'password',
@@ -149,12 +151,13 @@ test('public access is opt-in and visitors get a private link without administra
       true,
     )
     await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
-    await visitor.getByRole('link', { name: 'Admin login', exact: true }).click()
+    await visitor.getByRole('link', { name: 'Login', exact: true }).click()
+    await visitor.getByRole('tab', { name: 'Administrator', exact: true }).click()
     await expect(visitor.getByLabel('Administrator password', { exact: true })).toBeVisible()
     await visitor.goto('/')
     await enabled.uncheck()
     await access.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(visitor.getByLabel('Administrator password', { exact: true })).toBeVisible()
+    await expect(visitor.getByLabel('Password', { exact: true })).toBeVisible()
     await expect(visitor.getByLabel('Manifest URL', { exact: true })).toHaveCount(0)
   } finally {
     await context.close()

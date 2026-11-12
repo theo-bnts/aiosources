@@ -228,6 +228,7 @@ test('public access reviews a competing revision while preserving the local choi
   const headers = { 'X-CSRF-Token': session.csrf_token, Origin: server.origin }
   await page.goto('/public-access')
   const form = page.getByRole('form', { name: 'Public', exact: true })
+  await form.locator('summary').getByText('Permissions', { exact: true }).click()
   const choice = form.getByLabel('Enable public access', { exact: true })
   await choice.check()
   const initial = await (await page.request.get('/api/public-access')).json()

@@ -1,24 +1,37 @@
 import { test, expect } from './fixtures'
 
-test('password-manager form values work for sign-in and verification without change events', async ({
+test('password-manager form values work with password-only administrator sign-in', async ({
   browser,
   server,
 }) => {
   const context = await browser.newContext()
   const page = await context.newPage()
   try {
-    await page.goto(server.origin + '/security')
+    await page.goto(server.origin + '/login')
+    await expect(page.getByRole('tab', { name: 'Trusted user', exact: true })).toHaveAttribute(
+      'data-state',
+      'active',
+    )
+    if (process.env.QA_DIRECTORY) {
+      await page.screenshot({
+        path: `${process.env.QA_DIRECTORY}/login-desktop.png`,
+        fullPage: true,
+        animations: 'disabled',
+      })
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.screenshot({
+        path: `${process.env.QA_DIRECTORY}/login-mobile.png`,
+        fullPage: true,
+        animations: 'disabled',
+      })
+      await page.setViewportSize({ width: 1440, height: 1100 })
+    }
+    await page.getByRole('tab', { name: 'Administrator', exact: true }).click()
     const password = page.getByLabel('Administrator password', { exact: true })
     await expect(password).toHaveAttribute('type', 'password')
     await expect(password).toHaveAttribute('name', 'password')
     await expect(password).toHaveAttribute('autocomplete', 'current-password')
-    const code = page.getByLabel('Authenticator or recovery code', { exact: true })
-    await expect(code).toHaveAttribute('type', 'text')
-    await expect(code).toHaveAttribute('name', 'code')
-    await expect(code).toHaveAttribute('autocomplete', 'one-time-code')
-    await expect(code).toHaveAttribute('maxlength', '64')
-    await expect(page.getByText(/Sessions use an HttpOnly cookie/)).toHaveCount(0)
-
+    await expect(page.getByLabel('Authenticator or recovery code', { exact: true })).toHaveCount(0)
     // Some credential managers set the native field without a React change.
     // Do not put the temporary password into a failed action's reporter output.
     try {
@@ -29,39 +42,15 @@ test('password-manager form values work for sign-in and verification without cha
       throw new Error('Could not populate the isolated sign-in credential.')
     }
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
-    await page
-      .getByRole('navigation', { name: 'Main navigation', exact: true })
-      .getByRole('link', { name: 'Sign-in protection', exact: true })
-      .click()
-    await page.getByRole('switch', { name: 'Two-step verification', exact: true }).click()
-    const dialog = page.getByRole('dialog')
-    const current = dialog.getByLabel('Current password', { exact: true })
-    await expect(current).toHaveAttribute('type', 'password')
-    await expect(current).toHaveAttribute('name', 'password')
-    await expect(current).toHaveAttribute('autocomplete', 'current-password')
-    try {
-      await current.evaluate((element, value) => {
-        ;(element as HTMLInputElement).value = value
-      }, server.password)
-    } catch {
-      throw new Error('Could not populate the isolated verification credential.')
-    }
-    await dialog.getByRole('button', { name: 'Generate key', exact: true }).click()
-    const factor = dialog.getByLabel('Authenticator code', { exact: true })
-    await expect(factor).toHaveAttribute('type', 'text')
-    await expect(factor).toHaveAttribute('name', 'code')
-    await expect(factor).toHaveAttribute('autocomplete', 'one-time-code')
-    await expect(factor).toHaveAttribute('inputmode', 'numeric')
-    await expect(factor).toHaveAttribute('pattern', '[0-9]{6}')
-    await factor.fill('012345')
-    await expect(factor).toHaveValue('012345')
+    await expect(
+      page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 }),
+    ).toBeVisible()
   } finally {
     await context.close()
   }
 })
 
-test('switching sign-in roles clears credentials and verification fields', async ({
+test('switching login tabs clears credentials and keeps the trusted tab as default', async ({
   browser,
   server,
 }) => {
@@ -71,13 +60,12 @@ test('switching sign-in roles clears credentials and verification fields', async
     await visitor.goto('/user-login')
     await visitor.getByLabel('Email', { exact: true }).fill('reader@example.invalid')
     await visitor.getByLabel('Password', { exact: true }).fill('synthetic personal password')
-    await visitor.getByRole('link', { name: 'Administrator sign-in', exact: true }).click()
+    await visitor.getByRole('tab', { name: 'Administrator', exact: true }).click()
     await expect(visitor.getByLabel('Administrator password', { exact: true })).toHaveValue('')
     await visitor
       .getByLabel('Administrator password', { exact: true })
       .fill('synthetic admin password')
-    await visitor.getByLabel('Authenticator or recovery code', { exact: true }).fill('123456')
-    await visitor.getByRole('link', { name: 'Trusted user sign-in', exact: true }).click()
+    await visitor.getByRole('tab', { name: 'Trusted user', exact: true }).click()
     await expect(visitor.getByLabel('Email', { exact: true })).toHaveValue('')
     await expect(visitor.getByLabel('Password', { exact: true })).toHaveValue('')
     await expect(visitor.getByLabel('Authenticator or recovery code', { exact: true })).toHaveCount(

@@ -24,7 +24,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
   expect(
     (await (await page.request.get('/api/settings/runtime/identification')).json()).values,
   ).toEqual({ workers: 2, queue_batch: 10, transaction_batch: 5 })
-  await page.goto('/security/verification')
+  await page.goto('/security/settings')
   await openDisclosure(page, 'Authentication settings')
   const security = page.getByRole('form', { name: 'Authentication settings' })
   await security
@@ -68,7 +68,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
         animations: 'disabled',
       })
     }
-    await page.goto('/security/verification')
+    await page.goto('/security/settings')
     await openDisclosure(page, 'Authentication settings')
   }
 })
@@ -174,7 +174,7 @@ test('settings and shared controls fit desktop and mobile', async ({ page }) => 
     '/addon/settings',
     '/torznab/settings',
     '/sharing/settings',
-    '/security/verification',
+    '/security/settings',
     '/network/incoming',
     '/network/outgoing',
     '/network/outgoing/routing',

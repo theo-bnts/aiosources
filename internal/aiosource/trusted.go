@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"sort"
 	"strings"
 
@@ -50,16 +51,6 @@ func (s *Service) CreateTrustedConnectionWithCredentials(ctx context.Context, gr
 	if audience == "" || !ValidStreamPreferences(prefs) || !ValidPublicTorznabOptions(tz) || !store.ValidPublicCatalogOptions(catalog) {
 		return "", model.ErrInvalid
 	}
-	if !user.ExposeSources && (len(prefs.Sources) > 0 || len(tz.Sources) > 0) {
-		return "", model.ErrInvalid
-	}
-	if !user.ExposeSources {
-		for _, rule := range append(append([]model.ResultSort{}, prefs.Sorting...), tz.Sorting...) {
-			if rule.Field == "source" {
-				return "", model.ErrInvalid
-			}
-		}
-	}
 	if feature == "catalog" {
 		policy, e := s.DB.PublicCatalogPolicy(ctx)
 		if e != nil {
@@ -74,7 +65,7 @@ func (s *Service) CreateTrustedConnectionWithCredentials(ctx context.Context, gr
 		if personal.Trusted == nil || *personal.Trusted != grant || personal.Audience != audience {
 			return "", ErrAuth
 		}
-		if err := s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy, ExposeSources: user.ExposeSources}, personal); err != nil {
+		if err := s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy}, personal); err != nil {
 			return "", err
 		}
 		if feature != "catalog" {
@@ -135,7 +126,10 @@ func (s *Service) OpenTrustedConnection(ctx context.Context, audience, feature, 
 		return value, ErrAuth
 	}
 	user, err := s.DB.TrustedUser(ctx, model.TrustedGrant{UserID: value.UserID, Generation: value.Generation})
-	if err != nil || feature != "credentials" && !user.Allows(feature) {
+	if err != nil {
+		return value, trustedAccessError(err)
+	}
+	if feature != "credentials" && !user.Allows(feature) {
 		return value, ErrAuth
 	}
 	if override {
@@ -145,12 +139,6 @@ func (s *Service) OpenTrustedConnection(ctx context.Context, audience, feature, 
 			value.Torznab = tz
 		}
 	}
-	if !user.ExposeSources {
-		value.Preferences.Sources = nil
-		value.Preferences.ResultPreferences = value.Preferences.ResultPreferences.WithHiddenSources()
-		value.Torznab.Sources = nil
-		value.Torznab.ResultPreferences = value.Torznab.ResultPreferences.WithHiddenSources()
-	}
 	return value, nil
 }
 
@@ -159,19 +147,18 @@ func (s *Service) TrustedVisitor(ctx context.Context, grant model.TrustedGrant, 
 }
 func (s *Service) TrustedVisitorWithCredentials(ctx context.Context, grant model.TrustedGrant, audience, feature string, prefs model.StreamPreferences, services, announces map[string]string) (*PublicInstallation, error) {
 	user, err := s.DB.TrustedUser(ctx, grant)
-	if err != nil || !user.Allows(feature) {
+	if err != nil {
+		return nil, trustedAccessError(err)
+	}
+	if !user.Allows(feature) {
 		return nil, ErrAuth
 	}
 	if !ValidStreamPreferences(prefs) {
 		return nil, model.ErrInvalid
 	}
-	if !user.ExposeSources {
-		prefs.Sources = nil
-		prefs.ResultPreferences = prefs.ResultPreferences.WithHiddenSources()
-	}
 	copy := grant
 	visitor := &PublicInstallation{Trusted: &copy, Audience: audience, Generation: user.Generation, Preferences: prefs, Services: services, Announces: announces}
-	if err = s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy, ExposeSources: user.ExposeSources}, visitor); err != nil {
+	if err = s.personalCredentials(ctx, model.PublicAccess{CredentialPolicy: user.CredentialPolicy}, visitor); err != nil {
 		return nil, err
 	}
 	if err = s.resolveVisitorServices(ctx, visitor, user.CredentialPolicy); err != nil {
@@ -184,23 +171,23 @@ func (s *Service) TrustedVisitorWithCredentials(ctx context.Context, grant model
 func (s *Service) visitorAccess(ctx context.Context, visitor *PublicInstallation, feature string) (model.PublicAccess, error) {
 	if visitor != nil && visitor.Trusted != nil {
 		user, err := s.DB.TrustedUser(ctx, *visitor.Trusted)
-		if err != nil || feature != "credentials" && !user.Allows(feature) {
+		if err != nil {
+			return model.PublicAccess{}, trustedAccessError(err)
+		}
+		if feature != "credentials" && !user.Allows(feature) {
 			return model.PublicAccess{}, ErrAuth
 		}
-		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, SearchEnabled: user.SearchEnabled, StremioEnabled: user.StremioEnabled, TorznabEnabled: user.TorznabEnabled, CatalogEnabled: user.CatalogEnabled, ExposeSources: user.ExposeSources, Generation: user.Generation}, nil
+		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, SearchEnabled: user.SearchEnabled, StremioEnabled: user.StremioEnabled, TorznabEnabled: user.TorznabEnabled, CatalogEnabled: user.CatalogEnabled, Generation: user.Generation}, nil
 	}
 	return s.DB.PublicAccess(ctx)
 }
 
 func (s *Service) TrustedSources(ctx context.Context, grant model.TrustedGrant) ([]PublicPrivateSource, error) {
-	user, err := s.DB.TrustedUser(ctx, grant)
+	_, err := s.DB.TrustedUser(ctx, grant)
 	if err != nil {
 		return nil, err
 	}
 	items := []PublicPrivateSource{}
-	if !user.ExposeSources {
-		return items, nil
-	}
 	for id, name := range s.sourceNames() {
 		items = append(items, PublicPrivateSource{ID: id, Name: name})
 	}
@@ -213,7 +200,7 @@ func (s *Service) TrustedPrivateSources(ctx context.Context, grant model.Trusted
 	if err != nil {
 		return nil, err
 	}
-	if !user.ExposeSources || user.UseInstanceAnnounces {
+	if user.UseInstanceAnnounces {
 		return []PublicPrivateSource{}, nil
 	}
 	config, err := s.DB.AIOConfig(ctx)
@@ -221,4 +208,13 @@ func (s *Service) TrustedPrivateSources(ctx context.Context, grant model.Trusted
 		return nil, err
 	}
 	return s.publicPrivateSources(config)
+}
+
+// Only a revoked grant is an authentication failure. Timeouts and database
+// failures must leave a valid browser session intact.
+func trustedAccessError(err error) error {
+	if errors.Is(err, store.ErrAuthentication) {
+		return ErrAuth
+	}
+	return err
 }

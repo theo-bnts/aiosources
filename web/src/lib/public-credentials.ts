@@ -129,7 +129,7 @@ export async function publicAPI<T>(
   remembered = configuration,
 ) {
   const headers = new Headers(init.headers)
-  headers.set('Authorization', `Bearer ${configuration}`)
+  if (configuration) headers.set('Authorization', `Bearer ${configuration}`)
   try {
     return await api<T>(`/public${path}`, { ...init, headers, cache: 'no-store' })
   } catch (error) {

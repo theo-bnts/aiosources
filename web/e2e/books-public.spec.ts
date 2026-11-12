@@ -8,8 +8,9 @@ test('public books use the same title and file controls without administration o
 }) => {
   await page.goto('/public-access')
   const form = page.getByRole('form', { name: 'Public', exact: true })
+  await form.locator('summary').getByText('Permissions', { exact: true }).click()
   await form.getByLabel('Enable public access', { exact: true }).check()
-  await form.getByLabel('Allow public Search', { exact: true }).check()
+  await form.getByLabel('Allow Search', { exact: true }).check()
   await form.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(form.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   const context = await browser.newContext({

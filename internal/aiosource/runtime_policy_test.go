@@ -197,7 +197,7 @@ func TestAvailabilityRetryPolicyUsesSavedDelay(t *testing.T) {
 
 func TestReducedPublicConfigurationLimitsApplyToNewLinksOnly(t *testing.T) {
 	ctx, s, _ := testService(t)
-	if err := s.DB.SetPublicAccess(ctx, model.PublicAccess{Revision: 1, Enabled: true, TorznabEnabled: true, ExposeSources: true}); err != nil {
+	if err := s.DB.SetPublicAccess(ctx, model.PublicAccess{Revision: 1, Enabled: true, TorznabEnabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	options := model.PublicTorznabOptions{}

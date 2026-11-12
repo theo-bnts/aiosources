@@ -39,7 +39,7 @@ test('action confirmations use the shared opaque notification, field errors stay
   server,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/security/settings')
+  await page.goto('/security/secrets')
   await page.getByRole('button', { name: 'Create secret', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Reference name', { exact: true }).fill('synthetic-reference')
@@ -82,6 +82,7 @@ test('action confirmations use the shared opaque notification, field errors stay
   // Restore the authenticated fixture for its independent no-collection check.
   // Never include the temporary password in failure output.
   try {
+    await page.getByRole('tab', { name: 'Administrator', exact: true }).click()
     await page.getByLabel('Administrator password', { exact: true }).fill(server.password)
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toBeVisible()

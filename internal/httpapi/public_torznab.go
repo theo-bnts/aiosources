@@ -129,9 +129,9 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "torznab", values.Get("apikey"))
 		if err == nil {
 			grant := model.TrustedGrant{UserID: connection.UserID, Generation: connection.Generation}
-			user, e := s.options.Store.TrustedUser(ctx, grant)
+			_, e := s.options.Store.TrustedUser(ctx, grant)
 			err = e
-			visitor = &aiosource.PublicTorznabInstallation{Trusted: &grant, Announces: connection.Announces, Generation: connection.Generation, Audience: s.connectionOrigin(), Options: connection.Torznab, Access: model.PublicAccess{ExposeSources: user.ExposeSources}}
+			visitor = &aiosource.PublicTorznabInstallation{Trusted: &grant, Announces: connection.Announces, Generation: connection.Generation, Audience: s.connectionOrigin(), Options: connection.Torznab}
 		}
 	} else {
 		visitor, err = s.options.AIOSource.OpenPublicTorznab(ctx, s.auth.origin, values.Get("apikey"))
@@ -158,10 +158,6 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		torznabError(w, 400, code, "Unsupported function or incorrect parameter")
 		return
 	}
-	if !visitor.Access.ExposeSources && len(q.Providers) > 0 {
-		torznabError(w, 400, 201, "Incorrect parameter")
-		return
-	}
 	// Services only select known shared availability; credentials are configured
 	// in the recipient's download client. No provider calls or visitor rows here.
 	q = q.WithPreferences(model.TorznabPreferences{ResultPreferences: visitor.Options.ResultPreferences, Services: visitor.Options.Services, CachedOnly: visitor.Options.CachedOnly})
@@ -175,18 +171,16 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		names := map[string]string{}
-		if visitor.Access.ExposeSources {
-			list, e := s.options.AIOSource.PublicSources(ctx)
-			if visitor.Trusted != nil {
-				list, e = s.options.AIOSource.TrustedSources(ctx, *visitor.Trusted)
-			}
-			if e != nil {
-				torznabError(w, 503, 910, "Search unavailable")
-				return
-			}
-			for _, source := range list {
-				names[source.ID] = source.Name
-			}
+		list, e := s.options.AIOSource.PublicSources(ctx)
+		if visitor.Trusted != nil {
+			list, e = s.options.AIOSource.TrustedSources(ctx, *visitor.Trusted)
+		}
+		if e != nil {
+			torznabError(w, 503, 910, "Search unavailable")
+			return
+		}
+		for _, source := range list {
+			names[source.ID] = source.Name
 		}
 		q.SourceNames = names
 		result, e := s.options.Store.PublicTorznabCatalog(ctx, q, visitor.Options.Sources, visitor.Options.MediaTypes, policy, func(rec model.AIORecord) bool { return aiosource.MatchesTorznabEpisode(rec, q.Season, q.Episode) })

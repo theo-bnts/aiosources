@@ -14,6 +14,20 @@ test('trusted users have the visitor workspace with instance services and no adm
   await expect(
     dialog.getByRole('switch', { name: 'Enable account', exact: true }),
   ).not.toBeChecked()
+  if (process.env.QA_DIRECTORY) {
+    await page.screenshot({
+      path: `${process.env.QA_DIRECTORY}/trusted-new-desktop.png`,
+      fullPage: true,
+      animations: 'disabled',
+    })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({
+      path: `${process.env.QA_DIRECTORY}/trusted-new-mobile.png`,
+      fullPage: true,
+      animations: 'disabled',
+    })
+    await page.setViewportSize({ width: 1440, height: 1100 })
+  }
   await dialog.getByLabel('Email', { exact: true }).fill('reader@example.invalid')
   try {
     await dialog.getByLabel('Password', { exact: true }).fill('reader-' + server.password)
@@ -28,12 +42,11 @@ test('trusted users have the visitor workspace with instance services and no adm
   await permissions.locator('summary').getByText('Permissions', { exact: true }).click()
   await expect(
     dialog.getByRole('switch', { name: 'Allow shared catalogs', exact: true }),
-  ).toBeDisabled()
+  ).toBeChecked()
   for (const name of [
     'Allow Search',
     'Allow Torznab connections',
     'Allow Stremio connections',
-    'Expose source names and filters',
     'Allow shared catalogs',
   ])
     await dialog.getByRole('switch', { name, exact: true }).check()
@@ -97,9 +110,7 @@ test('trusted users have the visitor workspace with instance services and no adm
     await expect(edit).toBeHidden()
     expect((await context.request.get(new URL(manifest).pathname)).status()).toBe(401)
     await visitor.reload()
-    await expect(
-      visitor.getByRole('heading', { name: 'Trusted user sign-in', exact: true }),
-    ).toBeVisible()
+    await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toBeVisible()
   } finally {
     await context.close()
   }
@@ -197,12 +208,7 @@ test('trusted personal credentials reuse the public forms and remember announces
   await editor.getByLabel('Password', { exact: true }).fill('synthetic personal password')
   await editor.getByRole('switch', { name: 'Enable account', exact: true }).check()
   await editor.locator('summary').getByText('Permissions', { exact: true }).click()
-  for (const name of [
-    'Allow Search',
-    'Allow Torznab connections',
-    'Allow Stremio connections',
-    'Expose source names and filters',
-  ])
+  for (const name of ['Allow Search', 'Allow Torznab connections', 'Allow Stremio connections'])
     await editor.getByRole('switch', { name, exact: true }).check()
   await editor.locator('summary').filter({ hasText: 'Credentials' }).click()
   for (const name of ['Use instance debrid accounts', 'Use instance announce URLs']) {
@@ -268,6 +274,7 @@ test('Public offers instance credentials only after explicit administrator autho
 }) => {
   await page.goto('/public-access')
   const form = page.getByRole('form', { name: 'Public', exact: true })
+  await form.locator('summary').getByText('Permissions', { exact: true }).click()
   await form.getByRole('switch', { name: 'Enable public access', exact: true }).check()
   await form.locator('summary').filter({ hasText: 'Credentials' }).click()
   for (const name of ['Use instance debrid accounts', 'Use instance announce URLs']) {
@@ -299,6 +306,112 @@ test('Public offers instance credentials only after explicit administrator autho
     await visitor.reload()
     await expect(visitor.getByLabel('TorBox API key', { exact: true })).toBeVisible()
   } finally {
+    await context.close()
+  }
+})
+
+test('a failed third Search category preserves a trusted session and completed results', async ({
+  page,
+  server,
+  browser,
+}) => {
+  const session = await (await page.request.get('/api/session')).json()
+  const created = await page.request.post('/api/trusted-users', {
+    headers: { 'X-CSRF-Token': session.csrf_token, Origin: server.origin },
+    data: {
+      email: 'search.reader@example.invalid',
+      password: 'reader-' + server.password,
+      enabled: true,
+    },
+  })
+  expect(created.status()).toBe(201)
+  const context = await browser.newContext({ baseURL: server.origin })
+  const visitor = await context.newPage()
+  let releaseBooks!: () => void
+  const books = new Promise<void>((resolve) => {
+    releaseBooks = resolve
+  })
+  let recovered = false
+  let searched = 0
+  let sessionProbes = 0
+  await context.route('**/*', async (route) => {
+    const url = new URL(route.request().url())
+    if (url.origin !== server.origin) return route.abort('blockedbyclient')
+    if (url.pathname === '/api/session') sessionProbes++
+    if (url.pathname === '/api/trusted/catalog/search') {
+      searched++
+      const kind = url.searchParams.get('type') || ''
+      if (kind === 'ebook,audiobook,book') {
+        await books
+        if (!recovered)
+          return route.fulfill({
+            status: 401,
+            json: { error: 'Synthetic provider credential failure.' },
+          })
+      }
+      const index = ['movie,tv', 'game', 'ebook,audiobook,book'].indexOf(kind)
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: index + 1,
+              type: ['movie', 'game', 'book'][index],
+              title: ['Example Video', 'Example Game', 'Example Book'][index],
+              years: [2026],
+              releases: 1,
+              providers: [],
+              ranking: { precision: 4, relevance: 1, year: 2026 - index },
+            },
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      })
+    }
+    return route.continue()
+  })
+  try {
+    await visitor.goto('/login')
+    await visitor.getByLabel('Email', { exact: true }).fill('search.reader@example.invalid')
+    try {
+      await visitor.getByLabel('Password', { exact: true }).fill('reader-' + server.password)
+    } catch {
+      throw new Error('Could not populate isolated trusted credentials.')
+    }
+    await visitor.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await expect(
+      visitor.getByRole('heading', { name: 'Stremio', exact: true, level: 1 }),
+    ).toBeVisible()
+    await visitor.goto('/trusted/search?q=example')
+    await expect.poll(() => searched).toBe(3)
+    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+      'Example Video',
+      'Example Game',
+    ])
+    await expect(
+      visitor.locator('summary').getByText('Debrid services', { exact: true }),
+    ).toHaveCount(0)
+    releaseBooks()
+    await expect(
+      visitor.getByText('Synthetic provider credential failure.', { exact: true }),
+    ).toBeVisible()
+    await expect.poll(() => sessionProbes).toBeGreaterThanOrEqual(2)
+    await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toHaveCount(0)
+    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+      'Example Video',
+      'Example Game',
+    ])
+    expect((await context.request.get('/api/trusted/config')).status()).toBe(200)
+    recovered = true
+    await visitor.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+      'Example Video',
+      'Example Game',
+      'Example Book',
+    ])
+  } finally {
+    releaseBooks()
     await context.close()
   }
 })

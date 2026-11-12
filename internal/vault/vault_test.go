@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/store"
@@ -233,67 +232,4 @@ func TestVaultMissingFingerprintDoesNotAuthorizeExistingCiphertext(t *testing.T)
 		t.Fatalf("failed initialization changed recoverable encrypted data: %v", err)
 	}
 	assertSecret(t, ctx, v, "archive-key", "synthetic-backup-value")
-}
-
-func TestVaultMissingFingerprintDoesNotAuthorizeMFAOnlyCiphertext(t *testing.T) {
-	ctx, source := openDatabase(t)
-	key := bytes.Repeat([]byte{0x46}, 32)
-	v := openVault(t, ctx, source, key)
-	const fingerprintSetting = "vault.master_key_fingerprint.v1"
-	fingerprint, err := source.Setting(ctx, fingerprintSetting)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, purpose := range []string{"admin-mfa-active-v1", "admin-mfa-pending-v1"} {
-		t.Run(purpose, func(t *testing.T) {
-			plaintext := []byte("synthetic-restored-mfa-secret")
-			ciphertext, err := v.Seal(purpose, plaintext)
-			if err != nil {
-				t.Fatal(err)
-			}
-			ctx, restored := openDatabase(t)
-			err = restored.SecurityUpdate(ctx, "", nil, func(state *store.SecurityState) (store.SecurityChange, error) {
-				if purpose == "admin-mfa-active-v1" {
-					state.ActiveSecret = ciphertext
-				} else {
-					// Expired enrollment still contains key-bound ciphertext.
-					expired, session := time.Unix(1, 0), "restored-session"
-					state.PendingSecret = ciphertext
-					state.PendingExpiresAt = &expired
-					state.PendingSessionID = &session
-				}
-				return store.SecurityChange{}, nil
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, candidate := range [][]byte{bytes.Repeat([]byte{0x47}, 32), key} {
-				if _, err := vault.New(ctx, restored, candidate); err == nil {
-					t.Fatal("missing fingerprint authorized MFA-only ciphertext")
-				}
-			}
-			if _, err := restored.Setting(ctx, fingerprintSetting); !errors.Is(err, model.ErrNotFound) {
-				t.Fatalf("failed initialization established a replacement fingerprint: %v", err)
-			}
-			if _, err := restored.SetSettingOnce(ctx, fingerprintSetting, fingerprint); err != nil {
-				t.Fatal(err)
-			}
-			recovered := openVault(t, ctx, restored, key)
-			err = restored.SecurityUpdate(ctx, "", nil, func(state *store.SecurityState) (store.SecurityChange, error) {
-				preserved := state.ActiveSecret
-				if purpose == "admin-mfa-pending-v1" {
-					preserved = state.PendingSecret
-				}
-				opened, err := recovered.Open(purpose, preserved)
-				defer clear(opened)
-				if err != nil || !bytes.Equal(opened, plaintext) {
-					t.Fatal("failed initialization damaged recoverable MFA material")
-				}
-				return store.SecurityChange{}, nil
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
 }

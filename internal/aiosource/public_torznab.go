@@ -50,7 +50,7 @@ func (s *Service) CreatePublicTorznab(ctx context.Context, audience string, opti
 	if !access.Enabled || !access.TorznabEnabled {
 		return "", model.ErrNotFound
 	}
-	if audience == "" || !ValidPublicTorznabOptions(options) || (!access.ExposeSources && len(options.Sources) > 0) {
+	if audience == "" || !ValidPublicTorznabOptions(options) {
 		return "", model.ErrInvalid
 	}
 	if err = s.validatePublicAnnounces(ctx, access, announces); err != nil {
@@ -107,11 +107,6 @@ func (s *Service) OpenPublicTorznab(ctx context.Context, audience, value string)
 	}
 	v.Options = options
 	v.Access = access
-	if !access.ExposeSources {
-		clear(v.Announces)
-		v.Options.Sources = nil
-		v.Options.ResultPreferences = v.Options.ResultPreferences.WithHiddenSources()
-	}
 	return &v, nil
 }
 
@@ -150,7 +145,7 @@ func (s *Service) ValidatePublicTorznab(ctx context.Context, v *PublicTorznabIns
 	if err != nil {
 		return err
 	}
-	if !access.Enabled || !access.TorznabEnabled || v == nil || access.Generation != v.Generation || access.TorznabGeneration != v.ProtocolGeneration || access.ExposeSources != v.Access.ExposeSources {
+	if !access.Enabled || !access.TorznabEnabled || v == nil || access.Generation != v.Generation || access.TorznabGeneration != v.ProtocolGeneration {
 		return ErrAuth
 	}
 	return nil

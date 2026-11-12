@@ -61,7 +61,7 @@ Use the settings search at the top of the application to find a control directly
 - **Metadata → Identification → Settings:** automatic identification for videos, games and books, with separate processing, reliability and maintenance sections. Its **Results** and **History** tabs keep review and identification activity together.
 - **Debrid → Settings:** service accounts, availability checks, operation limits and cleanup.
 - **Storage → Settings:** retained torrent fields, optional search indexes, history retention and maintenance.
-- **Security:** Secrets, two-step verification and signed-in sessions.
+- **Security:** Secrets, sign-in settings and signed-in sessions.
 - **Network:** trusted incoming proxies and outgoing connections.
 - **Users → Public:** offered visitor pages and request limits.
 

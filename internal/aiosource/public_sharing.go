@@ -25,7 +25,7 @@ type publicCatalogInstallation struct {
 }
 
 func publicCatalogAvailable(access model.PublicAccess) bool {
-	return access.Enabled && access.ExposeSources && access.CatalogEnabled
+	return access.Enabled && access.CatalogEnabled
 }
 func EncodePublicCatalogOptions(options model.PublicCatalogOptions) (string, error) {
 	if !store.ValidPublicCatalogOptions(options) {

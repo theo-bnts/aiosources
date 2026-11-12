@@ -55,6 +55,42 @@ export const queryClient = new QueryClient({
   },
 })
 
+// Provider credentials and request timeouts can also produce 401 responses.
+// Confirm cookie expiry once for concurrent requests before changing the shell.
+let sessionCheck: Promise<void> | undefined
+function checkSessionExpiry() {
+  if (sessionCheck) return sessionCheck
+  const previous = queryClient.getQueryData(['session'])
+  const previousCSRF = csrfToken
+  sessionCheck = (async () => {
+    try {
+      const response = await fetch('/api/session', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!response.ok) return
+      const value: unknown = await response.json()
+      if (
+        value &&
+        typeof value === 'object' &&
+        'authenticated' in value &&
+        value.authenticated === false &&
+        queryClient.getQueryData(['session']) === previous &&
+        csrfToken === previousCSRF
+      ) {
+        setCSRF()
+        window.dispatchEvent(new Event('session-expired'))
+      }
+    } catch {
+      /* An unavailable session store is not an expired session. */
+    }
+  })().finally(() => {
+    sessionCheck = undefined
+  })
+  return sessionCheck
+}
+
 async function checkedResponse(path: string, init: RequestInit = {}) {
   const method = (init.method ?? 'GET').toUpperCase()
   const headers = new Headers(init.headers)
@@ -91,8 +127,7 @@ async function checkedResponse(path: string, init: RequestInit = {}) {
       path !== '/trusted/login' &&
       !path.startsWith('/public/')
     ) {
-      setCSRF()
-      window.dispatchEvent(new Event('session-expired'))
+      void checkSessionExpiry()
     }
     if (response.status === 403 && !path.startsWith('/public/'))
       void queryClient.invalidateQueries({ queryKey: ['session'] })

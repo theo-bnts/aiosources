@@ -114,7 +114,7 @@ func TestPublicRoutesResolveCachedPlaybackEndToEndWithoutSavingVisitorData(t *te
 	var payload struct {
 		Streams []aiosource.Stream `json:"streams"`
 	}
-	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &payload) != nil || len(payload.Streams) != 1 || payload.Streams[0].InfoHash != "" || len(payload.Streams[0].Sources) != 0 || payload.Streams[0].Hints.Indexer != "" {
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &payload) != nil || len(payload.Streams) != 1 || payload.Streams[0].InfoHash != "" || len(payload.Streams[0].Sources) != 0 || payload.Streams[0].Hints.Indexer != "source" {
 		t.Fatal("cached public stream unavailable or exposes torrent credentials", response.Code)
 	}
 	play := f.request("GET", strings.TrimPrefix(payload.Streams[0].URL, "https://addon.example"), "", false, "")
