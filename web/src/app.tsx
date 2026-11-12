@@ -305,7 +305,7 @@ const navigationGroups: NavigationGroup[] = [
           {
             to: '/public-access',
             label: 'Public',
-            description: 'Visitor access, source visibility and public connections.',
+            description: 'Manage visitor permissions and credentials.',
             icon: GlobeIcon,
           },
         ],
