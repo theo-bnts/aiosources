@@ -160,8 +160,15 @@ func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64
 	return databaseError("commit trusted user deletion", tx.Commit(ctx))
 }
 
-func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGrant, tokenHash []byte, lifetime time.Duration, replaceTokenHashes ...[]byte) (string, time.Time, error) {
-	if len(tokenHash) != 32 || lifetime <= 0 || lifetime > 365*24*time.Hour || len(replaceTokenHashes) > 1 || (len(replaceTokenHashes) == 1 && len(replaceTokenHashes[0]) != 32) {
+func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGrant, tokenHash []byte, lifetime time.Duration, replacements ...SessionReplacements) (string, time.Time, error) {
+	var replaced SessionReplacements
+	if len(replacements) > 1 {
+		return "", time.Time{}, model.ErrInvalid
+	}
+	if len(replacements) == 1 {
+		replaced = replacements[0]
+	}
+	if len(tokenHash) != 32 || lifetime <= 0 || lifetime > 365*24*time.Hour || !replaced.valid() {
 		return "", time.Time{}, model.ErrInvalid
 	}
 	id, err := newRunID()
@@ -173,6 +180,12 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 		return "", time.Time{}, err
 	}
 	defer rollback(tx)
+	// Keep the administrator → account → session lock order when switching roles.
+	if len(replaced.Administrator) == 32 {
+		if _, err = tx.Exec(ctx, `SELECT singleton FROM aiosources.admin_security WHERE singleton FOR UPDATE`); err != nil {
+			return "", time.Time{}, databaseError("lock replaced administrator session", err)
+		}
+	}
 	// Serialize sign-ins for this account, including same-browser replacement,
 	// so concurrent requests cannot exceed its cap or revive a stale generation.
 	var valid bool
@@ -190,10 +203,8 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
  ORDER BY expires_at,id LIMIT 1000 FOR UPDATE SKIP LOCKED)`); err != nil {
 		return "", time.Time{}, databaseError("expire trusted sessions", err)
 	}
-	if len(replaceTokenHashes) == 1 {
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE user_id=$1 AND token_hash=$2`, grant.UserID, replaceTokenHashes[0]); err != nil {
-			return "", time.Time{}, databaseError("replace trusted session", err)
-		}
+	if err = replaceSessionsTx(ctx, tx, replaced); err != nil {
+		return "", time.Time{}, err
 	}
 	var count, limit int
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM aiosources.trusted_sessions WHERE user_id=$1 AND expires_at>now()`, grant.UserID).Scan(&count); err != nil {

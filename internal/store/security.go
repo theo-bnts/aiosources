@@ -15,12 +15,37 @@ import (
 var ErrAuthentication = errors.New("authentication failed")
 var ErrSecurityLimit = errors.New("security limit reached")
 
+// SessionReplacements contains only hashes of cookies held by the signing-in
+// browser. Replacement commits with the new session, including across roles.
+type SessionReplacements struct {
+	Administrator []byte
+	Trusted       []byte
+}
+
+func (r SessionReplacements) valid() bool {
+	return (len(r.Administrator) == 0 || len(r.Administrator) == 32) && (len(r.Trusted) == 0 || len(r.Trusted) == 32)
+}
+
+func replaceSessionsTx(ctx context.Context, tx pgx.Tx, replaced SessionReplacements) error {
+	if len(replaced.Administrator) == 32 {
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE token_hash=$1`, replaced.Administrator); err != nil {
+			return databaseError("replace administrator session", err)
+		}
+	}
+	if len(replaced.Trusted) == 32 {
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE token_hash=$1`, replaced.Trusted); err != nil {
+			return databaseError("replace trusted session", err)
+		}
+	}
+	return nil
+}
+
 type SecuritySessionCreate struct {
-	ID               string
-	TokenHash        []byte
-	UserAgent        string
-	ExpiresAt        time.Time
-	ReplaceTokenHash []byte
+	ID        string
+	TokenHash []byte
+	UserAgent string
+	ExpiresAt time.Time
+	Replaces  SessionReplacements
 }
 
 // InitializeAdminPassword keeps bcrypt's random salt stable across restarts.
@@ -58,6 +83,9 @@ func (s *Store) InitializeAdminPassword(ctx context.Context, password string, ca
 // CreateAdminSession serializes password changes and session creation. A stale
 // application process cannot create a session after the password is replaced.
 func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, next *SecuritySessionCreate) error {
+	if next != nil && !next.Replaces.valid() {
+		return model.ErrInvalid
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return databaseError("begin sign-in", err)
@@ -74,10 +102,8 @@ func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, nex
 		return databaseError("expire sessions", err)
 	}
 	if next != nil {
-		if len(next.ReplaceTokenHash) == 32 {
-			if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE token_hash=$1`, next.ReplaceTokenHash); err != nil {
-				return databaseError("replace session", err)
-			}
+		if err = replaceSessionsTx(ctx, tx, next.Replaces); err != nil {
+			return err
 		}
 		var count int
 		if err = tx.QueryRow(ctx, `SELECT count(*) FROM aiosources.admin_sessions`).Scan(&count); err != nil {

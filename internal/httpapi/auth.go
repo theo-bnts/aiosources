@@ -273,10 +273,7 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	lifetime := time.Duration(hours) * time.Hour
 	next := &store.SecuritySessionCreate{ID: hex.EncodeToString(rawID[:]), TokenHash: hash[:], UserAgent: safeUserAgent(r.UserAgent()), ExpiresAt: time.Now().Add(lifetime)}
-	if old, err := requestSessionCookie(r); err == nil && len(old.Value) == 43 {
-		oldHash := sha256.Sum256([]byte(old.Value))
-		next.ReplaceTokenHash = oldHash[:]
-	}
+	next.Replaces = requestSessionReplacements(r)
 	err = a.db.CreateAdminSession(r.Context(), a.passwordHash, next)
 	if errors.Is(err, store.ErrSecurityLimit) {
 		writeError(w, http.StatusConflict, "The administrator session limit has been reached. Sign out another session or increase the limit.")
@@ -296,6 +293,19 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	a.retirePreviousSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true, "csrf_token": csrfForToken(token)})
+}
+
+func requestSessionReplacements(r *http.Request) store.SessionReplacements {
+	var replaced store.SessionReplacements
+	if old, err := requestSessionCookie(r); err == nil && len(old.Value) == 43 {
+		hash := sha256.Sum256([]byte(old.Value))
+		replaced.Administrator = hash[:]
+	}
+	if old, err := r.Cookie(trustedSessionCookie); err == nil && len(old.Value) == 43 {
+		hash := sha256.Sum256([]byte(old.Value))
+		replaced.Trusted = hash[:]
+	}
+	return replaced
 }
 
 func safeUserAgent(raw string) string {

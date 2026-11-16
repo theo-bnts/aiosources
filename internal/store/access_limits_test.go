@@ -115,7 +115,7 @@ func TestTrustedSessionCapacityIsAtomicPerAccountAndSupportsReplacement(t *testi
 	previous := <-hashes
 	replacement := sha256.Sum256([]byte("replacement"))
 	grant := model.TrustedGrant{UserID: user.ID, Generation: user.Generation}
-	if _, _, err = db.CreateTrustedSession(ctx, grant, replacement[:], time.Hour, previous); err != nil {
+	if _, _, err = db.CreateTrustedSession(ctx, grant, replacement[:], time.Hour, SessionReplacements{Trusted: previous}); err != nil {
 		t.Fatal("same browser cannot reauthenticate at capacity", err)
 	}
 	if _, _, _, err = db.TrustedSession(ctx, previous); !errors.Is(err, ErrAuthentication) {
@@ -129,7 +129,7 @@ func TestTrustedSessionCapacityIsAtomicPerAccountAndSupportsReplacement(t *testi
 		t.Fatal("one account exhausted another account's capacity", err)
 	}
 	next := sha256.Sum256([]byte("extra"))
-	if _, _, err = db.CreateTrustedSession(ctx, grant, next[:], time.Hour, otherHash[:]); !errors.Is(err, ErrSecurityLimit) {
+	if _, _, err = db.CreateTrustedSession(ctx, grant, next[:], time.Hour, SessionReplacements{Trusted: otherHash[:]}); !errors.Is(err, ErrSecurityLimit) {
 		t.Fatal("another account's cookie bypassed capacity", err)
 	}
 	if _, _, _, err = db.TrustedSession(ctx, otherHash[:]); err != nil {

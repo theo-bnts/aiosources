@@ -178,12 +178,7 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	var replace [][]byte
-	if old, e := r.Cookie(trustedSessionCookie); e == nil && len(old.Value) == 43 {
-		oldHash := sha256.Sum256([]byte(old.Value))
-		replace = append(replace, oldHash[:])
-	}
-	_, expires, err := a.db.CreateTrustedSession(r.Context(), model.TrustedGrant{UserID: user.ID, Generation: user.Generation}, tokenHash[:], time.Duration(hours)*time.Hour, replace...)
+	_, expires, err := a.db.CreateTrustedSession(r.Context(), model.TrustedGrant{UserID: user.ID, Generation: user.Generation}, tokenHash[:], time.Duration(hours)*time.Hour, requestSessionReplacements(r))
 	if errors.Is(err, store.ErrAuthentication) {
 		writeError(w, 401, "Incorrect email or password")
 		return
@@ -195,9 +190,6 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, 503, "Sign-in could not be completed. Check service availability and retry.")
 		return
-	}
-	if old, e := a.lookupTrusted(r); e == nil {
-		_ = a.db.RevokeTrustedSession(r.Context(), old.ID)
 	}
 	a.trustedCookie(w, token, expires, max(1, int(time.Until(expires).Seconds())))
 	a.cookie(w, "", time.Unix(1, 0), -1)
