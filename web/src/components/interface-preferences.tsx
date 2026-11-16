@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -54,12 +53,9 @@ export function InterfacePreferences() {
           <GearSixIcon />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Interface preferences</DialogTitle>
-          <DialogDescription>
-            Applies throughout the interface on this browser. Changes are applied automatically.
-          </DialogDescription>
         </DialogHeader>
         <div className="grid items-start gap-5 sm:grid-cols-2">
           <div className="min-w-0 space-y-2">

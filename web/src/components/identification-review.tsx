@@ -1,3 +1,9 @@
+import {
+  MagnifyingGlassIcon,
+  ListChecksIcon,
+  ArrowsClockwiseIcon,
+  CheckIcon,
+} from '@phosphor-icons/react'
 import { useState } from 'react'
 import { FilterSelect } from '@/components/filter-select'
 import { reviewMediaTypes } from '@/lib/connection-options'
@@ -283,6 +289,7 @@ function ReviewForm({
           />
         </div>
         <Button type="submit" variant="outline" className="self-end">
+          <MagnifyingGlassIcon aria-hidden="true" />
           Search
         </Button>
       </form>
@@ -401,7 +408,12 @@ function ReviewForm({
           description="The source, metadata or review changed. Your previous selection will be cleared so you can check the latest information."
           label="Load current information"
           variant="warning"
-          trigger={<Button variant="warning">Review latest data</Button>}
+          trigger={
+            <Button variant="warning">
+              <ListChecksIcon aria-hidden="true" />
+              Review latest data
+            </Button>
+          }
           action={reload}
         />
       )}
@@ -415,6 +427,7 @@ function ReviewForm({
               variant="warning"
               trigger={
                 <Button variant="warning" disabled={save.isPending}>
+                  <ArrowsClockwiseIcon aria-hidden="true" />
                   Use automatic matching
                 </Button>
               }
@@ -426,6 +439,7 @@ function ReviewForm({
           disabled={!selected || invalidEpisode || save.isPending}
           onClick={() => save.mutate(false)}
         >
+          <CheckIcon aria-hidden="true" />
           {save.isPending ? 'Saving…' : 'Confirm identification'}
         </Button>
       </DialogFooter>

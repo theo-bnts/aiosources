@@ -104,6 +104,10 @@ func TestSemanticPublicationHistoryIgnoresStagingAndObservations(t *testing.T) {
 	}
 	var deletedID string
 	for _, row := range live.Items {
+		current, err := db.TorrentHistory(ctx, row.OccurrenceID, model.ListOptions{})
+		if err != nil || current.Current == nil || current.Current.OccurrenceID != row.OccurrenceID || current.Current.Fields["title"] != row.Fields["title"] {
+			t.Fatal("occurrence detail lost the current published record", err)
+		}
 		if row.SourceID == "remove" {
 			deletedID = row.OccurrenceID
 		}
@@ -134,7 +138,7 @@ func TestSemanticPublicationHistoryIgnoresStagingAndObservations(t *testing.T) {
 		t.Fatalf("full publication semantic counts: %+v %v", published, err)
 	}
 	history, err := db.TorrentHistory(ctx, deletedID, model.ListOptions{})
-	if err != nil || history.Total != 2 || history.Items[0].Kind != "deleted" || history.Items[0].After != nil || history.Items[0].Before["arbitrary"] != json.Number("9007199254740993") || history.Items[0].Origin == nil {
+	if err != nil || history.Current != nil || history.Total != 2 || history.Items[0].Kind != "deleted" || history.Items[0].After != nil || history.Items[0].Before["arbitrary"] != json.Number("9007199254740993") || history.Items[0].Origin == nil {
 		t.Fatalf("deleted history missing exact before/provenance: %+v %v", history, err)
 	}
 	if _, err := db.pool.Exec(ctx, "DELETE FROM aiosources.torrent_history"); err == nil {

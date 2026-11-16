@@ -1,3 +1,4 @@
+import { ArrowRightIcon, MagnifyingGlassIcon, TelevisionIcon } from '@phosphor-icons/react'
 import { CatalogCover } from '@/components/catalog-cover'
 import { useCatalogSearch } from '@/lib/use-catalog-search'
 import { useLayoutEffect, useState } from 'react'
@@ -15,7 +16,7 @@ import {
 } from '@/lib/language-preferences'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+
 import { api, params } from '@/lib/api'
 import { number } from '@/lib/format'
 import { usePublicSearch, visitorAPI } from '@/lib/public-search'
@@ -449,6 +450,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                     />
                   </div>
                   <Button id="catalog-episode-submit" type="submit" variant="outline">
+                    <TelevisionIcon aria-hidden="true" />
                     Show episode
                   </Button>
                 </form>

@@ -1,4 +1,11 @@
 import {
+  ArrowClockwiseIcon,
+  ArrowLeftIcon,
+  KeyIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
+import {
   ResultCount,
   ConfirmAction,
   Empty,
@@ -11,7 +18,7 @@ import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { useNotification } from '@/lib/notifications'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { PlusIcon, KeyIcon, ArrowClockwiseIcon, TrashIcon } from '@phosphor-icons/react'
+
 import { newSecretReference } from '@/lib/secret-reference'
 import { api, ApiError, queryClient } from '@/lib/api'
 import { useDate } from '@/lib/format'
@@ -292,6 +299,7 @@ export default function SecretsPage() {
                     disabled={busy}
                     onClick={() => review.mutate(editing.name)}
                   >
+                    <ArrowClockwiseIcon aria-hidden="true" />
                     Load latest revision
                   </Button>
                 )}
@@ -304,6 +312,7 @@ export default function SecretsPage() {
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={busy}>
+                  <ArrowLeftIcon aria-hidden="true" />
                   Back
                 </Button>
               </DialogClose>
@@ -312,6 +321,11 @@ export default function SecretsPage() {
                 variant={editing?.rotate ? 'warning' : 'default'}
                 disabled={busy || !value || !name}
               >
+                {editing?.rotate ? (
+                  <ArrowClockwiseIcon aria-hidden="true" />
+                ) : (
+                  <PlusIcon aria-hidden="true" />
+                )}
                 {save.isPending
                   ? 'Saving…'
                   : editing?.rotate

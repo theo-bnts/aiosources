@@ -10,7 +10,7 @@
 | Files | Search records directly as imported from your sources or remote catalogs. |
 | Metadata → Identification | Review uncertain records, choose the correct film, series, game or book, and manage automatic identification and its history. |
 | Sources → Indexers → Torrents | Add sources, schedule imports and inspect their history. |
-| Metadata → Videos / Games / Books | Each has its own statistics, update settings and history. |
+| Metadata → Catalogs → Videos / Games / Books | Each has its own statistics, update settings and history. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |

@@ -12,7 +12,7 @@ import (
 
 func TestIdentificationReviewAndStremioHistoryRequireAdministratorAndCSRF(t *testing.T) {
 	f, addon, conn := addonAPI(t)
-	for _, path := range []string{"/api/aiosource/matches/invalid", "/api/aiosource/candidates?q=example", "/api/stremio/statistics", "/api/stremio/requests", "/api/stremio/requests/1"} {
+	for _, path := range []string{"/api/aiosource/matches/invalid", "/api/aiosource/candidates?q=example", "/api/stremio/statistics", "/api/stremio/requests", "/api/stremio/requests/1", "/api/torrents/" + strings.Repeat("a", 64) + "/history"} {
 		if response := f.request("GET", path, "", false, ""); response.Code != http.StatusUnauthorized {
 			t.Fatalf("admin-only history exposed at %s", path)
 		}
@@ -24,6 +24,11 @@ func TestIdentificationReviewAndStremioHistoryRequireAdministratorAndCSRF(t *tes
 	}
 	items, _ := f.db.ListAIOMatchDiagnostics(f.ctx, model.ListOptions{})
 	id := items.Items[0].OccurrenceID
+	window := f.request("GET", "/api/torrents/"+id+"/history", "", true, "")
+	var occurrence model.OccurrenceHistory
+	if window.Code != 200 || json.Unmarshal(window.Body.Bytes(), &occurrence) != nil || occurrence.Current == nil || occurrence.Current.Fields["title"] != "Example Film" {
+		t.Fatal("occurrence window omitted current published fields", window.Code)
+	}
 	detailResponse := f.request("GET", "/api/aiosource/matches/"+id, "", true, "")
 	if detailResponse.Code != 200 || strings.Contains(detailResponse.Body.String(), "private-value") {
 		t.Fatal("review exposes private fields")

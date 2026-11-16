@@ -82,7 +82,7 @@ test('statistics are the first view, settings contain configuration and statuses
     'data-variant',
     'success',
   )
-  await page.goto('/security/settings')
+  await page.goto('/security/limits')
   await expect(
     page.getByRole('switch', { name: 'Two-step verification', exact: true }),
   ).toHaveCount(0)

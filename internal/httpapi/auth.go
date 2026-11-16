@@ -157,7 +157,15 @@ func (a *authentication) sessionHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (a *authentication) allowAttempt(r *http.Request) bool {
-	limit, err := a.db.RuntimeValue(r.Context(), "security", "login_per_minute")
+	return a.allowRoleAttempt(r, false)
+}
+
+func (a *authentication) allowRoleAttempt(r *http.Request, trusted bool) bool {
+	section, domain := "security", "scraper/login-client/v1\x00"
+	if trusted {
+		section, domain = "trusted_security", "aiosources/trusted-login-client/v1\x00"
+	}
+	limit, err := a.db.RuntimeValue(r.Context(), section, "login_per_minute")
 	if err != nil {
 		return false
 	}
@@ -165,7 +173,7 @@ func (a *authentication) allowAttempt(r *http.Request) bool {
 	if a.clientAddress != nil {
 		address = a.clientAddress(r)
 	}
-	key := sha256.Sum256([]byte("scraper/login-client/v1\x00" + address))
+	key := sha256.Sum256([]byte(domain + address))
 	client := hex.EncodeToString(key[:])
 	now := time.Now()
 	a.mu.Lock()
@@ -189,7 +197,12 @@ func (a *authentication) allowAttempt(r *http.Request) bool {
 	window.attempts++
 	a.attempts[client] = window
 	a.mu.Unlock()
-	allowed, err := a.db.AllowSecurityAttempt(r.Context(), client)
+	var allowed bool
+	if trusted {
+		allowed, err = a.db.AllowTrustedSecurityAttempt(r.Context(), client)
+	} else {
+		allowed, err = a.db.AllowSecurityAttempt(r.Context(), client)
+	}
 	return err == nil && allowed
 }
 
@@ -265,6 +278,10 @@ func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {
 		next.ReplaceTokenHash = oldHash[:]
 	}
 	err = a.db.CreateAdminSession(r.Context(), a.passwordHash, next)
+	if errors.Is(err, store.ErrSecurityLimit) {
+		writeError(w, http.StatusConflict, "The administrator session limit has been reached. Sign out another session or increase the limit.")
+		return
+	}
 	if errors.Is(err, store.ErrAuthentication) {
 		writeError(w, http.StatusUnauthorized, "Incorrect administrator password")
 		return

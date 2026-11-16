@@ -1,3 +1,15 @@
+import {
+  ArrowLeftIcon,
+  ChartBarIcon,
+  ClockCounterClockwiseIcon,
+  GearSixIcon,
+  GlobeIcon,
+  IconContext,
+  ListChecksIcon,
+  PathIcon,
+} from '@phosphor-icons/react'
+import { OccurrenceNavigationProvider } from '@/lib/occurrence-navigation'
+import { OccurrenceDialogHost } from '@/components/occurrence-dialog-host'
 import React, { lazy } from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -12,16 +24,7 @@ import {
   useLocation,
 } from 'react-router-dom'
 import { UnsavedChangesProvider } from '@/lib/unsaved-changes'
-import {
-  IconContext,
-  ChartBarIcon,
-  GearSixIcon,
-  ClockCounterClockwiseIcon,
-  GlobeIcon,
-  PathIcon,
-  GaugeIcon,
-  ListChecksIcon,
-} from '@phosphor-icons/react'
+
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
 import { Empty } from '@/components/common'
@@ -73,9 +76,6 @@ const NetworkRoutingPage = lazy(() =>
   import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
 )
 const IncomingNetworkPage = lazy(() => import('@/pages/incoming-network'))
-const PublicRequestLimitsPage = lazy(() =>
-  import('@/pages/incoming-network').then((m) => ({ default: m.PublicRequestLimitsPage })),
-)
 const SharingPage = lazy(() => import('@/pages/sharing'))
 const RemotesPage = lazy(() => import('@/pages/remotes'))
 const RemoteStatisticsPage = lazy(() =>
@@ -94,8 +94,8 @@ const StorageSettingsPage = lazy(() =>
 const SecuritySecretsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecuritySecretsPage })),
 )
-const SecuritySettingsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecuritySettingsPage })),
+const SecurityLimitsPage = lazy(() =>
+  import('@/pages/security').then((m) => ({ default: m.SecurityLimitsPage })),
 )
 const SecuritySessionsPage = lazy(() =>
   import('@/pages/security').then((m) => ({ default: m.SecuritySessionsPage })),
@@ -109,13 +109,33 @@ function LegacySecuritySettings() {
     : location.hash === '#sessions'
       ? '/security/sessions'
       : location.hash === '#verification' || location.hash.startsWith('#runtime-security')
-        ? '/security/settings'
+        ? '/security/limits'
         : '/security/secrets'
   return (
     <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
   )
 }
-function SecuritySettingsRoute() {
+function LegacySecurityLimits() {
+  const location = useLocation()
+  return (
+    <Navigate
+      to={`/security/limits${location.search}${location.hash}`}
+      state={location.state}
+      replace
+    />
+  )
+}
+function LegacyPublicLimits() {
+  const location = useLocation()
+  return (
+    <Navigate
+      to={`/security/limits${location.search}${location.hash || '#public-request-limits'}`}
+      state={location.state}
+      replace
+    />
+  )
+}
+function SecurityLimitsRoute() {
   const location = useLocation()
   const setting = settingFromHash(location.hash)
   const target = setting?.route.startsWith('/security/')
@@ -125,11 +145,11 @@ function SecuritySettingsRoute() {
       : location.hash === '#sessions'
         ? '/security/sessions'
         : ''
-  if (target && target !== '/security/settings')
+  if (target && target !== '/security/limits')
     return (
       <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
     )
-  return <SecuritySettingsPage />
+  return <SecurityLimitsPage />
 }
 function LegacyImportSettings() {
   const location = useLocation()
@@ -242,7 +262,14 @@ const router = createBrowserRouter(
         </div>
       }
     >
-      <Route element={<AppShell />}>
+      <Route
+        element={
+          <OccurrenceNavigationProvider>
+            <AppShell />
+            <OccurrenceDialogHost />
+          </OccurrenceNavigationProvider>
+        }
+      >
         <Route index element={<Navigate to="/providers" replace />} />
         <Route
           element={
@@ -277,6 +304,7 @@ const router = createBrowserRouter(
           <Route path="raw/:id" element={<RawDetailPage />} />
           <Route path="pages/:id" element={<RawPageView />} />
         </Route>
+        <Route path="metadata/catalogs" element={<Navigate to="/metadata/videos" replace />} />
         <Route path="metadata" element={<LegacyMetadata view="statistics" />} />
         <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
         <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
@@ -378,12 +406,10 @@ const router = createBrowserRouter(
           <Route path="health/settings" element={<StorageSettingsPage />} />
         </Route>
         <Route path="security" element={<LegacySecuritySettings />} />
-        <Route path="security/settings" element={<SecuritySettingsRoute />} />
+        <Route path="security/limits" element={<SecurityLimitsRoute />} />
+        <Route path="security/settings" element={<LegacySecurityLimits />} />
         <Route path="security/secrets" element={<SecuritySecretsPage />} />
-        <Route
-          path="security/verification"
-          element={<Navigate to="/security/settings" replace />}
-        />
+        <Route path="security/verification" element={<Navigate to="/security/limits" replace />} />
         <Route path="security/sessions" element={<SecuritySessionsPage />} />
         <Route path="users" element={<Navigate to="/trusted-users" replace />} />
         <Route path="trusted-users" element={<TrustedUsersPage />} />
@@ -439,20 +465,8 @@ const router = createBrowserRouter(
           <Route path="sharing/settings" element={<SharingPage />} />
         </Route>
         <Route path="torznab" element={<TorznabPage />} />
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Public"
-              tabs={[
-                { path: '/public-access', label: 'Settings', icon: GearSixIcon },
-                { path: '/public-access/limits', label: 'Request limits', icon: GaugeIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="public-access" element={<PublicAccessPage />} />
-          <Route path="public-access/limits" element={<PublicRequestLimitsPage />} />
-        </Route>
+        <Route path="public-access" element={<PublicAccessPage />} />
+        <Route path="public-access/limits" element={<LegacyPublicLimits />} />
         <Route path="sharing/remotes" element={<LegacyRemotes />} />
         <Route path="logs" element={<LogsPage />} />
         <Route path="network/incoming" element={<IncomingNetworkPage />} />
@@ -476,7 +490,7 @@ const router = createBrowserRouter(
           path="network/routing"
           element={<Navigate to="/network/outgoing/routing" replace />}
         />
-        <Route path="network/limits" element={<Navigate to="/public-access/limits" replace />} />
+        <Route path="network/limits" element={<LegacyPublicLimits />} />
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
         <Route path="indexers" element={<Navigate to="/providers" replace />} />
@@ -497,7 +511,10 @@ const router = createBrowserRouter(
                 description="This address does not match a console page."
                 action={
                   <Button asChild>
-                    <Link to="/">Back to Sources</Link>
+                    <Link to="/">
+                      <ArrowLeftIcon aria-hidden="true" />
+                      Back to Sources
+                    </Link>
                   </Button>
                 }
               />

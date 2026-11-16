@@ -1,3 +1,12 @@
+import {
+  ArrowClockwiseIcon,
+  CheckIcon,
+  FloppyDiskIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  ShareNetworkIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
 import { catalogEntitiesKey, type CatalogEntities } from '@/lib/catalog-types'
 import {
   CatalogDataControls,
@@ -35,13 +44,7 @@ import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import {
-  PlusIcon,
-  ShareNetworkIcon,
-  PencilSimpleIcon,
-  TrashIcon,
-  ArrowClockwiseIcon,
-} from '@phosphor-icons/react'
+
 import { api, ApiError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type {
   CatalogShare,
@@ -972,6 +975,7 @@ function ShareForm({
             state will be kept.
           </p>
           <Button type="button" variant="outline" disabled={busy} onClick={() => reload.mutate()}>
+            <ArrowClockwiseIcon aria-hidden="true" />
             Reload revision, keep draft
           </Button>
         </div>
@@ -994,6 +998,7 @@ function ShareForm({
             (scope === 'selected' && sourceIDs.length === 0)
           }
         >
+          {original ? <FloppyDiskIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
           {save.isPending
             ? 'Saving…'
             : original
@@ -1064,7 +1069,10 @@ function PasswordDialog({
           />
           {stremio && (
             <Button asChild variant="outline">
-              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
+              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+                <PlusIcon aria-hidden="true" />
+                Install in Stremio
+              </a>
             </Button>
           )}
         </div>
@@ -1096,7 +1104,9 @@ function PasswordDialog({
           </div>
         )}
         <DialogFooter>
-          <Button onClick={onClose}>I have saved the {kind}</Button>
+          <Button onClick={onClose}>
+            <CheckIcon aria-hidden="true" />I have saved the {kind}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

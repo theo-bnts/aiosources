@@ -30,6 +30,7 @@ type HistoryBaseline struct {
 }
 
 type OccurrenceHistory struct {
+	Current      *Torrent            `json:"current,omitempty"`
 	OccurrenceID string              `json:"occurrence_id"`
 	ProviderID   string              `json:"provider_id"`
 	SourceID     string              `json:"source_id"`

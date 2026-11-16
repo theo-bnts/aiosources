@@ -1,3 +1,4 @@
+import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { serviceNames } from '@/lib/debrid'
 import { FilterSelect } from '@/components/filter-select'
 import {
@@ -12,7 +13,7 @@ import {
 } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRightIcon } from '@phosphor-icons/react'
+
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import { number, bytes, percentage, useDate } from '@/lib/format'
@@ -108,7 +109,7 @@ export function StremioStatisticsPage() {
                 label="Failed or interrupted requests"
                 value={query.data.failed}
                 detail={`(${percentage(query.data.failed, query.data.requests)})`}
-                to="/addon/history"
+                to="/addon/history?status=failed,cancelled,invalid,busy"
               />
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />
             </dl>
@@ -215,6 +216,7 @@ export function StremioHistoryPage() {
           </div>
         ))}
         <Button id="stremio-submit" variant="outline" type="submit" className="self-end">
+          <MagnifyingGlassIcon aria-hidden="true" />
           Search
         </Button>
         <div className="self-end">

@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { runtimeSections, type RuntimeSection } from '@/lib/runtime-settings-definitions'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -71,9 +72,13 @@ export function RuntimeSettingsPanel({
             : section === 'debrid_retries' &&
                 Number(values.delay_minutes) > Number(values.maximum_hours) * 60
               ? 'The maximum retry delay must cover the initial delay.'
-              : section === 'security' &&
-                  Number(values.login_per_minute) > Number(values.login_global_per_minute)
-                ? 'Total sign-in capacity must cover the per-address limit.'
+              : (section === 'security' || section === 'trusted_security') &&
+                  (Number(values.login_per_minute) > Number(values.login_global_per_minute) ||
+                    Number(values.login_account_per_minute ?? 0) >
+                      Number(values.login_global_per_minute))
+                ? section === 'security'
+                  ? 'Total sign-in capacity must cover the per-address limit.'
+                  : 'Total sign-in capacity must cover the per-address and per-account limits.'
                 : undefined
   const invalid =
     Boolean(relationshipIssue) ||
@@ -87,6 +92,7 @@ export function RuntimeSettingsPanel({
   useUnsavedChanges(dirty, definition.title.toLowerCase(), save.isPending)
   return (
     <Disclosure
+      id={`runtime-${section}`}
       title={definition.title}
       open={open}
       onOpenChange={setOpen}
@@ -175,6 +181,7 @@ export function RuntimeSettingsPanel({
                       save.reset()
                     }}
                   >
+                    <ArrowClockwiseIcon aria-hidden="true" />
                     Use saved values
                   </Button>
                 </div>
@@ -182,6 +189,7 @@ export function RuntimeSettingsPanel({
               {!conflict && <ErrorNotice error={save.error} />}
               <div className="toolbar">
                 <Button type="submit" disabled={!dirty || invalid || conflict || save.isPending}>
+                  <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 <FormStatus

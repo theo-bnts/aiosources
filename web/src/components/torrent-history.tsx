@@ -1,12 +1,18 @@
+import {
+  ArrowRightIcon,
+  ClockCounterClockwiseIcon,
+  DatabaseIcon,
+  LinkIcon,
+} from '@phosphor-icons/react'
 import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ArrowRightIcon } from '@phosphor-icons/react'
+
 import { api, params } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { CatalogOrigin, Page, Torrent } from '@/lib/types'
 import type { OccurrenceHistory, RunChanges, TorrentChange } from '@/lib/history-types'
-import { occurrenceHref } from '@/lib/search-types'
+import { OccurrenceLink } from '@/lib/occurrence-navigation'
 import { decodeSearchJSON, exactField, exactJSON, fieldChanges } from '@/lib/search-json'
 import { bytes, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
@@ -63,9 +69,10 @@ export function TorrentTable({
           {items.map((torrent) => (
             <TableRow key={torrent.occurrence_id}>
               <TableCell className="min-w-64 max-w-lg whitespace-normal">
-                <Link
+                <OccurrenceLink
                   className="data-link text-left font-medium leading-6"
-                  to={occurrenceHref(torrent.occurrence_id)}
+                  occurrenceId={torrent.occurrence_id}
+                  torrent={torrent}
                   onClick={(event) => {
                     if (
                       onOpen &&
@@ -81,7 +88,7 @@ export function TorrentTable({
                   }}
                 >
                   {torrent.fields?.title != null ? exactField(torrent.fields.title) : 'Untitled'}
-                </Link>
+                </OccurrenceLink>
                 <p className="mono mt-1 break-all text-muted-foreground">{torrent.source_id}</p>
               </TableCell>
               <TableCell className="text-xs">
@@ -294,7 +301,7 @@ function ChangeEntry({ change }: { change: TorrentChange }) {
 
 export function OccurrenceDialog({
   id,
-  torrent,
+  torrent: initialTorrent,
   onClose,
   onOpen,
   onReturnFocus,
@@ -307,6 +314,7 @@ export function OccurrenceDialog({
 }) {
   const date = useDate()
   const sourceName = useSourceNames()
+  const listState = useListViewState()
   const historyPage = useURLPagination({ limitKey: 'history_limit', offsetKey: 'history_offset' })
   const relatedPage = useURLPagination({ limitKey: 'related_limit', offsetKey: 'related_offset' })
   const [search, setSearch] = useViewSearchParams()
@@ -314,14 +322,6 @@ export function OccurrenceDialog({
   const historyOffset = historyPage.offset
   const relatedOffset = relatedPage.offset
   const requestedTab = search.get('occurrence_tab')
-  const activeTab =
-    requestedTab === 'related' ||
-    requestedTab === 'history' ||
-    (requestedTab === 'fields' && torrent)
-      ? requestedTab
-      : torrent
-        ? 'fields'
-        : 'history'
   const history = useQuery({
     queryKey: ['torrent-history', id, historyOffset, historyPage.limit],
     queryFn: ({ signal }) =>
@@ -332,6 +332,15 @@ export function OccurrenceDialog({
       ),
     enabled: valid,
   })
+  const torrent = history.data ? history.data.current : initialTorrent
+  const activeTab =
+    requestedTab === 'related' ||
+    requestedTab === 'history' ||
+    (requestedTab === 'fields' && torrent)
+      ? requestedTab
+      : torrent
+        ? 'fields'
+        : 'history'
   const related = useQuery({
     queryKey: ['torrent-related', id, relatedOffset, relatedPage.limit],
     queryFn: ({ signal }) =>
@@ -387,9 +396,20 @@ export function OccurrenceDialog({
               }}
             >
               <TabsList>
-                {torrent && <TabsTrigger value="fields">Published fields</TabsTrigger>}
-                <TabsTrigger value="history">Change history</TabsTrigger>
-                <TabsTrigger value="related">Related occurrences</TabsTrigger>
+                {torrent && (
+                  <TabsTrigger value="fields">
+                    <DatabaseIcon aria-hidden="true" />
+                    Published fields
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="history">
+                  <ClockCounterClockwiseIcon aria-hidden="true" />
+                  Change history
+                </TabsTrigger>
+                <TabsTrigger value="related">
+                  <LinkIcon aria-hidden="true" />
+                  Related occurrences
+                </TabsTrigger>
               </TabsList>
               {torrent && (
                 <TabsContent value="fields" className="mt-5 space-y-4">
@@ -418,7 +438,7 @@ export function OccurrenceDialog({
                   />
                   {torrent.raw_id != null && (
                     <Button asChild>
-                      <Link to={`/raw/${torrent.raw_id}`}>
+                      <Link to={`/raw/${torrent.raw_id}`} state={listState}>
                         View processed record
                         <ArrowRightIcon />
                       </Link>
@@ -602,10 +622,10 @@ export function RunChangesList({
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
-                <Link to={occurrenceHref(change.occurrence_id)}>
+                <OccurrenceLink occurrenceId={change.occurrence_id} tab="history">
                   Occurrence history
                   <ArrowRightIcon />
-                </Link>
+                </OccurrenceLink>
               </Button>
             </div>
             <ChangeEntry change={change} />

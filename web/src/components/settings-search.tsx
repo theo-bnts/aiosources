@@ -1,7 +1,15 @@
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CaretDownIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+} from '@phosphor-icons/react'
+
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeftIcon, ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+
 import { api } from '@/lib/api'
 import { catalogEntitiesKey } from '@/lib/catalog-types'
 import { randomID } from '@/lib/random-id'
@@ -361,7 +369,7 @@ export function SettingsSearch({
                   id={`${id}-result-${visible.length}`}
                   aria-selected={active === visible.length}
                   tabIndex={-1}
-                  className={`min-h-(--control-height) w-full rounded-md px-3 py-2 text-left text-base font-medium md:text-sm ${active === visible.length ? 'bg-accent' : 'hover:bg-accent/60'}`}
+                  className={`flex min-h-(--control-height) w-full items-center gap-2 rounded-md px-3 py-2 text-left text-base font-medium md:text-sm ${active === visible.length ? 'bg-accent' : 'hover:bg-accent/60'}`}
                   onMouseDown={(event) => event.preventDefault()}
                   onPointerMove={(event) => {
                     if (event.pointerType === 'mouse') {
@@ -371,6 +379,7 @@ export function SettingsSearch({
                   }}
                   onClick={() => choose(visible.length)}
                 >
+                  <PlusIcon aria-hidden="true" className="size-4 shrink-0" />
                   {entityNames[selected!.entity!][1]}…
                 </button>
               )}
@@ -396,6 +405,7 @@ export function SettingsSearch({
                 variant="ghost"
                 onClick={() => setShown((value) => value + 50)}
               >
+                <CaretDownIcon aria-hidden="true" />
                 Show more results
               </Button>
             )}

@@ -24,19 +24,19 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
   expect(
     (await (await page.request.get('/api/settings/runtime/identification')).json()).values,
   ).toEqual({ workers: 2, queue_batch: 10, transaction_batch: 5 })
-  await page.goto('/security/settings')
-  await openDisclosure(page, 'Authentication settings')
-  const security = page.getByRole('form', { name: 'Authentication settings' })
+  await page.goto('/security/limits')
+  await openDisclosure(page, 'Administrator limits')
+  const security = page.getByRole('form', { name: 'Administrator limits' })
   await security
     .getByLabel('New administrator session duration (hours)', { exact: true })
-    .fill('24')
+    .fill('48')
   await security.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(security.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await openDisclosure(page, 'Authentication settings')
+  await openDisclosure(page, 'Administrator limits')
   await expect(
     security.getByLabel('New administrator session duration (hours)', { exact: true }),
-  ).toHaveValue('24')
+  ).toHaveValue('48')
   for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 1100 })
     await expect(security).toBeVisible()
@@ -53,7 +53,7 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
       })
     }
     await page.goto('/network/incoming')
-    for (const title of ['Browser downloads', 'Configuration limits']) {
+    for (const title of ['Browser downloads']) {
       await openDisclosure(page, title)
       await expect(page.getByRole('form', { name: title }).locator('input').first()).toBeVisible()
     }
@@ -68,8 +68,8 @@ test('advanced settings stay grouped, persist, and reject contradictory values',
         animations: 'disabled',
       })
     }
-    await page.goto('/security/settings')
-    await openDisclosure(page, 'Authentication settings')
+    await page.goto('/security/limits')
+    await openDisclosure(page, 'Administrator limits')
   }
 })
 
@@ -174,7 +174,7 @@ test('settings and shared controls fit desktop and mobile', async ({ page }) => 
     '/addon/settings',
     '/torznab/settings',
     '/sharing/settings',
-    '/security/settings',
+    '/security/limits',
     '/network/incoming',
     '/network/outgoing',
     '/network/outgoing/routing',

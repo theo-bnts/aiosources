@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api, ApiError, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
@@ -170,12 +171,14 @@ export function PublicCatalogSettings() {
                     disabled={busy}
                     onClick={() => review.mutate()}
                   >
+                    <ArrowClockwiseIcon aria-hidden="true" />
                     {review.isPending ? 'Loading latest settings…' : 'Load latest settings'}
                   </Button>
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3">
                 <Button type="submit" disabled={!dirty || conflict || busy}>
+                  <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 {(dirty || save.isPending || save.isSuccess) && (

@@ -36,3 +36,6 @@ __pycache__/
 
 # Workflow adaptations delivered locally, never committed
 /livraison-workflows/
+
+# Local interface review reports, never published
+/livraison-audits/

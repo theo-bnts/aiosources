@@ -1,7 +1,8 @@
+import { ArrowLeftIcon, PlayIcon } from '@phosphor-icons/react'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { PlayIcon } from '@phosphor-icons/react'
+
 import { api, refreshData } from '@/lib/api'
 import type { Items, ProviderDocument, ProviderSummary, Run, RunMode, StartRun } from '@/lib/types'
 import { supportsMetadata } from '@/lib/collection-types'
@@ -337,6 +338,7 @@ export function CollectDialog({
               onClick={() => setOpen(false)}
               disabled={mutation.isPending}
             >
+              <ArrowLeftIcon aria-hidden="true" />
               Back
             </Button>
             <Button
@@ -351,6 +353,7 @@ export function CollectDialog({
                 invalidKnownPages
               }
             >
+              <PlayIcon aria-hidden="true" />
               {mutation.isPending ? 'Creating…' : 'Run manual import'}
             </Button>
           </DialogFooter>

@@ -108,6 +108,10 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toBeFocused()
+  const catalogMenu = page
+    .getByRole('navigation', { name: 'Main navigation', exact: true })
+    .getByRole('button', { name: 'Catalogs', exact: true })
+  if ((await catalogMenu.getAttribute('aria-expanded')) !== 'true') await catalogMenu.click()
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
     .getByRole('link', { name: 'Videos', exact: true })

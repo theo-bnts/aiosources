@@ -124,7 +124,7 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { <-a.passwordRequests }()
-	if !a.allowAttempt(r) {
+	if !a.allowRoleAttempt(r, true) {
 		w.Header().Set("Retry-After", "60")
 		writeError(w, 429, "Authentication is temporarily unavailable or rate limited. Try again in one minute.")
 		return
@@ -173,14 +173,27 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tokenHash := sha256.Sum256([]byte(token))
-	hours, err := a.db.RuntimeValue(r.Context(), "security", "session_hours")
+	hours, err := a.db.RuntimeValue(r.Context(), "trusted_security", "session_hours")
 	if err != nil {
 		respondError(w, err)
 		return
 	}
-	_, expires, err := a.db.CreateTrustedSession(r.Context(), model.TrustedGrant{UserID: user.ID, Generation: user.Generation}, tokenHash[:], time.Duration(hours)*time.Hour)
+	var replace [][]byte
+	if old, e := r.Cookie(trustedSessionCookie); e == nil && len(old.Value) == 43 {
+		oldHash := sha256.Sum256([]byte(old.Value))
+		replace = append(replace, oldHash[:])
+	}
+	_, expires, err := a.db.CreateTrustedSession(r.Context(), model.TrustedGrant{UserID: user.ID, Generation: user.Generation}, tokenHash[:], time.Duration(hours)*time.Hour, replace...)
+	if errors.Is(err, store.ErrAuthentication) {
+		writeError(w, 401, "Incorrect email or password")
+		return
+	}
+	if errors.Is(err, store.ErrSecurityLimit) {
+		writeError(w, 409, "Your session limit has been reached. Sign out another session or contact the administrator.")
+		return
+	}
 	if err != nil {
-		writeError(w, 401, "Sign-in could not be completed. Try again.")
+		writeError(w, 503, "Sign-in could not be completed. Check service availability and retry.")
 		return
 	}
 	if old, e := a.lookupTrusted(r); e == nil {

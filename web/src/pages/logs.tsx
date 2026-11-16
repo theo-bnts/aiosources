@@ -1,3 +1,4 @@
+import { InfoIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
 import { FilterSelect } from '@/components/filter-select'
 import { selectionValues } from '@/lib/filter-values'
@@ -5,7 +6,7 @@ import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useViewSearchParams } from '@/lib/detail-navigation'
-import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+
 import { api, params } from '@/lib/api'
 import { activityLevels, activityServices, type LogEntry } from '@/lib/activity-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
@@ -256,6 +257,7 @@ export function LogsPage() {
                                 setInspecting(entry)
                               }}
                             >
+                              <InfoIcon aria-hidden="true" />
                               Metadata<span className="sr-only"> for log {entry.id}</span>
                             </Button>
                           )}

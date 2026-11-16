@@ -1,3 +1,4 @@
+import { KeyIcon, ArrowClockwiseIcon, XIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useId, useState, type ReactNode } from 'react'
 import { compareListNames } from '@/lib/list-view'
 import { newSecretReference } from '@/lib/secret-reference'
@@ -162,6 +163,7 @@ export function SecretPicker({
           disabled={disabled || busy}
           onClick={() => prepare.mutate(value)}
         >
+          <KeyIcon aria-hidden="true" />
           {prepare.isPending ? 'Loading…' : value ? replaceLabel : addLabel}
         </Button>
       </div>
@@ -240,6 +242,7 @@ export function SecretPicker({
                       disabled={editorBusy}
                       onClick={() => review.mutate(editor.reference)}
                     >
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Load latest revision
                     </Button>
                   )}
@@ -248,6 +251,7 @@ export function SecretPicker({
               <DialogFooter>
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={editorBusy}>
+                    <XIcon aria-hidden="true" />
                     Cancel
                   </Button>
                 </DialogClose>
@@ -256,6 +260,7 @@ export function SecretPicker({
                   variant={editor.replacing ? 'warning' : 'default'}
                   disabled={editorBusy || conflict || !secretValue}
                 >
+                  <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending
                     ? 'Saving…'
                     : editor.replacing

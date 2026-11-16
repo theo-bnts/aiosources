@@ -68,6 +68,7 @@ export function SourceHTMLCompatibility() {
       <ConfirmAction
         trigger={
           <Button variant="warning" size="sm">
+            <TrashIcon aria-hidden="true" />
             Clear incompatible source settings
           </Button>
         }
@@ -358,7 +359,12 @@ export function HTMLDetailSettings() {
               help="One container unique to a valid detail page. Its field selectors are relative to this container."
             />
             <ConfirmAction
-              trigger={<Button variant="warning">Remove detail settings</Button>}
+              trigger={
+                <Button variant="warning">
+                  <TrashIcon aria-hidden="true" />
+                  Remove detail settings
+                </Button>
+              }
               label="Remove detail settings"
               title="Remove detail settings?"
               description="Removes these selectors from the draft. Saved source data is unchanged."
@@ -500,6 +506,7 @@ export function HTMLPaginationSettings() {
                 size="sm"
                 onClick={() => change((next) => next.deleteIn(['html', key]))}
               >
+                <TrashIcon aria-hidden="true" />
                 Remove {label.toLowerCase()} check
               </Button>
             </div>

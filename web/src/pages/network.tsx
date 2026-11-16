@@ -1,3 +1,12 @@
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  FloppyDiskIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { debridProviders } from '@/lib/debrid'
 import { randomID } from '@/lib/random-id'
 import { useSettingsEditor } from '@/lib/settings-navigation'
@@ -5,7 +14,7 @@ import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { CheckCircleIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
+
 import { api, ApiError, ConnectionError } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -382,6 +391,7 @@ function ProxyEditor({
                   save.reset()
                 }}
               >
+                <XIcon aria-hidden="true" />
                 Discard changes and reload
               </Button>
             </div>
@@ -390,10 +400,12 @@ function ProxyEditor({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={save.isPending}>
+                <ArrowLeftIcon aria-hidden="true" />
                 Back
               </Button>
             </DialogClose>
             <Button type="submit" disabled={save.isPending || conflict || (existing && !dirty)}>
+              <FloppyDiskIcon aria-hidden="true" />
               {save.isPending ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
@@ -609,6 +621,7 @@ export function NetworkRoutingPage() {
             <ErrorNotice error={save.error} />
             <div className="toolbar">
               <Button type="submit" disabled={save.isPending || !dirty || conflict}>
+                <FloppyDiskIcon aria-hidden="true" />
                 {save.isPending ? 'Saving…' : 'Save'}
               </Button>
               <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
@@ -622,6 +635,7 @@ export function NetworkRoutingPage() {
                     save.reset()
                   }}
                 >
+                  <XIcon aria-hidden="true" />
                   Discard changes and reload
                 </Button>
               )}

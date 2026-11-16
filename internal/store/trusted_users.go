@@ -44,7 +44,7 @@ func NormalizeTrustedEmail(raw string) (string, error) {
 // Account throttling complements the existing per-client/global admission,
 // without charging the same login twice against the global CPU protection.
 func (s *Store) AllowTrustedAccountAttempt(ctx context.Context, accountHash string) (bool, error) {
-	limit, err := s.RuntimeValue(ctx, "security", "login_per_minute")
+	limit, err := s.RuntimeValue(ctx, "trusted_security", "login_account_per_minute")
 	if err != nil {
 		return false, err
 	}
@@ -160,8 +160,8 @@ func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64
 	return databaseError("commit trusted user deletion", tx.Commit(ctx))
 }
 
-func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGrant, tokenHash []byte, lifetime time.Duration) (string, time.Time, error) {
-	if len(tokenHash) != 32 || lifetime <= 0 || lifetime > 365*24*time.Hour {
+func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGrant, tokenHash []byte, lifetime time.Duration, replaceTokenHashes ...[]byte) (string, time.Time, error) {
+	if len(tokenHash) != 32 || lifetime <= 0 || lifetime > 365*24*time.Hour || len(replaceTokenHashes) > 1 || (len(replaceTokenHashes) == 1 && len(replaceTokenHashes[0]) != 32) {
 		return "", time.Time{}, model.ErrInvalid
 	}
 	id, err := newRunID()
@@ -173,18 +173,37 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 		return "", time.Time{}, err
 	}
 	defer rollback(tx)
-	// Hold the account while creating the session so a concurrent password
-	// replacement cannot create a session under an obsolete generation.
+	// Serialize sign-ins for this account, including same-browser replacement,
+	// so concurrent requests cannot exceed its cap or revive a stale generation.
 	var valid bool
-	err = tx.QueryRow(ctx, `SELECT enabled FROM aiosources.trusted_users WHERE id=$1 AND generation=$2 FOR SHARE`, grant.UserID, grant.Generation).Scan(&valid)
+	err = tx.QueryRow(ctx, `SELECT enabled FROM aiosources.trusted_users WHERE id=$1 AND generation=$2 FOR UPDATE`, grant.UserID, grant.Generation).Scan(&valid)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !valid) {
 		return "", time.Time{}, ErrAuthentication
 	}
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE expires_at<=now() OR (user_id=$1 AND id IN (SELECT id FROM aiosources.trusted_sessions WHERE user_id=$1 ORDER BY created_at DESC OFFSET 19))`, grant.UserID); err != nil {
-		return "", time.Time{}, err
+	// Keep global expiry cleanup bounded and skip rows another login or account
+	// update holds. Inactive accounts must not retain obsolete sessions forever.
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE token_hash IN (
+ SELECT token_hash FROM aiosources.trusted_sessions WHERE expires_at<=now()
+ ORDER BY expires_at,id LIMIT 1000 FOR UPDATE SKIP LOCKED)`); err != nil {
+		return "", time.Time{}, databaseError("expire trusted sessions", err)
+	}
+	if len(replaceTokenHashes) == 1 {
+		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE user_id=$1 AND token_hash=$2`, grant.UserID, replaceTokenHashes[0]); err != nil {
+			return "", time.Time{}, databaseError("replace trusted session", err)
+		}
+	}
+	var count, limit int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM aiosources.trusted_sessions WHERE user_id=$1 AND expires_at>now()`, grant.UserID).Scan(&count); err != nil {
+		return "", time.Time{}, databaseError("count trusted sessions", err)
+	}
+	if err = tx.QueryRow(ctx, `SELECT (values->>'session_limit')::int FROM aiosources.runtime_settings WHERE section='trusted_security'`).Scan(&limit); err != nil {
+		return "", time.Time{}, databaseError("read trusted session limit", err)
+	}
+	if count >= limit {
+		return "", time.Time{}, ErrSecurityLimit
 	}
 	expires := time.Now().Add(lifetime)
 	_, err = tx.Exec(ctx, `INSERT INTO aiosources.trusted_sessions(id,token_hash,user_id,generation,expires_at) VALUES($1,$2,$3,$4,$5)`, id, tokenHash, grant.UserID, grant.Generation, expires)

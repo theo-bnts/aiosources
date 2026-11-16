@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, PencilSimpleIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { Disclosure } from '@/components/ui/disclosure'
 import { importNumberFields as numberFields } from '@/lib/import-settings-definitions'
 import { Switch } from '@/components/ui/switch'
@@ -284,6 +285,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                               setFeedback((current) => ({ ...current, [scope]: undefined }))
                             }}
                           >
+                            <ArrowClockwiseIcon aria-hidden="true" />
                             Use saved values
                           </Button>
                           <Button
@@ -298,6 +300,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                               setFeedback((current) => ({ ...current, [scope]: undefined }))
                             }}
                           >
+                            <PencilSimpleIcon aria-hidden="true" />
                             Keep my draft
                           </Button>
                         </>
@@ -308,6 +311,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                           disabled={overview.isFetching}
                           onClick={() => void overview.refetch()}
                         >
+                          <ArrowClockwiseIcon aria-hidden="true" />
                           {overview.isFetching ? 'Loading…' : 'Load latest settings'}
                         </Button>
                       )}
@@ -317,6 +321,7 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                 {!rejected && <ErrorNotice error={error} />}
                 <div className="flex flex-wrap items-center gap-4">
                   <Button type="submit" disabled={!dirty || invalid || save.isPending || conflict}>
+                    <FloppyDiskIcon aria-hidden="true" />
                     {save.isPending && save.variables.scope === scope ? 'Saving…' : 'Save'}
                   </Button>
                   <FormStatus

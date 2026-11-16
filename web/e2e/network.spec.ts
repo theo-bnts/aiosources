@@ -1,3 +1,4 @@
+import { openDisclosure } from './disclosures'
 import type { Page } from '@playwright/test'
 import type { NetworkSettings } from '../src/lib/network-types'
 import { test, expect } from './fixtures'
@@ -29,15 +30,21 @@ test('Public permissions share one optional section, while Network expands into 
     })
   const enabled = form.getByRole('switch', { name: 'Enable public access', exact: true })
   const initial = await enabled.isChecked()
+  const security = page
+    .getByRole('navigation', { name: 'Main navigation', exact: true })
+    .getByRole('button', { name: 'Security', exact: true })
+  if ((await security.getAttribute('aria-expanded')) !== 'true') await security.click()
+  const limitsLink = page.getByRole('link', { name: 'Limits', exact: true })
   await enabled.click()
-  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
+  await limitsLink.click()
   const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await expect(enabled).toBeChecked({ checked: !initial })
   await enabled.click()
-  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
-  await expect(page).toHaveURL(/\/public-access\/limits$/)
+  await limitsLink.click()
+  await expect(page).toHaveURL(/\/security\/limits$/)
+  await openDisclosure(page, 'Public request limits')
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toBeVisible()
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   const network = navigation.getByRole('button', { name: 'Network', exact: true })
@@ -257,13 +264,10 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveCount(0)
   await page
     .getByRole('navigation', { name: 'Main navigation', exact: true })
-    .getByRole('button', { name: 'Users', exact: true })
+    .getByRole('button', { name: 'Security', exact: true })
     .click()
-  await page
-    .getByRole('navigation', { name: 'Main navigation', exact: true })
-    .getByRole('link', { name: 'Public', exact: true })
-    .click()
-  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
+  await page.getByRole('link', { name: 'Limits', exact: true }).click()
+  await openDisclosure(page, 'Public request limits')
   await expect(page.getByLabel('IP address header', { exact: true })).toHaveCount(0)
   const form = page.getByRole('form', { name: 'Request limits', exact: true })
   for (const [label, value] of [
@@ -312,6 +316,7 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
     ).status(),
   ).toBe(401)
   await page.reload()
+  await openDisclosure(page, 'Public request limits')
   await expect(form.getByLabel('Public requests per minute', { exact: true })).toHaveValue('2')
   await page.goto('/public-access')
   await expect(
@@ -330,8 +335,8 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
       const network = navigation.getByRole('button', { name: 'Network', exact: true })
       if ((await network.getAttribute('aria-expanded')) !== 'true') await network.click()
     }
-    if (label === 'Public') {
-      const users = navigation.getByRole('button', { name: 'Users', exact: true })
+    if (label === 'Limits') {
+      const users = navigation.getByRole('button', { name: 'Security', exact: true })
       if ((await users.getAttribute('aria-expanded')) !== 'true') await users.click()
     }
     await navigation.getByRole('link', { name: label, exact: true }).click()
@@ -342,7 +347,7 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page
     .getByLabel('Trusted proxy addresses', { exact: true })
     .fill('2001:db8:1234:5678:90ab:cdef:1234:5678\n10.0.0.0/24')
-  await openSection('Public')
+  await openSection('Limits')
   const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
@@ -350,11 +355,11 @@ test('incoming settings preserve unsaved edits and stay within a mobile viewport
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await openSection('Public')
-  await page.getByRole('tab', { name: 'Request limits', exact: true }).click()
+  await openSection('Limits')
+  await openDisclosure(page, 'Public request limits')
   await expect(page.getByLabel('Simultaneous public requests', { exact: true })).toHaveValue('50')
   await page.getByLabel('Public requests per minute', { exact: true }).fill('80')
-  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await openSection('Incoming')
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toHaveValue('80')
@@ -437,7 +442,7 @@ test('each public request limit can be switched off while active limits and inco
   await requests.fill('')
   await expect(limit).toBeChecked()
   await expect(requests).toBeEditable()
-  await page.getByRole('tab', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Active sessions', exact: true }).click()
   const guard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(guard).toBeVisible()
   await guard.getByRole('button', { name: 'Keep editing', exact: true }).click()

@@ -1,3 +1,4 @@
+import { PlusIcon } from '@phosphor-icons/react'
 import { LanguageFilter } from '@/components/language-filter'
 import {
   useLanguagePreferences,
@@ -206,7 +207,10 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
               successMessage="Copied to your clipboard. Keep it private."
             />
             <Button variant="outline" asChild>
-              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>Install in Stremio</a>
+              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+                <PlusIcon aria-hidden="true" />
+                Install in Stremio
+              </a>
             </Button>
           </div>
         </section>

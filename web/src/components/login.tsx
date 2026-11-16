@@ -1,5 +1,7 @@
+import { DatabaseIcon, ShieldCheckIcon, SignInIcon, UsersThreeIcon } from '@phosphor-icons/react'
+
 import { useEffect, useRef, useState } from 'react'
-import { DatabaseIcon } from '@phosphor-icons/react'
+
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, queryClient, setCSRF } from '@/lib/api'
 import type { Session } from '@/lib/types'
@@ -26,8 +28,14 @@ export function Login() {
           }
         >
           <TabsList aria-label="Login">
-            <TabsTrigger value="trusted">Trusted user</TabsTrigger>
-            <TabsTrigger value="administrator">Administrator</TabsTrigger>
+            <TabsTrigger value="trusted">
+              <UsersThreeIcon aria-hidden="true" />
+              Trusted user
+            </TabsTrigger>
+            <TabsTrigger value="administrator">
+              <ShieldCheckIcon aria-hidden="true" />
+              Administrator
+            </TabsTrigger>
           </TabsList>
           <TabsContent value={role} className="pt-5">
             <LoginForm key={role} trusted={role === 'trusted'} />
@@ -127,6 +135,7 @@ function LoginForm({ trusted }: { trusted: boolean }) {
       </div>
       <ErrorNotice error={error} />
       <Button className="w-full" disabled={pending} type="submit">
+        <SignInIcon aria-hidden="true" />
         {pending ? 'Signing in…' : 'Sign in'}
       </Button>
     </form>

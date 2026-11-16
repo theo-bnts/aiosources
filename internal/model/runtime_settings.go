@@ -38,7 +38,9 @@ func RuntimeFields(section string) map[string]RuntimeField {
 	case "downloads":
 		return map[string]RuntimeField{"duration_hours": {24, 1, 168}, "ticket_minutes": {10, 1, MaxDownloadTicketMinutes}}
 	case "security":
-		return map[string]RuntimeField{"session_hours": {12, 1, 168}, "login_per_minute": {10, 1, 60}, "login_global_per_minute": {60, 1, 600}, "session_limit": {256, 1, 1024}}
+		return map[string]RuntimeField{"session_hours": {24, 1, 168}, "login_per_minute": {10, 1, 60}, "login_global_per_minute": {50, 1, 600}, "session_limit": {10, 1, 100}}
+	case "trusted_security":
+		return map[string]RuntimeField{"session_hours": {24, 1, 168}, "session_limit": {10, 1, 100}, "login_per_minute": {10, 1, 60}, "login_account_per_minute": {10, 1, 60}, "login_global_per_minute": {50, 1, 600}}
 	case "payloads":
 		return map[string]RuntimeField{"source_kib": {128, 16, 128}, "public_stremio_bytes": {8192, 1024, 8192}, "public_torznab_bytes": {6000, 1024, 6000}}
 	}
@@ -76,7 +78,7 @@ func (s RuntimeSection) Valid(section string) bool {
 	if section == "debrid_retries" && s.Values["delay_minutes"] > s.Values["maximum_hours"]*60 {
 		return false
 	}
-	if section == "security" && s.Values["login_per_minute"] > s.Values["login_global_per_minute"] {
+	if (section == "security" || section == "trusted_security") && (s.Values["login_per_minute"] > s.Values["login_global_per_minute"] || s.Values["login_account_per_minute"] > s.Values["login_global_per_minute"]) {
 		return false
 	}
 	if section == "source_retries" && s.Values["initial_seconds"] > s.Values["maximum_seconds"] {
@@ -86,7 +88,7 @@ func (s RuntimeSection) Valid(section string) bool {
 }
 
 func RuntimeSections() []string {
-	return []string{"debrid", "outgoing", "connections", "history", "identification", "matching", "metadata", "metadata_retries", "source_retries", "debrid_retries", "downloads", "security", "payloads"}
+	return []string{"debrid", "outgoing", "connections", "history", "identification", "matching", "metadata", "metadata_retries", "source_retries", "debrid_retries", "downloads", "security", "trusted_security", "payloads"}
 }
 
 type MatchingPolicy struct {

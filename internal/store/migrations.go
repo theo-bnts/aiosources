@@ -35,6 +35,7 @@ var migrations = []struct {
 	{95, gamesSchema},
 	{96, trustedUsersSchema},
 	{97, usersAccessSchema},
+	{98, accessLimitsSchema},
 }
 
 func schemaChecksum(sql string) string {

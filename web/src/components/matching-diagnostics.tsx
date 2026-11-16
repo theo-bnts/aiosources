@@ -1,3 +1,4 @@
+import { MagnifyingGlassIcon, ListChecksIcon } from '@phosphor-icons/react'
 import { Disclosure } from '@/components/ui/disclosure'
 import { FilterSelect } from '@/components/filter-select'
 import { compareListNames } from '@/lib/list-view'
@@ -11,7 +12,7 @@ import {
 } from '@/components/common'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { OccurrenceLink } from '@/lib/occurrence-navigation'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { MatchDiagnostic } from '@/lib/aiosource-types'
@@ -167,6 +168,7 @@ export function MatchingDiagnostics() {
         </Disclosure>
         <div className="flex flex-wrap gap-2">
           <Button id="matching-submit" type="submit">
+            <MagnifyingGlassIcon aria-hidden="true" />
             Search
           </Button>
           <ClearFiltersButton
@@ -201,12 +203,12 @@ export function MatchingDiagnostics() {
                       className="space-y-3 rounded-md border p-4"
                     >
                       <div className="min-w-0">
-                        <Link
+                        <OccurrenceLink
                           className="data-link break-words font-medium"
-                          to={`/torrents?occurrence=${encodeURIComponent(item.occurrence_id)}`}
+                          occurrenceId={item.occurrence_id}
                         >
                           {item.title || item.source_id}
-                        </Link>
+                        </OccurrenceLink>
                         <p className="help mt-1 break-words">
                           {sourceName(item.provider_id)} · {item.source_id}
                         </p>
@@ -229,6 +231,7 @@ export function MatchingDiagnostics() {
                         onClick={() => setReviewing(item)}
                         aria-label={`Review ${item.title || item.source_id}`}
                       >
+                        <ListChecksIcon aria-hidden="true" />
                         Review
                       </Button>
                     </article>
@@ -251,12 +254,12 @@ export function MatchingDiagnostics() {
                       {records.data.items?.map((item) => (
                         <TableRow key={item.occurrence_id}>
                           <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                            <Link
+                            <OccurrenceLink
                               className="data-link font-medium"
-                              to={`/torrents?occurrence=${encodeURIComponent(item.occurrence_id)}`}
+                              occurrenceId={item.occurrence_id}
                             >
                               {item.title || item.source_id}
-                            </Link>
+                            </OccurrenceLink>
                             <p className="help mt-1">
                               {sourceName(item.provider_id)} · {item.source_id}
                             </p>
@@ -281,6 +284,7 @@ export function MatchingDiagnostics() {
                               onClick={() => setReviewing(item)}
                               aria-label={`Review ${item.title || item.source_id}`}
                             >
+                              <ListChecksIcon aria-hidden="true" />
                               Review
                             </Button>
                           </TableCell>

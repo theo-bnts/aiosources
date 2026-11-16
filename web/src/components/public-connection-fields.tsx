@@ -1,3 +1,4 @@
+import { TrashIcon } from '@phosphor-icons/react'
 import type { CatalogEntities } from '@/lib/catalog-types'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
@@ -91,6 +92,7 @@ export function PublicAnnounceFields({
                     setRemoved((ids) => (ids.includes(source.id) ? ids : [...ids, source.id]))
                   }
                 >
+                  <TrashIcon aria-hidden="true" />
                   Remove announce
                 </Button>
               )}

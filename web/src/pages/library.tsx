@@ -1,14 +1,17 @@
-import { ResultCount } from '@/components/common'
-import { FilterSelect } from '@/components/filter-select'
-import { useRef, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
 import {
   ArrowRightIcon,
   DownloadSimpleIcon,
-  MagnifyingGlassIcon,
   FileTextIcon,
+  ListBulletsIcon,
+  MagnifyingGlassIcon,
+  PlugsConnectedIcon,
 } from '@phosphor-icons/react'
+
+import { ResultCount } from '@/components/common'
+import { FilterSelect } from '@/components/filter-select'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
+
 import { api, ApiError, AUTO_REFRESH_INTERVAL, downloadBytes, params, rawPage } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Page, RawDetail, RawRecord, Torrent } from '@/lib/types'
@@ -40,7 +43,7 @@ import {
   Pager,
 } from '@/components/common'
 import { TorrentSearchForm } from '@/components/torrent-filters'
-import { OccurrenceDialog, TorrentTable } from '@/components/torrent-history'
+import { TorrentTable } from '@/components/torrent-history'
 import { readTorrentFilters, torrentFilterParams, type TorrentFilters } from '@/lib/search-types'
 import { decodeSearchJSON, exactField, exactJSON } from '@/lib/search-json'
 
@@ -127,15 +130,12 @@ function DownloadButton({
 }
 
 export function TorrentsPage() {
-  const returnFocus = useRef<HTMLElement | null>(null)
   const [search, setSearch] = useViewSearchParams()
   const filters = readTorrentFilters(search)
   const filterKey = torrentFilterParams(filters).toString()
   const explicitLimit = search.get('limit')
   const pagination = useURLPagination()
   const { limit, offset } = pagination
-  const occurrenceId = search.get('occurrence') ?? ''
-  const [selected, setSelected] = useState<Torrent | null>(null)
   const query = torrentFilterParams(filters)
   query.set('limit', String(limit))
   query.set('offset', String(offset))
@@ -144,9 +144,6 @@ export function TorrentsPage() {
     queryFn: ({ signal }) =>
       api<Page<Torrent>>(`/torrents?${query}`, { signal }, decodeSearchJSON<Page<Torrent>>),
   })
-  const current =
-    torrents.data?.items?.find((item) => item.occurrence_id === occurrenceId) ??
-    (selected?.occurrence_id === occurrenceId ? selected : undefined)
   const hasFilters = Object.entries(filters).some(([key, value]) =>
     key === 'sort' ? value !== 'recent' : Array.isArray(value) ? value.length > 0 : Boolean(value),
   )
@@ -156,16 +153,6 @@ export function TorrentsPage() {
     // Commit the applied form before accepting a new draft. A delayed navigation
     // must not replace text entered while the previous results are still loading.
     setSearch(next, { flushSync: true })
-  }
-  function openOccurrence(torrent: Torrent, target: HTMLElement) {
-    if (!occurrenceId) returnFocus.current = target
-    setSelected(torrent)
-    const next = new URLSearchParams(search)
-    next.set('occurrence', torrent.occurrence_id)
-    next.delete('occurrence_tab')
-    next.delete('history_offset')
-    next.delete('related_offset')
-    setSearch(next)
   }
   return (
     <div className="page">
@@ -178,7 +165,7 @@ export function TorrentsPage() {
           <>
             <ResultCount total={torrents.data.total} label="torrents" />
             {torrents.data.items?.length ? (
-              <TorrentTable items={torrents.data.items} onOpen={openOccurrence} />
+              <TorrentTable items={torrents.data.items} />
             ) : (
               <ListEmpty
                 title={offset ? 'No torrents on this page' : 'No torrents in this view'}
@@ -191,7 +178,10 @@ export function TorrentsPage() {
                     <ClearFiltersButton onClear={() => applyFilters({})} />
                   ) : (
                     <Button variant="outline" asChild>
-                      <Link to="/providers/settings">Choose a source</Link>
+                      <Link to="/providers/settings">
+                        <PlugsConnectedIcon aria-hidden="true" />
+                        Choose a source
+                      </Link>
                     </Button>
                   )
                 }
@@ -206,32 +196,6 @@ export function TorrentsPage() {
             />
           </>
         )
-      )}
-      {occurrenceId && (
-        <OccurrenceDialog
-          key={occurrenceId}
-          id={occurrenceId}
-          torrent={current}
-          onOpen={openOccurrence}
-          onClose={() => {
-            const next = new URLSearchParams(search)
-            for (const key of [
-              'occurrence',
-              'occurrence_tab',
-              'history_offset',
-              'history_limit',
-              'related_offset',
-              'related_limit',
-            ])
-              next.delete(key)
-            setSearch(next)
-            setSelected(null)
-          }}
-          onReturnFocus={() => {
-            if (returnFocus.current?.isConnected) returnFocus.current.focus()
-            else document.getElementById('torrent-search')?.focus()
-          }}
-        />
       )}
     </div>
   )
@@ -528,8 +492,14 @@ export function RawDetailPage() {
       </dl>
       <Tabs defaultValue={payloadRetained ? 'original' : 'fields'}>
         <TabsList>
-          <TabsTrigger value="original">Original content</TabsTrigger>
-          <TabsTrigger value="fields">Interpreted fields</TabsTrigger>
+          <TabsTrigger value="original">
+            <FileTextIcon aria-hidden="true" />
+            Original content
+          </TabsTrigger>
+          <TabsTrigger value="fields">
+            <ListBulletsIcon aria-hidden="true" />
+            Interpreted fields
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="original" className="mt-5 space-y-3">
           {payloadRetained ? (

@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, FloppyDiskIcon, TrashIcon } from '@phosphor-icons/react'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
@@ -231,12 +232,14 @@ export function StorageSettingsPanel() {
                       save.reset()
                     }}
                   >
+                    <ArrowClockwiseIcon aria-hidden="true" />
                     Reload saved value
                   </Button>
                 </p>
               )}
               <div className="toolbar">
                 <Button type="submit" disabled={!dirty || conflict || save.isPending}>
+                  <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
@@ -266,6 +269,7 @@ export function StorageSettingsPanel() {
                 disabled={Boolean(resetUnavailableReason)}
                 aria-describedby={resetUnavailableReason ? 'source-data-reset-status' : undefined}
               >
+                <TrashIcon aria-hidden="true" />
                 Reset all source data
               </Button>
             }

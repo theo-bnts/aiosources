@@ -101,12 +101,23 @@ export const runtimeSections = {
     ],
   },
   security: {
-    title: 'Authentication settings',
+    title: 'Administrator limits',
     help: 'Session duration applies to new sign-ins. Reducing the session limit does not revoke existing sessions. Sign-in limits apply per minute across application replicas; global capacity must cover the per-address limit. Password and CSRF protections remain enforced.',
     fields: [
       ['session_hours', 'New administrator session duration (hours)', 1, 168],
-      ['session_limit', 'Maximum active administrator sessions', 1, 1024],
+      ['session_limit', 'Maximum active administrator sessions', 1, 100],
       ['login_per_minute', 'Sign-in attempts per address per minute', 1, 60],
+      ['login_global_per_minute', 'Total sign-in attempts per minute', 1, 600],
+    ],
+  },
+  trusted_security: {
+    title: 'Trusted user limits',
+    help: 'Session duration applies to new trusted user sign-ins. The session limit applies to each account and does not revoke existing sessions when reduced. Sign-in limits are shared across application replicas and are independent of administrator sign-ins. Total capacity must cover both per-address and per-account limits.',
+    fields: [
+      ['session_hours', 'New trusted user session duration (hours)', 1, 168],
+      ['session_limit', 'Maximum active sessions per trusted user', 1, 100],
+      ['login_per_minute', 'Sign-in attempts per address per minute', 1, 60],
+      ['login_account_per_minute', 'Sign-in attempts per account per minute', 1, 60],
       ['login_global_per_minute', 'Total sign-in attempts per minute', 1, 600],
     ],
   },

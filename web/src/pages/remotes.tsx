@@ -1,3 +1,13 @@
+import {
+  ArrowClockwiseIcon,
+  CloudArrowDownIcon,
+  FloppyDiskIcon,
+  MagnifyingGlassIcon,
+  PencilSimpleIcon,
+  PlayIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
 import { ImportLastRun } from '@/components/import-last-run'
 import { CatalogDataControls, catalogEntitiesSummary } from '@/components/catalog-data-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
@@ -9,14 +19,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import {
-  PlayIcon,
-  PlusIcon,
-  CloudArrowDownIcon,
-  MagnifyingGlassIcon,
-  PencilSimpleIcon,
-  TrashIcon,
-} from '@phosphor-icons/react'
+
 import { api, ApiError, ConnectionError, refreshData, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import type { RemoteCatalog } from '@/lib/catalog-types'
 import type { Items, ProviderDocument, Validation } from '@/lib/types'
@@ -681,6 +684,7 @@ function RemoteForm({
             settings. Only your changed form values will be reapplied; review them before saving.
           </p>
           <Button type="button" variant="outline" disabled={busy} onClick={() => reload.mutate()}>
+            <ArrowClockwiseIcon aria-hidden="true" />
             Reload source, keep edits
           </Button>
         </div>
@@ -703,6 +707,7 @@ function RemoteForm({
             !draft.id.trim()
           }
         >
+          {original ? <FloppyDiskIcon aria-hidden="true" /> : <PlusIcon aria-hidden="true" />}
           {save.isPending ? 'Saving…' : original ? 'Save' : 'Create remote catalog'}
         </Button>
       </DialogFooter>

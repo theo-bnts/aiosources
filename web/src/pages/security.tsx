@@ -5,6 +5,7 @@ import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
 import type { Items } from '@/lib/types'
 import type { AdminSession } from '@/lib/security-types'
+import { PublicRequestLimitsPanel } from '@/components/public-request-limits'
 import SecretsPage, { SecretReferencesHelp } from '@/pages/secrets'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -42,11 +43,14 @@ export function SecuritySecretsPage() {
   )
 }
 
-export function SecuritySettingsPage() {
+export function SecurityLimitsPage() {
   return (
     <div className="page">
       <SettingsSections>
         <RuntimeSettingsPanel section="security" />
+        <RuntimeSettingsPanel section="trusted_security" />
+        <PublicRequestLimitsPanel />
+        <RuntimeSettingsPanel section="payloads" />
       </SettingsSections>
     </div>
   )
@@ -69,12 +73,6 @@ export function SecuritySessionsPage() {
     <div className="page" id="sessions">
       <section className="space-y-4" aria-label="Active sessions">
         <div className="page-heading">
-          <div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Each session keeps the expiry assigned at sign-in. Device descriptions are
-              deliberately coarse; no IP address or raw user agent is stored.
-            </p>
-          </div>
           <ConfirmAction
             title="Revoke all other sessions?"
             description="Every session except this browser will be signed out. Other browsers will need your password."
@@ -82,6 +80,7 @@ export function SecuritySessionsPage() {
             variant="warning"
             trigger={
               <Button variant="warning" disabled={!sessions.data || sessionItems.length < 2}>
+                <SignOutIcon aria-hidden="true" />
                 Revoke others
               </Button>
             }

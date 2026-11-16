@@ -1,4 +1,4 @@
-import type { CatalogOrigin, Page } from './types'
+import type { CatalogOrigin, Page, Torrent } from './types'
 
 export interface TorrentChange {
   id: string
@@ -12,6 +12,7 @@ export interface TorrentChange {
 }
 
 export interface OccurrenceHistory extends Page<TorrentChange> {
+  current?: Torrent
   occurrence_id: string
   provider_id: string
   source_id: string

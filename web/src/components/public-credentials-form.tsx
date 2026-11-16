@@ -1,3 +1,4 @@
+import { TrashIcon, CheckIcon, EraserIcon } from '@phosphor-icons/react'
 import { debridProviders } from '@/lib/debrid'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from '@/lib/api'
@@ -162,6 +163,7 @@ export function PublicCredentialsForm({
                             )
                           }
                         >
+                          <TrashIcon aria-hidden="true" />
                           Remove key
                         </Button>
                       )}
@@ -189,6 +191,7 @@ export function PublicCredentialsForm({
       <ErrorNotice error={error} />
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={pending || disabled}>
+          <CheckIcon aria-hidden="true" />
           {pending ? (info.use_instance_debrid ? 'Saving…' : 'Checking services…') : submitLabel}
         </Button>
         {saved && (
@@ -202,6 +205,7 @@ export function PublicCredentialsForm({
               setError(null)
             }}
           >
+            <EraserIcon aria-hidden="true" />
             Forget saved credentials
           </Button>
         )}

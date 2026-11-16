@@ -170,7 +170,15 @@ func (s *Store) RevokeAdminSessions(ctx context.Context, currentID, targetID str
 // AllowSecurityAttempt applies a durable per-client and global administrator
 // limit across replicas. Client identifiers are domain-separated hashes, not raw addresses.
 func (s *Store) AllowSecurityAttempt(ctx context.Context, clientHash string) (bool, error) {
-	policy, err := s.RuntimeValues(ctx, "security")
+	return s.allowSignInAttempt(ctx, clientHash, "security", "administrator", "client-")
+}
+
+func (s *Store) AllowTrustedSecurityAttempt(ctx context.Context, clientHash string) (bool, error) {
+	return s.allowSignInAttempt(ctx, clientHash, "trusted_security", "trusted", "trusted-client-")
+}
+
+func (s *Store) allowSignInAttempt(ctx context.Context, clientHash, section, globalBucket, clientPrefix string) (bool, error) {
+	policy, err := s.RuntimeValues(ctx, section)
 	if err != nil {
 		return false, err
 	}
@@ -183,7 +191,7 @@ func (s *Store) AllowSecurityAttempt(ctx context.Context, clientHash string) (bo
 	for _, bucket := range []struct {
 		key   string
 		limit int
-	}{{"administrator", policy["login_global_per_minute"]}, {"client-" + clientHash, policy["login_per_minute"]}} {
+	}{{globalBucket, policy["login_global_per_minute"]}, {clientPrefix + clientHash, policy["login_per_minute"]}} {
 		var count int
 		err = tx.QueryRow(ctx, `INSERT INTO aiosources.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1)
  ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,

@@ -1,3 +1,4 @@
+import { PencilSimpleIcon, XIcon } from '@phosphor-icons/react'
 import {
   createContext,
   useCallback,
@@ -118,6 +119,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <Button ref={keepEditing} variant="outline" onClick={cancel}>
+              <PencilSimpleIcon aria-hidden="true" />
               Keep editing
             </Button>
             <Button
@@ -130,6 +132,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
                 else if (blocker.state === 'blocked') blocker.proceed()
               }}
             >
+              <XIcon aria-hidden="true" />
               Discard changes
             </Button>
           </AlertDialogFooter>

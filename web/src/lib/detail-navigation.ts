@@ -21,6 +21,7 @@ const viewLabels: Record<string, string> = {
   '/sharing/remotes': 'Remote catalogs',
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',
+  '/metadata/identification': 'Identification',
   '/metadata/videos/history': 'Video history',
   '/metadata/games/history': 'Game history',
   '/metadata/books/history': 'Book history',

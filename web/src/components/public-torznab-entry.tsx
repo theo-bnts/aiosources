@@ -1,3 +1,4 @@
+import { LinkIcon, EraserIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
 import {
@@ -162,6 +163,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
           )}
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={pending || Boolean(preferenceError)}>
+              <LinkIcon aria-hidden="true" />
               {pending ? 'Creating connection…' : 'Create connection link'}
             </Button>
             {saved && (
@@ -175,6 +177,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
                   setError(undefined)
                 }}
               >
+                <EraserIcon aria-hidden="true" />
                 Forget saved credentials
               </Button>
             )}

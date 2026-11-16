@@ -54,7 +54,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Remote catalogs', '/remotes/history/missing'],
     ['Connections', 'Shared catalogs', '/sharing/settings'],
     ['Administration', 'Incoming', '/network'],
-    ['Administration', 'Public', '/network/limits'],
+    ['Administration', 'Limits', '/network/limits'],
     ['Administration', 'Outgoing', '/network/proxies'],
     ['Administration', 'Outgoing', '/network/routing'],
     ['Administration', 'Incoming', '/network/incoming'],
@@ -62,7 +62,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Administration', 'Secrets', '/security'],
     ['Administration', 'Secrets', '/secrets'],
     ['Administration', 'Secrets', '/security/secrets'],
-    ['Administration', 'Settings', '/security/settings'],
+    ['Administration', 'Limits', '/security/limits'],
     ['Administration', 'Active sessions', '/security/sessions'],
     ['Administration', 'Logs', '/logs'],
     ['Administration', 'Logs', '/notifications'],
@@ -78,11 +78,13 @@ test('navigation and page tabs remain coherent on every current and legacy route
           ? ['Sources/', 'Indexers/', label]
           : ['Incoming', 'Outgoing'].includes(label)
             ? [`${group}/`, 'Network/', label]
-            : ['Statistics', 'Secrets', 'Settings', 'Active sessions'].includes(label)
+            : ['Secrets', 'Limits', 'Active sessions'].includes(label)
               ? [`${group}/`, 'Security/', label]
               : ['Public', 'Trusted'].includes(label)
                 ? [`${group}/`, 'Users/', label]
-                : [`${group}/`, label]
+                : ['Videos', 'Games', 'Books'].includes(label)
+                  ? [`${group}/`, 'Catalogs/', label]
+                  : [`${group}/`, label]
         : [label],
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -120,6 +122,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Sources',
     'Indexers',
     'Metadata',
+    'Catalogs',
     'Connections',
     'Administration',
     'Security',
@@ -182,6 +185,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     'aria-expanded',
     'false',
   )
+  await navigation.getByRole('button', { name: 'Catalogs', exact: true }).click()
   await navigation.getByRole('link', { name: 'Videos', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
   await page.getByRole('tab', { name: 'History', exact: true }).click()
@@ -190,7 +194,7 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     'aria-selected',
     'true',
   )
-  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Videos'])
+  await expect(breadcrumb.getByRole('listitem')).toHaveText(['Metadata/', 'Catalogs/', 'Videos'])
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await expect(navigation.getByRole('button', { name: 'Sources', exact: true })).toHaveAttribute(

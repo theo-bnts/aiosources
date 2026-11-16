@@ -1,3 +1,20 @@
+import {
+  ArrowClockwiseIcon,
+  BracketsCurlyIcon,
+  CheckCircleIcon,
+  DownloadSimpleIcon,
+  FileArrowUpIcon,
+  FilePlusIcon,
+  FloppyDiskIcon,
+  GitMergeIcon,
+  MagnifyingGlassIcon,
+  PencilSimpleIcon,
+  PlayIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadSimpleIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { ImportLastRun } from '@/components/import-last-run'
 import { toggleProvider } from '@/lib/provider-state'
 import {
@@ -15,18 +32,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
-import {
-  PlusIcon,
-  MagnifyingGlassIcon,
-  PencilSimpleIcon,
-  TrashIcon,
-  CheckCircleIcon,
-  ArrowClockwiseIcon,
-  PlayIcon,
-  DownloadSimpleIcon,
-  UploadSimpleIcon,
-  BracketsCurlyIcon,
-} from '@phosphor-icons/react'
+
 import { api, ApiError, queryClient, refreshData, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import type {
   AdapterInfo,
@@ -410,6 +416,7 @@ export function ProviderEditor() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => setTemplate(adapter)}>
+                      <FilePlusIcon aria-hidden="true" />
                       Use this template
                     </Button>
                   </TableCell>
@@ -588,6 +595,7 @@ function ProviderForm({
               {validate.isPending ? 'Checking…' : 'Check configuration'}
             </Button>
             <Button disabled={blocked || !dirty} onClick={() => save.mutate(json)}>
+              <FloppyDiskIcon aria-hidden="true" />
               {save.isPending ? 'Saving…' : 'Save'}
             </Button>
           </>
@@ -664,6 +672,7 @@ function ProviderForm({
                 )
               }}
             >
+              <GitMergeIcon aria-hidden="true" />
               Merge my field edits
             </Button>
             <Button
@@ -679,6 +688,7 @@ function ProviderForm({
                 )
               }}
             >
+              <PencilSimpleIcon aria-hidden="true" />
               Keep my edits on this revision
             </Button>
             <ConfirmAction
@@ -688,6 +698,7 @@ function ProviderForm({
               variant="warning"
               trigger={
                 <Button variant="warning" disabled={busy}>
+                  <XIcon aria-hidden="true" />
                   Discard my edits
                 </Button>
               }
@@ -756,9 +767,11 @@ function ProviderForm({
                 save.reset()
               }}
             >
+              <FileArrowUpIcon aria-hidden="true" />
               Replace editor content
             </Button>
             <Button variant="ghost" onClick={() => setPendingImport(null)}>
+              <XIcon aria-hidden="true" />
               Cancel import
             </Button>
           </div>

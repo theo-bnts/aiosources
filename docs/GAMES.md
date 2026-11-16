@@ -2,12 +2,12 @@
 
 [Back to README](../README.md) · [Search and identification](OPERATIONS.md)
 
-Connect IGDB to identify games already present in your source catalog. Games have their own **Statistics**, **Settings** and **History** under **Metadata → Games**. Search and review use the information imported on your instance; your search terms are not sent to IGDB.
+Connect IGDB to identify games already present in your source catalog. Games have their own **Statistics**, **Settings** and **History** under **Metadata → Catalogs → Games**. Search and review use the information imported on your instance; your search terms are not sent to IGDB.
 
 ## Set up
 
 1. Create a [Twitch developer application](https://dev.twitch.tv/console/apps) with the **Confidential** client type. IGDB does not use its OAuth redirect URL; `http://localhost/` is sufficient.
-2. Open **Metadata → Games → Settings** and enter its **Twitch client ID**.
+2. Open **Metadata → Catalogs → Games → Settings** and enter its **Twitch client ID**.
 3. Use **Add Twitch client secret** to save the secret in the same encrypted Secrets store as your other service credentials.
 4. Enable **Automatically update game information** and save. You can also use **Manual actions → Update game information**.
 5. Follow progress in **History**. Interrupted imports continue from saved progress; existing source records do not need to be downloaded again.

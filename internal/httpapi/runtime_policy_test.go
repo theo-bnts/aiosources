@@ -29,7 +29,7 @@ func TestAuthenticationPolicyControlsNewSessions(t *testing.T) {
 	if err != nil || len(sessions) != 1 || sessions[0].ExpiresAt.Sub(cookie.Expires) > time.Second {
 		t.Fatal("session and cookie deadlines differ", err)
 	}
-	if response := f.request(http.MethodPost, "/api/login", map[string]string{"password": "synthetic-test-password"}, nil); response.Code != http.StatusServiceUnavailable {
+	if response := f.request(http.MethodPost, "/api/login", map[string]string{"password": "synthetic-test-password"}, nil); response.Code != http.StatusConflict {
 		t.Fatal("active session limit ignored", response.Code)
 	}
 	if response := f.request(http.MethodGet, "/api/session", nil, cookie); !strings.Contains(response.Body.String(), `"authenticated":true`) {

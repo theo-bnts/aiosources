@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, FloppyDiskIcon, ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -166,17 +167,22 @@ export function PublicAccessSettings() {
                   disabled={busy}
                   onClick={() => review.mutate()}
                 >
+                  <ArrowClockwiseIcon aria-hidden="true" />
                   {review.isPending ? 'Loading latest settings…' : 'Load latest settings'}
                 </Button>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
               <Button type="submit" disabled={!dirty || conflict || busy}>
+                <FloppyDiskIcon aria-hidden="true" />
                 {save.isPending ? 'Saving…' : 'Save'}
               </Button>
               {query.data?.enabled && (
                 <Button variant="outline" asChild>
-                  <Link to="/public">Open public homepage</Link>
+                  <Link to="/public">
+                    <ArrowSquareOutIcon aria-hidden="true" />
+                    Open public homepage
+                  </Link>
                 </Button>
               )}
               {(dirty || save.isPending || save.isSuccess) && (

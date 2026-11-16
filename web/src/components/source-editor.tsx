@@ -1,17 +1,20 @@
+import {
+  ArrowsLeftRightIcon,
+  BracketsCurlyIcon,
+  CalendarIcon,
+  FingerprintIcon,
+  FlowArrowIcon,
+  GearSixIcon,
+  GlobeIcon,
+  RowsIcon,
+  TimerIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
 import { useSettingDestination } from '@/lib/settings-navigation'
 import { useLocation } from 'react-router-dom'
 import { useNotification } from '@/lib/notifications'
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import {
-  FingerprintIcon,
-  GlobeIcon,
-  RowsIcon,
-  ArrowsLeftRightIcon,
-  TimerIcon,
-  BracketsCurlyIcon,
-  FlowArrowIcon,
-  CalendarIcon,
-} from '@phosphor-icons/react'
+
 import { parseProviderJSON, type ProviderJSON } from '@/lib/provider-json'
 import { Button } from '@/components/ui/button'
 import { ConfirmAction } from '@/components/common'
@@ -243,6 +246,7 @@ function AuthenticationSettings({ other = false }: { other?: boolean }) {
             variant="warning"
             trigger={
               <Button type="button" variant="warning">
+                <TrashIcon aria-hidden="true" />
                 Clear incompatible fields
               </Button>
             }
@@ -461,7 +465,7 @@ function PaginationSettings() {
     },
   ]
   const optionalSettings = (
-    <>
+    <div className="space-y-5">
       <OptionalSection
         title="Other pagination parameters"
         description="Changing strategy keeps these settings; it never removes fields from the definition."
@@ -509,7 +513,7 @@ function PaginationSettings() {
           />
         </FieldGrid>
       </OptionalSection>
-    </>
+    </div>
   )
   const fields = (
     <>
@@ -767,6 +771,7 @@ function TraversalSettings() {
               size="sm"
               onClick={() => change((next) => next.delete('traversal'))}
             >
+              <TrashIcon aria-hidden="true" />
               Remove traversal configuration
             </Button>
           </OptionalSection>
@@ -830,6 +835,7 @@ function TraversalSettings() {
             )
           }
         >
+          <GearSixIcon aria-hidden="true" />
           Configure bounded traversal
         </Button>
       )}
@@ -854,6 +860,7 @@ function TraversalOptions() {
             size="sm"
             onClick={() => change((next) => next.deleteIn(['traversal', 'options']))}
           >
+            <TrashIcon aria-hidden="true" />
             Remove discovered options
           </Button>
           <TextField path={['traversal', 'options', 'url']} label="Options URL" />
@@ -881,6 +888,7 @@ function TraversalOptions() {
             )
           }
         >
+          <GearSixIcon aria-hidden="true" />
           Configure discovered options
         </Button>
       )}
@@ -902,6 +910,7 @@ function RecoverySettings() {
       {configured ? (
         <>
           <Button variant="warning" size="sm" onClick={() => change((next) => next.deleteIn(base))}>
+            <TrashIcon aria-hidden="true" />
             Remove ID recovery
           </Button>
           <MapField path={[...base, 'discovery_query']} label="Discovery query" />
@@ -941,6 +950,7 @@ function RecoverySettings() {
             )
           }
         >
+          <GearSixIcon aria-hidden="true" />
           Configure ID recovery
         </Button>
       )}
@@ -985,6 +995,7 @@ function RequestLimitsSettings() {
           size="sm"
           onClick={() => change((next) => next.delete('request_limits'))}
         >
+          <TrashIcon aria-hidden="true" />
           Remove all request budgets
         </Button>
       )}

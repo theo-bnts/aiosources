@@ -1,3 +1,4 @@
+import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { Disclosure } from '@/components/ui/disclosure'
 import { QuerySorting } from '@/components/result-controls'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
@@ -201,6 +202,7 @@ export function TorrentSearchForm({
       <input type="hidden" name="sort" value={sort} />
       <div className="flex flex-wrap gap-2">
         <Button id="torrent-submit" type="submit">
+          <MagnifyingGlassIcon aria-hidden="true" />
           Search
         </Button>
         <ClearFiltersButton

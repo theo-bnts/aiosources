@@ -1,3 +1,34 @@
+import {
+  ArrowClockwiseIcon,
+  BookOpenIcon,
+  BroadcastIcon,
+  CaretDownIcon,
+  CloudArrowDownIcon,
+  CloudCheckIcon,
+  DatabaseIcon,
+  DevicesIcon,
+  DownloadSimpleIcon,
+  FilmStripIcon,
+  GameControllerIcon,
+  GaugeIcon,
+  GearSixIcon,
+  GlobeIcon,
+  KeyIcon,
+  ListChecksIcon,
+  ListIcon,
+  ListMagnifyingGlassIcon,
+  MagnifyingGlassIcon,
+  PlayCircleIcon,
+  PlugsConnectedIcon,
+  ShareNetworkIcon,
+  ShieldCheckIcon,
+  SignInIcon,
+  SignOutIcon,
+  StackIcon,
+  TerminalWindowIcon,
+  UsersThreeIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { readNavigationPreferences } from '@/lib/navigation-preferences'
 import { SettingsSearch } from '@/components/settings-search'
 import { SettingsDestination } from '@/components/settings-destination'
@@ -16,35 +47,7 @@ import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
 import type { Icon } from '@phosphor-icons/react'
-import {
-  DatabaseIcon,
-  PlugsConnectedIcon,
-  MagnifyingGlassIcon,
-  ListMagnifyingGlassIcon,
-  StackIcon,
-  CloudCheckIcon,
-  PlayCircleIcon,
-  SignOutIcon,
-  ListIcon,
-  XIcon,
-  ArrowClockwiseIcon,
-  TerminalWindowIcon,
-  ShareNetworkIcon,
-  ShieldCheckIcon,
-  CaretDownIcon,
-  DownloadSimpleIcon,
-  CloudArrowDownIcon,
-  GearSixIcon,
-  ListChecksIcon,
-  BroadcastIcon,
-  GlobeIcon,
-  UsersThreeIcon,
-  FilmStripIcon,
-  BookOpenIcon,
-  GameControllerIcon,
-  KeyIcon,
-  DevicesIcon,
-} from '@phosphor-icons/react'
+
 import {
   api,
   queryClient,
@@ -157,22 +160,30 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/metadata/videos',
-        label: 'Videos',
-        description: 'Film and series information, updates and history.',
-        icon: FilmStripIcon,
-      },
-      {
-        to: '/metadata/games',
-        label: 'Games',
-        description: 'Game information, updates and history.',
-        icon: GameControllerIcon,
-      },
-      {
-        to: '/metadata/books',
-        label: 'Books',
-        description: 'Book and audiobook information, updates and history.',
-        icon: BookOpenIcon,
+        to: '/metadata/catalogs',
+        label: 'Catalogs',
+        description: 'Manage video, game and book information.',
+        icon: DatabaseIcon,
+        children: [
+          {
+            to: '/metadata/videos',
+            label: 'Videos',
+            description: 'Film and series information, updates and history.',
+            icon: FilmStripIcon,
+          },
+          {
+            to: '/metadata/games',
+            label: 'Games',
+            description: 'Game information, updates and history.',
+            icon: GameControllerIcon,
+          },
+          {
+            to: '/metadata/books',
+            label: 'Books',
+            description: 'Book and audiobook information, updates and history.',
+            icon: BookOpenIcon,
+          },
+        ],
       },
       {
         to: '/metadata/identification',
@@ -257,10 +268,10 @@ const navigationGroups: NavigationGroup[] = [
             icon: KeyIcon,
           },
           {
-            to: '/security/settings',
-            label: 'Settings',
-            description: 'Configure sign-in limits and sessions.',
-            icon: ShieldCheckIcon,
+            to: '/security/limits',
+            label: 'Limits',
+            description: 'Manage administrator, trusted user and public access limits.',
+            icon: GaugeIcon,
           },
           {
             to: '/security/sessions',
@@ -820,6 +831,11 @@ export function AppShell({
       <div className="shrink-0 space-y-2 p-3">
         <Button variant="outline" className="w-full" asChild>
           <Link to={authenticated ? '/providers' : '/login'}>
+            {authenticated ? (
+              <ShieldCheckIcon aria-hidden="true" />
+            ) : (
+              <SignInIcon aria-hidden="true" />
+            )}
             {authenticated ? 'Administration' : 'Login'}
           </Link>
         </Button>

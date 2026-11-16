@@ -1,4 +1,17 @@
 import {
+  ArrowClockwiseIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CaretDoubleLeftIcon,
+  CaretDoubleRightIcon,
+  CheckIcon,
+  DatabaseIcon,
+  MagnifyingGlassIcon,
+  WarningCircleIcon,
+  XIcon,
+  type Icon,
+} from '@phosphor-icons/react'
+import {
   createContext,
   useContext,
   useEffect,
@@ -7,16 +20,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  WarningCircleIcon,
-  ArrowClockwiseIcon,
-  DatabaseIcon,
-  MagnifyingGlassIcon,
-  XIcon,
-  type Icon,
-} from '@phosphor-icons/react'
+
 import { Link } from 'react-router-dom'
 import { ApiError } from '@/lib/api'
 import { RequestNotices } from '@/lib/request-notices'
@@ -244,6 +248,7 @@ export function Pager({
           disabled={busy || offset === 0}
           onClick={() => onChange(0)}
         >
+          <CaretDoubleLeftIcon aria-hidden="true" />
           First
         </Button>
         <Button
@@ -274,6 +279,7 @@ export function Pager({
           onClick={() => onChange(lastOffset)}
         >
           Last
+          <CaretDoubleRightIcon aria-hidden="true" />
         </Button>
       </div>
     </nav>
@@ -334,6 +340,7 @@ export function ListEmpty({
       action={
         offset > 0 ? (
           <Button type="button" variant="outline" onClick={onFirstPage}>
+            <CaretDoubleLeftIcon aria-hidden="true" />
             Return to first page
           </Button>
         ) : (
@@ -435,8 +442,12 @@ export function ConfirmAction({
         </AlertDialogHeader>
         <ErrorNotice error={error} />
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Back</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>
+            <ArrowLeftIcon aria-hidden="true" />
+            Back
+          </AlertDialogCancel>
           <Button variant={selected.variant} disabled={pending} onClick={() => void confirm()}>
+            <CheckIcon aria-hidden="true" />
             {pending ? 'Processing…' : selected.label}
           </Button>
         </AlertDialogFooter>

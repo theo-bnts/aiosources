@@ -1,4 +1,12 @@
-import { ArrowClockwiseIcon, MagnifyingGlassIcon, StopIcon, TrashIcon } from '@phosphor-icons/react'
+import {
+  ArrowClockwiseIcon,
+  ArrowSquareOutIcon,
+  FloppyDiskIcon,
+  MagnifyingGlassIcon,
+  StopIcon,
+  TrashIcon,
+} from '@phosphor-icons/react'
+
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { BookImportFilters } from '@/components/book-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
@@ -389,6 +397,7 @@ export default function AIOSourcePage({
             (form === 'book-catalog' && (Boolean(status.books?.running) || resetting))
           }
         >
+          <FloppyDiskIcon aria-hidden="true" />
           {save.isPending && save.variables?.scope === form ? 'Saving…' : 'Save'}
         </Button>
         {conflict(form) && (
@@ -398,6 +407,7 @@ export default function AIOSourcePage({
             disabled={save.isPending || review.isPending}
             onClick={() => review.mutate(form)}
           >
+            <ArrowClockwiseIcon aria-hidden="true" />
             Load latest settings
           </Button>
         )}
@@ -468,6 +478,24 @@ export default function AIOSourcePage({
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+            {(section === 'videos' || section === 'games') && (
+              <div>
+                <Button asChild variant="outline">
+                  <a
+                    href={
+                      section === 'videos'
+                        ? 'https://www.themoviedb.org/settings/api/request'
+                        : 'https://dev.twitch.tv/console/apps/create'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ArrowSquareOutIcon aria-hidden="true" />
+                    {section === 'videos' ? 'Create TMDB credentials' : 'Create Twitch credentials'}
+                  </a>
+                </Button>
               </div>
             )}
             {section === 'videos' &&
@@ -1026,6 +1054,7 @@ export default function AIOSourcePage({
                 disabled={action.isPending || !status.config.alldebrid_secret}
                 onClick={() => action.mutate('retry-cleanup')}
               >
+                <ArrowClockwiseIcon aria-hidden="true" />
                 Retry temporary cleanup
               </Button>
             </Disclosure>

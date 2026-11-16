@@ -89,9 +89,9 @@ Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. 
 ## First steps
 
 1. **Add a source** in **Sources → Indexers → Torrents → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
-2. **Set up film and series information** in **Metadata → Videos → Settings** with your TMDB token and enable automatic updates.
-3. **For books**, choose your catalog filters and enable Open Library updates in **Metadata → Books → Settings**. The default keeps digital, audio and locally referenced editions; language filtering is optional and starts disabled. The first import can take hours; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
-4. **For games**, add your Twitch client ID and client secret in **Metadata → Games → Settings**, then enable IGDB updates. [Game setup](docs/GAMES.md).
+2. **Set up film and series information** in **Metadata → Catalogs → Videos → Settings** with your TMDB token and enable automatic updates.
+3. **For books**, choose your catalog filters and enable Open Library updates in **Metadata → Catalogs → Books → Settings**. The default keeps digital, audio and locally referenced editions; language filtering is optional and starts disabled. The first import can take hours; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
+4. **For games**, add your Twitch client ID and client secret in **Metadata → Catalogs → Games → Settings**, then enable IGDB updates. [Game setup](docs/GAMES.md).
 5. **Review identification** in **Metadata → Identification** for videos, games and books. Adjust automatic identification in its **Settings** tab. Videos, Games, Books and Identification each keep their own history.
 6. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
 7. **Open Search** to find a title, or create a connection for your preferred application below.

@@ -63,10 +63,6 @@ export function torrentFilterParams(filters: TorrentFilters) {
   return search
 }
 
-export function occurrenceHref(id: string) {
-  return `/torrents?${new URLSearchParams({ occurrence: id })}`
-}
-
 export const torrentSorting = [
   { label: 'Last imported', asc: 'oldest', desc: 'recent' },
   { label: 'Size', asc: 'size_asc', desc: 'size_desc' },

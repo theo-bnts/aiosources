@@ -1,3 +1,12 @@
+import {
+  ArrowRightIcon,
+  FileTextIcon,
+  GitDiffIcon,
+  PauseIcon,
+  PlayIcon,
+  PulseIcon,
+  StopIcon,
+} from '@phosphor-icons/react'
 import { compareListNames, resetListView } from '@/lib/list-view'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import {
@@ -15,7 +24,7 @@ import { useRef } from 'react'
 import { FilterSelect } from '@/components/filter-select'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
-import { ArrowRightIcon, PauseIcon, PlayIcon, StopIcon } from '@phosphor-icons/react'
+
 import { api, params, queryClient, refreshData } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
@@ -688,9 +697,18 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         }}
       >
         <TabsList>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="changes">Published changes</TabsTrigger>
-          <TabsTrigger value="raw">Processed records</TabsTrigger>
+          <TabsTrigger value="events">
+            <PulseIcon aria-hidden="true" />
+            Events
+          </TabsTrigger>
+          <TabsTrigger value="changes">
+            <GitDiffIcon aria-hidden="true" />
+            Published changes
+          </TabsTrigger>
+          <TabsTrigger value="raw">
+            <FileTextIcon aria-hidden="true" />
+            Processed records
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="events" className="mt-4">
           <EventsView key={run.id} runId={run.id} />

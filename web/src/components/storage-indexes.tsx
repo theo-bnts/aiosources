@@ -1,3 +1,4 @@
+import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
@@ -194,12 +195,14 @@ export function StorageIndexesPanel() {
                       save.reset()
                     }}
                   >
+                    <ArrowClockwiseIcon aria-hidden="true" />
                     Reload saved value
                   </Button>
                 </p>
               )}
               <div className="toolbar">
                 <Button type="submit" disabled={!dirty || conflict || save.isPending}>
+                  <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
                 <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />

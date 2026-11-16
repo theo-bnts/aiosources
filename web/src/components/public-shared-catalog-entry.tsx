@@ -1,3 +1,4 @@
+import { LinkIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { CatalogEntities } from '@/lib/catalog-types'
@@ -112,6 +113,7 @@ export function PublicSharedCatalogEntry({
           </p>
           <ErrorNotice error={error} />
           <Button type="submit" disabled={pending}>
+            <LinkIcon aria-hidden="true" />
             {pending ? 'Creating connection…' : 'Create connection link'}
           </Button>
         </form>

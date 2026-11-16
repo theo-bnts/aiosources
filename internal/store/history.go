@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -110,6 +111,13 @@ func (s *Store) TorrentHistory(ctx context.Context, id string, options model.Lis
 	result.ProviderID = state.ProviderID
 	result.SourceID = state.SourceID
 	result.Origin = state.Origin
+	current, currentErr := scanTorrent(tx.QueryRow(ctx, "SELECT "+torrentColumns+" FROM aiosources.torrents WHERE occurrence_id=$1", id))
+	if currentErr != nil && !errors.Is(currentErr, pgx.ErrNoRows) {
+		return result, databaseError("read current occurrence", currentErr)
+	}
+	if currentErr == nil {
+		result.Current = &current
+	}
 	if err := tx.QueryRow(ctx, "SELECT history_since FROM aiosources.torrent_history_metadata WHERE singleton").Scan(&result.HistorySince); err != nil {
 		return result, databaseError("read history coverage", err)
 	}

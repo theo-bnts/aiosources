@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"github.com/theo-bnts/aiosources/internal/model"
 	"net/http"
 
 	"github.com/theo-bnts/aiosources/internal/store"
@@ -26,6 +27,14 @@ func (s *server) torrentHistory(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, err)
 		return
+	}
+	if result.Current != nil {
+		current := []model.Torrent{*result.Current}
+		if err := s.projectTorrentFields(current); err != nil {
+			respondError(w, err)
+			return
+		}
+		result.Current = &current[0]
 	}
 	writeJSON(w, http.StatusOK, result)
 }

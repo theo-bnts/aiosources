@@ -61,14 +61,15 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   outgoing: ['/network/outgoing', 'Administration / Network / Outgoing'],
   connections: ['/network/incoming', 'Administration / Network / Incoming'],
   downloads: ['/network/incoming', 'Administration / Network / Incoming'],
-  payloads: ['/network/incoming', 'Administration / Network / Incoming'],
+  payloads: ['/security/limits', 'Administration / Security / Limits'],
   history: ['/health/settings', 'Administration / Storage'],
-  security: ['/security/settings', 'Administration / Security / Settings'],
+  security: ['/security/limits', 'Administration / Security / Limits'],
+  trusted_security: ['/security/limits', 'Administration / Security / Limits'],
   source_retries: ['/providers/settings', 'Sources / Indexers / Torrents'],
   identification: ['/metadata/identification/settings', 'Metadata / Identification'],
   matching: ['/metadata/identification/settings', 'Metadata / Identification'],
-  metadata: ['/metadata/videos/settings', 'Metadata / Videos'],
-  metadata_retries: ['/metadata/videos/settings', 'Metadata / Videos, Games & Books'],
+  metadata: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos'],
+  metadata_retries: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos, Games & Books'],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
   const definition = runtimeSections[section]
@@ -112,7 +113,7 @@ add(
 add(
   {
     route: '/metadata/videos/settings',
-    group: 'Metadata / Videos / Settings',
+    group: 'Metadata / Catalogs / Videos / Settings',
     keywords: 'TMDB films movies series video metadonnees',
   },
   [
@@ -129,7 +130,7 @@ add(
 add(
   {
     route: '/metadata/games/settings',
-    group: 'Metadata / Games / Settings',
+    group: 'Metadata / Catalogs / Games / Settings',
     keywords: 'IGDB Twitch games jeux video metadata',
   },
   [
@@ -144,7 +145,7 @@ add(
 add(
   {
     route: '/metadata/books/settings',
-    group: 'Metadata / Books / Settings',
+    group: 'Metadata / Catalogs / Books / Settings',
     keywords: 'Open Library books ebooks audiobooks livres metadonnees',
   },
   [
@@ -292,8 +293,9 @@ add(
 )
 add(
   {
-    route: '/public-access/limits',
-    group: 'Administration / Users / Public / Request limits',
+    route: '/security/limits',
+    group: 'Administration / Security / Limits / Public request limits',
+    reveal: ['Public request limits'],
     keywords: 'public rate limit quota limite requetes',
   },
   [

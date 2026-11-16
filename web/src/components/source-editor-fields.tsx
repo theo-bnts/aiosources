@@ -1,5 +1,12 @@
+import {
+  ArrowCounterClockwiseIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+} from '@phosphor-icons/react'
 import { createContext, useContext, useEffect, useId, useState, type ReactNode } from 'react'
-import { PlusIcon, TrashIcon } from '@phosphor-icons/react'
+
 import { validateJSONValue, type ProviderJSON, type ProviderPath } from '@/lib/provider-json'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -137,6 +144,7 @@ export function BooleanField({
           className="self-start"
           onClick={() => change((next) => next.deleteIn(path))}
         >
+          <ArrowCounterClockwiseIcon aria-hidden="true" />
           Use default
         </Button>
       )}
@@ -225,6 +233,7 @@ export function JSONField({
               reportDraft(id, false)
             }}
           >
+            <XIcon aria-hidden="true" />
             Discard field draft
           </Button>
         </div>
@@ -330,6 +339,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
               reportDraft(id, false)
             }}
           >
+            <PencilSimpleIcon aria-hidden="true" />
             Rename key
           </Button>
         )}
@@ -343,6 +353,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
               reportDraft(id, false)
             }}
           >
+            <XIcon aria-hidden="true" />
             Discard rename
           </Button>
         )}

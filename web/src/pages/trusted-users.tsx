@@ -1,6 +1,7 @@
+import { FloppyDiskIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { PlusIcon, PencilSimpleIcon, TrashIcon } from '@phosphor-icons/react'
+
 import { api, queryClient } from '@/lib/api'
 import type { TrustedUser } from '@/lib/trusted-users'
 import { trustedPermissionControls } from '@/lib/trusted-users'
@@ -286,6 +287,7 @@ function UserEditor({
           <ErrorNotice error={error} scope="action" />
           <DialogFooter>
             <Button type="submit" disabled={pending || !dirty}>
+              <FloppyDiskIcon aria-hidden="true" />
               {pending ? 'Saving…' : 'Save'}
             </Button>
           </DialogFooter>
