@@ -16,6 +16,30 @@ import (
 
 var errProtocol = errors.New("torznab: invalid XML protocol response")
 
+func replaceInvalidXMLControls(data []byte) []byte {
+	var cleaned []byte
+	for index, value := range data {
+		if value < 0x20 && value != '\t' && value != '\r' && value != '\n' {
+			if cleaned == nil {
+				cleaned = bytes.Clone(data)
+			}
+			// Preserve byte offsets so archival item slices stay exact.
+			cleaned[index] = ' '
+		}
+	}
+	if cleaned == nil {
+		return data
+	}
+	return cleaned
+}
+
+func (c *Client) searchXML(data []byte) []byte {
+	if c.config.ReplaceInvalidXMLControls {
+		return replaceInvalidXMLControls(data)
+	}
+	return data
+}
+
 // xmlTokens enforces document rules that encoding/xml alone does not enforce.
 // Directives (including DTDs) are unnecessary for this protocol and rejected;
 // no custom entities or external resource resolver are ever installed.

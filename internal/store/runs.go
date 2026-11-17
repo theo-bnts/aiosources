@@ -37,6 +37,7 @@ func scanRun(row scanner) (model.Run, error) {
 		return run, errors.New("stored provider snapshot is invalid")
 	}
 	run.RemoteCatalog = run.Config.IsRemoteCatalog()
+	run.RetryFailed = run.Trigger == model.TriggerScheduled && run.Config.Schedule.RetryFailed
 	if len(policy) != 0 {
 		if err := json.Unmarshal(policy, &run.Policy); err != nil || run.Policy == nil || !run.Policy.Valid() {
 			return run, errors.New("stored collection policy is invalid")
@@ -540,7 +541,7 @@ pause_reason='',finished_at=NULL,error='' WHERE id=$1 RETURNING `+runColumns, id
 	return run, nil
 }
 
-// CoverageAttempt changes only after an explicit retry of a failed collection,
+// CoverageAttempt changes only after a retry of a failed collection,
 // not after automatic budget continuation or interrupted-worker recovery.
 func (s *Store) CoverageAttempt(ctx context.Context, id string) (string, error) {
 	var attempt string
@@ -574,7 +575,7 @@ func (s *Store) RequestPause(ctx context.Context, id string) (model.Run, error) 
 	if run.PauseRequested {
 		return run, nil
 	}
-	if run.Status != model.StatusQueued && run.Status != model.StatusRunning && run.Status != model.StatusPaused {
+	if run.Status != model.StatusQueued && run.Status != model.StatusRunning && run.Status != model.StatusPaused && !(run.Status == model.StatusFailed && run.RetryFailed) {
 		return model.Run{}, model.ErrConflict
 	}
 	kind, message := "pause_requested", "Pause requested; the current response checkpoint will be saved before stopping"
@@ -612,7 +613,7 @@ func (s *Store) RequestCancel(ctx context.Context, id string) (model.Run, error)
 	var kind, message, statement string
 	switch run.Status {
 	case model.StatusQueued, model.StatusPaused, model.StatusFailed:
-		if run.Status == model.StatusFailed && !run.PauseRequested {
+		if run.Status == model.StatusFailed && !run.PauseRequested && !run.RetryFailed {
 			return run, nil
 		}
 		kind, message = "cancelled", "Collection cancelled"

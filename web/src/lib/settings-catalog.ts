@@ -736,6 +736,17 @@ source('collection', [
 source(
   'collection',
   [
+    [
+      'xml-controls',
+      'Replace invalid XML control characters',
+      'Torznab compatibility forbidden control characters XML parsing',
+    ],
+  ],
+  ['torznab'],
+)
+source(
+  'collection',
+  [
     ['window', 'Window pages'],
     ['minimum', 'Minimum expected total'],
     ['coverage', 'Coverage total mode', 'at least exact advisory coverage pagination'],
@@ -774,6 +785,11 @@ source('schedules', [
   ['rebuild', 'Rebuild whole source periodically'],
   ['budget', 'Page budget per tick'],
   ['known-pages', 'Known-page boundary'],
+  [
+    'retry-failed',
+    'Retry failed scheduled imports',
+    'automatic retry resume recovery failed import checkpoint reprise echec',
+  ],
 ])
 
 for (const setting of settings.filter((entry) => entry.entity === 'source')) {

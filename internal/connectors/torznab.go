@@ -53,9 +53,14 @@ func validateTorznab(p model.Provider) error {
 	}
 	for name := range p.Options {
 		switch name {
-		case "category_scope", "search_mode", "search_queries", "published_at_unit", "id_source", "id_pattern", "local_categories", "total_mode":
+		case "category_scope", "search_mode", "search_queries", "published_at_unit", "id_source", "id_pattern", "local_categories", "total_mode", "replace_invalid_xml_controls":
 		default:
 			return errors.New("unknown Torznab adapter option")
+		}
+	}
+	if value, exists := p.Options["replace_invalid_xml_controls"]; exists {
+		if _, ok := value.(bool); !ok {
+			return errors.New("replace_invalid_xml_controls must be a boolean")
 		}
 	}
 	if _, err := publishedAtUnit(p); err != nil {
@@ -215,7 +220,8 @@ func (c *torznabConnector) open(ctx context.Context) error {
 	}
 	target.RawQuery = parameters.Encode()
 	unit, _ := publishedAtUnit(c.provider)
-	client, err := sdk.Open(ctx, sdk.Config{URL: target.String(), HTTPClient: c.client.HTTPClient(), PageSize: c.provider.PageSize, RequestInterval: time.Nanosecond, DisableRetries: true, PublishedAtUnit: unit, AdvisoryTotals: c.advisoryTotals})
+	replaceControls, _ := c.provider.Options["replace_invalid_xml_controls"].(bool)
+	client, err := sdk.Open(ctx, sdk.Config{URL: target.String(), HTTPClient: c.client.HTTPClient(), PageSize: c.provider.PageSize, RequestInterval: time.Nanosecond, DisableRetries: true, PublishedAtUnit: unit, AdvisoryTotals: c.advisoryTotals, ReplaceInvalidXMLControls: replaceControls})
 	if err != nil {
 		return err
 	}

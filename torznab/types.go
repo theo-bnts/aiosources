@@ -35,6 +35,10 @@ type Config struct {
 	// as bounds or completion signals. Enable only for indexers with capped
 	// totals; Walk then requires an empty page. Offset checks still apply.
 	AdvisoryTotals bool
+	// ReplaceInvalidXMLControls replaces forbidden ASCII control bytes with
+	// spaces when parsing search responses. Disabled by default. RawPage and
+	// RawItem retain the original bytes; all other XML checks still apply.
+	ReplaceInvalidXMLControls bool
 	// PublishedAtUnit enables integer Unix publication dates in seconds or
 	// milliseconds. Empty accepts textual dates only; units are never guessed.
 	// Textual dates remain supported, and normalized dates use UTC.

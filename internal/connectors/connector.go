@@ -31,7 +31,8 @@ type Environment struct {
 	// whether the transport can make another automatic attempt.
 	RateLimited func(ctx context.Context, response Response, retryAt time.Time, retry bool) error
 	// TransientFailure retains complete GET/HEAD responses with HTTP 500, 502,
-	// 503 or 504, including the final exhausted response. attempt is the
+	// 503, 504 or temporary gateway 520–524, including the final exhausted
+	// response. attempt is the
 	// one-based network attempt; retry reports whether another attempt is
 	// allowed. retryAt includes pacing and known quota deadlines, or is zero
 	// when an exhausted quota has no known reset. Callback errors stop retries.
@@ -62,7 +63,7 @@ type Environment struct {
 	// Numeric recovery revisits invalidated identities in (after, through].
 	// Returns the smallest candidate, or zero; required with IDRecovery.
 	NextRefreshID func(ctx context.Context, after, through int64) (int64, error)
-	// Changes only on an explicit Resume after failure, not budget pauses.
+	// Changes only on a retry after failure, not budget pauses.
 	// This renews bounded reconciliation without recycling fingerprints.
 	CoverageAttempt string
 }

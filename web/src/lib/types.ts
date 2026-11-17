@@ -9,6 +9,7 @@ export interface Schedule {
   mode?: Exclude<RunMode, 'preview'>
   max_pages?: number
   known_pages?: number
+  retry_failed?: boolean
 }
 export interface CatalogSync {
   enabled: boolean
@@ -226,6 +227,7 @@ export interface Run {
   status: RunStatus
   cancel_requested: boolean
   pause_requested: boolean
+  retry_failed?: boolean
   traversal_done: boolean
   policy?: CollectionPolicy
   pause_reason?: PauseReason

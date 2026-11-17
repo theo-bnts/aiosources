@@ -148,14 +148,15 @@ type Output struct {
 }
 
 type Schedule struct {
-	Enabled    *bool   `json:"enabled,omitempty"`
-	Every      string  `json:"every,omitempty"`
-	FullEvery  string  `json:"full_every,omitempty"`
-	Cron       string  `json:"cron,omitempty"`
-	Timezone   string  `json:"timezone,omitempty"`
-	MaxPages   int     `json:"max_pages,omitempty"`
-	Mode       RunMode `json:"mode,omitempty"`
-	KnownPages int     `json:"known_pages,omitempty"`
+	Enabled     *bool   `json:"enabled,omitempty"`
+	Every       string  `json:"every,omitempty"`
+	FullEvery   string  `json:"full_every,omitempty"`
+	Cron        string  `json:"cron,omitempty"`
+	Timezone    string  `json:"timezone,omitempty"`
+	MaxPages    int     `json:"max_pages,omitempty"`
+	Mode        RunMode `json:"mode,omitempty"`
+	KnownPages  int     `json:"known_pages,omitempty"`
+	RetryFailed bool    `json:"retry_failed,omitempty"`
 }
 
 type ScheduleSummary struct {
@@ -263,6 +264,7 @@ type Run struct {
 	Status                RunStatus         `json:"status"`
 	CancelRequested       bool              `json:"cancel_requested"`
 	PauseRequested        bool              `json:"pause_requested"`
+	RetryFailed           bool              `json:"retry_failed,omitempty"` // Derived from the scheduled run's immutable configuration.
 	PauseReason           PauseReason       `json:"pause_reason,omitempty"`
 	Policy                *CollectionPolicy `json:"policy,omitempty"`
 	StorageMode           StorageMode       `json:"storage_mode"`

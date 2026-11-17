@@ -81,6 +81,8 @@ func buildJSONSchema() json.RawMessage {
 	set("output.fields", "uniqueItems", true)
 	set("schedule.mode", "enum", []string{"", "incremental", "full", "metadata"})
 	set("schedule.mode", "default", "incremental")
+	set("schedule.retry_failed", "default", false)
+	set("schedule.retry_failed", "description", "Retry a failed scheduled import from its committed checkpoint on the next tick. Disabled by default. The original configuration and retry policy are preserved; manual holds and cancelled runs never resume automatically.")
 	for _, path := range []string{"schedule.max_pages", "schedule.known_pages"} {
 		set(path, "minimum", 0)
 		set(path, "maximum", 10000)

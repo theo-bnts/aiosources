@@ -1,6 +1,5 @@
 import {
   ArrowClockwiseIcon,
-  ArrowSquareOutIcon,
   FloppyDiskIcon,
   MagnifyingGlassIcon,
   StopIcon,
@@ -27,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { InfoTip } from '@/components/ui/info-tip'
 import { Switch } from '@/components/ui/switch'
 import { SecretPicker } from '@/components/secret-picker'
+import { CredentialPageLink } from '@/components/credential-page-link'
 import { FormStatus } from '@/components/form-status'
 import type { Config, Controls, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
@@ -476,27 +476,23 @@ export default function AIOSourcePage({
                       provider.secret,
                       'hint' in provider ? provider.hint : undefined,
                     )}
+                    <CredentialPageLink href={provider.credentialUrl}>
+                      Get {provider.name} API key
+                    </CredentialPageLink>
                   </div>
                 ))}
               </div>
             )}
             {(section === 'videos' || section === 'games') && (
-              <div>
-                <Button asChild variant="outline">
-                  <a
-                    href={
-                      section === 'videos'
-                        ? 'https://www.themoviedb.org/settings/api/request'
-                        : 'https://dev.twitch.tv/console/apps/create'
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ArrowSquareOutIcon aria-hidden="true" />
-                    {section === 'videos' ? 'Create TMDB credentials' : 'Create Twitch credentials'}
-                  </a>
-                </Button>
-              </div>
+              <CredentialPageLink
+                href={
+                  section === 'videos'
+                    ? 'https://www.themoviedb.org/settings/api/request'
+                    : 'https://dev.twitch.tv/console/apps/create'
+                }
+              >
+                {section === 'videos' ? 'Create TMDB credentials' : 'Create Twitch credentials'}
+              </CredentialPageLink>
             )}
             {section === 'videos' &&
               toggle('Automatically update film & series information', 'auto_sync')}

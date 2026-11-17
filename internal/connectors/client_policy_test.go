@@ -251,10 +251,10 @@ func TestTransientRetriesPreserveRequestAndEveryResponse(t *testing.T) {
 
 func TestTransientRetryMethodAndStatusEligibility(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions} {
-		for _, status := range []int{400, 401, 403, 404, 500, 501, 502, 503, 504} {
+		for _, status := range []int{400, 401, 403, 404, 500, 501, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526} {
 			t.Run(fmt.Sprintf("%s/%d", method, status), func(t *testing.T) {
 				eligible := (method == http.MethodGet || method == http.MethodHead) &&
-					(status == 500 || status == 502 || status == 503 || status == 504)
+					(status == 500 || status == 502 || status == 503 || status == 504 || status >= 520 && status <= 524)
 				var requests, archived atomic.Int32
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.Header().Set("Retry-After", "0")

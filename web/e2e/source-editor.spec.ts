@@ -116,6 +116,56 @@ async function pasteJSON(page: Page, label: string, text: string) {
   await editor.press('ControlOrMeta+V')
 }
 
+test('Torznab XML compatibility and scheduled retries round-trip through visual controls', async ({
+  page,
+  server,
+}) => {
+  const id = 'synthetic-torznab-options'
+  await importSource(
+    page,
+    JSON.stringify({
+      version: 1,
+      id,
+      name: 'Synthetic editor source',
+      adapter: 'torznab',
+      url: server.sourceURL,
+      enabled: false,
+      schedule: { enabled: false, every: '1h' },
+    }),
+  )
+  await page.getByRole('tab', { name: 'Imports', exact: true }).click()
+  await openDisclosure(page, 'Adapter options')
+  const xml = page.getByRole('switch', {
+    name: 'Replace invalid XML control characters',
+    exact: true,
+  })
+  await expect(xml).not.toBeChecked()
+  await xml.check()
+  await page.getByRole('tab', { name: 'Schedules', exact: true }).click()
+  await openDisclosure(page, 'Collection policy')
+  const retry = page.getByRole('switch', { name: 'Retry failed scheduled imports', exact: true })
+  await expect(retry).not.toBeChecked()
+  await retry.check()
+  await saveSource(page, id)
+  const saved = JSON.parse((await readSource(page, id)).json)
+  expect(saved.options.replace_invalid_xml_controls).toBe(true)
+  expect(saved.schedule.retry_failed).toBe(true)
+  expect(saved.schedule.enabled).toBe(false)
+  await page.reload()
+  await page.getByRole('tab', { name: 'Imports', exact: true }).click()
+  await openDisclosure(page, 'Adapter options')
+  await expect(xml).toBeChecked()
+  await xml.uncheck()
+  await page.getByRole('tab', { name: 'Schedules', exact: true }).click()
+  await openDisclosure(page, 'Collection policy')
+  await expect(retry).toBeChecked()
+  await retry.uncheck()
+  await saveSource(page, id)
+  const disabled = JSON.parse((await readSource(page, id)).json)
+  expect(disabled.options?.replace_invalid_xml_controls).toBeFalsy()
+  expect(disabled.schedule.retry_failed).toBeFalsy()
+})
+
 test('source actions stay aligned when the unsaved run hint appears on desktop and mobile', async ({
   page,
   server,

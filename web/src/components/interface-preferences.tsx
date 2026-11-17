@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { highlightSetting, useSettingDestination } from '@/lib/settings-navigation'
 import { GearSixIcon } from '@phosphor-icons/react'
@@ -22,6 +22,7 @@ export function InterfacePreferences() {
   const setting = useSettingDestination()
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const title = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     if (setting?.public !== 'interface') return
     setOpen(true)
@@ -53,9 +54,17 @@ export function InterfacePreferences() {
           <GearSixIcon />
         </Button>
       </DialogTrigger>
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent
+        aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          title.current?.focus({ preventScroll: true })
+        }}
+      >
         <DialogHeader>
-          <DialogTitle>Interface preferences</DialogTitle>
+          <DialogTitle ref={title} tabIndex={-1} className="outline-none">
+            Interface preferences
+          </DialogTitle>
         </DialogHeader>
         <div className="grid items-start gap-5 sm:grid-cols-2">
           <div className="min-w-0 space-y-2">

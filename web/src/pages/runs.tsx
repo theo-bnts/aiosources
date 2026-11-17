@@ -240,7 +240,7 @@ function RunControls({
   const pausing = run.pause_requested || pending === 'pause'
   const cancelling = run.cancel_requested || pending === 'cancel'
   const canHold =
-    run.status === 'paused' &&
+    (run.status === 'paused' || (run.status === 'failed' && run.retry_failed)) &&
     !requiresManualResume(run) &&
     (run.trigger === 'scheduled' || run.pause_reason === 'interrupted')
   return (
@@ -266,9 +266,17 @@ function RunControls({
                 : 'Pause'}
         </Button>
       )}
-      {(active || run.status === 'paused' || (run.status === 'failed' && run.pause_requested)) && (
+      {(active ||
+        run.status === 'paused' ||
+        (run.status === 'failed' && (run.pause_requested || run.retry_failed))) && (
         <ConfirmAction
-          title={active ? 'Cancel this run?' : 'Cancel this held run?'}
+          title={
+            active
+              ? 'Cancel this run?'
+              : run.status === 'failed'
+                ? 'Cancel this scheduled retry?'
+                : 'Cancel this held run?'
+          }
           description={
             active
               ? 'The current request will be interrupted. Validated pages and the resume point will be preserved. Cancellation becomes final when the worker confirms it.'

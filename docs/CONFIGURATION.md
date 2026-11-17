@@ -28,6 +28,8 @@ Enter a recognizable display name and the address reachable from AIOSources. Kee
 
 The HTML template has a [dedicated setup guide](HTML_SOURCES.md). A site can restrict its accessible history even when the configuration is correct; an empty category filter does not remove that restriction.
 
+If a Torznab source inserts forbidden control characters into its XML, **Imports → Adapter options → Replace invalid XML control characters** can read those responses by replacing the characters with spaces. This option is off by default. Other XML and pagination checks still apply, and retained raw responses keep their original bytes. Its JSON setting is `options.replace_invalid_xml_controls`.
+
 ## Private sources
 
 Enable **Private source** if downloading requires a personal announce URL. Store the announce URL through Secrets. Without an announce URL, uncached private-source torrents are not offered for direct downloading. Cached playback still depends on your debrid service.
@@ -43,6 +45,8 @@ In the source's **Schedules** section, choose an interval or a supported schedul
 - **Source details**, when configured, refreshes additional information for known records.
 
 Use **Run manual import** on a source card for an immediate run. **Preview** does not publish records. Page and duration limits can pause a long import; resuming continues its saved work. A scheduled continuation can pick up eligible work on a later tick. Avoid unnecessary rebuilds when incremental updates meet your needs.
+
+For long imports interrupted by unreliable source responses, **Schedules → Collection policy → Retry failed scheduled imports** can retry from the last committed page on the next scheduled tick. It is off by default. Retries preserve the original run settings and history; they never skip invalid pages or override manual pauses and cancellations. A persistent configuration error still needs correcting. Cancel or resume an older run explicitly if its source definition has changed.
 
 ## JSON import and export
 

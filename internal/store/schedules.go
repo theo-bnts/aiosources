@@ -38,6 +38,10 @@ type ScheduleClock struct {
 
 const clockColumns = `provider_id,revision,active,next_run_at,full_due_at,last_attempt_at,last_error,profile`
 
+const scheduleContinuationFilter = `(status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress')
+ OR (status='paused' AND trigger='scheduled')
+ OR (status='failed' AND trigger='scheduled' AND NOT cancel_requested AND config @> '{"schedule":{"retry_failed":true}}'::jsonb))`
+
 func scanClock(row scanner) (ScheduleClock, error) {
 	var clock ScheduleClock
 	err := row.Scan(&clock.ProviderID, &clock.Revision, &clock.Active, &clock.NextRunAt, &clock.FullDueAt, &clock.LastAttemptAt, &clock.LastError, &clock.Profile)
@@ -121,7 +125,7 @@ func (s *Store) ScheduleRuns(ctx context.Context, providerIDs []string) (map[str
 		return result, nil
 	}
 	rows, err := s.pool.Query(ctx, "SELECT "+runColumns+` FROM aiosources.runs
-WHERE provider_id=ANY($1::text[]) AND (status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress') OR (status='paused' AND trigger='scheduled'))
+WHERE provider_id=ANY($1::text[]) AND `+scheduleContinuationFilter+`
 ORDER BY provider_id,created_at,id`, providerIDs)
 	if err != nil {
 		return nil, databaseError("list schedule collections", err)
@@ -160,7 +164,7 @@ func (s *Store) AttemptSchedule(ctx context.Context, source scheduling.Source, n
 		return clock, nil, databaseError("lock scheduled collection queue", err)
 	}
 	rows, err := tx.Query(ctx, "SELECT "+runColumns+` FROM aiosources.runs
-WHERE provider_id=$1 AND (status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress') OR (status='paused' AND trigger='scheduled'))
+WHERE provider_id=$1 AND `+scheduleContinuationFilter+`
 ORDER BY created_at,id FOR UPDATE`, source.ID)
 	if err != nil {
 		return clock, nil, databaseError("read scheduled continuation", err)
@@ -220,9 +224,20 @@ ORDER BY created_at,id FOR UPDATE`, source.ID)
 				if err := lockProviderSecrets(ctx, tx, config); err != nil {
 					return clock, nil, err
 				}
-				run, err = scanRun(tx.QueryRow(ctx, "UPDATE aiosources.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NULL,error='' WHERE id=$1 AND NOT pause_requested AND pause_reason='budget' RETURNING "+runColumns, resume.ID))
+				run, err = scanRun(tx.QueryRow(ctx, `UPDATE aiosources.runs SET status='queued',cancel_requested=FALSE,pause_requested=FALSE,pause_reason='',finished_at=NULL,error=''
+WHERE id=$1 AND NOT pause_requested AND NOT cancel_requested AND
+ ((status='paused' AND pause_reason='budget') OR
+  (status='failed' AND trigger='scheduled' AND pause_reason NOT IN ('manual','quota','no_progress') AND config @> '{"schedule":{"retry_failed":true}}'::jsonb)) RETURNING `+runColumns, resume.ID))
 				if err == nil {
-					err = lifecycleEvent(ctx, tx, run.ID, "resumed", "Scheduled collection queued for continuation")
+					message := "Scheduled collection queued for continuation"
+					if resume.Status == model.StatusFailed {
+						message = "Failed scheduled collection queued for retry from its saved checkpoint"
+						_, err = tx.Exec(ctx, `WITH resumed AS (
+ INSERT INTO aiosources.events(run_id,kind,message,data) VALUES($1,'resumed',$2,'{"from_status":"failed"}'::jsonb) RETURNING id)
+ UPDATE aiosources.runs SET coverage_attempt=(SELECT id::text FROM resumed) WHERE id=$1`, run.ID, message)
+					} else {
+						err = lifecycleEvent(ctx, tx, run.ID, "resumed", message)
+					}
 				}
 			} else {
 				config.Schedule, err = scheduling.Settings(source.Provider)

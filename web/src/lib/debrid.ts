@@ -1,20 +1,42 @@
 export const debridProviders = [
-  { id: 'alldebrid', name: 'AllDebrid', secret: 'alldebrid_secret' },
-  { id: 'debridlink', name: 'Debrid-Link', secret: 'debridlink_secret' },
+  {
+    id: 'alldebrid',
+    name: 'AllDebrid',
+    secret: 'alldebrid_secret',
+    credentialUrl: 'https://alldebrid.com/apikeys',
+  },
+  {
+    id: 'debridlink',
+    name: 'Debrid-Link',
+    secret: 'debridlink_secret',
+    credentialUrl: 'https://debrid-link.com/webapp/apikey',
+  },
   {
     id: 'deepbrid',
     name: 'Deepbrid',
     secret: 'deepbrid_secret',
+    credentialUrl: 'https://www.deepbrid.com/devices',
     hint: 'Cache status is known after download preparation. Other torrents remain unknown.',
   },
-  { id: 'premiumize', name: 'Premiumize', secret: 'premiumize_secret' },
+  {
+    id: 'premiumize',
+    name: 'Premiumize',
+    secret: 'premiumize_secret',
+    credentialUrl: 'https://www.premiumize.me/account',
+  },
   {
     id: 'realdebrid',
     name: 'Real-Debrid',
     secret: 'realdebrid_secret',
+    credentialUrl: 'https://real-debrid.com/apitoken',
     hint: 'Checks ready files in your account. Other torrents stay unknown; no global cache check is available.',
   },
-  { id: 'torbox', name: 'TorBox', secret: 'torbox_secret' },
+  {
+    id: 'torbox',
+    name: 'TorBox',
+    secret: 'torbox_secret',
+    credentialUrl: 'https://torbox.app/settings',
+  },
 ] as const
 
 export type DebridService = (typeof debridProviders)[number]['id']

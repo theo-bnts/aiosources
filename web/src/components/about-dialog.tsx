@@ -130,18 +130,6 @@ export function AboutDialog() {
             </p>
           </div>
           <p className="text-sm leading-6 text-muted-foreground">
-            Book information and covers:{' '}
-            <a
-              href="https://openlibrary.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="data-link"
-            >
-              Open Library
-            </a>
-            .
-          </p>
-          <p className="text-sm leading-6 text-muted-foreground">
             Game information and covers:{' '}
             <a
               href="https://www.igdb.com"
@@ -150,6 +138,18 @@ export function AboutDialog() {
               className="data-link"
             >
               IGDB
+            </a>
+            .
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Book information and covers:{' '}
+            <a
+              href="https://openlibrary.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              Open Library
             </a>
             .
           </p>

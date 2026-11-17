@@ -14,6 +14,7 @@ import { ErrorNotice } from './common'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
+import { CredentialPageLink } from './credential-page-link'
 import type { LanguagePreferences, InstallationOptions } from '@/lib/language-preferences'
 
 export function PublicCredentialsForm({
@@ -169,6 +170,11 @@ export function PublicCredentialsForm({
                       )}
                     </div>
                     {details && 'hint' in details && <p className="help">{details.hint}</p>}
+                    {details && (
+                      <CredentialPageLink href={details.credentialUrl}>
+                        Get {provider.name} API key
+                      </CredentialPageLink>
+                    )}
                   </div>
                 )
               })}

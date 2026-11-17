@@ -32,11 +32,13 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true)`); err != nil {
 		return 0, databaseError("authorize history cleanup", err)
 	}
-	// Paused work and unsuccessful full imports with staging are recoverable.
+	// Paused work, opted-in scheduled retries and unsuccessful full imports
+	// with staging are recoverable.
 	// A metadata child retains its parent's identity membership until it expires.
 	// Skip row locks held by workers or Resume, rather than blocking either.
 	rows, err := tx.Query(ctx, `SELECT r.id FROM aiosources.runs r
  WHERE r.finished_at<$1 AND r.status IN ('succeeded','failed','cancelled')
+ AND NOT (r.status='failed' AND r.trigger='scheduled' AND NOT r.cancel_requested AND r.config @> '{"schedule":{"retry_failed":true}}'::jsonb)
  AND NOT EXISTS(SELECT 1 FROM aiosources.staged_torrents t WHERE t.run_id=r.id)
  AND NOT EXISTS(SELECT 1 FROM aiosources.runs child WHERE child.metadata_parent_run_id=r.id)
  ORDER BY r.finished_at,r.id LIMIT 64 FOR UPDATE OF r SKIP LOCKED`, cutoff)

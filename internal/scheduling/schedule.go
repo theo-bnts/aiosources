@@ -160,6 +160,20 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 	if resume != nil {
 		return "paused", resume, ""
 	}
+	if s.Provider.Schedule.RetryFailed {
+		for _, run := range runs {
+			if run.Status != model.StatusFailed || run.Trigger != model.TriggerScheduled || run.CancelRequested || !run.Config.Schedule.RetryFailed {
+				continue
+			}
+			initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
+			metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && s.Plan.Mode == model.ModeIncremental
+			if !s.matchesSnapshot(run) || !(run.Mode == s.Plan.Mode || initialFull || metadataFollowup || s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) {
+				return "blocked", nil, "A failed scheduled collection uses an older configuration or different mode; resume or cancel it manually in run history"
+			}
+			copy := run
+			return "waiting", &copy, ""
+		}
+	}
 	return "waiting", nil, ""
 }
 

@@ -1075,10 +1075,27 @@ function CollectionSettings() {
         configuredPaths={[['options']]}
         description="Adapter-specific options are preserved as arbitrary JSON. Configure only options supported by the selected adapter."
       >
+        {torznab && (
+          <BooleanField
+            path={['options', 'replace_invalid_xml_controls']}
+            label="Replace invalid XML control characters"
+            help="Torznab only: replace forbidden control characters with spaces when reading search responses. Original responses are preserved when retention is enabled. Other XML and pagination checks remain active. Disabled by default."
+          />
+        )}
         <MapField
           path={['options']}
           label="Options"
-          excludeKeys={torznab ? ['search_mode', 'category_scope', 'id_source', 'id_pattern'] : []}
+          excludeKeys={
+            torznab
+              ? [
+                  'search_mode',
+                  'category_scope',
+                  'id_source',
+                  'id_pattern',
+                  'replace_invalid_xml_controls',
+                ]
+              : []
+          }
         />
       </OptionalSection>
       {document.get('adapter') !== 'html' && <TraversalSettings />}
@@ -1205,6 +1222,11 @@ function SourceScheduleSettings() {
             help="Update only: stop after this many consecutive entirely known pages per scope. 0 = off."
           />
         </FieldGrid>
+        <BooleanField
+          path={['schedule', 'retry_failed']}
+          label="Retry failed scheduled imports"
+          help="On the next scheduled tick, continue a failed import from its last saved page instead of starting over. Its original settings are retained. Permanent errors still need attention. Manual holds and cancelled imports are not resumed. Disabled by default."
+        />
       </OptionalSection>
       <p className="help">
         Existing runs keep their original settings and committed checkpoint. Editing a paused

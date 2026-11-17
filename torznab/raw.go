@@ -42,7 +42,7 @@ func (c *Client) SearchRaw(ctx context.Context, query Query) (RawPage, error) {
 	var result RawPage
 	err = c.fetchResponseObserved(ctx, c.endpoint, params, func(data []byte, _ *url.URL) error {
 		var parseErr error
-		result, parseErr = parseRawPage(data, query.Offset, c.config.PublishedAtUnit)
+		result, parseErr = parseRawPageBytes(data, c.searchXML(data), query.Offset, c.config.PublishedAtUnit)
 		if parseErr != nil {
 			return parseErr
 		}
@@ -72,15 +72,19 @@ func (c *Client) SearchRaw(ctx context.Context, query Query) (RawPage, error) {
 		return nil
 	}, func(data []byte) { result.Body = data })
 	if err != nil && len(result.Items) == 0 && len(result.Body) > 0 {
-		parsed, _ := parseRawPage(result.Body, query.Offset, c.config.PublishedAtUnit)
+		parsed, _ := parseRawPageBytes(result.Body, c.searchXML(result.Body), query.Offset, c.config.PublishedAtUnit)
 		result = parsed
 	}
 	return result, err
 }
 
 func parseRawPage(data []byte, offset int, publishedAtUnit string) (RawPage, error) {
-	result := RawPage{Body: data, Page: Page{Offset: offset}}
-	fragments, fragmentErr := rawItemFragments(data)
+	return parseRawPageBytes(data, data, offset, publishedAtUnit)
+}
+
+func parseRawPageBytes(original, data []byte, offset int, publishedAtUnit string) (RawPage, error) {
+	result := RawPage{Body: original, Page: Page{Offset: offset}}
+	fragments, fragmentErr := rawItemFragmentsBytes(original, data)
 	result.Items = make([]RawItem, len(fragments))
 	for index, fragment := range fragments {
 		result.Items[index] = RawItem{Body: fragment, Error: errProtocol}
@@ -149,6 +153,10 @@ func parseRawPage(data []byte, offset int, publishedAtUnit string) (RawPage, err
 }
 
 func rawItemFragments(data []byte) ([][]byte, error) {
+	return rawItemFragmentsBytes(data, data)
+}
+
+func rawItemFragmentsBytes(original, data []byte) ([][]byte, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	var path []string
 	var result [][]byte
@@ -175,7 +183,7 @@ func rawItemFragments(data []byte) ([][]byte, error) {
 			}
 		case xml.EndElement:
 			if len(path) == 3 && start >= 0 {
-				result = append(result, data[start:decoder.InputOffset()])
+				result = append(result, original[start:decoder.InputOffset()])
 				start = -1
 			}
 			if len(path) > 0 {

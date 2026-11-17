@@ -653,7 +653,10 @@ func invalidHTMLResponse(header http.Header, body []byte) bool {
 
 func transientHTTPStatus(status int) bool {
 	switch status {
-	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout,
+		520, 521, 522, 523, 524:
+		// Reverse proxies can report a temporarily unreachable origin using
+		// these gateway statuses. Keep the same bounded, read-only retries.
 		return true
 	}
 	return false

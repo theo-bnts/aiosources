@@ -173,7 +173,7 @@ func (c *Client) searchPage(ctx context.Context, params url.Values, offset int) 
 	var page Page
 	err := c.fetch(ctx, c.endpoint, params, func(data []byte) error {
 		var err error
-		page, err = parsePage(data, offset, c.config.PublishedAtUnit)
+		page, err = parsePage(c.searchXML(data), offset, c.config.PublishedAtUnit)
 		if err != nil {
 			return err
 		}
