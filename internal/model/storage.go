@@ -69,10 +69,10 @@ func (r Run) EffectiveStorageOptions() StorageOptions {
 func (r Run) StoredFields(fields map[string]any) map[string]any {
 	fields = WithoutSwarmCounts(fields)
 	opts := r.EffectiveStorageOptions()
-	if opts.AllFields {
-		return StoredTorrentFields(fields, StorageFull)
+	if opts.AllFields || fields == nil {
+		return fields
 	}
-	result := StoredTorrentFields(fields, StorageCompact)
+	result := compactTorrentFields(fields)
 	for _, key := range opts.AdditionalFields {
 		if value, ok := fields[key]; ok && !CompactTorrentField(key) {
 			result[key] = value
@@ -135,9 +135,9 @@ func RequiredTorrentField(path string) bool {
 	}
 	switch root {
 	case "attributes":
-		return slices.Contains(compactAttributeKeys, field)
+		return compactAttributeKeySet[field]
 	case "external_ids":
-		return slices.Contains(compactIdentifierKeys, field)
+		return compactIdentifierKeySet[field]
 	case "metadata":
 		return RequiredTorrentField(field)
 	}
@@ -215,11 +215,25 @@ var compactAttributeKeys = []string{
 	"video_codec", "audio_codec", "audio_channels", "subtitles",
 }
 
-func CompactTorrentField(name string) bool { return slices.Contains(compactTorrentKeys, name) }
+func makeKeySet(keys []string) map[string]bool {
+	set := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		set[key] = true
+	}
+	return set
+}
+
+var (
+	compactTorrentKeySet    = makeKeySet(compactTorrentKeys)
+	compactIdentifierKeySet = makeKeySet(compactIdentifierKeys)
+	compactAttributeKeySet  = makeKeySet(compactAttributeKeys)
+)
+
+func CompactTorrentField(name string) bool { return compactTorrentKeySet[name] }
 
 func CompactTorrentFields() []string { return slices.Clone(compactTorrentKeys) }
 
-func compactObject(value any, keys []string) any {
+func compactObject(value any, keys map[string]bool) any {
 	switch object := value.(type) {
 	case map[string]any:
 		if object == nil {
@@ -227,7 +241,7 @@ func compactObject(value any, keys []string) any {
 		}
 		result := make(map[string]any)
 		for key, field := range object {
-			if slices.Contains(keys, key) {
+			if keys[key] {
 				result[key] = field
 			}
 		}
@@ -239,7 +253,7 @@ func compactObject(value any, keys []string) any {
 		// Torznab attributes use typed string slices before JSON persistence.
 		result := make(map[string][]string)
 		for key, field := range object {
-			if slices.Contains(keys, key) {
+			if keys[key] {
 				result[key] = field
 			}
 		}
@@ -250,7 +264,7 @@ func compactObject(value any, keys []string) any {
 		}
 		result := make(map[string]string)
 		for key, field := range object {
-			if slices.Contains(keys, key) {
+			if keys[key] {
 				result[key] = field
 			}
 		}
@@ -280,9 +294,9 @@ func compactTorrentFields(fields map[string]any) map[string]any {
 		}
 		switch key {
 		case "external_ids":
-			value = compactObject(value, compactIdentifierKeys)
+			value = compactObject(value, compactIdentifierKeySet)
 		case "attributes":
-			value = compactObject(value, compactAttributeKeys)
+			value = compactObject(value, compactAttributeKeySet)
 		case "metadata":
 			// Source metadata can nest the same identifier/attribute objects.
 			// Apply their projection at every level instead of retaining unused
@@ -290,7 +304,7 @@ func compactTorrentFields(fields map[string]any) map[string]any {
 			if object, ok := value.(map[string]any); ok {
 				value = compactTorrentFields(object)
 			} else {
-				value = compactObject(value, compactTorrentKeys)
+				value = compactObject(value, compactTorrentKeySet)
 			}
 		}
 		result[key] = value

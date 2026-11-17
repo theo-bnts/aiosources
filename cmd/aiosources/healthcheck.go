@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -13,8 +13,14 @@ func healthcheck(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	address := environment("BIND", "127.0.0.1:8080")
-	address = strings.Replace(address, "0.0.0.0:", "127.0.0.1:", 1)
-	address = strings.Replace(address, "[::]:", "[::1]:", 1)
+	if host, port, err := net.SplitHostPort(address); err == nil {
+		switch host {
+		case "", "0.0.0.0":
+			address = net.JoinHostPort("127.0.0.1", port)
+		case "::":
+			address = net.JoinHostPort("::1", port)
+		}
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+address+"/healthz", nil)
 	if err != nil {
 		return errors.New("invalid healthcheck address")

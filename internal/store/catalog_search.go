@@ -32,7 +32,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id),w.igdb_id,w.game_data->'platforms'`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,w.igdb_id,w.game_data->'platforms'`
 }
 
 func catalogYearFilter(year string) string {
@@ -152,7 +152,8 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	args = append(args, locale, opts.Limit, opts.Offset)
 	// The total and visible page share the same candidate search. In particular,
 	// book editions/aliases must not be materialized twice for every search.
-	rows, err := tx.Query(ctx, bookScope+`SELECT count(*) OVER(),candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,`+columns+filter+fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
+	pageSQL := bookScope + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
+	rows, err := tx.Query(ctx, pageSQL, args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
 	}

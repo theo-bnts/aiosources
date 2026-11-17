@@ -51,18 +51,54 @@ CASE WHEN status='matched' THEN COALESCE(imdb_id,'') ELSE '' END,
 CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics` + filter + `
 ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(countArgs)+1, len(countArgs)+2)
 	listArgs := append(append([]any{}, countArgs...), opts.Limit, opts.Offset)
-	if opts.Status == "ambiguous" {
-		// Count current ambiguous decisions without deriving every other status.
+	if opts.Status == "ambiguous" || opts.Status == "unmatched" {
+		// Count current ambiguous/unmatched decisions without deriving every other status.
 		// Their validity depends on the source fingerprint and queue, not on a
 		// work revision. Keep the ordered listing's original plan: restricting
-		// its joins here can make PostgreSQL sort all ambiguous rows before LIMIT.
-		current := ` FROM selected t
+		// its joins here can make PostgreSQL sort all rows before LIMIT.
+		current := fmt.Sprintf(` FROM selected t
 JOIN aiosources.aio_matches m USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
-WHERE m.status='ambiguous' AND m.fingerprint=t.fields_fingerprint AND q.provider_id IS NULL`
+WHERE m.status=$%d AND m.fingerprint=t.fields_fingerprint AND q.provider_id IS NULL`, len(args)+1)
 		prefix := `WITH selected AS (` + selected + `)`
 		countSQL = prefix + ` SELECT count(*)` + current
-		countArgs = args
+		countArgs = append(append([]any{}, args...), opts.Status)
+	}
+	if opts.Status == "pending" {
+		selectedKeys := `SELECT provider_id,source_id,fields_fingerprint` + sourceFilter
+		pendingSQL := `WITH selected AS (` + selectedKeys + `), page AS (
+SELECT count(*) OVER() AS total,t.provider_id,t.source_id
+FROM selected t` + aioDiagnosticJoins + `
+WHERE (` + aioDiagnosticStatus + `)='pending'
+ORDER BY t.provider_id||'',t.source_id||''` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(args)+1, len(args)+2) + `)
+SELECT page.total,t.occurrence_id,t.provider_id,t.source_id,COALESCE(t.fields->>'title',''),
+'pending','awaiting identification','',NULL::timestamptz
+FROM page JOIN aiosources.torrents t USING(provider_id,source_id)
+ORDER BY page.provider_id,page.source_id`
+		pendingArgs := append(append([]any{}, args...), opts.Limit, opts.Offset)
+		rows, err := tx.Query(ctx, pendingSQL, pendingArgs...)
+		if err != nil {
+			return result, databaseError("list identification diagnostics", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item model.AIOMatchDiagnostic
+			if err = rows.Scan(&result.Total, &item.OccurrenceID, &item.ProviderID, &item.SourceID, &item.Title, &item.Status, &item.Reason, &item.IMDb, &item.UpdatedAt); err != nil {
+				return result, databaseError("read identification diagnostic", err)
+			}
+			result.Items = append(result.Items, item)
+		}
+		if err = rows.Err(); err != nil {
+			return result, databaseError("list identification diagnostics", err)
+		}
+		rows.Close()
+		if len(result.Items) == 0 && opts.Offset > 0 {
+			countKeysSQL := `WITH selected AS (` + selectedKeys + `) SELECT count(*) FROM selected t` + aioDiagnosticJoins + ` WHERE (` + aioDiagnosticStatus + `)='pending'`
+			if err = tx.QueryRow(ctx, countKeysSQL, args...).Scan(&result.Total); err != nil {
+				return result, databaseError("count identification diagnostics", err)
+			}
+		}
+		return result, databaseError("finish identification diagnostics", tx.Commit(ctx))
 	}
 	if opts.Status == "" {
 		// Without a decision filter, count only the catalog and join decisions

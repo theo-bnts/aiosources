@@ -92,9 +92,6 @@ func parseRawPageBytes(original, data []byte, offset int, publishedAtUnit string
 	if fragmentErr != nil {
 		return result, fragmentErr
 	}
-	if err := parseAPIError(data); err != nil {
-		return result, err
-	}
 	var raw struct {
 		Channels []struct {
 			Items     []rssItem     `xml:"item"`
@@ -103,6 +100,9 @@ func parseRawPageBytes(original, data []byte, offset int, publishedAtUnit string
 		} `xml:"channel"`
 	}
 	if err := decodeProtocol(data, "rss", &raw); err != nil {
+		if apiErr := parseAPIError(data); apiErr != nil {
+			return result, apiErr
+		}
 		return result, err
 	}
 	if len(raw.Channels) != 1 {

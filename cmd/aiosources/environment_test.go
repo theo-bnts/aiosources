@@ -57,4 +57,8 @@ func TestUnprefixedCredentialsAndBindAreUsedByNativeCommands(t *testing.T) {
 	if err := command(context.Background(), []string{"healthcheck"}); err != nil {
 		t.Fatalf("healthcheck did not use BIND: %v", err)
 	}
+	t.Setenv("BIND", strings.TrimPrefix(server.URL, "http://127.0.0.1"))
+	if err := command(context.Background(), []string{"healthcheck"}); err != nil {
+		t.Fatalf("healthcheck did not resolve wildcard port BIND: %v", err)
+	}
 }

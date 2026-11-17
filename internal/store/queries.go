@@ -184,8 +184,53 @@ func (s *Store) ListTorrents(ctx context.Context, opts model.ListOptions) (model
 	}
 	defer rollback(tx)
 	filter, order, filterArgs, args := torrentSearchSQL(opts)
+	if opts.Query != "" {
+		limitParameter := "$" + strconv.Itoa(len(args)+1)
+		offsetParameter := "$" + strconv.Itoa(len(args)+2)
+		pageArgs := append(append([]any{}, args...), opts.Limit, opts.Offset)
+		rows, err := tx.Query(ctx, "SELECT count(*) OVER(),"+torrentColumns+filter+order+" LIMIT "+limitParameter+" OFFSET "+offsetParameter, pageArgs...)
+		if err != nil {
+			return result, databaseError("list torrents", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var torrent model.Torrent
+			var fields, origin []byte
+			if err := rows.Scan(&result.Total, &torrent.ProviderID, &torrent.SourceID, &fields, &torrent.RawID, &torrent.FirstSeenAt, &torrent.LastSeenAt, &torrent.Historical, &origin, &torrent.OccurrenceID); err != nil {
+				return result, databaseError("read torrent", err)
+			}
+			if len(origin) != 0 {
+				if err := json.Unmarshal(origin, &torrent.Origin); err != nil {
+					return result, errors.New("stored catalogue provenance is invalid")
+				}
+			}
+			if torrent.Fields, err = decodeObject(fields); err != nil {
+				return result, databaseError("read torrent", err)
+			}
+			result.Items = append(result.Items, torrent)
+		}
+		if err := rows.Err(); err != nil {
+			return result, databaseError("list torrents", err)
+		}
+		rows.Close()
+		if len(result.Items) == 0 && opts.Offset > 0 {
+			if err := tx.QueryRow(ctx, "SELECT count(*)"+filter, filterArgs...).Scan(&result.Total); err != nil {
+				return result, databaseError("count torrents", err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return result, databaseError("finish torrent listing", err)
+		}
+		return result, nil
+	}
 	if err := tx.QueryRow(ctx, "SELECT count(*)"+filter, filterArgs...).Scan(&result.Total); err != nil {
 		return result, databaseError("count torrents", err)
+	}
+	if result.Total <= int64(opts.Offset) {
+		if err := tx.Commit(ctx); err != nil {
+			return result, databaseError("finish torrent listing", err)
+		}
+		return result, nil
 	}
 	limitParameter := "$" + strconv.Itoa(len(args)+1)
 	offsetParameter := "$" + strconv.Itoa(len(args)+2)

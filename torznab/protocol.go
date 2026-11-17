@@ -63,12 +63,12 @@ func (r *xmlTokens) Token() (xml.Token, error) {
 			}
 			r.root = t.Name
 		}
-		seen := make(map[xml.Name]struct{}, len(t.Attr))
-		for _, attr := range t.Attr {
-			if _, exists := seen[attr.Name]; exists {
-				return nil, errProtocol
+		for i := 1; i < len(t.Attr); i++ {
+			for j := 0; j < i; j++ {
+				if t.Attr[i].Name == t.Attr[j].Name {
+					return nil, errProtocol
+				}
 			}
-			seen[attr.Name] = struct{}{}
 		}
 		r.depth++
 	case xml.EndElement:

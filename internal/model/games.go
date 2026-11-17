@@ -71,7 +71,8 @@ func GameSourceHints(fields map[string]any) GameHints {
 	}
 	names(fields["category"])
 	names(fields["categories"])
-	if attrs := storageObject(fields["attributes"]); attrs != nil {
+	attrs := storageObject(fields["attributes"])
+	if attrs != nil {
 		names(attrs["category"])
 		names(attrs["categories"])
 		extra := BookSourceHints(map[string]any{"category": attrs["category"], "categories": attrs["categories"]})
@@ -99,7 +100,7 @@ func GameSourceHints(fields map[string]any) GameHints {
 	}
 	for _, key := range []string{"platform", "platforms", "game_platform"} {
 		appendPlatform(fields[key])
-		if attrs := storageObject(fields["attributes"]); attrs != nil {
+		if attrs != nil {
 			appendPlatform(attrs[key])
 		}
 	}

@@ -129,13 +129,11 @@ const aioVideoCount = `SELECT count(*) AS total FROM aiosources.aio_works WHERE 
 
 // One aggregate consumes current decisions once. Referencing a large CTE from
 // four separate counts forces PostgreSQL to spool and reread the whole catalog.
-const aioStatusQuery = `WITH decisions AS (SELECT ` + aioDiagnosticStatus + ` AS status` + aioDiagnosticSource + `), grouped AS (
-SELECT status,count(*) AS total FROM decisions GROUP BY status
-), counts AS (
-SELECT COALESCE(sum(total) FILTER(WHERE status='matched'),0)::bigint AS matched,
-COALESCE(sum(total) FILTER(WHERE status='ambiguous'),0)::bigint AS ambiguous,
-COALESCE(sum(total) FILTER(WHERE status='unmatched'),0)::bigint AS unmatched,
-COALESCE(sum(total) FILTER(WHERE status='pending'),0)::bigint AS pending FROM grouped
+const aioStatusQuery = `WITH decisions AS (SELECT ` + aioDiagnosticStatus + ` AS status` + aioDiagnosticSource + `), counts AS MATERIALIZED (
+SELECT count(*) FILTER(WHERE status='matched')::bigint AS matched,
+count(*) FILTER(WHERE status='ambiguous')::bigint AS ambiguous,
+count(*) FILTER(WHERE status='unmatched')::bigint AS unmatched,
+count(*) FILTER(WHERE status='pending')::bigint AS pending FROM decisions
 ), video_counts AS MATERIALIZED (
 ` + aioVideoCount + `
 ) SELECT
@@ -175,10 +173,10 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 
 const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvdb_id,` + bookWorkYears + `,w.revision,w.adult,w.display_title,w.localized_titles,
 ARRAY(SELECT title FROM aiosources.aio_titles WHERE work_id=w.id UNION SELECT w.display_title WHERE w.media_type='book'),
-COALESCE((SELECT jsonb_object_agg(season,year) FROM aiosources.aio_seasons WHERE work_id=w.id),'{}'),
-COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}'),w.openlibrary_id,w.poster_path,w.localized_posters,
-w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM aiosources.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
-'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0)),w.igdb_id,w.game_data`
+CASE WHEN w.media_type='tv' THEN COALESCE((SELECT jsonb_object_agg(season,year) FROM aiosources.aio_seasons WHERE work_id=w.id),'{}') ELSE '{}'::jsonb END,
+CASE WHEN w.media_type='tv' THEN COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}') ELSE '{}'::jsonb END,w.openlibrary_id,w.poster_path,w.localized_posters,
+CASE WHEN w.media_type='book' THEN w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM aiosources.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
+'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0)) ELSE w.book_data END,w.igdb_id,w.game_data`
 
 func scanAIOWork(row scanner) (model.AIOWork, error) {
 	var w model.AIOWork

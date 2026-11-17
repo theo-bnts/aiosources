@@ -121,9 +121,11 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
  SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR tvdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
  UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM aiosources.aio_titles WHERE `+matching+bookExtras+`
 ), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
- SELECT `+columns+` FROM ranked c JOIN aiosources.aio_works w ON w.id=c.id
+ SELECT `+columns+` FROM (
+ SELECT w.id,c.precision,c.relevance FROM ranked c JOIN aiosources.aio_works w ON w.id=c.id
  WHERE NOT w.adult AND ($3='' OR w.media_type=ANY(string_to_array($3,','))) AND ($4::int=0 OR `+catalogYearFilter("$4::int")+`)
- ORDER BY c.precision DESC,c.relevance DESC,w.id LIMIT 40`, args...)
+ ORDER BY c.precision DESC,c.relevance DESC,w.id LIMIT 40
+) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,w.id`, args...)
 	if err != nil {
 		return out, databaseError("search review candidates", err)
 	}

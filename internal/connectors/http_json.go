@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -269,9 +270,8 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 	if err != nil {
 		return fail(err)
 	}
-	var root any
-	if err := decodeJSON(response.Body, &root); err != nil {
-		return fail(err)
+	if !utf8.Valid(response.Body) || !json.Valid(response.Body) {
+		return fail(errors.New("invalid JSON response"))
 	}
 	selected, found, err := rawPointer(response.Body, p.HTTP.ItemsPath)
 	if err != nil {
@@ -302,7 +302,7 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 		if p.Pagination.Type == "page" {
 			expected = state.Page
 		}
-		value, err := requiredPointer(root, p.Pagination.CurrentPath)
+		value, err := rawRequiredPointer(response.Body, p.Pagination.CurrentPath)
 		if err != nil {
 			page.Metadata["expected_position"] = expected
 			return fail(err, "invalid_position")
@@ -319,7 +319,7 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 	}
 	next := state
 	if p.Pagination.TotalPath != "" {
-		value, err := requiredPointer(root, p.Pagination.TotalPath)
+		value, err := rawRequiredPointer(response.Body, p.Pagination.TotalPath)
 		if err != nil {
 			if state.Total != nil {
 				page.Metadata["expected_total"] = *state.Total
@@ -358,7 +358,7 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 	}
 	explicitNext, terminator := false, false
 	if p.Pagination.NextPath != "" {
-		value, err := requiredPointer(root, p.Pagination.NextPath)
+		value, err := rawRequiredPointer(response.Body, p.Pagination.NextPath)
 		if err != nil {
 			return fail(err, "invalid_continuation")
 		}
@@ -551,6 +551,20 @@ func requiredPointer(root any, pointer string) (any, error) {
 	}
 	if !found {
 		return nil, errors.New("configured pagination path is missing")
+	}
+	return value, nil
+}
+func rawRequiredPointer(raw json.RawMessage, pointer string) (any, error) {
+	selected, found, err := rawPointer(raw, pointer)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, errors.New("configured pagination path is missing")
+	}
+	var value any
+	if err := decodeJSON(selected, &value); err != nil {
+		return nil, err
 	}
 	return value, nil
 }

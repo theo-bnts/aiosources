@@ -181,10 +181,22 @@ func (s ImportSelection) Allows(e Edition) bool {
 	if len(s.Languages) > 0 && !slices.ContainsFunc(e.Languages, func(value string) bool { return slices.Contains(s.Languages, value) }) {
 		return false
 	}
-	if !s.RelevantOnly || e.Digital || s.Titles[e.Normalized] || s.Identifiers[e.ID] {
+	if !s.RelevantOnly || e.Digital || s.Identifiers[e.ID] {
 		return true
 	}
-	for _, key := range append(slices.Clone(e.Works), e.ISBN...) {
+	normalized := e.Normalized
+	if normalized == "" && len(s.Titles) > 0 {
+		normalized = Normalize(e.Title)
+	}
+	if s.Titles[normalized] {
+		return true
+	}
+	for _, key := range e.Works {
+		if s.Identifiers[key] {
+			return true
+		}
+	}
+	for _, key := range e.ISBN {
 		if s.Identifiers[key] {
 			return true
 		}

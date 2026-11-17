@@ -90,6 +90,9 @@ func proxyDialer(endpoint *url.URL, username, password string) (DialFunc, error)
 			}
 			limited.N = 1<<63 - 1
 			complete = true
+			if reader.Buffered() == 0 {
+				return conn, nil
+			}
 			return &bufferedConn{Conn: conn, reader: reader}, nil
 		}
 	}

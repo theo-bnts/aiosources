@@ -182,6 +182,9 @@ func pointerTokens(pointer string) ([]string, error) {
 	}
 	tokens := strings.Split(pointer[1:], "/")
 	for i, token := range tokens {
+		if strings.IndexByte(token, '~') < 0 {
+			continue
+		}
 		for j := 0; j < len(token); j++ {
 			if token[j] == '~' {
 				j++
@@ -196,6 +199,12 @@ func pointerTokens(pointer string) ([]string, error) {
 }
 
 func pointerValue(root any, pointer string) (any, bool, error) {
+	if len(pointer) > 0 && pointer[0] == '/' && strings.IndexByte(pointer[1:], '/') < 0 && strings.IndexByte(pointer[1:], '~') < 0 {
+		if node, ok := root.(map[string]any); ok {
+			value, found := node[pointer[1:]]
+			return value, found, nil
+		}
+	}
 	tokens, err := pointerTokens(pointer)
 	if err != nil {
 		return nil, false, err

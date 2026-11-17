@@ -216,13 +216,14 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, f.column+f.op+bind(f.value)+typ)
 		}
 	}
-	from := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND m.fingerprint=t.fields_fingerprint
-LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)
+	baseFrom := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND m.fingerprint=t.fields_fingerprint
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)`
+	from := baseFrom + `
 LEFT JOIN aiosources.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(aiosources.aio_review_evidence(t.fields)::text)
 WHERE ` + strings.Join(clauses, " AND ")
 	filtered := q.Season != nil || q.Episode != nil
 	if !filtered {
-		if err = tx.QueryRow(ctx, "SELECT count(*)"+from, args...).Scan(&result.Total); err != nil {
+		if err = tx.QueryRow(ctx, "SELECT count(*)"+baseFrom+" WHERE "+strings.Join(clauses, " AND "), args...).Scan(&result.Total); err != nil {
 			return result, databaseError("count Torznab results", err)
 		}
 	}

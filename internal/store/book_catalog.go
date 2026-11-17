@@ -15,21 +15,21 @@ const bookWorkYears = `CASE WHEN w.media_type='book' AND cardinality(w.years)=0 
 func bookLanguageSQL(locale string) string { return `ARRAY[split_part(` + locale + `,'-',1)]` }
 
 func bookEditionTitle(locale string) string {
-	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.title FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.languages && ` + bookLanguageSQL(locale) + `)
- SELECT title FROM editions ORDER BY id LIMIT 1)`
+	return `CASE WHEN w.media_type='book' THEN (WITH editions AS MATERIALIZED(SELECT e.id,e.title FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.languages && ` + bookLanguageSQL(locale) + `)
+ SELECT title FROM editions ORDER BY id LIMIT 1) END`
 }
 
 // Resolve aliases once and select the work's editions before ordering. With a
 // global ORDER BY/LIMIT, a selective lookup can otherwise walk the edition
 // primary key and evaluate recursive redirects for millions of unrelated rows.
-const bookEditionCover = `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
- SELECT cover FROM editions ORDER BY id LIMIT 1)`
+const bookEditionCover = `CASE WHEN w.media_type='book' THEN (WITH editions AS MATERIALIZED(SELECT e.id,e.cover FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
+ SELECT cover FROM editions ORDER BY id LIMIT 1) END`
 
 // Cover language belongs to the edition, not the image server. Select from
 // locally indexed editions, with English followed by a stable fallback.
 func bookEditionLocalizedCover(locale string) string {
-	return `(WITH editions AS MATERIALIZED(SELECT e.id,e.cover,e.languages FROM aiosources.ol_editions e WHERE w.media_type='book' AND e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
- SELECT cover FROM editions ORDER BY COALESCE(languages && ` + bookLanguageSQL(locale) + `,false) DESC,COALESCE(languages && ARRAY['en'],false) DESC,id LIMIT 1)`
+	return `CASE WHEN w.media_type='book' THEN (WITH editions AS MATERIALIZED(SELECT e.id,e.cover,e.languages FROM aiosources.ol_editions e WHERE e.work_keys && ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id))) AND e.cover>0)
+ SELECT cover FROM editions ORDER BY COALESCE(languages && ` + bookLanguageSQL(locale) + `,false) DESC,COALESCE(languages && ARRAY['en'],false) DESC,id LIMIT 1) END`
 }
 
 // Start with the edition's small set of work identifiers, then follow the same

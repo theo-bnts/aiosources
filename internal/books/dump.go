@@ -26,8 +26,10 @@ func publicationYear(s string) int {
 var keyRE = regexp.MustCompile(`^OL[1-9][0-9]{0,14}[WMA]$`)
 
 func Key(s string) string {
-	p := strings.Split(s, "/")
-	s = strings.ToUpper(p[len(p)-1])
+	if i := strings.LastIndexByte(s, '/'); i >= 0 {
+		s = s[i+1:]
+	}
+	s = strings.ToUpper(s)
 	if keyRE.MatchString(s) {
 		return s
 	}

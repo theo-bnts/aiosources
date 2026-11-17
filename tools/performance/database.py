@@ -77,7 +77,7 @@ class Database:
         self.running = False
 
     def environment(self, name="postgres"):
-        return {**{key: value for key, value in os.environ.items() if not key.startswith("PG")}, "PGHOST": "127.0.0.1", "PGPORT": str(self.state["port"]), "PGUSER": "performance_owner", "PGPASSWORD": self.state["password"], "PGDATABASE": name, "PGCONNECT_TIMEOUT": "10", "PGOPTIONS": ""}
+        return {**{key: value for key, value in os.environ.items() if not key.startswith("PG")}, "LC_ALL": "C", "LANG": "C", "PGHOST": "127.0.0.1", "PGPORT": str(self.state["port"]), "PGUSER": "performance_owner", "PGPASSWORD": self.state["password"], "PGDATABASE": name, "PGCONNECT_TIMEOUT": "10", "PGOPTIONS": ""}
 
     def uri(self, name="postgres"):
         return "postgresql://performance_owner:" + urllib.parse.quote(self.state["password"], safe="") + "@127.0.0.1:" + str(self.state["port"]) + "/" + name

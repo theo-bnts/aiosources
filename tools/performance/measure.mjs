@@ -234,7 +234,7 @@ try {
     ['torznab.accesses', '/api/torznab/endpoints'],
     ['sharing.accesses', '/api/shares'],
     ['security.secrets', '/api/secrets'],
-    ['security.verification', '/api/security'],
+    ['security.limits', '/api/settings/runtime/security'],
     ['security.sessions', '/api/security/sessions'],
     ['network.settings', '/api/settings/network'],
     ['public.settings', '/api/public-access'],
