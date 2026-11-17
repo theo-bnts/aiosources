@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { resetListView } from '@/lib/list-view'
 import { Input } from '@/components/ui/input'
@@ -121,10 +122,12 @@ export function ListFilters({
         />
       </div>
       {entries && filters.query && (
-        <p className="help">
-          Matching “{filters.query}”. Choose {entityLabel.toLowerCase()} or clear filters to replace
-          this saved text filter.
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5 text-sm">
+          <span className="break-words">Matching “{filters.query}”</span>
+          <InfoTip label="Active text filter">
+            Choose {entityLabel.toLowerCase()} or clear filters to replace this saved text filter.
+          </InfoTip>
+        </div>
       )}
       <ResultCount total={total} shown={count} label={resultLabel} />
     </section>

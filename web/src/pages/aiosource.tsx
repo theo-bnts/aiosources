@@ -660,7 +660,7 @@ export default function AIOSourcePage({
       help={
         metadata
           ? 'Rebuild information or identification results when needed. Each action explains what it removes before confirmation.'
-          : undefined
+          : 'Available, absent and unknown results stay distinct. Cache observations and retries survive restart and are isolated by provider account.'
       }
     >
       <MaintenanceStatus
@@ -741,10 +741,6 @@ export default function AIOSourcePage({
       )}
       {section === 'debrid' && (
         <>
-          <p className="help">
-            Available, absent and unknown results stay distinct. Cache observations and retries
-            survive restart and are isolated by provider account.
-          </p>
           <div className="flex flex-wrap items-center gap-4">
             <ConfirmAction
               title="Reset cache observations?"
@@ -796,14 +792,25 @@ export default function AIOSourcePage({
               help="Run a task now without changing its automatic settings. Stopping the current task preserves committed progress; disable its automatic option to stop future runs."
             >
               {section === 'videos' && status.recovery_required && (
-                <p role="status" className="notice notice-warning">
-                  The TMDB change history could not cover the interruption. Film & series
-                  information will be refreshed progressively. Existing data, books and manual
-                  choices are retained.{' '}
-                  {status.config.auto_sync
-                    ? 'Automatic recovery continues from saved progress.'
-                    : 'Enable automatic video updates, or run Update film & series information to continue.'}
-                </p>
+                <div
+                  role="status"
+                  className="notice notice-warning flex flex-wrap items-center gap-1.5"
+                >
+                  <p>
+                    Video information needs recovery.{' '}
+                    {status.config.auto_sync
+                      ? 'Automatic recovery continues.'
+                      : 'Enable automatic video updates or run Update film & series information.'}
+                  </p>
+                  <InfoTip label="Video recovery">
+                    The TMDB change history could not cover the interruption. Film & series
+                    information will be refreshed progressively. Existing data, books and manual
+                    choices are retained.{' '}
+                    {status.config.auto_sync
+                      ? 'Automatic recovery continues from saved progress.'
+                      : 'Enable automatic video updates, or run Update film & series information to continue.'}
+                  </InfoTip>
+                </div>
               )}
               {section === 'books' && Boolean(status.books?.skipped) && (
                 <p role="status" className="notice notice-warning">
@@ -821,13 +828,25 @@ export default function AIOSourcePage({
                 </p>
               )}
               {section === 'books' && status.books?.needs_export && (
-                <p role="status" className="notice notice-warning">
-                  Change continuity was lost. A newer Open Library export is needed to cover the
-                  missing period. Existing data is retained.{' '}
-                  {status.config.openlibrary_enabled
-                    ? 'Recent updates continue while automatic recovery waits for that export.'
-                    : 'Enable automatic book updates, or run Update book information to retry manually.'}
-                </p>
+                <div
+                  role="status"
+                  className="notice notice-warning flex flex-wrap items-center gap-1.5"
+                >
+                  <p>
+                    A newer Open Library export is needed to recover a missing update period.
+                    Existing data is retained.{' '}
+                    {status.config.openlibrary_enabled
+                      ? 'Recent updates continue while recovery waits.'
+                      : 'Enable automatic book updates or run Update book information.'}
+                  </p>
+                  <InfoTip label="Book recovery">
+                    Change continuity was lost. A newer Open Library export is needed to cover the
+                    missing period. Existing data is retained.{' '}
+                    {status.config.openlibrary_enabled
+                      ? 'Recent updates continue while automatic recovery waits for that export.'
+                      : 'Enable automatic book updates, or run Update book information to retry manually.'}
+                  </InfoTip>
+                </div>
               )}
               {Boolean(
                 section === 'videos'

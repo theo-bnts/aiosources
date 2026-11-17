@@ -14,6 +14,7 @@ import { ErrorNotice } from './common'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
+import { InfoTip } from './ui/info-tip'
 import { CredentialPageLink } from './credential-page-link'
 import type { LanguagePreferences, InstallationOptions } from '@/lib/language-preferences'
 
@@ -181,15 +182,22 @@ export function PublicCredentialsForm({
           </div>
         )}
         {!info.use_instance_debrid && (
-          <p className="help">
-            {info.use_instance_debrid
-              ? 'Debrid requests use the instance’s configured accounts. '
-              : 'Enter at least one key. '}
-            Your personal keys and optional announce URLs are remembered automatically on this
-            browser in an encrypted configuration, shared between Search, Stremio and Torznab. The
-            server does not save them. Request history retains media, results and errors for the
-            instance’s configured retention period without identifying you.
-          </p>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <p>
+              Enter at least one key. Credentials are remembered on this browser, not saved on the
+              server.
+            </p>
+            <InfoTip label="Personal credentials">
+              <p>
+                Your personal keys and optional announce URLs are remembered automatically on this
+                browser in an encrypted configuration, shared between Search, Stremio and Torznab.
+              </p>
+              <p>
+                Request history retains media, results and errors for the instance’s configured
+                retention period without identifying you.
+              </p>
+            </InfoTip>
+          </div>
         )}
         {children}
       </fieldset>

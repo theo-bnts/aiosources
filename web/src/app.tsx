@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowClockwiseIcon,
   BookOpenIcon,
@@ -913,20 +914,16 @@ export function AppShell({
                       </span>
                     </li>
                   ))}
-                  <li aria-current="page" className="text-foreground">
-                    <h1
-                      className="text-sm font-medium"
-                      aria-describedby={activeItem ? 'page-description' : undefined}
-                    >
-                      {activeItem?.label ?? 'AIOSources'}
-                    </h1>
+                  <li
+                    aria-current="page"
+                    className="flex min-w-0 items-center gap-1.5 text-foreground"
+                  >
+                    <h1 className="text-sm font-medium">{activeItem?.label ?? 'AIOSources'}</h1>
+                    {activeItem && (
+                      <InfoTip label={activeItem.label}>{activeItem.description}</InfoTip>
+                    )}
                   </li>
                 </ol>
-                {activeItem && (
-                  <p id="page-description" className="text-xs leading-4">
-                    {activeItem.description}
-                  </p>
-                )}
               </nav>
             </div>
             <div className="order-last w-full basis-full lg:order-none lg:w-auto lg:basis-auto">

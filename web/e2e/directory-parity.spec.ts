@@ -361,7 +361,7 @@ test('history filters keep visible labels and align their clear action with the 
   }
 })
 
-test('secret JSON help has its own collapsed section and settings search reveals it without changing credentials', async ({
+test('secret JSON help opens from an info button and settings search finds it without changing credentials', async ({
   page,
 }) => {
   const writes: string[] = []
@@ -372,15 +372,21 @@ test('secret JSON help has its own collapsed section and settings search reveals
   await page.goto('/security/secrets')
   const help = page.locator('#secret-reference-help')
   await expect(help.locator('xpath=ancestor::details')).toHaveCount(0)
-  await expect(help.locator(':scope > summary')).toBeVisible()
-  await expect(help).not.toHaveAttribute('open', '')
+  const helpButton = help.getByRole('button', {
+    name: 'About Using references in JSON',
+    exact: true,
+  })
+  await expect(helpButton).toBeVisible()
+  await expect(helpButton).toHaveAttribute('aria-expanded', 'false')
   await page.getByRole('button', { name: 'Search settings', exact: true }).click()
   const search = page.getByRole('dialog', { name: 'Search settings', exact: true })
   await search.getByRole('combobox').fill('auth.secret_ref')
   await search.getByRole('option', { name: /Using references in JSON/ }).click()
-  await expect(help).toHaveAttribute('open', '')
   await expect(help).toBeFocused()
-  await expect(help).toContainText('auth.secret_ref')
+  await helpButton.click()
+  await expect(
+    page.getByRole('dialog', { name: 'About Using references in JSON', exact: true }),
+  ).toContainText('auth.secret_ref')
   expect(writes).toEqual([])
 })
 

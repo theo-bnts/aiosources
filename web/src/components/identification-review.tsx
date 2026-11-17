@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   MagnifyingGlassIcon,
   ListChecksIcon,
@@ -211,7 +212,13 @@ function ReviewForm({
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         <section className="space-y-3 rounded-md border p-4">
-          <h3 className="font-medium">Current identification</h3>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="font-medium">Current identification</h3>
+            <InfoTip label="Current identification">
+              Automatic updates retain manual choices. Changed title, hash, identifiers or numbering
+              requires another review.
+            </InfoTip>
+          </div>
           {detail.work ? (
             <WorkSummary work={detail.work} />
           ) : (
@@ -227,7 +234,12 @@ function ReviewForm({
           )}
         </section>
         <section className="space-y-3 rounded-md border p-4">
-          <h3 className="font-medium">Source identifiers</h3>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="font-medium">Source identifiers</h3>
+            <InfoTip label="Source identifiers">
+              A review corrects this occurrence without rewriting the source data.
+            </InfoTip>
+          </div>
           <p className="mono break-words text-xs">
             {[
               detail.record.igdb && `IGDB ${detail.record.igdb}`,
@@ -239,9 +251,6 @@ function ReviewForm({
             ]
               .filter(Boolean)
               .join(' · ') || 'None supplied'}
-          </p>
-          <p className="help">
-            A review corrects this occurrence without rewriting the source data.
           </p>
         </section>
       </div>
@@ -333,26 +342,26 @@ function ReviewForm({
         !candidates.data.items?.length && (
           <Empty
             title="No candidates in this view"
-            description="Try another title, author or identifier. Only locally imported film, series and book information is available here."
+            description="Try another title, author or identifier. Only information available on this instance can be selected."
           />
         )}
       {selected && !candidates.data?.items?.some((work) => work.id === selected.id) && (
         <section className="space-y-3 rounded-md border border-primary/40 p-4">
           <h3 className="font-medium">Selected identification</h3>
           <WorkSummary work={selected} />
-          <p className="help">
-            Automatic updates retain this choice. Changed source data requires another review.
-          </p>
         </section>
       )}
-      {selected && candidates.data?.items?.some((work) => work.id === selected.id) && (
-        <p className="help">
-          Automatic updates retain this choice. Changed title, hash, identifiers or numbering
-          requires another review.
-        </p>
-      )}
+
       {selected?.type === 'tv' && (
-        <Disclosure title="Season & episode correction">
+        <Disclosure
+          title="Season & episode correction"
+          help={
+            <>
+              Leave episode empty for a pack, or both empty for unknown numbering. Playback still
+              verifies the provider’s file list.
+            </>
+          }
+        >
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="review-episode-override">Override source numbering</Label>
             <Switch
@@ -388,10 +397,7 @@ function ReviewForm({
                   />
                 </div>
               </div>
-              <p className="help">
-                Leave episode empty for a pack, or both empty for unknown numbering. Playback still
-                verifies the provider’s file list.
-              </p>
+
               {invalidEpisode && (
                 <p role="alert" className="help text-destructive">
                   Enter a season from 0 to 999 and an episode from 1 to 99999, or leave them empty.

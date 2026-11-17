@@ -3,7 +3,15 @@ import { InfoIcon } from '@phosphor-icons/react'
 import { Popover } from 'radix-ui'
 import { popupLayer } from '@/lib/popup-layer'
 
-export function InfoTip({ label, children }: { label: string; children: ReactNode }) {
+export function InfoTip({
+  label,
+  children,
+  size = 'default',
+}: {
+  label: string
+  children: ReactNode
+  size?: 'default' | 'sm'
+}) {
   const trigger = useRef<HTMLButtonElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -38,7 +46,7 @@ export function InfoTip({ label, children }: { label: string; children: ReactNod
           type="button"
           data-slot="info-trigger"
           aria-label={`About ${label}`}
-          className="relative inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1 before:rounded-full"
+          className={`relative inline-flex ${size === 'sm' ? 'size-4' : 'size-5'} shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-1 before:rounded-full`}
           onClick={(event) => {
             keyboard.current = event.detail === 0
             event.stopPropagation()

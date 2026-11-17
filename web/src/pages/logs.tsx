@@ -304,8 +304,7 @@ export function LogsPage() {
           <DialogHeader>
             <DialogTitle>Event metadata</DialogTitle>
             <DialogDescription>
-              {inspecting?.kind} · {date(inspecting?.created_at)}. Only server-approved activity
-              metadata is included.
+              {inspecting?.kind} · {date(inspecting?.created_at)}.
             </DialogDescription>
           </DialogHeader>
           <pre className="max-h-96 overflow-auto rounded-md border border-border bg-muted p-4 font-mono text-xs whitespace-pre-wrap break-words">

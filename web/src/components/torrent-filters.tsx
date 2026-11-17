@@ -117,7 +117,12 @@ export function TorrentSearchForm({
     >
       <div>
         <div className="field">
-          <Label htmlFor="torrent-search">Search text</Label>
+          <Label
+            htmlFor="torrent-search"
+            help={<> Combine fragments, "exact phrases", -exclusions or OR alternatives. </>}
+          >
+            Search text
+          </Label>
           <Input
             id="torrent-search"
             name="q"
@@ -126,7 +131,7 @@ export function TorrentSearchForm({
           />
         </div>
       </div>
-      <p className="help">Combine fragments, "exact phrases", -exclusions or OR alternatives.</p>
+
       <Disclosure title="Filters">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="field sm:col-span-2">

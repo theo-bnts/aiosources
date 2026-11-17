@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { LinkIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
@@ -63,7 +64,14 @@ export function PublicSharedCatalogEntry({
   return (
     <div className="page max-w-4xl">
       <section className="section-card">
-        <h2 className="section-title">Connect another AIOSources instance</h2>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h2 className="section-title">Connect another AIOSources instance</h2>
+          <InfoTip label="Connect another AIOSources instance">
+            Copy the catalog to your own instance and keep it up to date automatically. Playback
+            uses the receiving instance’s accounts and private-source announce URLs. No service key
+            or announce URL is shared.
+          </InfoTip>
+        </div>
         <form
           className="space-y-5"
           onSubmit={(event) => {
@@ -106,11 +114,7 @@ export function PublicSharedCatalogEntry({
               }
             />
           </fieldset>
-          <p className="help">
-            Copy the catalog to your own instance and keep it up to date automatically. Playback
-            uses the receiving instance’s accounts and private-source announce URLs. No service key
-            or announce URL is shared.
-          </p>
+
           <ErrorNotice error={error} />
           <Button type="submit" disabled={pending}>
             <LinkIcon aria-hidden="true" />
@@ -120,10 +124,17 @@ export function PublicSharedCatalogEntry({
       </section>
       {connection && (
         <section className="section-card">
-          <h2 className="section-title">Connect your instance</h2>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h2 className="section-title">Connect your instance</h2>
+            <InfoTip label="Connect your instance">
+              Save the sharing password in Secrets when adding the remote catalog. Changing data
+              choices creates a separate connection. Turning off public sharing revokes existing
+              links.
+            </InfoTip>
+          </div>
           <p className="help">
-            In AIOSources, open Sources → Remote catalogs and add a remote catalog. Paste this URL
-            and save the sharing password in Secrets. Enable the connection to start syncing.
+            On your instance, open Sources → Remote catalogs → Add remote catalog. Enter these
+            values and enable the connection.
           </p>
           <div className="field">
             <Label htmlFor="public-catalog-url">Catalog URL</Label>
@@ -154,10 +165,7 @@ export function PublicSharedCatalogEntry({
               successMessage="Copied to your clipboard. Keep it private."
             />
           </div>
-          <p className="help">
-            Keep the password with its matching URL. Changing data choices creates a separate
-            connection. Turning off public sharing revokes existing links.
-          </p>
+          <p className="help">Keep the password private with its matching URL.</p>
         </section>
       )}
     </div>

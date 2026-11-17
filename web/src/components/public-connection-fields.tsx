@@ -47,15 +47,16 @@ export function PublicAnnounceFields({
   useEffect(() => setRemoved([]), [saved])
   if (!sources.length) return null
   return (
-    <Disclosure id="public-announce-settings" title="Private source playback">
+    <Disclosure
+      id="public-announce-settings"
+      title="Private source playback"
+      help="Announce URLs are remembered in your encrypted browser configuration and included in your connection links. Without one, private sources are limited to known cached results."
+    >
       <p className="help">
-        Optional: supply your own complete announce URL to allow uncached downloads from a private
-        source.{' '}
+        Your announce URL unlocks uncached private-source downloads.{' '}
         {torznab
           ? 'Your client receives your announce in its magnets.'
           : 'These URLs are sent only to your debrid account when needed.'}{' '}
-        They are remembered in your encrypted browser configuration and included in your connection
-        links.
       </p>
       {sources.map((source) => {
         const retained = saved?.announces?.includes(source.id) && !removed.includes(source.id)

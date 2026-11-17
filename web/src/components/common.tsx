@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button'
 import { PageActions, PageActionsTarget } from '@/components/page-actions'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -45,11 +46,13 @@ import {
 export function PageHeader({
   title,
   description,
+  help,
   actions,
   back: defaultBack,
 }: {
   title: string
   description?: string
+  help?: ReactNode
   actions?: ReactNode
   back?: BackLink
 }) {
@@ -76,11 +79,16 @@ export function PageHeader({
       )}
       <div className="page-heading">
         {(visibility.title || showDescription) && (
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-full sm:basis-0">
             {visibility.title && (
-              <Heading className={`break-words ${level === 1 ? 'page-title' : 'section-title'}`}>
-                {title}
-              </Heading>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Heading
+                  className={`min-w-0 break-words ${level === 1 ? 'page-title' : 'section-title'}`}
+                >
+                  {title}
+                </Heading>
+                {help && <InfoTip label={title}>{help}</InfoTip>}
+              </div>
             )}
             {showDescription && (
               <p
@@ -179,7 +187,7 @@ export function Empty({
   icon: EmptyIcon = DatabaseIcon,
 }: {
   title: string
-  description: string
+  description?: string
   action?: ReactNode
   icon?: Icon
 }) {
@@ -188,7 +196,9 @@ export function Empty({
       <EmptyIcon aria-hidden="true" className="size-6 text-muted-foreground" />
       <div>
         <h2 className="section-title">{title}</h2>
-        <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
+        {description && (
+          <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
+        )}
       </div>
       {action}
     </div>
@@ -199,21 +209,31 @@ export function ResultCount({
   total,
   shown,
   label = 'results',
+  help,
 }: {
   total: number
   shown?: number
   label?: string
+  help?: ReactNode
 }) {
   const singular = label
     .replace(/entries$/, 'entry')
     .replace(/categories$/, 'category')
     .replace(/proxies$/, 'proxy')
     .replace(/s$/, '')
-  return (
+  const content = (
     <p className="help" role="status" data-result-count>
       {shown !== undefined && <>Showing {number(shown)} of </>}
       {number(total)} {total === 1 ? singular : label}
     </p>
+  )
+  return help ? (
+    <div className="flex min-w-0 items-center gap-1.5">
+      {content}
+      <InfoTip label={`${label} count`}>{help}</InfoTip>
+    </div>
+  ) : (
+    content
   )
 }
 
@@ -320,7 +340,7 @@ export function ListEmpty({
   action,
 }: {
   title: string
-  description: string
+  description?: string
   filtered?: boolean
   offset?: number
   onFirstPage: () => void

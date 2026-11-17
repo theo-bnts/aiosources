@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { json } from '@codemirror/lang-json'
 import { xml } from '@codemirror/lang-xml'
 import { EditorView } from '@codemirror/view'
+import { InfoTip } from '@/components/ui/info-tip'
 
 const editorTheme = EditorView.theme(
   {
@@ -22,6 +23,7 @@ export function CodeEditor({
   label,
   height = '460px',
   readOnly = false,
+  help,
 }: {
   value: string
   onChange?: (value: string) => void
@@ -29,6 +31,7 @@ export function CodeEditor({
   label: string
   height?: string
   readOnly?: boolean
+  help?: ReactNode
 }) {
   const extensions = useMemo(
     () => [
@@ -40,22 +43,30 @@ export function CodeEditor({
     [language, label],
   )
   return (
-    <div className="editor-frame">
-      <CodeMirror
-        value={value}
-        onChange={onChange}
-        height={height}
-        theme="dark"
-        extensions={extensions}
-        readOnly={readOnly}
-        editable={!readOnly}
-        basicSetup={{
-          foldGutter: true,
-          highlightActiveLine: !readOnly,
-          highlightActiveLineGutter: !readOnly,
-        }}
-        indentWithTab={false}
-      />
+    <div className="min-w-0 space-y-2">
+      {help && (
+        <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+          <span>{label}</span>
+          <InfoTip label={label}>{help}</InfoTip>
+        </div>
+      )}
+      <div className="editor-frame">
+        <CodeMirror
+          value={value}
+          onChange={onChange}
+          height={height}
+          theme="dark"
+          extensions={extensions}
+          readOnly={readOnly}
+          editable={!readOnly}
+          basicSetup={{
+            foldGutter: true,
+            highlightActiveLine: !readOnly,
+            highlightActiveLineGutter: !readOnly,
+          }}
+          indentWithTab={false}
+        />
+      </div>
     </div>
   )
 }

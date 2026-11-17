@@ -231,10 +231,13 @@ test('information recovery and schedules stay consistent without asking to erase
     await page.goto('/metadata/videos/settings')
     await openDisclosure(page, 'Manual actions')
     await expect(
-      page
-        .getByRole('status')
-        .filter({ hasText: 'Existing data, books and manual choices are retained.' }),
+      page.getByRole('status').filter({ hasText: 'Video information needs recovery.' }),
     ).toBeVisible()
+    await page.getByRole('button', { name: 'About Video recovery', exact: true }).click()
+    await expect(
+      page.getByRole('dialog', { name: 'About Video recovery', exact: true }),
+    ).toContainText('Existing data, books and manual choices are retained.')
+    await page.keyboard.press('Escape')
     await expect(
       page.getByRole('button', { name: 'Update film & series information', exact: true }),
     ).toBeEnabled()

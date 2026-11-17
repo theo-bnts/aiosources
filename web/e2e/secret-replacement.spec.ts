@@ -26,7 +26,7 @@ test('inline key replacement preserves the reference and handles conflicts and l
   await page.setViewportSize({ width: 320, height: 900 })
   await form.getByRole('button', { name: 'Replace AllDebrid key', exact: true }).click()
   editor = page.getByRole('dialog', { name: 'Replace AllDebrid key', exact: true })
-  await expect(editor).toContainText('applies immediately to every configuration')
+  await expect(editor).toContainText('immediately in every configuration using this reference')
   await expect(editor.getByLabel('AllDebrid API key', { exact: true })).toHaveValue('')
   await editor.getByLabel('AllDebrid API key', { exact: true }).fill('synthetic-replacement-key')
   const replacement = page.waitForRequest(

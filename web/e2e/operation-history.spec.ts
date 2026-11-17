@@ -49,6 +49,19 @@ test('metadata and debrid histories have consistent filters, pagination and reta
   await expect(page.getByRole('region', { name: 'Operation events', exact: true })).toContainText(
     'Failed',
   )
+  const labelGrowth = await page.locator('.statistic-card dt').evaluateAll((labels) =>
+    labels.flatMap((label) => {
+      const trigger = label.querySelector<HTMLElement>('[data-slot="info-trigger"]')
+      if (!trigger) return []
+      const before = label.getBoundingClientRect().height
+      trigger.style.display = 'none'
+      const after = label.getBoundingClientRect().height
+      trigger.style.removeProperty('display')
+      return [before - after]
+    }),
+  )
+  expect(labelGrowth.length).toBeGreaterThan(0)
+  expect(labelGrowth.every((growth) => growth === 0)).toBe(true)
   await page.reload()
   await expect(page.getByText('metadata-failed', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Video history', exact: true }).click()

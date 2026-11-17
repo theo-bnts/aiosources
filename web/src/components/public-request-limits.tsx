@@ -132,8 +132,8 @@ export function PublicRequestLimitsPanel() {
             </div>
             {conflict && (
               <p className="notice notice-warning" role="status">
-                Network settings changed. Your draft is preserved; discard it to load the saved
-                settings.
+                Settings changed elsewhere. Your draft is preserved; reload the saved settings
+                before saving.
               </p>
             )}
             <ErrorNotice error={save.error} />

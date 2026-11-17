@@ -280,8 +280,11 @@ test('sharing forms use common draft feedback and do not write reverted edits', 
   await expect(dialog).toBeHidden()
   expect(writes).toBe(0)
   await page.goto('/secrets')
-  const advanced = page.locator('#secret-reference-help')
-  expect(await advanced.evaluate((element) => (element as HTMLDetailsElement).open)).toBe(false)
+  await expect(
+    page
+      .locator('#secret-reference-help')
+      .getByRole('button', { name: 'About Using references in JSON', exact: true }),
+  ).toHaveAttribute('aria-expanded', 'false')
   await page
     .locator('.page-heading')
     .getByRole('button', { name: 'Create secret', exact: true })

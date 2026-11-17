@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { ArrowRightIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { serviceNames } from '@/lib/debrid'
 import { FilterSelect } from '@/components/filter-select'
@@ -370,7 +371,16 @@ export function StremioRequestPage() {
                 <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   <Statistic label="Identified source records" value={item.matched} />
                   <Statistic label="Eligible torrents" value={item.eligible} />
-                  <Statistic label="Results returned" value={item.returned} />
+                  <Statistic
+                    label="Results returned"
+                    value={item.returned}
+                    help={
+                      <>
+                        A torrent can produce one result per configured debrid service. Provider
+                        exclusions are counted separately.
+                      </>
+                    }
+                  />
                   <Statistic label="Response time (ms)" value={item.duration_ms} />
                 </dl>
                 <section className="section-card">
@@ -397,10 +407,7 @@ export function StremioRequestPage() {
                       <dd className="mt-1 tabular-nums">{number(item.file_unavailable)}</dd>
                     </div>
                   </dl>
-                  <p className="help">
-                    A torrent can produce one result per configured debrid service. Provider
-                    exclusions are counted separately.
-                  </p>
+
                   {item.outcome === 'empty' && (
                     <p className="notice notice-warning">
                       {item.matched === 0
@@ -492,10 +499,13 @@ export function StremioRequestPage() {
                     />
                   )}
                   {item.truncated && (
-                    <p className="notice notice-warning">
-                      Result details were limited by the retention settings or the per-request
-                      safety limit. The total count above is complete.
-                    </p>
+                    <div className="notice notice-warning flex flex-wrap items-center gap-1.5">
+                      <p>Result details limited. The total count is complete.</p>
+                      <InfoTip label="Result details">
+                        Result details were limited by the retention settings or the per-request
+                        safety limit. The total count above is complete.
+                      </InfoTip>
+                    </div>
                   )}
                 </section>
               </>

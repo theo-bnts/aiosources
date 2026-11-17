@@ -24,7 +24,17 @@ export function DurationSelect({
   const showCustom = custom || !preset
   return (
     <div className="field min-w-0">
-      <Label htmlFor={id}>{label}</Label>
+      <Label
+        htmlFor={id}
+        help={
+          <>
+            Use a supported duration, such as 90m or 1h30m. Existing custom values are preserved
+            exactly.
+          </>
+        }
+      >
+        {label}
+      </Label>
       <select
         id={id}
         className="native-select w-full"
@@ -56,12 +66,7 @@ export function DurationSelect({
             onChange={(event) => onChange(event.target.value)}
             required={required}
             placeholder="1h30m"
-            aria-describedby={`${id}-help`}
           />
-          <p id={`${id}-help`} className="help">
-            Use a supported duration, such as 90m or 1h30m. Existing custom values are preserved
-            exactly.
-          </p>
         </>
       )}
     </div>
@@ -103,7 +108,17 @@ export function ScheduleTimingFields({
   return (
     <div className="space-y-4">
       <div className="field">
-        <Label htmlFor={`${id}-timing`}>{label}</Label>
+        <Label
+          htmlFor={`${id}-timing`}
+          help={
+            <>
+              With Manual only, imports start only when requested. Choosing this option removes the
+              automatic frequency when saved.
+            </>
+          }
+        >
+          {label}
+        </Label>
         <select
           id={`${id}-timing`}
           className="native-select w-full"
@@ -129,12 +144,6 @@ export function ScheduleTimingFields({
           <option value="daily">Daily at…</option>
           <option value="cron">Custom schedule (Cron)</option>
         </select>
-        {timing === 'manual' && (
-          <p className="help">
-            Imports start only when requested. Choosing this option removes the automatic frequency
-            when saved.
-          </p>
-        )}
       </div>
       {timing === 'every' && (
         <DurationSelect
@@ -158,19 +167,24 @@ export function ScheduleTimingFields({
       )}
       {timing === 'cron' && (
         <div className="field">
-          <Label htmlFor={`${id}-cron`}>Cron expression</Label>
+          <Label
+            htmlFor={`${id}-cron`}
+            help={
+              <>
+                Advanced: minute, hour, day of month, month, day of week. Existing custom
+                expressions stay unchanged until edited.
+              </>
+            }
+          >
+            Cron expression
+          </Label>
           <Input
             id={`${id}-cron`}
             value={cron}
             required
             onChange={(event) => onChange({ cron: event.target.value })}
             placeholder="0 */6 * * *"
-            aria-describedby={`${id}-cron-help`}
           />
-          <p id={`${id}-cron-help`} className="help">
-            Advanced: minute, hour, day of month, month, day of week. Existing custom expressions
-            stay unchanged until edited.
-          </p>
         </div>
       )}
       {invalid && (
@@ -179,14 +193,24 @@ export function ScheduleTimingFields({
         </p>
       )}
       <div className="field">
-        <Label htmlFor={`${id}-zone`}>Timezone</Label>
+        <Label
+          htmlFor={`${id}-zone`}
+          help={
+            <>
+              Daily and Cron schedules follow this timezone, including daylight-saving changes.
+              Empty uses UTC. Fixed intervals measure elapsed time. The server runs schedules even
+              when this page is closed.
+            </>
+          }
+        >
+          Timezone
+        </Label>
         <Input
           id={`${id}-zone`}
           value={timezone}
           onChange={(event) => onChange({ timezone: event.target.value })}
           placeholder="UTC"
           list={`${id}-zones`}
-          aria-describedby={`${id}-zone-help`}
         />
         <datalist id={`${id}-zones`}>
           <option value="UTC" />
@@ -194,11 +218,6 @@ export function ScheduleTimingFields({
           <option value="Europe/London" />
           <option value="America/New_York" />
         </datalist>
-        <p id={`${id}-zone-help`} className="help">
-          Daily and Cron schedules follow this timezone, including daylight-saving changes. Empty
-          uses UTC. Fixed intervals measure elapsed time. The server runs schedules even when this
-          page is closed.
-        </p>
       </div>
     </div>
   )

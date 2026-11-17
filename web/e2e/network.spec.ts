@@ -403,7 +403,7 @@ test('public access saves preserve network quotas and concurrent request limit e
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(
     page.getByText(
-      'Network settings changed. Your draft is preserved; discard it to load the saved settings.',
+      'Settings changed elsewhere. Your draft is preserved; reload the saved settings before saving.',
       { exact: true },
     ),
   ).toBeVisible()

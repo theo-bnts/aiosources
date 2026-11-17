@@ -320,8 +320,10 @@ export function HTMLMappingSettings() {
           />
         </FieldGrid>
       </FieldSection>
-      <FieldSection title="Native identity">
-        <p className="help">A stable site ID keeps imports and updates tied to the same record.</p>
+      <FieldSection
+        title="Native identity"
+        description="A stable site ID keeps imports and updates tied to the same record."
+      >
         <HTMLFieldSettings path={['html', 'id']} label="Native ID" identity />
       </FieldSection>
       <FieldSection

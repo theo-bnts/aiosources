@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { LinkIcon, EraserIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
@@ -148,13 +149,17 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
               scope={info.credential_scope}
             />
           </fieldset>
-          <p className="help">
-            Availability uses the shared cache already known by this instance. Configure debrid
-            accounts in your download client.{' '}
-            {info.use_instance_announces
-              ? 'Private downloads use the instance’s announce URLs.'
-              : 'Private sources without your own announce URL are limited to known cached results.'}
-          </p>
+          <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+            <p>
+              {info.use_instance_announces
+                ? 'Private downloads use the instance’s announce URLs.'
+                : 'Private sources without your own announce URL are limited to known cached results.'}
+            </p>
+            <InfoTip label="Cache services">
+              Availability uses the shared cache already known by this instance. Configure debrid
+              accounts in your download client.
+            </InfoTip>
+          </div>
           <ErrorNotice error={error} />
           {preferenceError && (
             <p className="text-sm text-destructive" role="alert">
@@ -186,11 +191,16 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
       </section>
       {connection && !preferenceError && (
         <section className="section-card">
-          <h2 className="section-title">Connect your client</h2>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h2 className="section-title">Connect your client</h2>
+            <InfoTip label="Connect your client">
+              The connection key carries your URL filters and encrypted personal announce URLs.
+              Changing filters updates this link without changing existing connections. No visitor
+              profile is saved.
+            </InfoTip>
+          </div>
           <p className="help">
-            In Prowlarr, choose Generic Torznab. The connection key carries your URL filters and
-            encrypted personal announce URLs; keep it private. Changing filters updates this link
-            without changing existing connections. No visitor profile is saved.
+            In Prowlarr, choose Generic Torznab and enter these values. Keep the API key private.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">

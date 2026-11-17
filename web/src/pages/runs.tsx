@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowRightIcon,
   FileTextIcon,
@@ -330,7 +331,13 @@ function EventsView({ runId }: { runId: string }) {
   return (
     <section className="space-y-3" aria-label="Run events">
       <ErrorNotice error={events.error} retry={() => void events.refetch()} />
-      {events.data && <ResultCount total={events.data.total} label="events" />}
+      {events.data && (
+        <ResultCount
+          total={events.data.total}
+          label="events"
+          help="Events follow the history retention policy in Storage settings."
+        />
+      )}
       <p className="sr-only" role="status">
         Events page {number(page + 1)}
         {events.data && ` of ${number(pageCount)}`}
@@ -416,7 +423,6 @@ function EventsView({ runId }: { runId: string }) {
         !events.isError && (
           <ListEmpty
             title={events.data?.total ? 'No events on this page' : 'No retained events'}
-            description="Events follow the history retention policy in Storage settings."
             offset={offset}
             onFirstPage={() => setOffset(0)}
           />
@@ -603,17 +609,23 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         </p>
       )}
       {run.mode === 'preview' && (
-        <p className="notice text-muted-foreground">
-          Preview mode: a parsed sample is saved without publishing torrents or storing raw bodies.
-          Reaching the budget is normal in this mode.
-        </p>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="secondary">Preview</Badge>
+          <InfoTip label="Preview">
+            Preview mode: a parsed sample is saved without publishing torrents or storing raw
+            bodies. Reaching the budget is normal in this mode.
+          </InfoTip>
+        </div>
       )}
       {run.initial_full && (
-        <p className="notice text-muted-foreground">
-          Initial Full: this Incremental request first builds a complete source catalog. Publication
-          happens only after successful completion. Later requests use Incremental; attempt budgets
-          and pause/resume controls still apply.
-        </p>
+        <div className="notice text-muted-foreground flex flex-wrap items-center gap-1.5">
+          <p>Initial Full · publication after completion.</p>
+          <InfoTip label="Initial Full">
+            Initial Full: this Incremental request first builds a complete source catalog.
+            Publication happens only after successful completion. Later requests use Incremental;
+            attempt budgets and pause/resume controls still apply.
+          </InfoTip>
+        </div>
       )}
       {run.mode === 'metadata' && (
         <p className="notice text-muted-foreground">
@@ -640,18 +652,28 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
       )}
       <section className="space-y-3" aria-label="Collection progress">
         <dl className="grid gap-3 sm:grid-cols-3">
-          <Statistic label="Records" value={run.distinct_records} />
+          <Statistic
+            label="Records"
+            value={run.distinct_records}
+            help="Records count distinct source IDs. Full collections publish only after successful completion."
+          />
           <Statistic label="Validated pages" value={run.pages} />
-          <Statistic label="Historical errors" value={run.errors} />
+          <Statistic
+            label="Historical errors"
+            value={run.errors}
+            help={
+              <>
+                Records count distinct source IDs.
+                {run.mode === 'full' &&
+                  ' Full collections publish only after successful completion.'}
+                {run.errors > 0 &&
+                  (run.status === 'succeeded'
+                    ? ' This run succeeded. Retained errors describe earlier attempts or rejected records, not a current run failure; inspect Events and Processed records for unresolved record omissions.'
+                    : ' Errors are cumulative across attempts and rejected records. Current run health is shown by its status, not this history count.')}
+              </>
+            }
+          />
         </dl>
-        <p className="help">
-          Records count distinct source IDs.
-          {run.mode === 'full' && ' Full collections publish only after successful completion.'}
-          {run.errors > 0 &&
-            (run.status === 'succeeded'
-              ? ' This run succeeded. Retained errors describe earlier attempts or rejected records, not a current run failure; inspect Events and Processed records for unresolved record omissions.'
-              : ' Errors are cumulative across attempts and rejected records. Current run health is shown by its status, not this history count.')}
-        </p>
       </section>
       <Disclosure
         title={

@@ -123,8 +123,15 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
     .filter({ hasText: /^Manual actions$/ })
     .click()
   await expect(
-    page.getByText(/Enable automatic book updates, or run Update book information/),
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Enable automatic book updates or run Update book information.' }),
   ).toBeVisible()
+  await page.getByRole('button', { name: 'About Book recovery', exact: true }).click()
+  await expect(
+    page.getByRole('dialog', { name: 'About Book recovery', exact: true }),
+  ).toContainText('Change continuity was lost.')
+  await page.keyboard.press('Escape')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )

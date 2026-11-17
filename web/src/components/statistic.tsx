@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { number } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import type { ReactNode } from 'react'
+import { InfoTip } from '@/components/ui/info-tip'
 
 export function Statistic({
   label,
@@ -11,6 +13,7 @@ export function Statistic({
   className,
   valueClassName,
   loadingLabel,
+  help,
 }: {
   label: string
   value: number | string
@@ -20,11 +23,19 @@ export function Statistic({
   className?: string
   valueClassName?: string
   loadingLabel?: string
+  help?: ReactNode
 }) {
   const text = typeof value === 'number' ? number(value) : value
   return (
     <div className={cn('statistic-card', className)}>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        {label}
+        {help && (
+          <InfoTip label={label} size="sm">
+            {help}
+          </InfoTip>
+        )}
+      </dt>
       <dd
         aria-busy={Boolean(loadingLabel)}
         className={cn(

@@ -2,6 +2,7 @@ import { SourceFilter } from '@/components/source-filter'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import type { ReactNode } from 'react'
 
 export { stremioMediaTypes, torznabMediaTypes } from '@/lib/connection-options'
 export { debridServices } from '@/lib/debrid'
@@ -47,6 +48,7 @@ export function ConnectionFilterFields({
   cachedOnly,
   onCachedChange,
   showSources = false,
+  serviceHelp,
 }: {
   id: string
   media: string[]
@@ -61,6 +63,7 @@ export function ConnectionFilterFields({
   cachedOnly: boolean
   onCachedChange: (value: boolean) => void
   showSources?: boolean
+  serviceHelp?: ReactNode
 }) {
   return (
     <div className="space-y-4">
@@ -85,7 +88,9 @@ export function ConnectionFilterFields({
         </div>
         {services.length > 0 && (
           <div className="field">
-            <Label htmlFor={`${id}-services`}>Services</Label>
+            <Label htmlFor={`${id}-services`} help={serviceHelp}>
+              Services
+            </Label>
             <MultiSelect
               id={`${id}-services`}
               label="Services"

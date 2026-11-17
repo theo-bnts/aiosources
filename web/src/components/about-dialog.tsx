@@ -11,7 +11,6 @@ import { buildVersion } from '@/lib/build-version'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -35,7 +34,7 @@ export function AboutDialog() {
           <InfoIcon />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex min-w-0 items-center gap-2">
             <DatabaseIcon size={24} className="shrink-0 text-primary" aria-hidden="true" />
@@ -63,9 +62,6 @@ export function AboutDialog() {
               </span>
             </span>
           </DialogTitle>
-          <DialogDescription>
-            Bring your sources together for search, playback and downloads.
-          </DialogDescription>
         </DialogHeader>
         <section aria-label="Project and support" className="grid gap-3 sm:grid-cols-2">
           <Button variant="outline" className="h-auto justify-start gap-3 px-4 py-3" asChild>

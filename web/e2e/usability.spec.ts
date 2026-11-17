@@ -251,7 +251,11 @@ test('adaptive authentication, pagination and adapter controls retain hidden val
   await page.getByRole('tab', { name: /^Identity/ }).click()
   await page.getByLabel('Source type', { exact: true }).selectOption('torznab')
   await page.getByRole('tab', { name: /^Source fields/ }).click()
-  await expect(page.getByText('Torznab reads torrent fields', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'About Native identity', exact: true }).click()
+  await expect(
+    page.getByRole('dialog', { name: 'About Native identity', exact: true }),
+  ).toContainText('Torznab reads torrent fields')
+  await page.keyboard.press('Escape')
   await page.getByRole('tab', { name: /^Identity/ }).click()
   await page.getByLabel('Source type', { exact: true }).selectOption('json')
   await page.getByRole('tab', { name: /^Connection/ }).click()
@@ -594,7 +598,7 @@ test.describe('real local imports', () => {
       ).toBeDisabled()
       if (index === 1) {
         await expect(
-          dialog.getByText('The first update automatically', { exact: false }),
+          dialog.getByText('Import new torrents; the first import is Full.', { exact: true }),
         ).toBeVisible()
         await dialog.getByText('Import limits', { exact: true }).click()
         await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('1')

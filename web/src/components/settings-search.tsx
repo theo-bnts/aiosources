@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -239,6 +240,7 @@ export function SettingsSearch({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           data-settings-search
+          aria-describedby={selected ? `${id}-description` : undefined}
           className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl"
           onOpenAutoFocus={(event) => {
             event.preventDefault()
@@ -253,9 +255,9 @@ export function SettingsSearch({
             <DialogTitle>
               {selected ? `Choose ${entityNames[selected.entity!][0]}` : 'Search settings'}
             </DialogTitle>
-            <DialogDescription>
-              {selected ? selected.title : 'Find a setting and open its exact location.'}
-            </DialogDescription>
+            {selected && (
+              <DialogDescription id={`${id}-description`}>{selected.title}</DialogDescription>
+            )}
           </DialogHeader>
           <div className="flex items-center gap-2 border-y border-border px-4 py-3">
             {selected ? (
@@ -275,8 +277,12 @@ export function SettingsSearch({
             ) : (
               <MagnifyingGlassIcon className="shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
+            <InfoTip label="Search settings">
+              Search by setting name or topic. Use ↑ ↓ and Enter to choose a result.
+            </InfoTip>
             <Input
               ref={input}
+              aria-describedby={`${id}-keyboard-help`}
               className="min-w-0 border-0 bg-transparent shadow-none focus-visible:ring-0"
               role="combobox"
               aria-label={selected ? `Find ${entityNames[selected.entity!][0]}` : 'Find a setting'}
@@ -311,6 +317,9 @@ export function SettingsSearch({
                 }
               }}
             />
+            <span id={`${id}-keyboard-help`} className="sr-only">
+              Use the up and down arrow keys and Enter to choose a result.
+            </span>
           </div>
           <div
             ref={results}
@@ -384,11 +393,6 @@ export function SettingsSearch({
                 </button>
               )}
             </div>
-            {!selected && !normalizeSettingQuery(query) && (
-              <p className="p-4 text-sm text-muted-foreground">
-                Search by setting name or topic. Use ↑ ↓ and Enter to choose a result.
-              </p>
-            )}
             {!visible.length &&
               (selected
                 ? !entities.isPending && !entities.isError

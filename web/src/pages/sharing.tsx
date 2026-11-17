@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowClockwiseIcon,
   CheckIcon,
@@ -175,7 +176,15 @@ export function SharedCatalogStatisticsPage() {
                       <TableHead>Recipient</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Last access</TableHead>
-                      <TableHead>Last completed download</TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1.5">
+                          Last completed download
+                          <InfoTip label="Completed downloads">
+                            A completed download means the final page was delivered; the recipient
+                            confirms its own import separately.
+                          </InfoTip>
+                        </span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -221,12 +230,6 @@ export function SharedCatalogStatisticsPage() {
                     : 'Create a share in Settings to grant access to your published torrents.'
                 }
               />
-            )}
-            {items.length > 0 && (
-              <p className="help">
-                A completed download means the final page was delivered; the recipient confirms its
-                own import separately.
-              </p>
             )}
           </>
         )
@@ -598,6 +601,7 @@ export default function SharingPage({
         }}
       >
         <DialogContent
+          aria-describedby={undefined}
           data-settings-editor={format === 'catalog' ? 'share' : format}
           data-settings-entity={editing === 'new' ? 'new' : editing?.id}
           className="sm:max-w-2xl"
@@ -617,13 +621,6 @@ export default function SharingPage({
                   ? 'Edit access'
                   : 'Edit share'}
             </DialogTitle>
-            <DialogDescription>
-              {stremio
-                ? 'Create independent installations. Saved settings apply to the same link, and each access can be disabled, replaced or revoked separately.'
-                : torznab
-                  ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
-                  : 'Choose the sources and fields shared with this recipient.'}
-            </DialogDescription>
           </DialogHeader>
           {editing && shares.data && (
             <ShareForm
@@ -813,17 +810,20 @@ function ShareForm({
   }
   const expiration = (
     <div className="field">
-      <Label htmlFor="share-expires">Expires at ({dateZone})</Label>
+      <Label
+        htmlFor="share-expires"
+        helpLabel="Expires at"
+        help={<> Uses {dateZone}. Leave empty for no expiration. Expired access cannot be used. </>}
+      >
+        Expires at ({dateZone})
+      </Label>
       <DateTimeInput
         id="share-expires"
         precision="seconds"
         value={expiresAt}
         onValueChange={setExpiresAt}
-        aria-describedby="share-expires-help"
       />
-      <p id="share-expires-help" className="help">
-        Uses {dateZone}. Leave empty for no expiration. Expired access cannot be used.
-      </p>
+
       {expiresAt && new Date(expiresAt).getTime() <= Date.now() && (
         <p className="help text-destructive">
           This date is in the past. Access will remain blocked.
@@ -846,7 +846,6 @@ function ShareForm({
             step="1"
             value={requestsPerMinute}
             onChange={(event) => setRequestsPerMinute(event.target.value)}
-            aria-describedby="share-limits-help"
           />
         </div>
         <div className="field">
@@ -863,15 +862,9 @@ function ShareForm({
             step="1"
             value={maxConcurrentDownloads}
             onChange={(event) => setMaxConcurrentDownloads(event.target.value)}
-            aria-describedby="share-limits-help"
           />
         </div>
       </div>
-      <p id="share-limits-help" className="help">
-        {connection
-          ? 'Leave empty or enter 0 for no limit. Limits apply to all clients using this access key.'
-          : 'Limits apply across all clients using this access key and all server instances. Every authenticated request counts toward a rolling minute. Clients exceeding a limit receive HTTP 429 with a retry delay.'}
-      </p>
     </fieldset>
   )
   return (
@@ -884,7 +877,18 @@ function ShareForm({
     >
       <fieldset className="min-w-0 space-y-5" disabled={busy}>
         <div className="field">
-          <Label htmlFor="share-name">
+          <Label
+            htmlFor="share-name"
+            help={
+              <>
+                {stremio
+                  ? 'Create independent installations. Saved settings apply to the same link, and each access can be disabled, replaced or revoked separately.'
+                  : torznab
+                    ? 'Published titles, verified identifiers and tracker-free magnets. No administrator announce URLs or debrid access.'
+                    : 'Choose the sources and fields shared with this recipient.'}
+              </>
+            }
+          >
             {connection ? 'Access name' : 'Recipient / share name'}
           </Label>
           <Input
@@ -917,9 +921,6 @@ function ShareForm({
                 sources={sourceOptions}
                 showSources
               />
-              <p className="help">
-                Services select the local availability cache. Configure downloads in your client.
-              </p>
             </Disclosure>
             <ResultSorting
               value={torznabPreferences.sorting}
@@ -957,14 +958,40 @@ function ShareForm({
             }
           />
         )}
-        <Disclosure title="Request limits">{requestLimits}</Disclosure>
+        <Disclosure
+          title="Request limits"
+          help={
+            <>
+              {connection
+                ? 'Leave empty or enter 0 for no limit. Limits apply to all clients using this access key.'
+                : 'Limits apply across all clients using this access key and all server instances. Every authenticated request counts toward a rolling minute. Clients exceeding a limit receive HTTP 429 with a retry delay.'}
+            </>
+          }
+        >
+          {requestLimits}
+        </Disclosure>
         <Disclosure title="Expiration">{expiration}</Disclosure>
       </fieldset>
-      <p className="help">
-        {original
-          ? `Access remains ${original.enabled ? 'enabled' : 'disabled'}, unless expired. Settings apply to every new request${stremio ? ' without reinstalling' : ', including saved cursors'}.`
-          : `Access starts disabled. Save the generated ${stremio ? 'manifest URL' : connection ? 'API key' : 'password'} securely; enable access separately when ready.`}
-      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge
+          variant={
+            original && shareExpired(original)
+              ? 'warning'
+              : original?.enabled
+                ? 'success'
+                : 'secondary'
+          }
+        >
+          {original
+            ? `Access ${shareExpired(original) ? 'expired' : original.enabled ? 'enabled' : 'disabled'}`
+            : 'Access starts disabled'}
+        </Badge>
+        <InfoTip label="Access settings">
+          {original
+            ? `Settings apply to every new request${stremio ? ' without reinstalling' : ', including saved cursors'}. Expired access stays blocked until its expiration is changed.`
+            : `Access starts disabled. Save the generated ${stremio ? 'manifest URL' : connection ? 'API key' : 'password'} securely; enable access separately when ready.`}
+        </InfoTip>
+      </div>
       <ErrorNotice error={save.error} />
       <ErrorNotice error={reload.error} />
       {conflict && (
@@ -1076,18 +1103,24 @@ function PasswordDialog({
             </Button>
           )}
         </div>
-        <p className="notice">
-          {shareExpired(credential.share)
-            ? 'This access has expired; update its expiration before using it.'
-            : credential.share.enabled
-              ? 'This access is enabled.'
-              : 'This access is disabled; enable it separately.'}{' '}
-          {stremio
-            ? 'Use the manifest in Stremio or AIOStreams. Keep the link private. Saved settings apply without reinstalling.'
-            : torznab
-              ? 'Enter the URL and API key in your Torznab client. Keep the key private; it grants access to the permitted catalog.'
-              : 'Send the catalog URL and password through a secure channel. Never append the password to the URL.'}
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>
+            {shareExpired(credential.share)
+              ? 'This access has expired; update its expiration before using it.'
+              : credential.share.enabled
+                ? 'This access is enabled.'
+                : 'This access is disabled; enable it separately.'}{' '}
+            {stremio
+              ? 'Install this manifest in Stremio or AIOStreams. Keep the link private.'
+              : torznab
+                ? 'Enter the URL and API key in your Torznab client. Keep the key private.'
+                : 'Send the catalog URL and password securely. Never append the password to the URL.'}
+          </p>
+          <InfoTip label="Connection instructions">
+            Saved settings apply to new requests. Stremio installations do not need reinstalling.
+            Credentials grant access to the permitted catalog; save them securely before closing.
+          </InfoTip>
+        </div>
         {!stremio && credential.share.url && (
           <div className="field">
             <Label htmlFor="created-share-url">{torznab ? 'Torznab URL' : 'Catalog URL'}</Label>

@@ -340,9 +340,12 @@ SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title
     await page.getByRole('link', { name: 'Rejected sample', exact: true }).click()
     await expect(page).toHaveURL(/\/raw\/\d+$/)
     await expect(page.getByRole('heading', { name: /^Processed record #\d+$/ })).toBeVisible()
+    await expect(page.getByText('Original content not retained.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'About Original content', exact: true }).click()
     await expect(
-      page.getByText('Original content was not retained.', { exact: false }),
-    ).toBeVisible()
+      page.getByRole('dialog', { name: 'About Original content', exact: true }),
+    ).toContainText('Imported fields, processing results and collection checkpoints are preserved.')
+    await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: 'Download original', exact: true })).toHaveCount(
       0,
     )

@@ -140,11 +140,14 @@ function Provenance({
   if (!origin) return null
   return (
     <section className="notice space-y-3">
-      <h3 className="font-medium">{title}</h3>
-      <p className="help">
-        Read-only imported values. The original identity is preserved independently of every other
-        source occurrence.
-      </p>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <h3 className="font-medium">{title}</h3>
+        <InfoTip label={title}>
+          Read-only imported values. The original identity is preserved independently of every other
+          source occurrence.
+        </InfoTip>
+      </div>
+
       <dl className="grid gap-3 text-xs sm:grid-cols-3">
         {(
           [
@@ -359,6 +362,7 @@ export function OccurrenceDialog({
       }}
     >
       <DialogContent
+        aria-describedby={torrent || history.data ? 'occurrence-description' : undefined}
         className="min-w-0 sm:max-w-5xl"
         onCloseAutoFocus={(event) => {
           event.preventDefault()
@@ -366,12 +370,19 @@ export function OccurrenceDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Source occurrence</DialogTitle>
-          <DialogDescription className="break-all">
-            {torrent || history.data
-              ? `${sourceName(torrent?.provider_id ?? history.data?.provider_id)} · ${torrent?.source_id ?? history.data?.source_id}`
-              : 'Publication history and related source records.'}
-          </DialogDescription>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <DialogTitle>Source occurrence</DialogTitle>
+            <InfoTip label="Source occurrence">
+              Every source occurrence is independent. Matching info hashes do not merge records or
+              remove them from search.
+            </InfoTip>
+          </div>
+          {(torrent || history.data) && (
+            <DialogDescription
+              id="occurrence-description"
+              className="break-all"
+            >{`${sourceName(torrent?.provider_id ?? history.data?.provider_id)} · ${torrent?.source_id ?? history.data?.source_id}`}</DialogDescription>
+          )}
         </DialogHeader>
         {!valid ? (
           <ErrorNotice
@@ -383,10 +394,6 @@ export function OccurrenceDialog({
           />
         ) : (
           <>
-            <p className="help">
-              Every source occurrence is independent. Matching info hashes do not merge records or
-              remove them from search.
-            </p>
             <Tabs
               value={activeTab}
               onValueChange={(value) => {
@@ -425,9 +432,12 @@ export function OccurrenceDialog({
                   </dl>
                   <Provenance origin={torrent.origin} />
                   {torrent.historical && (
-                    <p className="notice">
-                      Imported normalized history. No raw original was fabricated for this data.
-                    </p>
+                    <div className="notice flex flex-wrap items-center gap-1.5">
+                      <p>Imported history.</p>
+                      <InfoTip label="Imported history">
+                        Imported normalized history. No raw original was fabricated for this data.
+                      </InfoTip>
+                    </div>
                   )}
                   <CodeEditor
                     label="Interpreted torrent fields"
@@ -453,16 +463,22 @@ export function OccurrenceDialog({
                 ) : (
                   history.data && (
                     <>
-                      <p className="help">
-                        Semantic publication changes, newest first. Processed records without
-                        changed values are not updates. Missing fields and explicit null values
-                        remain distinct.
-                      </p>
+                      <div className="flex items-center gap-1.5 text-sm font-medium">
+                        <span>Published changes</span>
+                        <InfoTip label="Change history">
+                          Semantic publication changes, newest first. Processed records without
+                          changed values are not updates. Missing fields and explicit null values
+                          remain distinct.
+                        </InfoTip>
+                      </div>
                       <Provenance origin={history.data.origin} />
                       {history.data.history_since && (
-                        <p className="help">
-                          Detailed history tracking began {date(history.data.history_since)}.
-                        </p>
+                        <div className="help flex flex-wrap items-center gap-1.5">
+                          <p>History since {date(history.data.history_since)}.</p>
+                          <InfoTip label="History coverage">
+                            Detailed history tracking began {date(history.data.history_since)}.
+                          </InfoTip>
+                        </div>
                       )}
                       {history.data.baseline && (
                         <Disclosure
@@ -476,11 +492,14 @@ export function OccurrenceDialog({
                           className="bg-muted/50"
                         >
                           <div className="space-y-3">
-                            <p className="help">
-                              Baseline recorded {date(history.data.baseline.recorded_at)} when
-                              history tracking began. This is not an addition attributed to an
-                              earlier run; older field transitions may not be available.
-                            </p>
+                            <div className="help flex flex-wrap items-center gap-1.5">
+                              <p>Baseline · {date(history.data.baseline.recorded_at)}.</p>
+                              <InfoTip label="Baseline">
+                                Baseline recorded {date(history.data.baseline.recorded_at)} when
+                                history tracking began. This is not an addition attributed to an
+                                earlier run; older field transitions may not be available.
+                              </InfoTip>
+                            </div>
                             <Provenance origin={history.data.baseline.origin} />
                             {history.data.baseline.fields === null ? (
                               <p className="help">
@@ -527,17 +546,22 @@ export function OccurrenceDialog({
                 )}
               </TabsContent>
               <TabsContent value="related" className="mt-5 space-y-4">
-                <p className="help">
-                  Other live occurrences with the same nonempty info hash. Each source record is
-                  listed separately, including multiple records from one source.
-                </p>
                 <ErrorNotice error={related.error} retry={() => void related.refetch()} />
                 {related.isPending ? (
                   <Loading label="Loading related occurrences" />
                 ) : (
                   related.data && (
                     <>
-                      <ResultCount total={related.data.total} label="related torrents" />
+                      <ResultCount
+                        total={related.data.total}
+                        label="related torrents"
+                        help={
+                          <>
+                            Other live occurrences with the same nonempty info hash. Each source
+                            record is listed separately, including multiple records from one source.
+                          </>
+                        }
+                      />
                       {related.data.items?.length ? (
                         <TorrentTable items={related.data.items} onOpen={onOpen} />
                       ) : (
@@ -575,11 +599,14 @@ export function RunPublicationCounts({ data }: { data: RunChanges }) {
         Published changes
       </h2>
       {!data.history_complete && (
-        <p className="notice">
-          This run predates complete history tracking
-          {data.history_since ? ` (${date(data.history_since)})` : ''}. The values below show only
-          recorded changes, not a reconstructed total for the run.
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>Partial history{data.history_since ? ` since ${date(data.history_since)}` : ''}.</p>
+          <InfoTip label="Partial history">
+            This run predates complete history tracking
+            {data.history_since ? ` (${date(data.history_since)})` : ''}. The values below show only
+            recorded changes, not a reconstructed total for the run.
+          </InfoTip>
+        </div>
       )}
       <dl className="grid gap-3 sm:grid-cols-3">
         {(['added', 'updated', 'deleted'] as const).map((kind) => (

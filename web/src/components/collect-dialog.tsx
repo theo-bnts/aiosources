@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { ArrowLeftIcon, PlayIcon } from '@phosphor-icons/react'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -18,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { ErrorNotice, Loading } from './common'
@@ -125,13 +125,9 @@ export function CollectDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Run manual import</DialogTitle>
-          <DialogDescription>
-            Choose what to do with this {remote ? 'remote catalog' : 'source'}. Follow progress and
-            resume interrupted imports in History.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-5"
@@ -180,7 +176,34 @@ export function CollectDialog({
             )}
           </div>
           <div className="field">
-            <Label htmlFor="collect-mode">Action</Label>
+            <Label
+              htmlFor="collect-mode"
+              help={
+                <>
+                  <p>
+                    Preview inspects a sample without publishing torrents. Full replaces this
+                    source’s published catalog only after successful completion. Incremental imports
+                    changes; the first import is Full. Other sources are preserved.
+                  </p>
+                  {!remote && (
+                    <p>
+                      Fetching source details requires a JSON source with ID recovery and configured
+                      missing-metadata fields. It does not update metadata or identify torrents.
+                    </p>
+                  )}
+                  {mode === 'incremental' && metadataFollowup && (
+                    <p>
+                      After successful Incremental or initial Full completion, a separate
+                      source-details import will fill configured missing fields only for newly
+                      inserted native torrents. Existing torrents encountered by this run are
+                      excluded. No eligible new torrents means no follow-up.
+                    </p>
+                  )}
+                </>
+              }
+            >
+              Action
+            </Label>
             <select
               id="collect-mode"
               className="native-select"
@@ -203,46 +226,55 @@ export function CollectDialog({
                 ? 'Inspect a sample without adding torrents to the catalog.'
                 : mode === 'full'
                   ? remote
-                    ? 'Download a fresh snapshot and replace this remote catalog’s local copy only after completion. Other sources are preserved.'
-                    : 'Read the whole source and replace its published catalog only after completion. Other sources are preserved.'
+                    ? 'Replace this remote catalog’s local copy after a complete import.'
+                    : 'Replace this source’s published catalog after a complete import.'
                   : mode === 'metadata'
-                    ? 'Fetch missing fields from this source for existing torrents. This does not update metadata or identify torrents.'
+                    ? 'Fetch missing source fields for existing torrents.'
                     : remote
-                      ? 'Import changes since the last successful sync. The first sync downloads the complete catalog. Your current copy remains available until completion.'
-                      : 'Import new torrents. The first update automatically starts with a complete import (Full); later updates use Incremental.'}
+                      ? 'Import changes; the first sync downloads the complete catalog.'
+                      : 'Import new torrents; the first import is Full.'}
             </p>
-            {mode === 'incremental' && metadataFollowup && (
-              <p className="help">
-                After successful Incremental or initial Full completion, a separate source-details
-                import will fill configured missing fields only for newly inserted native torrents.
-                Existing torrents encountered by this run are excluded. No eligible new torrents
-                means no follow-up.
-              </p>
-            )}
+
             {provider && definition.isPending ? (
               <p className="help" role="status">
                 Checking available actions…
               </p>
             ) : !remote && !definition.isError && !metadataSupported ? (
-              <p className="help">
-                Fetching source details is unavailable for this source. It requires a JSON source,
-                ID recovery and configured missing-metadata fields; remote catalogs are not
-                supported.
-              </p>
+              <p className="help">Fetching source details is unavailable for this source.</p>
             ) : null}
           </div>
-          <p className="notice" aria-live="polite">
-            Applied limits:{' '}
-            {Number(maxPages || defaultPages) === 0
-              ? 'unlimited pages'
-              : `${(maxPages || defaultPages) ?? '…'} pages`}{' '}
-            · {Number(maxDuration || 0) === 0 ? 'unlimited duration' : `${maxDuration} seconds`}.
-            Imports pause when a limit is reached and can resume from the saved point.
-          </p>
+          <div className="notice flex flex-wrap items-center gap-1.5" aria-live="polite">
+            <p>
+              Applied limits:{' '}
+              {Number(maxPages || defaultPages) === 0
+                ? 'unlimited pages'
+                : `${(maxPages || defaultPages) ?? '…'} pages`}{' '}
+              · {Number(maxDuration || 0) === 0 ? 'unlimited duration' : `${maxDuration} seconds`}.
+            </p>
+            <InfoTip label="Applied limits">
+              Imports pause when a limit is reached and can resume from the saved point. Limits
+              apply only to this run.
+            </InfoTip>
+          </div>
           <Disclosure title="Import limits">
             {!remote && mode === 'incremental' && (
               <div className="field">
-                <Label htmlFor="collect-known-pages">Known pages (X)</Label>
+                <Label
+                  htmlFor="collect-known-pages"
+                  help={
+                    <>
+                      Empty = source schedule default
+                      {definition.data
+                        ? ` (${defaultKnownPages === 0 ? 'off' : defaultKnownPages})`
+                        : ''}
+                      . Stop each scope after this many consecutive entirely known pages. 0 disables
+                      early stopping. Applies only to this run; the source configuration is
+                      unchanged.
+                    </>
+                  }
+                >
+                  Known pages (X)
+                </Label>
                 <Input
                   id="collect-known-pages"
                   type="number"
@@ -254,18 +286,11 @@ export function CollectDialog({
                     definition.data ? String(defaultKnownPages) : 'Loading source default…'
                   }
                   aria-invalid={invalidKnownPages}
-                  aria-describedby={`collect-known-help${invalidKnownPages ? ' collect-known-error' : ''}`}
+                  aria-describedby={invalidKnownPages ? 'collect-known-error' : undefined}
                   disabled={mutation.isPending}
                   onChange={(event) => setKnownPages(event.target.value)}
                 />
-                <p id="collect-known-help" className="help">
-                  Empty = source schedule default
-                  {definition.data
-                    ? ` (${defaultKnownPages === 0 ? 'off' : defaultKnownPages})`
-                    : ''}
-                  . Stop each scope after this many consecutive entirely known pages. 0 disables
-                  early stopping. Applies only to this run; the source configuration is unchanged.
-                </p>
+
                 {invalidKnownPages && (
                   <p id="collect-known-error" role="alert" className="text-sm text-destructive">
                     Enter a whole number from 0 to 10000, or leave empty to use the source default.
@@ -274,7 +299,21 @@ export function CollectDialog({
               </div>
             )}
             <div className="field">
-              <Label htmlFor="collect-budget">Page budget per attempt</Label>
+              <Label
+                htmlFor="collect-budget"
+                help={
+                  <>
+                    Empty = {remote ? 'remote catalog' : 'source'} limit
+                    {defaultPages === undefined
+                      ? ''
+                      : ` (${defaultPages === 0 ? 'unlimited' : `${defaultPages} pages`})`}
+                    . 0 explicitly selects unlimited. Imports pause when their budget is reached,
+                    never as a false success.
+                  </>
+                }
+              >
+                Page budget per attempt
+              </Label>
               <Input
                 id="collect-budget"
                 type="number"
@@ -286,18 +325,11 @@ export function CollectDialog({
                   defaultPages === undefined ? 'Loading source limit…' : String(defaultPages)
                 }
                 aria-invalid={invalidPages}
-                aria-describedby={`collect-budget-help${invalidPages ? ' collect-budget-error' : ''}`}
+                aria-describedby={invalidPages ? 'collect-budget-error' : undefined}
                 disabled={mutation.isPending}
                 onChange={(event) => setMaxPages(event.target.value)}
               />
-              <p id="collect-budget-help" className="help">
-                Empty = {remote ? 'remote catalog' : 'source'} limit
-                {defaultPages === undefined
-                  ? ''
-                  : ` (${defaultPages === 0 ? 'unlimited' : `${defaultPages} pages`})`}
-                . 0 explicitly selects unlimited. Imports pause when their budget is reached, never
-                as a false success.
-              </p>
+
               {invalidPages && (
                 <p id="collect-budget-error" role="alert" className="text-sm text-destructive">
                   Enter a whole number from 0 to 10000, or leave empty to use the source limit.
@@ -305,7 +337,17 @@ export function CollectDialog({
               )}
             </div>
             <div className="field">
-              <Label htmlFor="collect-duration">Duration budget per attempt (seconds)</Label>
+              <Label
+                htmlFor="collect-duration"
+                help={
+                  <>
+                    Empty or 0 = unlimited duration. Pauses at a safe response boundary or during a
+                    cooldown wait, without interrupting atomic Full publication.
+                  </>
+                }
+              >
+                Duration budget per attempt (seconds)
+              </Label>
               <Input
                 id="collect-duration"
                 type="number"
@@ -316,13 +358,10 @@ export function CollectDialog({
                 placeholder="0"
                 disabled={mutation.isPending}
                 aria-invalid={invalidDuration}
-                aria-describedby={`collect-duration-help${invalidDuration ? ' collect-duration-error' : ''}`}
+                aria-describedby={invalidDuration ? 'collect-duration-error' : undefined}
                 onChange={(event) => setMaxDuration(event.target.value)}
               />
-              <p id="collect-duration-help" className="help">
-                Empty or 0 = unlimited duration. Pauses at a safe response boundary or during a
-                cooldown wait, without interrupting atomic Full publication.
-              </p>
+
               {invalidDuration && (
                 <p id="collect-duration-error" role="alert" className="text-sm text-destructive">
                   Enter a whole number from 0 to 604800, or leave empty for unlimited duration.

@@ -115,10 +115,6 @@ export function PublicCatalogSettings() {
           if (dirty && current && !conflict && !busy) save.mutate(current)
         }}
       >
-        <p className="help">
-          Choose what visitors may copy. These permissions apply only to public shared catalogs.
-          Visitors can select a smaller set of data.
-        </p>
         <ErrorNotice error={query.error || save.error || review.error} />
         {query.isPending ? (
           <Loading />

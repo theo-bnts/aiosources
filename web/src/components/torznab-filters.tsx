@@ -35,6 +35,7 @@ export function TorznabFilters({
         sourceIDs={value.sources ?? []}
         onSourcesChange={(sources) => onChange({ ...value, sources })}
         services={debridServices}
+        serviceHelp="Services select the local availability cache. Configure downloads in your client."
         serviceIDs={value.services ?? []}
         onServicesChange={(services) => onChange({ ...value, services })}
         cachedOnly={value.cached_only ?? false}

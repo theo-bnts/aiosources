@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
@@ -37,7 +38,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -292,15 +292,13 @@ function ProxyEditor({
       }}
     >
       <DialogContent
+        aria-describedby={undefined}
         data-settings-editor="proxy"
         data-settings-entity={existing ? initial.id : 'new'}
         showCloseButton={!save.isPending}
       >
         <DialogHeader>
           <DialogTitle>{existing ? 'Edit proxy' : 'Add proxy'}</DialogTitle>
-          <DialogDescription>
-            Connect to an existing HTTP(S) or SOCKS5 proxy, including WARP local proxy mode.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-5"
@@ -330,7 +328,7 @@ function ProxyEditor({
           <div className="field">
             <Label
               htmlFor="proxy-url"
-              help="Use an address reachable from AIOSources. Keep credentials in Secrets."
+              help="Connect to an existing HTTP(S) CONNECT or SOCKS5 proxy, including WARP local proxy mode. Use an address reachable from AIOSources. Keep credentials in Secrets."
             >
               Proxy URL
             </Label>
@@ -503,7 +501,13 @@ export function NetworkRoutingPage() {
             }}
           >
             <section className="section-card">
-              <h2 className="section-title">Default connection</h2>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h2 className="section-title">Default connection</h2>
+                <InfoTip label="Default connection">
+                  Applies to sources, metadata, debrid services and browser downloads unless
+                  overridden below. System connection preserves existing system proxy settings.
+                </InfoTip>
+              </div>
               <div className="max-w-xl">
                 <ConnectionSelect
                   id="network-default"
@@ -514,10 +518,6 @@ export function NetworkRoutingPage() {
                   onChange={(value) => setDraft({ ...settings, default: value })}
                 />
               </div>
-              <p className="help">
-                Applies to sources, metadata, debrid services and browser downloads unless
-                overridden below. System connection preserves existing system proxy settings.
-              </p>
             </section>
             <section className="section-card">
               <h2 className="section-title">Sources</h2>
@@ -579,7 +579,13 @@ export function NetworkRoutingPage() {
               </div>
             </section>
             <section className="section-card">
-              <h2 className="section-title">Debrid</h2>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h2 className="section-title">Debrid</h2>
+                <InfoTip label="Debrid">
+                  Browser downloads inherit their debrid service’s connection unless overridden.
+                  Stremio playback links are opened by your player.
+                </InfoTip>
+              </div>
               <div className="grid gap-5 md:grid-cols-2">
                 {[
                   ...debridProviders.map((provider) => [`debrid:${provider.id}`, provider.name]),
@@ -601,10 +607,6 @@ export function NetworkRoutingPage() {
                   />
                 ))}
               </div>
-              <p className="help">
-                Browser downloads inherit their debrid service’s connection unless overridden.
-                Stremio playback links are opened by your player.
-              </p>
             </section>
             {settings.proxies.some((proxy) => !proxy.enabled && proxyInUse(settings, proxy.id)) && (
               <p role="status" className="notice notice-warning">

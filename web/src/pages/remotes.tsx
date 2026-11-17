@@ -43,7 +43,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
@@ -395,6 +394,7 @@ export default function RemotesPage() {
         }}
       >
         <DialogContent
+          aria-describedby={undefined}
           data-settings-editor="remote"
           data-settings-entity={editing === 'new' ? 'new' : editing?.id}
           className="sm:max-w-2xl"
@@ -408,10 +408,6 @@ export default function RemotesPage() {
             <DialogTitle>
               {editing === 'new' ? 'Add remote catalog' : 'Edit remote catalog'}
             </DialogTitle>
-            <DialogDescription>
-              Connect to a shared catalog and choose which additional data to receive.
-              Identification and reviews stay local.
-            </DialogDescription>
           </DialogHeader>
           {editing && (
             <RemoteDocument
@@ -542,7 +538,12 @@ function RemoteForm({
       <fieldset className="min-w-0 space-y-5" disabled={busy}>
         <div className="grid items-start gap-4 sm:grid-cols-2">
           <div className="field">
-            <Label htmlFor="remote-id">Local source identifier</Label>
+            <Label
+              htmlFor="remote-id"
+              help={<> Unique locally. Imported data stays in this source’s namespace. </>}
+            >
+              Local source identifier
+            </Label>
             <Input
               id="remote-id"
               required
@@ -552,7 +553,6 @@ function RemoteForm({
               value={draft.id}
               onChange={(event) => change('id', event.target.value)}
             />
-            <p className="help">Unique locally. Imported data stays in this source’s namespace.</p>
           </div>
           <div className="field">
             <Label htmlFor="remote-name">Display name</Label>
@@ -566,7 +566,12 @@ function RemoteForm({
           </div>
         </div>
         <div className="field">
-          <Label htmlFor="remote-url">HTTPS catalog URL</Label>
+          <Label
+            htmlFor="remote-url"
+            help={<> Use the owner’s HTTPS catalog URL without credentials or query parameters. </>}
+          >
+            HTTPS catalog URL
+          </Label>
           <Input
             id="remote-url"
             type="url"
@@ -576,15 +581,12 @@ function RemoteForm({
             placeholder="https://catalog.example/api/catalogs/share-id"
             autoComplete="off"
             spellCheck={false}
-            aria-describedby="remote-url-help"
           />
-          <p id="remote-url-help" className="help">
-            Use the owner’s HTTPS catalog URL without credentials or query parameters.
-          </p>
+
           {original && draft.url.trim() !== original.provider.url && (
             <p className="help">
-              Changing the URL starts a fresh snapshot on the next sync. The current copy remains
-              until that sync succeeds.
+              Changing the URL starts a new snapshot on the next sync; the current copy stays until
+              completion.
             </p>
           )}
         </div>
@@ -601,10 +603,14 @@ function RemoteForm({
         />
         <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3">
           <div>
-            <Label htmlFor="remote-enabled">Connection enabled</Label>
-            <p className="help mt-1">
-              Allows manual and automatic imports. Disabling does not cancel an existing run.
-            </p>
+            <Label
+              htmlFor="remote-enabled"
+              help={
+                <>Allows manual and automatic imports. Disabling does not cancel an existing run.</>
+              }
+            >
+              Connection enabled
+            </Label>
           </div>
           <Switch
             id="remote-enabled"
@@ -634,10 +640,28 @@ function RemoteForm({
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <Label htmlFor="remote-auto-sync">Automatic synchronization</Label>
-              <p className="help mt-1">
-                The server keeps this local copy up to date even when the console is closed.
-              </p>
+              <Label
+                htmlFor="remote-auto-sync"
+                help={
+                  <>
+                    <p>
+                      Connect to a shared catalog and choose which additional data to receive.
+                      Identification and reviews stay local.
+                    </p>
+                    <p>
+                      The first sync imports a snapshot. Later syncs request changes from the saved
+                      checkpoint. Incomplete imports keep the current published copy intact.
+                    </p>
+                    <p>
+                      Saving waits for the next automatic sync. Use Run manual import for an
+                      immediate import. Failed or incomplete runs leave the published copy and
+                      checkpoint unchanged.
+                    </p>
+                  </>
+                }
+              >
+                Automatic synchronization
+              </Label>
             </div>
             <Switch
               id="remote-auto-sync"
@@ -658,16 +682,9 @@ function RemoteForm({
               onChange={(event) => change('intervalMinutes', event.target.value)}
             />
           </div>
-          <p className="help">
-            The first sync imports a snapshot. Later syncs request changes from the saved
-            checkpoint. Incomplete imports keep the current published copy intact.
-          </p>
         </section>
       </fieldset>
-      <p className="notice">
-        Saving waits for the next automatic sync. Use Run manual import for an immediate import.
-        Failed or incomplete runs leave the published copy and checkpoint unchanged.
-      </p>
+
       {original && (
         <p className="help">
           Editing a source with a paused scheduled run can block automatic continuation. Resume or

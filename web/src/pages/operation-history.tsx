@@ -292,7 +292,7 @@ export function OperationHistoryPage({
             ) : (
               <ListEmpty
                 title="No runs in this view"
-                description="New operations will appear here. History starts when this version is installed; earlier activity remains in Logs."
+                description="New operations will appear here."
                 filtered={filtered}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}
@@ -360,7 +360,6 @@ export function OperationDetailPage({
       <PageHeader
         title={result ? kinds[result.kind] : 'Operation'}
         back={{ to: historyPath, label: 'History' }}
-        description="Inspect the status, saved progress and events for this operation."
       />
       <ErrorNotice error={run.error} retry={() => void run.refetch()} />
       {run.isPending ? (
@@ -430,14 +429,21 @@ export function OperationDetailPage({
                   label={label}
                   value={value}
                   size={typeof value === 'number' ? 'default' : 'sm'}
+                  help={
+                    label === 'Records processed' || label === 'Errors' ? (
+                      <>
+                        {' '}
+                        Counts show the last recorded progress for this attempt. Unidentified
+                        torrents and uncached torrents are results, not errors. Stopping or
+                        restarting preserves saved data; pending work follows the existing automatic
+                        retry settings.{' '}
+                      </>
+                    ) : undefined
+                  }
                 />
               ))}
             </dl>
-            <p className="help">
-              Counts show the last recorded progress for this attempt. Unidentified torrents and
-              uncached torrents are results, not errors. Stopping or restarting preserves saved
-              data; pending work follows the existing automatic retry settings.
-            </p>
+
             {result.kind === 'metadata' && result.errors > 0 && result.status === 'succeeded' && (
               <p className="notice notice-warning" role="status">
                 {result.service === 'openlibrary'

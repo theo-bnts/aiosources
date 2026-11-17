@@ -54,9 +54,17 @@ export function CatalogDataControls({
   ) => (
     <div key={key} className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <Label htmlFor={`${id}-${key}`}>{label}</Label>
-        <p className="help mt-1">{description}</p>
-        {disabled && <p className="help mt-1">Include Info hash in Published fields first.</p>}
+        <Label
+          htmlFor={`${id}-${key}`}
+          help={
+            <>
+              <p>{description}</p>
+              {disabled && <p>Include Info hash in Published fields first.</p>}
+            </>
+          }
+        >
+          {label}
+        </Label>
       </div>
       <Switch
         id={`${id}-${key}`}
@@ -67,20 +75,31 @@ export function CatalogDataControls({
     </div>
   )
   return (
-    <Disclosure title="Shared data">
-      <Disclosure title="Torrents">
+    <Disclosure
+      title="Shared data"
+      help={
+        receiving
+          ? 'Choices apply when the owner permits them. Local metadata and fresh local cache checks take priority. Received metadata and cache observations are not forwarded.'
+          : undefined
+      }
+    >
+      <Disclosure
+        title="Torrents"
+        help={
+          <>
+            {receiving && <p>The owner chooses which basic torrent fields are available.</p>}
+            <p>
+              {receiving
+                ? 'Changing these choices refreshes the local torrent copy at the next sync. It does not contact the original sources.'
+                : 'Only selected source facts are included. Keys, announce URLs, source definitions and raw payloads are excluded.'}
+            </p>
+          </>
+        }
+      >
         {publishedFields}
-        {receiving && (
-          <p className="help">The owner chooses which basic torrent fields are available.</p>
-        )}
         {torrentOptions
           .filter(([key]) => !allowed || allowed[key])
           .map(([key, label, description]) => control(key, label, description))}
-        <p className="help">
-          {receiving
-            ? 'Changing these choices refreshes the local torrent copy at the next sync. It does not contact the original sources.'
-            : 'Only selected source facts are included. Keys, announce URLs, source definitions and raw payloads are excluded.'}
-        </p>
       </Disclosure>
       {(!allowed || allowed.metadata) && (
         <Disclosure title="Metadata">
@@ -100,12 +119,6 @@ export function CatalogDataControls({
             !allowAvailability,
           )}
         </Disclosure>
-      )}
-      {receiving && (
-        <p className="help">
-          Choices apply when the owner permits them. Local metadata and fresh local cache checks
-          take priority. Received metadata and cache observations are not forwarded.
-        </p>
       )}
     </Disclosure>
   )

@@ -47,6 +47,7 @@ import { frequencyLabel } from '@/lib/schedule-input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   Table,
   TableHeader,
@@ -381,7 +382,6 @@ export function ProviderEditor() {
     <div className="page">
       <PageHeader
         title="Add source"
-        description="Choose a source template or configure a JSON definition."
         back={{ to: '/providers/settings', label: 'All sources' }}
         actions={
           <Button variant="outline" onClick={() => setJSONDefinition(true)}>
@@ -495,6 +495,12 @@ function ProviderForm({
     onSuccess: (result, source) => {
       setValidation(result)
       setValidatedJSON(source)
+      notify({
+        message: result.valid
+          ? 'Configuration is valid.'
+          : 'The definition contains errors. Check the highlighted issues.',
+        warning: !result.valid,
+      })
     },
   })
   const save = useMutation({
@@ -585,15 +591,16 @@ function ProviderForm({
         back={{ to: '/providers/settings', label: 'All sources' }}
         actions={
           <>
-            <Button
-              variant="outline"
-              disabled={blocked}
-              onClick={() => validate.mutate(json)}
-              title="Check without contacting the source"
-            >
-              <CheckCircleIcon />
-              {validate.isPending ? 'Checking…' : 'Check configuration'}
-            </Button>
+            <div className="inline-flex items-center gap-1.5">
+              <Button variant="outline" disabled={blocked} onClick={() => validate.mutate(json)}>
+                <CheckCircleIcon />
+                {validate.isPending ? 'Checking…' : 'Check configuration'}
+              </Button>
+              <InfoTip label="Check configuration">
+                Checks the definition without contacting the source. Save it, then use Preview to
+                inspect returned data before publication. Saving also validates the definition.
+              </InfoTip>
+            </div>
             <Button disabled={blocked || !dirty} onClick={() => save.mutate(json)}>
               <FloppyDiskIcon aria-hidden="true" />
               {save.isPending ? 'Saving…' : 'Save'}
@@ -601,7 +608,7 @@ function ProviderForm({
           </>
         }
       />
-      <ErrorNotice error={validate.error} />
+      <ErrorNotice error={validate.error} scope="action" />
       <ErrorNotice error={save.error} />
       <ErrorNotice error={loadRemote.error} />
       <ErrorNotice error={importError} />
@@ -828,15 +835,6 @@ function ProviderForm({
           </>
         }
       />
-      {validation && validatedJSON === json && (
-        <section className="notice" aria-live="polite">
-          <p className={validation.valid ? 'text-primary' : 'text-destructive'}>
-            {validation.valid
-              ? 'Valid definition. No provider network requests were made.'
-              : 'The definition contains errors.'}
-          </p>
-        </section>
-      )}
       {Boolean(issues?.length) && (
         <ul
           className="list-disc space-y-2 rounded-md border border-destructive/25 bg-destructive/5 p-5 pl-9 text-sm"
@@ -847,13 +845,8 @@ function ProviderForm({
           ))}
         </ul>
       )}
-      <footer className="flex flex-wrap items-center justify-between gap-4">
-        <p className="help max-w-2xl">
-          Saving always uses server validation. Secret values stay in the vault; source JSON
-          contains references only. Configure automatic imports in the Schedules section above. New
-          runs use the saved definition.
-        </p>
-        {sourceID && (
+      {sourceID && (
+        <footer className="flex flex-wrap items-center justify-between gap-4">
           <div className="ml-auto grid min-w-0 max-w-full justify-items-end gap-2">
             <div className="flex flex-wrap justify-end gap-2">
               <CollectDialog
@@ -901,8 +894,8 @@ function ProviderForm({
               </p>
             )}
           </div>
-        )}
-      </footer>
+        </footer>
+      )}
     </>
   )
 }

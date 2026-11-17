@@ -134,7 +134,11 @@ test.describe('processed records', () => {
     }
     await page.goto('/runs/query-run?tab=raw&raw_q=Original')
     await submitAndContinueTyping(page, page.locator('#raw-search'), 'raw_q')
-    await page.locator('main').getByRole('link', { name: 'Identification', exact: true }).click()
+    await page.getByRole('button', { name: 'About Filters', exact: true }).click()
+    await page
+      .getByRole('dialog', { name: 'About Filters', exact: true })
+      .getByRole('link', { name: 'Identification', exact: true })
+      .click()
     await expect(page).toHaveURL(/\/metadata\/identification$/)
   })
 })

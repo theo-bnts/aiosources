@@ -87,7 +87,14 @@ test('six configured services stay alphabetic in settings, statistics, Stremio, 
     debridProviders.map((p) => p.name),
   )
   await expect(statistics.getByText('Configured', { exact: true })).toHaveCount(6)
-  await expect(statistics).toContainText('unknown')
+  for (const provider of debridProviders) {
+    if (!('hint' in provider)) continue
+    await statistics.getByRole('button', { name: `About ${provider.name}`, exact: true }).click()
+    await expect(
+      page.getByRole('dialog', { name: `About ${provider.name}`, exact: true }),
+    ).toContainText(provider.hint)
+    await page.keyboard.press('Escape')
+  }
 
   for (const format of ['stremio', 'torznab']) {
     await page.goto(format === 'stremio' ? '/addon/settings' : '/torznab')

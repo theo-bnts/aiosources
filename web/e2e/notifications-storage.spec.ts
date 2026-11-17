@@ -248,8 +248,15 @@ for (const width of [1440, 390]) {
     ).toBeVisible()
     await storage.locator('summary').filter({ hasText: 'Imports with prepared data' }).click()
     await expect(
-      storage.getByText('This data is preserved while needed for recovery.', { exact: false }),
+      storage.getByText('1 cancelled import retains prepared data.', { exact: true }),
     ).toBeVisible()
+    await storage
+      .getByRole('button', { name: 'About Imports with prepared data', exact: true })
+      .click()
+    await expect(
+      page.getByRole('dialog', { name: 'About Imports with prepared data', exact: true }),
+    ).toContainText('Includes unpublished records and resume state.')
+    await page.keyboard.press('Escape')
     await expect(
       storage.getByRole('link', { name: /Open import from Readable source name/ }),
     ).toHaveAttribute('href', '/runs/synthetic-cancelled')

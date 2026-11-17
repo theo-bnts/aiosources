@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowRightIcon,
   DownloadSimpleIcon,
@@ -53,12 +54,14 @@ function ProcessedRecordFilters({
   onFilter,
   onProcessingChange,
   onClear,
+  compact,
 }: {
   q: string
   processing: string
   onFilter: (q: string) => void
   onProcessingChange: (value: string) => void
   onClear: () => void
+  compact: boolean
 }) {
   return (
     <form
@@ -79,7 +82,27 @@ function ProcessedRecordFilters({
           placeholder="Search record data…"
         />
       </div>
-      <Disclosure title="Filters">
+      <Disclosure
+        title="Filters"
+        help={
+          <>
+            {compact && (
+              <p>
+                Storage saving retains record errors here. Successful records are omitted; response
+                errors remain in Events, and imported torrents remain in Search.
+              </p>
+            )}
+            <p>
+              Errors and ignored records explain source import processing. Review torrent
+              identification in{' '}
+              <Link className="data-link" to="/metadata/identification">
+                Identification
+              </Link>
+              .
+            </p>
+          </>
+        }
+      >
         <div className="field max-w-sm">
           <Label htmlFor="run-raw-processing">Processing result</Label>
           <FilterSelect
@@ -225,6 +248,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
   return (
     <div className="space-y-5">
       <ProcessedRecordFilters
+        compact={compact}
         q={q}
         processing={processing}
         onClear={() =>
@@ -242,31 +266,14 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
           setSearch(next, { flushSync: true })
         }}
       />
-      <div className="space-y-3">
-        {compact && (
-          <p className="help">
-            Storage saving retains record errors here. Successful records are omitted; response
-            errors remain in Events, and imported torrents remain in Search.
-          </p>
-        )}
-        {records.data?.counts && !compact && (
-          <p className="help" role="status">
-            {number(records.data.counts.error)}{' '}
-            {records.data.counts.error === 1 ? 'error' : 'errors'} ·{' '}
-            {number(records.data.counts.ignored)} ignored · {number(records.data.counts.enrichment)}{' '}
-            enrichment · {number(records.data.counts.accepted)} accepted across the current source,
-            import and text filters.
-          </p>
-        )}
-        <p className="help">
-          Errors and ignored records explain source import processing. Review torrent identification
-          in{' '}
-          <Link className="data-link" to="/metadata/identification">
-            Identification
-          </Link>
-          .
+      {records.data?.counts && !compact && (
+        <p className="help" role="status">
+          {number(records.data.counts.error)} {records.data.counts.error === 1 ? 'error' : 'errors'}{' '}
+          · {number(records.data.counts.ignored)} ignored · {number(records.data.counts.enrichment)}{' '}
+          enrichment · {number(records.data.counts.accepted)} accepted across the current source,
+          import and text filters.
         </p>
-      </div>
+      )}
       <ErrorNotice error={records.error} retry={() => void records.refetch()} />
       {records.isPending ? (
         <Loading />
@@ -440,21 +447,30 @@ export function RawDetailPage() {
       <ErrorNotice error={detail.error} retry={() => void detail.refetch()} />
       {record.error && <ErrorNotice error={new Error(record.error)} />}
       {!payloadRetained && (
-        <p className="notice">
-          Original content was not retained. Imported fields, processing results and collection
-          checkpoints are preserved.
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>Original content not retained.</p>
+          <InfoTip label="Original content">
+            Original content was not retained. Imported fields, processing results and collection
+            checkpoints are preserved.
+          </InfoTip>
+        </div>
       )}
       {record.auxiliary && (
-        <p className="notice">
-          Metadata update record. It preserves processing history and does not represent an
-          additional torrent.
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>Metadata update.</p>
+          <InfoTip label="Metadata update">
+            Metadata update record. It preserves processing history and does not represent an
+            additional torrent.
+          </InfoTip>
+        </div>
       )}
       {record.ignored && (
-        <p className="notice">
-          Record ignored for publication; its processing result is preserved.
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>Ignored for publication.</p>
+          <InfoTip label="Processing result">
+            Record ignored for publication; its processing result is preserved.
+          </InfoTip>
+        </div>
       )}
       <dl className="grid gap-5 border-y border-border py-5 text-sm sm:grid-cols-2 xl:grid-cols-4">
         <div>
@@ -504,14 +520,16 @@ export function RawDetailPage() {
         <TabsContent value="original" className="mt-5 space-y-3">
           {payloadRetained ? (
             <>
-              <p className="help">
-                Text view without reformatting. The download preserves the original bytes, including
-                non-text data.
-              </p>
               <CodeEditor
                 value={raw ?? ''}
                 language={language}
                 label="Original record content"
+                help={
+                  <>
+                    Text view without reformatting. The download preserves the original bytes,
+                    including non-text data.
+                  </>
+                }
                 height="600px"
                 readOnly
               />
@@ -522,21 +540,26 @@ export function RawDetailPage() {
         </TabsContent>
         <TabsContent value="fields" className="mt-5 space-y-3">
           {record.fields == null || Object.keys(record.fields).length === 0 ? (
-            <p className="notice">
-              No parsed fields are stored with this record. Full, Incremental and Metadata keep
-              fields in the catalog or private Full staging, not duplicate snapshots here. Preview
-              keeps its parsed sample here without publication.
-            </p>
+            <div className="notice flex flex-wrap items-center gap-1.5">
+              <p>No parsed fields were archived with this record.</p>
+              <InfoTip label="Archived fields">
+                No parsed fields are stored with this record. Full, Incremental and Metadata keep
+                fields in the catalog or private Full staging, not duplicate snapshots here. Preview
+                keeps its parsed sample here without publication.
+              </InfoTip>
+            </div>
           ) : (
             <>
-              <p className="help">
-                Parsed fields are separate from raw payloads. Missing values are not replaced by
-                zero.
-              </p>
               <CodeEditor
                 value={exactJSON(record.fields)}
                 language="json"
                 label="Interpreted record fields"
+                help={
+                  <>
+                    Parsed fields are separate from raw payloads. Missing values are not replaced by
+                    zero.
+                  </>
+                }
                 height="460px"
                 readOnly
               />
@@ -548,7 +571,6 @@ export function RawDetailPage() {
         <section className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="section-title">Complete provider response</h2>
-            <p className="help mt-1">The page contains this record’s original context.</p>
           </div>
           <div className="toolbar">
             <Button variant="ghost" asChild>
@@ -591,7 +613,8 @@ export function RawPageView() {
     <div className="page">
       <PageHeader
         title={`Original page #${id}`}
-        description="Historical response archive. New response bodies are not stored."
+        description="Historical response archive"
+        help="New response bodies are not stored. Historical archived responses remain available when their page exists."
         back={{ to: '/runs', label: 'Torrent history' }}
         actions={
           page.data && (
@@ -604,10 +627,13 @@ export function RawPageView() {
         }
       />
       {page.error instanceof ApiError && page.error.status === 404 ? (
-        <p className="notice">
-          Response unavailable. New response bodies are not stored; historical archived responses
-          remain available when their page exists.
-        </p>
+        <div className="notice flex flex-wrap items-center gap-1.5">
+          <p>Response unavailable.</p>
+          <InfoTip label="Response archive">
+            Response unavailable. New response bodies are not stored; historical archived responses
+            remain available when their page exists.
+          </InfoTip>
+        </div>
       ) : (
         <ErrorNotice error={page.error} retry={() => void page.refetch()} />
       )}

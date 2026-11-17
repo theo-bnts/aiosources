@@ -162,7 +162,7 @@ export function SecuritySessionsPage() {
               </Table>
             </div>
           ) : (
-            <Empty title="No active sessions" description="Session status updates automatically." />
+            <Empty title="No active sessions" />
           ))
         )}
       </section>

@@ -1,4 +1,5 @@
 import { test, expect, selectMultiple } from './fixtures'
+import { openDisclosure } from './disclosures'
 import type { SharePassword } from '../src/lib/catalog-types'
 
 test('Torznab saves cache and media filters with its access key and removes duplicate client setup', async ({
@@ -311,8 +312,8 @@ for (const format of ['stremio', 'torznab'] as const) {
     await expect(editor.getByRole('button', { name: 'Sources', exact: true })).toHaveText(
       'All sources',
     )
-    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
-    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
+    await openDisclosure(editor, 'Request limits')
+    await openDisclosure(editor, 'Expiration')
     await expect(editor.getByLabel('Requests per minute', { exact: true })).toHaveValue('')
     await expect(editor.getByLabel('Concurrent requests', { exact: true })).toHaveValue('')
     await expect(editor.getByLabel('Expires at (browser local time)', { exact: true })).toHaveValue(
@@ -365,8 +366,8 @@ for (const format of ['stremio', 'torznab'] as const) {
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitemcheckbox', { name: 'Alpha library', exact: true }).click()
     await page.keyboard.press('Escape')
-    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
-    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
+    await openDisclosure(editor, 'Request limits')
+    await openDisclosure(editor, 'Expiration')
     await editor.getByLabel('Requests per minute', { exact: true }).fill('9')
     await editor.getByLabel('Concurrent requests', { exact: true }).fill('1')
     await editor
@@ -389,8 +390,8 @@ for (const format of ['stremio', 'torznab'] as const) {
     )
     await editor.getByRole('button', { name: 'Sources', exact: true }).click()
     await page.getByRole('menuitem', { name: 'All sources', exact: true }).click()
-    await editor.locator('summary', { hasText: /^Request limits$/ }).click()
-    await editor.locator('summary', { hasText: /^Expiration$/ }).click()
+    await openDisclosure(editor, 'Request limits')
+    await openDisclosure(editor, 'Expiration')
     await editor.getByLabel('Requests per minute', { exact: true }).fill('')
     await editor.getByLabel('Concurrent requests', { exact: true }).fill('')
     await editor.getByLabel('Expires at (browser local time)', { exact: true }).fill('')

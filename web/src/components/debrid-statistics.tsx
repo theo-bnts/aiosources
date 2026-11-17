@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { debridProviders } from '@/lib/debrid'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -70,19 +71,30 @@ export function DebridStatistics({ config }: { config: Config }) {
                 return (
                   <section className="statistic-card flex h-full flex-col gap-4" key={service}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="section-title mb-0">
-                        <Link className="data-link" to={`/debrid/settings#${provider.secret}`}>
-                          {name}
-                        </Link>
-                      </h3>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <h3 className="section-title mb-0">
+                          <Link className="data-link" to={`/debrid/settings#${provider.secret}`}>
+                            {name}
+                          </Link>
+                        </h3>
+                        {'hint' in provider && <InfoTip label={name}>{provider.hint}</InfoTip>}
+                      </div>
                       <Badge variant={configured ? 'success' : 'secondary'}>
                         {configured ? 'Configured' : 'Not configured'}
                       </Badge>
                     </div>
-                    {'hint' in provider && <p className="help">{provider.hint}</p>}
+
                     <dl className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <dt className="text-muted-foreground">Cached</dt>
+                        <dt className="flex items-center gap-1.5 text-muted-foreground">
+                          Cached
+                          <InfoTip label="Cached availability">
+                            Last known result per torrent and service within the cache period; not
+                            the percentage of your catalog available at the provider. Negative
+                            checks may need rechecking sooner. Shared cache counts include only
+                            reusable observations.
+                          </InfoTip>
+                        </dt>
                         <dd className="mt-1 tabular-nums text-primary">
                           {number(cached)} ({percentage(cached, total)})
                         </dd>
@@ -117,11 +129,6 @@ export function DebridStatistics({ config }: { config: Config }) {
                 )
               })}
             </div>
-            <p className="help">
-              Last known result per torrent and service within the cache period; not the percentage
-              of your catalog available at the provider. Negative checks may need rechecking sooner.
-              Shared cache counts include only reusable observations.
-            </p>
           </section>
         )
       )}

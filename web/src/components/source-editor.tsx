@@ -579,9 +579,12 @@ function PaginationSettings() {
       </FieldSection>
       {torznab ? (
         <>
-          <p className="notice">Torznab reads pagination from its RSS response.</p>
-
-          <OptionalSection title="Pagination settings">{fields}</OptionalSection>
+          <OptionalSection
+            title="Pagination settings"
+            description="Torznab reads pagination from its RSS response."
+          >
+            {fields}
+          </OptionalSection>
           {optionalSettings}
         </>
       ) : (
@@ -647,23 +650,12 @@ function MappingSettings() {
   )
   return (
     <>
-      {html ? (
-        <HTMLMappingSettings />
-      ) : (
-        <>
-          {torznab && (
-            <p className="notice">
-              Torznab reads torrent fields from its native RSS format. Custom JSON field settings
-              remain accessible below. These fields do not configure IMDb identification.
-            </p>
-          )}
-          {!torznab && recordSelection}
-        </>
-      )}
+      {html ? <HTMLMappingSettings /> : <>{!torznab && recordSelection}</>}
 
       {torznab && (
         <OptionalSection
           title="Native identity"
+          description="Torznab reads torrent fields from its native RSS format. Custom JSON field settings remain accessible below. These fields do not configure IMDb identification."
           configuredPaths={[
             ['options', 'id_source'],
             ['options', 'id_pattern'],
@@ -964,7 +956,7 @@ function RequestLimitsSettings() {
     <OptionalSection
       title="Rolling request budgets"
       configuredPaths={[['request_limits']]}
-      description="Optional limits shared by all runs of this source, including retries. Each rolling window counts recent requests, not calendar resets. Request spacing still applies."
+      description="Optional limits shared by all runs of this source, including retries. Each rolling window counts recent requests, not calendar resets. Request spacing still applies. Use whole numbers up to 1,000,000. Keep at least one positive limit, or remove all budgets."
     >
       <FieldGrid>
         <JSONField
@@ -986,9 +978,7 @@ function RequestLimitsSettings() {
           help="Previous 86,400 seconds. 0 or empty disables this window."
         />
       </FieldGrid>
-      <p className="help">
-        Use whole numbers up to 1,000,000. Keep at least one positive limit, or remove all budgets.
-      </p>
+
       {document.kindIn(['request_limits']) !== undefined && (
         <Button
           variant="warning"
@@ -1139,14 +1129,16 @@ function SourceScheduleSettings() {
     <>
       <FieldSection
         title="Automatic imports"
-        description="These settings are saved with this source. Both the source and its schedule must be enabled. The server runs imports even when this page is closed."
+        description="These settings are saved with this source. Both the source and its schedule must be enabled. The server runs imports even when this page is closed. Existing runs keep their original settings and committed checkpoint. Editing a paused source can require resuming or cancelling its old run in History. Missed ticks do not create catch-up bursts."
       >
         <div className="flex items-center justify-between gap-4 rounded-md border p-3">
           <div>
-            <Label htmlFor={id}>Schedule enabled</Label>
-            <p className="help mt-1">
-              Disabling keeps the frequency and does not stop an existing run.
-            </p>
+            <Label
+              htmlFor={id}
+              help={<> Disabling keeps the frequency and does not stop an existing run. </>}
+            >
+              Schedule enabled
+            </Label>
           </div>
           <Switch
             id={id}
@@ -1228,11 +1220,6 @@ function SourceScheduleSettings() {
           help="On the next scheduled tick, continue a failed import from its last saved page instead of starting over. Its original settings are retained. Permanent errors still need attention. Manual holds and cancelled imports are not resumed. Disabled by default."
         />
       </OptionalSection>
-      <p className="help">
-        Existing runs keep their original settings and committed checkpoint. Editing a paused
-        scheduled source can require resuming or cancelling its old run in History. Missed ticks do
-        not create catch-up bursts.
-      </p>
     </>
   )
 }
@@ -1417,13 +1404,15 @@ export function SourceEditor({
                 onChange(next)
               }}
               label="Source JSON definition"
+              help={
+                <>
+                  Strict JSON object · no comments, duplicate keys or trailing commas · {limitKiB}{' '}
+                  KiB maximum. Untouched numeric values retain their exact representation.
+                </>
+              }
               height="620px"
               readOnly={readOnly}
             />
-            <p className="help">
-              Strict JSON object · no comments, duplicate keys or trailing commas · {limitKiB} KiB
-              maximum. Untouched numeric values retain their exact representation.
-            </p>
           </>
         ) : (
           <Tabs

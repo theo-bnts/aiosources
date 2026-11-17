@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { useQuery } from '@tanstack/react-query'
 import { api, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { bytes, useDate } from '@/lib/format'
@@ -55,7 +56,13 @@ export function HealthPage() {
               </section>
               <section className="section-card">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="section-title">Local available space</h2>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <h2 className="section-title">Local available space</h2>
+                    <InfoTip label="Local available space">
+                      Space available to AIOSources on this server. PostgreSQL may use another
+                      volume or server.
+                    </InfoTip>
+                  </div>
                   {disk?.label !== 'Available' && (
                     <Badge variant={disk?.variant}>{disk?.label}</Badge>
                   )}
@@ -75,10 +82,6 @@ export function HealthPage() {
                     Local filesystem measurement is unavailable.
                   </p>
                 )}
-                <p className="help">
-                  Space available to AIOSources on this server. PostgreSQL may use another volume or
-                  server.
-                </p>
               </section>
             </div>
             <StorageBreakdown report={report} />

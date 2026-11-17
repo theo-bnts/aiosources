@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { ArrowClockwiseIcon, FloppyDiskIcon, TrashIcon } from '@phosphor-icons/react'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
@@ -95,11 +96,14 @@ export function StorageSettingsPanel() {
   return (
     <>
       <section className="section-card">
-        <h2 className="section-title">Stored data</h2>
-        <p className="help">
-          Identifiers, search fields, matching evidence and playback information are always
-          retained.
-        </p>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h2 className="section-title">Stored data</h2>
+          <InfoTip label="Stored data">
+            Identifiers, search fields, matching evidence and playback information are always
+            retained.
+          </InfoTip>
+        </div>
+
         <ErrorNotice error={query.error} retry={() => void query.refetch()} />
         {query.isPending && <Loading label="Loading storage settings" />}
       </section>

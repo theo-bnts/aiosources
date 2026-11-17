@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import {
   ArrowClockwiseIcon,
   ArrowLeftIcon,
@@ -26,7 +27,6 @@ import type { Items, SecretInfo } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Disclosure } from '@/components/ui/disclosure'
 import { FormStatus } from '@/components/form-status'
 import {
   Dialog,
@@ -238,8 +238,8 @@ export default function SecretsPage() {
             <DialogTitle>{editing?.rotate ? 'Replace secret value' : 'Create secret'}</DialogTitle>
             <DialogDescription>
               {editing?.rotate
-                ? `The current value of “${editing.name}” will be replaced. It cannot be retrieved from this console.`
-                : 'The value is sent to the server once, then encrypted. It is not recorded in the browser or JSON definitions.'}
+                ? `Replace “${editing.name}” immediately in every configuration using this reference. The previous value cannot be retrieved.`
+                : 'The value is encrypted after saving and cannot be retrieved from this console.'}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -251,7 +251,16 @@ export default function SecretsPage() {
             }}
           >
             <div className="field">
-              <Label htmlFor="secret-name">Reference name</Label>
+              <Label
+                htmlFor="secret-name"
+                help={
+                  <>
+                    Letters, digits, hyphens and underscores. Sources use this name as a reference.
+                  </>
+                }
+              >
+                Reference name
+              </Label>
               <Input
                 id="secret-name"
                 required
@@ -264,12 +273,14 @@ export default function SecretsPage() {
                 spellCheck={false}
                 autoComplete="off"
               />
-              <p className="help">
-                Letters, digits, hyphens and underscores. Sources use this name as a reference.
-              </p>
             </div>
             <div className="field">
-              <Label htmlFor="secret-value">{editing?.rotate ? 'New value' : 'Secret value'}</Label>
+              <Label
+                htmlFor="secret-value"
+                help="The value is sent to the server once, then encrypted. It is not recorded in the browser or JSON definitions."
+              >
+                {editing?.rotate ? 'New value' : 'Secret value'}
+              </Label>
               <Input
                 id="secret-value"
                 type="password"
@@ -281,7 +292,6 @@ export default function SecretsPage() {
                 autoComplete="new-password"
                 spellCheck={false}
               />
-              <p className="help">The value is never returned after saving.</p>
             </div>
             <ErrorNotice error={save.error} />
             <ErrorNotice error={review.error} />
@@ -342,14 +352,21 @@ export default function SecretsPage() {
 
 export function SecretReferencesHelp() {
   return (
-    <Disclosure id="secret-reference-help" tabIndex={-1} title="Using references in JSON">
-      <p className="help">
-        Reference stored names in <code className="mono">auth.secret_ref</code>,{' '}
-        <code className="mono">auth.username_ref</code>,{' '}
-        <code className="mono">auth.password_ref</code> or{' '}
-        <code className="mono">http.secret_headers</code>. Keep secret values out of JSON
-        definitions.
-      </p>
-    </Disclosure>
+    <section
+      id="secret-reference-help"
+      tabIndex={-1}
+      className="flex min-w-0 items-center gap-1.5 text-sm font-medium"
+    >
+      <span>Using references in JSON</span>
+      <InfoTip label="Using references in JSON">
+        <p>
+          Reference stored names in <code className="mono">auth.secret_ref</code>,{' '}
+          <code className="mono">auth.username_ref</code>,{' '}
+          <code className="mono">auth.password_ref</code> or{' '}
+          <code className="mono">http.secret_headers</code>. Keep secret values out of JSON
+          definitions.
+        </p>
+      </InfoTip>
+    </section>
   )
 }

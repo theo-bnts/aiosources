@@ -199,8 +199,8 @@ export function SecretPicker({
             <DialogTitle>{editor?.replacing ? replaceLabel : addLabel}</DialogTitle>
             <DialogDescription>
               {editor?.replacing
-                ? `Replace the encrypted value of “${editor.reference}”. This applies immediately to every configuration using this reference. The current value remains hidden.`
-                : 'Stored as a new encrypted entry in Secrets, then selected here. Existing credentials are preserved. Save the surrounding configuration to apply the selection.'}
+                ? `Replace “${editor.reference}” immediately in every configuration using this reference. The previous value cannot be retrieved.`
+                : 'Store a new secret, then save the surrounding configuration to apply the selection.'}
             </DialogDescription>
           </DialogHeader>
           {editor && (
@@ -213,7 +213,12 @@ export function SecretPicker({
               }}
             >
               <div className="field">
-                <Label htmlFor={`${id}-value`}>{valueLabel}</Label>
+                <Label
+                  htmlFor={`${id}-value`}
+                  help="Values are encrypted in Secrets and remain hidden after saving. Adding a new reference preserves existing credentials."
+                >
+                  {valueLabel}
+                </Label>
                 <Input
                   id={`${id}-value`}
                   type="password"

@@ -1,3 +1,4 @@
+import { InfoTip } from '@/components/ui/info-tip'
 import { useBrowserPreferences } from '@/lib/browser-preferences'
 import { ResultCount } from '@/components/common'
 import { Fragment, useState } from 'react'
@@ -103,8 +104,12 @@ function AllocationDetails({ category }: { category: StorageCategory }) {
                 {category.details.map((part) => (
                   <TableRow key={part.key}>
                     <TableCell className="min-w-52 whitespace-normal">
-                      <p>{labels[part.key] || part.key}</p>
-                      <p className="help mt-1 max-w-xl">{explanations[part.key]}</p>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span>{labels[part.key] || part.key}</span>
+                        <InfoTip label={labels[part.key] || part.key}>
+                          {explanations[part.key]}
+                        </InfoTip>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right mono">{bytes(part.table_bytes)}</TableCell>
                     <TableCell className="text-right mono">{bytes(part.index_bytes)}</TableCell>
@@ -134,7 +139,16 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
   )
   return (
     <div className="space-y-4">
-      <Disclosure title="By source (estimated)">
+      <Disclosure
+        title="By source (estimated)"
+        help={
+          <>
+            Includes source records, preparation data, retained history and indexes. Estimates use
+            PostgreSQL statistics and can lag recent imports. Shared metadata and caches are
+            separate.
+          </>
+        }
+      >
         <ResultCount total={sources.length} label="sources" />
         {sources.length ? (
           <div className="table-frame">
@@ -172,12 +186,22 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
             onChange={setSourceOffset}
           />
         )}
-        <p className="help">
-          Includes source records, preparation data, retained history and indexes. Estimates use
-          PostgreSQL statistics and can lag recent imports. Shared metadata and caches are separate.
-        </p>
       </Disclosure>
       <Disclosure
+        help={
+          <>
+            <p>
+              Includes unpublished records and resume state. History and published records are
+              counted separately. Resuming continues the same data; starting another Full import can
+              create a separate preparation set.
+            </p>
+            <p>
+              The 20 largest estimates are shown. All imports remain available in Sources → Indexers
+              → Torrents → History.
+            </p>
+          </>
+        }
+        helpLabel="Imports with prepared data"
         title={
           <span className="flex flex-wrap items-center gap-2">
             Imports with prepared data{' '}
@@ -196,8 +220,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
             {(report.cancelled_import_count ?? 0) > 0 && (
               <p className="help text-warning-foreground">
                 {number(report.cancelled_import_count ?? 0)} cancelled import
-                {report.cancelled_import_count === 1 ? ' keeps' : 's keep'} prepared data for
-                resuming. This data is preserved while needed for recovery.
+                {report.cancelled_import_count === 1 ? ' retains' : 's retain'} prepared data.
               </p>
             )}
             <ResultCount total={report.retained_import_count ?? 0} label="retained imports" />
@@ -248,21 +271,10 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                 </TableBody>
               </Table>
             </div>
-            {(report.retained_import_count ?? 0) > (report.retained_imports?.length ?? 0) && (
-              <p className="help">
-                The 20 largest estimates are shown. All imports remain available in Sources →
-                Indexers → Torrents → History.
-              </p>
-            )}
           </>
         ) : (
           <p className="help">No imports currently retain prepared data.</p>
         )}
-        <p className="help">
-          Includes unpublished records and resume state. History and published records are counted
-          separately. Resuming continues the same data; starting another Full import can create a
-          separate preparation set.
-        </p>
       </Disclosure>
     </div>
   )
@@ -283,9 +295,34 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
   ].sort((a, b) => b.bytes - a.bytes || a.key.localeCompare(b.key))
   return (
     <section className="section-card" id="source-storage" aria-labelledby="storage-usage-title">
-      <h2 className="section-title" id="storage-usage-title">
-        Where storage is used
-      </h2>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <h2 className="section-title" id="storage-usage-title">
+          Where storage is used
+        </h2>
+        <InfoTip label="Where storage is used">
+          <p>
+            Measured PostgreSQL allocation includes tables, indexes and reusable space. It is
+            separate from torrent file sizes. Expand a category for details.
+          </p>
+          <p>
+            Expired diagnostic history is removed automatically in batches, according to Storage
+            settings. Published torrents, metadata and current identification decisions remain
+            available.
+          </p>
+          <p>
+            Unfinished Full imports, including failed and cancelled runs, keep preparation data
+            needed to resume. Their checkpoints and coverage evidence can remain beyond the
+            configured retention period. Successful publication clears preparation data for that
+            run.
+          </p>
+          <p>
+            Deleting records makes PostgreSQL space reusable; it does not necessarily shrink
+            database files. Per-source and per-import sizes are estimates from PostgreSQL
+            statistics, not a scan of all records. Independent measurements can briefly differ
+            during writes.
+          </p>
+        </InfoTip>
+      </div>
       {report.database.measured_at ? (
         <>
           <ResultCount total={items.length} label="storage categories" />
@@ -355,29 +392,6 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
               </TableBody>
             </Table>
           </div>
-          <p className="help">
-            Measured PostgreSQL allocation includes tables, indexes and reusable space. It is
-            separate from torrent file sizes. Expand a category for details.
-          </p>
-          <Disclosure title="Retention and estimates" variant="inline">
-            <p className="help">
-              Expired diagnostic history is removed automatically in batches, according to Storage
-              settings. Published torrents, metadata and current identification decisions remain
-              available.
-            </p>
-            <p className="help">
-              Unfinished Full imports, including failed and cancelled runs, keep preparation data
-              needed to resume. Their checkpoints and coverage evidence can remain beyond the
-              configured retention period. Successful publication clears preparation data for that
-              run.
-            </p>
-            <p className="help">
-              Deleting records makes PostgreSQL space reusable; it does not necessarily shrink
-              database files. Per-source and per-import sizes are estimates from PostgreSQL
-              statistics, not a scan of all records. Independent measurements can briefly differ
-              during writes.
-            </p>
-          </Disclosure>
         </>
       ) : (
         <p className="help">
