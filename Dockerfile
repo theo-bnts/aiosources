@@ -1,6 +1,7 @@
 FROM --platform=$BUILDPLATFORM node:22-alpine AS panel
 WORKDIR /build/web
 COPY web/package.json web/package-lock.json ./
+COPY web/vendor/picomatch/ ./vendor/picomatch/
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
