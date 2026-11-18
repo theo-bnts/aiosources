@@ -309,14 +309,7 @@ func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "Invalid stream resource")
 		return
 	}
-	budget, err := s.options.Store.ConnectionTimeout(r.Context(), "stremio")
-	if err != nil {
-		respondError(w, err)
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), max(time.Second, budget-5*time.Second))
-	defer cancel()
-	streams, err := s.options.AIOSource.Streams(ctx, s.aioOrigin(r), r.PathValue("token"), r.PathValue("type"), resourceID)
+	streams, err := s.options.AIOSource.Streams(r.Context(), s.aioOrigin(r), r.PathValue("token"), r.PathValue("type"), resourceID)
 	if err != nil {
 		respondError(w, err)
 		return

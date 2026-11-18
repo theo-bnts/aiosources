@@ -20,11 +20,11 @@ export const runtimeSections = {
   },
   connections: {
     title: 'Request timeouts',
-    help: 'Maximum processing and delivery time for new incoming requests, shared by private and public connections. A provider request also respects its outgoing timeout. This does not change the lifetime of an active file download.',
+    help: 'Maximum processing and delivery time for new incoming requests, across private, public and trusted connections. Each defaults to 5 seconds. Increase it for large catalogs or slower providers. A connection can use a shorter timeout in Filters. Browser file downloads have their own limits.',
     fields: [
-      ['stremio_seconds', 'Stremio request timeout (seconds)', 10, 600],
-      ['torznab_seconds', 'Torznab request timeout (seconds)', 5, 600],
-      ['catalog_seconds', 'Shared catalog request timeout (seconds)', 5, 600],
+      ['stremio_seconds', 'Stremio request timeout (seconds)', 1, 300],
+      ['torznab_seconds', 'Torznab request timeout (seconds)', 1, 300],
+      ['catalog_seconds', 'Shared catalog request timeout (seconds)', 1, 300],
     ],
   },
   history: {

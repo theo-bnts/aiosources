@@ -3,11 +3,52 @@ package store
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/testutil"
 )
+
+func TestConnectionTimeoutUpgradePreservesCustomizedSettings(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		previous string
+		want     map[string]int
+		revision int64
+	}{
+		{"untouched defaults", "", map[string]int{"stremio_seconds": 5, "torznab_seconds": 5, "catalog_seconds": 5}, 2},
+		{"saved policy", `{"stremio_seconds":70,"torznab_seconds":45,"catalog_seconds":20}`, map[string]int{"stremio_seconds": 70, "torznab_seconds": 45, "catalog_seconds": 20}, 6},
+		{"above the new range", `{"stremio_seconds":600,"torznab_seconds":300,"catalog_seconds":301}`, map[string]int{"stremio_seconds": 300, "torznab_seconds": 300, "catalog_seconds": 300}, 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, dsn := testutil.NewDatabase(t)
+			db, err := Open(ctx, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			if err = db.migrateThrough(ctx, 98); err != nil {
+				t.Fatal(err)
+			}
+			if tc.previous != "" {
+				if _, err := db.pool.Exec(ctx, `UPDATE aiosources.runtime_settings SET revision=6, values=$1::jsonb WHERE section='connections'`, tc.previous); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for range 2 {
+				if err := db.Migrate(ctx); err != nil {
+					t.Fatal(err)
+				}
+				settings, err := db.RuntimeSection(ctx, "connections")
+				if err != nil || !reflect.DeepEqual(settings.Values, tc.want) || settings.Revision != tc.revision {
+					t.Fatal("unexpected connection policy after upgrade", settings, err)
+				}
+			}
+		})
+	}
+}
 
 func TestRuntimeSettingsPreserveSectionsRevisionsAndEffectiveValues(t *testing.T) {
 	ctx, dsn, db := activityDatabase(t)

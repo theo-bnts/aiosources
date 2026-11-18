@@ -1,6 +1,7 @@
 package aiosource
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -216,7 +217,7 @@ func TestLimitedAvailabilityTimeoutAndQuotaKeepKnownResultsAndLeaveOthersUnknown
 				}
 				c, _ := s.DB.AIOConfig(ctx)
 				c.TorBoxSecret = "tb"
-				c.ResponseSeconds = 1
+				c.ResponseSeconds = 5
 				if err := s.DB.SetAIOConfig(ctx, c); err != nil {
 					t.Fatal(err)
 				}
@@ -248,9 +249,10 @@ func TestLimitedAvailabilityTimeoutAndQuotaKeepKnownResultsAndLeaveOthersUnknown
 				if err != nil {
 					t.Fatal(err)
 				}
-				started := time.Now()
-				states, err := s.limitedAvailability(ctx, c, "movie:bounded-error", hashes, plan, 2, Resource{Type: "movie"}, nil)
-				if err != nil || time.Since(started) > 2*time.Second || calls.Load() != 1 || len(states["torbox"]) != 1 || !states["torbox"][hashes[0]].Cached {
+				request, cancel := context.WithTimeout(ctx, 2*time.Second)
+				defer cancel()
+				states, err := s.limitedAvailability(request, c, "movie:bounded-error", hashes, plan, 2, Resource{Type: "movie"}, nil)
+				if err != nil || request.Err() != nil || calls.Load() != 1 || len(states["torbox"]) != 1 || !states["torbox"][hashes[0]].Cached {
 					t.Fatal("failed check erased known data, fabricated a miss or ignored its budget", err, calls.Load(), states)
 				}
 			})

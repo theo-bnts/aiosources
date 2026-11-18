@@ -497,7 +497,7 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 			return nil, err
 		}
 	}
-	wait, cancel := context.WithTimeout(ctx, time.Duration(c.ResponseSeconds)*time.Second)
+	wait, cancel := availabilityCheckContext(ctx, c.ResponseSeconds)
 	defer cancel()
 	for _, f := range flights {
 		select {
@@ -514,6 +514,18 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 	}
 	return out, nil
 }
+
+// Leave a portion of the response budget for reading completed observations,
+// rechecking access and returning the results when a provider is slow.
+func availabilityCheckContext(ctx context.Context, seconds int) (context.Context, context.CancelFunc) {
+	budget := time.Duration(seconds) * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := max(0, time.Until(deadline))
+		budget = min(budget, remaining-min(remaining/5, time.Second))
+	}
+	return context.WithTimeout(ctx, budget)
+}
+
 func mergeAccountAvailability(target map[string]model.AIOAvailability, service string, items []model.AIOAvailability) {
 	for _, a := range items {
 		if current, ok := target[a.Hash]; ok && service == "alldebrid" && current.Cached && !a.Cached {

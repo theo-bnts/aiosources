@@ -42,6 +42,6 @@ Routing controls requests made by AIOSources, including imports, metadata and de
 
 ## Timeouts
 
-Less common outgoing request timeouts are in **Network → Outgoing → Proxies → Request timeouts**. Incoming request and download limits are in their respective sections under **Network → Incoming**. Individual sources keep their timeout in their source definition, and connections can have their own response timeout in **Filters**.
+Less common outgoing request timeouts are in **Network → Outgoing → Proxies → Request timeouts**. In **Network → Incoming → Request timeouts**, Stremio, Torznab and shared catalogs each default to 5 seconds and accept 1–300 seconds. Increase the relevant timeout if large catalog requests or slow providers need longer. Browser downloads have their own section. Individual sources keep their timeout in their source definition, and connections can set a shorter response timeout in **Filters**.
 
 Use the settings search to find a timeout directly. Increasing it can help a slow service, but does not bypass the provider's own limits.

@@ -506,7 +506,12 @@ export default function AIOSourcePage({
           >
             {section === 'videos' && (
               <div className="grid gap-5 md:grid-cols-2">
-                {secret('TMDB read access token', 'tmdb_secret')}
+                <div className="min-w-0 space-y-1">
+                  {secret('TMDB read access token', 'tmdb_secret')}
+                  <CredentialPageLink href="https://www.themoviedb.org/settings/api/request">
+                    Create TMDB credentials
+                  </CredentialPageLink>
+                </div>
               </div>
             )}
             {section === 'games' && (
@@ -521,13 +526,18 @@ export default function AIOSourcePage({
                     onChange={(e) => update(scope, { igdb_client_id: e.target.value.trim() })}
                   />
                 </div>
-                {secret('Twitch client secret', 'igdb_secret')}
+                <div className="min-w-0 space-y-1">
+                  {secret('Twitch client secret', 'igdb_secret')}
+                  <CredentialPageLink href="https://dev.twitch.tv/console/apps/create">
+                    Create Twitch credentials
+                  </CredentialPageLink>
+                </div>
               </div>
             )}
             {section === 'debrid' && (
               <div className="grid gap-5 md:grid-cols-2">
                 {debridProviders.map((provider) => (
-                  <div key={provider.id} className="min-w-0 space-y-2">
+                  <div key={provider.id} className="min-w-0 space-y-1">
                     {secret(
                       `${provider.name} API key`,
                       provider.secret,
@@ -539,17 +549,6 @@ export default function AIOSourcePage({
                   </div>
                 ))}
               </div>
-            )}
-            {(section === 'videos' || section === 'games') && (
-              <CredentialPageLink
-                href={
-                  section === 'videos'
-                    ? 'https://www.themoviedb.org/settings/api/request'
-                    : 'https://dev.twitch.tv/console/apps/create'
-                }
-              >
-                {section === 'videos' ? 'Create TMDB credentials' : 'Create Twitch credentials'}
-              </CredentialPageLink>
             )}
             {section === 'videos' &&
               toggle('Automatically update film & series information', 'auto_sync')}
@@ -697,9 +696,10 @@ export default function AIOSourcePage({
               {number(
                 'TMDB requests per second',
                 'tmdb_requests_per_second',
-                5,
+                1,
                 40,
                 'videos-requests',
+                'TMDB rate limits can vary. Lower this value if you share credentials with other services or regularly hit the provider limit.',
               )}
               {footer('videos-requests')}
             </form>

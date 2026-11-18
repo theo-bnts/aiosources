@@ -202,7 +202,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("POST /api/public/install", install(true))
 	mux.HandleFunc("POST /api/public/credentials", install(false))
-	protect := func(budget time.Duration, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
+	protect := func(manifest bool, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Cache-Control", "no-store")
@@ -216,16 +216,15 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				return
 			}
 			defer release()
-			effective := budget
-			if budget > 5*time.Second {
-				configured, err := s.options.Store.ConnectionTimeout(r.Context(), "stremio")
-				if err != nil {
-					respondError(w, err)
-					return
-				}
-				effective = configured
+			budget, err := s.options.Store.ConnectionTimeout(r.Context(), "stremio")
+			if err != nil {
+				respondError(w, err)
+				return
 			}
-			ctx, cancel := context.WithTimeout(r.Context(), effective)
+			if manifest {
+				budget = min(budget, 5*time.Second)
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), budget)
 			defer cancel()
 			r = r.WithContext(ctx)
 			deadline, _ := ctx.Deadline()
@@ -259,13 +258,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		func(w http.ResponseWriter, _ error) {
 			writeError(w, 401, "Invalid public installation")
 		},
-		func(manifest bool, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
-			budget := 20 * time.Second
-			if manifest {
-				budget = 5 * time.Second
-			}
-			return protect(budget, next)
-		},
+		protect,
 	)
 }
 

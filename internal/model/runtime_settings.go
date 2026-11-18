@@ -20,7 +20,7 @@ func RuntimeFields(section string) map[string]RuntimeField {
 	case "outgoing":
 		return map[string]RuntimeField{"metadata_seconds": {60, 5, 600}, "debrid_seconds": {60, 5, 600}, "inventory_seconds": {600, 30, 3600}}
 	case "connections":
-		return map[string]RuntimeField{"stremio_seconds": {70, 10, 600}, "torznab_seconds": {20, 5, 600}, "catalog_seconds": {20, 5, 600}}
+		return map[string]RuntimeField{"stremio_seconds": {5, 1, 300}, "torznab_seconds": {5, 1, 300}, "catalog_seconds": {5, 1, 300}}
 	case "history":
 		return map[string]RuntimeField{"days": {7, 1, 3650}, "cleanup_seconds": {30, 5, 3600}, "batch_size": {5000, 100, 20000}, "pass_seconds": {10, 1, 60}}
 	case "identification":

@@ -3,6 +3,36 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test, expect } from './fixtures'
 
+test('incoming connection timeouts default to five seconds and accept one through 300', async ({
+  page,
+}) => {
+  await page.goto('/network/incoming')
+  await openDisclosure(page, 'Request timeouts')
+  const form = page.getByRole('form', { name: 'Request timeouts' })
+  const fields = ['Stremio', 'Torznab', 'Shared catalog'].map((connection) =>
+    form.getByLabel(`${connection} request timeout (seconds)`, { exact: true }),
+  )
+  for (const input of fields) {
+    await expect(input).toHaveValue('5')
+    await expect(input).toHaveAttribute('min', '1')
+    await expect(input).toHaveAttribute('max', '300')
+  }
+  const save = form.getByRole('button', { name: 'Save', exact: true })
+  await fields[0].fill('0')
+  await expect(save).toBeDisabled()
+  await fields[0].fill('301')
+  await expect(save).toBeDisabled()
+  await fields[0].fill('1')
+  await fields[1].fill('300')
+  await save.click()
+  await expect(save).toBeDisabled()
+  await page.reload()
+  await openDisclosure(page, 'Request timeouts')
+  await expect(fields[0]).toHaveValue('1')
+  await expect(fields[1]).toHaveValue('300')
+  await expect(fields[2]).toHaveValue('5')
+})
+
 test('advanced settings stay grouped, persist, and reject contradictory values', async ({
   page,
 }) => {

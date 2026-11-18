@@ -21,6 +21,8 @@ test('debrid key pages are available in administrator and personal visitor forms
       await expect(link).toHaveAttribute('target', '_blank')
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
       await expect(link.locator('svg')).toHaveCount(1)
+      const field = scope.getByLabel(`${name} API key`, { exact: true })
+      expect((await link.boundingBox())!.height).toBeLessThan((await field.boundingBox())!.height)
     }
   }
   await page.goto('/debrid/settings')
@@ -34,6 +36,7 @@ test('debrid key pages are available in administrator and personal visitor forms
   const visitor = await context.newPage()
   try {
     for (const route of ['/public', '/public/search']) {
+      await visitor.setViewportSize({ width: 390, height: 1000 })
       await visitor.goto(route)
       await checkLinks(visitor)
       await expect(visitor.getByLabel('AllDebrid API key', { exact: true })).toHaveValue('')
