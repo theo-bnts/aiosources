@@ -98,22 +98,44 @@ type sharingSource struct {
 	Name string `json:"name"`
 }
 
+func (s *server) validSharingSources() ([]sharingSource, map[string]bool, error) {
+	providers, err := s.options.Providers.List()
+	if err != nil {
+		return nil, nil, err
+	}
+	sources := []sharingSource{}
+	valid := make(map[string]bool, len(providers))
+	for _, provider := range providers {
+		valid[provider.ID] = provider.Valid
+		if provider.Valid {
+			sources = append(sources, sharingSource{ID: provider.ID, Name: provider.Name})
+		}
+	}
+	return sources, valid, nil
+}
+
+func bearerPassword(r *http.Request) (string, bool) {
+	authorizations := r.Header.Values("Authorization")
+	if len(authorizations) != 1 {
+		return "", false
+	}
+	parts := strings.Fields(authorizations[0])
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return "", false
+	}
+	return parts[1], true
+}
+
 func (s *server) listShares(w http.ResponseWriter, r *http.Request) {
 	items, err := s.options.Store.SharesByFormat(r.Context(), shareRequestFormat(r))
 	if err != nil {
 		respondError(w, err)
 		return
 	}
-	providers, err := s.options.Providers.List()
+	sources, _, err := s.validSharingSources()
 	if err != nil {
 		respondError(w, err)
 		return
-	}
-	sources := []sharingSource{}
-	for _, provider := range providers {
-		if provider.Valid {
-			sources = append(sources, sharingSource{ID: provider.ID, Name: provider.Name})
-		}
 	}
 	for index := range items {
 		s.shareURL(&items[index])
@@ -153,14 +175,10 @@ func (s *server) validateShare(w http.ResponseWriter, r *http.Request, input mod
 	if input.Scope == "all" {
 		return true
 	}
-	providers, err := s.options.Providers.List()
+	_, valid, err := s.validSharingSources()
 	if err != nil {
 		respondError(w, err)
 		return false
-	}
-	valid := make(map[string]bool, len(providers))
-	for _, provider := range providers {
-		valid[provider.ID] = provider.Valid
 	}
 	for _, id := range input.SourceIDs {
 		if !valid[id] {
@@ -282,16 +300,9 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "HTTPS catalogue sharing is not configured")
 		return
 	}
-	authorizations := r.Header.Values("Authorization")
-	if len(authorizations) != 1 {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="catalogue"`)
-		writeError(w, http.StatusUnauthorized, "A valid sharing password is required")
-		return
-	}
-	parts := strings.Fields(authorizations[0])
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="catalogue"`)
-		writeError(w, http.StatusUnauthorized, "A valid sharing password is required")
+	password, ok := bearerPassword(r)
+	if !ok {
+		catalogFeedError(w, store.ErrCatalogAuthentication)
 		return
 	}
 	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "catalog")
@@ -312,7 +323,7 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	download, err := s.options.Store.BeginCatalogDownload(ctx, r.PathValue("id"), parts[1])
+	download, err := s.options.Store.BeginCatalogDownload(ctx, r.PathValue("id"), password)
 	if err != nil {
 		catalogFeedError(w, err)
 		return

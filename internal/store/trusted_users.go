@@ -17,10 +17,11 @@ const trustedUserColumns = "id,email,enabled,permissions,revision,generation,cre
 
 var ErrTrustedEmailConflict = errors.New("trusted account email already exists")
 
-func scanTrustedUser(row scanner) (model.TrustedUser, error) {
+func scanTrustedUser(row scanner, extra ...any) (model.TrustedUser, error) {
 	var value model.TrustedUser
 	var permissions []byte
-	err := row.Scan(&value.ID, &value.Email, &value.Enabled, &permissions, &value.Revision, &value.Generation, &value.CreatedAt, &value.UpdatedAt)
+	dest := append([]any{&value.ID, &value.Email, &value.Enabled, &permissions, &value.Revision, &value.Generation, &value.CreatedAt, &value.UpdatedAt}, extra...)
+	err := row.Scan(dest...)
 	if err == nil {
 		err = json.Unmarshal(permissions, &value.TrustedPermissions)
 	}
@@ -79,22 +80,12 @@ func (s *Store) TrustedUser(ctx context.Context, grant model.TrustedGrant) (mode
 }
 
 func (s *Store) TrustedLogin(ctx context.Context, email string) (model.TrustedUser, string, error) {
-	var value model.TrustedUser
-	var permissions []byte
 	var passwordHash string
-	err := s.pool.QueryRow(ctx, "SELECT "+trustedUserColumns+",password_hash FROM aiosources.trusted_users WHERE email=$1 AND enabled", email).Scan(
-		&value.ID, &value.Email, &value.Enabled, &permissions, &value.Revision, &value.Generation, &value.CreatedAt, &value.UpdatedAt, &passwordHash,
-	)
+	value, err := scanTrustedUser(s.pool.QueryRow(ctx, "SELECT "+trustedUserColumns+",password_hash FROM aiosources.trusted_users WHERE email=$1 AND enabled", email), &passwordHash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.TrustedUser{}, "", ErrAuthentication
 	}
-	if err != nil {
-		return model.TrustedUser{}, "", databaseError("read trusted login", err)
-	}
-	if err = json.Unmarshal(permissions, &value.TrustedPermissions); err != nil {
-		return model.TrustedUser{}, "", databaseError("read trusted login", err)
-	}
-	return value, passwordHash, nil
+	return value, passwordHash, databaseError("read trusted login", err)
 }
 
 func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, passwordHash string) (model.TrustedUser, error) {
@@ -109,8 +100,8 @@ func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, pa
 		return model.TrustedUser{}, databaseError("begin trusted user update", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
-		return model.TrustedUser{}, databaseError("lock trusted catalog policy", err)
+	if err = lockCatalogPolicy(ctx, tx, "lock trusted catalog policy"); err != nil {
+		return model.TrustedUser{}, err
 	}
 	if value.ID == "" {
 		if value.Revision != 0 || passwordHash == "" {
@@ -149,8 +140,8 @@ func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64
 		return databaseError("begin trusted user deletion", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
-		return databaseError("lock trusted catalog policy", err)
+	if err = lockCatalogPolicy(ctx, tx, "lock trusted catalog policy"); err != nil {
+		return err
 	}
 	tag, err := tx.Exec(ctx, `DELETE FROM aiosources.trusted_users WHERE id=$1 AND revision=$2`, id, revision)
 	if err != nil {
@@ -230,26 +221,16 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 }
 
 func (s *Store) TrustedSession(ctx context.Context, tokenHash []byte) (model.TrustedUser, string, time.Time, error) {
-	var user model.TrustedUser
-	var permissions []byte
 	var id string
 	var expires time.Time
-	err := s.pool.QueryRow(ctx, `SELECT u.id,u.email,u.enabled,u.permissions,u.revision,u.generation,u.created_at,u.updated_at,s.id,s.expires_at
+	user, err := scanTrustedUser(s.pool.QueryRow(ctx, `SELECT u.id,u.email,u.enabled,u.permissions,u.revision,u.generation,u.created_at,u.updated_at,s.id,s.expires_at
  FROM aiosources.trusted_sessions s
  JOIN aiosources.trusted_users u ON u.id=s.user_id AND u.generation=s.generation AND u.enabled
- WHERE s.token_hash=$1 AND s.expires_at>now()`, tokenHash).Scan(
-		&user.ID, &user.Email, &user.Enabled, &permissions, &user.Revision, &user.Generation, &user.CreatedAt, &user.UpdatedAt, &id, &expires,
-	)
+ WHERE s.token_hash=$1 AND s.expires_at>now()`, tokenHash), &id, &expires)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.TrustedUser{}, "", expires, ErrAuthentication
 	}
-	if err != nil {
-		return model.TrustedUser{}, "", expires, databaseError("read trusted session", err)
-	}
-	if err = json.Unmarshal(permissions, &user.TrustedPermissions); err != nil {
-		return model.TrustedUser{}, "", expires, databaseError("read trusted session", err)
-	}
-	return user, id, expires, nil
+	return user, id, expires, databaseError("read trusted session", err)
 }
 
 func (s *Store) RevokeTrustedSession(ctx context.Context, id string) error {

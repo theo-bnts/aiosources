@@ -66,17 +66,13 @@ type trustedSession struct {
 }
 type trustedSessionKey struct{}
 
+func currentTrustedSession(r *http.Request) trustedSession {
+	return r.Context().Value(trustedSessionKey{}).(trustedSession)
+}
+
 func (a *authentication) lookupTrusted(r *http.Request) (trustedSession, error) {
-	var cookie *http.Cookie
-	for _, candidate := range r.Cookies() {
-		if candidate.Name == trustedSessionCookie {
-			if cookie != nil {
-				return trustedSession{}, store.ErrAuthentication
-			}
-			cookie = candidate
-		}
-	}
-	if cookie == nil || len(cookie.Value) != 43 {
+	cookie, err := singleCookie(r, trustedSessionCookie)
+	if err != nil || len(cookie.Value) != 43 {
 		return trustedSession{}, store.ErrAuthentication
 	}
 	hash := sha256.Sum256([]byte(cookie.Value))
@@ -103,16 +99,9 @@ func (a *authentication) protectTrusted(feature string, next http.HandlerFunc) h
 			writeError(w, 403, "This feature is not enabled for your account")
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			csrfValues := r.Header.Values("X-CSRF-Token")
-			csrf := ""
-			if len(csrfValues) == 1 {
-				csrf = csrfValues[0]
-			}
-			if !a.allowedOrigin(r) || len(csrf) != len(value.CSRF) || subtle.ConstantTimeCompare([]byte(csrf), []byte(value.CSRF)) != 1 {
-				writeError(w, 403, "Invalid form session. Reload the page.")
-				return
-			}
+		if !a.validCSRF(r, value.CSRF) {
+			writeError(w, 403, "Invalid form session. Reload the page.")
+			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), trustedSessionKey{}, value)))
 	}
@@ -218,7 +207,7 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) trustedLogout(w http.ResponseWriter, r *http.Request) {
-	value := r.Context().Value(trustedSessionKey{}).(trustedSession)
+	value := currentTrustedSession(r)
 	if err := s.options.Store.RevokeTrustedSession(r.Context(), value.ID); err != nil {
 		respondError(w, err)
 		return

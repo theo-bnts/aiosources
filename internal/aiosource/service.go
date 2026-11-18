@@ -74,10 +74,10 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 		return nil, errors.New("AIOSources dependencies required")
 	}
 	life, cancel := context.WithCancel(ctx)
-	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}}
+	s := &Service{DB: db, Vault: v, sources: sources, Providers: NewProviderHTTP(), TMDBBase: "https://api.themoviedb.org/3", ExportBase: "https://files.tmdb.org/p/exports", MetadataHTTP: &http.Client{CheckRedirect: noRedirect}, ctx: life, cancel: cancel, flights: map[string]*flight{}, probes: map[string]*adProbe{}}
 	s.Network = &outbound.Router{Settings: db.NetworkSettings, Secrets: v.Resolve}
 	s.IGDBBase, s.IGDBTokenURL = "https://api.igdb.com/v4", "https://id.twitch.tv/oauth2/token"
-	s.GameHTTP = &http.Client{Transport: s.Network.Transport("metadata:igdb", outbound.HTTPTransport()), CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
+	s.GameHTTP = &http.Client{Transport: s.Network.Transport("metadata:igdb", outbound.HTTPTransport()), CheckRedirect: noRedirect}
 	s.gameRate.setRate(3)
 	s.bookRate.setRate(1)
 	s.BookHTTP = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}

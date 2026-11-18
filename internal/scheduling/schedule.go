@@ -143,19 +143,10 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 		if run.PauseReason != model.PauseBudget {
 			return "blocked", nil, "A paused scheduled collection requires explicit resume; only budget pauses continue on a scheduled tick"
 		}
-		metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && s.Plan.Mode == model.ModeIncremental
-		initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
-		modeMatches := run.Mode == s.Plan.Mode || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) || initialFull || metadataFollowup ||
-			(s.Provider.IsRemoteCatalog() && run.Mode == model.ModeFull)
-		if !s.matchesSnapshot(run) || !modeMatches {
+		if !s.matchesScheduledContinuation(run) {
 			return "blocked", nil, "A paused scheduled collection uses an older configuration or different mode; resume or cancel it manually in run history"
 		}
-		// Finish a budgeted discovery before optional enrichment. Otherwise an
-		// older metadata child can strand a newer Incremental at every tick.
-		if resume == nil || resume.MetadataParentRunID != "" && run.MetadataParentRunID == "" {
-			copy := run
-			resume = &copy
-		}
+		resume = preferScheduledContinuation(resume, run)
 	}
 	if resume != nil {
 		return "paused", resume, ""
@@ -166,23 +157,34 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 			if run.Status != model.StatusFailed || run.Trigger != model.TriggerScheduled || run.CancelRequested || !run.Config.Schedule.RetryFailed {
 				continue
 			}
-			initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
-			metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && s.Plan.Mode == model.ModeIncremental
-			modeMatches := run.Mode == s.Plan.Mode || initialFull || metadataFollowup || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) ||
-				(s.Provider.IsRemoteCatalog() && run.Mode == model.ModeFull)
-			if !s.matchesSnapshot(run) || !modeMatches {
+			if !s.matchesScheduledContinuation(run) {
 				return "blocked", nil, "A failed scheduled collection uses an older configuration or different mode; resume or cancel it manually in run history"
 			}
-			if retry == nil || retry.MetadataParentRunID != "" && run.MetadataParentRunID == "" {
-				copy := run
-				retry = &copy
-			}
+			retry = preferScheduledContinuation(retry, run)
 		}
 		if retry != nil {
 			return "waiting", retry, ""
 		}
 	}
 	return "waiting", nil, ""
+}
+
+func (s Source) matchesScheduledContinuation(run model.Run) bool {
+	metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && s.Plan.Mode == model.ModeIncremental
+	initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
+	modeMatches := run.Mode == s.Plan.Mode || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) || initialFull || metadataFollowup ||
+		(s.Provider.IsRemoteCatalog() && run.Mode == model.ModeFull)
+	return s.matchesSnapshot(run) && modeMatches
+}
+
+// Finish a budgeted discovery before optional enrichment. Otherwise an
+// older metadata child can strand a newer Incremental at every tick.
+func preferScheduledContinuation(selected *model.Run, candidate model.Run) *model.Run {
+	if selected == nil || (selected.MetadataParentRunID != "" && candidate.MetadataParentRunID == "") {
+		copy := candidate
+		return &copy
+	}
+	return selected
 }
 
 func (s Source) matchesSnapshot(run model.Run) bool {

@@ -17,7 +17,7 @@ import {
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames, matchesListQuery } from '@/lib/list-view'
 import { useNotification } from '@/lib/notifications'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { newSecretReference } from '@/lib/secret-reference'
@@ -49,7 +49,6 @@ import {
 export default function SecretsPage() {
   const filters = useListFilters()
   const date = useDate()
-  const returnFocus = useRef<HTMLElement | null>(null)
   const secrets = useQuery({
     queryKey: ['secrets'],
     queryFn: ({ signal }) => api<Items<SecretInfo>>('/secrets', { signal }),
@@ -108,8 +107,6 @@ export default function SecretsPage() {
   const busy = save.isPending || review.isPending
   function openSecret(secretName = '') {
     const reference = secretName || newSecretReference('secret')
-    returnFocus.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
     setName(reference)
     setValue('')
     save.reset()
@@ -227,13 +224,7 @@ export default function SecretsPage() {
           }
         }}
       >
-        <DialogContent
-          showCloseButton={!busy}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            returnFocus.current?.focus()
-          }}
-        >
+        <DialogContent showCloseButton={!busy}>
           <DialogHeader>
             <DialogTitle>{editing?.rotate ? 'Replace secret value' : 'Create secret'}</DialogTitle>
             <DialogDescription>

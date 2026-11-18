@@ -2,8 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -16,13 +14,24 @@ import (
 
 type publicCatalogAction func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation) (any, error)
 
+func optionalBearerCredential(r *http.Request) (string, bool, bool) {
+	values := r.Header.Values("Authorization")
+	if len(values) == 0 {
+		return "", false, true
+	}
+	if len(values) != 1 || !strings.HasPrefix(values[0], "Bearer ") {
+		return "", true, false
+	}
+	return strings.TrimPrefix(values[0], "Bearer "), true, true
+}
+
 func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalogAction) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.publicOriginAllowed() {
 			writeError(w, 404, "Public Search is disabled")
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && (len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.hasPublicOrigin(r) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
@@ -43,16 +52,16 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			writeError(w, 404, "Public Search is disabled")
 			return
 		}
-		authorization := r.Header.Values("Authorization")
+		token, present, valid := optionalBearerCredential(r)
 		var visitor *aiosource.PublicInstallation
-		if len(authorization) == 0 && access.UseInstanceDebrid {
+		if !present && access.UseInstanceDebrid {
 			visitor, err = s.options.AIOSource.PublicInstanceSearch(ctx, s.auth.origin)
 		} else {
-			if len(authorization) != 1 || !strings.HasPrefix(authorization[0], "Bearer ") {
+			if !present || !valid {
 				writeError(w, 401, "Enter your debrid service keys to use Search.")
 				return
 			}
-			visitor, err = s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, strings.TrimPrefix(authorization[0], "Bearer "))
+			visitor, err = s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, token)
 		}
 		if err != nil {
 			if errors.Is(err, aiosource.ErrAuth) {
@@ -172,17 +181,18 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 				audience = s.trustedSearchAudience()
 				sessionID = ts.ID
 			}
-			data, e := json.Marshal(publicCatalogFileTicket{Trusted: visitor.Trusted, Session: sessionID, Service: result.Service, URL: result.URL, Audience: audience, Generation: visitor.Generation, Expires: expires})
+			result.URL, result.URLValidSeconds, e = s.sealDownloadTicket("public-catalog-file-v1", "/api/public/catalog-downloads/", expires, publicCatalogFileTicket{
+				Trusted:    visitor.Trusted,
+				Session:    sessionID,
+				Service:    result.Service,
+				URL:        result.URL,
+				Audience:   audience,
+				Generation: visitor.Generation,
+				Expires:    expires,
+			})
 			if e != nil {
 				return nil, e
 			}
-			sealed, e := s.options.Vault.Seal("public-catalog-file-v1", data)
-			clear(data)
-			if e != nil {
-				return nil, e
-			}
-			result.URL = "/api/public/catalog-downloads/" + base64.RawURLEncoding.EncodeToString(sealed)
-			result.URLValidSeconds = max(0, int(expires-time.Now().Unix()))
 		}
 		return result, err
 	}))
@@ -199,25 +209,9 @@ type publicCatalogFileTicket struct {
 }
 
 func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-	if len(token) < 32 || len(token) > 14000 || strings.Contains(token, "~") {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
-	if err != nil {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	data, err := s.options.Vault.Open("public-catalog-file-v1", sealed)
-	if err != nil {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	defer clear(data)
 	var ticket publicCatalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil {
+	if !s.openDownloadTicket("public-catalog-file-v1", r.PathValue("token"), &ticket) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
@@ -225,7 +219,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	if ticket.Trusted != nil {
 		expectedAudience = s.trustedSearchAudience()
 	}
-	if expectedAudience == "" || ticket.Audience != expectedAudience || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !model.IsDebridService(ticket.Service) || !validCatalogFileURL(ticket.URL) {
+	if expectedAudience == "" || ticket.Audience != expectedAudience || !model.IsDebridService(ticket.Service) || !validDownloadTicket(ticket.URL, ticket.Expires, now) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
@@ -263,7 +257,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	}
-	if err = authorize(r.Context()); err != nil {
+	if err := authorize(r.Context()); err != nil {
 		respondError(w, err)
 		return
 	}

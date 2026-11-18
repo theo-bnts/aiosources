@@ -99,14 +99,12 @@ export function ProvidersPage() {
       <PageHeader
         title="Sources"
         actions={
-          <>
-            <Button asChild>
-              <Link to="/providers/new" state={listState}>
-                <PlusIcon />
-                Add source
-              </Link>
-            </Button>
-          </>
+          <Button asChild>
+            <Link to="/providers/new" state={listState}>
+              <PlusIcon />
+              Add source
+            </Link>
+          </Button>
         }
       />
       <ErrorNotice

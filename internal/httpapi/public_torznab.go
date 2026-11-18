@@ -19,7 +19,7 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 			writeError(w, 404, "Public access is disabled")
 			return
 		}
-		if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin {
+		if !s.hasPublicOrigin(r) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}

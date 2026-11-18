@@ -64,7 +64,7 @@ func (p *ProviderHTTP) exchange(ctx context.Context, service, key, method, path 
 		req.Header.Set("Content-Type", contentType)
 	}
 	client := *p.Client
-	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	client.CheckRedirect = noRedirect
 	if p.Timeout != nil && client.Timeout == 0 {
 		timeout, err := p.Timeout(ctx)
 		if err != nil {

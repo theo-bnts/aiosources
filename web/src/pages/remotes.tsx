@@ -16,7 +16,7 @@ import { SecretPicker } from '@/components/secret-picker'
 import { Statistic } from '@/components/statistic'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 
@@ -196,7 +196,6 @@ function matchesRemoteFilters(remote: RemoteCatalog, filters: ReturnType<typeof 
 export default function RemotesPage() {
   const listState = useListViewState()
   const filters = useListFilters()
-  const returnFocus = useRef<HTMLElement | null>(null)
   const [editing, setEditing] = useState<RemoteCatalog | 'new' | null>(null)
   const [saving, setSaving] = useState(false)
   const notify = useNotification()
@@ -204,23 +203,18 @@ export default function RemotesPage() {
   useSettingsEditor(
     'remote',
     remotes.data ? (remotes.data.items ?? []) : undefined,
-    (remote) => openEditor(remote),
+    (remote) => setEditing(remote),
     () => setEditing(null),
     editing === 'new' ? 'new' : (editing?.id ?? null),
   )
   const items = [...(remotes.data?.items ?? [])].sort(compareListNames)
   const visible = items.filter((remote) => matchesRemoteFilters(remote, filters))
   const filtered = Boolean(filters.query || filters.selection || filters.state)
-  function openEditor(remote: RemoteCatalog | 'new') {
-    returnFocus.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
-    setEditing(remote)
-  }
   const toggle = useMutation({ mutationFn: toggleProvider, onSuccess: refreshData })
   return (
     <div className="page">
       <PageActions>
-        <Button onClick={() => openEditor('new')}>
+        <Button onClick={() => setEditing('new')}>
           <PlusIcon />
           Add remote catalog
         </Button>
@@ -334,7 +328,7 @@ export default function RemotesPage() {
                       </Button>
                     }
                   />
-                  <Button size="sm" variant="outline" onClick={() => openEditor(remote)}>
+                  <Button size="sm" variant="outline" onClick={() => setEditing(remote)}>
                     <PencilSimpleIcon />
                     Edit
                   </Button>
@@ -400,10 +394,6 @@ export default function RemotesPage() {
           data-settings-entity={editing === 'new' ? 'new' : editing?.id}
           className="sm:max-w-2xl"
           showCloseButton={!saving}
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            returnFocus.current?.focus()
-          }}
         >
           <DialogHeader>
             <DialogTitle>

@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { resultPreferences, type ResultPreferences } from './result-preferences.ts'
+import {
+  encodeBase64URL,
+  resultPreferences,
+  resultPreferencesError,
+  type ResultPreferences,
+} from './result-preferences.ts'
 
 export type LanguagePreferences = {
   language: string
@@ -113,25 +118,8 @@ export function preferenceManifestError(
   language?: LanguagePreferences,
 ) {
   if ((options.sources?.length ?? 0) > 100) return 'Select up to 100 sources, or use All sources.'
-  if (
-    options.max_results !== undefined &&
-    (!Number.isInteger(options.max_results) ||
-      options.max_results < 0 ||
-      options.max_results > 10000)
-  )
-    return 'Enter a maximum result count between 1 and 10,000.'
-  if (
-    options.max_cached !== undefined &&
-    (!Number.isInteger(options.max_cached) || options.max_cached < 0 || options.max_cached > 10000)
-  )
-    return 'Enter a maximum cached result count between 1 and 10,000.'
-  if (
-    options.response_seconds !== undefined &&
-    (!Number.isInteger(options.response_seconds) ||
-      options.response_seconds < 0 ||
-      options.response_seconds > 60)
-  )
-    return 'Enter a response timeout between 1 and 60 seconds.'
+  const prefErr = resultPreferencesError(options, 60)
+  if (prefErr) return prefErr
   if (
     language &&
     new TextEncoder().encode(
@@ -163,12 +151,7 @@ export function preferenceManifest(
       Object.keys(resultPreferences(options)).length)
   ) {
     const preferences = { language: resolvedLanguage(value), mode: value.mode, ...options }
-    const data = new TextEncoder().encode(JSON.stringify(preferences))
-    const encoded = btoa(Array.from(data, (byte) => String.fromCharCode(byte)).join(''))
-      .replaceAll('+', '-')
-      .replaceAll('/', '_')
-      .replace(/=+$/, '')
-    return base.replace(/\/manifest\.json$/, `~v1~${encoded}/manifest.json`)
+    return base.replace(/\/manifest\.json$/, `~v1~${encodeBase64URL(preferences)}/manifest.json`)
   }
   return base.replace(
     /(?:~[^/~]+~[^/~]+)?\/manifest\.json$/,

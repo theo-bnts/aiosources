@@ -145,7 +145,7 @@ func (s *Store) ListOperations(ctx context.Context, opts model.OperationFilter) 
 	for rows.Next() {
 		run, err := scanOperation(rows)
 		if err != nil {
-			return result, err
+			return result, databaseError("read operation history", err)
 		}
 		result.Items = append(result.Items, run)
 	}
@@ -169,7 +169,7 @@ func (s *Store) OperationEvents(ctx context.Context, id string, opts model.ListO
 	for rows.Next() {
 		var event model.OperationEvent
 		if err := rows.Scan(&event.ID, &event.RunID, &event.Phase, &event.Processed, &event.Errors, &event.CreatedAt, &event.DurationMS, &event.HTTPStatus, &event.ErrorCode); err != nil {
-			return result, err
+			return result, databaseError("read operation events", err)
 		}
 		result.Items = append(result.Items, event)
 	}

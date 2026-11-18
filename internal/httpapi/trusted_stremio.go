@@ -16,6 +16,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Referrer-Policy", "no-referrer")
 			release, ok := s.enterConnection(w, r, true)
 			if !ok {
 				return
@@ -98,11 +99,6 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 		}
 		http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 	}))
-	mux.HandleFunc("OPTIONS /trusted/stremio/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.WriteHeader(204)
-	})
-	mux.HandleFunc("/trusted/stremio/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "Addon route not found") })
+	mux.HandleFunc("OPTIONS /trusted/stremio/{rest...}", stremioOptions)
+	mux.HandleFunc("/trusted/stremio/", stremioNotFound)
 }

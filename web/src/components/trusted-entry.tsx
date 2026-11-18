@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Navigate, useLocation } from 'react-router-dom'
-import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
-import type { PublicInfo } from './public-connection-fields'
+import { useVisitorConfig } from './public-connection-fields'
 import { PublicSharedCatalogEntry } from './public-shared-catalog-entry'
 import { PublicStremioEntry } from './public-entry'
 import { PublicTorznabEntry } from './public-torznab-entry'
@@ -10,12 +8,7 @@ import { PublicSearchEntry } from './public-search-entry'
 import { Empty, ErrorNotice, Loading } from './common'
 export function TrustedEntry({ layout }: { layout: (children: ReactNode) => ReactNode }) {
   const location = useLocation()
-  const info = useQuery({
-    queryKey: ['trusted-config'],
-    queryFn: ({ signal }) => api<PublicInfo>('/trusted/config', { signal, cache: 'no-store' }),
-    refetchInterval: LIVE_REFRESH_INTERVAL,
-    retry: false,
-  })
+  const info = useVisitorConfig(true)
   if (info.isPending)
     return (
       <div className="page">

@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -85,17 +84,8 @@ func (c *httpJSONConnector) continuationURL(base *url.URL, value string) (*url.U
 	}
 	// Managed query authentication is reapplied by Client, never saved inside
 	// a checkpoint. Other credential parameters are still refused.
-	if c.client.authType == "query" {
-		query := target.Query()
-		for name, values := range query {
-			if strings.EqualFold(name, c.client.authName) {
-				if slices.ContainsFunc(values, func(item string) bool { return item != c.client.authValue }) {
-					return nil, errors.New("next URL contains a foreign authentication key")
-				}
-				delete(query, name)
-			}
-		}
-		target.RawQuery = query.Encode()
+	if err := c.client.stripManagedQueryAuth(target, errors.New("next URL contains a foreign authentication key")); err != nil {
+		return nil, err
 	}
 	for name := range target.Query() {
 		if sensitiveName(name) || model.CredentialParameter(name) {

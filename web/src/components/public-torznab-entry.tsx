@@ -21,6 +21,7 @@ import { ResultSorting } from '@/components/result-controls'
 import {
   PublicAnnounceFields,
   clearPublicCredentials,
+  useSessionExpired,
   type PublicInfo,
 } from '@/components/public-connection-fields'
 
@@ -34,16 +35,12 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   const connectionCredential = useRef('')
   const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => () => request.current?.abort(), [])
-  useEffect(() => {
-    const clear = () => {
-      request.current?.abort()
-      setPending(false)
-      setConnection(undefined)
-      if (formRef.current) clearPublicCredentials(formRef.current)
-    }
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => {
+    request.current?.abort()
+    setPending(false)
+    setConnection(undefined)
+    if (formRef.current) clearPublicCredentials(formRef.current)
+  })
   useEffect(() => {
     if ((saved?.credential ?? '') !== connectionCredential.current) setConnection(undefined)
   }, [saved])

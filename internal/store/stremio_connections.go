@@ -18,14 +18,9 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 	if err != nil || len(decoded) != 32 || len(key) != 43 || len(id) != 36 {
 		return zero, ErrCatalogAuthentication
 	}
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
-	if err != nil {
-		return zero, databaseError("begin Stremio access verification", err)
-	}
-	defer rollback(tx)
 	var hash []byte
-	var enabled bool
-	err = tx.QueryRow(ctx, `SELECT password_hash,enabled AND (expires_at IS NULL OR expires_at>clock_timestamp()) FROM aiosources.shares WHERE id=$1 AND format='stremio'`, id).Scan(&hash, &enabled)
+	var unexpired bool
+	value, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+`,password_hash,expires_at IS NULL OR expires_at>clock_timestamp() FROM aiosources.shares WHERE id=$1 AND format='stremio'`, id), &hash, &unexpired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return zero, ErrCatalogAuthentication
 	}
@@ -33,17 +28,10 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 		return zero, databaseError("verify Stremio access", err)
 	}
 	candidate := sharingPasswordHash(id, key)
-	if !enabled || subtle.ConstantTimeCompare(hash, candidate[:]) != 1 {
+	if !value.Enabled || !unexpired || subtle.ConstantTimeCompare(hash, candidate[:]) != 1 {
 		return zero, ErrCatalogAuthentication
 	}
-	value, err := scanShare(tx.QueryRow(ctx, "SELECT "+shareColumns+` FROM aiosources.shares WHERE id=$1 AND format='stremio' AND enabled AND (expires_at IS NULL OR expires_at>clock_timestamp())`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return zero, ErrCatalogAuthentication
-	}
-	if err != nil {
-		return zero, databaseError("read Stremio settings", err)
-	}
-	return value, databaseError("commit Stremio settings read", tx.Commit(ctx))
+	return value, nil
 }
 
 func (s *Store) BeginStremioRequest(ctx context.Context, id, key string) (*CatalogDownload, error) {

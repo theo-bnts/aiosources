@@ -140,9 +140,7 @@ func (m *Manager) runClaim(run model.Run) {
 		default:
 		}
 	}
-	m.Notify("run", run.ID)
-	m.signalWork()
-	m.signalSchedule()
+	m.notifyRun(run.ID)
 }
 
 func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunStatus, message string, reason model.PauseReason) {

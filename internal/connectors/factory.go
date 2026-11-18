@@ -255,7 +255,7 @@ func validateCommon(p model.Provider) error {
 		if sensitiveName(name) {
 			return errors.New("sensitive HTTP headers require secret refs")
 		}
-		if strings.EqualFold(name, "Host") || strings.EqualFold(name, "Content-Length") || strings.EqualFold(name, "Transfer-Encoding") || strings.EqualFold(name, "Connection") {
+		if isTransportHeader(name) {
 			return errors.New("HTTP transport headers cannot be configured")
 		}
 	}
@@ -271,7 +271,7 @@ func validateCommon(p model.Provider) error {
 		if strings.EqualFold(name, "Cookie") || strings.EqualFold(name, "Set-Cookie") {
 			return errors.New("session cookies must use auth.type=cookie")
 		}
-		if strings.EqualFold(name, "Host") || strings.EqualFold(name, "Content-Length") || strings.EqualFold(name, "Transfer-Encoding") || strings.EqualFold(name, "Connection") {
+		if isTransportHeader(name) {
 			return errors.New("HTTP transport headers cannot be configured")
 		}
 	}
@@ -347,6 +347,10 @@ func validateCommon(p model.Provider) error {
 		}
 	}
 	return nil
+}
+
+func isTransportHeader(name string) bool {
+	return strings.EqualFold(name, "Host") || strings.EqualFold(name, "Content-Length") || strings.EqualFold(name, "Transfer-Encoding") || strings.EqualFold(name, "Connection")
 }
 
 func validateStaticBody(value any, depth int) error {

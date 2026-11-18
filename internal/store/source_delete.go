@@ -19,15 +19,8 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 		return databaseError("begin source deletion", err)
 	}
 	defer rollback(tx)
-	var locked bool
-	if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(1768843109,5)`).Scan(&locked); err != nil {
-		return databaseError("lock source deletion", err)
-	}
-	if !locked {
-		return model.ErrBusy
-	}
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,4)`); err != nil {
-		return databaseError("wait for source history cleanup", err)
+	if err = lockSourceDataExclusive(ctx, tx, "lock source deletion"); err != nil {
+		return err
 	}
 	if err = lockProviderQueue(ctx, tx, providerID); err != nil {
 		return err
@@ -65,6 +58,7 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 		return databaseError("read source download preparations", err)
 	}
 	for _, key := range keys {
+		var locked bool
 		if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1)`, key).Scan(&locked); err != nil {
 			return databaseError("lock source download preparation", err)
 		}

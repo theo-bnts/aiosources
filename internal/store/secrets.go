@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/jackc/pgx/v5"
 
@@ -73,22 +74,31 @@ func (s *Store) HasEncryptedMaterial(ctx context.Context) (bool, error) {
 	return exists, databaseError("inspect encrypted material", err)
 }
 
+func lockSecretReferences(ctx context.Context, tx pgx.Tx, names []string, missingErr error, operation string) error {
+	sorted := slices.Clone(names)
+	slices.Sort(sorted)
+	for _, name := range slices.Compact(sorted) {
+		if name == "" {
+			continue
+		}
+		var locked string
+		err := tx.QueryRow(ctx, "SELECT name FROM aiosources.secrets WHERE name=$1 FOR KEY SHARE", name).Scan(&locked)
+		if errors.Is(err, pgx.ErrNoRows) && missingErr != nil {
+			return missingErr
+		}
+		if err != nil {
+			return databaseError(operation, err)
+		}
+	}
+	return nil
+}
+
 func lockProviderSecrets(ctx context.Context, tx pgx.Tx, provider model.Provider) error {
 	names, err := provider.SecretReferences()
 	if err != nil {
 		return err
 	}
-	for _, name := range names {
-		var locked string
-		err := tx.QueryRow(ctx, "SELECT name FROM aiosources.secrets WHERE name=$1 FOR KEY SHARE", name).Scan(&locked)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return model.ErrInvalid
-		}
-		if err != nil {
-			return databaseError("lock collection secret", err)
-		}
-	}
-	return nil
+	return lockSecretReferences(ctx, tx, names, model.ErrInvalid, "lock collection secret")
 }
 
 func (s *Store) DeleteSecret(ctx context.Context, name string) error {

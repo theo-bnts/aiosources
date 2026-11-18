@@ -154,11 +154,12 @@ WHERE page.id=$1 AND page.payload_retained`, id).Scan(&body, &contentType)
 
 const torrentColumns = `provider_id,source_id,fields,raw_id,first_seen_at,last_seen_at,historical,origin,occurrence_id`
 
-func scanTorrent(row scanner) (model.Torrent, error) {
+func scanTorrent(row scanner, extra ...any) (model.Torrent, error) {
 	var torrent model.Torrent
 	var fields []byte
 	var origin []byte
-	if err := row.Scan(&torrent.ProviderID, &torrent.SourceID, &fields, &torrent.RawID, &torrent.FirstSeenAt, &torrent.LastSeenAt, &torrent.Historical, &origin, &torrent.OccurrenceID); err != nil {
+	dest := append([]any{&torrent.ProviderID, &torrent.SourceID, &fields, &torrent.RawID, &torrent.FirstSeenAt, &torrent.LastSeenAt, &torrent.Historical, &origin, &torrent.OccurrenceID}, extra...)
+	if err := row.Scan(dest...); err != nil {
 		return torrent, err
 	}
 	if len(origin) != 0 {
@@ -188,24 +189,15 @@ func (s *Store) ListTorrents(ctx context.Context, opts model.ListOptions) (model
 		limitParameter := "$" + strconv.Itoa(len(args)+1)
 		offsetParameter := "$" + strconv.Itoa(len(args)+2)
 		pageArgs := append(append([]any{}, args...), opts.Limit, opts.Offset)
-		pageSQL := "SELECT page.total," + torrentColumns + " FROM (SELECT count(*) OVER() AS total,provider_id,source_id" + filter + order + " LIMIT " + limitParameter + " OFFSET " + offsetParameter + ") page JOIN aiosources.torrents USING(provider_id,source_id)" + order
+		pageSQL := "SELECT " + torrentColumns + ",page.total FROM (SELECT count(*) OVER() AS total,provider_id,source_id" + filter + order + " LIMIT " + limitParameter + " OFFSET " + offsetParameter + ") page JOIN aiosources.torrents USING(provider_id,source_id)" + order
 		rows, err := tx.Query(ctx, pageSQL, pageArgs...)
 		if err != nil {
 			return result, databaseError("list torrents", err)
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var torrent model.Torrent
-			var fields, origin []byte
-			if err := rows.Scan(&result.Total, &torrent.ProviderID, &torrent.SourceID, &fields, &torrent.RawID, &torrent.FirstSeenAt, &torrent.LastSeenAt, &torrent.Historical, &origin, &torrent.OccurrenceID); err != nil {
-				return result, databaseError("read torrent", err)
-			}
-			if len(origin) != 0 {
-				if err := json.Unmarshal(origin, &torrent.Origin); err != nil {
-					return result, errors.New("stored catalogue provenance is invalid")
-				}
-			}
-			if torrent.Fields, err = decodeObject(fields); err != nil {
+			torrent, err := scanTorrent(rows, &result.Total)
+			if err != nil {
 				return result, databaseError("read torrent", err)
 			}
 			result.Items = append(result.Items, torrent)

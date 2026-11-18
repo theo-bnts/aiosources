@@ -2,6 +2,7 @@ package aiosource
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"time"
 
@@ -76,4 +77,24 @@ func (s *Service) acquireCapacity(ctx context.Context, gate *capacityGate, key s
 func (s *Service) outgoingTimeout(ctx context.Context, key string) (time.Duration, error) {
 	seconds, err := s.DB.RuntimeValue(ctx, "outgoing", key)
 	return time.Duration(seconds) * time.Second, err
+}
+
+func noRedirect(*http.Request, []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
+func (s *Service) prepareOutgoingClient(ctx context.Context, base *http.Client, timeoutKey string, preserveCustomTimeout bool) (http.Client, error) {
+	var client http.Client
+	if base != nil {
+		client = *base
+	}
+	client.CheckRedirect = noRedirect
+	if !preserveCustomTimeout || client.Timeout == 0 {
+		timeout, err := s.outgoingTimeout(ctx, timeoutKey)
+		if err != nil {
+			return http.Client{}, err
+		}
+		client.Timeout = timeout
+	}
+	return client, nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -41,36 +40,13 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 			return
 		}
 		input.ID = r.PathValue("id")
-		if input.SearchEnabled == nil {
-			input.TrustedUser.SearchEnabled = input.ID == ""
-		} else {
-			input.TrustedUser.SearchEnabled = *input.SearchEnabled
-		}
-		if input.TorznabEnabled == nil {
-			input.TrustedUser.TorznabEnabled = input.ID == ""
-		} else {
-			input.TrustedUser.TorznabEnabled = *input.TorznabEnabled
-		}
-		if input.StremioEnabled == nil {
-			input.TrustedUser.StremioEnabled = input.ID == ""
-		} else {
-			input.TrustedUser.StremioEnabled = *input.StremioEnabled
-		}
-		if input.CatalogEnabled == nil {
-			input.TrustedUser.CatalogEnabled = input.ID == ""
-		} else {
-			input.TrustedUser.CatalogEnabled = *input.CatalogEnabled
-		}
-		if input.UseInstanceDebrid == nil {
-			input.TrustedUser.UseInstanceDebrid = input.ID == ""
-		} else {
-			input.TrustedUser.UseInstanceDebrid = *input.UseInstanceDebrid
-		}
-		if input.UseInstanceAnnounces == nil {
-			input.TrustedUser.UseInstanceAnnounces = input.ID == ""
-		} else {
-			input.TrustedUser.UseInstanceAnnounces = *input.UseInstanceAnnounces
-		}
+		defaultEnabled := input.ID == ""
+		input.TrustedUser.SearchEnabled = boolOrDefault(input.SearchEnabled, defaultEnabled)
+		input.TrustedUser.TorznabEnabled = boolOrDefault(input.TorznabEnabled, defaultEnabled)
+		input.TrustedUser.StremioEnabled = boolOrDefault(input.StremioEnabled, defaultEnabled)
+		input.TrustedUser.CatalogEnabled = boolOrDefault(input.CatalogEnabled, defaultEnabled)
+		input.TrustedUser.UseInstanceDebrid = boolOrDefault(input.UseInstanceDebrid, defaultEnabled)
+		input.TrustedUser.UseInstanceAnnounces = boolOrDefault(input.UseInstanceAnnounces, defaultEnabled)
 		if _, err := store.NormalizeTrustedEmail(input.Email); err != nil {
 			writeError(w, 422, "Enter a valid email address")
 			return
@@ -139,8 +115,15 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 	mux.HandleFunc("/trusted/catalogs/{configuration}", s.publicCatalogFeed)
 }
 
+func boolOrDefault(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
 func trustedGrant(r *http.Request) model.TrustedGrant {
-	user := r.Context().Value(trustedSessionKey{}).(trustedSession).User
+	user := currentTrustedSession(r).User
 	return model.TrustedGrant{UserID: user.ID, Generation: user.Generation}
 }
 
@@ -180,7 +163,7 @@ func (s *server) enterConnection(w http.ResponseWriter, r *http.Request, trusted
 }
 
 func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(trustedSessionKey{}).(trustedSession).User
+	user := currentTrustedSession(r).User
 	config, err := s.options.Store.AIOConfig(r.Context())
 	if err != nil {
 		respondError(w, err)
@@ -208,26 +191,17 @@ func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
 		info["private_sources"] = private
 	}
 	if user.CatalogEnabled {
-		policy, e := s.options.Store.PublicCatalogPolicy(r.Context())
-		if e != nil {
-			respondError(w, e)
+		if err := s.populateCatalogPolicyConfig(r.Context(), info, sources); err != nil {
+			respondError(w, err)
 			return
 		}
-		info["catalog_fields"], info["catalog_entities"], info["catalog_revision"] = policy.Fields, policy.CatalogEntities, policy.Revision
-		permitted := []aiosource.PublicPrivateSource{}
-		for _, source := range sources {
-			if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
-				permitted = append(permitted, source)
-			}
-		}
-		info["catalog_sources"] = permitted
 	}
 	writeJSON(w, 200, info)
 }
 
 func (s *server) trustedConnection(w http.ResponseWriter, r *http.Request) {
 	feature := r.PathValue("feature")
-	user := r.Context().Value(trustedSessionKey{}).(trustedSession).User
+	user := currentTrustedSession(r).User
 	if !user.Allows(feature) {
 		writeError(w, 403, "This connection is not enabled for your account")
 		return
@@ -313,14 +287,10 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 		visitor := &aiosource.PublicInstallation{Trusted: &grant, Generation: grant.Generation, Audience: audience}
 		metadataOnly := r.Method == http.MethodGet && !strings.HasSuffix(r.URL.Path, "/releases") && r.URL.Path != "/api/trusted/catalog/torrents"
 		if !metadataOnly {
-			auths := r.Header.Values("Authorization")
-			credential := ""
-			if len(auths) > 1 || (len(auths) == 1 && !strings.HasPrefix(auths[0], "Bearer ")) {
+			credential, _, valid := optionalBearerCredential(r)
+			if !valid {
 				publicCredentialError(w, aiosource.ErrAuth)
 				return
-			}
-			if len(auths) == 1 {
-				credential = strings.TrimPrefix(auths[0], "Bearer ")
 			}
 			personal, e := s.options.AIOSource.ResolveTrustedCredential(ctx, grant, s.connectionOrigin(), aiosource.PublicCredentialChanges{Credential: credential})
 			if e != nil {

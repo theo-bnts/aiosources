@@ -30,7 +30,7 @@ type ProviderHTTP struct {
 }
 
 func NewProviderHTTP() *ProviderHTTP {
-	return &ProviderHTTP{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}, ADBase: "https://api.alldebrid.com", TBBase: "https://api.torbox.app/v1/api", RDBase: "https://api.real-debrid.com/rest/1.0", PMBase: "https://www.premiumize.me/api", DLBase: "https://debrid-link.com/api/v2", DBBase: "https://www.deepbrid.com/api/v1", next: map[string]time.Time{}}
+	return &ProviderHTTP{Client: &http.Client{Timeout: 60 * time.Second, CheckRedirect: noRedirect}, ADBase: "https://api.alldebrid.com", TBBase: "https://api.torbox.app/v1/api", RDBase: "https://api.real-debrid.com/rest/1.0", PMBase: "https://www.premiumize.me/api", DLBase: "https://debrid-link.com/api/v2", DBBase: "https://www.deepbrid.com/api/v1", next: map[string]time.Time{}}
 }
 
 // Documented demonstration keys authenticate static fixtures, not an account.

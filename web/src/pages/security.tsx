@@ -1,7 +1,7 @@
 import { useNotification } from '@/lib/notifications'
 import { useQuery } from '@tanstack/react-query'
 import { SignOutIcon } from '@phosphor-icons/react'
-import { api, queryClient, setCSRF, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import { api, queryClient, expireSession, AUTO_REFRESH_INTERVAL } from '@/lib/api'
 import { useDate } from '@/lib/format'
 import type { Items } from '@/lib/types'
 import type { AdminSession } from '@/lib/security-types'
@@ -65,10 +65,7 @@ export function SecuritySessionsPage() {
   })
   const sessionItems = sessions.data?.items ?? []
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['security'] })
-  function signedOut() {
-    setCSRF()
-    window.dispatchEvent(new Event('session-expired'))
-  }
+  const signedOut = expireSession
   return (
     <div className="page" id="sessions">
       <section className="space-y-4" aria-label="Active sessions">

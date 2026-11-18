@@ -251,20 +251,8 @@ func (c *htmlConnector) continuationURL(base *url.URL, value string) (*url.URL, 
 	if err != nil {
 		return nil, err
 	}
-	if c.client.authType == "query" {
-		query := target.Query()
-		for name, values := range query {
-			if !strings.EqualFold(name, c.client.authName) {
-				continue
-			}
-			for _, value := range values {
-				if value != c.client.authValue {
-					return nil, errors.New("HTML continuation changes source credentials")
-				}
-			}
-			delete(query, name)
-		}
-		target.RawQuery = query.Encode()
+	if err := c.client.stripManagedQueryAuth(target, errors.New("HTML continuation changes source credentials")); err != nil {
+		return nil, err
 	}
 	// Managed query authentication is reapplied by Client, never saved inside
 	// a checkpoint. Other credential parameters are still refused.
@@ -272,15 +260,5 @@ func (c *htmlConnector) continuationURL(base *url.URL, value string) (*url.URL, 
 }
 
 func (c *htmlConnector) containsURLSecret(target *url.URL) bool {
-	if c.containsSecret(target.String()) || c.containsSecret(target.Path) {
-		return true
-	}
-	for _, values := range target.Query() {
-		for _, value := range values {
-			if c.containsSecret(value) {
-				return true
-			}
-		}
-	}
-	return false
+	return c != nil && urlContains(target, c.containsSecret)
 }

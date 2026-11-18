@@ -81,7 +81,7 @@ func (s *Store) SetPublicCatalogPolicy(ctx context.Context, value model.PublicCa
 		return databaseError("begin public catalog policy", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+	if err = lockCatalogPolicy(ctx, tx, "lock public catalog policy"); err != nil {
 		return err
 	}
 	tag, err := tx.Exec(ctx, `UPDATE aiosources.public_catalog_policy SET revision=revision+1,source_ids=$1,fields=$2,catalog_entities=$3 WHERE singleton AND revision=$4`, value.Sources, value.Fields, catalogEntitiesJSON(value.CatalogEntities), value.Revision)

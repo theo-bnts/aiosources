@@ -306,18 +306,61 @@ func (c *Client) containsSecret(text string) bool {
 	return false
 }
 
-func (c *Client) containsURLSecret(target *url.URL) bool {
-	if c.containsSecret(target.String()) || c.containsSecret(target.Path) {
+func urlContains(target *url.URL, match func(string) bool) bool {
+	if target == nil {
+		return false
+	}
+	if match(target.String()) || match(target.Path) {
 		return true
 	}
 	for _, values := range target.Query() {
 		for _, value := range values {
-			if c.containsSecret(value) {
+			if match(value) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func (c *Client) containsURLSecret(target *url.URL) bool {
+	return c != nil && urlContains(target, c.containsSecret)
+}
+
+func (c *Client) hasCredentialURL(raw, authParam string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || !validHTTPURL(u) {
+		return false
+	}
+	if c.containsURLSecret(u) {
+		return true
+	}
+	for name := range u.Query() {
+		if sensitiveName(name) || (authParam != "" && strings.EqualFold(name, authParam)) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) stripManagedQueryAuth(target *url.URL, mismatchErr error) error {
+	if c == nil || c.authType != "query" {
+		return nil
+	}
+	query := target.Query()
+	for name, values := range query {
+		if !strings.EqualFold(name, c.authName) {
+			continue
+		}
+		for _, value := range values {
+			if value != c.authValue {
+				return mismatchErr
+			}
+		}
+		delete(query, name)
+	}
+	target.RawQuery = query.Encode()
+	return nil
 }
 
 func (c *Client) target(value string) (*url.URL, error) {

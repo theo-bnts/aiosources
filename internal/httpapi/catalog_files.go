@@ -59,21 +59,51 @@ func (s *server) writeCatalogDownload(w http.ResponseWriter, r *http.Request, it
 			respondError(w, e)
 			return
 		}
-		data, e := json.Marshal(catalogFileTicket{Service: item.Service, URL: item.URL, Session: r.Context().Value(sessionContextKey{}).(session).id, Expires: expires})
+		item.URL, item.URLValidSeconds, e = s.sealDownloadTicket(catalogFilePurpose, "/api/catalog-downloads/", expires, catalogFileTicket{
+			Service: item.Service,
+			URL:     item.URL,
+			Session: currentSession(r).id,
+			Expires: expires,
+		})
 		if e != nil {
 			respondError(w, e)
 			return
 		}
-		sealed, e := s.options.Vault.Seal(catalogFilePurpose, data)
-		clear(data)
-		if e != nil {
-			respondError(w, e)
-			return
-		}
-		item.URL = "/api/catalog-downloads/" + base64.RawURLEncoding.EncodeToString(sealed)
-		item.URLValidSeconds = max(0, int(expires-time.Now().Unix()))
 	}
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (s *server) sealDownloadTicket(purpose, pathPrefix string, expires int64, ticket any) (string, int, error) {
+	data, err := json.Marshal(ticket)
+	if err != nil {
+		return "", 0, err
+	}
+	sealed, err := s.options.Vault.Seal(purpose, data)
+	clear(data)
+	if err != nil {
+		return "", 0, err
+	}
+	return pathPrefix + base64.RawURLEncoding.EncodeToString(sealed), max(0, int(expires-time.Now().Unix())), nil
+}
+
+func (s *server) openDownloadTicket(purpose, token string, destination any) bool {
+	if len(token) < 32 || len(token) > 14000 || strings.Contains(token, "~") {
+		return false
+	}
+	ciphertext, err := base64.RawURLEncoding.Strict().DecodeString(token)
+	if err != nil {
+		return false
+	}
+	data, err := s.options.Vault.Open(purpose, ciphertext)
+	if err != nil {
+		return false
+	}
+	defer clear(data)
+	return json.Unmarshal(data, destination) == nil
+}
+
+func validDownloadTicket(url string, expires, now int64) bool {
+	return expires > now && expires <= now+model.MaxDownloadTicketMinutes*60 && validCatalogFileURL(url)
 }
 
 func (s *server) operationDownload(w http.ResponseWriter, r *http.Request) {
@@ -143,26 +173,10 @@ func newCatalogFileClient() *http.Client {
 }
 
 func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-	if len(token) < 32 || len(token) > 14000 || strings.Contains(token, "~") {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	ciphertext, err := base64.RawURLEncoding.Strict().DecodeString(token)
-	if err != nil {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	data, err := s.options.Vault.Open(catalogFilePurpose, ciphertext)
-	if err != nil {
-		respondError(w, model.ErrNotFound)
-		return
-	}
-	defer clear(data)
 	var ticket catalogFileTicket
 	now := time.Now().Unix()
-	sessionID := r.Context().Value(sessionContextKey{}).(session).id
-	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && !model.IsDebridService(ticket.Service)) || ticket.Session != sessionID || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
+	sessionID := currentSession(r).id
+	if !s.openDownloadTicket(catalogFilePurpose, r.PathValue("token"), &ticket) || (ticket.Service != "" && !model.IsDebridService(ticket.Service)) || ticket.Session != sessionID || !validDownloadTicket(ticket.URL, ticket.Expires, now) {
 		respondError(w, model.ErrNotFound)
 		return
 	}

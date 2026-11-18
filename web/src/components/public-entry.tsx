@@ -7,16 +7,19 @@ import {
   preferenceManifestError,
 } from '@/lib/language-preferences'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Navigate, useLocation } from 'react-router-dom'
-import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
-import { PublicAnnounceFields, type PublicInfo } from '@/components/public-connection-fields'
+import {
+  PublicAnnounceFields,
+  useSessionExpired,
+  useVisitorConfig,
+  type PublicInfo,
+} from '@/components/public-connection-fields'
 import { PublicSharedCatalogEntry } from '@/components/public-shared-catalog-entry'
 import { PublicTorznabEntry } from '@/components/public-torznab-entry'
 import { PublicCredentialsForm } from '@/components/public-credentials-form'
@@ -32,12 +35,7 @@ export function PublicEntry({
   layout?: (content: ReactNode) => ReactNode
 }) {
   const location = useLocation()
-  const info = useQuery({
-    queryKey: ['public-config'],
-    queryFn: ({ signal }) => api<PublicInfo>('/public/config', { signal, cache: 'no-store' }),
-    refetchInterval: LIVE_REFRESH_INTERVAL,
-    retry: false,
-  })
+  const info = useVisitorConfig(false)
   if (info.isPending)
     return (
       <main className="mx-auto max-w-sm px-6 py-24">
@@ -94,11 +92,7 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
   useEffect(() => {
     setManifest('')
   }, [location.pathname])
-  useEffect(() => {
-    const clear = () => setManifest('')
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => setManifest(''))
   useEffect(() => {
     if (credential?.credential !== manifestCredential.current) setManifest('')
   }, [credential])

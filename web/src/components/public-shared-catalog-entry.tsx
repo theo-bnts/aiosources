@@ -3,7 +3,7 @@ import { LinkIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { CatalogEntities } from '@/lib/catalog-types'
-import type { PublicInfo } from '@/components/public-connection-fields'
+import { useSessionExpired, type PublicInfo } from '@/components/public-connection-fields'
 import { CatalogDataControls, CatalogPublishedFields } from '@/components/catalog-data-controls'
 import { SourceFilter } from '@/components/source-filter'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -29,15 +29,11 @@ export function PublicSharedCatalogEntry({
   const [error, setError] = useState<unknown>()
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
-  useEffect(() => {
-    const clear = () => {
-      request.current?.abort()
-      setPending(false)
-      setConnection(undefined)
-    }
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => {
+    request.current?.abort()
+    setPending(false)
+    setConnection(undefined)
+  })
   useEffect(() => {
     const allowed = new Set((info.sources ?? []).map((source) => source.id))
     const selected = options.sources ?? []

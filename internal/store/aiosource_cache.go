@@ -30,43 +30,50 @@ func (s *Store) SaveAIOResource(ctx context.Context, v model.AIOResource) error 
 INSERT INTO aiosources.aio_resources(service,account,resource,hashes,checked_at,last_attempt,retry) SELECT $1,$2,$3,$4,$5,$6,$7 FROM generation ON CONFLICT(service,account,resource) DO UPDATE SET hashes=EXCLUDED.hashes,checked_at=EXCLUDED.checked_at,last_attempt=EXCLUDED.last_attempt,retry=EXCLUDED.retry`, v.Service, v.Account, v.Key, v.Hashes, v.CheckedAt, v.LastAttempt, v.Retry, v.Generation)
 	return databaseError("save availability resource", err)
 }
-func (s *Store) AIOAvailability(ctx context.Context, service, account string, hashes []string, after time.Time) ([]model.AIOAvailability, error) {
-	rows, err := s.pool.Query(ctx, `SELECT hash,cached,checked_at,files FROM aiosources.aio_availability WHERE service=$1 AND account=$2 AND hash=ANY($3) AND checked_at>$4 AND checked_at<=now()`, service, account, hashes, after)
-	if err != nil {
-		return nil, databaseError("read availability", err)
-	}
+func scanAvailabilityRows(rows pgx.Rows, operation string) ([]model.AIOAvailability, error) {
 	defer rows.Close()
 	out := []model.AIOAvailability{}
 	for rows.Next() {
 		var v model.AIOAvailability
 		var files []byte
-		if err = rows.Scan(&v.Hash, &v.Cached, &v.CheckedAt, &files); err != nil {
-			return nil, databaseError("read availability", err)
+		if err := rows.Scan(&v.Hash, &v.Cached, &v.CheckedAt, &files); err != nil {
+			return nil, databaseError(operation, err)
 		}
-		if err = json.Unmarshal(files, &v.Files); err != nil {
-			return nil, databaseError("read availability", err)
+		if err := json.Unmarshal(files, &v.Files); err != nil {
+			return nil, databaseError(operation, err)
 		}
 		out = append(out, v)
 	}
-	return out, databaseError("read availability", rows.Err())
+	return out, databaseError(operation, rows.Err())
+}
+
+func marshalAvailabilityFiles(files []model.AIOFile) ([]byte, error) {
+	if files == nil {
+		files = []model.AIOFile{}
+	}
+	if len(files) > 10000 {
+		return nil, model.ErrInvalid
+	}
+	for i := range files {
+		if files[i].Size < 0 || len(files[i].Path) > 4096 || len(files[i].Link) > 8192 {
+			return nil, model.ErrInvalid
+		}
+	}
+	return json.Marshal(files)
+}
+
+func (s *Store) AIOAvailability(ctx context.Context, service, account string, hashes []string, after time.Time) ([]model.AIOAvailability, error) {
+	rows, err := s.pool.Query(ctx, `SELECT hash,cached,checked_at,files FROM aiosources.aio_availability WHERE service=$1 AND account=$2 AND hash=ANY($3) AND checked_at>$4 AND checked_at<=now()`, service, account, hashes, after)
+	if err != nil {
+		return nil, databaseError("read availability", err)
+	}
+	return scanAvailabilityRows(rows, "read availability")
 }
 func (s *Store) SaveAIOAvailability(ctx context.Context, service, account string, v model.AIOAvailability) error {
 	if service == "" || account == "" || v.Hash == "" || len(v.Hash) > 128 {
 		return model.ErrInvalid
 	}
-	files := v.Files
-	if files == nil {
-		files = []model.AIOFile{}
-	}
-	if len(files) > 10000 {
-		return model.ErrInvalid
-	}
-	for i := range files {
-		if files[i].Size < 0 || len(files[i].Path) > 4096 || len(files[i].Link) > 8192 {
-			return model.ErrInvalid
-		}
-	}
-	b, err := json.Marshal(files)
+	b, err := marshalAvailabilityFiles(v.Files)
 	if err != nil {
 		return err
 	}
@@ -93,18 +100,18 @@ func (s *Store) AddAIOCleanup(ctx context.Context, v model.AIOCleanup) error {
 func (s *Store) AIOCleanup(ctx context.Context, account string) ([]model.AIOCleanup, error) {
 	rows, err := s.pool.Query(ctx, `SELECT account,hash,magnet_id,failed FROM aiosources.aio_cleanup WHERE account=$1 ORDER BY created_at`, account)
 	if err != nil {
-		return nil, err
+		return nil, databaseError("read temporary magnet cleanup", err)
 	}
 	defer rows.Close()
 	out := []model.AIOCleanup{}
 	for rows.Next() {
 		var v model.AIOCleanup
 		if err = rows.Scan(&v.Account, &v.Hash, &v.ID, &v.Failed); err != nil {
-			return nil, err
+			return nil, databaseError("read temporary magnet cleanup", err)
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	return out, databaseError("read temporary magnet cleanup", rows.Err())
 }
 func (s *Store) FinishAIOCleanup(ctx context.Context, v model.AIOCleanup, success bool) error {
 	var err error
@@ -133,22 +140,22 @@ func (s *Store) AIOIncident(ctx context.Context, service string, active bool) er
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return databaseError("begin provider incident", err)
 	}
 	defer rollback(tx)
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, providerLockKey("aiosource-incident:"+service)); err != nil {
-		return err
+		return databaseError("lock provider incident", err)
 	}
 	var previous bool
 	err = tx.QueryRow(ctx, `SELECT active FROM aiosources.aio_incidents WHERE service=$1`, service).Scan(&previous)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return err
+		return databaseError("read provider incident", err)
 	}
 	if previous == active {
 		return nil
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_incidents(service,active) VALUES($1,$2) ON CONFLICT(service) DO UPDATE SET active=EXCLUDED.active,updated_at=now()`, service, active); err != nil {
-		return err
+		return databaseError("save provider incident", err)
 	}
 	event, err := newRunID()
 	if err != nil {
@@ -170,7 +177,7 @@ func (s *Store) AIOIncident(ctx context.Context, service string, active bool) er
 		}
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,title,message,service) VALUES($1,$2,'aiosource.incident',$3,$4,$5)`, "activity-"+event, level, title, message, logService); err != nil {
-		return err
+		return databaseError("record provider incident log", err)
 	}
 	return databaseError("record provider incident", tx.Commit(ctx))
 }

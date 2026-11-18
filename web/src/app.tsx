@@ -52,6 +52,7 @@ import type { Icon } from '@phosphor-icons/react'
 import {
   api,
   ApiError,
+  expireSession,
   queryClient,
   refreshLiveData,
   setCSRF,
@@ -70,7 +71,7 @@ import {
 } from '@/components/ui/dialog'
 import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/components/common'
 import { Login } from '@/components/login'
-import type { PublicInfo } from '@/components/public-connection-fields'
+import { useSessionExpired, useVisitorConfig } from '@/components/public-connection-fields'
 import { PublicEntry } from '@/components/public-entry'
 import { TrustedEntry } from '@/components/trusted-entry'
 
@@ -521,17 +522,13 @@ export function SessionGate({ children }: { children: ReactNode }) {
     refetchInterval: AUTO_REFRESH_INTERVAL,
     retry: false,
   })
-  useEffect(() => {
-    function expired() {
-      setCSRF()
-      queryClient.setQueryData<Session>(['session'], { authenticated: false })
-      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'session' })
-      queryClient.getMutationCache().clear()
-      void queryClient.cancelQueries()
-    }
-    window.addEventListener('session-expired', expired)
-    return () => window.removeEventListener('session-expired', expired)
-  }, [])
+  useSessionExpired(() => {
+    setCSRF()
+    queryClient.setQueryData<Session>(['session'], { authenticated: false })
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'session' })
+    queryClient.getMutationCache().clear()
+    void queryClient.cancelQueries()
+  })
   if (session.isPending)
     return (
       <div className="mx-auto max-w-lg px-6 py-24">
@@ -626,17 +623,7 @@ export function AppShell({
   authenticated?: boolean
   children?: ReactNode
 }) {
-  const publicInfo = useQuery({
-    queryKey: trustedMode ? ['trusted-config'] : ['public-config'],
-    queryFn: ({ signal }) =>
-      api<PublicInfo>(trustedMode ? '/trusted/config' : '/public/config', {
-        signal,
-        cache: 'no-store',
-      }),
-    enabled: publicMode,
-    refetchInterval: LIVE_REFRESH_INTERVAL,
-    retry: false,
-  })
+  const publicInfo = useVisitorConfig(trustedMode, publicMode)
   const baseGroups = publicMode
     ? [
         ...(publicInfo.data?.search_enabled ? [publicSearchNavigation] : []),
@@ -801,14 +788,10 @@ export function AppShell({
   }, [])
   const logout = useMutation({
     mutationFn: () => api<void>(trustedMode ? '/trusted/logout' : '/logout', { method: 'POST' }),
-    onSuccess: () => {
-      setCSRF()
-      window.dispatchEvent(new Event('session-expired'))
-    },
+    onSuccess: expireSession,
     onError: (error) => {
       if (error instanceof ApiError && error.status === 401) {
-        setCSRF()
-        window.dispatchEvent(new Event('session-expired'))
+        expireSession()
       }
     },
   })

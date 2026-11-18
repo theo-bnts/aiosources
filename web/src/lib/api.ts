@@ -28,6 +28,11 @@ export function setCSRF(token?: string) {
   csrfToken = token
 }
 
+export function expireSession() {
+  setCSRF()
+  window.dispatchEvent(new Event('session-expired'))
+}
+
 export function retryRead(count: number, error: unknown) {
   if (count >= 1 || (error instanceof Error && error.name === 'AbortError')) return false
   return (
@@ -79,8 +84,7 @@ function checkSessionExpiry() {
         queryClient.getQueryData(['session']) === previous &&
         csrfToken === previousCSRF
       ) {
-        setCSRF()
-        window.dispatchEvent(new Event('session-expired'))
+        expireSession()
       }
     } catch {
       /* An unavailable session store is not an expired session. */

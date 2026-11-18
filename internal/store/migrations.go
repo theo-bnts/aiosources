@@ -12,9 +12,23 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Keep the migration lock stable while supported release workers are replaced.
-const migrationLockNamespace int32 = 1768843109
-const migrationLockID int32 = 1
+// Keep the advisory lock namespace and object IDs stable across releases.
+// Global transaction lock order:
+//
+//	sourceDataLockID (5) -> historyCleanupLockID (4) -> catalogPublicationLockID (3)
+//	-> recipient rows (aio_public_access, public_catalog_policy, shares, trusted_users)
+//	-> aio_state -> catalogPolicyLockID (9) -> catalogEntityIndexLockID (8).
+const (
+	migrationLockNamespace   int32 = 1768843109
+	migrationLockID          int32 = 1
+	legacyImportLockID       int32 = 2
+	catalogPublicationLockID int32 = 3
+	historyCleanupLockID     int32 = 4
+	sourceDataLockID         int32 = 5
+	catalogEntityIndexLockID int32 = 8
+	catalogPolicyLockID      int32 = 9
+)
+
 const applicationSchema = "aiosources"
 const minimumSchemaVersion = 89 // The first AIOSources 2.3.0 release.
 

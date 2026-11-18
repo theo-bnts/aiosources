@@ -132,15 +132,25 @@ func (m *Manager) Start(ctx context.Context) error {
 	go func() {
 		m.workers.Wait()
 		m.mu.Lock()
-		m.closed = true
-		for subscriber := range m.subscribers {
-			close(subscriber)
-			delete(m.subscribers, subscriber)
-		}
-		close(m.done)
+		m.closeSubscribersLocked()
 		m.mu.Unlock()
 	}()
 	return nil
+}
+
+func (m *Manager) closeSubscribersLocked() {
+	m.closed = true
+	for subscriber := range m.subscribers {
+		close(subscriber)
+		delete(m.subscribers, subscriber)
+	}
+	close(m.done)
+}
+
+func (m *Manager) notifyRun(id string) {
+	m.Notify("run", id)
+	m.signalWork()
+	m.signalSchedule()
 }
 
 // Done closes after all workers and their source requests have stopped.
@@ -153,12 +163,7 @@ func (m *Manager) Close(ctx context.Context) error {
 	m.lifecycle.Lock()
 	m.mu.Lock()
 	if !m.started && !m.closed {
-		m.closed = true
-		for subscriber := range m.subscribers {
-			close(subscriber)
-			delete(m.subscribers, subscriber)
-		}
-		close(m.done)
+		m.closeSubscribersLocked()
 	}
 	cancel := m.cancel
 	m.mu.Unlock()
@@ -250,9 +255,7 @@ func (m *Manager) Enqueue(ctx context.Context, req model.StartRun) (model.Run, e
 	if err != nil {
 		return model.Run{}, err
 	}
-	m.signalWork()
-	m.signalSchedule()
-	m.Notify("run", run.ID)
+	m.notifyRun(run.ID)
 	return run, nil
 }
 
@@ -266,9 +269,7 @@ func (m *Manager) Pause(ctx context.Context, id string) (model.Run, error) {
 	}
 	// Do not cancel the attempt: its current observation and checkpoint must
 	// commit before the durable hold is acknowledged as paused.
-	m.Notify("run", id)
-	m.signalWork()
-	m.signalSchedule()
+	m.notifyRun(id)
 	return run, nil
 }
 
@@ -293,9 +294,7 @@ func (m *Manager) Cancel(ctx context.Context, id string) (model.Run, error) {
 			attempt.cancel(errCancelled)
 		}
 	}
-	m.Notify("run", id)
-	m.signalWork()
-	m.signalSchedule()
+	m.notifyRun(id)
 	return run, nil
 }
 
@@ -327,9 +326,7 @@ func (m *Manager) Resume(ctx context.Context, id string) (model.Run, error) {
 	if err != nil {
 		return model.Run{}, err
 	}
-	m.signalWork()
-	m.signalSchedule()
-	m.Notify("run", id)
+	m.notifyRun(id)
 	return run, nil
 }
 

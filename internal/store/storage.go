@@ -16,6 +16,20 @@ func lockSourceData(ctx context.Context, tx pgx.Tx) error {
 	return databaseError("lock source data admission", err)
 }
 
+func lockSourceDataExclusive(ctx context.Context, tx pgx.Tx, operation string) error {
+	var locked bool
+	if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(1768843109,5)`).Scan(&locked); err != nil {
+		return databaseError(operation, err)
+	}
+	if !locked {
+		return model.ErrBusy
+	}
+	// Retention locks diagnostic tables before publication. Wait for it before
+	// taking that lock or attempting TRUNCATE, using the same transaction order.
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,4)`)
+	return databaseError("wait for source history cleanup", err)
+}
+
 func (s *Store) StorageOverview(ctx context.Context) (model.StorageOverview, error) {
 	var result model.StorageOverview
 	var options []byte
@@ -98,17 +112,8 @@ func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {
 		return databaseError("begin source data reset", err)
 	}
 	defer rollback(tx)
-	var locked bool
-	if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(1768843109,5)`).Scan(&locked); err != nil {
-		return databaseError("lock source data reset", err)
-	}
-	if !locked {
-		return model.ErrBusy
-	}
-	// Retention locks diagnostic tables before publication. Wait for it before
-	// taking that lock or attempting TRUNCATE, using the same transaction order.
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,4)`); err != nil {
-		return databaseError("wait for source history cleanup", err)
+	if err := lockSourceDataExclusive(ctx, tx, "lock source data reset"); err != nil {
+		return err
 	}
 	var saved int64
 	if err := tx.QueryRow(ctx, `SELECT revision FROM aiosources.storage_settings WHERE singleton FOR UPDATE`).Scan(&saved); err != nil {

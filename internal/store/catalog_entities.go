@@ -19,12 +19,19 @@ func lockCatalogEntityWrites(ctx context.Context, tx pgx.Tx) error {
 	return databaseError("lock shared data publication", err)
 }
 
+// lockCatalogPolicy serializes catalog export policy changes after native
+// publication (3) and before recipient rows or metadata entity writes (9).
+func lockCatalogPolicy(ctx context.Context, tx pgx.Tx, operation string) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`)
+	return databaseError(operation, err)
+}
+
 func seedCatalogEntities(ctx context.Context, tx pgx.Tx, share model.Share) error {
 	if share.Format != "catalog" || !share.Enabled || !share.CatalogEntities.Metadata {
 		return nil
 	}
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,8)`); err != nil {
-		return err
+		return databaseError("lock shared metadata initialization", err)
 	}
 	if share.CatalogEntities.Metadata {
 		_, err := tx.Exec(ctx, `INSERT INTO aiosources.catalog_entity_changes(kind,identity,changed_tx)
@@ -62,14 +69,14 @@ ORDER BY c.changed_tx,c.kind||':'||c.identity LIMIT $8`, state.AuxLow, state.Aux
 		var e entry
 		if err = rows.Scan(&e.kind, &e.key, &e.tx); err != nil {
 			rows.Close()
-			return false, err
+			return false, databaseError("read shared metadata supplement", err)
 		}
 		entries = append(entries, e)
 	}
 	err = rows.Err()
 	rows.Close()
 	if err != nil {
-		return false, err
+		return false, databaseError("read shared metadata supplement", err)
 	}
 	more := len(entries) > limit
 	if more {
@@ -86,7 +93,7 @@ ORDER BY c.changed_tx,c.kind||':'||c.identity LIMIT $8`, state.AuxLow, state.Aux
 					state.AuxAfter, state.AuxIdentity = e.tx, e.kind+":"+e.key
 					continue
 				}
-				return false, err
+				return false, databaseError("read shared metadata work", err)
 			}
 			m := model.CatalogWork(w, updated)
 			if m.Valid(time.Now()) {

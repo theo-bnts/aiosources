@@ -185,6 +185,7 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 				return err
 			}
 			value = strings.TrimSuffix(string(data), "\n")
+			clear(data)
 		}
 		fmt.Println(value)
 		return nil

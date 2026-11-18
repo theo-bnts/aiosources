@@ -45,38 +45,19 @@ func ProbeEdition(line []byte) (Edition, error) {
 	var archive string
 	_ = json.Unmarshal(fields.Archive, &archive)
 	_ = json.Unmarshal(fields.Format, &e.Format)
-	rows := func(raw json.RawMessage) []json.RawMessage {
-		var out []json.RawMessage
-		_ = json.Unmarshal(raw, &out)
-		return out
-	}
-	sources := []string{}
-	for _, raw := range rows(fields.Sources) {
-		var v string
-		if json.Unmarshal(raw, &v) == nil {
-			sources = append(sources, v)
-		}
-	}
+	sources := decodeJSONStrings(fields.Sources)
 	e.Digital = digitalEvidence(e.Format, archive, sources)
-	for _, raw := range rows(fields.Languages) {
-		var ref reference
-		if json.Unmarshal(raw, &ref) != nil {
-			continue
-		}
+	for _, ref := range decodeJSONReferences(fields.Languages) {
 		if value := editionLanguage(ref.Key); value != "" && !slices.Contains(e.Languages, value) && len(e.Languages) < 30 {
 			e.Languages = append(e.Languages, value)
 		}
 	}
-	for _, raw := range append(rows(fields.ISBN10), rows(fields.ISBN13)...) {
-		var v string
-		_ = json.Unmarshal(raw, &v)
+	for _, v := range append(decodeJSONStrings(fields.ISBN10), decodeJSONStrings(fields.ISBN13)...) {
 		if isbn := ISBN(v); isbn != "" && !slices.Contains(e.ISBN, isbn) && len(e.ISBN) < 50 {
 			e.ISBN = append(e.ISBN, isbn)
 		}
 	}
-	for _, raw := range rows(fields.Works) {
-		var ref reference
-		_ = json.Unmarshal(raw, &ref)
+	for _, ref := range decodeJSONReferences(fields.Works) {
 		if key := Key(ref.Key); strings.HasSuffix(key, "W") && !slices.Contains(e.Works, key) && len(e.Works) < 20 {
 			e.Works = append(e.Works, key)
 		}
@@ -84,9 +65,7 @@ func ProbeEdition(line []byte) (Edition, error) {
 	if len(e.Works) == 0 {
 		e.Works = []string{e.ID}
 	}
-	for _, raw := range rows(fields.Authors) {
-		var ref reference
-		_ = json.Unmarshal(raw, &ref)
+	for _, ref := range decodeJSONReferences(fields.Authors) {
 		if key := Key(ref.Key); strings.HasSuffix(key, "A") && !slices.Contains(e.Authors, key) && len(e.Authors) < 100 {
 			e.Authors = append(e.Authors, key)
 		}

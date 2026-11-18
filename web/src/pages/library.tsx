@@ -537,21 +537,19 @@ export function RawDetailPage() {
         </TabsList>
         <TabsContent value="original" className="mt-5 space-y-3">
           {payloadRetained ? (
-            <>
-              <CodeEditor
-                value={raw ?? ''}
-                language={language}
-                label="Original record content"
-                help={
-                  <>
-                    Text view without reformatting. The download preserves the original bytes,
-                    including non-text data.
-                  </>
-                }
-                height="600px"
-                readOnly
-              />
-            </>
+            <CodeEditor
+              value={raw ?? ''}
+              language={language}
+              label="Original record content"
+              help={
+                <>
+                  Text view without reformatting. The download preserves the original bytes,
+                  including non-text data.
+                </>
+              }
+              height="600px"
+              readOnly
+            />
           ) : (
             <p className="notice">Original content was not stored for this record.</p>
           )}
@@ -567,21 +565,19 @@ export function RawDetailPage() {
               </InfoTip>
             </div>
           ) : (
-            <>
-              <CodeEditor
-                value={exactJSON(record.fields)}
-                language="json"
-                label="Interpreted record fields"
-                help={
-                  <>
-                    Parsed fields are separate from raw payloads. Missing values are not replaced by
-                    zero.
-                  </>
-                }
-                height="460px"
-                readOnly
-              />
-            </>
+            <CodeEditor
+              value={exactJSON(record.fields)}
+              language="json"
+              label="Interpreted record fields"
+              help={
+                <>
+                  Parsed fields are separate from raw payloads. Missing values are not replaced by
+                  zero.
+                </>
+              }
+              height="460px"
+              readOnly
+            />
           )}
         </TabsContent>
       </Tabs>

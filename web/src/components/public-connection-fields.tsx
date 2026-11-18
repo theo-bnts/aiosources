@@ -1,11 +1,38 @@
 import { TrashIcon } from '@phosphor-icons/react'
+import { useQuery } from '@tanstack/react-query'
+import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import type { CatalogEntities } from '@/lib/catalog-types'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePublicCredential } from '@/lib/public-credentials'
+
+export function useSessionExpired(onExpired?: () => void) {
+  const handler = useRef(onExpired)
+  handler.current = onExpired
+  useEffect(() => {
+    if (!handler.current) return
+    const listener = () => handler.current?.()
+    window.addEventListener('session-expired', listener)
+    return () => window.removeEventListener('session-expired', listener)
+  }, [])
+}
+
+export function useVisitorConfig(trusted = false, enabled = true) {
+  return useQuery({
+    queryKey: trusted ? ['trusted-config'] : ['public-config'],
+    queryFn: ({ signal }) =>
+      api<PublicInfo>(trusted ? '/trusted/config' : '/public/config', {
+        signal,
+        cache: 'no-store',
+      }),
+    enabled,
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+    retry: false,
+  })
+}
 
 // Clear personal inputs without resetting the controlled, non-secret filters.
 export function clearPublicCredentials(form: HTMLFormElement) {

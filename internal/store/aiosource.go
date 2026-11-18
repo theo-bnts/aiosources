@@ -6,7 +6,6 @@ import (
 	"errors"
 	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,15 +103,8 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 			return model.ErrConflict
 		}
 	}
-	sort.Strings(refs)
-	for _, ref := range refs {
-		if ref == "" {
-			continue
-		}
-		var name string
-		if err = tx.QueryRow(ctx, `SELECT name FROM aiosources.secrets WHERE name=$1 FOR KEY SHARE`, ref).Scan(&name); err != nil {
-			return databaseError("lock configured secret", err)
-		}
+	if err = lockSecretReferences(ctx, tx, refs, nil, "lock configured secret"); err != nil {
+		return err
 	}
 	tag, err := tx.Exec(ctx, `INSERT INTO aiosources.settings(key,value) SELECT 'aiosource.config.v2',$1 WHERE $2::bigint=1 OR EXISTS(SELECT 1 FROM aiosources.settings WHERE key='aiosource.config.v2') ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value WHERE (aiosources.settings.value::jsonb->>'revision')::bigint=$2`, string(b), expected)
 	if err != nil {

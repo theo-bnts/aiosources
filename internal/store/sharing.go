@@ -115,10 +115,11 @@ func ValidateShare(input model.ShareInput) error {
 	return nil
 }
 
-func scanShare(row scanner) (model.Share, error) {
+func scanShare(row scanner, extra ...any) (model.Share, error) {
 	var item model.Share
 	var preferences, torznabPreferences, entities []byte
-	err := row.Scan(&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes, &preferences, &torznabPreferences, &entities)
+	dest := append([]any{&item.ID, &item.Name, &item.Enabled, &item.Scope, &item.SourceIDs, &item.Fields, &item.Revision, &item.CreatedAt, &item.UpdatedAt, &item.LastAccessAt, &item.LastSyncAt, &item.ExpiresAt, &item.RequestsPerMinute, &item.MaxConcurrentDownloads, &item.Format, &item.MediaTypes, &preferences, &torznabPreferences, &entities}, extra...)
+	err := row.Scan(dest...)
 	if err == nil && item.Format == "stremio" {
 		var p model.StreamPreferences
 		err = json.Unmarshal(preferences, &p)
@@ -221,7 +222,7 @@ func (s *Store) CreateShare(ctx context.Context, input model.ShareInput) (model.
 		return result, databaseError("begin share creation", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
+	if err = lockCatalogPolicy(ctx, tx, "lock share publication policy"); err != nil {
 		return model.ShareCredential{}, err
 	}
 	result.Share, err = scanShare(tx.QueryRow(ctx, `INSERT INTO aiosources.shares(id,name,enabled,scope,source_ids,fields,password_hash,expires_at,requests_per_minute,max_concurrent_downloads,format,media_types,stream_preferences,torznab_preferences,catalog_entities) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,COALESCE($14::jsonb,'{}'::jsonb),$15::jsonb) RETURNING `+shareColumns, id, input.Name, input.Enabled, input.Scope, input.SourceIDs, input.Fields, hash, input.ExpiresAt, requests, concurrent, shareFormat(input.Format), input.MediaTypes, sharePreferencesJSON(input), torznabPreferencesJSON(input), catalogEntitiesJSON(input.CatalogEntities)))
@@ -247,8 +248,8 @@ func lockShareRevision(ctx context.Context, tx pgx.Tx, id string, expected int64
 	}
 	// Policy triggers and source resets use publication before recipient rows.
 	// Acquiring it before the revision lock avoids a cycle with snapshot cleanup.
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
-		return databaseError("lock share publication policy", err)
+	if err := lockCatalogPolicy(ctx, tx, "lock share publication policy"); err != nil {
+		return err
 	}
 	var revision int64
 	if err := tx.QueryRow(ctx, "SELECT revision FROM aiosources.shares WHERE id=$1 FOR UPDATE", id).Scan(&revision); err != nil {

@@ -311,13 +311,10 @@ func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *ope
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "AIOSources/"+Version)
-	client := *s.GameHTTP
-	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
+	client, err := s.prepareOutgoingClient(ctx, s.GameHTTP, "metadata_seconds", false)
 	if err != nil {
 		return "", err
 	}
-	client.Timeout = timeout
 	started := time.Now()
 	res, err := client.Do(req)
 	status := 0
@@ -382,15 +379,10 @@ func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationH
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "text/plain")
 		req.Header.Set("User-Agent", "AIOSources/"+Version)
-		client := *s.GameHTTP
-		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-		timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
+		client, err := s.prepareOutgoingClient(ctx, s.GameHTTP, "metadata_seconds", false)
 		if err != nil {
 			return err
 		}
-		client.Timeout = timeout
 		started := time.Now()
 		res, err := client.Do(req)
 		status := 0

@@ -59,13 +59,19 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("GET /stremio/{token}/stream/{type}/{id}", s.aioProtect(s.aioStreams))
 	mux.HandleFunc("GET /stremio/{token}/play/{service}/{provider}/{source}/{type}/{id}", s.aioProtect(s.aioPlayback))
-	mux.HandleFunc("OPTIONS /stremio/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.WriteHeader(204)
-	})
-	mux.HandleFunc("/stremio/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "Addon route not found") })
+	mux.HandleFunc("OPTIONS /stremio/{rest...}", stremioOptions)
+	mux.HandleFunc("/stremio/", stremioNotFound)
+}
+
+func stremioOptions(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.WriteHeader(204)
+}
+
+func stremioNotFound(w http.ResponseWriter, _ *http.Request) {
+	writeError(w, 404, "Addon route not found")
 }
 
 func (s *server) aioMatches(w http.ResponseWriter, r *http.Request) {

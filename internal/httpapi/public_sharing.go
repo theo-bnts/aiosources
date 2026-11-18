@@ -20,16 +20,10 @@ func (s *server) registerPublicSharing(mux *http.ServeMux) {
 			respondError(w, err)
 			return
 		}
-		providers, err := s.options.Providers.List()
+		sources, _, err := s.validSharingSources()
 		if err != nil {
 			respondError(w, err)
 			return
-		}
-		sources := []sharingSource{}
-		for _, p := range providers {
-			if p.Valid {
-				sources = append(sources, sharingSource{ID: p.ID, Name: p.Name})
-			}
 		}
 		writeJSON(w, 200, map[string]any{"policy": policy, "fields": store.CatalogFields(), "sources": sources})
 	}))
@@ -39,14 +33,10 @@ func (s *server) registerPublicSharing(mux *http.ServeMux) {
 			return
 		}
 		if len(policy.Sources) > 0 {
-			providers, err := s.options.Providers.List()
+			_, valid, err := s.validSharingSources()
 			if err != nil {
 				respondError(w, err)
 				return
-			}
-			valid := make(map[string]bool, len(providers))
-			for _, provider := range providers {
-				valid[provider.ID] = provider.Valid
 			}
 			for _, id := range policy.Sources {
 				if !valid[id] {
@@ -66,7 +56,7 @@ func (s *server) registerPublicSharing(mux *http.ServeMux) {
 			writeError(w, 404, "Public access is disabled")
 			return
 		}
-		if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin {
+		if !s.hasPublicOrigin(r) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
@@ -118,13 +108,8 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	authorizations := r.Header.Values("Authorization")
-	if len(authorizations) != 1 {
-		catalogFeedError(w, store.ErrCatalogAuthentication)
-		return
-	}
-	parts := strings.Fields(authorizations[0])
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+	password, ok := bearerPassword(r)
+	if !ok {
 		catalogFeedError(w, store.ErrCatalogAuthentication)
 		return
 	}
@@ -144,7 +129,7 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 	var grant model.PublicCatalogGrant
 	if trusted {
 		var connection aiosource.TrustedConnection
-		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "catalog", parts[1])
+		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "catalog", password)
 		if err == nil {
 			configuration, e := aiosource.EncodePublicCatalogOptions(connection.Catalog)
 			if e != nil || configuration != r.PathValue("configuration") {
@@ -154,7 +139,7 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		grant, err = s.options.AIOSource.OpenPublicCatalog(ctx, s.auth.origin, r.PathValue("configuration"), parts[1])
+		grant, err = s.options.AIOSource.OpenPublicCatalog(ctx, s.auth.origin, r.PathValue("configuration"), password)
 	}
 	if err != nil {
 		if errors.Is(err, aiosource.ErrAuth) || errors.Is(err, model.ErrNotFound) {

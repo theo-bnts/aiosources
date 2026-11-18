@@ -49,16 +49,7 @@ func (s *Service) CatalogTorrents(ctx context.Context, opts model.ListOptions, f
 		}
 		defer clear(announces)
 		if !policy.CachedOnly {
-			for id, tracker := range config.Trackers {
-				if !tracker.Private || announces[id] != "" {
-					policy.UncachedSources = append(policy.UncachedSources, id)
-				}
-			}
-			for id := range announces {
-				if !slices.Contains(policy.UncachedSources, id) {
-					policy.UncachedSources = append(policy.UncachedSources, id)
-				}
-			}
+			policy.UncachedSources = uncachedAccessibleSources(config, announces)
 		}
 		if len(visitor.Preferences.Sources) > 0 {
 			if opts.ProviderID != "" {

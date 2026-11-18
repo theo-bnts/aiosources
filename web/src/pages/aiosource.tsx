@@ -1032,15 +1032,13 @@ export default function AIOSourcePage({
         </>
       )}
       {section === 'stremio' && (
-        <>
-          <SharingPage
-            format="stremio"
-            services={[
-              ...debridProviders.filter((provider) => config[provider.secret]),
-              { id: 'direct', name: 'Direct torrents' },
-            ]}
-          />
-        </>
+        <SharingPage
+          format="stremio"
+          services={[
+            ...debridProviders.filter((provider) => config[provider.secret]),
+            { id: 'direct', name: 'Direct torrents' },
+          ]}
+        />
       )}
       {section === 'debrid' && (
         <>

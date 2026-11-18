@@ -47,28 +47,23 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		value := input.PublicAccess
-		if input.StremioEnabled != nil {
-			value.StremioEnabled = *input.StremioEnabled
-		} else {
+		if input.StremioEnabled == nil || input.CatalogEnabled == nil {
 			// A settings form opened before the upgrade must not revoke Stremio
-			// merely because it does not yet contain the new control.
+			// or catalog access merely because it does not yet contain the new control.
 			current, err := s.options.Store.PublicAccess(r.Context())
 			if err != nil {
 				respondError(w, err)
 				return
 			}
-			value.StremioEnabled = current.StremioEnabled
-		}
-		if input.CatalogEnabled != nil {
-			value.CatalogEnabled = *input.CatalogEnabled
-		} else {
-			current, err := s.options.Store.PublicAccess(r.Context())
-			if err != nil {
-				respondError(w, err)
-				return
+			if input.StremioEnabled == nil {
+				input.StremioEnabled = &current.StremioEnabled
 			}
-			value.CatalogEnabled = current.CatalogEnabled
+			if input.CatalogEnabled == nil {
+				input.CatalogEnabled = &current.CatalogEnabled
+			}
 		}
+		value.StremioEnabled = *input.StremioEnabled
+		value.CatalogEnabled = *input.CatalogEnabled
 		if value.Enabled && !s.publicOriginAllowed() {
 			writeError(w, 400, "Set PUBLIC_URL to the external HTTPS origin before enabling public access.")
 			return
@@ -97,8 +92,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
 		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled}
+		var allSources []aiosource.PublicPrivateSource
 		if enabled {
-			allSources, e := s.options.AIOSource.PublicSources(ctx)
+			var e error
+			allSources, e = s.options.AIOSource.PublicSources(ctx)
 			if e != nil {
 				respondError(w, e)
 				return
@@ -128,26 +125,10 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			info["providers"] = providers
 		}
 		if enabled && value.CatalogEnabled {
-			policy, e := s.options.Store.PublicCatalogPolicy(ctx)
-			if e != nil {
-				respondError(w, e)
+			if err := s.populateCatalogPolicyConfig(ctx, info, allSources); err != nil {
+				respondError(w, err)
 				return
 			}
-			info["catalog_fields"] = policy.Fields
-			info["catalog_revision"] = policy.Revision
-			info["catalog_entities"] = policy.CatalogEntities
-			all, e := s.options.AIOSource.PublicSources(ctx)
-			if e != nil {
-				respondError(w, e)
-				return
-			}
-			permitted := []aiosource.PublicPrivateSource{}
-			for _, source := range all {
-				if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
-					permitted = append(permitted, source)
-				}
-			}
-			info["catalog_sources"] = permitted
 		}
 		writeJSON(w, 200, info)
 	})
@@ -157,7 +138,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				writeError(w, 404, "Public access is disabled")
 				return
 			}
-			if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin {
+			if !s.hasPublicOrigin(r) {
 				writeError(w, 403, "Request origin is not allowed")
 				return
 			}
@@ -316,13 +297,31 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		}
 		http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 	}))
-	mux.HandleFunc("OPTIONS /public/stremio/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.WriteHeader(204)
-	})
-	mux.HandleFunc("/public/stremio/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "Addon route not found") })
+	mux.HandleFunc("OPTIONS /public/stremio/{rest...}", stremioOptions)
+	mux.HandleFunc("/public/stremio/", stremioNotFound)
+}
+
+func (s *server) hasPublicOrigin(r *http.Request) bool {
+	origins := r.Header.Values("Origin")
+	return len(origins) == 1 && origins[0] == s.auth.origin
+}
+
+func (s *server) populateCatalogPolicyConfig(ctx context.Context, info map[string]any, sources []aiosource.PublicPrivateSource) error {
+	policy, err := s.options.Store.PublicCatalogPolicy(ctx)
+	if err != nil {
+		return err
+	}
+	info["catalog_fields"] = policy.Fields
+	info["catalog_revision"] = policy.Revision
+	info["catalog_entities"] = policy.CatalogEntities
+	permitted := []aiosource.PublicPrivateSource{}
+	for _, source := range sources {
+		if len(policy.Sources) == 0 || slices.Contains(policy.Sources, source.ID) {
+			permitted = append(permitted, source)
+		}
+	}
+	info["catalog_sources"] = permitted
+	return nil
 }
 
 func publicCredentialError(w http.ResponseWriter, err error) {

@@ -125,30 +125,8 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 	// Optional historical fields are not uniformly typed across all editions.
 	// Keep the valid bibliographic core and ignore malformed optional values.
 	text := func(key string) string { var out string; _ = json.Unmarshal(fields[key], &out); return out }
-	stringsFor := func(key string) []string {
-		var rows []json.RawMessage
-		_ = json.Unmarshal(fields[key], &rows)
-		out := []string{}
-		for _, row := range rows {
-			var value string
-			if json.Unmarshal(row, &value) == nil {
-				out = append(out, value)
-			}
-		}
-		return out
-	}
-	references := func(key string) []reference {
-		var rows []json.RawMessage
-		_ = json.Unmarshal(fields[key], &rows)
-		out := []reference{}
-		for _, row := range rows {
-			var ref reference
-			if json.Unmarshal(row, &ref) == nil {
-				out = append(out, ref)
-			}
-		}
-		return out
-	}
+	stringsFor := func(key string) []string { return decodeJSONStrings(fields[key]) }
+	references := func(key string) []reference { return decodeJSONReferences(fields[key]) }
 	var authorsRaw []json.RawMessage
 	_ = json.Unmarshal(fields["authors"], &authorsRaw)
 	var covers []json.RawMessage
@@ -256,4 +234,30 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 		return Record{Edition: &e}, nil
 	}
 	return Record{}, nil
+}
+
+func decodeJSONStrings(raw json.RawMessage) []string {
+	var rows []json.RawMessage
+	_ = json.Unmarshal(raw, &rows)
+	out := []string{}
+	for _, row := range rows {
+		var value string
+		if json.Unmarshal(row, &value) == nil {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func decodeJSONReferences(raw json.RawMessage) []reference {
+	var rows []json.RawMessage
+	_ = json.Unmarshal(raw, &rows)
+	out := []reference{}
+	for _, row := range rows {
+		var ref reference
+		if json.Unmarshal(row, &ref) == nil {
+			out = append(out, ref)
+		}
+	}
+	return out
 }

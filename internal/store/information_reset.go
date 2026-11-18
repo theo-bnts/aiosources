@@ -80,7 +80,7 @@ ON CONFLICT DO NOTHING`); err != nil {
 		return err
 	}
 	if _, err = tx.Exec(ctx, `ANALYZE reset_information_records;`); err != nil {
-		return err
+		return databaseError("analyze related cache records", err)
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_hashes
 SELECT hash FROM reset_information_records WHERE hash IS NOT NULL
@@ -89,7 +89,7 @@ ON CONFLICT DO NOTHING`, resources); err != nil {
 		return databaseError("select related cache hashes", err)
 	}
 	if _, err = tx.Exec(ctx, `ANALYZE reset_information_hashes;`); err != nil {
-		return err
+		return databaseError("analyze related cache hashes", err)
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO reset_information_operations
 SELECT r.id FROM aiosources.operation_runs r WHERE (r.kind='metadata' AND r.service=ANY($1::text[]))
@@ -113,14 +113,14 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 		var key int64
 		if err = rows.Scan(&key); err != nil {
 			rows.Close()
-			return err
+			return databaseError("read related operation locks", err)
 		}
 		keys = append(keys, key)
 	}
 	err = rows.Err()
 	rows.Close()
 	if err != nil {
-		return err
+		return databaseError("read related operation locks", err)
 	}
 	for _, key := range keys {
 		var locked bool
@@ -171,7 +171,7 @@ sync_failures=0,sync_error='',recovery_started_at=NULL,applied_through=NULL;`); 
 	}
 	if scope == "games" || scope == "metadata" {
 		if _, err = tx.Exec(ctx, `UPDATE aiosources.igdb_state SET complete=FALSE,works=0,processed=0,total=0,phase='initial',after_id=0,generation=generation+1,started_at=NULL,last_sync=NULL,changes_through=NULL,last_reconciliation=NULL,retry_at=NULL,error='' WHERE singleton`); err != nil {
-			return err
+			return databaseError("reset game information", err)
 		}
 	}
 	if scope == "metadata" {
@@ -183,10 +183,10 @@ UPDATE aiosources.aio_state SET last_match=NULL;`); err != nil {
 		}
 	}
 	if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,cache_generation=cache_generation+1;`); err != nil {
-		return err
+		return databaseError("advance information generation", err)
 	}
 	if err = notify(ctx, tx); err != nil {
-		return err
+		return databaseError("notify information reset", err)
 	}
 	return databaseError("commit information reset", tx.Commit(ctx))
 }
@@ -217,7 +217,7 @@ LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 			record, err := scanAIORecord(aioStreamRow{scanner: rows, ids: []any{&kind, &decision}})
 			if err != nil {
 				rows.Close()
-				return err
+				return databaseError("read related cache records", err)
 			}
 			count++
 			if kind == "" {
@@ -236,7 +236,7 @@ LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
-			return err
+			return databaseError("read related cache records", err)
 		}
 		if len(providers) > 0 {
 			if _, err = tx.Exec(ctx, `INSERT INTO reset_information_records

@@ -39,8 +39,12 @@ func (v *Vault) Open(purpose string, envelope []byte) ([]byte, error) {
 }
 
 func internalPurpose(purpose string) bool {
-	if purpose == "trusted-connection-v1" {
+	switch purpose {
+	case "trusted-connection-v1", "public-catalog-v1", "provider-preparation-v1",
+		"public-catalog-source-v1", "public-catalog-preparation-v1", "public-catalog-file-v1",
+		"catalog-browser-download-v1", "public-installation-v1", "public-playback-v1", "public-torznab-v1":
 		return true
+	default:
+		return false
 	}
-	return purpose == "public-catalog-v1" || purpose == "provider-preparation-v1" || purpose == "public-catalog-source-v1" || purpose == "public-catalog-preparation-v1" || purpose == "public-catalog-file-v1" || purpose == "catalog-browser-download-v1" || purpose == "public-installation-v1" || purpose == "public-playback-v1" || purpose == "public-torznab-v1"
 }

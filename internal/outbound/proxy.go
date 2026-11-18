@@ -18,7 +18,14 @@ import (
 func proxyDialer(endpoint *url.URL, username, password string) (DialFunc, error) {
 	port := endpoint.Port()
 	if port == "" {
-		port = map[string]string{"http": "80", "https": "443", "socks5": "1080", "socks5h": "1080"}[endpoint.Scheme]
+		switch endpoint.Scheme {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		case "socks5", "socks5h":
+			port = "1080"
+		}
 	}
 	address := net.JoinHostPort(endpoint.Hostname(), port)
 	direct := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
@@ -43,6 +50,10 @@ func proxyDialer(endpoint *url.URL, username, password string) (DialFunc, error)
 	} else {
 		if strings.Contains(username, ":") {
 			return nil, ErrUnavailable
+		}
+		proxyAuth := ""
+		if username != "" {
+			proxyAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
 		}
 		connect = func(ctx context.Context, network, target string) (net.Conn, error) {
 			conn, err := direct.DialContext(ctx, network, address)
@@ -73,8 +84,8 @@ func proxyDialer(endpoint *url.URL, username, password string) (DialFunc, error)
 				conn = secure
 			}
 			req := &http.Request{Method: http.MethodConnect, URL: &url.URL{Opaque: target}, Host: target, Header: make(http.Header)}
-			if username != "" {
-				req.Header.Set("Proxy-Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+			if proxyAuth != "" {
+				req.Header.Set("Proxy-Authorization", proxyAuth)
 			}
 			if err := req.Write(conn); err != nil {
 				return nil, err

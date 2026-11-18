@@ -496,35 +496,13 @@ func (c *torznabConnector) record(source sdk.RawItem) model.Record {
 	} else if id == "" && item.Link != "" {
 		// A download URL can rotate passkeys. Only a credential-free link is
 		// suitable as a fallback identity; do not hash changing signed URLs.
-		link, err := url.Parse(item.Link)
-		if err == nil && validHTTPURL(link) {
-			private := c.client.containsURLSecret(link)
-			for name := range link.Query() {
-				if sensitiveName(name) || (c.provider.Auth.Name != "" && strings.EqualFold(name, c.provider.Auth.Name)) {
-					private = true
-				}
-			}
-			if !private {
-				id = item.Link
-			}
+		if link, err := url.Parse(item.Link); err == nil && validHTTPURL(link) && !c.client.hasCredentialURL(item.Link, c.provider.Auth.Name) {
+			id = item.Link
 		}
 	}
 	if id != "" {
-		if c.client.containsSecret(id) {
+		if c.client.containsSecret(id) || (c.idPattern == nil && c.client.hasCredentialURL(id, c.provider.Auth.Name)) {
 			id = ""
-		} else if c.idPattern == nil {
-			if u, err := url.Parse(id); err == nil && validHTTPURL(u) {
-				if c.client.containsURLSecret(u) {
-					id = ""
-				} else {
-					for name := range u.Query() {
-						if sensitiveName(name) || (c.provider.Auth.Name != "" && strings.EqualFold(name, c.provider.Auth.Name)) {
-							id = ""
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 	for _, key := range []string{"link", "guid", "comments", "magnet_url"} {
@@ -532,23 +510,8 @@ func (c *torznabConnector) record(source sdk.RawItem) model.Record {
 		if value == "" {
 			continue
 		}
-		if c.client.containsSecret(value) {
+		if c.client.containsSecret(value) || (key == "link" && c.client.hasCredentialURL(value, c.provider.Auth.Name)) {
 			delete(fields, key)
-			continue
-		}
-		if key == "link" {
-			if u, err := url.Parse(value); err == nil && validHTTPURL(u) {
-				if c.client.containsURLSecret(u) {
-					delete(fields, key)
-					continue
-				}
-				for name := range u.Query() {
-					if sensitiveName(name) || (c.provider.Auth.Name != "" && strings.EqualFold(name, c.provider.Auth.Name)) {
-						delete(fields, key)
-						break
-					}
-				}
-			}
 		}
 	}
 	record := model.Record{SourceID: id, Raw: source.Body, ContentType: "application/xml", Fields: fields}

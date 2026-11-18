@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -80,15 +78,8 @@ func (s *Store) UpdateNetworkSettings(ctx context.Context, input model.NetworkSe
 			references = append(references, proxy.UsernameRef, proxy.PasswordRef)
 		}
 	}
-	slices.Sort(references)
-	for _, reference := range slices.Compact(references) {
-		var name string
-		if err := tx.QueryRow(ctx, `SELECT name FROM aiosources.secrets WHERE name=$1 FOR KEY SHARE`, reference).Scan(&name); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return model.ErrInvalid
-			}
-			return databaseError("lock proxy credential", err)
-		}
+	if err := lockSecretReferences(ctx, tx, references, model.ErrInvalid, "lock proxy credential"); err != nil {
+		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE aiosources.network_settings SET revision=revision+1,default_route=$1,proxies=$2,overrides=$3,incoming=COALESCE($4,incoming),public_limits=COALESCE($5,public_limits) WHERE singleton`, input.Default, proxies, overrides, incoming, limits); err != nil {
 		return databaseError("update network settings", err)

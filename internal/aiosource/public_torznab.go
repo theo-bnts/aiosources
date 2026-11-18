@@ -1,11 +1,9 @@
 package aiosource
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -122,16 +120,10 @@ func (s *Service) PublicTorznabPolicy(ctx context.Context, v *PublicTorznabInsta
 	if err != nil {
 		return store.TorznabVisibility{}, nil, err
 	}
-	policy := store.TorznabVisibility{Public: true, CacheAfter: time.Now().Add(-time.Duration(c.CacheMinutes) * time.Minute), UncachedSources: []string{}}
-	for id, t := range c.Trackers {
-		if !t.Private {
-			policy.UncachedSources = append(policy.UncachedSources, id)
-		}
-	}
-	for id := range announces {
-		if !slices.Contains(policy.UncachedSources, id) {
-			policy.UncachedSources = append(policy.UncachedSources, id)
-		}
+	policy := store.TorznabVisibility{
+		Public:          true,
+		CacheAfter:      time.Now().Add(-time.Duration(c.CacheMinutes) * time.Minute),
+		UncachedSources: uncachedAccessibleSources(c, announces),
 	}
 	return policy, announces, nil
 }
@@ -176,16 +168,7 @@ func PublicTorznabOptions(value string) (string, model.PublicTorznabOptions, err
 	if len(parts) == 1 {
 		return value, options, nil
 	}
-	if len(parts) != 3 || parts[0] == "" || parts[1] != "v1" {
-		return "", options, model.ErrInvalid
-	}
-	data, err := base64.RawURLEncoding.Strict().DecodeString(parts[2])
-	if err != nil || len(data) > 4096 {
-		return "", options, model.ErrInvalid
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if decoder.Decode(&options) != nil || decoder.Decode(new(any)) != io.EOF || !ValidPublicTorznabOptions(options) {
+	if len(parts) != 3 || parts[0] == "" || parts[1] != "v1" || !decodeVersionedURLJSON(parts[2], &options) || !ValidPublicTorznabOptions(options) {
 		return "", options, model.ErrInvalid
 	}
 	return parts[0], options, nil

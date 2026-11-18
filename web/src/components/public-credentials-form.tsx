@@ -9,7 +9,11 @@ import {
   isCurrentPublicCredential,
   type PublicInstallation,
 } from '@/lib/public-credentials'
-import { clearPublicCredentials, type PublicInfo } from './public-connection-fields'
+import {
+  clearPublicCredentials,
+  useSessionExpired,
+  type PublicInfo,
+} from './public-connection-fields'
 import { ErrorNotice } from './common'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -44,16 +48,12 @@ export function PublicCredentialsForm({
   const request = useRef<AbortController | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => () => request.current?.abort(), [])
-  useEffect(() => {
-    const clear = () => {
-      request.current?.abort()
-      setPending(false)
-      setError(null)
-      if (formRef.current) clearPublicCredentials(formRef.current)
-    }
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => {
+    request.current?.abort()
+    setPending(false)
+    setError(null)
+    if (formRef.current) clearPublicCredentials(formRef.current)
+  })
   useEffect(() => {
     setRemoved([])
   }, [saved])
@@ -142,57 +142,56 @@ export function PublicCredentialsForm({
       <fieldset disabled={pending} className="space-y-5">
         {!info.use_instance_debrid && (
           <div className="grid items-start gap-5 md:grid-cols-2">
-            {!info.use_instance_debrid &&
-              info.providers.map((provider) => {
-                const details = debridProviders.find((item) => item.id === provider.id)
-                const retained =
-                  saved?.services.includes(provider.id) && !removed.includes(provider.id)
-                return (
-                  <div className="field" key={provider.id}>
-                    <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
-                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
-                      <Input
-                        key={retained ? 'remembered' : 'new'}
-                        id={`public-${provider.id}`}
-                        name={provider.id}
-                        type="password"
-                        revealLabel={`${provider.name} API key`}
-                        autoComplete="off"
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        maxLength={512}
-                        autoFocus={removed.includes(provider.id)}
-                        placeholder={
-                          retained ? 'Saved on this browser · enter a key to replace it' : undefined
-                        }
-                      />
-                      {retained &&
-                        (saved?.services.filter((id) => !removed.includes(id)).length ?? 0) > 1 && (
-                          <Button
-                            type="button"
-                            variant="warning"
-                            size="sm"
-                            className="self-start sm:self-auto"
-                            onClick={() =>
-                              setRemoved((ids) =>
-                                ids.includes(provider.id) ? ids : [...ids, provider.id],
-                              )
-                            }
-                          >
-                            <TrashIcon aria-hidden="true" />
-                            Remove key
-                          </Button>
-                        )}
-                    </div>
-                    {details && 'hint' in details && <p className="help">{details.hint}</p>}
-                    {details && (
-                      <CredentialPageLink href={details.credentialUrl}>
-                        Get {provider.name} API key
-                      </CredentialPageLink>
-                    )}
+            {info.providers.map((provider) => {
+              const details = debridProviders.find((item) => item.id === provider.id)
+              const retained =
+                saved?.services.includes(provider.id) && !removed.includes(provider.id)
+              return (
+                <div className="field" key={provider.id}>
+                  <Label htmlFor={`public-${provider.id}`}>{provider.name} API key</Label>
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+                    <Input
+                      key={retained ? 'remembered' : 'new'}
+                      id={`public-${provider.id}`}
+                      name={provider.id}
+                      type="password"
+                      revealLabel={`${provider.name} API key`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      maxLength={512}
+                      autoFocus={removed.includes(provider.id)}
+                      placeholder={
+                        retained ? 'Saved on this browser · enter a key to replace it' : undefined
+                      }
+                    />
+                    {retained &&
+                      (saved?.services.filter((id) => !removed.includes(id)).length ?? 0) > 1 && (
+                        <Button
+                          type="button"
+                          variant="warning"
+                          size="sm"
+                          className="self-start sm:self-auto"
+                          onClick={() =>
+                            setRemoved((ids) =>
+                              ids.includes(provider.id) ? ids : [...ids, provider.id],
+                            )
+                          }
+                        >
+                          <TrashIcon aria-hidden="true" />
+                          Remove key
+                        </Button>
+                      )}
                   </div>
-                )
-              })}
+                  {details && 'hint' in details && <p className="help">{details.hint}</p>}
+                  {details && (
+                    <CredentialPageLink href={details.credentialUrl}>
+                      Get {provider.name} API key
+                    </CredentialPageLink>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
         {!info.use_instance_debrid && (

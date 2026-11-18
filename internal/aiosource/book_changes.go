@@ -243,13 +243,9 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 	if client == nil {
 		client = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport())}
 	}
-	copyClient := *client
-	copyClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	if copyClient.Timeout == 0 {
-		copyClient.Timeout, err = s.outgoingTimeout(ctx, "metadata_seconds")
-		if err != nil {
-			return nil, 0, "", err
-		}
+	copyClient, err := s.prepareOutgoingClient(ctx, client, "metadata_seconds", true)
+	if err != nil {
+		return nil, 0, "", err
 	}
 	started := time.Now()
 	response, err := copyClient.Do(req)

@@ -359,7 +359,7 @@ func safeUserAgent(raw string) string {
 }
 
 func (a *authentication) logoutHandler(w http.ResponseWriter, r *http.Request) {
-	value := r.Context().Value(sessionContextKey{}).(session)
+	value := currentSession(r)
 	if err := a.db.RevokeAdminSessions(r.Context(), value.id, value.id, false); err != nil {
 		securityError(w, err)
 		return
@@ -367,6 +367,14 @@ func (a *authentication) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	a.cookie(w, "", time.Unix(1, 0), -1)
 	a.retirePreviousSessionCookie(w, r)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *authentication) validCSRF(r *http.Request, expected string) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+		return true
+	}
+	values := r.Header.Values("X-CSRF-Token")
+	return len(values) == 1 && a.allowedOrigin(r) && len(values[0]) == len(expected) && subtle.ConstantTimeCompare([]byte(values[0]), []byte(expected)) == 1
 }
 
 func (a *authentication) protect(next http.HandlerFunc) http.HandlerFunc {
@@ -380,19 +388,24 @@ func (a *authentication) protect(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "Authentication storage is unavailable")
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			csrfValues := r.Header.Values("X-CSRF-Token")
-			csrf := ""
-			if len(csrfValues) == 1 {
-				csrf = csrfValues[0]
-			}
-			if !a.allowedOrigin(r) || len(csrf) != len(value.csrf) || subtle.ConstantTimeCompare([]byte(csrf), []byte(value.csrf)) != 1 {
-				writeError(w, http.StatusForbidden, "Invalid form session. Reload the page.")
-				return
-			}
+		if !a.validCSRF(r, value.csrf) {
+			writeError(w, http.StatusForbidden, "Invalid form session. Reload the page.")
+			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), sessionContextKey{}, value)))
 	}
+}
+
+func noStorePath(path string) bool {
+	if path == "/healthz" {
+		return true
+	}
+	for _, prefix := range []string{"/api/", "/stremio/", "/public/stremio/", "/trusted/stremio/", "/torznab/", "/public/torznab/", "/trusted/torznab/", "/public/catalogs/", "/trusted/catalogs/"} {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -402,7 +415,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://image.tmdb.org https://covers.openlibrary.org https://images.igdb.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/stremio/") || strings.HasPrefix(r.URL.Path, "/public/stremio/") || strings.HasPrefix(r.URL.Path, "/trusted/stremio/") || strings.HasPrefix(r.URL.Path, "/torznab/") || strings.HasPrefix(r.URL.Path, "/public/torznab/") || strings.HasPrefix(r.URL.Path, "/trusted/torznab/") || strings.HasPrefix(r.URL.Path, "/public/catalogs/") || strings.HasPrefix(r.URL.Path, "/trusted/catalogs/") || r.URL.Path == "/healthz" {
+		if noStorePath(r.URL.Path) {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)

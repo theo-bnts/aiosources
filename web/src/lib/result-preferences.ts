@@ -59,3 +59,34 @@ export function readResponseSeconds(raw: string | null, max = 60): number | unde
   const value = Number(raw.trim())
   return Number.isSafeInteger(value) && value >= 1 && value <= max ? value : undefined
 }
+
+export function resultPreferencesError(options: ResultPreferences, maxSeconds = 60): string {
+  if (
+    options.max_results !== undefined &&
+    (!Number.isInteger(options.max_results) ||
+      options.max_results < 0 ||
+      options.max_results > 10000)
+  )
+    return 'Enter a maximum result count between 1 and 10,000.'
+  if (
+    options.max_cached !== undefined &&
+    (!Number.isInteger(options.max_cached) || options.max_cached < 0 || options.max_cached > 10000)
+  )
+    return 'Enter a maximum cached result count between 1 and 10,000.'
+  if (
+    options.response_seconds !== undefined &&
+    (!Number.isInteger(options.response_seconds) ||
+      options.response_seconds < 0 ||
+      options.response_seconds > maxSeconds)
+  )
+    return `Enter a response timeout between 1 and ${maxSeconds} seconds.`
+  return ''
+}
+
+export function encodeBase64URL(value: unknown): string {
+  const data = new TextEncoder().encode(JSON.stringify(value))
+  return btoa(Array.from(data, (byte) => String.fromCharCode(byte)).join(''))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '')
+}

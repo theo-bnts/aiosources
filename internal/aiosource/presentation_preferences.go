@@ -33,14 +33,8 @@ func InstallationPreferences(token string) (string, model.StreamPreferences, err
 	}
 	p := model.StreamPreferences{Language: parts[1], Mode: parts[2]}
 	if parts[1] == "v1" {
-		data, err := base64.RawURLEncoding.Strict().DecodeString(parts[2])
-		if err != nil || len(data) > 4096 {
-			return "", p, model.ErrInvalid
-		}
 		p = model.StreamPreferences{}
-		decoder := json.NewDecoder(bytes.NewReader(data))
-		decoder.DisallowUnknownFields()
-		if decoder.Decode(&p) != nil || decoder.Decode(new(any)) != io.EOF {
+		if !decodeVersionedURLJSON(parts[2], &p) {
 			return "", p, model.ErrInvalid
 		}
 	}
@@ -48,6 +42,31 @@ func InstallationPreferences(token string) (string, model.StreamPreferences, err
 		return "", p, model.ErrInvalid
 	}
 	return parts[0], p, nil
+}
+
+func decodeVersionedURLJSON(encoded string, out any) bool {
+	data, err := base64.RawURLEncoding.Strict().DecodeString(encoded)
+	if err != nil || len(data) > 4096 {
+		return false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(out) == nil && decoder.Decode(new(any)) == io.EOF
+}
+
+func uncachedAccessibleSources(c model.AIOConfig, announces map[string]string) []string {
+	sources := []string{}
+	for id, t := range c.Trackers {
+		if !t.Private || announces[id] != "" {
+			sources = append(sources, id)
+		}
+	}
+	for id, announce := range announces {
+		if announce != "" && !slices.Contains(sources, id) {
+			sources = append(sources, id)
+		}
+	}
+	return sources
 }
 
 func WithInstallationPreferences(token string, p model.StreamPreferences) (string, error) {

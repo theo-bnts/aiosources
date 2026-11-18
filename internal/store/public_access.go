@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -27,8 +26,8 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 	defer rollback(tx)
 	// Match named catalog policy changes: publication and metadata fences precede
 	// the policy row, including when enabling or revoking public access.
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
-		return databaseError("lock public catalog publication policy", err)
+	if err = lockCatalogPolicy(ctx, tx, "lock public catalog publication policy"); err != nil {
+		return err
 	}
 	var previous, previousTorznab, previousSearch, previousStremio, previousCatalog, previousDebrid, previousAnnounces bool
 	err = tx.QueryRow(ctx, `SELECT enabled,torznab_enabled,search_enabled,stremio_enabled,catalog_enabled,use_instance_debrid,use_instance_announces FROM aiosources.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousTorznab, &previousSearch, &previousStremio, &previousCatalog, &previousDebrid, &previousAnnounces)
@@ -107,34 +106,13 @@ func (s *Store) SharedAvailability(ctx context.Context, service string, hashes [
 	if err != nil {
 		return nil, databaseError("read shared availability", err)
 	}
-	defer rows.Close()
-	out := []model.AIOAvailability{}
-	for rows.Next() {
-		var a model.AIOAvailability
-		var data []byte
-		if err = rows.Scan(&a.Hash, &a.Cached, &a.CheckedAt, &data); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(data, &a.Files); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, databaseError("read shared availability", rows.Err())
+	return scanAvailabilityRows(rows, "read shared availability")
 }
 func (s *Store) SaveSharedAvailability(ctx context.Context, service string, a model.AIOAvailability) error {
-	if !model.IsDebridService(service) || !sharedHashRE.MatchString(a.Hash) || a.CheckedAt.IsZero() || len(a.Files) > 10000 {
+	if !model.IsDebridService(service) || !sharedHashRE.MatchString(a.Hash) || a.CheckedAt.IsZero() {
 		return model.ErrInvalid
 	}
-	files := append([]model.AIOFile{}, a.Files...)
-	for i := range files {
-		files[i].ID = 0
-		files[i].Link = ""
-		if files[i].Size < 0 || len(files[i].Path) > 4096 {
-			return model.ErrInvalid
-		}
-	}
-	data, err := json.Marshal(files)
+	data, err := marshalAvailabilityFiles(a.Files)
 	if err != nil {
 		return err
 	}
