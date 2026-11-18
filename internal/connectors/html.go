@@ -117,7 +117,11 @@ func (operation *htmlFetch) request(ctx context.Context, request Request, phase 
 		operation.metadata["detail_response"] = true
 	}
 	response, err := c.client.Do(ctx, request)
-	operation.response = response
+	archived := response
+	if phase == "torrent" {
+		archived.Body = nil
+	}
+	operation.response = archived
 	return response, err
 }
 

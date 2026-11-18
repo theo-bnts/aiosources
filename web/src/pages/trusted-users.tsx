@@ -159,8 +159,9 @@ function UserEditor({
   const dirty =
     !original.id || password !== '' || JSON.stringify(value) !== JSON.stringify(original)
   const changed = password !== '' || JSON.stringify(value) !== JSON.stringify(original)
-  async function save(form: FormData) {
+  async function save(formElement: HTMLFormElement) {
     if (pending) return
+    const form = new FormData(formElement)
     const controller = new AbortController()
     request.current = controller
     setPending(true)
@@ -195,6 +196,7 @@ function UserEditor({
     } catch (error) {
       if (!controller.signal.aborted) setError(error)
     } finally {
+      form.delete('password')
       if (!controller.signal.aborted) {
         setPending(false)
       }
@@ -227,7 +229,7 @@ function UserEditor({
           className="space-y-5"
           onSubmit={(event) => {
             event.preventDefault()
-            void save(new FormData(event.currentTarget))
+            void save(event.currentTarget)
           }}
         >
           <fieldset className="min-w-0 space-y-5" disabled={pending}>

@@ -51,6 +51,7 @@ import type { Icon } from '@phosphor-icons/react'
 
 import {
   api,
+  ApiError,
   queryClient,
   refreshLiveData,
   setCSRF,
@@ -521,11 +522,12 @@ export function SessionGate({ children }: { children: ReactNode }) {
     retry: false,
   })
   useEffect(() => {
-    async function expired() {
-      await queryClient.cancelQueries()
+    function expired() {
+      setCSRF()
       queryClient.setQueryData<Session>(['session'], { authenticated: false })
       queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'session' })
       queryClient.getMutationCache().clear()
+      void queryClient.cancelQueries()
     }
     window.addEventListener('session-expired', expired)
     return () => window.removeEventListener('session-expired', expired)
@@ -802,6 +804,12 @@ export function AppShell({
     onSuccess: () => {
       setCSRF()
       window.dispatchEvent(new Event('session-expired'))
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 401) {
+        setCSRF()
+        window.dispatchEvent(new Event('session-expired'))
+      }
     },
   })
   const navigationProps = {

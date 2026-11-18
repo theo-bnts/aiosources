@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
+    host: '127.0.0.1',
     proxy: {
       '/api': { target: apiTarget, changeOrigin: false },
       '/healthz': { target: apiTarget, changeOrigin: false },

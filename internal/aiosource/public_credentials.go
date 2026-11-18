@@ -3,6 +3,7 @@ package aiosource
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -27,6 +28,9 @@ type PublicCredentialChanges struct {
 // Merge only the visitor's encrypted configuration. Administrator credentials
 // are never read. Withdrawn source permissions also retire remembered announces.
 func (s *Service) ResolvePublicCredential(ctx context.Context, audience string, changes PublicCredentialChanges) (*PublicInstallation, error) {
+	if strings.TrimSpace(audience) == "" {
+		return nil, ErrAuth
+	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return nil, err
@@ -130,7 +134,7 @@ func (s *Service) PublicBrowserCredential(ctx context.Context, audience string, 
 		return result, nil
 	}
 	profile := *installation
-	profile.StremioGeneration = 0
+	profile.StremioGeneration = -1
 	result.Credential, err = s.sealPublicInstallation(ctx, profile)
 	return result, err
 }

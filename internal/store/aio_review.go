@@ -96,7 +96,7 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	args := []any{query, normalized, kind, filter.Year, filter.Language}
 	terms := []string{}
 	anchor, longest := "", 0
-	for _, word := range strings.Fields(normalized) {
+	for _, word := range searchWords(normalized) {
 		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
 		if len(word) > longest {
 			longest = len(word)

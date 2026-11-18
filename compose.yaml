@@ -32,8 +32,14 @@ services:
       - "${BIND_IP:-127.0.0.1}:${PORT:-7000}:7000"
     volumes:
       - state:/data
+    read_only: true
     tmpfs:
-      - /var/lib/postgresql
+      - /tmp:rw,noexec,nosuid,size=256m
+      - /var/lib/postgresql:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       postgres:
         condition: service_healthy

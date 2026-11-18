@@ -237,6 +237,11 @@ func (s *server) trustedConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { clear(input.Services); clear(input.Announces) }()
+	if (feature == "torznab" || feature == "catalog") && (len(input.Services) > 0 || len(input.RemoveServices) > 0) ||
+		feature == "catalog" && (len(input.Announces) > 0 || len(input.RemoveAnnounces) > 0) {
+		publicCredentialError(w, model.ErrInvalid)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	personal, err := s.options.AIOSource.ResolveTrustedCredential(ctx, trustedGrant(r), origin, input.PublicCredentialChanges)

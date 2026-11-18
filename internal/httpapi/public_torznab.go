@@ -161,9 +161,13 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 	// Services only select known shared availability; credentials are configured
 	// in the recipient's download client. No provider calls or visitor rows here.
 	q = q.WithPreferences(model.TorznabPreferences{ResultPreferences: visitor.Options.ResultPreferences, Services: visitor.Options.Services, CachedOnly: visitor.Options.CachedOnly})
+	origin := s.auth.origin
+	if trusted {
+		origin = s.connectionOrigin()
+	}
 	var response any
 	if q.Mode == "caps" {
-		response = torznabCaps(model.Share{MediaTypes: visitor.Options.MediaTypes}, s.auth.origin)
+		response = torznabCaps(model.Share{MediaTypes: visitor.Options.MediaTypes}, origin)
 	} else {
 		policy, announces, e := s.options.AIOSource.PublicTorznabPolicy(ctx, visitor)
 		if e != nil {
@@ -196,7 +200,7 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		if q.CachedOnly {
 			announces = nil
 		}
-		response = torznabResults(result, names, s.auth.origin, announces)
+		response = torznabResults(result, names, origin, announces)
 		kind := "torznab.public_searched"
 		if trusted {
 			kind = "torznab.searched"

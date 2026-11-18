@@ -70,6 +70,9 @@ func (r *xmlTokens) Token() (xml.Token, error) {
 				}
 			}
 		}
+		if r.depth >= 128 {
+			return nil, errProtocol
+		}
 		r.depth++
 	case xml.EndElement:
 		r.depth--
@@ -111,7 +114,7 @@ func decodeProtocol(data []byte, root string, value any) error {
 }
 
 func parseAPIError(data []byte) error {
-	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder := xml.NewTokenDecoder(&xmlTokens{decoder: xml.NewDecoder(bytes.NewReader(data))})
 	for {
 		token, err := decoder.Token()
 		if err != nil {

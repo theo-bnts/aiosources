@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -50,7 +51,23 @@ func validateRemoteCatalog(p model.Provider) error {
 // connection and only the validated IP is dialed, including through a selected
 // proxy. Certificate verification still uses the original URL hostname.
 func catalogAddressAllowed(ip net.IP) bool {
-	return ip != nil && !ip.IsUnspecified() && !ip.IsMulticast() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() && !ip.Equal(net.IPv4bcast) && !ip.Equal(net.IP{100, 100, 100, 200})
+	if ip == nil {
+		return false
+	}
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	if !addr.IsValid() || addr.IsUnspecified() || addr.IsMulticast() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr == netip.AddrFrom4([4]byte{255, 255, 255, 255}) || addr == netip.AddrFrom4([4]byte{100, 100, 100, 200}) || addr == netip.MustParseAddr("fd00:ec2::254") {
+		return false
+	}
+	for _, prefix := range []string{"0.0.0.0/8", "192.0.0.0/24", "240.0.0.0/4", "::/96", "100::/64", "2001::/32", "2002::/16", "64:ff9b::/96", "64:ff9b:1::/48"} {
+		if netip.MustParsePrefix(prefix).Contains(addr) {
+			return false
+		}
+	}
+	return true
 }
 
 func catalogDial(ctx context.Context, network, address string) (net.Conn, error) {

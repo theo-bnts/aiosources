@@ -129,9 +129,9 @@ func rawSelection(opts model.ListOptions) (string, []any) {
 		return columns + where(""), args
 	}
 	pattern, literal := bind("%"+escapeSearchFragment.Replace(opts.Query)+"%"), bind(opts.Query)
-	direct := "aiosources.raw_search_text(record.source_id,record.fields,record.error) ILIKE " + pattern +
+	direct := "aiosources.raw_search_text(record.source_id,record.fields,record.error) ILIKE " + pattern + ` ESCAPE '\'` +
 		" AND (strpos(lower(record.source_id),lower(" + literal + "))>0 OR (record.payload_id IS NULL AND strpos(lower(record.fields::text),lower(" + literal + "))>0) OR strpos(lower(record.error),lower(" + literal + "))>0)"
-	referenced := "record.payload_id IS NOT NULL AND aiosources.raw_search_text(payload.source_id,payload.fields,payload.error) ILIKE " + pattern +
+	referenced := "record.payload_id IS NOT NULL AND aiosources.raw_search_text(payload.source_id,payload.fields,payload.error) ILIKE " + pattern + ` ESCAPE '\'` +
 		" AND strpos(lower(payload.fields::text),lower(" + literal + "))>0"
 	// UNION preserves one observation when its own identity/error and the
 	// referenced fields both match. Source/run filters apply to the observation.

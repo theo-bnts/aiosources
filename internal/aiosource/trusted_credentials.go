@@ -3,6 +3,7 @@ package aiosource
 import (
 	"context"
 	"sort"
+	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -10,6 +11,9 @@ import (
 // Remembered personal credentials are scoped to one live account generation.
 // They cannot be replayed as a public credential or by another trusted account.
 func (s *Service) ResolveTrustedCredential(ctx context.Context, grant model.TrustedGrant, audience string, changes PublicCredentialChanges) (*PublicInstallation, error) {
+	if strings.TrimSpace(audience) == "" {
+		return nil, ErrAuth
+	}
 	user, err := s.DB.TrustedUser(ctx, grant)
 	if err != nil {
 		return nil, trustedAccessError(err)

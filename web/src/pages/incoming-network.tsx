@@ -167,7 +167,7 @@ export default function IncomingNetworkPage() {
                         className="data-link"
                         href="https://www.cloudflare.com/ips/"
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                       >
                         published IP ranges
                       </a>

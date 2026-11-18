@@ -67,7 +67,7 @@ func expandTorznabCategories(cats []int) []int {
 func bookTitleSearchSQL(query string, bind func(any) string) string {
 	raw := torrentTextSearchSQLFor("t", query, bind)
 	work, edition := []string{}, []string{}
-	for _, word := range strings.Fields(books.Normalize(query)) {
+	for _, word := range searchWords(books.Normalize(query)) {
 		value := bind("%" + escapeSearchFragment.Replace(word) + "%")
 		work = append(work, `w.book_normalized LIKE `+value+` ESCAPE '\'`)
 		edition = append(edition, `e.normalized LIKE `+value+` ESCAPE '\'`)
@@ -101,12 +101,12 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 // or scanning the complete bibliographic catalog.
 func bookCombinedCandidates(normalized, matching, anchor string) string {
 	return ` UNION ALL SELECT id,2 AS precision,public.similarity(` + normalized + `,normalized) FROM (
- WITH author_keys AS MATERIALIZED(SELECT ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE normalized LIKE ` + anchor + `) AS ids),
+ WITH author_keys AS MATERIALIZED(SELECT ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE normalized LIKE ` + anchor + ` ESCAPE '\') AS ids),
  author_works AS MATERIALIZED(SELECT id,openlibrary_id,book_normalized FROM aiosources.aio_works w WHERE media_type='book' AND (book_data->'author_keys') ?| (SELECT ids FROM author_keys)),
  aliases AS (
- SELECT id,book_normalized AS title FROM aiosources.aio_works WHERE media_type='book' AND book_normalized LIKE ` + anchor + `
+ SELECT id,book_normalized AS title FROM aiosources.aio_works WHERE media_type='book' AND book_normalized LIKE ` + anchor + ` ESCAPE '\'
  UNION SELECT id,book_normalized FROM author_works
- UNION SELECT w.id,e.normalized FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + `
+ UNION SELECT w.id,e.normalized FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.normalized LIKE ` + anchor + ` ESCAPE '\'
  UNION SELECT w.id,e.normalized FROM author_works w JOIN aiosources.ol_editions e ON e.work_keys && aiosources.ol_aliases(w.openlibrary_id)
  ) SELECT aliases.id,aliases.title||' '||COALESCE((SELECT string_agg(a.normalized,' ') FROM aiosources.ol_authors a WHERE a.id=ANY(
  ARRAY(SELECT aiosources.ol_resolve(key) FROM jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')) key)

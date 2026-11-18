@@ -293,7 +293,7 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if access.UseInstanceAnnounces {
 		announces = nil
 	}
-	installation := PublicInstallation{Version: 1, Generation: access.Generation, Audience: audience, Services: keys, Announces: announces}
+	installation := PublicInstallation{Version: 1, Generation: access.Generation, StremioGeneration: -1, Audience: audience, Services: keys, Announces: announces}
 	if stremio {
 		installation.StremioGeneration = access.StremioGeneration
 	}
@@ -367,7 +367,7 @@ func (s *Service) OpenPublicInstallation(ctx context.Context, audience, value st
 }
 
 func (s *Service) openPublicCredential(ctx context.Context, audience, value string, requireServices bool) (*PublicInstallation, error) {
-	if len(value) < 32 || len(value) > MaxPublicInstallationSize {
+	if strings.TrimSpace(audience) == "" || len(value) < 32 || len(value) > MaxPublicInstallationSize {
 		return nil, ErrAuth
 	}
 	access, err := s.DB.PublicAccess(ctx)
@@ -381,7 +381,7 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 	if err != nil {
 		return nil, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(credential)
+	sealed, err := base64.RawURLEncoding.Strict().DecodeString(credential)
 	if err != nil {
 		return nil, ErrAuth
 	}
@@ -403,7 +403,7 @@ func (s *Service) PublicStreams(ctx context.Context, base, configuration, mediaT
 	if visitor == nil {
 		return nil, ErrAuth
 	}
-	if visitor.Trusted == nil && !validPublicKeys(visitor.Services) {
+	if !validPublicKeys(visitor.Services) {
 		access, err := s.visitorCredentialAccess(ctx, visitor)
 		// A live instance-credential grant remains valid while no service is
 		// configured. Return an empty result rather than invalidating its URL.
@@ -432,10 +432,10 @@ func (s *Service) sealPublicSource(provider, source string) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(sealed), nil
 }
 func (s *Service) PublicPlaybackSource(ctx context.Context, value, service, mediaType, id string, visitor *PublicInstallation) (string, error) {
-	if visitor == nil || visitor.Services[service] == "" || len(value) > 4096 {
+	if visitor == nil || visitor.Services[service] == "" || len(value) > 4096 || strings.Contains(value, "~") {
 		return "", ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(value)
+	sealed, err := base64.RawURLEncoding.Strict().DecodeString(value)
 	if err != nil {
 		return "", model.ErrInvalid
 	}

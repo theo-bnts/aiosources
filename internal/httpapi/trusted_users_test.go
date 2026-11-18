@@ -96,6 +96,12 @@ func TestTrustedUsersIsolationConnectionsAndRevocation(t *testing.T) {
 	stremio := trustedRequest(f, cookie, "POST", "/api/trusted/connections/stremio", `{"preferences":{}}`)
 	tz := trustedRequest(f, cookie, "POST", "/api/trusted/connections/torznab", `{"options":{}}`)
 	catalog := trustedRequest(f, cookie, "POST", "/api/trusted/connections/catalog", `{"catalog":{}}`)
+	if got := trustedRequest(f, cookie, "POST", "/api/trusted/connections/torznab", `{"options":{},"services":{"torbox":"unvalidated-key"}}`); got.Code != 400 {
+		t.Fatal("Torznab setup accepted unvalidated debrid service keys", got.Code)
+	}
+	if got := trustedRequest(f, cookie, "POST", "/api/trusted/connections/catalog", `{"catalog":{},"services":{"torbox":"unvalidated-key"}}`); got.Code != 400 {
+		t.Fatal("Catalog setup accepted unvalidated debrid service keys", got.Code)
+	}
 	var st, torznab, shared map[string]any
 	if stremio.Code != 200 || tz.Code != 200 || catalog.Code != 200 {
 		t.Fatal("trusted connection creation failed", stremio.Code, tz.Code, catalog.Code, stremio.Body, tz.Body, catalog.Body)

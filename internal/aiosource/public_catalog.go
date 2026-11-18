@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -86,10 +87,10 @@ type publicCatalogPreparation struct {
 }
 
 func (s *Service) openPublicCatalogValue(purpose, token string, result any) error {
-	if len(token) < 32 || len(token) > 16384 {
+	if len(token) < 32 || len(token) > 16384 || strings.Contains(token, "~") {
 		return model.ErrNotFound
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(token)
+	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil {
 		return model.ErrNotFound
 	}

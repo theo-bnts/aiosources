@@ -92,6 +92,9 @@ function checkSessionExpiry() {
 }
 
 async function checkedResponse(path: string, init: RequestInit = {}) {
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    throw new ApiError(0, 'Invalid API request path.')
+  }
   const method = (init.method ?? 'GET').toUpperCase()
   const headers = new Headers(init.headers)
   if (init.body) headers.set('Content-Type', 'application/json')
@@ -184,10 +187,12 @@ export async function rawPage(id: string, signal?: AbortSignal) {
 
 export async function downloadBytes(path: string, filename: string) {
   const response = await checkedResponse(path)
-  const url = URL.createObjectURL(await readBody(() => response.blob()))
+  const bytes = await readBody(() => response.arrayBuffer())
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }))
   const link = document.createElement('a')
   link.href = url
-  link.download = filename
+  link.rel = 'noopener noreferrer'
+  link.download = filename.replace(/[\u0000-\u001f\u007f/\\]+/g, '_').trim() || 'download'
   document.body.appendChild(link)
   link.click()
   link.remove()

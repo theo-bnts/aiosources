@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, queryClient, setCSRF } from '@/lib/api'
 import type { Session } from '@/lib/types'
+import { clearPublicCredentials } from './public-connection-fields'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -54,8 +55,9 @@ function LoginForm({ trusted }: { trusted: boolean }) {
   const [error, setError] = useState<unknown>(null)
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
-  async function signIn(credentials: FormData) {
+  async function signIn(form: HTMLFormElement) {
     if (pending) return
+    const credentials = new FormData(form)
     setPending(true)
     setError(null)
     const controller = new AbortController()
@@ -92,6 +94,8 @@ function LoginForm({ trusted }: { trusted: boolean }) {
     } catch (caught) {
       if (!controller.signal.aborted) setError(caught)
     } finally {
+      credentials.delete('password')
+      clearPublicCredentials(form)
       if (!controller.signal.aborted) {
         setPassword('')
         setPending(false)
@@ -104,7 +108,7 @@ function LoginForm({ trusted }: { trusted: boolean }) {
       className="space-y-5"
       onSubmit={(event) => {
         event.preventDefault()
-        void signIn(new FormData(event.currentTarget))
+        void signIn(event.currentTarget)
       }}
     >
       {trusted && (

@@ -387,12 +387,12 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
               />
               <div className="min-w-0 space-y-2">
                 <TitleDetails title={title.data} compact={false} />
-                {title.data.openlibrary && (
+                {title.data.openlibrary && /^OL[1-9][0-9]*[MW]$/.test(title.data.openlibrary) && (
                   <a
                     className="data-link text-sm"
                     href={`https://openlibrary.org/${title.data.openlibrary.endsWith('M') ? 'books' : 'works'}/${title.data.openlibrary}`}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                   >
                     View on Open Library
                   </a>

@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"slices"
 	"sort"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -165,6 +167,9 @@ func (s *Store) PublicCatalogPage(ctx context.Context, grant model.PublicCatalog
 		}
 	} else {
 		err = tx.QueryRow(ctx, `SELECT enabled,catalog_enabled,generation,catalog_generation FROM aiosources.aio_public_access WHERE singleton FOR SHARE`).Scan(&enabled, &catalogEnabled, &generation, &catalogGeneration)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.CatalogEnvelope{}, 0, ErrCatalogAuthentication
 	}
 	if err != nil {
 		return model.CatalogEnvelope{}, 0, databaseError("authorize public catalog export", err)

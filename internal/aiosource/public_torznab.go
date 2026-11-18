@@ -77,7 +77,7 @@ func (s *Service) CreatePublicTorznab(ctx context.Context, audience string, opti
 }
 
 func (s *Service) OpenPublicTorznab(ctx context.Context, audience, value string) (*PublicTorznabInstallation, error) {
-	if len(value) < 32 || len(value) > MaxPublicTorznabSize {
+	if strings.TrimSpace(audience) == "" || len(value) < 32 || len(value) > MaxPublicTorznabSize {
 		return nil, ErrAuth
 	}
 	access, err := s.DB.PublicAccess(ctx)

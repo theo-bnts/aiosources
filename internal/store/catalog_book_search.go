@@ -47,11 +47,11 @@ func catalogBookCandidates(query, normalized, matching, anchor string) string {
 		// anchor used by full-catalog review, without a global edition scan.
 		sql += ` UNION ALL SELECT id,2,public.similarity(` + normalized + `,normalized) FROM (
  WITH author_works AS MATERIALIZED(
- SELECT DISTINCT work_id AS id FROM catalog_book_authors WHERE normalized LIKE ` + anchor + `),
+ SELECT DISTINCT work_id AS id FROM catalog_book_authors WHERE normalized LIKE ` + anchor + ` ESCAPE '\'),
  aliases AS MATERIALIZED(
- SELECT id,book_normalized AS title FROM catalog_books WHERE book_normalized LIKE ` + anchor + `
+ SELECT id,book_normalized AS title FROM catalog_books WHERE book_normalized LIKE ` + anchor + ` ESCAPE '\'
  UNION SELECT w.id,w.book_normalized FROM catalog_books w JOIN author_works a USING(id)
- UNION SELECT e.work_id,e.normalized FROM catalog_book_editions e WHERE e.normalized LIKE ` + anchor + `
+ UNION SELECT e.work_id,e.normalized FROM catalog_book_editions e WHERE e.normalized LIKE ` + anchor + ` ESCAPE '\'
  UNION SELECT e.work_id,e.normalized FROM catalog_book_editions e JOIN author_works a ON a.id=e.work_id),
  author_labels AS MATERIALIZED(
  SELECT w.id,COALESCE((SELECT string_agg(a.normalized,' ') FROM aiosources.ol_authors a WHERE a.id=ANY(

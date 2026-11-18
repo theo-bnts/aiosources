@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -94,10 +95,10 @@ func (s *Service) sealPreparation(service, key, hash, id string) (string, error)
 }
 
 func (s *Service) openPreparation(service, key, hash, token string) (string, error) {
-	if len(token) < 32 || len(token) > 1024 {
+	if len(token) < 32 || len(token) > 1024 || strings.Contains(token, "~") {
 		return "", model.ErrInvalid
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(token)
+	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil {
 		return "", model.ErrInvalid
 	}

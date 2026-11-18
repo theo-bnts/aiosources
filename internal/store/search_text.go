@@ -8,6 +8,18 @@ import (
 )
 
 const torrentSearchTextSQL = "aiosources.torrent_search_text(provider_id,source_id,fields)"
+const (
+	maxSearchWords  = 24
+	maxSearchGroups = 8
+)
+
+func searchWords(text string) []string {
+	words := strings.Fields(text)
+	if len(words) > maxSearchWords {
+		words = words[:maxSearchWords]
+	}
+	return words
+}
 
 type torrentSearchTerm struct {
 	text     string
@@ -20,7 +32,8 @@ type torrentSearchTerm struct {
 // kind of term. Unclosed quotes are accepted like PostgreSQL web search.
 func torrentSearchGroups(query string) [][]torrentSearchTerm {
 	groups := [][]torrentSearchTerm{nil}
-	for query != "" {
+	totalTerms := 0
+	for query != "" && totalTerms < maxSearchWords {
 		query = strings.TrimLeftFunc(query, unicode.IsSpace)
 		term := torrentSearchTerm{}
 		if strings.HasPrefix(query, "-") {
@@ -59,10 +72,14 @@ func torrentSearchGroups(query string) [][]torrentSearchTerm {
 		}
 		last := len(groups) - 1
 		if !term.excluded && !term.phrase && strings.EqualFold(term.text, "OR") && len(groups[last]) > 0 && strings.TrimSpace(query) != "" {
+			if len(groups) >= maxSearchGroups {
+				break
+			}
 			groups = append(groups, nil)
 			continue
 		}
 		groups[last] = append(groups[last], term)
+		totalTerms++
 	}
 	if len(groups[len(groups)-1]) == 0 {
 		groups = groups[:len(groups)-1]
@@ -101,10 +118,13 @@ func torrentTextSearchSQLFor(alias, query string, bind func(any) string) string 
 				fragments := []string{term.text}
 				if !strings.ContainsAny(term.text, `%_\`) {
 					fragments = strings.FieldsFunc(term.text, unicode.IsPunct)
+					if len(fragments) > 8 {
+						fragments = fragments[:8]
+					}
 				}
 				parts := []string{}
 				for _, fragment := range fragments {
-					parts = append(parts, document+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%"))
+					parts = append(parts, document+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%")+" ESCAPE '\\'")
 				}
 				if len(parts) == 0 {
 					predicate = "FALSE"

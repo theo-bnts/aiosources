@@ -106,7 +106,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	args := []any{identity, media, normalized}
 	terms := []string{}
 	anchor, longest := "", 0
-	for _, word := range strings.Fields(normalized) {
+	for _, word := range searchWords(normalized) {
 		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
 		if len(word) > longest {
 			longest = len(word)
@@ -193,7 +193,7 @@ func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (
 		normalized := locales[1]
 		args = append(args, normalized)
 		terms := []string{}
-		for _, word := range strings.Fields(normalized) {
+		for _, word := range searchWords(normalized) {
 			args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
 			terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
 		}

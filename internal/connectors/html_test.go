@@ -257,7 +257,7 @@ func TestHTMLTorrentMetadataRetainsOnlyTheExactInfoHash(t *testing.T) {
 				t.Fatalf("torrent-file extraction did not hash exact info bytes: %+v %v", page.Items, err)
 			}
 			fields, _ := json.Marshal(page.Items[0].Fields)
-			if strings.Contains(string(fields), "announce") || strings.Contains(string(fields), "secret") || strings.Contains(string(page.Next), "secret") || strings.Contains(string(fields), "example.txt") {
+			if strings.Contains(string(fields), "announce") || strings.Contains(string(fields), "secret") || strings.Contains(string(page.Next), "secret") || strings.Contains(string(fields), "example.txt") || strings.Contains(string(page.Body), "private-key") {
 				t.Fatal("torrent metadata retained an announce, credential or filename")
 			}
 		})

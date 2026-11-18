@@ -361,7 +361,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                           {record.page_id > 0 && record.payload_retained !== false ? (
                             <Link
                               className="data-link"
-                              to={`/pages/${record.page_id}`}
+                              to={`/pages/${encodeURIComponent(String(record.page_id))}`}
                               state={listState}
                             >
                               {number(record.page)}
@@ -376,7 +376,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                         <TableCell>
                           <Button variant="ghost" size="icon-sm" asChild>
                             <Link
-                              to={`/raw/${record.id}`}
+                              to={`/raw/${encodeURIComponent(String(record.id))}`}
                               state={listState}
                               aria-label={`View record ${record.id}`}
                             >
@@ -454,7 +454,7 @@ export function RawDetailPage() {
         actions={
           payloadRetained && (
             <DownloadButton
-              path={`/raw/${record.id}/download`}
+              path={`/raw/${encodeURIComponent(String(record.id))}/download`}
               filename={`record-${record.id}.${language === 'text' ? 'bin' : language}`}
               label="Download original"
             />
@@ -510,7 +510,7 @@ export function RawDetailPage() {
             {record.page_id > 0 && payloadRetained ? (
               <Link
                 className="data-link inline-flex items-center gap-2"
-                to={`/pages/${record.page_id}`}
+                to={`/pages/${encodeURIComponent(String(record.page_id))}`}
                 state={listState}
               >
                 <FileTextIcon />
@@ -592,13 +592,13 @@ export function RawDetailPage() {
           </div>
           <div className="toolbar">
             <Button variant="ghost" asChild>
-              <Link to={`/pages/${record.page_id}`} state={listState}>
+              <Link to={`/pages/${encodeURIComponent(String(record.page_id))}`} state={listState}>
                 View page
                 <ArrowRightIcon />
               </Link>
             </Button>
             <DownloadButton
-              path={`/pages/${record.page_id}/download`}
+              path={`/pages/${encodeURIComponent(String(record.page_id))}/download`}
               filename={`page-${record.page_id}.bin`}
               label="Download page"
             />

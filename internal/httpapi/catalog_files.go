@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -97,7 +98,7 @@ func catalogFileAddressAllowed(ip netip.Addr) bool {
 	if !ip.IsValid() || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 		return false
 	}
-	for _, prefix := range []string{"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32", "2001::/32", "2002::/16", "64:ff9b::/96", "64:ff9b:1::/48"} {
+	for _, prefix := range []string{"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "::/96", "100::/64", "2001:db8::/32", "2001::/32", "2002::/16", "64:ff9b::/96", "64:ff9b:1::/48"} {
 		if netip.MustParsePrefix(prefix).Contains(ip) {
 			return false
 		}
@@ -142,11 +143,11 @@ func newCatalogFileClient() *http.Client {
 
 func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	if len(token) > 14000 {
+	if len(token) < 32 || len(token) > 14000 || strings.Contains(token, "~") {
 		respondError(w, model.ErrNotFound)
 		return
 	}
-	ciphertext, err := base64.RawURLEncoding.DecodeString(token)
+	ciphertext, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil {
 		respondError(w, model.ErrNotFound)
 		return
@@ -234,18 +235,36 @@ func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, tick
 		filename = path.Base(u.Path)
 	}
 	filename = path.Base(strings.ReplaceAll(filename, "\\", "/"))
+	if !utf8.ValidString(filename) {
+		filename = "download"
+	} else {
+		filename = strings.Map(func(r rune) rune {
+			if r < 0x20 || r == 0x7f {
+				return -1
+			}
+			return r
+		}, filename)
+	}
 	if filename == "." || filename == "/" || filename == "" || len(filename) > 255 {
 		filename = "download"
 	}
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
+	disposition := mime.FormatMediaType("attachment", map[string]string{"filename": filename})
+	if disposition == "" {
+		disposition = `attachment; filename="download"`
+	}
+	w.Header().Set("Content-Disposition", disposition)
 	// Safari rejects an attachment framed under DENY. Only this authenticated
 	// download can be framed by this application; scripts and foreign frames
 	// remain forbidden. The application's own pages retain their DENY policy.
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
 	w.Header().Set("Content-Type", "application/octet-stream")
-	if kind, _, e := mime.ParseMediaType(response.Header.Get("Content-Type")); e == nil && kind == "multipart/byteranges" {
-		w.Header().Set("Content-Type", response.Header.Get("Content-Type"))
+	if response.StatusCode == http.StatusPartialContent {
+		if kind, params, e := mime.ParseMediaType(response.Header.Get("Content-Type")); e == nil && kind == "multipart/byteranges" && params["boundary"] != "" {
+			if formatted := mime.FormatMediaType("multipart/byteranges", map[string]string{"boundary": params["boundary"]}); formatted != "" {
+				w.Header().Set("Content-Type", formatted)
+			}
+		}
 	}
 	if n, e := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64); e == nil && n >= 0 {
 		w.Header().Set("Content-Length", strconv.FormatInt(n, 10))

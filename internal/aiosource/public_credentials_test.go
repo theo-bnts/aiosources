@@ -68,6 +68,9 @@ func TestBrowserCredentialsShareOnlyPersonalAnnouncesAndServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if browserVisitor, err := s.OpenPublicInstallation(ctx, origin, browser.Credential); err != nil || s.CheckPublicStremio(ctx, browserVisitor) == nil {
+		t.Fatal("Browser credential bypassed Stremio installation scope")
+	}
 	changed, err := s.ResolvePublicCredential(ctx, origin, PublicCredentialChanges{Credential: browser.Credential, RemoveAnnounces: []string{"unspecified"}, Announces: map[string]string{"private-one": replacement}})
 	if err != nil || len(changed.Announces) != 1 || changed.Announces["private-one"] != replacement || changed.Services["torbox"] != key {
 		t.Fatal("Announce removal or replacement affected the service key", err)

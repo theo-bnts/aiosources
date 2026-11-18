@@ -161,7 +161,13 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 			if e != nil {
 				return nil, e
 			}
-			data, e := json.Marshal(publicCatalogFileTicket{Trusted: visitor.Trusted, Service: result.Service, URL: result.URL, Audience: s.auth.origin, Generation: visitor.Generation, Expires: expires})
+			audience := s.auth.origin
+			sessionID := ""
+			if ts, ok := r.Context().Value(trustedSessionKey{}).(trustedSession); ok {
+				audience = s.connectionOrigin()
+				sessionID = ts.ID
+			}
+			data, e := json.Marshal(publicCatalogFileTicket{Trusted: visitor.Trusted, Session: sessionID, Service: result.Service, URL: result.URL, Audience: audience, Generation: visitor.Generation, Expires: expires})
 			if e != nil {
 				return nil, e
 			}
@@ -179,6 +185,7 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 
 type publicCatalogFileTicket struct {
 	Trusted    *model.TrustedGrant `json:"trusted,omitempty"`
+	Session    string              `json:"session,omitempty"`
 	Service    string              `json:"service"`
 	URL        string              `json:"url"`
 	Audience   string              `json:"audience"`
@@ -187,11 +194,12 @@ type publicCatalogFileTicket struct {
 }
 
 func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
-	if len(r.PathValue("token")) > 14000 {
+	token := r.PathValue("token")
+	if len(token) < 32 || len(token) > 14000 || strings.Contains(token, "~") {
 		respondError(w, model.ErrNotFound)
 		return
 	}
-	sealed, err := base64.RawURLEncoding.DecodeString(r.PathValue("token"))
+	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
 	if err != nil {
 		respondError(w, model.ErrNotFound)
 		return
@@ -204,7 +212,15 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket publicCatalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || ticket.Audience != s.auth.origin || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !model.IsDebridService(ticket.Service) || !validCatalogFileURL(ticket.URL) {
+	if json.Unmarshal(data, &ticket) != nil {
+		respondError(w, model.ErrNotFound)
+		return
+	}
+	expectedAudience := s.auth.origin
+	if ticket.Trusted != nil {
+		expectedAudience = s.connectionOrigin()
+	}
+	if expectedAudience == "" || ticket.Audience != expectedAudience || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !model.IsDebridService(ticket.Service) || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
@@ -215,6 +231,12 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	authorize := func(ctx context.Context) error {
 		if ticket.Trusted != nil {
+			if ticket.Session != "" {
+				ts, err := s.auth.lookupTrusted(r.WithContext(ctx))
+				if err != nil || ts.ID != ticket.Session || ts.User.ID != ticket.Trusted.UserID || ts.User.Generation != ticket.Trusted.Generation {
+					return model.ErrNotFound
+				}
+			}
 			user, err := s.options.Store.TrustedUser(ctx, *ticket.Trusted)
 			if err != nil || !user.SearchEnabled {
 				return model.ErrNotFound

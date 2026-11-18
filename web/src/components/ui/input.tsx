@@ -6,12 +6,29 @@ function Input({
   className,
   type,
   revealLabel = 'password',
+  ref,
   ...props
 }: React.ComponentProps<'input'> & { revealLabel?: string }) {
   const [visible, setVisible] = React.useState(false)
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
   const sensitive = type === 'password'
+  React.useEffect(() => {
+    if (sensitive && props.value === '') setVisible(false)
+  }, [sensitive, props.value])
+  React.useEffect(() => {
+    const element = inputRef.current
+    if (!sensitive || !element) return
+    const reset = () => setVisible(false)
+    element.addEventListener('reset-sensitive', reset)
+    return () => element.removeEventListener('reset-sensitive', reset)
+  }, [sensitive])
   const input = (
     <input
+      ref={(node) => {
+        inputRef.current = node
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+      }}
       type={sensitive && visible ? 'text' : type}
       data-sensitive={sensitive || undefined}
       data-slot="input"

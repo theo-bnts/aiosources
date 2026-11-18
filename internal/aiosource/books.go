@@ -21,7 +21,8 @@ const openLibraryAgent = "AIOSources/" + Version + " (+https://github.com/theo-b
 
 func trustedBookExport(r *http.Request, via []*http.Request) error {
 	host := r.URL.Hostname()
-	if len(via) > 5 || r.URL.Scheme != "https" || r.URL.User != nil || !(host == "openlibrary.org" || host == "archive.org" || strings.HasSuffix(host, ".archive.org")) {
+	port := r.URL.Port()
+	if len(via) > 5 || r.URL.Scheme != "https" || r.URL.User != nil || (port != "" && port != "443") || !(host == "openlibrary.org" || host == "archive.org" || strings.HasSuffix(host, ".archive.org")) {
 		return errors.New("untrusted book export redirect")
 	}
 	return nil
@@ -184,6 +185,11 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 		client = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}
 	}
 	defer client.CloseIdleConnections()
+	if client.CheckRedirect != nil {
+		if err = client.CheckRedirect(req, nil); err != nil {
+			return err
+		}
+	}
 	headerTimeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
 	if err != nil {
 		return err

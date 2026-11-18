@@ -35,6 +35,16 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
+    if (!info.trusted) return
+    const clear = () => {
+      request.current?.abort()
+      setPending(false)
+      setConnection(undefined)
+    }
+    window.addEventListener('session-expired', clear)
+    return () => window.removeEventListener('session-expired', clear)
+  }, [info.trusted])
+  useEffect(() => {
     if ((saved?.credential ?? '') !== connectionCredential.current) setConnection(undefined)
   }, [saved])
   useEffect(() => {
@@ -115,7 +125,15 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   }
   const credential = connection ? torznabPreferenceKey(connection.api_key, options) : ''
   const preferenceError = torznabPreferenceError(connection?.api_key ?? '', options)
-  const endpoint = connection ? new URL(connection.url, window.location.origin) : null
+  let endpoint: URL | null = null
+  if (connection) {
+    try {
+      const parsed = new URL(connection.url, window.location.origin)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') endpoint = parsed
+    } catch {
+      endpoint = null
+    }
+  }
   const full = connection ? `${connection.url}?apikey=${encodeURIComponent(credential)}` : ''
   return (
     <div className="page max-w-4xl">

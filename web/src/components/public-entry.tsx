@@ -95,6 +95,12 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
     setManifest('')
   }, [location.pathname])
   useEffect(() => {
+    if (!info.trusted) return
+    const clear = () => setManifest('')
+    window.addEventListener('session-expired', clear)
+    return () => window.removeEventListener('session-expired', clear)
+  }, [info.trusted])
+  useEffect(() => {
     if (credential?.credential !== manifestCredential.current) setManifest('')
   }, [credential])
   useEffect(() => {
@@ -207,12 +213,14 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
               manualCopyMessage="Clipboard access is unavailable. Reveal the manifest URL and copy it manually."
               successMessage="Copied to your clipboard. Keep it private."
             />
-            <Button variant="outline" asChild>
-              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
-                <PlusIcon aria-hidden="true" />
-                Install in Stremio
-              </a>
-            </Button>
+            {/^https?:\/\//.test(manifest) && (
+              <Button variant="outline" asChild>
+                <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+                  <PlusIcon aria-hidden="true" />
+                  Install in Stremio
+                </a>
+              </Button>
+            )}
           </div>
         </section>
       )}

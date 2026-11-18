@@ -2,9 +2,11 @@ package store
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"regexp"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -95,7 +97,7 @@ func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, nex
 	if err = tx.QueryRow(ctx, `SELECT password_hash FROM aiosources.admin_security WHERE singleton FOR UPDATE`).Scan(&configuredHash); err != nil {
 		return databaseError("read authentication verifier", err)
 	}
-	if string(configuredHash) != string(passwordHash) {
+	if subtle.ConstantTimeCompare(configuredHash, passwordHash) != 1 {
 		return ErrAuthentication
 	}
 	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions WHERE expires_at<=now()`); err != nil {
@@ -116,7 +118,15 @@ func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, nex
 		if count >= limit {
 			return ErrSecurityLimit
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.admin_sessions(id,token_hash,user_agent,expires_at) VALUES($1,$2,$3,$4)`, next.ID, next.TokenHash, next.UserAgent, next.ExpiresAt); err != nil {
+		userAgent := next.UserAgent
+		for len(userAgent) > 100 {
+			_, size := utf8.DecodeLastRuneInString(userAgent)
+			userAgent = userAgent[:len(userAgent)-size]
+		}
+		if !utf8.ValidString(userAgent) {
+			userAgent = "Other browser / Unknown OS"
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.admin_sessions(id,token_hash,user_agent,expires_at) VALUES($1,$2,$3,$4)`, next.ID, next.TokenHash, userAgent, next.ExpiresAt); err != nil {
 			return databaseError("create session", err)
 		}
 	}
@@ -217,7 +227,7 @@ func (s *Store) allowSignInAttempt(ctx context.Context, clientHash, section, glo
 	for _, bucket := range []struct {
 		key   string
 		limit int
-	}{{globalBucket, policy["login_global_per_minute"]}, {clientPrefix + clientHash, policy["login_per_minute"]}} {
+	}{{clientPrefix + clientHash, policy["login_per_minute"]}, {globalBucket, policy["login_global_per_minute"]}} {
 		var count int
 		err = tx.QueryRow(ctx, `INSERT INTO aiosources.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1)
  ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,

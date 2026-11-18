@@ -30,6 +30,16 @@ export function PublicSharedCatalogEntry({
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
+    if (!trusted) return
+    const clear = () => {
+      request.current?.abort()
+      setPending(false)
+      setConnection(undefined)
+    }
+    window.addEventListener('session-expired', clear)
+    return () => window.removeEventListener('session-expired', clear)
+  }, [trusted])
+  useEffect(() => {
     const allowed = new Set((info.sources ?? []).map((source) => source.id))
     const selected = options.sources ?? []
     const sources = selected.filter((id) => allowed.has(id))

@@ -51,7 +51,11 @@ func address(value string) (netip.Addr, bool) {
 	if err != nil || addr.Zone() != "" {
 		return netip.Addr{}, false
 	}
-	return addr.Unmap(), true
+	addr = addr.Unmap()
+	if addr.IsUnspecified() || addr.IsMulticast() {
+		return netip.Addr{}, false
+	}
+	return addr, true
 }
 
 func Direct(r *http.Request) string {
@@ -89,18 +93,14 @@ func (r Resolver) ClientIP(request *http.Request) string {
 	if len(parts) > 64 {
 		return direct
 	}
-	addresses := make([]netip.Addr, len(parts))
-	for i, part := range parts {
-		var valid bool
-		addresses[i], valid = address(strings.TrimSpace(part))
+	// Walk from the connected proxy towards the visitor, stopping at the first
+	// untrusted hop. Never take a caller-controlled leftmost address blindly.
+	for i := len(parts) - 1; i >= 0 && r.trusted(peer); i-- {
+		addr, valid := address(strings.TrimSpace(parts[i]))
 		if !valid {
 			return direct
 		}
-	}
-	// Walk from the connected proxy towards the visitor, stopping at the first
-	// untrusted hop. Never take a caller-controlled leftmost address blindly.
-	for i := len(addresses) - 1; i >= 0 && r.trusted(peer); i-- {
-		peer = addresses[i]
+		peer = addr
 	}
 	return peer.String()
 }

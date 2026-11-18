@@ -60,7 +60,15 @@ func (s *Service) CreateTrustedConnectionWithCredentials(ctx context.Context, gr
 			return "", e
 		}
 	}
-	value := TrustedConnection{Version: 1, UserID: user.ID, Generation: user.Generation, Audience: audience, Feature: feature, Preferences: prefs, Torznab: tz, Catalog: catalog}
+	value := TrustedConnection{Version: 1, UserID: user.ID, Generation: user.Generation, Audience: audience, Feature: feature}
+	switch feature {
+	case "stremio":
+		value.Preferences = prefs
+	case "torznab":
+		value.Torznab = tz
+	case "catalog":
+		value.Catalog = catalog
+	}
 	if personal != nil {
 		if personal.Trusted == nil || *personal.Trusted != grant || personal.Audience != audience {
 			return "", ErrAuth
@@ -98,7 +106,7 @@ func (s *Service) CreateTrustedConnectionWithCredentials(ctx context.Context, gr
 
 func (s *Service) OpenTrustedConnection(ctx context.Context, audience, feature, token string) (TrustedConnection, error) {
 	var value TrustedConnection
-	if len(token) < 32 || len(token) > MaxPublicInstallationSize {
+	if strings.TrimSpace(audience) == "" || len(token) < 32 || len(token) > MaxPublicInstallationSize {
 		return value, ErrAuth
 	}
 	var prefs model.StreamPreferences

@@ -37,15 +37,18 @@ type loginWindow struct {
 }
 
 type authentication struct {
-	mu               sync.Mutex
-	passwordHash     []byte
-	origin           string
-	secure           bool
-	db               *store.Store
-	attempts         map[string]loginWindow
-	passwordChecks   chan struct{}
-	passwordRequests chan struct{}
-	clientAddress    func(*http.Request) string
+	mu                      sync.Mutex
+	passwordHash            []byte
+	origin                  string
+	secure                  bool
+	db                      *store.Store
+	attempts                map[string]loginWindow
+	trustedAttempts         map[string]loginWindow
+	passwordChecks          chan struct{}
+	passwordRequests        chan struct{}
+	trustedPasswordChecks   chan struct{}
+	trustedPasswordRequests chan struct{}
+	clientAddress           func(*http.Request) string
 }
 
 func newAuthentication(password, publicURL string, db *store.Store) (*authentication, error) {
@@ -75,7 +78,7 @@ func newAuthentication(password, publicURL string, db *store.Store) (*authentica
 	if err != nil {
 		return nil, errors.New("could not initialize persistent administrator authentication")
 	}
-	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, attempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2), passwordRequests: make(chan struct{}, 8)}, nil
+	return &authentication{passwordHash: hash, origin: origin, secure: secure, db: db, attempts: make(map[string]loginWindow), trustedAttempts: make(map[string]loginWindow), passwordChecks: make(chan struct{}, 2), passwordRequests: make(chan struct{}, 8), trustedPasswordChecks: make(chan struct{}, 2), trustedPasswordRequests: make(chan struct{}, 8)}, nil
 }
 
 func randomToken() (string, error) {
@@ -111,9 +114,17 @@ func (a *authentication) current(r *http.Request) (session, bool) {
 }
 
 func (a *authentication) allowedOrigin(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
+	origins := r.Header.Values("Origin")
+	if len(origins) > 1 {
+		return false
+	}
+	origin := ""
+	if len(origins) == 1 {
+		origin = origins[0]
+	}
 	if origin == "" {
-		return true
+		site := r.Header.Get("Sec-Fetch-Site")
+		return site == "" || site == "same-origin" || site == "none"
 	}
 	expected := a.origin
 	if expected == "" {
@@ -177,14 +188,21 @@ func (a *authentication) allowRoleAttempt(r *http.Request, trusted bool) bool {
 	client := hex.EncodeToString(key[:])
 	now := time.Now()
 	a.mu.Lock()
-	for key, window := range a.attempts {
+	attempts := a.attempts
+	if trusted {
+		if a.trustedAttempts == nil {
+			a.trustedAttempts = make(map[string]loginWindow)
+		}
+		attempts = a.trustedAttempts
+	}
+	for key, window := range attempts {
 		if !now.Before(window.until) {
-			delete(a.attempts, key)
+			delete(attempts, key)
 		}
 	}
-	window, exists := a.attempts[client]
+	window, exists := attempts[client]
 	if !exists {
-		if len(a.attempts) >= 4096 {
+		if len(attempts) >= 4096 {
 			a.mu.Unlock()
 			return false
 		}
@@ -195,7 +213,7 @@ func (a *authentication) allowRoleAttempt(r *http.Request, trusted bool) bool {
 		return false
 	}
 	window.attempts++
-	a.attempts[client] = window
+	attempts[client] = window
 	a.mu.Unlock()
 	var allowed bool
 	if trusted {
@@ -301,7 +319,7 @@ func requestSessionReplacements(r *http.Request) store.SessionReplacements {
 		hash := sha256.Sum256([]byte(old.Value))
 		replaced.Administrator = hash[:]
 	}
-	if old, err := r.Cookie(trustedSessionCookie); err == nil && len(old.Value) == 43 {
+	if old, err := singleCookie(r, trustedSessionCookie); err == nil && len(old.Value) == 43 {
 		hash := sha256.Sum256([]byte(old.Value))
 		replaced.Trusted = hash[:]
 	}
@@ -378,7 +396,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://image.tmdb.org https://covers.openlibrary.org https://images.igdb.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if strings.HasPrefix(r.URL.Path, "/api/") {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/stremio/") || strings.HasPrefix(r.URL.Path, "/public/stremio/") || strings.HasPrefix(r.URL.Path, "/trusted/stremio/") || r.URL.Path == "/healthz" {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)

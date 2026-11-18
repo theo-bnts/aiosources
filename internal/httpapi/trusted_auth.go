@@ -120,10 +120,18 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, "Request origin is not allowed")
 		return
 	}
-	if !a.admitPasswordRequest(w) {
+	requests := a.trustedPasswordRequests
+	if requests == nil {
+		requests = a.passwordRequests
+	}
+	select {
+	case requests <- struct{}{}:
+		defer func() { <-requests }()
+	default:
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusTooManyRequests, "Authentication is temporarily busy. Try again shortly.")
 		return
 	}
-	defer func() { <-a.passwordRequests }()
 	if !a.allowRoleAttempt(r, true) {
 		w.Header().Set("Retry-After", "60")
 		writeError(w, 429, "Authentication is temporarily unavailable or rate limited. Try again in one minute.")
@@ -137,8 +145,12 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	email, _ := store.NormalizeTrustedEmail(input.Email)
-	accountHash := sha256.Sum256([]byte("aiosources/trusted-login/v1\x00" + email))
+	email, emailErr := store.NormalizeTrustedEmail(input.Email)
+	accountKey := email
+	if emailErr != nil {
+		accountKey = strings.ToLower(strings.TrimSpace(input.Email))
+	}
+	accountHash := sha256.Sum256([]byte("aiosources/trusted-login/v1\x00" + accountKey))
 	allowed, admissionErr := a.db.AllowTrustedAccountAttempt(r.Context(), hex.EncodeToString(accountHash[:]))
 	if admissionErr != nil || !allowed {
 		w.Header().Set("Retry-After", "60")
@@ -155,13 +167,17 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 	if hash == "" {
 		hash = trustedPasswordPrefix + "AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	}
+	checks := a.trustedPasswordChecks
+	if checks == nil {
+		checks = a.passwordChecks
+	}
 	select {
-	case a.passwordChecks <- struct{}{}:
+	case checks <- struct{}{}:
 	case <-r.Context().Done():
 		return
 	}
 	valid := checkTrustedPassword(hash, input.Password)
-	<-a.passwordChecks
+	<-checks
 	input.Password = ""
 	if !valid || err != nil {
 		writeError(w, 401, "Incorrect email or password")

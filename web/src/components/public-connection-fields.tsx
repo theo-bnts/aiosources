@@ -11,6 +11,7 @@ import { usePublicCredential } from '@/lib/public-credentials'
 export function clearPublicCredentials(form: HTMLFormElement) {
   for (const input of form.querySelectorAll<HTMLInputElement>('input[data-sensitive][name]')) {
     input.value = ''
+    input.dispatchEvent(new Event('reset-sensitive'))
   }
 }
 export type PublicInfo = {

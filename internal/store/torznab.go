@@ -123,16 +123,16 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 	if len(filters.Providers) > 0 {
 		clauses = append(clauses, "t.provider_id=ANY("+bind(filters.Providers)+"::text[])")
 	}
+	for _, service := range q.Services {
+		if !model.IsDebridService(service) {
+			return result, model.ErrInvalid
+		}
+	}
 	cached := "false"
 	if policy.Public || q.CachedOnly {
 		services := q.Services
 		if services == nil {
 			services = model.DebridServices()
-		}
-		for _, service := range services {
-			if !model.IsDebridService(service) {
-				return result, model.ErrInvalid
-			}
 		}
 		cached = "EXISTS(SELECT 1 FROM aiosources.aio_shared_availability availability WHERE availability.hash=t.search_info_hash AND availability.service=ANY(" + bind(services) + "::text[]) AND availability.cached AND availability.checked_at>" + bind(policy.CacheAfter) + " AND availability.checked_at<=now())"
 
@@ -160,7 +160,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		clauses = append(clauses, bookTitleSearchSQL(q.BookTitle, bind))
 	}
 	if q.Author != "" {
-		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+")")
+		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+` ESCAPE '\')`)
 	}
 	if q.ISBN != "" {
 		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")

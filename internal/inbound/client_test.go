@@ -23,6 +23,7 @@ func TestTrustedHeadersAndChainsNeverTrustUnapprovedPeers(t *testing.T) {
 		{"comma single", "10.0.0.2:1234", "CF-Connecting-IP", "single", "203.0.113.9, 192.0.2.5", "10.0.0.2", false},
 		{"forwarded chain", "10.0.0.2:1234", "X-Forwarded-For", "chain", "203.0.113.9, 10.0.0.3", "203.0.113.9", false},
 		{"injected leftmost", "10.0.0.2:1234", "X-Forwarded-For", "chain", "198.51.100.7, 203.0.113.9, 10.0.0.3", "203.0.113.9", false},
+		{"injected invalid leftmost", "10.0.0.2:1234", "X-Forwarded-For", "chain", "invalid, 203.0.113.9, 10.0.0.3", "203.0.113.9", false},
 		{"untrusted intermediate", "10.0.0.2:1234", "X-Forwarded-For", "chain", "203.0.113.9, 192.0.2.5", "192.0.2.5", false},
 		{"empty chain item", "10.0.0.2:1234", "X-Forwarded-For", "chain", "203.0.113.9,,10.0.0.3", "10.0.0.2", false},
 		{"duplicate chain", "10.0.0.2:1234", "X-Forwarded-For", "chain", "203.0.113.9", "203.0.113.9", true},

@@ -25,11 +25,11 @@ func (s IncomingNetwork) Validate() error {
 		return errors.New("Add at least one trusted proxy IP address or network before enabling header trust")
 	}
 	for _, value := range s.TrustedProxies {
-		if addr, err := netip.ParseAddr(value); err == nil && addr.Zone() == "" {
+		if addr, err := netip.ParseAddr(value); err == nil && addr.Zone() == "" && !addr.Unmap().IsUnspecified() && !addr.Unmap().IsMulticast() {
 			continue
 		}
 		prefix, err := netip.ParsePrefix(value)
-		if err != nil || prefix.Bits() == 0 || prefix.Addr().Is4In6() {
+		if err != nil || prefix.Bits() == 0 || prefix.Addr().Is4In6() || prefix.Addr().IsUnspecified() || prefix.Addr().IsMulticast() {
 			return errors.New("Trusted proxies must be IP addresses or CIDR networks; trusting every address is not allowed")
 		}
 	}

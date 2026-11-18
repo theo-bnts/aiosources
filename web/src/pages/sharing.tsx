@@ -1084,12 +1084,18 @@ function PasswordDialog({
   const stremio = credential.share.format === 'stremio'
   const torznab = credential.share.format === 'torznab'
   const kind = stremio ? 'manifest URL' : torznab ? 'API key' : 'password'
-  const manifest = stremio
-    ? new URL(
+  let manifest = ''
+  if (stremio) {
+    try {
+      const url = new URL(
         `${credential.share.url}.${credential.password}/manifest.json`,
         window.location.origin,
-      ).toString()
-    : ''
+      )
+      if (url.protocol === 'http:' || url.protocol === 'https:') manifest = url.toString()
+    } catch {
+      manifest = ''
+    }
+  }
   const secret = stremio ? manifest : credential.password
   return (
     <Dialog

@@ -3,6 +3,8 @@ package httpapi
 import (
 	"net/http"
 	"time"
+
+	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 // Existing sessions remain valid during the application-name transition. A
@@ -10,10 +12,26 @@ import (
 // to a different identity hidden in an older cookie.
 const previousSessionCookie = "ingest_session"
 
+func singleCookie(r *http.Request, name string) (*http.Cookie, error) {
+	var found *http.Cookie
+	for _, candidate := range r.Cookies() {
+		if candidate.Name == name {
+			if found != nil {
+				return nil, store.ErrAuthentication
+			}
+			found = candidate
+		}
+	}
+	if found == nil {
+		return nil, http.ErrNoCookie
+	}
+	return found, nil
+}
+
 func requestSessionCookie(r *http.Request) (*http.Cookie, error) {
-	cookie, err := r.Cookie(sessionCookie)
+	cookie, err := singleCookie(r, sessionCookie)
 	if err == http.ErrNoCookie {
-		return r.Cookie(previousSessionCookie)
+		return singleCookie(r, previousSessionCookie)
 	}
 	return cookie, err
 }
