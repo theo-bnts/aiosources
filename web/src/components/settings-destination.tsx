@@ -61,14 +61,19 @@ export function SettingsDestination() {
           : document.getElementById('main-content')
       if (!root) return
       if (root.dataset.settingsEditor && entity && root.dataset.settingsEntity !== entity) return
+      let waitingForOpen = false
       for (const summary of root.querySelectorAll<HTMLElement>('details:not([open]) > summary')) {
-        const title = summary.textContent?.trim()
+        const title = (
+          summary.parentElement?.getAttribute('data-settings-section') ?? summary.textContent
+        )?.trim()
         if (title && setting.reveal?.includes(title) && !opened.has(summary)) {
           opened.add(summary)
           revealSettingParents(summary.parentElement!)
           summary.click()
+          if (!summary.parentElement?.hasAttribute('open')) waitingForOpen = true
         }
       }
+      if (waitingForOpen) return
       let control = setting.control ? document.getElementById(setting.control) : undefined
       if (control && !root.contains(control)) control = undefined
       if (!control && setting.entity === 'tracker' && entity) {
@@ -83,9 +88,10 @@ export function SettingsDestination() {
         root.querySelector('[data-settings-editor="source"]') &&
         !client.isFetching()
       ) {
-        const section = [...root.querySelectorAll<HTMLElement>('[data-settings-section]')].find(
-          (section) => section.dataset.settingsSection === setting.fallback,
-        )
+        const sections = [...root.querySelectorAll<HTMLElement>('[data-settings-section]')]
+        const section =
+          sections.find((item) => item.dataset.settingsSection === setting.fallback) ??
+          sections.find((item) => setting.reveal?.includes(item.dataset.settingsSection ?? ''))
         control = section?.querySelector<HTMLElement>(':scope > summary, h3')
         if (control && !explainedFallback) {
           explainedFallback = true

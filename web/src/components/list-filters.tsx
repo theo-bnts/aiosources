@@ -74,7 +74,9 @@ export function ListFilters({
           ? 'Access'
           : kind === 'share'
             ? 'Share'
-            : 'Proxy'
+            : kind === 'secret'
+              ? 'Secret'
+              : 'Proxy'
   return (
     <section className="space-y-3 rounded-md border border-border p-4" aria-label={label}>
       <div className="flex flex-wrap items-end gap-3">

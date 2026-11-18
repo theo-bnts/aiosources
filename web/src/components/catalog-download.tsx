@@ -52,6 +52,9 @@ export function DownloadAction({
   const [selectedFile, setSelectedFile] = useState(selection.file ?? '')
   const fileSelection = { ...selection, ...(selectedFile ? { file: selectedFile } : {}) }
   const [waiting, setWaiting] = useState(preparing)
+  useEffect(() => {
+    if (preparing) setWaiting(true)
+  }, [preparing])
   const [notReady, setNotReady] = useState(false)
   const [operation, setOperation] = useState(operationID ?? '')
   const [checkVersion, setCheckVersion] = useState(0)

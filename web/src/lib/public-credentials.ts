@@ -127,13 +127,14 @@ export async function publicAPI<T>(
   configuration: string,
   init: RequestInit = {},
   remembered = configuration,
+  scope = '',
 ) {
   const headers = new Headers(init.headers)
   if (configuration) headers.set('Authorization', `Bearer ${configuration}`)
   try {
     return await api<T>(`/public${path}`, { ...init, headers, cache: 'no-store' })
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) forgetPublicCredential(remembered)
+    if (error instanceof ApiError && error.status === 401) forgetPublicCredential(remembered, scope)
     throw error
   }
 }

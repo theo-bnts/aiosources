@@ -12,8 +12,18 @@ export function defaultLanguagePreferences(): LanguagePreferences {
 export function browserLanguage() {
   return (navigator.languages?.[0] || navigator.language || 'en').split(/[-_]/)[0].toLowerCase()
 }
+const languageNames = new Intl.DisplayNames(['en'], { type: 'language' })
+
+export function languageDisplayName(code: string) {
+  if (!code) return ''
+  try {
+    return languageNames.of(code) || code
+  } catch {
+    return code
+  }
+}
+
 export function languageChoices(selected: string[] = []) {
-  const names = new Intl.DisplayNames(['en'], { type: 'language' })
   return [
     ...new Set(
       [
@@ -55,7 +65,7 @@ export function languageChoices(selected: string[] = []) {
       ].filter(Boolean),
     ),
   ]
-    .map((value) => ({ value, label: names.of(value) || value }))
+    .map((value) => ({ value, label: languageDisplayName(value) }))
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 export function resolvedLanguage(value: LanguagePreferences) {
@@ -135,7 +145,7 @@ export function preferenceManifest(
   ) {
     const preferences = { language: resolvedLanguage(value), mode: value.mode, ...options }
     const data = new TextEncoder().encode(JSON.stringify(preferences))
-    const encoded = btoa(String.fromCharCode(...data))
+    const encoded = btoa(Array.from(data, (byte) => String.fromCharCode(byte)).join(''))
       .replaceAll('+', '-')
       .replaceAll('/', '_')
       .replace(/=+$/, '')

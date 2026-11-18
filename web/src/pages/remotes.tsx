@@ -148,7 +148,8 @@ export function RemoteStatisticsPage() {
                       source={remote.name || remote.id}
                       counts={counts.bySource.get(remote.id)}
                       unavailable={counts.isError}
-                      totals={counts.totals}
+                      totals={totals}
+                      remote
                     />
                     <p className="help">
                       Last successful sync:{' '}
@@ -442,6 +443,7 @@ function RemoteDocument({
     enabled: Boolean(remote),
     staleTime: 0,
     gcTime: 0,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
   })
   if (remote && document.isPending) return <Loading label="Loading remote definition" />
@@ -465,6 +467,9 @@ function RemoteForm({
   const [localError, setLocalError] = useState<Error | null>(null)
   function change<K extends keyof RemoteDraft>(key: K, value: RemoteDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
+    setLocalError(null)
+    setReloaded(false)
+    save.reset()
   }
   const save = useMutation({
     gcTime: 0,
@@ -495,8 +500,8 @@ function RemoteForm({
       } catch (error) {
         throw safeConfigurationError(error)
       }
-      setOriginal(result)
       await refreshData()
+      setOriginal(result)
       onSaved()
     },
     onMutate: () => onSaving(true),

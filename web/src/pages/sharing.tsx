@@ -770,6 +770,37 @@ function ShareForm({
       return current
     },
     onSuccess: (current) => {
+      if (original) {
+        if (name === original.name) setName(current.name)
+        if (scope === original.scope) setScope(current.scope)
+        if (JSON.stringify(sourceIDs) === JSON.stringify(original.source_ids))
+          setSourceIDs(current.source_ids)
+        if (JSON.stringify(fields) === JSON.stringify(original.fields)) setFields(current.fields)
+        if (JSON.stringify(catalogEntities) === JSON.stringify(original.catalog_entities ?? {}))
+          setCatalogEntities(current.catalog_entities ?? {})
+        if (expiresAt === (original.expires_at ?? '')) setExpiresAt(current.expires_at ?? '')
+        if (requestsPerMinute === limitValue(original.requests_per_minute, requestsDefault))
+          setRequestsPerMinute(limitValue(current.requests_per_minute, requestsDefault))
+        if (
+          maxConcurrentDownloads ===
+          limitValue(original.max_concurrent_downloads, concurrentDefault)
+        )
+          setMaxConcurrentDownloads(limitValue(current.max_concurrent_downloads, concurrentDefault))
+        if (JSON.stringify(mediaTypes) === JSON.stringify(original.media_types ?? []))
+          setMediaTypes(current.media_types ?? [])
+        if (
+          stremio &&
+          stremioPreferencesKey(streamPreferences) ===
+            stremioPreferencesKey(original.stream_preferences ?? defaultStremioPreferences())
+        )
+          setStreamPreferences(current.stream_preferences ?? defaultStremioPreferences())
+        if (
+          torznab &&
+          JSON.stringify(torznabPreferences) ===
+            JSON.stringify(torznabCachePreferences(original.torznab_preferences ?? {}))
+        )
+          setTorznabPreferences(torznabCachePreferences(current.torznab_preferences ?? {}))
+      }
       setOriginal(current)
       setReloaded(true)
       save.reset()

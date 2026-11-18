@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { useBrowserPreferences } from '@/lib/browser-preferences'
 import { dateTimeToISO, localDateTime } from '@/lib/format'
 import { Input } from '@/components/ui/input'
@@ -21,14 +21,35 @@ export function DateTimeInput({
   defaultValue,
   onValueChange,
   precision = 'minutes',
+  ref,
   ...props
 }: Props) {
   useBrowserPreferences()
   const [local, setLocal] = useState(defaultValue ?? '')
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    setLocal(defaultValue ?? '')
+  }, [defaultValue])
+  useEffect(() => {
+    if (value !== undefined) return
+    const form = inputRef.current?.form
+    const reset = (event: Event) => {
+      queueMicrotask(() => {
+        if (!event.defaultPrevented) setLocal(defaultValue ?? '')
+      })
+    }
+    form?.addEventListener('reset', reset)
+    return () => form?.removeEventListener('reset', reset)
+  }, [defaultValue, value])
   const instant = value === undefined ? local : value
   return (
     <Input
       {...props}
+      ref={(node) => {
+        inputRef.current = node
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+      }}
       type="datetime-local"
       min="0001-01-01T00:00"
       max="9999-12-31T23:59:59.999"

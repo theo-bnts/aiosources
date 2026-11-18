@@ -80,7 +80,16 @@ export function OccurrenceNavigationProvider({ children }: { children: ReactNode
             new URLSearchParams(origin.search).toString() === next.toString()
           ) {
             void navigate(-1)
-          } else setSearch(next, { replace: true, preventScrollReset: true })
+          } else {
+            const state =
+              location.state && typeof location.state === 'object' ? { ...location.state } : {}
+            delete (state as Record<string, unknown>).occurrenceReturn
+            setSearch(next, {
+              replace: true,
+              preventScrollReset: true,
+              state: Object.keys(state).length ? state : undefined,
+            })
+          }
         },
         returnFocus: () => {
           if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true })

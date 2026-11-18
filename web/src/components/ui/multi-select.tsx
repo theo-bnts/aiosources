@@ -91,7 +91,7 @@ export function MultiSelect({
             >
               {allLabel}
             </DropdownMenu.Item>
-            <DropdownMenu.Separator className="my-1 h-px bg-border" />
+            {groups.length > 0 && <DropdownMenu.Separator className="my-1 h-px bg-border" />}
             {groups.map((group) => {
               const members = options.filter((option) => (option.group ?? '') === group)
               const parent =

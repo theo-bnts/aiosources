@@ -265,6 +265,7 @@ function ChangeFieldDiff({ change }: { change: TorrentChange }) {
 
 function ChangeEntry({ change }: { change: TorrentChange }) {
   const date = useDate()
+  const listState = useListViewState()
   return (
     <Disclosure
       title={
@@ -290,6 +291,7 @@ function ChangeEntry({ change }: { change: TorrentChange }) {
         <Link
           className="data-link inline-flex items-center gap-2 break-all text-xs"
           to={`/runs/${encodeURIComponent(change.run_id)}?tab=changes`}
+          state={listState}
         >
           Run {change.run_id}
           <ArrowRightIcon className="shrink-0" />
@@ -318,8 +320,16 @@ export function OccurrenceDialog({
   const date = useDate()
   const sourceName = useSourceNames()
   const listState = useListViewState()
-  const historyPage = useURLPagination({ limitKey: 'history_limit', offsetKey: 'history_offset' })
-  const relatedPage = useURLPagination({ limitKey: 'related_limit', offsetKey: 'related_offset' })
+  const historyPage = useURLPagination({
+    limitKey: 'history_limit',
+    offsetKey: 'history_offset',
+    replace: true,
+  })
+  const relatedPage = useURLPagination({
+    limitKey: 'related_limit',
+    offsetKey: 'related_offset',
+    replace: true,
+  })
   const [search, setSearch] = useViewSearchParams()
   const valid = /^[a-f0-9]{64}$/.test(id)
   const historyOffset = historyPage.offset

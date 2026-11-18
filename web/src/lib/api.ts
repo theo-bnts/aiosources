@@ -232,11 +232,15 @@ async function invalidateData(cancelRefetch: boolean) {
       'catalog-search',
       'catalog-title',
       'catalog-releases',
+      'catalog-torrents',
       'stremio-statistics',
       'stremio-requests',
+      'stremio-request',
       'security',
       'collection-settings',
       'network-settings',
+      'storage-settings',
+      'storage-indexes',
     ].map((key) =>
       queryClient.invalidateQueries(
         {

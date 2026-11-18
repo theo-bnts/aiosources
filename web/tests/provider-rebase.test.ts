@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { rebaseProviderJSON } from '../src/lib/provider-json.ts'
+import { parseProviderJSON, rebaseProviderJSON } from '../src/lib/provider-json.ts'
 
 test('source edits merge with concurrent settings without rounding numbers or rewriting custom cron', () => {
   const base =
@@ -27,6 +27,18 @@ test('independent additions and deletions merge while format-only edits preserve
   assert.deepEqual(merged.conflicts, [])
   assert.deepEqual(JSON.parse(merged.json), { local: 2, remote: 3 })
   assert.equal(rebaseProviderJSON('{"n":1}', '{ "n" : 1 }', '{"n":2}').json, '{"n":2}')
+  const nullBase = rebaseProviderJSON(
+    '{"mapping":{"fields":null}}',
+    '{"mapping":{"fields":{"title":"/title"}}}',
+    '{"mapping":{"fields":{"size":"/size"}}}',
+  )
+  assert.deepEqual(nullBase.conflicts, [])
+  assert.deepEqual(JSON.parse(nullBase.json), {
+    mapping: { fields: { size: '/size', title: '/title' } },
+  })
+  const doc = parseProviderJSON('{"mapping":null}')
+  doc.setRawIn(['mapping', 'fields', 'title'], '"/title"')
+  assert.deepEqual(JSON.parse(doc.toString()), { mapping: { fields: { title: '/title' } } })
 })
 
 test('invalid source versions cannot be merged into a valid local draft', () => {

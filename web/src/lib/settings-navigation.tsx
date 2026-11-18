@@ -44,7 +44,10 @@ export function useSettingsEditor<T extends { id: string }>(
     }
     const destination = settingsEditorDestination(location)
     if (destination?.entity !== entity) {
-      const closeEditor = handled.current?.editor || location.state?.settingsNavigation
+      const closeEditor =
+        handled.current?.editor ||
+        Boolean(handled.current && currentSelection) ||
+        location.state?.settingsNavigation
       handled.current = { key: navigationKey, editor: false }
       if (closeEditor) closeCallback.current()
       return
@@ -77,17 +80,26 @@ export function highlightSetting(element: HTMLElement) {
     element = element.closest<HTMLElement>('.field') ?? element.parentElement ?? element
   element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
   const focusable = element.matches(
-    'input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex]',
+    'a[href], summary, input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex]',
   )
+  const removeTabIndex = () => element.removeAttribute('tabindex')
   if (!focusable) {
     element.setAttribute('tabindex', '-1')
-    element.addEventListener('blur', () => element.removeAttribute('tabindex'), { once: true })
+    element.addEventListener('blur', removeTabIndex, { once: true })
   }
   element.focus({ preventScroll: true })
+  if (!focusable && document.activeElement !== element) {
+    element.removeEventListener('blur', removeTabIndex)
+    removeTabIndex()
+  }
   element.setAttribute('data-setting-highlight', '')
   const timeout = window.setTimeout(() => element.removeAttribute('data-setting-highlight'), 4000)
   return () => {
     window.clearTimeout(timeout)
+    if (!focusable) {
+      element.removeEventListener('blur', removeTabIndex)
+      if (document.activeElement !== element) removeTabIndex()
+    }
     element.removeAttribute('data-setting-highlight')
   }
 }

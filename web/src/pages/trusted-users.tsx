@@ -284,7 +284,7 @@ function UserEditor({
               />
             </Disclosure>
           </fieldset>
-          <ErrorNotice error={error} scope="action" />
+          <ErrorNotice error={error} />
           <DialogFooter>
             <Button type="submit" disabled={pending || !dirty}>
               <FloppyDiskIcon aria-hidden="true" />

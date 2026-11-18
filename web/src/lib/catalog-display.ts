@@ -2,7 +2,7 @@ import type { CatalogShare, ConnectionFormat } from './catalog-types'
 import { stremioMediaTypes, torznabMediaTypes } from './connection-options.ts'
 import { serviceNames } from './debrid.ts'
 import { number } from './format.ts'
-import { resolvedLanguage } from './language-preferences.ts'
+import { languageDisplayName, resolvedLanguage } from './language-preferences.ts'
 import { sortFields } from './result-preferences.ts'
 
 const publishedFields: Record<string, string> = {
@@ -47,7 +47,7 @@ export function connectionSummary(
   const language = share.stream_preferences
   if (stremio && language?.mode && language.mode !== 'all') {
     const preferred = resolvedLanguage(language)
-    const label = new Intl.DisplayNames(['en'], { type: 'language' }).of(preferred) || preferred
+    const label = languageDisplayName(preferred)
     filters.push(
       label +
         (language.mode === 'preferred'

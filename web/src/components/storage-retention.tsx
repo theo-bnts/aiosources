@@ -86,10 +86,20 @@ export function StorageRetentionPanel() {
     request_results: String(query.data?.request_results ?? true),
   }
   function edit(key: string, value: string) {
-    setDraft({
-      revision: draft?.revision ?? query.data!.revision,
-      values: { ...values, [key]: value },
-    })
+    const saved = query.data
+    const revision = draft?.revision ?? saved!.revision
+    const nextValues = { ...values, [key]: value }
+    if (
+      saved &&
+      revision === saved.revision &&
+      nextValues.request_limit === String(saved.request_limit) &&
+      nextValues.request_results === String(saved.request_results) &&
+      groups.every(([k]) => nextValues[k] === (saved.days[k] === -1 ? '' : String(saved.days[k])))
+    ) {
+      setDraft(null)
+    } else {
+      setDraft({ revision, values: nextValues })
+    }
     save.reset()
   }
   const save = useMutation({
@@ -112,9 +122,8 @@ export function StorageRetentionPanel() {
           values[key] !== (query.data?.days[key] === -1 ? '' : String(query.data?.days[key])),
       ))
   const conflict =
-    draft !== null &&
-    (draft.revision !== query.data?.revision ||
-      (save.error instanceof ApiError && save.error.status === 409))
+    (draft !== null && draft.revision !== query.data?.revision) ||
+    (save.error instanceof ApiError && save.error.status === 409)
   const invalid =
     !/^\d+$/.test(values.request_limit ?? '') ||
     Number(values.request_limit) > 1000000 ||
@@ -181,13 +190,7 @@ export function StorageRetentionPanel() {
                       value={values[key] ?? ''}
                       placeholder="Default retention"
                       disabled={save.isPending}
-                      onChange={(event) => {
-                        setDraft({
-                          revision: draft?.revision ?? query.data!.revision,
-                          values: { ...values, [key]: event.target.value },
-                        })
-                        save.reset()
-                      }}
+                      onChange={(event) => edit(key, event.target.value)}
                     />
                     <StorageImpact storage={storage} performance={performance} />
                   </div>
@@ -252,7 +255,14 @@ export function StorageRetentionPanel() {
                   <FloppyDiskIcon aria-hidden="true" />
                   {save.isPending ? 'Saving…' : 'Save'}
                 </Button>
-                <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
+                <FormStatus
+                  dirty={dirty}
+                  saving={save.isPending}
+                  saved={save.isSuccess}
+                  message={
+                    dirty && invalid ? 'Enter whole numbers within the allowed ranges.' : undefined
+                  }
+                />
               </div>
             </form>
           )}

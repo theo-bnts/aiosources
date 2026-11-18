@@ -304,7 +304,17 @@ export function OptionalSection({
   )
 }
 
-function MapRow({ path, name, strings }: { path: ProviderPath; name: string; strings: boolean }) {
+function MapRow({
+  path,
+  name,
+  strings,
+  excludeKeys = [],
+}: {
+  path: ProviderPath
+  name: string
+  strings: boolean
+  excludeKeys?: readonly string[]
+}) {
   const { document, change, reportDraft } = useSourceEditor()
   const [key, setKey] = useState(name)
   const id = useId()
@@ -320,6 +330,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
           value={key}
           onChange={(event) => {
             setKey(event.target.value)
+            setError('')
             reportDraft(id, event.target.value !== name)
           }}
         />
@@ -328,7 +339,7 @@ function MapRow({ path, name, strings }: { path: ProviderPath; name: string; str
             size="sm"
             variant="outline"
             onClick={() => {
-              if (!key || document.keysIn(path).includes(key)) {
+              if (!key || document.keysIn(path).includes(key) || excludeKeys.includes(key)) {
                 setError('Enter a nonempty, unique key.')
                 return
               }
@@ -421,7 +432,13 @@ export function MapField({
       ) : (
         <>
           {keys.map((name) => (
-            <MapRow key={name} path={path} name={name} strings={strings} />
+            <MapRow
+              key={name}
+              path={path}
+              name={name}
+              strings={strings}
+              excludeKeys={excludeKeys}
+            />
           ))}
           {!keys.length && <p className="help">No entries configured.</p>}
           <div className="flex flex-wrap items-end gap-2">
@@ -483,6 +500,7 @@ export function ArrayField({
   children,
 }: FieldProps & { initial: unknown; children: (path: ProviderPath, index: number) => ReactNode }) {
   const { document, change } = useSourceEditor()
+  const [version, setVersion] = useState(0)
   const count = document.lengthIn(path)
   const kind = document.kindIn(path)
   return (
@@ -501,7 +519,7 @@ export function ArrayField({
       ) : (
         <>
           {Array.from({ length: count }, (_, index) => (
-            <div className="space-y-4 border-l-2 border-border pl-4" key={index}>
+            <div className="space-y-4 border-l-2 border-border pl-4" key={`${version}:${index}`}>
               <div className="flex items-center justify-between gap-3">
                 <span className="mono text-muted-foreground">
                   {label} · {index + 1}
@@ -510,7 +528,10 @@ export function ArrayField({
                   variant="warning"
                   size="icon-sm"
                   aria-label={`Remove ${label} ${index + 1}`}
-                  onClick={() => change((next) => next.deleteIn([...path, index]))}
+                  onClick={() => {
+                    setVersion((current) => current + 1)
+                    change((next) => next.deleteIn([...path, index]))
+                  }}
                 >
                   <TrashIcon />
                 </Button>

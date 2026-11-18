@@ -17,6 +17,7 @@ export function InfoTip({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const keyboard = useRef(false)
   const opened = useRef(false)
+  const hadFocusInside = useRef(false)
   const [open, setOpen] = useState(false)
   const [pinned, setPinned] = useState(false)
   const [layer, setLayer] = useState({ dialog: false, top: 8 })
@@ -25,8 +26,11 @@ export function InfoTip({
   }
   function changeOpen(next: boolean) {
     cancelClose()
+    if (!next) {
+      hadFocusInside.current = Boolean(content.current?.contains(document.activeElement))
+      setPinned(false)
+    }
     opened.current = next
-    if (!next) setPinned(false)
     if (next) setLayer(popupLayer(trigger.current))
     setOpen(next)
   }
@@ -95,7 +99,9 @@ export function InfoTip({
             onCloseAutoFocus={(event) => {
               // Focus restoration is deferred by the popup. A previous hover
               // must not steal focus after this help has already opened again.
-              if (!keyboard.current || opened.current) event.preventDefault()
+              if ((!keyboard.current && !hadFocusInside.current) || opened.current)
+                event.preventDefault()
+              hadFocusInside.current = false
             }}
             onPointerEnter={cancelClose}
             onPointerLeave={closeLater}

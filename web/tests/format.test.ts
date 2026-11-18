@@ -42,9 +42,11 @@ test('date fields follow browser local time, including daylight saving and expir
       '2026-10-25T02:30:10.000Z',
     )
     assert.equal(dateTimeToISO('', repeatedHour, 'seconds'), null)
+    assert.equal(dateTimeToISO('invalid', repeatedHour, 'seconds'), null)
     process.env.TZ = 'UTC'
     assert.equal(localDateTime('2026-07-02T03:04:05Z', 'seconds'), '2026-07-02T03:04:05')
-    for (const value of [undefined, null, '', 'invalid']) assert.equal(localDateTime(value), '')
+    for (const value of [undefined, null, '', 'invalid', '+010000-01-01T00:00:00Z'])
+      assert.equal(localDateTime(value), '')
   } finally {
     if (original === undefined) delete process.env.TZ
     else process.env.TZ = original

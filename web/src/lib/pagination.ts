@@ -12,7 +12,8 @@ export function normalizePageOffset(value: string | number | null, limit = pageS
 export function useURLPagination({
   limitKey = 'limit',
   offsetKey = 'offset',
-}: { limitKey?: string; offsetKey?: string } = {}) {
+  replace = false,
+}: { limitKey?: string; offsetKey?: string; replace?: boolean } = {}) {
   const { pageSize: preferredSize } = useBrowserPreferences()
   const [search, setSearch] = useViewSearchParams()
   return {
@@ -23,7 +24,7 @@ export function useURLPagination({
       next.delete(limitKey)
       const offset = normalizePageOffset(value, preferredSize)
       if (offset) next.set(offsetKey, String(offset))
-      setSearch(next)
+      setSearch(next, replace ? { replace: true, preventScrollReset: true } : undefined)
     },
   }
 }

@@ -40,7 +40,7 @@ export default function IncomingNetworkPage() {
   }
   const dirty = Boolean(draft && JSON.stringify(value) !== JSON.stringify(query.data?.incoming))
   const conflict =
-    Boolean(draft && draft.base.revision !== query.data?.revision) ||
+    Boolean(dirty && draft && draft.base.revision !== query.data?.revision) ||
     (save.error instanceof ApiError && save.error.status === 409)
   useUnsavedChanges(dirty, 'incoming proxy settings', save.isPending)
   function change(change: Partial<IncomingNetwork>, text?: string) {
@@ -145,7 +145,7 @@ export default function IncomingNetworkPage() {
                       One IP address or CIDR network per line. For a tunnel, enter the cloudflared
                       address seen by AIOSources. For Cloudflare’s standard proxy, use its{' '}
                       <a
-                        className="link"
+                        className="data-link"
                         href="https://www.cloudflare.com/ips/"
                         target="_blank"
                         rel="noreferrer"

@@ -58,6 +58,7 @@ export function LogsPage() {
   const q = search.get('q') ?? ''
   const from = search.get('from') ?? ''
   const to = search.get('to') ?? ''
+  const filterKey = params({ level, provider, service, scope, run, q, from, to })
   const query = params({ level, provider, service, scope, run, q, from, to, limit, offset })
   const logs = useQuery({
     queryKey: ['logs', query],
@@ -70,7 +71,7 @@ export function LogsPage() {
   return (
     <div className="page">
       <form
-        key={`${search.toString()}:${clearVersion}`}
+        key={`${filterKey}:${clearVersion}`}
         className="space-y-4 rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
@@ -272,7 +273,14 @@ export function LogsPage() {
                 title="No logs match these filters"
                 description="Source and service activity will appear here."
                 filtered={Boolean(
-                  search.has('level') || provider || service || scope || run || q || from || to,
+                  (level && level !== 'info,warn,error') ||
+                  provider ||
+                  service ||
+                  scope ||
+                  run ||
+                  q ||
+                  from ||
+                  to,
                 )}
                 offset={offset}
                 onFirstPage={() => setSearch(resetListView(search))}

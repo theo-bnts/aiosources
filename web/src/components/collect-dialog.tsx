@@ -114,6 +114,12 @@ export function CollectDialog({
         if (!mutation.isPending) {
           setOpen(value)
           mutation.reset()
+          if (!value) {
+            setMode(remote ? 'incremental' : 'preview')
+            setMaxPages('')
+            setMaxDuration('')
+            setKnownPages('')
+          }
         }
       }}
     >

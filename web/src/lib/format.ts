@@ -77,10 +77,17 @@ export function localDateTime(
   if (!value) return ''
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return ''
-  return new Date(
+  const shifted = new Date(
     parsed.getTime() -
       (browserPreferences().timeZone === 'utc' ? 0 : parsed.getTimezoneOffset() * 60_000),
   )
+  if (
+    Number.isNaN(shifted.getTime()) ||
+    shifted.getUTCFullYear() < 1 ||
+    shifted.getUTCFullYear() > 9999
+  )
+    return ''
+  return shifted
     .toISOString()
     .slice(0, precision === 'milliseconds' ? 23 : precision === 'seconds' ? 19 : 16)
 }
@@ -93,5 +100,7 @@ export function dateTimeToISO(
   if (!value) return null
   // Untouched fields retain fractional seconds and the offset of a repeated DST hour.
   if (previous && localDateTime(previous, precision) === value) return previous
-  return new Date(browserPreferences().timeZone === 'utc' ? value + 'Z' : value).toISOString()
+  const parsed = new Date(browserPreferences().timeZone === 'utc' ? value + 'Z' : value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
 }

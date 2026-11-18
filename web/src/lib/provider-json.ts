@@ -109,7 +109,13 @@ export function parseProviderJSON(source: string): ProviderJSON {
     const checked = inspect(value, path.length === 0)
     if (checked.errors.length) throw new Error(checked.errors[0])
     let next = prepareParents(path)
-    let target = nodeAt(path)
+    let target =
+      next === text
+        ? nodeAt(path)
+        : (() => {
+            const root = inspect(next, true).root
+            return root && findNodeAtLocation(root, path)
+          })()
     if (!target) {
       next = applyEdits(next, modify(next, path, null, editOptions))
       const root = inspect(next, true).root
@@ -201,7 +207,9 @@ export function rebaseProviderJSON(baseText: string, localText: string, serverTe
       return
     }
     if (
-      (base.kindIn(path) === 'object' || base.kindIn(path) === undefined) &&
+      (base.kindIn(path) === 'object' ||
+        base.kindIn(path) === 'null' ||
+        base.kindIn(path) === undefined) &&
       local.kindIn(path) === 'object' &&
       server.kindIn(path) === 'object'
     ) {

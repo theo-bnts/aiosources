@@ -109,9 +109,8 @@ export function StorageIndexesPanel() {
   const dirty =
     draft !== null && indexes.some(([key]) => draft.values[key] !== query.data?.values[key])
   const conflict =
-    draft !== null &&
-    (draft.revision !== query.data?.revision ||
-      (save.error instanceof ApiError && save.error.status === 409))
+    (draft !== null && draft.revision !== query.data?.revision) ||
+    (save.error instanceof ApiError && save.error.status === 409)
   useUnsavedChanges(dirty, 'search indexes', save.isPending)
   return (
     <Disclosure
@@ -174,7 +173,17 @@ export function StorageIndexesPanel() {
                         checked={value.values[key]}
                         disabled={save.isPending}
                         onCheckedChange={(checked) => {
-                          setDraft({ ...value, values: { ...value.values, [key]: checked } })
+                          const saved = query.data
+                          const nextValues = { ...value.values, [key]: checked }
+                          if (
+                            saved &&
+                            value.revision === saved.revision &&
+                            indexes.every(([k]) => nextValues[k] === saved.values[k])
+                          ) {
+                            setDraft(null)
+                          } else {
+                            setDraft({ ...value, values: nextValues })
+                          }
                           save.reset()
                         }}
                       />

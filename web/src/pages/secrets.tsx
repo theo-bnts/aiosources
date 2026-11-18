@@ -269,7 +269,11 @@ export default function SecretsPage() {
                 value={name}
                 readOnly={editing?.rotate}
                 disabled={busy}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value)
+                  save.reset()
+                  review.reset()
+                }}
                 spellCheck={false}
                 autoComplete="off"
               />
@@ -288,7 +292,11 @@ export default function SecretsPage() {
                 required
                 value={value}
                 disabled={busy}
-                onChange={(event) => setValue(event.target.value)}
+                onChange={(event) => {
+                  setValue(event.target.value)
+                  save.reset()
+                  review.reset()
+                }}
                 autoComplete="new-password"
                 spellCheck={false}
               />

@@ -276,6 +276,7 @@ function ProxyEditor({
     Boolean(query.data && query.data.revision !== base.revision) ||
     (save.error instanceof ApiError && save.error.status === 409)
   function update(change: Partial<NetworkProxy>) {
+    save.reset()
     setDraft((current) => {
       const next = { ...current, ...change }
       if (!next.username_ref) delete next.username_ref
@@ -464,7 +465,6 @@ export function NetworkRoutingPage() {
   })
   const [draft, setDraft] = useState<NetworkSettings | null>(null)
   const save = useSaveNetwork(() => setDraft(null))
-  const settings = draft ?? query.data
   const sources = [...(providers.data?.items ?? [])].sort(compareListNames)
   const dirty = Boolean(
     draft &&
@@ -474,12 +474,14 @@ export function NetworkRoutingPage() {
         (key) => draft.overrides[key] !== query.data?.overrides[key],
       )),
   )
+  const settings = (dirty ? draft : null) ?? query.data
   const conflict =
-    Boolean(draft && query.data && draft.revision !== query.data.revision) ||
+    Boolean(dirty && draft && query.data && draft.revision !== query.data.revision) ||
     (save.error instanceof ApiError && save.error.status === 409)
   useUnsavedChanges(dirty, 'network routing', save.isPending)
   function route(target: string, value: string) {
     if (!settings) return
+    save.reset()
     const overrides = { ...settings.overrides }
     if (value) overrides[target] = value
     else delete overrides[target]
@@ -515,7 +517,10 @@ export function NetworkRoutingPage() {
                   value={settings.default}
                   settings={settings}
                   disabled={save.isPending}
-                  onChange={(value) => setDraft({ ...settings, default: value })}
+                  onChange={(value) => {
+                    save.reset()
+                    setDraft({ ...settings, default: value })
+                  }}
                 />
               </div>
             </section>

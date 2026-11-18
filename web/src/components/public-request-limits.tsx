@@ -63,7 +63,22 @@ export function PublicRequestLimitsPanel() {
   useUnsavedChanges(dirty, 'public request limits', save.isPending)
   function change(values: Values) {
     if (!query.data) return
-    setDraft({ base: draft?.base ?? query.data, values })
+    const base = draft?.base ?? query.data
+    if (
+      base.revision === query.data.revision &&
+      fields.every(([key]) => {
+        const field = values[key]
+        const saved = query.data.public_limits[key]
+        return (
+          field.enabled === (saved !== undefined && saved > 0) &&
+          (!field.enabled || field.value === String(saved))
+        )
+      })
+    ) {
+      setDraft(null)
+    } else {
+      setDraft({ base, values })
+    }
     save.reset()
   }
   return (

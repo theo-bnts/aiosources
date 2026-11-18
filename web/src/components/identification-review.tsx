@@ -266,7 +266,6 @@ function ReviewForm({
           <Input
             id="review-query"
             name="q"
-            key={q}
             defaultValue={q}
             placeholder="At least 3 characters, or an identifier"
           />
@@ -313,27 +312,44 @@ function ReviewForm({
         aria-label="Candidate titles"
         aria-busy={candidates.isFetching}
       >
-        {candidates.data?.items?.map((work) => (
-          <label
-            key={work.id}
-            className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 ${selected?.id === work.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'}`}
-          >
-            <input
-              type="radio"
-              name="review-work"
-              className="mt-1 accent-primary"
-              checked={selected?.id === work.id}
-              onChange={() => setSelected(work)}
-              disabled={save.isPending}
-              aria-label={`Choose ${work.display_title || work.titles[0] || work.tmdb}`}
-            />
-            <WorkSummary work={work} />
-          </label>
-        ))}
+        {candidates.data?.items?.map((work) => {
+          const title =
+            work.display_title ||
+            work.titles[0] ||
+            (work.type === 'book'
+              ? work.openlibrary || 'Untitled book'
+              : work.type === 'game'
+                ? work.igdb
+                  ? `IGDB ${work.igdb}`
+                  : 'Untitled game'
+                : work.tmdb)
+          return (
+            <label
+              key={work.id}
+              className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 ${selected?.id === work.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'}`}
+            >
+              <input
+                type="radio"
+                name="review-work"
+                className="mt-1 accent-primary"
+                checked={selected?.id === work.id}
+                onChange={() => setSelected(work)}
+                disabled={save.isPending}
+                aria-label={`Choose ${title}`}
+              />
+              <WorkSummary work={work} />
+            </label>
+          )
+        })}
       </div>
       {!canSearch && (
         <p className="help" role="status">
           Enter at least 3 characters or an identifier to search.
+        </p>
+      )}
+      {canSearch && year && !/^\d{4}$/.test(year) && (
+        <p className="help" role="status">
+          Enter a 4-digit year, or leave year empty.
         </p>
       )}
       {canSearch &&

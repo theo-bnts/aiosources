@@ -77,8 +77,8 @@ export function TorrentSearchForm({
             continue
           }
           if (next[key]) {
-            const instant = dateTimeToISO(next[key]!, filters[key], 'milliseconds')!
-            if (Number.isNaN(new Date(instant).getTime())) {
+            const instant = dateTimeToISO(next[key]!, filters[key], 'milliseconds')
+            if (!instant || Number.isNaN(new Date(instant).getTime())) {
               setError(new Error('Enter a valid publication date and time.'))
               setInvalidFields([key])
               return

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { api, params } from '@/lib/api'
@@ -67,8 +68,13 @@ export function CatalogTorrentsPage() {
         ? visitorAPI<Page<CatalogRelease>>(`/catalog/torrents?${queryParams}`, visitor, { signal })
         : api<Page<CatalogRelease>>(`/catalog/torrents?${queryParams}`, { signal }),
   })
+  const formRef = useRef<HTMLFormElement>(null)
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
+    if (key !== 'q' && formRef.current) {
+      const draftQ = String(new FormData(formRef.current).get('q') || '').trim()
+      if (draftQ.length >= 2) next.set('q', draftQ)
+    }
     value ? next.set(key, value) : next.delete(key)
     next.delete('offset')
     setSearch(next, { flushSync: true, preventScrollReset: true })
@@ -77,6 +83,7 @@ export function CatalogTorrentsPage() {
     <div className={visitor ? 'space-y-6' : 'page'}>
       <PageHeader title="Search torrents" back={{ to: searchPath, label: 'Search' }} />
       <form
+        ref={formRef}
         key={q}
         className="space-y-4 rounded-md border border-border p-4"
         onSubmit={(event) => {
@@ -164,11 +171,13 @@ export function CatalogTorrentsPage() {
               />
             ) : (
               <Empty
-                title="No matching torrents"
+                title={query.data.total > 0 ? 'No torrents on this page' : 'No matching torrents'}
                 description={
-                  visitor
-                    ? 'No available source releases match this search and your permitted filters.'
-                    : 'No published source releases match this search. Adjust the query or filters.'
+                  query.data.total > 0
+                    ? 'Use the pagination controls to return to the available torrents.'
+                    : visitor
+                      ? 'No available source releases match this search and your permitted filters.'
+                      : 'No published source releases match this search. Adjust the query or filters.'
                 }
               />
             )}

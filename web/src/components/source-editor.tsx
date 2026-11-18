@@ -1155,7 +1155,7 @@ function SourceScheduleSettings() {
           timezone={text('timezone') || 'UTC'}
           onValidityChange={reportTiming}
           onChange={(patch) => {
-            if (patch.timing !== undefined) setTiming(patch.timing)
+            setTiming(patch.timing ?? timing)
             change((next) => {
               for (const key of ['every', 'cron', 'timezone'] as const) {
                 const value = patch[key]

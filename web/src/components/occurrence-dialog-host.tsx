@@ -6,7 +6,6 @@ export function OccurrenceDialogHost() {
   if (!navigation.id) return null
   return (
     <OccurrenceDialog
-      key={navigation.id}
       id={navigation.id}
       torrent={navigation.torrent}
       onClose={navigation.close}

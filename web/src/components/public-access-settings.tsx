@@ -42,10 +42,23 @@ export function PublicAccessSettings() {
       draft.value.catalog_enabled !== query.data?.catalog_enabled),
   )
   function change(value: Partial<Omit<Access, 'revision'>>) {
-    setDraft((draft) => ({
-      base: draft?.base || query.data!,
-      value: { ...(draft?.value || query.data!), ...value },
-    }))
+    setDraft((draft) => {
+      const base = draft?.base || query.data!
+      const next = { ...(draft?.value || query.data!), ...value }
+      if (
+        next.revision === query.data?.revision &&
+        next.enabled === query.data.enabled &&
+        next.use_instance_debrid === query.data.use_instance_debrid &&
+        next.use_instance_announces === query.data.use_instance_announces &&
+        next.search_enabled === query.data.search_enabled &&
+        next.stremio_enabled === query.data.stremio_enabled &&
+        next.torznab_enabled === query.data.torznab_enabled &&
+        next.catalog_enabled === query.data.catalog_enabled
+      ) {
+        return undefined
+      }
+      return { base, value: next }
+    })
     save.reset()
     review.reset()
   }

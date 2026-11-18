@@ -152,10 +152,19 @@ export function RuntimeSettingsPanel({
                         aria-invalid={fieldInvalid}
                         aria-describedby={fieldInvalid ? `${id}-help` : undefined}
                         onChange={(event) => {
-                          setDraft({
-                            base: draft?.base ?? query.data!,
-                            values: { ...values, [key]: event.target.value },
-                          })
+                          const saved = query.data!
+                          const base = draft?.base ?? saved
+                          const nextValues = { ...values, [key]: event.target.value }
+                          if (
+                            base.revision === saved.revision &&
+                            Object.entries(nextValues).every(
+                              ([k, v]) => v === String(saved.values[k]),
+                            )
+                          ) {
+                            setDraft(null)
+                          } else {
+                            setDraft({ base, values: nextValues })
+                          }
                           save.reset()
                         }}
                       />

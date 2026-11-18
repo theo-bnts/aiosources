@@ -25,11 +25,13 @@ export function SourceTorrentStats({
   counts,
   unavailable,
   totals,
+  remote = false,
 }: {
   source: string
   counts?: TorrentStats
   unavailable: boolean
   totals?: SourceTorrentOverview['totals']
+  remote?: boolean
 }) {
   const date = useDate()
   if (!counts)
@@ -96,7 +98,7 @@ export function SourceTorrentStats({
         <div className="space-y-2 border-t pt-2 text-xs text-muted-foreground">
           <Link
             className="data-link tabular-nums"
-            to={`/runs/${encodeURIComponent(counts.pending_import.run_id)}`}
+            to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(counts.pending_import.run_id)}`}
           >
             {number(counts.pending_import.torrents)} awaiting import completion
             {totals && (

@@ -226,7 +226,11 @@ export function SecretPicker({
                   required
                   value={secretValue}
                   disabled={editorBusy}
-                  onChange={(event) => setSecretValue(event.target.value)}
+                  onChange={(event) => {
+                    setSecretValue(event.target.value)
+                    save.reset()
+                    review.reset()
+                  }}
                   autoComplete="new-password"
                   spellCheck={false}
                 />

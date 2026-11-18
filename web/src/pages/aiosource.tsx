@@ -103,6 +103,7 @@ export default function AIOSourcePage({
   const usesSecrets = section === 'games' || section === 'videos' || section === 'debrid'
   const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
+  const [manualActionsOpen, setManualActionsOpen] = useState(location.hash === '#maintenance')
   const query = useQuery({
     queryKey: ['aiosource', 'controls'],
     queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
@@ -150,9 +151,16 @@ export default function AIOSourcePage({
   const save = useMutation({
     mutationFn: ({ value }: { scope: FormScope; value: Config }) =>
       api('/aiosource/config', { method: 'PUT', body: JSON.stringify(value) }),
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['aiosource'] }),
     onSuccess: async (_, savedForm) => {
       await queryClient.invalidateQueries({ queryKey: ['aiosource'] })
-      const saved = queryClient.getQueryData<Controls>(['aiosource', 'controls'])?.config
+      let saved = queryClient.getQueryData<Controls>(['aiosource', 'controls'])?.config
+      if (!saved || saved.revision < savedForm.value.revision + 1) {
+        saved = { ...savedForm.value, revision: savedForm.value.revision + 1 }
+        queryClient.setQueryData<Controls>(['aiosource', 'controls'], (current) =>
+          current ? { ...current, config: saved! } : current,
+        )
+      }
       setDrafts((current) => {
         const next = { ...current }
         delete next[savedForm.scope]
@@ -160,7 +168,9 @@ export default function AIOSourcePage({
         // changed fields while adopting the new revision and untouched values.
         if (saved && saved.revision === savedForm.value.revision + 1) {
           for (const key of Object.keys(next) as FormScope[]) {
-            next[key] = { ...next[key]!, base: saved }
+            if (next[key]!.base.revision === savedForm.value.revision) {
+              next[key] = { ...next[key]!, base: saved }
+            }
           }
         }
         return next
@@ -177,9 +187,12 @@ export default function AIOSourcePage({
     mutationFn: (_form: FormScope) => api<Controls>('/aiosource/controls'),
     onSuccess: async (latest, form) => {
       await queryClient.cancelQueries({ queryKey: ['aiosource'] })
-      queryClient.setQueryData(['aiosource', 'controls'], latest)
-      setDrafts((current) =>
-        current[form] ? { ...current, [form]: { ...current[form], base: latest.config } } : current,
+      const current = queryClient.getQueryData<Controls>(['aiosource', 'controls'])
+      const effective =
+        current && current.config.revision > latest.config.revision ? current : latest
+      queryClient.setQueryData(['aiosource', 'controls'], effective)
+      setDrafts((drafts) =>
+        drafts[form] ? { ...drafts, [form]: { ...drafts[form], base: effective.config } } : drafts,
       )
       clearFeedback(form)
     },
@@ -274,6 +287,7 @@ export default function AIOSourcePage({
     })
   }
   const clearFeedback = (form: FormScope) => {
+    if (review.variables === form) review.reset()
     setFeedback((current) => {
       const next = { ...current }
       delete next[form]
@@ -319,23 +333,26 @@ export default function AIOSourcePage({
     max: number,
     form: FormScope = scope,
     help?: ReactNode,
-  ) => (
-    <div className="field">
-      <Label htmlFor={key} help={help}>
-        {label}
-      </Label>
-      <Input
-        id={key}
-        type="number"
-        disabled={save.isPending}
-        required
-        min={min}
-        max={max}
-        value={formConfig(form)?.[key] ?? ''}
-        onChange={(e) => update(form, { [key]: e.target.valueAsNumber })}
-      />
-    </div>
-  )
+  ) => {
+    const currentValue = formConfig(form)?.[key]
+    return (
+      <div className="field">
+        <Label htmlFor={key} help={help}>
+          {label}
+        </Label>
+        <Input
+          id={key}
+          type="number"
+          disabled={save.isPending}
+          required
+          min={min}
+          max={max}
+          value={currentValue === undefined || Number.isNaN(currentValue) ? '' : currentValue}
+          onChange={(e) => update(form, { [key]: e.target.valueAsNumber })}
+        />
+      </div>
+    )
+  }
   const toggle = (
     label: string,
     key: 'igdb_enabled' | 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
@@ -370,9 +387,16 @@ export default function AIOSourcePage({
   const status = query.data
   const resetting = status.maintenance?.status === 'running'
   const maintenanceBusy = resetting || action.isPending
+  const invalidNumbers = (form: FormScope) => {
+    const local = drafts[form]
+    if (!local) return false
+    return Object.values(applyChanges(local.base, local.changes)).some(
+      (value) => typeof value === 'number' && Number.isNaN(value),
+    )
+  }
   const submit = (form: FormScope) => {
     const local = drafts[form]
-    if (local && !save.isPending && !review.isPending && !conflict(form)) {
+    if (local && !save.isPending && !review.isPending && !conflict(form) && !invalidNumbers(form)) {
       save.mutate({ scope: form, value: applyChanges(local.base, local.changes) })
     }
   }
@@ -394,6 +418,7 @@ export default function AIOSourcePage({
             save.isPending ||
             review.isPending ||
             conflict(form) ||
+            invalidNumbers(form) ||
             (form === 'book-catalog' && (Boolean(status.books?.running) || resetting))
           }
         >
@@ -1064,7 +1089,11 @@ export default function AIOSourcePage({
             </Disclosure>
             <RuntimeSettingsPanel section="debrid" />
             <RuntimeSettingsPanel section="debrid_retries" />
-            <Disclosure title="Manual actions">
+            <Disclosure
+              title="Manual actions"
+              open={manualActionsOpen}
+              onOpenChange={setManualActionsOpen}
+            >
               <Button
                 disabled={action.isPending || !status.config.alldebrid_secret}
                 onClick={() => action.mutate('retry-cleanup')}

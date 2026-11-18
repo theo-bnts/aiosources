@@ -88,10 +88,18 @@ export function PublicCatalogSettings() {
     },
   })
   function change(value: Partial<Policy>) {
-    setDraft((draft) => ({
-      base: draft?.base ?? query.data!.policy,
-      value: { ...(draft?.value ?? query.data!.policy), ...value },
-    }))
+    setDraft((draft) => {
+      const base = draft?.base ?? query.data!.policy
+      const next = { ...(draft?.value ?? query.data!.policy), ...value }
+      if (
+        query.data &&
+        next.revision === query.data.policy.revision &&
+        !changed(next, query.data.policy)
+      ) {
+        return undefined
+      }
+      return { base, value: next }
+    })
     save.reset()
     review.reset()
   }

@@ -84,7 +84,11 @@ function LoginForm({ trusted }: { trusted: boolean }) {
         !/^\/(public|trusted)(\/|$)/.test(location.pathname)
           ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
           : '/providers'
-      navigate(trusted ? '/trusted' : returnTo, { replace: true })
+      const trustedReturnTo =
+        location.pathname === '/trusted' || location.pathname.startsWith('/trusted/')
+          ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
+          : '/trusted'
+      navigate(trusted ? trustedReturnTo : returnTo, { replace: true })
     } catch (caught) {
       if (!controller.signal.aborted) setError(caught)
     } finally {

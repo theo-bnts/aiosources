@@ -485,7 +485,7 @@ function ProviderForm({
   const definitionLimit = limits.data?.values.source_kib ?? 128
   const locallyInvalid = parsed.errors.length > 0 || byteLength > definitionLimit * 1024
   const dirty = json !== savedJSON || fieldDraft
-  const externallyChanged = Boolean(document && document.revision !== revision)
+  const externallyChanged = Boolean(dirty && document && document.revision !== revision)
   const validate = useMutation({
     mutationFn: (source: string) =>
       api<Validation>('/providers/validate', {
@@ -558,6 +558,18 @@ function ProviderForm({
         })
     },
   })
+  useEffect(() => {
+    if (
+      document &&
+      document.revision !== revision &&
+      !dirty &&
+      !(save.error instanceof ApiError && save.error.status === 409)
+    ) {
+      setJSON(document.json)
+      setSavedJSON(document.json)
+      setRevision(document.revision)
+    }
+  }, [document, revision, dirty, save.error])
   const markSaved = useUnsavedChanges(dirty, 'source configuration', save.isPending)
   const appliedResets = useRef(new Set<string>())
   useEffect(() => {
@@ -569,13 +581,16 @@ function ProviderForm({
     setFieldDraft(false)
     setValidation(null)
     setRemote(null)
+    validate.reset()
+    save.reset()
     setEditorKey((key) => key + 1)
   }, [navigationState, navigationKey])
 
   const loadRemote = useMutation({
     mutationFn: () =>
       api<ProviderDocument>(`/providers/${encodeURIComponent(sourceID ?? validation?.id ?? '')}`),
-    onSuccess: (current) => {
+    onSuccess: async (current) => {
+      if (sourceID) await queryClient.cancelQueries({ queryKey: ['provider', sourceID] })
       setRemote(current)
       setMergeError('')
       if (sourceID) queryClient.setQueryData(['provider', sourceID], current)

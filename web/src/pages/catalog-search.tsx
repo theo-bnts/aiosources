@@ -96,7 +96,9 @@ export function CatalogSearchPage() {
           event.preventDefault()
           const data = new FormData(event.currentTarget)
           const next = new URLSearchParams()
-          next.set('q', String(data.get('q') || '').trim())
+          const trimmed = String(data.get('q') || '').trim()
+          setDraftQuery(trimmed)
+          next.set('q', trimmed)
           if (data.get('type')) next.set('type', String(data.get('type')))
           if (data.get('year')) next.set('year', String(data.get('year')))
           setSearch(next, { flushSync: true })
@@ -297,11 +299,16 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
         : api<CatalogTitle>(path, { signal })
     },
   })
+  const parsePositiveInt = (raw: string | null, fallback: number, min = 0) => {
+    if (!raw || !/^\d+$/.test(raw)) return fallback
+    const n = Number(raw)
+    return Number.isSafeInteger(n) && n >= min ? n : fallback
+  }
   const selection: CatalogSelection =
     title.data?.type === 'tv'
       ? {
-          season: Number(search.get('season') ?? title.data.selection.season ?? 1),
-          episode: Number(search.get('episode') ?? title.data.selection.episode ?? 1),
+          season: parsePositiveInt(search.get('season'), title.data.selection.season ?? 1, 0),
+          episode: parsePositiveInt(search.get('episode'), title.data.selection.episode ?? 1, 1),
         }
       : {}
   const discloseSources = !visitor || Boolean(visitor.info.sources)
@@ -470,7 +477,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                   sorting={sorting.some((rule) => rule.field === 'language')}
                   onChange={(next) => {
                     setPreferences(next)
-                    pagination.setOffset(0)
+                    if (search.has('offset')) filter('offset', '')
                   }}
                 />
                 <div className="flex flex-wrap items-end gap-3">
@@ -532,15 +539,23 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                     />
                   ) : (
                     <Empty
-                      title={cachedOnly ? 'No cached releases' : 'No source releases'}
+                      title={
+                        releases.data.total > 0
+                          ? 'No releases on this page'
+                          : cachedOnly
+                            ? 'No cached releases'
+                            : 'No source releases'
+                      }
                       description={
-                        cachedOnly
-                          ? 'No cached versions match these filters. Turn off Cached results only to see other permitted versions.'
-                          : visitor
-                            ? 'No available versions match these filters. Private sources require verified cached files or your own permitted announce URL.'
-                            : title.data.type === 'tv'
-                              ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
-                              : 'No releases match the selected source and language filters. Adjust them to see other versions.'
+                        releases.data.total > 0
+                          ? 'Use the pagination controls to return to the available releases.'
+                          : cachedOnly
+                            ? 'No cached versions match these filters. Turn off Cached results only to see other permitted versions.'
+                            : visitor
+                              ? 'No available versions match these filters. Private sources require verified cached files or your own permitted announce URL.'
+                              : title.data.type === 'tv'
+                                ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
+                                : 'No releases match the selected source and language filters. Adjust them to see other versions.'
                       }
                     />
                   )}

@@ -403,6 +403,7 @@ function GameStatisticsPage() {
                 label="Changes applied through"
                 value={games.changes_through ? date(games.changes_through) : 'Not established'}
                 size="sm"
+                to="/metadata/games/history"
               />
               <Statistic
                 label="Next automatic update"

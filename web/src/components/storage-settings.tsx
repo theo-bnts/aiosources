@@ -62,10 +62,21 @@ export function StorageSettingsPanel() {
   const dirty =
     draft !== null && JSON.stringify(draft.options) !== JSON.stringify(query.data?.settings.options)
   const conflict =
-    draft !== null &&
-    (draft.revision !== query.data?.settings.revision ||
-      (save.error instanceof ApiError && save.error.status === 409))
+    (draft !== null && draft.revision !== query.data?.settings.revision) ||
+    (save.error instanceof ApiError && save.error.status === 409)
   useUnsavedChanges(dirty, 'storage settings', save.isPending)
+
+  function updateDraft(next: StorageSettings) {
+    if (
+      next.revision === query.data?.settings.revision &&
+      JSON.stringify(next.options) === JSON.stringify(query.data.settings.options)
+    ) {
+      setDraft(null)
+    } else {
+      setDraft(next)
+    }
+    save.reset()
+  }
 
   let resetUnavailableReason: string | undefined
   if (query.error) {
@@ -184,12 +195,11 @@ export function StorageSettingsPanel() {
                       disabled={save.isPending}
                       onCheckedChange={(checked) => {
                         const options = { ...settings.options, [key]: checked }
-                        setDraft({
+                        updateDraft({
                           ...settings,
                           options,
                           mode: options.all_fields ? 'full' : 'compact',
                         })
-                        save.reset()
                       }}
                     />
                   </div>
@@ -217,8 +227,10 @@ export function StorageSettingsPanel() {
                     label: field,
                   }))}
                   onChange={(additional_fields) => {
-                    setDraft({ ...settings, options: { ...settings.options, additional_fields } })
-                    save.reset()
+                    updateDraft({
+                      ...settings,
+                      options: { ...settings.options, additional_fields },
+                    })
                   }}
                 />
                 <StorageImpact storage="medium" performance="low" />

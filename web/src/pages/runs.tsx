@@ -314,6 +314,7 @@ function RunControls({
 
 function EventsView({ runId }: { runId: string }) {
   const date = useDate()
+  const listState = useListViewState()
   const pagination = useURLPagination({ offsetKey: 'events_offset', limitKey: 'events_limit' })
   const { limit: pageSize, offset, setOffset } = pagination
   const page = offset / pageSize
@@ -384,6 +385,7 @@ function EventsView({ runId }: { runId: string }) {
                           <Link
                             className="data-link inline-flex items-center gap-2 text-xs leading-6"
                             to={`/runs/${encodeURIComponent(event.data.metadata_run_id)}`}
+                            state={listState}
                           >
                             Open Metadata follow-up · new torrents only
                             <ArrowRightIcon />
@@ -399,6 +401,7 @@ function EventsView({ runId }: { runId: string }) {
                           <Link
                             className="data-link inline-flex items-center gap-2 text-xs leading-6"
                             to={`/pages/${event.data.page_id}`}
+                            state={listState}
                           >
                             Open response
                             <ArrowRightIcon />
@@ -723,7 +726,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         onValueChange={(value) => {
           const next = new URLSearchParams(search)
           next.set('tab', value)
-          setSearch(next, { replace: true })
+          setSearch(next, { replace: true, preventScrollReset: true })
         }}
       >
         <TabsList>

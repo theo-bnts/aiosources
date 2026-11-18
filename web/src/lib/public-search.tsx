@@ -17,10 +17,17 @@ export function visitorAPI<T>(path: string, visitor: PublicSearchAccess, init: R
   return visitor.trusted
     ? api<T>(`/trusted${path}`, {
         ...init,
+        cache: 'no-store',
         headers: {
           ...Object.fromEntries(new Headers(init.headers)),
           ...(visitor.configuration ? { Authorization: `Bearer ${visitor.configuration}` } : {}),
         },
       })
-    : publicAPI<T>(path, visitor.configuration, init, visitor.credential)
+    : publicAPI<T>(
+        path,
+        visitor.configuration,
+        init,
+        visitor.credential,
+        visitor.info.credential_scope,
+      )
 }

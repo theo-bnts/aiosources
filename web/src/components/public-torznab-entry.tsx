@@ -63,6 +63,10 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
       const value = String(values.get(`announce:${source.id}`) ?? '').trim()
       if (value) announces[source.id] = value
     }
+    const removedAnnounces = values
+      .getAll('remove_announce')
+      .map(String)
+      .filter((id) => !announces[id])
     const controller = new AbortController()
     request.current = controller
     setPending(true)
@@ -78,9 +82,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
             options,
             announces,
             ...(saved ? { credential: saved.credential } : {}),
-            ...(values.getAll('remove_announce').length
-              ? { remove_announces: values.getAll('remove_announce') }
-              : {}),
+            ...(removedAnnounces.length ? { remove_announces: removedAnnounces } : {}),
           }),
           signal: controller.signal,
         },
@@ -113,7 +115,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   }
   const credential = connection ? torznabPreferenceKey(connection.api_key, options) : ''
   const preferenceError = torznabPreferenceError(connection?.api_key ?? '', options)
-  const endpoint = connection ? new URL(connection.url) : null
+  const endpoint = connection ? new URL(connection.url, window.location.origin) : null
   const full = connection ? `${connection.url}?apikey=${encodeURIComponent(credential)}` : ''
   return (
     <div className="page max-w-4xl">

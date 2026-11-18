@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Navigate, useLocation } from 'react-router-dom'
-import { api } from '@/lib/api'
+import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import type { PublicInfo } from './public-connection-fields'
 import { PublicSharedCatalogEntry } from './public-shared-catalog-entry'
 import { PublicStremioEntry } from './public-entry'
@@ -12,7 +12,9 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
   const location = useLocation()
   const info = useQuery({
     queryKey: ['trusted-config'],
-    queryFn: ({ signal }) => api<PublicInfo>('/trusted/config', { signal }),
+    queryFn: ({ signal }) => api<PublicInfo>('/trusted/config', { signal, cache: 'no-store' }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+    retry: false,
   })
   if (info.isPending)
     return (
@@ -64,7 +66,8 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
     )
   if (!path.startsWith('/trusted') || !available) return <Navigate to={target} replace />
   if (section === 'search') return layout(<PublicSearchEntry info={access} />)
-  if (section === 'catalog') return layout(<PublicSharedCatalogEntry trusted info={access} />)
+  if (section === 'catalog')
+    return layout(<PublicSharedCatalogEntry key={access.catalog_revision} trusted info={access} />)
   return layout(
     section === 'torznab' ? (
       <PublicTorznabEntry info={access} />

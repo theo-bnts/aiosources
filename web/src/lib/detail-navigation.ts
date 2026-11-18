@@ -27,6 +27,7 @@ const viewLabels: Record<string, string> = {
   '/metadata/books/history': 'Book history',
   '/metadata/identification/history': 'Identification history',
   '/debrid/history': 'Debrid history',
+  '/logs': 'Logs',
 }
 type ListView = { pathname: string; search: string; returnView?: ListView }
 export type BackLink = { to: string; label: string; state?: { returnView: ListView } }
@@ -35,6 +36,7 @@ function viewLabel(pathname: string) {
   if (Object.hasOwn(viewLabels, pathname)) return viewLabels[pathname]
   if (/^\/(?:runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(pathname))
     return 'Processed records'
+  if (/^\/raw\/[1-9][0-9]{0,15}$/.test(pathname)) return 'Processed record'
   if (isSourceSettingsPath(pathname)) return 'Source settings'
   if (/^\/(?:(?:public|trusted)\/)?search\/[1-9][0-9]{0,15}$/.test(pathname))
     return 'Source releases'
@@ -101,11 +103,17 @@ export function useViewSearchParams() {
   const update = useCallback<SetURLSearchParams>(
     (next, options) => {
       const focused = options?.flushSync ? document.activeElement : null
-      const selection =
-        (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) &&
-        focused.selectionStart !== null
-          ? ([focused.selectionStart, focused.selectionEnd ?? focused.selectionStart] as const)
-          : undefined
+      let selection: readonly [number, number] | undefined
+      try {
+        if (
+          (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) &&
+          focused.selectionStart !== null
+        ) {
+          selection = [focused.selectionStart, focused.selectionEnd ?? focused.selectionStart]
+        }
+      } catch {
+        selection = undefined
+      }
       setSearch(next, { state, ...options })
       // Applied query values can replace their fields. Keep keyboard users in
       // the same control without stealing focus from an explicitly opened view.
@@ -121,8 +129,13 @@ export function useViewSearchParams() {
           if (
             selection &&
             (replacement instanceof HTMLInputElement || replacement instanceof HTMLTextAreaElement)
-          )
-            replacement.setSelectionRange(...selection)
+          ) {
+            try {
+              replacement.setSelectionRange(...selection)
+            } catch {
+              /* Non-text inputs do not support selection ranges. */
+            }
+          }
         }
       }
     },

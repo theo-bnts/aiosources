@@ -21,6 +21,8 @@ export function CopyButton({
   const generation = useRef(0)
   useEffect(() => {
     generation.current++
+    pending.current = false
+    setCopying(false)
     setFeedback('idle')
     return () => {
       generation.current++
@@ -39,8 +41,10 @@ export function CopyButton({
     } catch {
       if (generation.current === attempt) setFeedback('failed')
     } finally {
-      pending.current = false
-      setCopying(false)
+      if (generation.current === attempt) {
+        pending.current = false
+        setCopying(false)
+      }
     }
   }
   return (

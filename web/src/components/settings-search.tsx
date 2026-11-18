@@ -116,7 +116,9 @@ export function SettingsSearch({
   const choices = (entities.data ?? []).filter(
     (entity) =>
       (!selected?.adapters || (entity.adapter && selected.adapters.includes(entity.adapter))) &&
-      normalizeSettingQuery(entity.name || entity.id).includes(normalizeSettingQuery(query)),
+      normalizeSettingQuery(`${entity.name ?? ''} ${entity.id}`).includes(
+        normalizeSettingQuery(query),
+      ),
   )
   const rows = selected ? choices : matches
   const visible = rows.slice(0, shown)

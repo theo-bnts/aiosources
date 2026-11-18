@@ -18,6 +18,7 @@ export function useSaveNetwork(onSaved?: () => void) {
         method: 'PUT',
         body: JSON.stringify(settings),
       }),
+    onMutate: () => client.cancelQueries({ queryKey: ['network-settings'] }),
     onSuccess: async (settings) => {
       await client.cancelQueries({ queryKey: ['network-settings'] })
       client.setQueryData<NetworkSettings>(['network-settings'], (current) =>

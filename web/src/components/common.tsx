@@ -127,6 +127,9 @@ export function ErrorNotice({
 }) {
   const register = useContext(RequestNotices)
   const id = useId()
+  const retryRef = useRef(retry)
+  retryRef.current = retry
+  const hasRetry = Boolean(retry)
   const notification =
     register &&
     presentation === 'inline' &&
@@ -135,8 +138,12 @@ export function ErrorNotice({
       (error instanceof ApiError &&
         (error.status === 0 || error.status === 408 || error.status >= 500)))
   useEffect(() => {
-    if (notification) return register(id, { error, retry })
-  }, [notification, register, id, error, retry])
+    if (notification)
+      return register(id, {
+        error,
+        retry: hasRetry ? () => retryRef.current?.() : undefined,
+      })
+  }, [notification, register, id, error, hasRetry])
   if (!error || notification) return null
   return (
     <div
@@ -147,7 +154,11 @@ export function ErrorNotice({
         <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1 space-y-2">
           <p className="break-words text-sm">
-            {error instanceof Error ? messageText(error.message) : 'An unexpected error occurred.'}
+            {error instanceof Error
+              ? messageText(error.message)
+              : typeof error === 'string' && error.trim()
+                ? messageText(error)
+                : 'An unexpected error occurred.'}
           </p>
           {error instanceof ApiError && error.details.length > 0 && (
             <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">

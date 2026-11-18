@@ -1,8 +1,8 @@
 import { InfoTip } from '@/components/ui/info-tip'
 import { useBrowserPreferences } from '@/lib/browser-preferences'
 import { ResultCount } from '@/components/common'
-import { Fragment, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Fragment, useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowRightIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { bytes, number, percentage, useDate } from '@/lib/format'
 import { useSourceNames } from '@/lib/source-names'
@@ -106,9 +106,11 @@ function AllocationDetails({ category }: { category: StorageCategory }) {
                     <TableCell className="min-w-52 whitespace-normal">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <span>{labels[part.key] || part.key}</span>
-                        <InfoTip label={labels[part.key] || part.key}>
-                          {explanations[part.key]}
-                        </InfoTip>
+                        {explanations[part.key] && (
+                          <InfoTip label={labels[part.key] || part.key}>
+                            {explanations[part.key]}
+                          </InfoTip>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right mono">{bytes(part.table_bytes)}</TableCell>
@@ -281,9 +283,13 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
 }
 
 export function StorageBreakdown({ report }: { report: SystemHealth }) {
+  const routerLocation = useLocation()
   const [expanded, setExpanded] = useState<string | null>(() =>
-    location.hash === '#source-storage' ? 'sources' : null,
+    routerLocation.hash === '#source-storage' ? 'sources' : null,
   )
+  useEffect(() => {
+    if (routerLocation.hash === '#source-storage') setExpanded('sources')
+  }, [routerLocation.hash])
   const items: StorageCategory[] = [
     ...report.database.categories,
     {

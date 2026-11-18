@@ -68,6 +68,11 @@ export function PublicCredentialsForm({
       const announce = String(values.get(`announce:${source.id}`) ?? '').trim()
       if (announce) announces[source.id] = announce
     }
+    const removedServices = removed.filter((id) => !services[id])
+    const removedAnnounces = values
+      .getAll('remove_announce')
+      .map(String)
+      .filter((id) => !announces[id])
     const controller = new AbortController()
     request.current = controller
     setPending(true)
@@ -83,10 +88,8 @@ export function PublicCredentialsForm({
           body: JSON.stringify({
             services,
             ...(saved ? { credential: saved.credential } : {}),
-            ...(removed.length ? { remove_services: removed } : {}),
-            ...(values.getAll('remove_announce').length
-              ? { remove_announces: values.getAll('remove_announce') }
-              : {}),
+            ...(removedServices.length ? { remove_services: removedServices } : {}),
+            ...(removedAnnounces.length ? { remove_announces: removedAnnounces } : {}),
             ...(preferences ? { preferences } : {}),
             ...(Object.keys(announces).length ? { announces } : {}),
           }),
@@ -153,22 +156,23 @@ export function PublicCredentialsForm({
                           retained ? 'Saved on this browser · enter a key to replace it' : undefined
                         }
                       />
-                      {retained && (saved?.services.length ?? 0) > 1 && (
-                        <Button
-                          type="button"
-                          variant="warning"
-                          size="sm"
-                          className="self-start sm:self-auto"
-                          onClick={() =>
-                            setRemoved((ids) =>
-                              ids.includes(provider.id) ? ids : [...ids, provider.id],
-                            )
-                          }
-                        >
-                          <TrashIcon aria-hidden="true" />
-                          Remove key
-                        </Button>
-                      )}
+                      {retained &&
+                        (saved?.services.filter((id) => !removed.includes(id)).length ?? 0) > 1 && (
+                          <Button
+                            type="button"
+                            variant="warning"
+                            size="sm"
+                            className="self-start sm:self-auto"
+                            onClick={() =>
+                              setRemoved((ids) =>
+                                ids.includes(provider.id) ? ids : [...ids, provider.id],
+                              )
+                            }
+                          >
+                            <TrashIcon aria-hidden="true" />
+                            Remove key
+                          </Button>
+                        )}
                     </div>
                     {details && 'hint' in details && <p className="help">{details.hint}</p>}
                     {details && (

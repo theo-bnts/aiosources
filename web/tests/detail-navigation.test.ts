@@ -52,6 +52,8 @@ test('detail return links retain the complete public list view and direct links 
     ['/remotes/settings', '?q=example&state=disabled', 'Remote catalogs'],
     ['/remotes/history', '?status=failed&offset=50', 'Remote catalog history'],
     ['/remotes/history/run-one', '?tab=raw&raw_offset=50', 'Processed records'],
+    ['/raw/42', '', 'Processed record'],
+    ['/logs', '?service=tmdb', 'Logs'],
     ['/providers/source-one', '', 'Source settings'],
   ]) {
     assert.deepEqual(detailBackLink(listViewState({ pathname, search }), fallback), {

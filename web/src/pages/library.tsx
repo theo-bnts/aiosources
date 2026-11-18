@@ -10,6 +10,7 @@ import {
 
 import { ResultCount } from '@/components/common'
 import { FilterSelect } from '@/components/filter-select'
+import { useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
@@ -59,12 +60,14 @@ function ProcessedRecordFilters({
   q: string
   processing: string
   onFilter: (q: string) => void
-  onProcessingChange: (value: string) => void
+  onProcessingChange: (value: string, currentQ?: string) => void
   onClear: () => void
   compact: boolean
 }) {
+  const formRef = useRef<HTMLFormElement>(null)
   return (
     <form
+      ref={formRef}
       className="space-y-4 rounded-md border border-border p-4"
       aria-label="Processed record filters"
       onSubmit={(event) => {
@@ -110,7 +113,14 @@ function ProcessedRecordFilters({
             label="Processing result"
             allLabel="All results"
             value={processing}
-            onChange={onProcessingChange}
+            onChange={(value) =>
+              onProcessingChange(
+                value,
+                formRef.current
+                  ? String(new FormData(formRef.current).get('q') ?? '').trim()
+                  : undefined,
+              )
+            }
             options={[
               { value: 'error', label: 'Errors' },
               { value: 'ignored', label: 'Ignored' },
@@ -141,6 +151,9 @@ function DownloadButton({
   label: string
 }) {
   const download = useMutation({ mutationFn: () => downloadBytes(path, filename) })
+  useEffect(() => {
+    download.reset()
+  }, [path])
   return (
     <div className="space-y-2">
       <Button variant="outline" disabled={download.isPending} onClick={() => download.mutate()}>
@@ -260,8 +273,11 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
           nextQ ? next.set(qKey, nextQ) : next.delete(qKey)
           setSearch(next, { flushSync: true })
         }}
-        onProcessingChange={(value) => {
+        onProcessingChange={(value, draftQ) => {
           const next = resetListView(search, [], offsetKey)
+          if (draftQ !== undefined) {
+            draftQ ? next.set(qKey, draftQ) : next.delete(qKey)
+          }
           value ? next.set(statusKey, value) : next.delete(statusKey)
           setSearch(next, { flushSync: true })
         }}
@@ -399,6 +415,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
 export function RawDetailPage() {
   const sourceName = useSourceNames()
   const date = useDate()
+  const listState = useListViewState()
   const { id = '' } = useParams()
   const detail = useQuery({
     queryKey: ['raw-record', id],
@@ -494,6 +511,7 @@ export function RawDetailPage() {
               <Link
                 className="data-link inline-flex items-center gap-2"
                 to={`/pages/${record.page_id}`}
+                state={listState}
               >
                 <FileTextIcon />
                 Page {record.page} · #{record.page_id}
@@ -506,7 +524,7 @@ export function RawDetailPage() {
           </dd>
         </div>
       </dl>
-      <Tabs defaultValue={payloadRetained ? 'original' : 'fields'}>
+      <Tabs key={record.id} defaultValue={payloadRetained ? 'original' : 'fields'}>
         <TabsList>
           <TabsTrigger value="original">
             <FileTextIcon aria-hidden="true" />
@@ -574,7 +592,7 @@ export function RawDetailPage() {
           </div>
           <div className="toolbar">
             <Button variant="ghost" asChild>
-              <Link to={`/pages/${record.page_id}`}>
+              <Link to={`/pages/${record.page_id}`} state={listState}>
                 View page
                 <ArrowRightIcon />
               </Link>
