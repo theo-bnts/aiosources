@@ -109,8 +109,8 @@ func (s *server) testNetworkProxy(w http.ResponseWriter, r *http.Request) {
 				for line := range strings.SplitSeq(string(body), "\n") {
 					name, value, _ := strings.Cut(strings.TrimSpace(line), "=")
 					if name == "ip" {
-						if parsed, parseErr := netip.ParseAddr(value); parseErr == nil {
-							ip = parsed.String()
+						if parsed, parseErr := netip.ParseAddr(value); parseErr == nil && parsed.Zone() == "" {
+							ip = parsed.Unmap().String()
 						}
 					}
 					if name == "warp" && (value == "on" || value == "off" || value == "plus") {

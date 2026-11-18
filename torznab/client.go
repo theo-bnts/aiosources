@@ -524,7 +524,7 @@ func (c *Client) fetchResponseObserved(ctx context.Context, target *url.URL, par
 		}
 		data, readErr := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
 		if observe != nil {
-			observe(data)
+			observe(data[:min(len(data), maxResponseBytes)])
 		}
 		response.Body.Close()
 		if readErr != nil {

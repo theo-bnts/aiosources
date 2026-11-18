@@ -283,8 +283,11 @@ func (p *ProviderHTTP) ADUnlock(ctx context.Context, key, link string) (string, 
 	return HTTPSLink(out.Link)
 }
 func HTTPSLink(s string) (string, error) {
+	if len(s) > 8192 || strings.ContainsAny(s, "\r\n\x00") {
+		return "", ErrInvalidResponse
+	}
 	u, err := url.Parse(s)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.Hostname() == "" || u.User != nil || u.Opaque != "" || strings.ContainsAny(u.Host, "\\%") {
 		return "", ErrInvalidResponse
 	}
 	return u.String(), nil

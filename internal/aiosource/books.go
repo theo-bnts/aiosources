@@ -208,7 +208,10 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 	}
 	_ = s.DB.RecordProviderCall(ctx, h.run.ID, "provider_request", httpStatus, time.Since(requestStarted).Milliseconds(), "")
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errBookRequest
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
@@ -266,7 +269,10 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 	body := &bookExportReader{reader: response.Body, timer: idle}
 	compressed, err := gzip.NewReader(body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errBookRequest
 	}
 	defer compressed.Close()
 	limited := &io.LimitedReader{R: compressed, N: (500 << 30) + 1}
@@ -418,7 +424,10 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errBookRequest
 	}
 	if limited.N == 0 {
 		return errors.New("book export exceeds the supported size")

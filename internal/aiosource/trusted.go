@@ -171,7 +171,13 @@ func (s *Service) TrustedVisitorWithCredentials(ctx context.Context, grant model
 	}
 	if err = s.resolveVisitorServices(ctx, visitor, user.CredentialPolicy); err != nil {
 		clear(visitor.Services)
+		clear(visitor.Announces)
 		return nil, err
+	}
+	if !user.UseInstanceDebrid && (feature == "search" || feature == "stremio") && !validPublicKeys(visitor.Services) {
+		clear(visitor.Services)
+		clear(visitor.Announces)
+		return nil, ErrAuth
 	}
 	return visitor, nil
 }

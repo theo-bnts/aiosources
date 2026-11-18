@@ -29,6 +29,9 @@ func (s *Store) AddEvent(ctx context.Context, runID, kind, message string, data 
 		return model.Event{}, databaseError("begin collection event", err)
 	}
 	defer rollback(tx)
+	if err := lockSourceData(ctx, tx); err != nil {
+		return model.Event{}, err
+	}
 	// Serialize event ID allocation with this run's other transactions so
 	// chronological pages keep their order as new events commit.
 	var id string

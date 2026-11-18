@@ -104,7 +104,11 @@ func (a *authentication) protectTrusted(feature string, next http.HandlerFunc) h
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			csrf := r.Header.Get("X-CSRF-Token")
+			csrfValues := r.Header.Values("X-CSRF-Token")
+			csrf := ""
+			if len(csrfValues) == 1 {
+				csrf = csrfValues[0]
+			}
 			if !a.allowedOrigin(r) || len(csrf) != len(value.CSRF) || subtle.ConstantTimeCompare([]byte(csrf), []byte(value.CSRF)) != 1 {
 				writeError(w, 403, "Invalid form session. Reload the page.")
 				return

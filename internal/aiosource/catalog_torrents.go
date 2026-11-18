@@ -54,6 +54,11 @@ func (s *Service) CatalogTorrents(ctx context.Context, opts model.ListOptions, f
 					policy.UncachedSources = append(policy.UncachedSources, id)
 				}
 			}
+			for id := range announces {
+				if !slices.Contains(policy.UncachedSources, id) {
+					policy.UncachedSources = append(policy.UncachedSources, id)
+				}
+			}
 		}
 		if len(visitor.Preferences.Sources) > 0 {
 			if opts.ProviderID != "" {

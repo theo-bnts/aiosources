@@ -104,4 +104,5 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.WriteHeader(204)
 	})
+	mux.HandleFunc("/trusted/stremio/", func(w http.ResponseWriter, r *http.Request) { writeError(w, 404, "Addon route not found") })
 }

@@ -9,7 +9,14 @@ export function useSettingDestination(): Setting | undefined {
   const location = useLocation()
   const setting = settingFromHash(location.hash)
   if (!setting) {
-    const rawHash = location.hash.startsWith('#') ? decodeURIComponent(location.hash.slice(1)) : ''
+    let rawHash = ''
+    if (location.hash.startsWith('#')) {
+      try {
+        rawHash = decodeURIComponent(location.hash.slice(1))
+      } catch {
+        rawHash = ''
+      }
+    }
     const debridProvider =
       rawHash && location.pathname === '/debrid/settings'
         ? debridProviders.find((item) => item.secret === rawHash)

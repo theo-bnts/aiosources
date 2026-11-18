@@ -449,6 +449,7 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 	hashes = uniqueStrings(hashes)
 	out := map[string]map[string]model.AIOAvailability{}
 	keys := map[string]string{}
+	defer clear(keys)
 	flights := []*flight{}
 	for service, name := range c.DebridSecrets() {
 		if name == "" {

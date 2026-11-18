@@ -71,7 +71,7 @@ func (c *Client) SearchRaw(ctx context.Context, query Query) (RawPage, error) {
 		}
 		return nil
 	}, func(data []byte) { result.Body = data })
-	if err != nil && len(result.Items) == 0 && len(result.Body) > 0 {
+	if err != nil && len(result.Items) == 0 && len(result.Body) > 0 && len(result.Body) <= maxResponseBytes {
 		parsed, _ := parseRawPageBytes(result.Body, c.searchXML(result.Body), query.Offset, c.config.PublishedAtUnit)
 		result = parsed
 	}

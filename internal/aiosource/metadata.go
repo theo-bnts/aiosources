@@ -40,6 +40,7 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 			return false, err
 		}
 		client := *s.MetadataHTTP
+		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
 		if client.Timeout == 0 {
 			timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
 			if err != nil {
@@ -283,7 +284,15 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 	}
 	return w, nil
 }
+func validTMDBID(id string) bool {
+	n, err := strconv.ParseInt(id, 10, 64)
+	return err == nil && n > 0 && strconv.FormatInt(n, 10) == id
+}
+
 func (s *Service) loadDetails(ctx context.Context, key string, j store.AIOJob) (*store.AIOMetadataPublication, error) {
+	if (j.Type != "movie" && j.Type != "tv") || !validTMDBID(j.ID) {
+		return nil, ErrInvalidResponse
+	}
 	appendFields := "external_ids,alternative_titles,translations,images"
 	if j.Type == "movie" {
 		appendFields += ",release_dates"
@@ -334,6 +343,9 @@ func (s *Service) loadDetails(ctx context.Context, key string, j store.AIOJob) (
 }
 
 func (s *Service) loadSeasons(ctx context.Context, key string, work *model.AIOWork, seasons []int) error {
+	if !validTMDBID(work.TMDB) {
+		return ErrInvalidResponse
+	}
 	for start := 0; start < len(seasons); start += 20 {
 		chunk := seasons[start:min(start+20, len(seasons))]
 		responses := map[int]tmdbSeasonDetails{}
@@ -424,6 +436,7 @@ func (s *Service) inventory(ctx context.Context, typ, date string) error {
 	// temporary file before importing: http.Client.Timeout must not include
 	// PostgreSQL batch processing, which can take minutes on a small container.
 	client := *s.MetadataHTTP
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
 	client.Timeout, err = s.outgoingTimeout(ctx, "inventory_seconds")
 	if err != nil {
 		return err

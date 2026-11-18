@@ -20,6 +20,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/outbound"
+	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 const catalogFilePurpose = "catalog-browser-download-v1"
@@ -160,11 +161,22 @@ func (s *server) catalogFile(w http.ResponseWriter, r *http.Request) {
 	defer clear(data)
 	var ticket catalogFileTicket
 	now := time.Now().Unix()
-	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && !model.IsDebridService(ticket.Service)) || ticket.Session != r.Context().Value(sessionContextKey{}).(session).id || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
+	sessionID := r.Context().Value(sessionContextKey{}).(session).id
+	if json.Unmarshal(data, &ticket) != nil || (ticket.Service != "" && !model.IsDebridService(ticket.Service)) || ticket.Session != sessionID || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
-	s.deliverCatalogFile(w, r, ticket, nil)
+	var authorize func(context.Context) error
+	if s.auth != nil {
+		authorize = func(ctx context.Context) error {
+			current, err := s.auth.lookup(r.WithContext(ctx))
+			if errors.Is(err, store.ErrAuthentication) || (err == nil && current.id != sessionID) {
+				return model.ErrNotFound
+			}
+			return err
+		}
+	}
+	s.deliverCatalogFile(w, r, ticket, authorize)
 }
 
 func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, ticket catalogFileTicket, authorize func(context.Context) error) {
@@ -269,7 +281,7 @@ func (s *server) deliverCatalogFile(w http.ResponseWriter, r *http.Request, tick
 	if n, e := strconv.ParseInt(response.Header.Get("Content-Length"), 10, 64); e == nil && n >= 0 {
 		w.Header().Set("Content-Length", strconv.FormatInt(n, 10))
 	}
-	for _, key := range []string{"Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Content-Encoding"} {
+	for _, key := range []string{"Content-Range", "Accept-Ranges", "ETag", "Last-Modified"} {
 		if value := response.Header.Get(key); value != "" {
 			w.Header().Set(key, value)
 		}

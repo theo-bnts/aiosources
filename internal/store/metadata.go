@@ -45,6 +45,9 @@ ORDER BY source_id LIMIT $5`, run.ProviderID, run.CreatedAt, after, run.Metadata
 // locks. Copy the stored snapshot, not current defaults, and commit the child
 // and both lifecycle events atomically with the successful parent.
 func queueMetadataAfterDiscovery(ctx context.Context, tx pgx.Tx, parent model.Run) error {
+	if err := lockProviderSecrets(ctx, tx, parent.Config); err != nil {
+		return err
+	}
 	id, err := newRunID()
 	if err != nil {
 		return err

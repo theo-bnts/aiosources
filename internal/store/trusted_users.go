@@ -63,7 +63,7 @@ func (s *Store) TrustedUsers(ctx context.Context) ([]model.TrustedUser, error) {
 	for rows.Next() {
 		value, err := scanTrustedUser(rows)
 		if err != nil {
-			return nil, err
+			return nil, databaseError("list trusted users", err)
 		}
 		items = append(items, value)
 	}
@@ -79,17 +79,22 @@ func (s *Store) TrustedUser(ctx context.Context, grant model.TrustedGrant) (mode
 }
 
 func (s *Store) TrustedLogin(ctx context.Context, email string) (model.TrustedUser, string, error) {
-	var id, passwordHash string
-	var generation int64
-	err := s.pool.QueryRow(ctx, `SELECT id,generation,password_hash FROM aiosources.trusted_users WHERE email=$1 AND enabled`, email).Scan(&id, &generation, &passwordHash)
+	var value model.TrustedUser
+	var permissions []byte
+	var passwordHash string
+	err := s.pool.QueryRow(ctx, "SELECT "+trustedUserColumns+",password_hash FROM aiosources.trusted_users WHERE email=$1 AND enabled", email).Scan(
+		&value.ID, &value.Email, &value.Enabled, &permissions, &value.Revision, &value.Generation, &value.CreatedAt, &value.UpdatedAt, &passwordHash,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.TrustedUser{}, "", ErrAuthentication
 	}
 	if err != nil {
 		return model.TrustedUser{}, "", databaseError("read trusted login", err)
 	}
-	value, err := s.TrustedUser(ctx, model.TrustedGrant{UserID: id, Generation: generation})
-	return value, passwordHash, err
+	if err = json.Unmarshal(permissions, &value.TrustedPermissions); err != nil {
+		return model.TrustedUser{}, "", databaseError("read trusted login", err)
+	}
+	return value, passwordHash, nil
 }
 
 func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, passwordHash string) (model.TrustedUser, error) {
@@ -101,7 +106,7 @@ func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, pa
 	permissions, _ := json.Marshal(value.TrustedPermissions)
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return model.TrustedUser{}, err
+		return model.TrustedUser{}, databaseError("begin trusted user update", err)
 	}
 	defer rollback(tx)
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
@@ -130,7 +135,7 @@ func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, pa
 		return model.TrustedUser{}, databaseError("save trusted user", err)
 	}
 	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.trusted_sessions WHERE user_id=$1`, value.ID); err != nil {
-		return model.TrustedUser{}, err
+		return model.TrustedUser{}, databaseError("revoke trusted user sessions", err)
 	}
 	if err = recordAccessActivityTx(ctx, tx, "security.trusted_user_changed", value.ID); err != nil {
 		return model.TrustedUser{}, err
@@ -141,7 +146,7 @@ func (s *Store) SaveTrustedUser(ctx context.Context, value model.TrustedUser, pa
 func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return databaseError("begin trusted user deletion", err)
 	}
 	defer rollback(tx)
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3); SELECT pg_advisory_xact_lock(1768843109,9)`); err != nil {
@@ -177,7 +182,7 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, databaseError("begin trusted session", err)
 	}
 	defer rollback(tx)
 	// Keep the administrator → account → session lock order when switching roles.
@@ -194,7 +199,7 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 		return "", time.Time{}, ErrAuthentication
 	}
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, databaseError("lock trusted account session", err)
 	}
 	// Keep global expiry cleanup bounded and skip rows another login or account
 	// update holds. Inactive accounts must not retain obsolete sessions forever.
@@ -219,24 +224,32 @@ func (s *Store) CreateTrustedSession(ctx context.Context, grant model.TrustedGra
 	expires := time.Now().Add(lifetime)
 	_, err = tx.Exec(ctx, `INSERT INTO aiosources.trusted_sessions(id,token_hash,user_id,generation,expires_at) VALUES($1,$2,$3,$4,$5)`, id, tokenHash, grant.UserID, grant.Generation, expires)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, databaseError("create trusted session", err)
 	}
 	return id, expires, databaseError("commit trusted session", tx.Commit(ctx))
 }
 
 func (s *Store) TrustedSession(ctx context.Context, tokenHash []byte) (model.TrustedUser, string, time.Time, error) {
-	var id, userID string
-	var generation int64
+	var user model.TrustedUser
+	var permissions []byte
+	var id string
 	var expires time.Time
-	err := s.pool.QueryRow(ctx, `SELECT id,user_id,generation,expires_at FROM aiosources.trusted_sessions WHERE token_hash=$1 AND expires_at>now()`, tokenHash).Scan(&id, &userID, &generation, &expires)
+	err := s.pool.QueryRow(ctx, `SELECT u.id,u.email,u.enabled,u.permissions,u.revision,u.generation,u.created_at,u.updated_at,s.id,s.expires_at
+ FROM aiosources.trusted_sessions s
+ JOIN aiosources.trusted_users u ON u.id=s.user_id AND u.generation=s.generation AND u.enabled
+ WHERE s.token_hash=$1 AND s.expires_at>now()`, tokenHash).Scan(
+		&user.ID, &user.Email, &user.Enabled, &permissions, &user.Revision, &user.Generation, &user.CreatedAt, &user.UpdatedAt, &id, &expires,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.TrustedUser{}, "", expires, ErrAuthentication
 	}
 	if err != nil {
 		return model.TrustedUser{}, "", expires, databaseError("read trusted session", err)
 	}
-	user, err := s.TrustedUser(ctx, model.TrustedGrant{UserID: userID, Generation: generation})
-	return user, id, expires, err
+	if err = json.Unmarshal(permissions, &user.TrustedPermissions); err != nil {
+		return model.TrustedUser{}, "", expires, databaseError("read trusted session", err)
+	}
+	return user, id, expires, nil
 }
 
 func (s *Store) RevokeTrustedSession(ctx context.Context, id string) error {

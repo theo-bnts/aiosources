@@ -76,11 +76,11 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 	// Match publication/reset lock order. Exporters hold their recipient before
 	// reading the retention boundary, so lock recipients before changing it.
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3);
- SELECT pg_advisory_xact_lock(1768843109,9);
  SELECT revision FROM aiosources.aio_public_access WHERE singleton FOR UPDATE;
  SELECT revision FROM aiosources.public_catalog_policy WHERE singleton FOR UPDATE;
  SELECT id FROM aiosources.shares ORDER BY id FOR UPDATE;
  SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;
+ SELECT pg_advisory_xact_lock(1768843109,9);
  SELECT set_config('aiosources.history_retention','on',TRUE);
  SELECT set_config('aiosources.storage_reset','on',TRUE);`); err != nil {
 		return databaseError("lock source publication", err)

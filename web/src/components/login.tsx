@@ -81,13 +81,17 @@ function LoginForm({ trusted }: { trusted: boolean }) {
       queryClient.setQueryData(['session'], value)
       const query = new URLSearchParams(location.search)
       query.delete('role')
+      const safePathname =
+        /^\/(?!\/)/.test(location.pathname) && !/(?:^|\/)\.\.?(?:\/|$)/.test(location.pathname)
       const returnTo =
+        safePathname &&
         !['/login', '/user-login', '/'].includes(location.pathname) &&
         !/^\/(public|trusted)(\/|$)/.test(location.pathname)
           ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
           : '/providers'
       const trustedReturnTo =
-        location.pathname === '/trusted' || location.pathname.startsWith('/trusted/')
+        safePathname &&
+        (location.pathname === '/trusted' || location.pathname.startsWith('/trusted/'))
           ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
           : '/trusted'
       navigate(trusted ? trustedReturnTo : returnTo, { replace: true })

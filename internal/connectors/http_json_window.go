@@ -1264,6 +1264,9 @@ func (c *windowJSONConnector) options(state *windowCursor, body []byte) error {
 			if text == "" {
 				continue
 			}
+			if len(text) > 256 || c.client.containsSecret(text) || len(values) >= 10000 {
+				return errors.New("discovered option value is invalid or exceeds bounds")
+			}
 			if !seen[text] {
 				seen[text] = true
 				values = append(values, text)
@@ -1275,7 +1278,7 @@ func (c *windowJSONConnector) options(state *windowCursor, body []byte) error {
 }
 
 func (c *windowJSONConnector) validToken(value string) bool {
-	if value == "" || value == "." || value == ".." || strings.ContainsAny(value, "/\\\r\n\x00") || c.resolver == nil {
+	if value == "" || value == "." || value == ".." || strings.ContainsAny(value, "/\\\r\n\x00") || c.resolver == nil || c.client.containsSecret(value) {
 		return false
 	}
 	match := c.resolver.FindStringIndex(value)

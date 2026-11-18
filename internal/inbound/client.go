@@ -76,7 +76,7 @@ func (r Resolver) ClientIP(request *http.Request) string {
 		return direct
 	}
 	values := request.Header.Values(r.header)
-	if len(values) == 0 || len(values) > 64 || (!r.chain && len(values) != 1) {
+	if len(values) == 0 || (!r.chain && len(values) != 1) {
 		return direct
 	}
 	value := strings.Join(values, ",")
@@ -90,12 +90,12 @@ func (r Resolver) ClientIP(request *http.Request) string {
 		return direct
 	}
 	parts := strings.Split(value, ",")
-	if len(parts) > 64 {
-		return direct
-	}
 	// Walk from the connected proxy towards the visitor, stopping at the first
 	// untrusted hop. Never take a caller-controlled leftmost address blindly.
-	for i := len(parts) - 1; i >= 0 && r.trusted(peer); i-- {
+	for i, steps := len(parts)-1, 0; i >= 0 && r.trusted(peer); i, steps = i-1, steps+1 {
+		if steps >= 64 {
+			return direct
+		}
 		addr, valid := address(strings.TrimSpace(parts[i]))
 		if !valid {
 			return direct

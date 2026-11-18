@@ -25,7 +25,17 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const configuration =
     saved && (saved.services.length || info.use_instance_debrid) ? saved.credential : ''
   const canSearch = Boolean(configuration || info.use_instance_debrid)
-  const scope = useMemo(() => randomID(), [configuration])
+  const sourceScope = (info.sources ?? []).map((s) => s.id).join(',')
+  const scope = useMemo(
+    () => randomID(),
+    [
+      configuration,
+      info.credential_scope,
+      info.use_instance_debrid,
+      info.use_instance_announces,
+      sourceScope,
+    ],
+  )
   const base = info.trusted ? '/trusted' : '/public'
   const id = new RegExp(`^${base}/search/([0-9]+)$`).exec(location.pathname)?.[1]
   const form = (

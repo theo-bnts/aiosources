@@ -95,11 +95,10 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
     setManifest('')
   }, [location.pathname])
   useEffect(() => {
-    if (!info.trusted) return
     const clear = () => setManifest('')
     window.addEventListener('session-expired', clear)
     return () => window.removeEventListener('session-expired', clear)
-  }, [info.trusted])
+  }, [])
   useEffect(() => {
     if (credential?.credential !== manifestCredential.current) setManifest('')
   }, [credential])

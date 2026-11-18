@@ -21,6 +21,7 @@ import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/compo
 import { PageActions } from '@/components/page-actions'
 import { AccessPermissions } from '@/components/access-permissions'
 import { CredentialPolicyControls } from '@/components/credential-policy-controls'
+import { clearPublicCredentials } from '@/components/public-connection-fields'
 import { PublicCatalogSettings } from '@/components/public-catalog-settings'
 
 const emptyUser: TrustedUser = {
@@ -197,6 +198,7 @@ function UserEditor({
       if (!controller.signal.aborted) setError(error)
     } finally {
       form.delete('password')
+      clearPublicCredentials(formElement)
       if (!controller.signal.aborted) {
         setPending(false)
       }

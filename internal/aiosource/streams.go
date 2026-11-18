@@ -150,6 +150,7 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	if err != nil {
 		return nil, err
 	}
+	defer clear(announces)
 	eligible := []model.AIORecord{}
 	hashes := []string{}
 	for _, rec := range rows {
@@ -493,6 +494,7 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 		if e != nil {
 			return "", e
 		}
+		defer clear(announces)
 		announce := ""
 		if private {
 			items, e := s.DB.SharedAvailability(life, service, []string{rec.Hash}, time.Now().Add(-time.Duration(c.CacheMinutes)*time.Minute))

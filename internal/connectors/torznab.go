@@ -509,6 +509,48 @@ func (c *torznabConnector) record(source sdk.RawItem) model.Record {
 			}
 		}
 	}
+	if id != "" {
+		if c.client.containsSecret(id) {
+			id = ""
+		} else if c.idPattern == nil {
+			if u, err := url.Parse(id); err == nil && validHTTPURL(u) {
+				if c.client.containsURLSecret(u) {
+					id = ""
+				} else {
+					for name := range u.Query() {
+						if sensitiveName(name) || (c.provider.Auth.Name != "" && strings.EqualFold(name, c.provider.Auth.Name)) {
+							id = ""
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	for _, key := range []string{"link", "guid", "comments", "magnet_url"} {
+		value := FieldString(fields[key])
+		if value == "" {
+			continue
+		}
+		if c.client.containsSecret(value) {
+			delete(fields, key)
+			continue
+		}
+		if key == "link" {
+			if u, err := url.Parse(value); err == nil && validHTTPURL(u) {
+				if c.client.containsURLSecret(u) {
+					delete(fields, key)
+					continue
+				}
+				for name := range u.Query() {
+					if sensitiveName(name) || (c.provider.Auth.Name != "" && strings.EqualFold(name, c.provider.Auth.Name)) {
+						delete(fields, key)
+						break
+					}
+				}
+			}
+		}
+	}
 	record := model.Record{SourceID: id, Raw: source.Body, ContentType: "application/xml", Fields: fields}
 	if source.Error != nil {
 		record.Error = "Torznab item contains invalid metadata"

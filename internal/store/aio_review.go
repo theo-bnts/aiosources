@@ -239,6 +239,9 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
  ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=aiosources.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,openlibrary_id=EXCLUDED.openlibrary_id,igdb_id=EXCLUDED.igdb_id,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode, w.OpenLibrary, w.IGDB); err != nil {
 			return databaseError("save identification review", err)
 		}
+		if err = lockCatalogEntityWrites(ctx, tx); err != nil {
+			return err
+		}
 		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind,media_hint)
  VALUES($1,$2,$3,$4,$5,'matched','manually reviewed',$6,$7) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status='matched',reason='manually reviewed',book_kind=EXCLUDED.book_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.ID, w.Revision, matchedBookKind(record, &w), w.Type); err != nil {
 			return databaseError("publish reviewed identification", err)

@@ -18,9 +18,14 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 	if err != nil || len(decoded) != 32 || len(key) != 43 || len(id) != 36 {
 		return zero, ErrCatalogAuthentication
 	}
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return zero, databaseError("begin Stremio access verification", err)
+	}
+	defer rollback(tx)
 	var hash []byte
 	var enabled bool
-	err = s.pool.QueryRow(ctx, `SELECT password_hash,enabled AND (expires_at IS NULL OR expires_at>clock_timestamp()) FROM aiosources.shares WHERE id=$1 AND format='stremio'`, id).Scan(&hash, &enabled)
+	err = tx.QueryRow(ctx, `SELECT password_hash,enabled AND (expires_at IS NULL OR expires_at>clock_timestamp()) FROM aiosources.shares WHERE id=$1 AND format='stremio'`, id).Scan(&hash, &enabled)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return zero, ErrCatalogAuthentication
 	}
@@ -31,13 +36,14 @@ func (s *Store) StremioConnection(ctx context.Context, id, key string) (model.Sh
 	if !enabled || subtle.ConstantTimeCompare(hash, candidate[:]) != 1 {
 		return zero, ErrCatalogAuthentication
 	}
-	// Verify again in the settings read so a concurrent rotation cannot authorize
-	// settings from a newer revision using the former key.
-	value, err := scanShare(s.pool.QueryRow(ctx, "SELECT "+shareColumns+` FROM aiosources.shares WHERE id=$1 AND format='stremio' AND password_hash=$2 AND enabled AND (expires_at IS NULL OR expires_at>clock_timestamp())`, id, candidate[:]))
+	value, err := scanShare(tx.QueryRow(ctx, "SELECT "+shareColumns+` FROM aiosources.shares WHERE id=$1 AND format='stremio' AND enabled AND (expires_at IS NULL OR expires_at>clock_timestamp())`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return zero, ErrCatalogAuthentication
 	}
-	return value, databaseError("read Stremio settings", err)
+	if err != nil {
+		return zero, databaseError("read Stremio settings", err)
+	}
+	return value, databaseError("commit Stremio settings read", tx.Commit(ctx))
 }
 
 func (s *Store) BeginStremioRequest(ctx context.Context, id, key string) (*CatalogDownload, error) {

@@ -31,7 +31,17 @@ export function prepareBrowserDownload() {
         document.body.append(frame)
         // Attachment delivery belongs to the browser once its response arrives.
         // Leave enough time for connection setup, independently of page routing.
-        window.setTimeout(() => frame.remove(), 120_000)
+        const remove = () => {
+          window.clearTimeout(timer)
+          if (typeof window.removeEventListener === 'function') {
+            window.removeEventListener('session-expired', remove)
+          }
+          frame.remove()
+        }
+        const timer = window.setTimeout(remove, 120_000)
+        if (typeof window.addEventListener === 'function') {
+          window.addEventListener('session-expired', remove, { once: true })
+        }
         active = false
         return true
       } catch {

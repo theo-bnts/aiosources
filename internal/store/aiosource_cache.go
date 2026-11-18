@@ -18,6 +18,14 @@ func (s *Store) AIOResource(ctx context.Context, service, account, key string) (
 	return v, err == nil, databaseError("read availability resource", err)
 }
 func (s *Store) SaveAIOResource(ctx context.Context, v model.AIOResource) error {
+	if v.Service == "" || v.Account == "" || v.Key == "" || len(v.Hashes) > 10000 {
+		return model.ErrInvalid
+	}
+	for _, h := range v.Hashes {
+		if h == "" || len(h) > 128 {
+			return model.ErrInvalid
+		}
+	}
 	_, err := s.pool.Exec(ctx, `WITH generation AS MATERIALIZED(SELECT 1 FROM aiosources.aio_state WHERE cache_generation=$8 FOR SHARE)
 INSERT INTO aiosources.aio_resources(service,account,resource,hashes,checked_at,last_attempt,retry) SELECT $1,$2,$3,$4,$5,$6,$7 FROM generation ON CONFLICT(service,account,resource) DO UPDATE SET hashes=EXCLUDED.hashes,checked_at=EXCLUDED.checked_at,last_attempt=EXCLUDED.last_attempt,retry=EXCLUDED.retry`, v.Service, v.Account, v.Key, v.Hashes, v.CheckedAt, v.LastAttempt, v.Retry, v.Generation)
 	return databaseError("save availability resource", err)
@@ -33,19 +41,30 @@ func (s *Store) AIOAvailability(ctx context.Context, service, account string, ha
 		var v model.AIOAvailability
 		var files []byte
 		if err = rows.Scan(&v.Hash, &v.Cached, &v.CheckedAt, &files); err != nil {
-			return nil, err
+			return nil, databaseError("read availability", err)
 		}
 		if err = json.Unmarshal(files, &v.Files); err != nil {
-			return nil, err
+			return nil, databaseError("read availability", err)
 		}
 		out = append(out, v)
 	}
 	return out, databaseError("read availability", rows.Err())
 }
 func (s *Store) SaveAIOAvailability(ctx context.Context, service, account string, v model.AIOAvailability) error {
+	if service == "" || account == "" || v.Hash == "" || len(v.Hash) > 128 {
+		return model.ErrInvalid
+	}
 	files := v.Files
 	if files == nil {
 		files = []model.AIOFile{}
+	}
+	if len(files) > 10000 {
+		return model.ErrInvalid
+	}
+	for i := range files {
+		if files[i].Size < 0 || len(files[i].Path) > 4096 || len(files[i].Link) > 8192 {
+			return model.ErrInvalid
+		}
 	}
 	b, err := json.Marshal(files)
 	if err != nil {

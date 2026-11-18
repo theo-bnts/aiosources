@@ -19,7 +19,7 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 			writeError(w, 404, "Public access is disabled")
 			return
 		}
-		if r.Header.Get("Origin") != s.auth.origin {
+		if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
@@ -171,15 +171,24 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 	} else {
 		policy, announces, e := s.options.AIOSource.PublicTorznabPolicy(ctx, visitor)
 		if e != nil {
+			if errors.Is(e, aiosource.ErrAuth) {
+				torznabError(w, 401, 100, "Invalid public configuration")
+				return
+			}
 			torznabError(w, 503, 910, "Search unavailable")
 			return
 		}
+		defer clear(announces)
 		names := map[string]string{}
 		list, e := s.options.AIOSource.PublicSources(ctx)
 		if visitor.Trusted != nil {
 			list, e = s.options.AIOSource.TrustedSources(ctx, *visitor.Trusted)
 		}
 		if e != nil {
+			if errors.Is(e, aiosource.ErrAuth) {
+				torznabError(w, 401, 100, "Invalid public configuration")
+				return
+			}
 			torznabError(w, 503, 910, "Search unavailable")
 			return
 		}

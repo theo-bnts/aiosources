@@ -66,7 +66,7 @@ func (s *server) registerPublicSharing(mux *http.ServeMux) {
 			writeError(w, 404, "Public access is disabled")
 			return
 		}
-		if r.Header.Get("Origin") != s.auth.origin {
+		if len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}

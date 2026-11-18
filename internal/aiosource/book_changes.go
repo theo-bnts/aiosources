@@ -224,6 +224,9 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 	if base == "" {
 		base = "https://openlibrary.org"
 	}
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return nil, 0, "", errBookRequest
+	}
 	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, strings.TrimRight(base, "/")+path, nil)
 	if err != nil {
 		return nil, 0, "", errBookRequest
@@ -507,7 +510,11 @@ func (s *Service) catchUpBookDay(ctx context.Context, h *operationHistory) error
 }
 
 func (s *Service) readBookDocument(ctx context.Context, h *operationHistory, job store.BookChangeJob) (books.Record, error) {
-	body, status, location, err := s.bookGET(ctx, h, books.Path(job.ID)+".json", "book_details")
+	docPath := books.Path(job.ID)
+	if docPath == "" {
+		return books.Record{}, books.ErrChanges
+	}
+	body, status, location, err := s.bookGET(ctx, h, docPath+".json", "book_details")
 	if err != nil {
 		return books.Record{}, err
 	}
@@ -548,7 +555,11 @@ func (s *Service) readBookDocuments(ctx context.Context, h *operationHistory, jo
 	keys := make([]string, 0, len(jobs))
 	revisions := make(map[string]int64, len(jobs))
 	for _, job := range jobs {
-		keys = append(keys, books.Path(job.ID))
+		docPath := books.Path(job.ID)
+		if docPath == "" {
+			return nil, false, books.ErrChanges
+		}
+		keys = append(keys, docPath)
 		revisions[job.ID] = job.Revision
 	}
 	query, err := json.Marshal(keys)

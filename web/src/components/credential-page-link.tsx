@@ -3,6 +3,7 @@ import { ArrowSquareOutIcon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 
 export function CredentialPageLink({ href, children }: { href: string; children: ReactNode }) {
+  if (!/^https:\/\/[^\s"'<>]+$/.test(href)) return null
   return (
     <div>
       <Button asChild variant="outline">

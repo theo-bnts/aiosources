@@ -1,6 +1,7 @@
 // Source identifiers remain data when they match a directory or action name.
 // Ordinary URLs stay stable; only conflicting identifiers need another path.
 export function sourceSettingsPath(id: string) {
+  if (id === '.' || id === '..') return '/providers'
   const prefix = ['new', 'settings'].includes(id.toLowerCase()) ? '/providers/id/' : '/providers/'
   return prefix + encodeURIComponent(id)
 }

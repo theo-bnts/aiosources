@@ -109,7 +109,9 @@ func (a *authentication) lookup(r *http.Request) (session, error) {
 
 // current deliberately performs a fresh durable check for long-lived SSE streams.
 func (a *authentication) current(r *http.Request) (session, bool) {
-	value, err := a.lookup(r)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	value, err := a.lookup(r.WithContext(ctx))
 	return value, err == nil
 }
 
@@ -379,7 +381,11 @@ func (a *authentication) protect(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			csrf := r.Header.Get("X-CSRF-Token")
+			csrfValues := r.Header.Values("X-CSRF-Token")
+			csrf := ""
+			if len(csrfValues) == 1 {
+				csrf = csrfValues[0]
+			}
 			if !a.allowedOrigin(r) || len(csrf) != len(value.csrf) || subtle.ConstantTimeCompare([]byte(csrf), []byte(value.csrf)) != 1 {
 				writeError(w, http.StatusForbidden, "Invalid form session. Reload the page.")
 				return
@@ -396,7 +402,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://image.tmdb.org https://covers.openlibrary.org https://images.igdb.com; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/stremio/") || strings.HasPrefix(r.URL.Path, "/public/stremio/") || strings.HasPrefix(r.URL.Path, "/trusted/stremio/") || r.URL.Path == "/healthz" {
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/stremio/") || strings.HasPrefix(r.URL.Path, "/public/stremio/") || strings.HasPrefix(r.URL.Path, "/trusted/stremio/") || strings.HasPrefix(r.URL.Path, "/torznab/") || strings.HasPrefix(r.URL.Path, "/public/torznab/") || strings.HasPrefix(r.URL.Path, "/trusted/torznab/") || strings.HasPrefix(r.URL.Path, "/public/catalogs/") || strings.HasPrefix(r.URL.Path, "/trusted/catalogs/") || r.URL.Path == "/healthz" {
 			w.Header().Set("Cache-Control", "no-store")
 		}
 		next.ServeHTTP(w, r)

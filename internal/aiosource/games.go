@@ -312,6 +312,7 @@ func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *ope
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "AIOSources/"+Version)
 	client := *s.GameHTTP
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
 	timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
 	if err != nil {
 		return "", err
@@ -382,6 +383,9 @@ func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationH
 		req.Header.Set("Content-Type", "text/plain")
 		req.Header.Set("User-Agent", "AIOSources/"+Version)
 		client := *s.GameHTTP
+		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 		timeout, err := s.outgoingTimeout(ctx, "metadata_seconds")
 		if err != nil {
 			return err

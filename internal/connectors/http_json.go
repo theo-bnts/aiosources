@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -69,6 +70,43 @@ func newHTTPJSON(ctx context.Context, p model.Provider, mode model.RunMode, env 
 	return &httpJSONConnector{provider: p, client: client, localInstanceID: env.LocalInstanceID, localCategories: categories, preserveQuery: preserveQuery, incremental: mode == model.ModeIncremental}, nil
 }
 func (c *httpJSONConnector) Close() error { return c.client.Close() }
+
+func (c *httpJSONConnector) continuationURL(base *url.URL, value string) (*url.URL, error) {
+	if base == nil {
+		base = c.client.origin
+	}
+	reference, err := url.Parse(value)
+	if err != nil {
+		return nil, errors.New("invalid next URL")
+	}
+	target := base.ResolveReference(reference)
+	if !sameOrigin(c.client.origin, target) {
+		return nil, errors.New("cross-origin next URL refused")
+	}
+	// Managed query authentication is reapplied by Client, never saved inside
+	// a checkpoint. Other credential parameters are still refused.
+	if c.client.authType == "query" {
+		query := target.Query()
+		for name, values := range query {
+			if strings.EqualFold(name, c.client.authName) {
+				if slices.ContainsFunc(values, func(item string) bool { return item != c.client.authValue }) {
+					return nil, errors.New("next URL contains a foreign authentication key")
+				}
+				delete(query, name)
+			}
+		}
+		target.RawQuery = query.Encode()
+	}
+	for name := range target.Query() {
+		if sensitiveName(name) || model.CredentialParameter(name) {
+			return nil, errors.New("next URL contains credential parameters")
+		}
+	}
+	if c.client.containsURLSecret(target) {
+		return nil, errors.New("next URL contains a source credential")
+	}
+	return target, nil
+}
 
 func validateHTTPJSON(p model.Provider) error {
 	if p.HTTP.Catalog {
@@ -231,13 +269,15 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 		state.Cursor = strconv.Itoa(p.Pagination.Start)
 	}
 	if len(checkpoint) > 0 {
-		if err := decodeJSON(checkpoint, &state); err != nil || state.Version != 1 || state.Page < 0 || state.Offset < 0 || (state.Total != nil && *state.Total < 0) {
+		if err := decodeJSON(checkpoint, &state); err != nil || state.Version != 1 || state.Page < 0 || state.Offset < 0 || (state.Total != nil && *state.Total < 0) || c.client.containsSecret(state.Cursor) {
 			return model.Page{}, errors.New("invalid JSON continuation state")
 		}
 		if state.URL != "" {
-			if _, err := c.client.target(state.URL); err != nil {
+			target, err := c.continuationURL(c.client.origin, state.URL)
+			if err != nil {
 				return model.Page{}, errors.New("invalid JSON continuation URL")
 			}
+			state.URL = target.String()
 		}
 	}
 	if state.Done {
@@ -371,13 +411,9 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 			}
 			if strings.HasPrefix(text, "/") || strings.HasPrefix(text, "?") || strings.HasPrefix(text, "http:") || strings.HasPrefix(text, "https:") {
 				base, _ := c.client.target(request.URL)
-				reference, err := url.Parse(text)
+				target, err := c.continuationURL(base, text)
 				if err != nil {
-					return fail(errors.New("invalid next URL"), "invalid_continuation")
-				}
-				target := base.ResolveReference(reference)
-				if !sameOrigin(c.client.origin, target) {
-					return fail(errors.New("cross-origin next URL refused"), "invalid_continuation")
+					return fail(err, "invalid_continuation")
 				}
 				next.URL = target.String()
 				if next.URL == state.URL {
@@ -387,6 +423,9 @@ func (c *httpJSONConnector) Fetch(ctx context.Context, checkpoint json.RawMessag
 				next.URL = ""
 				switch p.Pagination.Type {
 				case "cursor":
+					if c.client.containsSecret(text) {
+						return fail(errors.New("cursor contains a source credential"), "invalid_continuation")
+					}
 					if text == state.Cursor {
 						return fail(fmt.Errorf("%w: repeated cursor", model.ErrStalled), "continuation_repeated")
 					}

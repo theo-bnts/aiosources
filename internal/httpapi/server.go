@@ -45,15 +45,16 @@ type Options struct {
 }
 
 type server struct {
-	files      chan struct{}
-	fileClient *http.Client
-	options    Options
-	auth       *authentication
-	streams    chan struct{}
-	streamAuth chan struct{}
-	public     *publicAdmission
-	policies   *requestPolicyCache
-	torznab    chan struct{}
+	files          chan struct{}
+	fileClient     *http.Client
+	options        Options
+	auth           *authentication
+	streams        chan struct{}
+	trustedStreams chan struct{}
+	streamAuth     chan struct{}
+	public         *publicAdmission
+	policies       *requestPolicyCache
+	torznab        chan struct{}
 }
 
 func New(options Options) (http.Handler, error) {
@@ -67,7 +68,7 @@ func New(options Options) (http.Handler, error) {
 	if _, err := fs.Stat(options.Frontend, "index.html"); err != nil {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
-	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
+	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
 	s.initRequestPolicy()
 	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
 	s.fileClient.Transport = network.Transport("downloads", s.fileClient.Transport.(*http.Transport))

@@ -144,12 +144,23 @@ func trustedGrant(r *http.Request) model.TrustedGrant {
 	return model.TrustedGrant{UserID: user.ID, Generation: user.Generation}
 }
 
+func (s *server) trustedSearchAudience() string {
+	if origin := s.connectionOrigin(); origin != "" {
+		return origin
+	}
+	return "trusted-browser"
+}
+
 // Trusted accounts use the same bounded work capacity as private connections,
 // rather than consuming anonymous visitors' per-address request quotas.
 func (s *server) reserveTrusted() (func(), int, error) {
+	pool := s.trustedStreams
+	if pool == nil {
+		pool = s.streams
+	}
 	select {
-	case s.streams <- struct{}{}:
-		return func() { <-s.streams }, 0, nil
+	case pool <- struct{}{}:
+		return func() { <-pool }, 0, nil
 	default:
 		return nil, 1, nil
 	}
@@ -298,19 +309,29 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 		}
 		defer release()
 		grant := trustedGrant(r)
-		visitor := &aiosource.PublicInstallation{Trusted: &grant, Generation: grant.Generation, Audience: s.connectionOrigin()}
+		audience := s.trustedSearchAudience()
+		visitor := &aiosource.PublicInstallation{Trusted: &grant, Generation: grant.Generation, Audience: audience}
 		metadataOnly := r.Method == http.MethodGet && !strings.HasSuffix(r.URL.Path, "/releases") && r.URL.Path != "/api/trusted/catalog/torrents"
 		if !metadataOnly {
-			personal, e := s.options.AIOSource.ResolveTrustedCredential(ctx, grant, s.connectionOrigin(), aiosource.PublicCredentialChanges{Credential: strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")})
+			auths := r.Header.Values("Authorization")
+			credential := ""
+			if len(auths) > 1 || (len(auths) == 1 && !strings.HasPrefix(auths[0], "Bearer ")) {
+				publicCredentialError(w, aiosource.ErrAuth)
+				return
+			}
+			if len(auths) == 1 {
+				credential = strings.TrimPrefix(auths[0], "Bearer ")
+			}
+			personal, e := s.options.AIOSource.ResolveTrustedCredential(ctx, grant, s.connectionOrigin(), aiosource.PublicCredentialChanges{Credential: credential})
 			if e != nil {
 				publicCredentialError(w, e)
 				return
 			}
 			defer func() { clear(personal.Services); clear(personal.Announces) }()
 			var err error
-			visitor, err = s.options.AIOSource.TrustedVisitorWithCredentials(ctx, grant, s.connectionOrigin(), "search", model.StreamPreferences{}, personal.Services, personal.Announces)
+			visitor, err = s.options.AIOSource.TrustedVisitorWithCredentials(ctx, grant, audience, "search", model.StreamPreferences{}, personal.Services, personal.Announces)
 			if err != nil {
-				respondError(w, err)
+				publicCredentialError(w, err)
 				return
 			}
 		}

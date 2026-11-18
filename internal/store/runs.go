@@ -606,6 +606,13 @@ func (s *Store) RequestCancel(ctx context.Context, id string) (model.Run, error)
 		return model.Run{}, databaseError("begin collection cancellation", err)
 	}
 	defer rollback(tx)
+	var providerID string
+	if err := tx.QueryRow(ctx, "SELECT provider_id FROM aiosources.runs WHERE id=$1", id).Scan(&providerID); err != nil {
+		return model.Run{}, databaseError("read collection provider", err)
+	}
+	if err := lockProviderQueue(ctx, tx, providerID); err != nil {
+		return model.Run{}, databaseError("lock collection queue", err)
+	}
 	run, err := scanRun(tx.QueryRow(ctx, "SELECT "+runColumns+" FROM aiosources.runs WHERE id=$1 FOR UPDATE", id))
 	if err != nil {
 		return model.Run{}, databaseError("read collection cancellation", err)

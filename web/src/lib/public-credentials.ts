@@ -43,8 +43,27 @@ function parse(value: unknown): PublicCredential | null {
   }
 }
 
+function pruneTrustedRevisions(scope: string) {
+  const match = /^trusted:([^:]+):([0-9]+)$/.exec(scope)
+  if (!match) return
+  const prefix = `${storageKey}.trusted:${match[1]}:`
+  const activeKey = scopedKey(scope)
+  for (const key of records.keys()) {
+    if (key.startsWith(`trusted:${match[1]}:`) && key !== scope) records.delete(key)
+  }
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index)
+      if (key && key.startsWith(prefix) && key !== activeKey) localStorage.removeItem(key)
+    }
+  } catch {
+    /* Storage is optional. */
+  }
+}
+
 function read(scope = '') {
   if (!records.has(scope)) {
+    pruneTrustedRevisions(scope)
     let value: PublicCredential | null = null
     try {
       value = parse(JSON.parse(localStorage.getItem(scopedKey(scope)) || 'null'))
@@ -93,6 +112,7 @@ export function isCurrentPublicCredential(expected?: string, scope = '') {
 export function savePublicCredential(value: PublicCredential, scope = '') {
   const next = parse(value)
   if (!next) throw new Error('The server returned an invalid service configuration.')
+  pruneTrustedRevisions(scope)
   records.set(scope, next)
   // Only server-sealed credentials and field identifiers are persisted. Personal
   // keys and announce URLs never enter localStorage or query-cache entries in plaintext.

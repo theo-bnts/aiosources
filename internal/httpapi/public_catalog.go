@@ -11,6 +11,7 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 type publicCatalogAction func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation) (any, error)
@@ -21,7 +22,7 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			writeError(w, 404, "Public Search is disabled")
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("Origin") != s.auth.origin {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && (len(r.Header.Values("Origin")) != 1 || r.Header.Get("Origin") != s.auth.origin) {
 			writeError(w, 403, "Request origin is not allowed")
 			return
 		}
@@ -163,8 +164,12 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 			}
 			audience := s.auth.origin
 			sessionID := ""
-			if ts, ok := r.Context().Value(trustedSessionKey{}).(trustedSession); ok {
-				audience = s.connectionOrigin()
+			if visitor.Trusted != nil {
+				ts, ok := r.Context().Value(trustedSessionKey{}).(trustedSession)
+				if !ok || ts.ID == "" {
+					return nil, aiosource.ErrAuth
+				}
+				audience = s.trustedSearchAudience()
 				sessionID = ts.ID
 			}
 			data, e := json.Marshal(publicCatalogFileTicket{Trusted: visitor.Trusted, Session: sessionID, Service: result.Service, URL: result.URL, Audience: audience, Generation: visitor.Generation, Expires: expires})
@@ -218,7 +223,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedAudience := s.auth.origin
 	if ticket.Trusted != nil {
-		expectedAudience = s.connectionOrigin()
+		expectedAudience = s.trustedSearchAudience()
 	}
 	if expectedAudience == "" || ticket.Audience != expectedAudience || ticket.Expires <= now || ticket.Expires > now+model.MaxDownloadTicketMinutes*60 || !model.IsDebridService(ticket.Service) || !validCatalogFileURL(ticket.URL) {
 		respondError(w, model.ErrNotFound)
@@ -231,14 +236,17 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	authorize := func(ctx context.Context) error {
 		if ticket.Trusted != nil {
-			if ticket.Session != "" {
-				ts, err := s.auth.lookupTrusted(r.WithContext(ctx))
-				if err != nil || ts.ID != ticket.Session || ts.User.ID != ticket.Trusted.UserID || ts.User.Generation != ticket.Trusted.Generation {
-					return model.ErrNotFound
-				}
+			if ticket.Session == "" {
+				return model.ErrNotFound
 			}
-			user, err := s.options.Store.TrustedUser(ctx, *ticket.Trusted)
-			if err != nil || !user.SearchEnabled {
+			ts, err := s.auth.lookupTrusted(r.WithContext(ctx))
+			if errors.Is(err, store.ErrAuthentication) {
+				return model.ErrNotFound
+			}
+			if err != nil {
+				return err
+			}
+			if ts.ID != ticket.Session || ts.User.ID != ticket.Trusted.UserID || ts.User.Generation != ticket.Trusted.Generation || !ts.User.SearchEnabled {
 				return model.ErrNotFound
 			}
 			return nil

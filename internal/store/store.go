@@ -279,6 +279,9 @@ func pageOptions(opts model.ListOptions) model.ListOptions {
 	if opts.Offset < 0 {
 		opts.Offset = 0
 	}
+	if opts.Offset > 1000000 {
+		opts.Offset = 1000000
+	}
 	return opts
 }
 

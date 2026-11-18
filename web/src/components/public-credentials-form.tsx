@@ -45,6 +45,16 @@ export function PublicCredentialsForm({
   const formRef = useRef<HTMLFormElement>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
+    const clear = () => {
+      request.current?.abort()
+      setPending(false)
+      setError(null)
+      if (formRef.current) clearPublicCredentials(formRef.current)
+    }
+    window.addEventListener('session-expired', clear)
+    return () => window.removeEventListener('session-expired', clear)
+  }, [])
+  useEffect(() => {
     setRemoved([])
   }, [saved])
   async function submit(form: HTMLFormElement) {

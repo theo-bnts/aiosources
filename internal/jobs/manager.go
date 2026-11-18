@@ -284,6 +284,11 @@ func (m *Manager) Cancel(ctx context.Context, id string) (model.Run, error) {
 		return model.Run{}, publicStoreError(err)
 	}
 	if run.CancelRequested || run.Status == model.StatusCancelled {
+		if attempt == nil {
+			m.mu.Lock()
+			attempt = m.active[id]
+			m.mu.Unlock()
+		}
 		if attempt != nil {
 			attempt.cancel(errCancelled)
 		}

@@ -72,6 +72,21 @@ export function DownloadAction({
     },
     [],
   )
+  useEffect(() => {
+    const clear = () => {
+      controller.current?.abort()
+      download.current?.cancel()
+      preparation.current = ''
+      preparationOperation.current = ''
+      setReady(null)
+      setBookFiles([])
+      setWaiting(false)
+      setNotReady(false)
+      setOperation('')
+    }
+    window.addEventListener('session-expired', clear)
+    return () => window.removeEventListener('session-expired', clear)
+  }, [])
   const mutation = useMutation({
     gcTime: 0,
     mutationFn: (allowUncached: boolean) => {

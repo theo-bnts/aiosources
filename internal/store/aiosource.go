@@ -59,7 +59,7 @@ func (s *Store) SetAIOConfig(ctx context.Context, c model.AIOConfig) error {
 func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, encrypted map[string][]byte) error {
 	expected := c.Revision
 	c.Revision++
-	if expected < 1 {
+	if expected < 1 || len(c.Trackers) > 1000 || len(c.OpenLibraryLanguages) > 100 {
 		return model.ErrInvalid
 	}
 	b, err := json.Marshal(c)
@@ -68,12 +68,18 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return databaseError("begin AIOSources configuration", err)
 	}
 	defer rollback(tx)
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", providerLockKey("aiosource.config.v2")); err != nil {
+		return databaseError("lock AIOSources configuration", err)
+	}
 	old, err := readAIOConfig(ctx, tx)
 	if err != nil {
 		return err
+	}
+	if old.Revision != expected {
+		return model.ErrConflict
 	}
 	refs := c.SecretReferences()
 	for _, t := range c.Trackers {

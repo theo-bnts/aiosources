@@ -187,7 +187,8 @@ function LegacyRemotes() {
 function LegacyRawHistory() {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
-  const run = search.get('run') || search.get('run_id')
+  const rawRun = search.get('run') || search.get('run_id')
+  const run = rawRun && /^[A-Za-z0-9_-]{1,128}$/.test(rawRun) ? rawRun : null
   const target = new URLSearchParams()
   if (run) {
     target.set('tab', 'raw')

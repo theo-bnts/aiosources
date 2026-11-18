@@ -1085,7 +1085,7 @@ function PasswordDialog({
   const torznab = credential.share.format === 'torznab'
   const kind = stremio ? 'manifest URL' : torznab ? 'API key' : 'password'
   let manifest = ''
-  if (stremio) {
+  if (stremio && credential.share.url) {
     try {
       const url = new URL(
         `${credential.share.url}.${credential.password}/manifest.json`,
@@ -1135,7 +1135,7 @@ function PasswordDialog({
             manualCopyMessage={`Clipboard access is unavailable. Reveal the ${kind} and copy it manually.`}
             successMessage="Copied to your clipboard. Keep it private."
           />
-          {stremio && (
+          {stremio && manifest && (
             <Button asChild variant="outline">
               <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
                 <PlusIcon aria-hidden="true" />
