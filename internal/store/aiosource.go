@@ -176,10 +176,11 @@ CASE WHEN w.media_type='tv' THEN COALESCE((SELECT jsonb_object_agg(season::text|
 CASE WHEN w.media_type='book' THEN w.book_data || jsonb_build_object('author_aliases',COALESCE((SELECT jsonb_agg(alias) FROM (SELECT DISTINCT unnest(a.aliases) AS alias FROM aiosources.ol_authors a WHERE w.media_type='book' AND a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) LIMIT 200) names),'[]'), 'authors',COALESCE((SELECT jsonb_agg(a.name ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'[]'),
 'cover',COALESCE(NULLIF((w.book_data->>'cover')::bigint,0),` + bookEditionCover + `,0)) ELSE w.book_data END,w.igdb_id,w.game_data`
 
-func scanAIOWork(row scanner) (model.AIOWork, error) {
+func scanAIOWork(row scanner, extra ...any) (model.AIOWork, error) {
 	var w model.AIOWork
 	var seasons, episodes, book, game []byte
-	err := row.Scan(&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book, &w.IGDB, &game)
+	dest := append([]any{&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book, &w.IGDB, &game}, extra...)
+	err := row.Scan(dest...)
 	if err != nil {
 		return w, err
 	}
@@ -226,14 +227,17 @@ func (s *Store) AIOCandidates(ctx context.Context, title, tmdb, imdb, tvdb strin
 
 const aioRecordColumns = `t.provider_id,t.source_id,t.fields,t.fields_fingerprint`
 
-func scanAIORecord(row scanner) (model.AIORecord, error) { return scanAIORecordQueue(row, false) }
-func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
+func scanAIORecord(row scanner, extra ...any) (model.AIORecord, error) {
+	return scanAIORecordQueue(row, false, extra...)
+}
+func scanAIORecordQueue(row scanner, queue bool, extra ...any) (model.AIORecord, error) {
 	var r model.AIORecord
 	var b []byte
 	dest := []any{&r.Provider, &r.SourceID, &b, &r.Fingerprint}
 	if queue {
 		dest = append(dest, &r.QueueVersion)
 	}
+	dest = append(dest, extra...)
 	if err := row.Scan(dest...); err != nil {
 		return r, err
 	}
@@ -485,13 +489,6 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 	return records, err
 }
 
-type aioStreamRow struct {
-	scanner
-	ids []any
-}
-
-func (r aioStreamRow) Scan(dest ...any) error { return r.scanner.Scan(append(dest, r.ids...)...) }
-
 func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIORecord, error) {
 	if err != nil {
 		return nil, databaseError("search local streams", err)
@@ -500,11 +497,11 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 	out := []model.AIORecord{}
 	for rows.Next() {
 		var imdb, tmdb, tvdb string
-		var row scanner = rows
+		var extra []any
 		if publishedIDs {
-			row = aioStreamRow{scanner: rows, ids: []any{&imdb, &tmdb, &tvdb}}
+			extra = []any{&imdb, &tmdb, &tvdb}
 		}
-		v, e := scanAIORecord(row)
+		v, e := scanAIORecord(rows, extra...)
 		if e != nil {
 			return nil, e
 		}

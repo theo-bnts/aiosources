@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -187,15 +186,14 @@ func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visit
 	if access.UseInstanceAnnounces {
 		announces := map[string]string{}
 		for id, tracker := range c.Trackers {
-			if !tracker.Private || tracker.AnnounceSecret == "" {
-				continue
-			}
-			value, e := s.key(ctx, tracker.AnnounceSecret)
+			value, e := s.trackerAnnounce(ctx, tracker)
 			if e != nil {
 				clear(announces)
 				return nil, e
 			}
-			announces[id] = value
+			if value != "" {
+				announces[id] = value
+			}
 		}
 		return announces, nil
 	}
@@ -205,20 +203,7 @@ func (s *Service) visitorAnnounces(ctx context.Context, c model.AIOConfig, visit
 	if len(visitor.Announces) == 0 {
 		return nil, nil
 	}
-
-	sources, err := s.publicPrivateSources(c)
-	if err != nil {
-		// An unreadable definition cannot authorize an uncached download, but
-		// must not prevent existing cached playback through an encrypted link.
-		return nil, nil
-	}
-	allowed := map[string]string{}
-	for _, source := range sources {
-		if value := visitor.Announces[source.ID]; value != "" {
-			allowed[source.ID] = value
-		}
-	}
-	return allowed, nil
+	return s.filterPersonalAnnounces(c, visitor.Announces), nil
 }
 
 func validPublicKeys(keys map[string]string) bool {
@@ -265,11 +250,9 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if err = s.validatePublicAnnounces(ctx, access, announces); err != nil {
 		return "", err
 	}
-	for _, provider := range PublicProviders {
-		if key, ok := keys[provider.ID]; ok && !access.UseInstanceDebrid {
-			if err = s.Providers.ValidateKey(ctx, provider.ID, key); err != nil {
-				return "", err
-			}
+	if !access.UseInstanceDebrid {
+		if err = s.validateServiceKeys(ctx, keys); err != nil {
+			return "", err
 		}
 	}
 	// Provider validation may take seconds. Do not create a new link after public
@@ -319,16 +302,10 @@ func (s *Service) CheckPublicStremio(ctx context.Context, visitor *PublicInstall
 }
 
 func (s *Service) sealPublicInstallation(ctx context.Context, installation PublicInstallation) (string, error) {
-	data, err := json.Marshal(installation)
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal(publicInstallationPurpose, data)
+	configuration, err := s.sealVaultJSON(publicInstallationPurpose, installation)
 	if err != nil {
 		return "", err
 	}
-	configuration := base64.RawURLEncoding.EncodeToString(sealed)
 	if err := s.CheckPublicConfigurationSize(ctx, "stremio", configuration); err != nil {
 		return "", err
 	}
@@ -381,17 +358,8 @@ func (s *Service) openPublicCredential(ctx context.Context, audience, value stri
 	if err != nil {
 		return nil, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(credential)
-	if err != nil {
-		return nil, ErrAuth
-	}
-	data, err := s.Vault.Open(publicInstallationPurpose, sealed)
-	if err != nil {
-		return nil, ErrAuth
-	}
-	defer clear(data)
 	var out PublicInstallation
-	if json.Unmarshal(data, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || (requireServices && !access.UseInstanceDebrid || len(out.Services) > 0) && !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
+	if s.openVaultJSON(publicInstallationPurpose, credential, &out) != nil || out.Version != 1 || out.Generation != access.Generation || out.Audience != audience || (requireServices && !access.UseInstanceDebrid || len(out.Services) > 0) && !validPublicKeys(out.Services) || !validPublicAnnounces(out.Announces) {
 		clear(out.Services)
 		clear(out.Announces)
 		return nil, ErrAuth
@@ -420,32 +388,14 @@ type publicSource struct {
 }
 
 func (s *Service) sealPublicSource(provider, source string) (string, error) {
-	data, err := json.Marshal(publicSource{provider, source})
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal("public-playback-v1", data)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(sealed), nil
+	return s.sealVaultJSON("public-playback-v1", publicSource{provider, source})
 }
 func (s *Service) PublicPlaybackSource(ctx context.Context, value, service, mediaType, id string, visitor *PublicInstallation) (string, error) {
 	if visitor == nil || visitor.Services[service] == "" || len(value) > 4096 || strings.Contains(value, "~") {
 		return "", ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(value)
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	data, err := s.Vault.Open("public-playback-v1", sealed)
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	defer clear(data)
 	var source publicSource
-	if json.Unmarshal(data, &source) != nil {
+	if err := s.openVaultJSON("public-playback-v1", value, &source); err != nil {
 		return "", model.ErrInvalid
 	}
 	return s.PublicPlayback(ctx, service, source.Provider, source.Source, mediaType, id, visitor)

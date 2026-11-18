@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/xml"
 	"errors"
 	"net/http"
 	"strconv"
@@ -74,11 +73,7 @@ func (s *server) registerPublicTorznab(mux *http.ServeMux) {
 
 func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Referrer-Policy", "no-referrer")
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		torznabError(w, 405, 202, "Read-only endpoint")
+	if !prepareTorznabFeedRequest(w, r) {
 		return
 	}
 	trusted := strings.HasPrefix(r.URL.Path, "/trusted/")
@@ -151,11 +146,7 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if queryErr != nil {
-		code := 201
-		if errors.Is(queryErr, model.ErrNotFound) {
-			code = 202
-		}
-		torznabError(w, 400, code, "Unsupported function or incorrect parameter")
+		writeTorznabQueryError(w, queryErr)
 		return
 	}
 	// Services only select known shared availability; credentials are configured
@@ -219,19 +210,11 @@ func (s *server) publicTorznabFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	body, err := xml.Marshal(response)
-	if err != nil {
-		torznabError(w, 503, 910, "Could not encode response")
-		return
-	}
-	if err = s.options.AIOSource.ValidatePublicTorznab(ctx, visitor); err != nil {
-		torznabError(w, 401, 100, "Invalid public configuration")
-		return
-	}
-	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	w.WriteHeader(200)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(append([]byte(xml.Header), body...))
-	}
-	_ = controller.Flush()
+	writeTorznabXMLResponse(w, r, controller, response, func() bool {
+		if err := s.options.AIOSource.ValidatePublicTorznab(ctx, visitor); err != nil {
+			torznabError(w, 401, 100, "Invalid public configuration")
+			return false
+		}
+		return true
+	})
 }

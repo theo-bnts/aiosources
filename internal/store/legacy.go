@@ -14,7 +14,7 @@ func (s *Store) ImportLegacy(ctx context.Context) (int64, error) {
 		return 0, databaseError("begin historical import", err)
 	}
 	defer rollback(tx)
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", migrationLockNamespace, int32(2)); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", migrationLockNamespace, legacyImportLockID); err != nil {
 		return 0, databaseError("lock historical import", err)
 	}
 	var exists bool

@@ -69,12 +69,8 @@ func (s *Service) metadataGET(ctx context.Context, key, path string, out any) (b
 			if attempt == policy["request_attempts"]-1 {
 				break
 			}
-			timer := time.NewTimer(delay)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return false, ctx.Err()
-			case <-timer.C:
+			if err := sleepContext(ctx, delay); err != nil {
+				return false, err
 			}
 			continue
 		}

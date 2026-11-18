@@ -131,12 +131,8 @@ func (s *Service) checkPublicService(ctx context.Context, service, key, resource
 		if locked {
 			break
 		}
-		timer := time.NewTimer(50 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, ctx.Err()
-		case <-timer.C:
+		if err := sleepContext(ctx, 50*time.Millisecond); err != nil {
+			return nil, err
 		}
 	}
 	defer release()

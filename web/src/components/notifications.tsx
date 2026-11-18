@@ -1,12 +1,13 @@
 import { messageText } from '@/lib/format'
 import { ConnectionError } from '@/lib/api'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CheckCircleIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react'
 import { createPortal } from 'react-dom'
 import { Toast } from 'radix-ui'
 import { RequestNotices, type RequestIssue } from '@/lib/request-notices'
 import { Notifications, type Notification, type Notify } from '@/lib/notifications'
 import { ErrorNotice } from '@/components/common'
+import { useSessionExpired } from '@/components/public-connection-fields'
 import { Button } from '@/components/ui/button'
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -14,15 +15,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [dismissed, setDismissed] = useState<Set<unknown>>(() => new Set())
   const [messages, setMessages] = useState<Array<Notification & { id: number }>>([])
   const nextID = useRef(0)
-  useEffect(() => {
-    const clear = () => {
-      setMessages([])
-      setIssues(new Map())
-      setDismissed(new Set())
-    }
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => {
+    setMessages([])
+    setIssues(new Map())
+    setDismissed(new Set())
+  })
   const notify = useCallback<Notify>((notice) => {
     const message = typeof notice === 'string' ? { message: notice } : notice
     if (!message.message) return

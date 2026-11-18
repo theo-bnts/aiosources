@@ -1,6 +1,6 @@
 import { debridProviders, isDebridService } from './debrid'
 import { useSyncExternalStore } from 'react'
-import { api, ApiError, queryClient } from './api'
+import { queryClient } from './api'
 
 export type PublicCredential = {
   credential: string
@@ -140,21 +140,4 @@ export function forgetPublicCredential(expected?: string, scope = '') {
   }
   clearPublicSearch()
   notify()
-}
-
-export async function publicAPI<T>(
-  path: string,
-  configuration: string,
-  init: RequestInit = {},
-  remembered = configuration,
-  scope = '',
-) {
-  const headers = new Headers(init.headers)
-  if (configuration) headers.set('Authorization', `Bearer ${configuration}`)
-  try {
-    return await api<T>(`/public${path}`, { ...init, headers, cache: 'no-store' })
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 401) forgetPublicCredential(remembered, scope)
-    throw error
-  }
 }

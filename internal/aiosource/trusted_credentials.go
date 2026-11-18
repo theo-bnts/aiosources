@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"sort"
 	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -48,21 +47,11 @@ func (s *Service) ResolveTrustedCredential(ctx context.Context, grant model.Trus
 }
 
 func (s *Service) TrustedBrowserCredential(ctx context.Context, grant model.TrustedGrant, audience string, visitor *PublicInstallation) (PublicBrowserCredential, error) {
-	result := PublicBrowserCredential{Services: []string{}, Announces: []string{}}
 	user, err := s.DB.TrustedUser(ctx, grant)
 	if err != nil {
-		return result, trustedAccessError(err)
+		return PublicBrowserCredential{Services: []string{}, Announces: []string{}}, trustedAccessError(err)
 	}
-	result.InstanceServices = user.UseInstanceDebrid
-	for _, p := range PublicProviders {
-		if visitor.Services[p.ID] != "" {
-			result.Services = append(result.Services, p.ID)
-		}
-	}
-	for id := range visitor.Announces {
-		result.Announces = append(result.Announces, id)
-	}
-	sort.Strings(result.Announces)
+	result := browserCredentialSummary(visitor, user.UseInstanceDebrid)
 	// A browser credential may also authorize Search with instance services.
 	result.Credential, err = s.CreateTrustedConnectionWithCredentials(ctx, grant, audience, "credentials", model.StreamPreferences{}, model.PublicTorznabOptions{}, model.PublicCatalogOptions{}, visitor)
 	return result, err
@@ -79,12 +68,5 @@ func (s *Service) ValidatePersonalServices(ctx context.Context, visitor *PublicI
 	if required && !validPublicKeys(visitor.Services) {
 		return model.ErrInvalid
 	}
-	for _, p := range PublicProviders {
-		if key := visitor.Services[p.ID]; key != "" {
-			if err = s.Providers.ValidateKey(ctx, p.ID, key); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return s.validateServiceKeys(ctx, visitor.Services)
 }

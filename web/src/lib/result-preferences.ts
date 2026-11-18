@@ -1,3 +1,5 @@
+import { isWholeNumberString } from './format.ts'
+
 export type SortField = 'cached' | 'language' | 'size' | 'published' | 'age' | 'name' | 'source'
 export type SortRule = { field: SortField; direction: 'asc' | 'desc' }
 export type ResultPreferences = {
@@ -55,9 +57,8 @@ export function readResultSorting(raw: string | null): SortRule[] {
 }
 
 export function readResponseSeconds(raw: string | null, max = 60): number | undefined {
-  if (!raw || !/^\d+$/.test(raw.trim())) return undefined
-  const value = Number(raw.trim())
-  return Number.isSafeInteger(value) && value >= 1 && value <= max ? value : undefined
+  const trimmed = raw?.trim()
+  return isWholeNumberString(trimmed, 1, max) ? Number(trimmed) : undefined
 }
 
 export function resultPreferencesError(options: ResultPreferences, maxSeconds = 60): string {

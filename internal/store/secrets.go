@@ -129,7 +129,7 @@ func (s *Store) deleteSecret(ctx context.Context, name string, expected *int64) 
 	// separate statement sees admissions that committed while the lock waited.
 	var referenced bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (
-SELECT 1 FROM aiosources.runs WHERE (status IN ('queued','running','paused') OR (status='failed' AND trigger='scheduled' AND NOT cancel_requested AND config @> '{"schedule":{"retry_failed":true}}'::jsonb)) AND (
+SELECT 1 FROM aiosources.runs WHERE (status IN ('queued','running','paused') OR `+retryableScheduledFailureSQL+`) AND (
 $1 IN (config#>>'{auth,secret_ref}',config#>>'{auth,username_ref}',config#>>'{auth,password_ref}')
 OR EXISTS (SELECT 1 FROM jsonb_each_text(CASE WHEN jsonb_typeof(config#>'{http,secret_headers}')='object'
 THEN config#>'{http,secret_headers}' ELSE '{}'::jsonb END) AS headers WHERE headers.value=$1)))

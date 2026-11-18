@@ -292,3 +292,30 @@ export function refreshData() {
 export function refreshLiveData() {
   return invalidateData(false)
 }
+
+export function isRevisionConflict(
+  baseRevision: number | undefined,
+  currentRevision: number | undefined,
+  error: unknown,
+): boolean {
+  return (
+    (baseRevision !== undefined &&
+      currentRevision !== undefined &&
+      baseRevision !== currentRevision) ||
+    (error instanceof ApiError && error.status === 409)
+  )
+}
+
+export async function commitRevisionQueryData<T>(
+  queryKey: readonly unknown[],
+  next: T,
+  revisionOf: (value: T) => number = (value) => (value as { revision: number }).revision,
+): Promise<T> {
+  await queryClient.cancelQueries({ queryKey })
+  let committed = next
+  queryClient.setQueryData<T>(queryKey, (current) => {
+    committed = current && revisionOf(current) > revisionOf(next) ? current : next
+    return committed
+  })
+  return committed
+}

@@ -34,7 +34,7 @@ func initializeRemoteCursor(ctx context.Context, tx pgx.Tx, run model.Run) error
 	}
 	state := model.CatalogCursor{Version: 1}
 	if err := tx.QueryRow(ctx, `SELECT cache_generation FROM aiosources.aio_state`).Scan(&state.CacheGeneration); err != nil {
-		return err
+		return databaseError("read catalogue cache generation", err)
 	}
 	err := tx.QueryRow(ctx, "SELECT endpoint,checkpoint FROM aiosources.remote_checkpoints WHERE provider_id=$1", run.ProviderID).Scan(&state.BaseEndpoint, &state.BaseCheckpoint)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -90,7 +90,7 @@ func (s *Store) RemoteStates(ctx context.Context, providerIDs []string) (map[str
 			return nil, databaseError("read remote catalogue state", err)
 		}
 		if err := json.Unmarshal(data, &state.Entities); err != nil {
-			return nil, err
+			return nil, databaseError("read remote catalogue state", err)
 		}
 		result[id] = state
 	}

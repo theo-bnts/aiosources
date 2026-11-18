@@ -139,20 +139,7 @@ func (s *Store) queueBookChanges(ctx context.Context, keys []books.ChangeKey, de
 		return err
 	}
 	if !dependencies && (config.OpenLibraryRelevantOnly || len(config.OpenLibraryLanguages) > 0) {
-		rows, err := tx.Query(ctx, `SELECT id FROM aiosources.ol_import_references WHERE id=ANY($1::text[])`, ids)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var id string
-			if err = rows.Scan(&id); err != nil {
-				rows.Close()
-				return err
-			}
-			wanted[id] = true
-		}
-		err = rows.Err()
-		rows.Close()
+		wanted, err = selectBookImportReferences(ctx, tx, ids)
 		if err != nil {
 			return err
 		}
@@ -327,16 +314,7 @@ func (s *Store) ApplyBookChange(ctx context.Context, job BookChangeJob, record b
 }
 
 func (s *Store) BookDependencies(ctx context.Context, record books.Record) ([]string, error) {
-	keys := []string{}
-	switch {
-	case record.Work != nil:
-		keys = append(keys, record.Work.Book.AuthorKeys...)
-	case record.Edition != nil:
-		keys = append(keys, record.Edition.Works...)
-		keys = append(keys, record.Edition.Authors...)
-	case record.Redirect != nil:
-		keys = append(keys, record.Redirect.Target)
-	}
+	keys := bookRecordReferences(record)
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, err

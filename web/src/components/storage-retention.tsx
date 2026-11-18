@@ -1,7 +1,8 @@
 import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, ApiError } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { api, commitRevisionQueryData, isRevisionConflict, queryClient } from '@/lib/api'
+import { isWholeNumberString } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { ErrorNotice, Loading } from '@/components/common'
 import { StorageImpact } from '@/components/storage-indexes'
@@ -68,7 +69,6 @@ export function StorageRetentionPanel() {
   const [draft, setDraft] = useState<{ revision: number; values: Record<string, string> } | null>(
     null,
   )
-  const client = useQueryClient()
   const queryKey = ['storage-retention']
   const query = useQuery({
     queryKey,
@@ -105,16 +105,13 @@ export function StorageRetentionPanel() {
   const save = useMutation({
     mutationFn: (value: Settings) =>
       api<Settings>('/settings/storage/retention', { method: 'PUT', body: JSON.stringify(value) }),
-    onMutate: () => client.cancelQueries({ queryKey }),
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
     onSuccess: async (value) => {
-      await client.cancelQueries({ queryKey })
-      client.setQueryData<Settings>(queryKey, (current) =>
-        current && current.revision > value.revision ? current : value,
-      )
+      await commitRevisionQueryData(queryKey, value)
       setDraft(null)
-      void client.invalidateQueries({ queryKey })
+      void queryClient.invalidateQueries({ queryKey })
     },
-    onError: () => void client.invalidateQueries({ queryKey }),
+    onError: () => void queryClient.invalidateQueries({ queryKey }),
   })
   const dirty =
     draft !== null &&
@@ -124,16 +121,12 @@ export function StorageRetentionPanel() {
         ([key]) =>
           values[key] !== (query.data?.days[key] === -1 ? '' : String(query.data?.days[key])),
       ))
-  const conflict =
-    (draft !== null && draft.revision !== query.data?.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = Boolean(
+    draft !== null && isRevisionConflict(draft.revision, query.data?.revision, save.error),
+  )
   const invalid =
-    !/^\d+$/.test(values.request_limit ?? '') ||
-    Number(values.request_limit) > 1000000 ||
-    groups.some(
-      ([key]) =>
-        values[key] !== '' && (!/^\d+$/.test(values[key] ?? '') || Number(values[key]) > 3650),
-    )
+    !isWholeNumberString(values.request_limit, 0, 1000000) ||
+    groups.some(([key]) => values[key] !== '' && !isWholeNumberString(values[key], 0, 3650))
   useUnsavedChanges(dirty, 'retention overrides', save.isPending)
   return (
     <Disclosure

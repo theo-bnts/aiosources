@@ -112,7 +112,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	reviews := []*model.AIOMatchReview{}
 	for rows.Next() {
 		var review model.AIOMatchReview
-		r, err := scanAIORecordQueue(aioStreamRow{scanner: rows, ids: []any{&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged}}, true)
+		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged)
 		if err != nil {
 			rows.Close()
 			return nil, err

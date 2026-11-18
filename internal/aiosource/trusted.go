@@ -121,16 +121,7 @@ func (s *Service) OpenTrustedConnection(ctx context.Context, audience, feature, 
 	if err != nil {
 		return value, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
-	if err != nil {
-		return value, ErrAuth
-	}
-	data, err := s.Vault.Open(trustedConnectionPurpose, sealed)
-	if err != nil {
-		return value, ErrAuth
-	}
-	defer clear(data)
-	if json.Unmarshal(data, &value) != nil || value.Version != 1 || value.Feature != feature || value.Audience != audience {
+	if s.openVaultJSON(trustedConnectionPurpose, token, &value) != nil || value.Version != 1 || value.Feature != feature || value.Audience != audience {
 		return value, ErrAuth
 	}
 	user, err := s.DB.TrustedUser(ctx, model.TrustedGrant{UserID: value.UserID, Generation: value.Generation})

@@ -302,7 +302,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 		var item model.TorznabRecord
 		var imdb, tmdb, tvdb string
 		var reviewed bool
-		rec, e := scanAIORecord(aioStreamRow{scanner: rows, ids: []any{&item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed}})
+		rec, e := scanAIORecord(rows, &item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed)
 		if e != nil {
 			rows.Close()
 			return result, e

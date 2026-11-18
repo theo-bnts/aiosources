@@ -2,7 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"sort"
 	"strings"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -121,15 +120,7 @@ func (s *Service) PublicBrowserCredential(ctx context.Context, audience string, 
 	if err := s.validatePublicAnnounces(ctx, access, installation.Announces); err != nil {
 		return result, err
 	}
-	for _, provider := range PublicProviders {
-		if installation.Services[provider.ID] != "" {
-			result.Services = append(result.Services, provider.ID)
-		}
-	}
-	for source := range installation.Announces {
-		result.Announces = append(result.Announces, source)
-	}
-	sort.Strings(result.Announces)
+	result = browserCredentialSummary(installation, access.UseInstanceDebrid)
 	if len(result.Services) == 0 && len(result.Announces) == 0 && !access.UseInstanceDebrid {
 		return result, nil
 	}

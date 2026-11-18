@@ -14,8 +14,11 @@ import { Label } from '@/components/ui/label'
 import { ErrorNotice, Loading } from '@/components/common'
 import { CopyButton } from '@/components/copy-button'
 import { Login } from '@/components/login'
+import { buildStremioInstallURL } from '@/lib/connection-options'
 import {
   PublicAnnounceFields,
+  pruneVisitorOptions,
+  resolveVisitorSection,
   useSessionExpired,
   useVisitorConfig,
   type PublicInfo,
@@ -49,30 +52,13 @@ export function PublicEntry({
       </main>
     )
   if (!info.data?.enabled) return <Login />
-  const section = location.pathname.startsWith('/public/search')
-    ? 'search'
-    : location.pathname === '/public/torznab'
-      ? 'torznab'
-      : location.pathname === '/public/sharing'
-        ? 'catalog'
-        : 'stremio'
-  const available = {
-    search: info.data.search_enabled,
-    stremio: info.data.stremio_enabled,
-    torznab: info.data.torznab_enabled,
-    catalog: info.data.catalog_enabled,
-  }
-  if (!available[section]) {
-    const target = available.stremio
-      ? '/public'
-      : available.search
-        ? '/public/search'
-        : available.torznab
-          ? '/public/torznab'
-          : available.catalog
-            ? '/public/sharing'
-            : ''
-    return target ? <Navigate to={target} replace /> : <Login />
+  const { section, available, fallbackTarget } = resolveVisitorSection(
+    info.data,
+    location.pathname,
+    '/public',
+  )
+  if (!available) {
+    return fallbackTarget ? <Navigate to={fallbackTarget} replace /> : <Login />
   }
   if (section === 'search') return layout(<PublicSearchEntry info={info.data} />)
   if (section === 'catalog')
@@ -97,21 +83,17 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
     if (credential?.credential !== manifestCredential.current) setManifest('')
   }, [credential])
   useEffect(() => {
-    const allowed = new Set((info.sources ?? info.private_sources ?? []).map((source) => source.id))
-    const selected = installationOptions.sources ?? []
-    const sources = selected.filter((id) => allowed.has(id))
-    const sorting = installationOptions.sorting?.filter(
-      (rule) => Boolean(info.sources) || rule.field !== 'source',
+    const next = pruneVisitorOptions(
+      installationOptions,
+      info.sources ?? info.private_sources,
+      Boolean(info.sources),
     )
-    if (
-      selected.length !== sources.length ||
-      sorting?.length !== installationOptions.sorting?.length
-    ) {
-      const next = { ...installationOptions, sources, sorting }
+    if (next) {
       setInstallationOptions(next)
       setManifest((current) => (current ? preferenceManifest(current, preferences, next) : ''))
     }
   }, [info, installationOptions, preferences])
+  const installURL = buildStremioInstallURL(manifest)
   return (
     <div className="page max-w-4xl">
       <section className="section-card">
@@ -206,9 +188,9 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
               manualCopyMessage="Clipboard access is unavailable. Reveal the manifest URL and copy it manually."
               successMessage="Copied to your clipboard. Keep it private."
             />
-            {/^https?:\/\//.test(manifest) && (
+            {installURL && (
               <Button variant="outline" asChild>
-                <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+                <a href={installURL}>
                   <PlusIcon aria-hidden="true" />
                   Install in Stremio
                 </a>

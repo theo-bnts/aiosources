@@ -2,7 +2,13 @@ import { ArrowClockwiseIcon, FloppyDiskIcon, ArrowSquareOutIcon } from '@phospho
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api, ApiError, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
+import {
+  api,
+  commitRevisionQueryData,
+  isRevisionConflict,
+  LIVE_REFRESH_INTERVAL,
+  queryClient,
+} from '@/lib/api'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -67,12 +73,10 @@ export function PublicAccessSettings() {
       api('/public-access', { method: 'PUT', body: JSON.stringify(value) }),
     onMutate: () => queryClient.cancelQueries({ queryKey: ['public-access'] }),
     onSuccess: async (_result, submitted) => {
-      await queryClient.cancelQueries({ queryKey: ['public-access'] })
-      queryClient.setQueryData<Access>(['public-access'], (current) =>
-        current && current.revision > submitted.revision
-          ? current
-          : { ...submitted, revision: submitted.revision + 1 },
-      )
+      await commitRevisionQueryData(['public-access'], {
+        ...submitted,
+        revision: submitted.revision + 1,
+      })
       setDraft(undefined)
       await queryClient.invalidateQueries({ queryKey: ['public-access'] })
       await queryClient.invalidateQueries({ queryKey: ['public-config'] })
@@ -132,9 +136,7 @@ export function PublicAccessSettings() {
     },
   })
   const conflict = Boolean(
-    draft &&
-    (draft.value.revision !== query.data?.revision ||
-      (save.error instanceof ApiError && save.error.status === 409)),
+    draft && isRevisionConflict(draft.value.revision, query.data?.revision, save.error),
   )
   const busy = save.isPending || review.isPending
   useUnsavedChanges(dirty, 'Public', save.isPending)

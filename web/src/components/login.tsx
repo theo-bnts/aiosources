@@ -1,11 +1,11 @@
 import { DatabaseIcon, ShieldCheckIcon, SignInIcon, UsersThreeIcon } from '@phosphor-icons/react'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, queryClient, setCSRF } from '@/lib/api'
 import type { Session } from '@/lib/types'
-import { clearPublicCredentials } from './public-connection-fields'
+import { clearPublicCredentials, useRequestController } from './public-connection-fields'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -53,8 +53,7 @@ function LoginForm({ trusted }: { trusted: boolean }) {
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
-  const request = useRef<AbortController | null>(null)
-  useEffect(() => () => request.current?.abort(), [])
+  const request = useRequestController()
   async function signIn(form: HTMLFormElement) {
     if (pending) return
     const credentials = new FormData(form)

@@ -17,13 +17,6 @@ type AIOMetadataPublication struct {
 	Job        *AIOJob
 }
 
-type aioMetadataRow struct {
-	pgx.Row
-	aliases *[]string
-}
-
-func (r aioMetadataRow) Scan(dest ...any) error { return r.Row.Scan(append(dest, r.aliases)...) }
-
 func aioWorkIdentity(w model.AIOWork) string { return w.Type + ":" + w.TMDB }
 
 // Only decision-relevant data advances the revision. A routine refresh, alias
@@ -141,7 +134,7 @@ func saveAIOMetadataBatch(ctx context.Context, tx pgx.Tx, inputs []AIOMetadataPu
 	previousAliases := map[string][]string{}
 	for rows.Next() {
 		var aliases []string
-		w, err := scanAIOWork(aioMetadataRow{Row: rows, aliases: &aliases})
+		w, err := scanAIOWork(rows, &aliases)
 		if err != nil {
 			rows.Close()
 			return databaseError("read prior metadata", err)

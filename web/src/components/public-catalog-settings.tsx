@@ -1,7 +1,7 @@
 import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { api, ApiError, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
+import { api, isRevisionConflict, queryClient, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { catalogEntitiesKey, catalogEntityKeys, type CatalogEntities } from '@/lib/catalog-types'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { CatalogDataControls, CatalogPublishedFields } from '@/components/catalog-data-controls'
@@ -112,9 +112,7 @@ export function PublicCatalogSettings() {
   }
   const busy = save.isPending || review.isPending
   const conflict = Boolean(
-    draft &&
-    (draft.value.revision !== query.data?.policy.revision ||
-      (save.error instanceof ApiError && save.error.status === 409)),
+    draft && isRevisionConflict(draft.value.revision, query.data?.policy.revision, save.error),
   )
   useUnsavedChanges(dirty, 'Shared catalog data', save.isPending)
   return (

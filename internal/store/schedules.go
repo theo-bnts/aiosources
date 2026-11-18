@@ -38,9 +38,11 @@ type ScheduleClock struct {
 
 const clockColumns = `provider_id,revision,active,next_run_at,full_due_at,last_attempt_at,last_error,profile`
 
+const retryableScheduledFailureSQL = `(status='failed' AND trigger='scheduled' AND NOT cancel_requested AND config @> '{"schedule":{"retry_failed":true}}'::jsonb)`
+
 const scheduleContinuationFilter = `(status IN ('queued','running') OR pause_requested OR pause_reason IN ('manual','quota','no_progress')
  OR (status='paused' AND trigger='scheduled')
- OR (status='failed' AND trigger='scheduled' AND NOT cancel_requested AND config @> '{"schedule":{"retry_failed":true}}'::jsonb))`
+ OR ` + retryableScheduledFailureSQL + `)`
 
 func scanClock(row scanner) (ScheduleClock, error) {
 	var clock ScheduleClock

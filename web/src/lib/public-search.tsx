@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { PublicInfo } from '@/components/public-connection-fields'
 import { api, ApiError } from './api'
-import { forgetPublicCredential, publicAPI } from './public-credentials'
+import { forgetPublicCredential } from './public-credentials'
 
 export type PublicSearchAccess = {
   trusted?: boolean
@@ -13,38 +13,50 @@ export type PublicSearchAccess = {
 export const PublicSearchContext = createContext<PublicSearchAccess | null>(null)
 export const usePublicSearch = () => useContext(PublicSearchContext)
 
+export function catalogSearchPath(visitor: PublicSearchAccess | null): string {
+  return visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
+}
+
+export function catalogQueryKey(
+  visitor: PublicSearchAccess | null,
+  resource: string,
+  ...rest: unknown[]
+): unknown[] {
+  return visitor
+    ? ['public-catalog', visitor.scope, resource, ...rest]
+    : [`catalog-${resource}`, ...rest]
+}
+
 export async function visitorAPI<T>(
   path: string,
   visitor: PublicSearchAccess,
   init: RequestInit = {},
 ) {
-  if (!visitor.trusted) {
-    return publicAPI<T>(
-      path,
-      visitor.configuration,
-      init,
-      visitor.credential,
-      visitor.info.credential_scope,
-    )
-  }
+  const headers = new Headers(init.headers)
+  if (visitor.configuration) headers.set('Authorization', `Bearer ${visitor.configuration}`)
   try {
-    return await api<T>(`/trusted${path}`, {
+    return await api<T>(`/${visitor.trusted ? 'trusted' : 'public'}${path}`, {
       ...init,
+      headers,
       cache: 'no-store',
-      headers: {
-        ...Object.fromEntries(new Headers(init.headers)),
-        ...(visitor.configuration ? { Authorization: `Bearer ${visitor.configuration}` } : {}),
-      },
     })
   } catch (error) {
     if (
       error instanceof ApiError &&
       error.status === 401 &&
       visitor.credential &&
-      !path.startsWith('/catalog/search')
+      (!visitor.trusted || !path.startsWith('/catalog/search'))
     ) {
       forgetPublicCredential(visitor.credential, visitor.info.credential_scope)
     }
     throw error
   }
+}
+
+export function catalogAPI<T>(
+  path: string,
+  visitor: PublicSearchAccess | null,
+  init: RequestInit = {},
+) {
+  return visitor ? visitorAPI<T>(path, visitor, init) : api<T>(path, init)
 }

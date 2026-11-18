@@ -31,6 +31,19 @@ func (s *Store) RecoverOperations(ctx context.Context) error {
 	return databaseError("recover operation history", err)
 }
 
+func tryLockOperationKeys(ctx context.Context, tx pgx.Tx, keys []int64, operation string) error {
+	for _, key := range keys {
+		var locked bool
+		if err := tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1)`, key).Scan(&locked); err != nil {
+			return databaseError(operation, err)
+		}
+		if !locked {
+			return model.ErrBusy
+		}
+	}
+	return nil
+}
+
 // BeginOperation is called only after acquiring the existing AIOLock for
 // lockName. It adds no extra long-lived connection or independent worker lease.
 func (s *Store) BeginOperation(ctx context.Context, run model.OperationRun, lockName string) (model.OperationRun, error) {

@@ -54,16 +54,10 @@ func (s *Service) CreatePublicTorznab(ctx context.Context, audience string, opti
 	if err = s.validatePublicAnnounces(ctx, access, announces); err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(PublicTorznabInstallation{Version: 1, Generation: access.Generation, ProtocolGeneration: access.TorznabGeneration, Audience: audience, Announces: announces, Options: options})
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal(publicTorznabPurpose, data)
+	key, err := s.sealVaultJSON(publicTorznabPurpose, PublicTorznabInstallation{Version: 1, Generation: access.Generation, ProtocolGeneration: access.TorznabGeneration, Audience: audience, Announces: announces, Options: options})
 	if err != nil {
 		return "", err
 	}
-	key := base64.RawURLEncoding.EncodeToString(sealed)
 	configuration, err := WithPublicTorznabOptions(key, options)
 	if err != nil {
 		return "", err
@@ -89,17 +83,8 @@ func (s *Service) OpenPublicTorznab(ctx context.Context, audience, value string)
 	if err != nil {
 		return nil, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(credential)
-	if err != nil {
-		return nil, ErrAuth
-	}
-	data, err := s.Vault.Open(publicTorznabPurpose, sealed)
-	if err != nil {
-		return nil, ErrAuth
-	}
-	defer clear(data)
 	var v PublicTorznabInstallation
-	if json.Unmarshal(data, &v) != nil || v.Version != 1 || v.Generation != access.Generation || v.ProtocolGeneration != access.TorznabGeneration || v.Audience != audience || !validPublicAnnounces(v.Announces) {
+	if s.openVaultJSON(publicTorznabPurpose, credential, &v) != nil || v.Version != 1 || v.Generation != access.Generation || v.ProtocolGeneration != access.TorznabGeneration || v.Audience != audience || !validPublicAnnounces(v.Announces) {
 		clear(v.Announces)
 		return nil, ErrAuth
 	}

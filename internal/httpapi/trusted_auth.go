@@ -113,18 +113,11 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, "Request origin is not allowed")
 		return
 	}
-	requests := a.trustedPasswordRequests
-	if requests == nil {
-		requests = a.passwordRequests
-	}
-	select {
-	case requests <- struct{}{}:
-		defer func() { <-requests }()
-	default:
-		w.Header().Set("Retry-After", "1")
-		writeError(w, http.StatusTooManyRequests, "Authentication is temporarily busy. Try again shortly.")
+	release, ok := a.admitPasswordRequestFor(w, true)
+	if !ok {
 		return
 	}
+	defer release()
 	if !a.allowRoleAttempt(r, true) {
 		w.Header().Set("Retry-After", "60")
 		writeError(w, 429, "Authentication is temporarily unavailable or rate limited. Try again in one minute.")
@@ -160,17 +153,12 @@ func (s *server) trustedLogin(w http.ResponseWriter, r *http.Request) {
 	if hash == "" {
 		hash = trustedPasswordPrefix + "AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 	}
-	checks := a.trustedPasswordChecks
-	if checks == nil {
-		checks = a.passwordChecks
-	}
-	select {
-	case checks <- struct{}{}:
-	case <-r.Context().Done():
+	var valid bool
+	if !a.runPasswordWork(r.Context(), true, func() {
+		valid = checkTrustedPassword(hash, input.Password)
+	}) {
 		return
 	}
-	valid := checkTrustedPassword(hash, input.Password)
-	<-checks
 	input.Password = ""
 	if !valid || err != nil {
 		writeError(w, 401, "Incorrect email or password")

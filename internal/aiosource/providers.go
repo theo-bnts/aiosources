@@ -59,14 +59,7 @@ func (p *ProviderHTTP) pace(ctx context.Context, service string) error {
 	at := maxTime(now, p.next[service])
 	p.next[service] = at.Add(gap)
 	p.mu.Unlock()
-	timer := time.NewTimer(time.Until(at))
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return ctx.Err()
-	}
+	return sleepContext(ctx, time.Until(at))
 }
 func maxTime(a, b time.Time) time.Time {
 	if a.After(b) {

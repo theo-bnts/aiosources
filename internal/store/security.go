@@ -57,7 +57,7 @@ func (s *Store) InitializeAdminPassword(ctx context.Context, password string, ca
 	if err != nil {
 		return nil, databaseError("initialize authentication", err)
 	}
-	defer tx.Rollback(ctx)
+	defer rollback(tx)
 	var stored []byte
 	if err = tx.QueryRow(ctx, `SELECT password_hash FROM aiosources.admin_security WHERE singleton FOR UPDATE`).Scan(&stored); err != nil {
 		return nil, databaseError("read authentication verifier", err)
@@ -92,7 +92,7 @@ func (s *Store) CreateAdminSession(ctx context.Context, passwordHash []byte, nex
 	if err != nil {
 		return databaseError("begin sign-in", err)
 	}
-	defer tx.Rollback(ctx)
+	defer rollback(tx)
 	var configuredHash []byte
 	if err = tx.QueryRow(ctx, `SELECT password_hash FROM aiosources.admin_security WHERE singleton FOR UPDATE`).Scan(&configuredHash); err != nil {
 		return databaseError("read authentication verifier", err)
@@ -171,7 +171,7 @@ func (s *Store) RevokeAdminSessions(ctx context.Context, currentID, targetID str
 	if err != nil {
 		return databaseError("begin session revocation", err)
 	}
-	defer tx.Rollback(ctx)
+	defer rollback(tx)
 	if _, err = tx.Exec(ctx, `SELECT singleton FROM aiosources.admin_security WHERE singleton FOR UPDATE`); err != nil {
 		return databaseError("lock security state", err)
 	}
@@ -213,6 +213,10 @@ func (s *Store) AllowTrustedSecurityAttempt(ctx context.Context, clientHash stri
 	return s.allowSignInAttempt(ctx, clientHash, "trusted_security", "trusted", "trusted-client-")
 }
 
+const recordSecurityAttemptSQL = `INSERT INTO aiosources.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1)
+ ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,
+ attempts=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN 1 ELSE LEAST(security_attempts.attempts+1,1000000) END RETURNING attempts`
+
 func (s *Store) allowSignInAttempt(ctx context.Context, clientHash, section, globalBucket, clientPrefix string) (bool, error) {
 	policy, err := s.RuntimeValues(ctx, section)
 	if err != nil {
@@ -222,16 +226,14 @@ func (s *Store) allowSignInAttempt(ctx context.Context, clientHash, section, glo
 	if err != nil {
 		return false, databaseError("begin authentication limit", err)
 	}
-	defer tx.Rollback(ctx)
+	defer rollback(tx)
 	allowed := true
 	for _, bucket := range []struct {
 		key   string
 		limit int
 	}{{clientPrefix + clientHash, policy["login_per_minute"]}, {globalBucket, policy["login_global_per_minute"]}} {
 		var count int
-		err = tx.QueryRow(ctx, `INSERT INTO aiosources.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1)
- ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,
- attempts=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN 1 ELSE LEAST(security_attempts.attempts+1,1000000) END RETURNING attempts`, bucket.key).Scan(&count)
+		err = tx.QueryRow(ctx, recordSecurityAttemptSQL, bucket.key).Scan(&count)
 		if err != nil {
 			return false, databaseError("apply authentication limit", err)
 		}
@@ -251,18 +253,24 @@ func (s *Store) allowSignInAttempt(ctx context.Context, clientHash, section, glo
 
 var securityTarget = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
 
-func validAccessActivity(action, targetID string) bool {
-	if !securityTarget.MatchString(targetID) {
-		return false
-	}
+func isAccessActivityKind(action string) bool {
 	switch action {
-	case "security.trusted_user_changed", "security.trusted_user_deleted", "security.public_credentials_changed":
-		return true
-	case "security.public_catalog_enabled", "security.public_catalog_disabled", "security.public_catalog_permissions_changed", "security.public_stremio_enabled", "security.public_stremio_disabled", "security.public_search_enabled", "security.public_search_disabled", "security.session_revoked", "security.sessions_revoked", "security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled", "security.public_access_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked", "stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked", "torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
+	case "security.trusted_user_changed", "security.trusted_user_deleted", "security.public_credentials_changed",
+		"security.public_catalog_enabled", "security.public_catalog_disabled", "security.public_catalog_permissions_changed",
+		"security.public_stremio_enabled", "security.public_stremio_disabled", "security.public_search_enabled",
+		"security.public_search_disabled", "security.session_revoked", "security.sessions_revoked",
+		"security.public_torznab_enabled", "security.public_torznab_disabled", "security.public_access_enabled",
+		"security.public_access_disabled", "share.created", "share.permissions_changed", "share.rotated", "share.revoked",
+		"stremio.created", "stremio.permissions_changed", "stremio.rotated", "stremio.revoked",
+		"torznab.created", "torznab.permissions_changed", "torznab.rotated", "torznab.revoked":
 		return true
 	default:
 		return false
 	}
+}
+
+func validAccessActivity(action, targetID string) bool {
+	return securityTarget.MatchString(targetID) && isAccessActivityKind(action)
 }
 
 func recordAccessActivityTx(ctx context.Context, tx pgx.Tx, kind, subjectID string) error {

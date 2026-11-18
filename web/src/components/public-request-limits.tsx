@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FloppyDiskIcon, XIcon } from '@phosphor-icons/react'
-import { ApiError } from '@/lib/api'
+import { isRevisionConflict } from '@/lib/api'
+import { isWholeNumberString } from '@/lib/format'
 import { useNetworkSettings, useSaveNetwork } from '@/lib/network-settings'
 import type { NetworkSettings, PublicLimits } from '@/lib/network-types'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
@@ -48,18 +49,12 @@ export function PublicRequestLimitsPanel() {
     values &&
     fields.some(([key, , max]) => {
       const field = values[key]
-      return (
-        field.enabled &&
-        (!/^\d+$/.test(field.value) ||
-          !Number.isSafeInteger(Number(field.value)) ||
-          Number(field.value) < 1 ||
-          Number(field.value) > max)
-      )
+      return field.enabled && !isWholeNumberString(field.value, 1, max)
     }),
   )
-  const conflict =
-    Boolean(draft && draft.base.revision !== query.data?.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = Boolean(
+    draft && isRevisionConflict(draft.base.revision, query.data?.revision, save.error),
+  )
   useUnsavedChanges(dirty, 'public request limits', save.isPending)
   function change(values: Values) {
     if (!query.data) return

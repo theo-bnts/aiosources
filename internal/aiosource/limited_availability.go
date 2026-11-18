@@ -55,15 +55,7 @@ func (s *Service) readPlannedAvailability(ctx context.Context, c model.AIOConfig
 		if err != nil {
 			return err
 		}
-		for _, a := range items {
-			current, ok := p.states[service][a.Hash]
-			if ok && service == "alldebrid" && current.Cached && !a.Cached {
-				continue
-			}
-			if !ok || a.CheckedAt.After(current.CheckedAt) {
-				p.states[service][a.Hash] = a
-			}
-		}
+		mergeAccountAvailability(p.states[service], service, items)
 	} else if service == "deepbrid" {
 		generation, err := s.DB.AIOCacheGeneration(ctx)
 		if err != nil {

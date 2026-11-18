@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
@@ -116,13 +115,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				respondError(w, e)
 				return
 			}
-			providers := []aiosource.PublicProvider{}
-			for _, provider := range aiosource.PublicProviders {
-				if config.DebridSecret(provider.ID) != "" {
-					providers = append(providers, provider)
-				}
-			}
-			info["providers"] = providers
+			info["providers"] = availablePublicProviders(config, false)
 		}
 		if enabled && value.CatalogEnabled {
 			if err := s.populateCatalogPolicyConfig(ctx, info, allSources); err != nil {
@@ -253,33 +246,65 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			next(w, r, visitor)
 		}
 	}
-	mux.HandleFunc("GET /public/stremio/{configuration}/manifest.json", protect(5*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
-		s.options.AIOSource.RecordAddonRequest("public", "manifest", "", "", time.Now(), nil)
-		writeJSON(w, 200, aiosource.InstallationManifest(visitor.Preferences))
-	}))
-	mux.HandleFunc("GET /public/stremio/{configuration}/configure", protect(5*time.Second, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) {
-		http.Redirect(w, r, "/public", http.StatusSeeOther)
-	}))
-	mux.HandleFunc("GET /public/stremio/{configuration}/stream/{type}/{id}", protect(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
-		id := r.PathValue("id")
-		if !strings.HasSuffix(id, ".json") || len(id) > 160 {
+	s.registerVisitorStremioRoutes(
+		mux,
+		"/public/stremio",
+		"public",
+		"/public",
+		func() string { return s.auth.origin },
+		func(w http.ResponseWriter, r *http.Request) {
 			s.options.AIOSource.RecordAddonRequest("public", "stream", r.PathValue("type"), "", time.Now(), model.ErrInvalid)
 			writeError(w, 400, "Invalid stream resource")
+		},
+		func(w http.ResponseWriter, _ error) {
+			writeError(w, 401, "Invalid public installation")
+		},
+		func(manifest bool, next func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc {
+			budget := 20 * time.Second
+			if manifest {
+				budget = 5 * time.Second
+			}
+			return protect(budget, next)
+		},
+	)
+}
+
+func (s *server) registerVisitorStremioRoutes(
+	mux *http.ServeMux,
+	prefix string,
+	historyOrigin string,
+	configureTarget string,
+	originFn func() string,
+	onInvalidStream func(http.ResponseWriter, *http.Request),
+	onAuthFail func(http.ResponseWriter, error),
+	protect func(bool, func(http.ResponseWriter, *http.Request, *aiosource.PublicInstallation)) http.HandlerFunc,
+) {
+	mux.HandleFunc("GET "+prefix+"/{configuration}/manifest.json", protect(true, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
+		s.options.AIOSource.RecordAddonRequest(historyOrigin, "manifest", "", "", time.Now(), nil)
+		writeJSON(w, 200, aiosource.InstallationManifest(visitor.Preferences))
+	}))
+	mux.HandleFunc("GET "+prefix+"/{configuration}/configure", protect(true, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) {
+		http.Redirect(w, r, configureTarget, http.StatusSeeOther)
+	}))
+	mux.HandleFunc("GET "+prefix+"/{configuration}/stream/{type}/{id}", protect(false, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
+		resourceID, ok := parseStremioStreamResourceID(r)
+		if !ok {
+			onInvalidStream(w, r)
 			return
 		}
-		streams, err := s.options.AIOSource.PublicStreams(r.Context(), s.auth.origin, r.PathValue("configuration"), r.PathValue("type"), strings.TrimSuffix(id, ".json"), visitor)
+		streams, err := s.options.AIOSource.PublicStreams(r.Context(), originFn(), r.PathValue("configuration"), r.PathValue("type"), resourceID, visitor)
 		if err != nil {
 			respondError(w, err)
 			return
 		}
 		if err := s.options.AIOSource.CheckPublicStremio(r.Context(), visitor); err != nil {
-			writeError(w, 401, "Invalid public installation")
+			onAuthFail(w, err)
 			return
 		}
 		writeJSON(w, 200, map[string]any{"streams": streams})
 	}))
-	mux.HandleFunc("GET /public/stremio/{configuration}/play/{service}/{source}/{type}/{id}", protect(65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
-		link, err := s.options.AIOSource.TracePlayback(r.Context(), "public", r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
+	mux.HandleFunc("GET "+prefix+"/{configuration}/play/{service}/{source}/{type}/{id}", protect(false, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) {
+		link, err := s.options.AIOSource.TracePlayback(r.Context(), historyOrigin, r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
 			return s.options.AIOSource.PublicPlaybackSource(ctx, r.PathValue("source"), r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), visitor)
 		})
 		if errors.Is(err, aiosource.ErrPending) {
@@ -292,13 +317,23 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		if err := s.options.AIOSource.CheckPublicStremio(r.Context(), visitor); err != nil {
-			writeError(w, 401, "Invalid public installation")
+			onAuthFail(w, err)
 			return
 		}
 		http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 	}))
-	mux.HandleFunc("OPTIONS /public/stremio/{rest...}", stremioOptions)
-	mux.HandleFunc("/public/stremio/", stremioNotFound)
+	mux.HandleFunc("OPTIONS "+prefix+"/{rest...}", stremioOptions)
+	mux.HandleFunc(prefix+"/", stremioNotFound)
+}
+
+func availablePublicProviders(config model.AIOConfig, includeAll bool) []aiosource.PublicProvider {
+	providers := []aiosource.PublicProvider{}
+	for _, provider := range aiosource.PublicProviders {
+		if includeAll || config.DebridSecret(provider.ID) != "" {
+			providers = append(providers, provider)
+		}
+	}
+	return providers
 }
 
 func (s *server) hasPublicOrigin(r *http.Request) bool {

@@ -1,5 +1,7 @@
 package model
 
+import "slices"
+
 // DebridProvider is the shared, ordered service catalog. Endpoint selection,
 // credential references and capabilities never come from a visitor's URL.
 type DebridProvider struct {
@@ -77,12 +79,7 @@ func (c AIOConfig) RestrictDebrid(services []string) AIOConfig {
 		return c
 	}
 	allowed := func(id string) bool {
-		for _, service := range services {
-			if id == service {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(services, id)
 	}
 	if !allowed("alldebrid") {
 		c.AllDebridSecret = ""

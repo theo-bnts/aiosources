@@ -4,8 +4,14 @@ import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import {
+  api,
+  AUTO_REFRESH_INTERVAL,
+  commitRevisionQueryData,
+  isRevisionConflict,
+  queryClient,
+} from '@/lib/api'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { ConfirmAction, ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
@@ -38,7 +44,6 @@ export function StorageSettingsPanel() {
   useEffect(() => {
     if (location.hash === '#maintenance') setMaintenanceOpen(true)
   }, [location.hash])
-  const client = useQueryClient()
   const query = useQuery({
     queryKey: ['storage-settings'],
     queryFn: ({ signal }) => api<StorageOverview>('/settings/storage', { signal }),
@@ -51,23 +56,24 @@ export function StorageSettingsPanel() {
         method: 'PUT',
         body: JSON.stringify(settings),
       }),
-    onMutate: () => client.cancelQueries({ queryKey: ['storage-settings'] }),
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['storage-settings'] }),
     onSuccess: async (result) => {
-      await client.cancelQueries({ queryKey: ['storage-settings'] })
-      client.setQueryData<StorageOverview>(['storage-settings'], (current) =>
-        current && current.settings.revision > result.settings.revision ? current : result,
+      await commitRevisionQueryData(
+        ['storage-settings'],
+        result,
+        (value) => value.settings.revision,
       )
       setDraft(null)
-      void client.invalidateQueries({ queryKey: ['storage-settings'] })
+      void queryClient.invalidateQueries({ queryKey: ['storage-settings'] })
     },
-    onError: () => void client.invalidateQueries({ queryKey: ['storage-settings'] }),
+    onError: () => void queryClient.invalidateQueries({ queryKey: ['storage-settings'] }),
   })
   const settings = draft ?? query.data?.settings
   const dirty =
     draft !== null && JSON.stringify(draft.options) !== JSON.stringify(query.data?.settings.options)
-  const conflict =
-    (draft !== null && draft.revision !== query.data?.settings.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = Boolean(
+    draft !== null && isRevisionConflict(draft.revision, query.data?.settings.revision, save.error),
+  )
   useUnsavedChanges(dirty, 'storage settings', save.isPending)
 
   function updateDraft(next: StorageSettings) {
@@ -105,7 +111,7 @@ export function StorageSettingsPanel() {
       method: 'POST',
       body: JSON.stringify({ revision: query.data.settings.revision, confirm: true }),
     })
-    await client.invalidateQueries()
+    await queryClient.invalidateQueries()
   }
 
   return (

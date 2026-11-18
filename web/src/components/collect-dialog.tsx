@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, refreshData } from '@/lib/api'
 import type { Items, ProviderDocument, ProviderSummary, Run, RunMode, StartRun } from '@/lib/types'
 import { supportsMetadata } from '@/lib/collection-types'
-import { modeLabels } from '@/lib/format'
+import { isWholeNumberString, modeLabels } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -63,21 +63,13 @@ export function CollectDialog({
       ? 3
       : (definition.data?.provider.schedule?.max_pages ?? 0)
     : undefined
-  const invalidPages =
-    maxPages !== '' &&
-    (!/^\d+$/.test(maxPages) || !Number.isSafeInteger(Number(maxPages)) || Number(maxPages) > 10000)
+  const invalidPages = maxPages !== '' && !isWholeNumberString(maxPages, 0, 10000)
   const invalidKnownPages =
     !remote &&
     mode === 'incremental' &&
     knownPages !== '' &&
-    (!/^\d+$/.test(knownPages) ||
-      !Number.isSafeInteger(Number(knownPages)) ||
-      Number(knownPages) > 10000)
-  const invalidDuration =
-    maxDuration !== '' &&
-    (!/^\d+$/.test(maxDuration) ||
-      !Number.isSafeInteger(Number(maxDuration)) ||
-      Number(maxDuration) > 604800)
+    !isWholeNumberString(knownPages, 0, 10000)
+  const invalidDuration = maxDuration !== '' && !isWholeNumberString(maxDuration, 0, 604800)
   const mutation = useMutation({
     mutationFn: (request: StartRun) =>
       api<Run>('/runs', { method: 'POST', body: JSON.stringify(request) }),

@@ -208,12 +208,8 @@ func (s *Service) withHash(ctx context.Context, account, hash string, work func(
 			defer release()
 			return work()
 		}
-		timer := time.NewTimer(100 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err := sleepContext(ctx, 100*time.Millisecond); err != nil {
+			return err
 		}
 	}
 }
@@ -514,18 +510,21 @@ func (s *Service) availability(ctx context.Context, c model.AIOConfig, resource 
 		if err != nil {
 			return nil, err
 		}
-		for _, a := range items {
-			if current, ok := out[service][a.Hash]; ok && service == "alldebrid" && current.Cached && !a.Cached {
-				// An inventory entry still downloading is account-specific. It
-				// cannot invalidate verified, fresh provider-wide availability.
-				continue
-			}
-			if current, ok := out[service][a.Hash]; !ok || a.CheckedAt.After(current.CheckedAt) {
-				out[service][a.Hash] = a
-			}
-		}
+		mergeAccountAvailability(out[service], service, items)
 	}
 	return out, nil
+}
+func mergeAccountAvailability(target map[string]model.AIOAvailability, service string, items []model.AIOAvailability) {
+	for _, a := range items {
+		if current, ok := target[a.Hash]; ok && service == "alldebrid" && current.Cached && !a.Cached {
+			// An inventory entry still downloading is account-specific. It
+			// cannot invalidate verified, fresh provider-wide availability.
+			continue
+		}
+		if current, ok := target[a.Hash]; !ok || a.CheckedAt.After(current.CheckedAt) {
+			target[a.Hash] = a
+		}
+	}
 }
 func uniqueStrings(in []string) []string {
 	out := []string{}

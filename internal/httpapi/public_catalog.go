@@ -92,17 +92,21 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			writeError(w, 401, "Your saved service configuration is no longer available. Enter your keys again.")
 			return
 		}
-		if actionErr != nil && !errors.Is(actionErr, aiosource.ErrPending) {
-			respondError(w, actionErr)
-			return
-		}
-		status := http.StatusOK
-		if errors.Is(actionErr, aiosource.ErrPending) {
-			status = http.StatusAccepted
-			w.Header().Set("Retry-After", "15")
-		}
-		writeJSON(w, status, result)
+		writeVisitorCatalogResult(w, result, actionErr)
 	}
+}
+
+func writeVisitorCatalogResult(w http.ResponseWriter, result any, err error) {
+	if err != nil && !errors.Is(err, aiosource.ErrPending) {
+		respondError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if errors.Is(err, aiosource.ErrPending) {
+		status = http.StatusAccepted
+		w.Header().Set("Retry-After", "15")
+	}
+	writeJSON(w, status, result)
 }
 
 func (s *server) registerPublicCatalog(mux *http.ServeMux) {

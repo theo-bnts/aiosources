@@ -14,6 +14,7 @@ import {
   CatalogPublishedFields,
   catalogEntitiesSummary,
 } from '@/components/catalog-data-controls'
+import { buildStremioInstallURL, parseHttpEndpoint } from '@/lib/connection-options'
 import { ResultSorting } from '@/components/result-controls'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { DateTimeInput, useDateTimeZoneLabel } from '@/components/date-time-input'
@@ -1084,18 +1085,13 @@ function PasswordDialog({
   const stremio = credential.share.format === 'stremio'
   const torznab = credential.share.format === 'torznab'
   const kind = stremio ? 'manifest URL' : torznab ? 'API key' : 'password'
-  let manifest = ''
-  if (stremio && credential.share.url) {
-    try {
-      const url = new URL(
-        `${credential.share.url}.${credential.password}/manifest.json`,
-        window.location.origin,
-      )
-      if (url.protocol === 'http:' || url.protocol === 'https:') manifest = url.toString()
-    } catch {
-      manifest = ''
-    }
-  }
+  const manifest =
+    stremio && credential.share.url
+      ? (parseHttpEndpoint(
+          `${credential.share.url}.${credential.password}/manifest.json`,
+        )?.toString() ?? '')
+      : ''
+  const installURL = buildStremioInstallURL(manifest)
   const secret = stremio ? manifest : credential.password
   return (
     <Dialog
@@ -1135,9 +1131,9 @@ function PasswordDialog({
             manualCopyMessage={`Clipboard access is unavailable. Reveal the ${kind} and copy it manually.`}
             successMessage="Copied to your clipboard. Keep it private."
           />
-          {stremio && manifest && (
+          {stremio && installURL && (
             <Button asChild variant="outline">
-              <a href={`stremio://${manifest.replace(/^https?:\/\//, '')}`}>
+              <a href={installURL}>
                 <PlusIcon aria-hidden="true" />
                 Install in Stremio
               </a>

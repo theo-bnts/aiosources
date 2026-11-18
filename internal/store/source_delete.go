@@ -57,14 +57,8 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 	if err != nil {
 		return databaseError("read source download preparations", err)
 	}
-	for _, key := range keys {
-		var locked bool
-		if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1)`, key).Scan(&locked); err != nil {
-			return databaseError("lock source download preparation", err)
-		}
-		if !locked {
-			return model.ErrBusy
-		}
+	if err = tryLockOperationKeys(ctx, tx, keys, "lock source download preparation"); err != nil {
+		return err
 	}
 
 	// Match publication/reset lock order. Exporters hold their recipient before

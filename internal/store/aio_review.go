@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -93,23 +92,9 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	if isbn := books.ISBN(query); isbn != "" {
 		query = isbn
 	}
-	args := []any{query, normalized, kind, filter.Year, filter.Language}
-	terms := []string{}
-	anchor, longest := "", 0
-	for _, word := range searchWords(normalized) {
-		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
-		if len(word) > longest {
-			longest = len(word)
-			anchor = fmt.Sprintf("$%d", len(args))
-		}
-		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
-	}
-	matching := "FALSE"
-	if len(terms) > 0 {
-		matching = strings.Join(terms, " AND ")
-	}
-	if len(terms) < 2 || longest < 3 {
-		anchor = ""
+	args, matching, anchor := catalogWordFilter(normalized, []any{query, normalized, kind, filter.Year, filter.Language})
+	if matching == "" {
+		matching = "FALSE"
 	}
 	bookExtras := ""
 	if kind == "" || slices.Contains(model.SelectionValues(kind), "book") {
@@ -284,7 +269,7 @@ func (s *Store) applyAIOEpisodeReviews(ctx context.Context, records []model.AIOR
 		var provider, id, fingerprint string
 		var season, episode *int
 		if err = rows.Scan(&provider, &id, &fingerprint, &season, &episode); err != nil {
-			return err
+			return databaseError("read reviewed episode numbers", err)
 		}
 		for i := range records {
 			if records[i].Provider == provider && records[i].SourceID == id && records[i].Fingerprint == fingerprint {

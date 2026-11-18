@@ -17,9 +17,14 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { api, params } from '@/lib/api'
-import { number } from '@/lib/format'
-import { usePublicSearch, visitorAPI } from '@/lib/public-search'
+import { params } from '@/lib/api'
+import { isWholeNumberString, number } from '@/lib/format'
+import {
+  catalogAPI,
+  catalogQueryKey,
+  catalogSearchPath,
+  usePublicSearch,
+} from '@/lib/public-search'
 import { useSourceNames } from '@/lib/source-names'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
@@ -67,7 +72,7 @@ function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?
 
 export function CatalogSearchPage() {
   const visitor = usePublicSearch()
-  const searchPath = visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
+  const searchPath = catalogSearchPath(visitor)
   const language = browserLanguage()
   const [search, setSearch] = useViewSearchParams()
   const listState = useListViewState()
@@ -275,7 +280,7 @@ export function CatalogSearchPage() {
 
 export function CatalogTitlePage({ publicID }: { publicID?: string }) {
   const visitor = usePublicSearch()
-  const searchPath = visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
+  const searchPath = catalogSearchPath(visitor)
   const [preferences, setPreferences] = useLanguagePreferences()
   const language = resolvedLanguage(preferences)
   const titleLanguage = browserLanguage()
@@ -289,21 +294,16 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
       ? visitor.info.sources?.find((source) => source.id === id)?.name || savedName || id || ''
       : privateSourceName(id, savedName)
   const title = useQuery({
-    queryKey: visitor
-      ? ['public-catalog', visitor.scope, 'title', id, titleLanguage, search.get('q')]
-      : ['catalog-title', id, titleLanguage, search.get('q')],
-    queryFn: ({ signal }) => {
-      const path = `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`
-      return visitor
-        ? visitorAPI<CatalogTitle>(path, visitor, { signal })
-        : api<CatalogTitle>(path, { signal })
-    },
+    queryKey: catalogQueryKey(visitor, 'title', id, titleLanguage, search.get('q')),
+    queryFn: ({ signal }) =>
+      catalogAPI<CatalogTitle>(
+        `/catalog/${id}?${params({ language: titleLanguage, q: search.get('q') || '' })}`,
+        visitor,
+        { signal },
+      ),
   })
-  const parsePositiveInt = (raw: string | null, fallback: number, min = 0) => {
-    if (!raw || !/^\d+$/.test(raw)) return fallback
-    const n = Number(raw)
-    return Number.isSafeInteger(n) && n >= min ? n : fallback
-  }
+  const parsePositiveInt = (raw: string | null, fallback: number, min = 0) =>
+    isWholeNumberString(raw, min) ? Number(raw) : fallback
   const selection: CatalogSelection =
     title.data?.type === 'tv'
       ? {
@@ -346,13 +346,9 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     offset: pagination.offset,
   })
   const releases = useQuery({
-    queryKey: visitor
-      ? ['public-catalog', visitor.scope, 'releases', id, query]
-      : ['catalog-releases', id, query],
+    queryKey: catalogQueryKey(visitor, 'releases', id, query),
     queryFn: ({ signal }) =>
-      visitor
-        ? visitorAPI<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, visitor, { signal })
-        : api<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, { signal }),
+      catalogAPI<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, visitor, { signal }),
     enabled: Boolean(title.data),
   })
   const sourceOptions = [...(title.data?.providers ?? [])].sort((a, b) =>

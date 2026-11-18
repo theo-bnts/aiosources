@@ -1,7 +1,13 @@
 import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import {
+  api,
+  AUTO_REFRESH_INTERVAL,
+  commitRevisionQueryData,
+  isRevisionConflict,
+  queryClient,
+} from '@/lib/api'
 import { bytes } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { ErrorNotice, Loading } from '@/components/common'
@@ -81,7 +87,6 @@ type Settings = {
 }
 
 export function StorageIndexesPanel() {
-  const client = useQueryClient()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Settings | null>(null)
   const queryKey = ['storage-indexes']
@@ -97,23 +102,20 @@ export function StorageIndexesPanel() {
         method: 'PUT',
         body: JSON.stringify({ revision: value.revision, values: value.values }),
       }),
-    onMutate: () => client.cancelQueries({ queryKey }),
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
     onSuccess: async (value) => {
-      await client.cancelQueries({ queryKey })
-      client.setQueryData<Settings>(queryKey, (current) =>
-        current && current.revision > value.revision ? current : value,
-      )
+      await commitRevisionQueryData(queryKey, value)
       setDraft(null)
-      void client.invalidateQueries({ queryKey })
+      void queryClient.invalidateQueries({ queryKey })
     },
-    onError: () => void client.invalidateQueries({ queryKey }),
+    onError: () => void queryClient.invalidateQueries({ queryKey }),
   })
   const value = draft ?? query.data
   const dirty =
     draft !== null && indexes.some(([key]) => draft.values[key] !== query.data?.values[key])
-  const conflict =
-    (draft !== null && draft.revision !== query.data?.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = Boolean(
+    draft !== null && isRevisionConflict(draft.revision, query.data?.revision, save.error),
+  )
   useUnsavedChanges(dirty, 'search indexes', save.isPending)
   return (
     <Disclosure

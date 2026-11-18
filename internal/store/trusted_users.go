@@ -50,7 +50,7 @@ func (s *Store) AllowTrustedAccountAttempt(ctx context.Context, accountHash stri
 		return false, err
 	}
 	var attempts int
-	err = s.pool.QueryRow(ctx, `INSERT INTO aiosources.security_attempts(bucket,window_start,attempts) VALUES($1,now(),1) ON CONFLICT(bucket) DO UPDATE SET window_start=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN now() ELSE security_attempts.window_start END,attempts=CASE WHEN security_attempts.window_start<=now()-interval '1 minute' THEN 1 ELSE LEAST(security_attempts.attempts+1,1000000) END RETURNING attempts`, "trusted-account-"+accountHash).Scan(&attempts)
+	err = s.pool.QueryRow(ctx, recordSecurityAttemptSQL, "trusted-account-"+accountHash).Scan(&attempts)
 	return attempts <= limit, databaseError("limit trusted account authentication", err)
 }
 

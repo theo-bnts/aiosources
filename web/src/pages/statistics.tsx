@@ -16,7 +16,7 @@ import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { DebridStatistics } from '@/components/debrid-statistics'
-import { useDate } from '@/lib/format'
+import { number, useDate } from '@/lib/format'
 import { bookSyncLabel, metadataSyncLabel } from '@/lib/information-sync'
 
 export function SourceStatisticsPage() {
@@ -284,21 +284,15 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
                 <dl className="grid gap-4 sm:grid-cols-3">
                   <div>
                     <dt className="text-sm text-muted-foreground">Records read from exports</dt>
-                    <dd className="mt-1 font-medium tabular-nums">
-                      {books.position.toLocaleString()}
-                    </dd>
+                    <dd className="mt-1 font-medium tabular-nums">{number(books.position)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm text-muted-foreground">Excluded by catalog filters</dt>
-                    <dd className="mt-1 font-medium tabular-nums">
-                      {(books.filtered ?? 0).toLocaleString()}
-                    </dd>
+                    <dd className="mt-1 font-medium tabular-nums">{number(books.filtered ?? 0)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm text-muted-foreground">Unreadable records</dt>
-                    <dd className="mt-1 font-medium tabular-nums">
-                      {books.skipped.toLocaleString()}
-                    </dd>
+                    <dd className="mt-1 font-medium tabular-nums">{number(books.skipped)}</dd>
                   </div>
                 </dl>
               </Disclosure>

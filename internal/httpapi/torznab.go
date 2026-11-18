@@ -13,12 +13,45 @@ import (
 	"github.com/theo-bnts/aiosources/internal/store"
 )
 
-func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
-	started := time.Now()
+func prepareTorznabFeedRequest(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		torznabError(w, 405, 202, "Read-only endpoint")
+		return false
+	}
+	return true
+}
+
+func writeTorznabQueryError(w http.ResponseWriter, err error) {
+	code := 201
+	if errors.Is(err, model.ErrNotFound) {
+		code = 202
+	}
+	torznabError(w, 400, code, "Unsupported function or incorrect parameter")
+}
+
+func writeTorznabXMLResponse(w http.ResponseWriter, r *http.Request, controller *http.ResponseController, response any, validate func() bool) {
+	body, err := xml.Marshal(response)
+	if err != nil {
+		torznabError(w, 503, 910, "Could not encode response")
+		return
+	}
+	if validate != nil && !validate() {
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.WriteHeader(200)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(append([]byte(xml.Header), body...))
+	}
+	_ = controller.Flush()
+}
+
+func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
+	if !prepareTorznabFeedRequest(w, r) {
 		return
 	}
 	origin := s.connectionOrigin()
@@ -72,11 +105,7 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 	stop := context.AfterFunc(ctx, func() { _ = download.Close() })
 	defer func() { stop(); _ = download.Close() }()
 	if queryErr != nil {
-		code := 201
-		if errors.Is(queryErr, model.ErrNotFound) {
-			code = 202
-		}
-		torznabError(w, 400, code, "Unsupported function or incorrect parameter")
+		writeTorznabQueryError(w, queryErr)
 		return
 	}
 	share, err := s.options.Store.Share(ctx, r.PathValue("id"))
@@ -116,19 +145,11 @@ func (s *server) torznabFeed(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	body, err := xml.Marshal(response)
-	if err != nil {
-		torznabError(w, 503, 910, "Could not encode response")
-		return
-	}
-	if err = download.Validate(ctx); err != nil {
-		torznabError(w, 401, 100, "Incorrect API key")
-		return
-	}
-	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	w.WriteHeader(200)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(append([]byte(xml.Header), body...))
-	}
-	_ = controller.Flush()
+	writeTorznabXMLResponse(w, r, controller, response, func() bool {
+		if err := download.Validate(ctx); err != nil {
+			torznabError(w, 401, 100, "Incorrect API key")
+			return false
+		}
+		return true
+	})
 }

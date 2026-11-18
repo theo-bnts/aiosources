@@ -122,14 +122,8 @@ WHERE r.kind IN ('cache','download') ORDER BY r.lock_key`)
 	if err != nil {
 		return databaseError("read related operation locks", err)
 	}
-	for _, key := range keys {
-		var locked bool
-		if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1)`, key).Scan(&locked); err != nil {
-			return databaseError("lock related operation", err)
-		}
-		if !locked {
-			return model.ErrBusy
-		}
+	if err = tryLockOperationKeys(ctx, tx, keys, "lock related operation"); err != nil {
+		return err
 	}
 	queries := []struct {
 		sql  string
@@ -214,7 +208,7 @@ LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 		for rows.Next() {
 			var kind string
 			var decision bool
-			record, err := scanAIORecord(aioStreamRow{scanner: rows, ids: []any{&kind, &decision}})
+			record, err := scanAIORecord(rows, &kind, &decision)
 			if err != nil {
 				rows.Close()
 				return databaseError("read related cache records", err)

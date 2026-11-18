@@ -16,6 +16,7 @@ import type {
   CatalogDownload,
 } from '@/lib/catalog-search-types'
 import { ErrorNotice } from '@/components/common'
+import { useRequestController, useSessionExpired } from '@/components/public-connection-fields'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -63,30 +64,25 @@ export function DownloadAction({
   const [checkVersion, setCheckVersion] = useState(0)
   const notify = useNotification()
   const attempts = useRef(0)
-  const controller = useRef<AbortController | null>(null)
+  const controller = useRequestController()
   const download = useRef<ReturnType<typeof prepareBrowserDownload> | null>(null)
   useEffect(
     () => () => {
-      controller.current?.abort()
       download.current?.cancel()
     },
     [],
   )
-  useEffect(() => {
-    const clear = () => {
-      controller.current?.abort()
-      download.current?.cancel()
-      preparation.current = ''
-      preparationOperation.current = ''
-      setReady(null)
-      setBookFiles([])
-      setWaiting(false)
-      setNotReady(false)
-      setOperation('')
-    }
-    window.addEventListener('session-expired', clear)
-    return () => window.removeEventListener('session-expired', clear)
-  }, [])
+  useSessionExpired(() => {
+    controller.current?.abort()
+    download.current?.cancel()
+    preparation.current = ''
+    preparationOperation.current = ''
+    setReady(null)
+    setBookFiles([])
+    setWaiting(false)
+    setNotReady(false)
+    setOperation('')
+  })
   const mutation = useMutation({
     gcTime: 0,
     mutationFn: (allowUncached: boolean) => {

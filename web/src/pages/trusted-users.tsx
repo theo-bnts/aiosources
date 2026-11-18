@@ -1,5 +1,5 @@
 import { FloppyDiskIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { api, queryClient } from '@/lib/api'
@@ -21,7 +21,7 @@ import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/compo
 import { PageActions } from '@/components/page-actions'
 import { AccessPermissions } from '@/components/access-permissions'
 import { CredentialPolicyControls } from '@/components/credential-policy-controls'
-import { clearPublicCredentials } from '@/components/public-connection-fields'
+import { clearPublicCredentials, useRequestController } from '@/components/public-connection-fields'
 import { PublicCatalogSettings } from '@/components/public-catalog-settings'
 
 const emptyUser: TrustedUser = {
@@ -155,8 +155,7 @@ function UserEditor({
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>()
-  const request = useRef<AbortController | null>(null)
-  useEffect(() => () => request.current?.abort(), [])
+  const request = useRequestController()
   const dirty =
     !original.id || password !== '' || JSON.stringify(value) !== JSON.stringify(original)
   const changed = password !== '' || JSON.stringify(value) !== JSON.stringify(original)

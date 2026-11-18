@@ -47,29 +47,10 @@ func ProbeEdition(line []byte) (Edition, error) {
 	_ = json.Unmarshal(fields.Format, &e.Format)
 	sources := decodeJSONStrings(fields.Sources)
 	e.Digital = digitalEvidence(e.Format, archive, sources)
-	for _, ref := range decodeJSONReferences(fields.Languages) {
-		if value := editionLanguage(ref.Key); value != "" && !slices.Contains(e.Languages, value) && len(e.Languages) < 30 {
-			e.Languages = append(e.Languages, value)
-		}
-	}
-	for _, v := range append(decodeJSONStrings(fields.ISBN10), decodeJSONStrings(fields.ISBN13)...) {
-		if isbn := ISBN(v); isbn != "" && !slices.Contains(e.ISBN, isbn) && len(e.ISBN) < 50 {
-			e.ISBN = append(e.ISBN, isbn)
-		}
-	}
-	for _, ref := range decodeJSONReferences(fields.Works) {
-		if key := Key(ref.Key); strings.HasSuffix(key, "W") && !slices.Contains(e.Works, key) && len(e.Works) < 20 {
-			e.Works = append(e.Works, key)
-		}
-	}
-	if len(e.Works) == 0 {
-		e.Works = []string{e.ID}
-	}
-	for _, ref := range decodeJSONReferences(fields.Authors) {
-		if key := Key(ref.Key); strings.HasSuffix(key, "A") && !slices.Contains(e.Authors, key) && len(e.Authors) < 100 {
-			e.Authors = append(e.Authors, key)
-		}
-	}
+	e.Languages = decodeEditionLanguages(fields.Languages)
+	e.ISBN = decodeEditionISBNs(fields.ISBN10, fields.ISBN13)
+	e.Works = decodeEditionWorks(fields.Works, e.ID)
+	e.Authors = decodeAuthorKeys(fields.Authors)
 	return e, nil
 }
 

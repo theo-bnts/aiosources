@@ -11,12 +11,20 @@ import { BookImportFilters } from '@/components/book-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
 import { SettingsSections } from '@/components/settings-sections'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
-import { messageText } from '@/lib/format'
+import { messageText, number as formatNumber } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
-import { api, ApiError, queryClient, refreshData, LIVE_REFRESH_INTERVAL } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  commitRevisionQueryData,
+  isRevisionConflict,
+  queryClient,
+  refreshData,
+  LIVE_REFRESH_INTERVAL,
+} from '@/lib/api'
 import type { Items, SecretInfo, ProviderSummary } from '@/lib/types'
 import { Loading, ErrorNotice, ConfirmAction } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -192,11 +200,11 @@ export default function AIOSourcePage({
   const review = useMutation({
     mutationFn: (_form: FormScope) => api<Controls>('/aiosource/controls'),
     onSuccess: async (latest, form) => {
-      await queryClient.cancelQueries({ queryKey: ['aiosource'] })
-      const current = queryClient.getQueryData<Controls>(['aiosource', 'controls'])
-      const effective =
-        current && current.config.revision > latest.config.revision ? current : latest
-      queryClient.setQueryData(['aiosource', 'controls'], effective)
+      const effective = await commitRevisionQueryData(
+        ['aiosource', 'controls'],
+        latest,
+        (value) => value.config.revision,
+      )
       setDrafts((drafts) => {
         if (!drafts[form]) return drafts
         const next = { ...drafts }
@@ -211,8 +219,11 @@ export default function AIOSourcePage({
   const conflict = (form: FormScope) =>
     Boolean(
       drafts[form] &&
-      (drafts[form].base.revision !== query.data?.config.revision ||
-        (feedback[form]?.error instanceof ApiError && feedback[form]?.error.status === 409)),
+      isRevisionConflict(
+        drafts[form].base.revision,
+        query.data?.config.revision,
+        feedback[form]?.error,
+      ),
     )
   useUnsavedChanges(
     dirty,
@@ -720,89 +731,85 @@ export default function AIOSourcePage({
         }
       />
       {metadata && (
-        <>
-          <div className="flex flex-wrap gap-3">
-            {section === 'videos' && (
-              <ConfirmAction
-                title="Reset video information?"
-                description="Information updates and identification will be stopped first. Film and series information, related automatic and manual identifications, availability observations and video operation history will be removed. Torrent records, book information, settings and files in your debrid accounts are retained. Automatic video updates can import the catalog again."
-                label="Reset video information"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-videos')}
-                trigger={
-                  <Button variant="destructive" disabled={maintenanceBusy}>
-                    <TrashIcon />
-                    Reset video information
-                  </Button>
-                }
-              />
-            )}
-            {section === 'games' && (
-              <ConfirmAction
-                title="Reset game information?"
-                description="Information updates and identification will be stopped first. IGDB information, related automatic and manual identifications, availability observations and game operation history will be removed. Source files, video and book information, settings and files in your debrid accounts are retained. Automatic game updates can import the catalog again."
-                label="Reset game information"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-games')}
-                trigger={
-                  <Button variant="destructive" disabled={maintenanceBusy}>
-                    <TrashIcon />
-                    Reset game information
-                  </Button>
-                }
-              />
-            )}
-            {section === 'books' && (
-              <ConfirmAction
-                title="Reset book information?"
-                description="Information updates and identification will be stopped first. Open Library information, related automatic and manual identifications, availability observations and book operation history will be removed. Torrent records, film & series information, settings and files in your debrid accounts are retained. Automatic book updates can import the catalog again."
-                label="Reset book information"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-books')}
-                trigger={
-                  <Button variant="destructive" disabled={maintenanceBusy}>
-                    <TrashIcon />
-                    Reset book information
-                  </Button>
-                }
-              />
-            )}
-            {section === 'identification' && (
-              <ConfirmAction
-                title="Reset title matches?"
-                description="Information updates and identification will be stopped first. Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
-                label="Reset matches"
-                variant="destructive"
-                action={() => action.mutateAsync('reset-mapping')}
-                trigger={
-                  <Button variant="destructive" disabled={maintenanceBusy}>
-                    <TrashIcon />
-                    Reset matches
-                  </Button>
-                }
-              />
-            )}
-          </div>
-        </>
-      )}
-      {section === 'debrid' && (
-        <>
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap gap-3">
+          {section === 'videos' && (
             <ConfirmAction
-              title="Reset cache observations?"
-              description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
-              label="Reset cache"
+              title="Reset video information?"
+              description="Information updates and identification will be stopped first. Film and series information, related automatic and manual identifications, availability observations and video operation history will be removed. Torrent records, book information, settings and files in your debrid accounts are retained. Automatic video updates can import the catalog again."
+              label="Reset video information"
               variant="destructive"
-              action={() => action.mutateAsync('reset-cache')}
+              action={() => action.mutateAsync('reset-videos')}
               trigger={
-                <Button variant="destructive" disabled={action.isPending || resetting}>
+                <Button variant="destructive" disabled={maintenanceBusy}>
                   <TrashIcon />
-                  Reset cache
+                  Reset video information
                 </Button>
               }
             />
-          </div>
-        </>
+          )}
+          {section === 'games' && (
+            <ConfirmAction
+              title="Reset game information?"
+              description="Information updates and identification will be stopped first. IGDB information, related automatic and manual identifications, availability observations and game operation history will be removed. Source files, video and book information, settings and files in your debrid accounts are retained. Automatic game updates can import the catalog again."
+              label="Reset game information"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-games')}
+              trigger={
+                <Button variant="destructive" disabled={maintenanceBusy}>
+                  <TrashIcon />
+                  Reset game information
+                </Button>
+              }
+            />
+          )}
+          {section === 'books' && (
+            <ConfirmAction
+              title="Reset book information?"
+              description="Information updates and identification will be stopped first. Open Library information, related automatic and manual identifications, availability observations and book operation history will be removed. Torrent records, film & series information, settings and files in your debrid accounts are retained. Automatic book updates can import the catalog again."
+              label="Reset book information"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-books')}
+              trigger={
+                <Button variant="destructive" disabled={maintenanceBusy}>
+                  <TrashIcon />
+                  Reset book information
+                </Button>
+              }
+            />
+          )}
+          {section === 'identification' && (
+            <ConfirmAction
+              title="Reset title matches?"
+              description="Information updates and identification will be stopped first. Automatic correspondences will be recomputed from the local information catalog. Manual choices are retained. No metadata download is needed."
+              label="Reset matches"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-mapping')}
+              trigger={
+                <Button variant="destructive" disabled={maintenanceBusy}>
+                  <TrashIcon />
+                  Reset matches
+                </Button>
+              }
+            />
+          )}
+        </div>
+      )}
+      {section === 'debrid' && (
+        <div className="flex flex-wrap items-center gap-4">
+          <ConfirmAction
+            title="Reset cache observations?"
+            description="Availability will be checked again on the next search. Temporary magnet ownership records are preserved."
+            label="Reset cache"
+            variant="destructive"
+            action={() => action.mutateAsync('reset-cache')}
+            trigger={
+              <Button variant="destructive" disabled={action.isPending || resetting}>
+                <TrashIcon />
+                Reset cache
+              </Button>
+            }
+          />
+        </div>
       )}
     </Disclosure>
   )
@@ -860,7 +867,7 @@ export default function AIOSourcePage({
               )}
               {section === 'books' && Boolean(status.books?.skipped) && (
                 <p role="status" className="notice notice-warning">
-                  {status.books!.skipped.toLocaleString()} unreadable or oversized book records were
+                  {formatNumber(status.books!.skipped)} unreadable or oversized book records were
                   skipped.{' '}
                   <Link className="data-link" to="/metadata/books/history">
                     View history

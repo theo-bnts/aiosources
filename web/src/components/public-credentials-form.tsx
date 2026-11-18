@@ -11,6 +11,7 @@ import {
 } from '@/lib/public-credentials'
 import {
   clearPublicCredentials,
+  useRequestController,
   useSessionExpired,
   type PublicInfo,
 } from './public-connection-fields'
@@ -45,9 +46,8 @@ export function PublicCredentialsForm({
   const [removed, setRemoved] = useState<string[]>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>(null)
-  const request = useRef<AbortController | null>(null)
+  const request = useRequestController()
   const formRef = useRef<HTMLFormElement>(null)
-  useEffect(() => () => request.current?.abort(), [])
   useSessionExpired(() => {
     request.current?.abort()
     setPending(false)

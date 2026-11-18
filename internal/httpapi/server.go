@@ -382,15 +382,23 @@ func (s *server) putSecret(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *server) deleteSecret(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
+func decodeRevision(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	var input struct {
 		Revision int64 `json:"revision"`
 	}
 	if !decodeJSON(w, r, &input) {
+		return 0, false
+	}
+	return input.Revision, true
+}
+
+func (s *server) deleteSecret(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	revision, ok := decodeRevision(w, r)
+	if !ok {
 		return
 	}
-	if input.Revision < 1 {
+	if revision < 1 {
 		writeError(w, http.StatusBadRequest, "The current secret revision is required")
 		return
 	}
@@ -408,7 +416,7 @@ func (s *server) deleteSecret(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		return s.options.Vault.DeleteAtRevision(r.Context(), name, input.Revision)
+		return s.options.Vault.DeleteAtRevision(r.Context(), name, revision)
 	})
 	if errors.Is(err, model.ErrConflict) {
 		writeError(w, http.StatusConflict, "This secret changed or is still referenced by a source, active run or AIOSources configuration. Refresh before trying again.")

@@ -313,7 +313,7 @@ func validateCommon(p model.Provider) error {
 			if !httpguts.ValidHeaderFieldName(p.Auth.Name) {
 				return errors.New("authentication parameter name is required and must be a token")
 			}
-			if authType == "header" && (strings.EqualFold(p.Auth.Name, "Cookie") || strings.EqualFold(p.Auth.Name, "Host") || strings.EqualFold(p.Auth.Name, "Content-Length") || strings.EqualFold(p.Auth.Name, "Transfer-Encoding")) {
+			if authType == "header" && isTransportHeader(p.Auth.Name) {
 				return errors.New("invalid authentication header; cookies require auth.type=cookie")
 			}
 		} else if p.Auth.Name != "" {

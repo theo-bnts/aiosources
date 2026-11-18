@@ -1,9 +1,14 @@
 import { InfoTip } from '@/components/ui/info-tip'
 import { LinkIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { CatalogEntities } from '@/lib/catalog-types'
-import { useSessionExpired, type PublicInfo } from '@/components/public-connection-fields'
+import {
+  pruneVisitorOptions,
+  useRequestController,
+  useSessionExpired,
+  type PublicInfo,
+} from '@/components/public-connection-fields'
 import { CatalogDataControls, CatalogPublishedFields } from '@/components/catalog-data-controls'
 import { SourceFilter } from '@/components/source-filter'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -27,21 +32,16 @@ export function PublicSharedCatalogEntry({
   const [connection, setConnection] = useState<Connection>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>()
-  const request = useRef<AbortController | null>(null)
-  useEffect(() => () => request.current?.abort(), [])
+  const request = useRequestController()
   useSessionExpired(() => {
     request.current?.abort()
     setPending(false)
     setConnection(undefined)
   })
   useEffect(() => {
-    const allowed = new Set((info.sources ?? []).map((source) => source.id))
-    const selected = options.sources ?? []
-    const sources = selected.filter((id) => allowed.has(id))
-    if (selected.length !== sources.length) {
-      setOptions((current) => ({ ...current, sources }))
-    }
-  }, [info.sources, options.sources])
+    const next = pruneVisitorOptions(options, info.catalog_sources ?? info.sources)
+    if (next) setOptions(next)
+  }, [info.catalog_sources, info.sources, options])
   function change(next: Options) {
     setOptions(next)
     setConnection(undefined)

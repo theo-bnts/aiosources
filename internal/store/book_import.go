@@ -114,25 +114,32 @@ UPDATE aiosources.ol_import_state SET export_phase=1,position=0,phase_snapshot='
 }
 
 func (s *Store) SelectBookExportKeys(ctx context.Context, keys []string) (map[string]bool, error) {
+	return selectBookImportReferences(ctx, s.pool, keys)
+}
+
+func selectBookImportReferences(ctx context.Context, q interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, keys []string) (map[string]bool, error) {
 	selected := map[string]bool{}
-	if len(keys) > 0 {
-		rows, err := s.pool.Query(ctx, `SELECT id FROM aiosources.ol_import_references WHERE id=ANY($1::text[])`, keys)
-		if err != nil {
+	if len(keys) == 0 {
+		return selected, nil
+	}
+	rows, err := q.Query(ctx, `SELECT id FROM aiosources.ol_import_references WHERE id=ANY($1::text[])`, keys)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var key string
+		if err = rows.Scan(&key); err != nil {
+			rows.Close()
 			return nil, err
 		}
-		for rows.Next() {
-			var key string
-			if err = rows.Scan(&key); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			selected[key] = true
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, err
-		}
+		selected[key] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
 	}
 	return selected, nil
 }

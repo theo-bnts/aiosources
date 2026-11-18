@@ -944,10 +944,5 @@ func sameOrigin(a, b *url.URL) bool {
 	return validHTTPURL(a) && validHTTPURL(b) && originKey(a) == originKey(b)
 }
 func sensitiveName(name string) bool {
-	name = strings.ToLower(strings.NewReplacer("-", "", "_", "", ".", "").Replace(name))
-	switch name {
-	case "authorization", "proxyauthorization", "cookie", "setcookie", "apikey", "key", "token", "password", "pass", "secret", "username", "credential", "credentials", "passkey", "auth", "signature", "sig", "accesskey":
-		return true
-	}
-	return strings.HasSuffix(name, "token") || strings.HasSuffix(name, "password") || strings.HasSuffix(name, "secret") || strings.HasSuffix(name, "apikey")
+	return model.CredentialParameter(name)
 }

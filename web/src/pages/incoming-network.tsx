@@ -3,7 +3,7 @@ import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
+import { api, AUTO_REFRESH_INTERVAL, isRevisionConflict } from '@/lib/api'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import type { IncomingNetwork, NetworkSettings } from '@/lib/network-types'
 import { ErrorNotice, Loading } from '@/components/common'
@@ -40,9 +40,11 @@ export default function IncomingNetworkPage() {
   }
   const dirty = Boolean(draft && JSON.stringify(value) !== JSON.stringify(query.data?.incoming))
   const activeDraft = dirty ? draft : null
-  const conflict =
-    Boolean(dirty && draft && draft.base.revision !== query.data?.revision) ||
-    (save.error instanceof ApiError && save.error.status === 409)
+  const conflict = isRevisionConflict(
+    dirty ? draft?.base.revision : undefined,
+    query.data?.revision,
+    save.error,
+  )
   useUnsavedChanges(dirty, 'incoming proxy settings', save.isPending)
   function change(change: Partial<IncomingNetwork>, text?: string) {
     if (!query.data || !current) return

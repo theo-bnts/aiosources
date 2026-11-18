@@ -2,10 +2,7 @@ package aiosource
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -58,16 +55,7 @@ type publicCatalogSource struct {
 }
 
 func (s *Service) sealPublicCatalogSource(workID int64, row store.CatalogRecord) (string, error) {
-	data, err := json.Marshal(publicCatalogSource{WorkID: workID, Provider: row.Provider, SourceID: row.SourceID, Fingerprint: row.Fingerprint})
-	if err != nil {
-		return "", err
-	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal("public-catalog-source-v1", data)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(sealed), nil
+	return s.sealVaultJSON("public-catalog-source-v1", publicCatalogSource{WorkID: workID, Provider: row.Provider, SourceID: row.SourceID, Fingerprint: row.Fingerprint})
 }
 
 // Readiness is carried by the visitor, not by a saved credential or background
@@ -87,19 +75,7 @@ type publicCatalogPreparation struct {
 }
 
 func (s *Service) openPublicCatalogValue(purpose, token string, result any) error {
-	if len(token) < 32 || len(token) > 16384 || strings.Contains(token, "~") {
-		return model.ErrNotFound
-	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
-	if err != nil {
-		return model.ErrNotFound
-	}
-	data, err := s.Vault.Open(purpose, sealed)
-	if err != nil {
-		return model.ErrNotFound
-	}
-	defer clear(data)
-	if json.Unmarshal(data, result) != nil {
+	if len(token) > 16384 || s.openVaultJSON(purpose, token, result) != nil {
 		return model.ErrNotFound
 	}
 	return nil
@@ -134,11 +110,7 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 		return model.CatalogDownload{}, model.ErrNotFound
 	}
 	defer func() {
-		if operation != "" && (errors.Is(downloadErr, model.ErrNotFound) || errors.Is(downloadErr, model.ErrConflict)) {
-			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			defer cancel()
-			_ = s.DB.UnavailableOperationDownload(final, operation)
-		}
+		s.retireUnavailableOperationDownload(ctx, operation, downloadErr)
 	}()
 	var rows []store.CatalogRecord
 	var err error
@@ -166,16 +138,10 @@ func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInst
 	input.AllowUncached = input.AllowUncached && !visitor.Preferences.CachedOnly
 	result, downloadErr = s.catalogDownload(ctx, workID, input, operation, account, visitor)
 	if errors.Is(downloadErr, ErrPending) {
-		data, err := json.Marshal(publicCatalogPreparation{TrustedID: trustedVisitorID(visitor), WorkID: workID, Source: source, Selection: input.CatalogSelection, Service: input.Service, OperationID: result.OperationID, PreparedID: result.PreparationID, Account: fingerprint(visitor.Services[input.Service]), Audience: visitor.Audience, Generation: visitor.Generation, Expires: time.Now().Add(7 * 24 * time.Hour).Unix()})
+		result.PreparationID, err = s.sealVaultJSON("public-catalog-preparation-v1", publicCatalogPreparation{TrustedID: trustedVisitorID(visitor), WorkID: workID, Source: source, Selection: input.CatalogSelection, Service: input.Service, OperationID: result.OperationID, PreparedID: result.PreparationID, Account: fingerprint(visitor.Services[input.Service]), Audience: visitor.Audience, Generation: visitor.Generation, Expires: time.Now().Add(7 * 24 * time.Hour).Unix()})
 		if err != nil {
 			return model.CatalogDownload{}, err
 		}
-		defer clear(data)
-		sealed, err := s.Vault.Seal("public-catalog-preparation-v1", data)
-		if err != nil {
-			return model.CatalogDownload{}, err
-		}
-		result.PreparationID = base64.RawURLEncoding.EncodeToString(sealed)
 	}
 	return result, downloadErr
 }

@@ -112,17 +112,21 @@ func catalogResource(title model.CatalogTitle, selection model.CatalogSelection)
 	return r, id, nil
 }
 
-func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
-	return s.catalogReleases(ctx, workID, selection, opts, nil, options...)
-}
-
-func (s *Service) catalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, visitor *PublicInstallation, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+func newCatalogReleaseList(opts model.ListOptions) (model.List[model.CatalogRelease], int, int) {
 	limit := opts.Limit
 	if limit < 1 || limit > 200 {
 		limit = 50
 	}
 	offset := max(0, opts.Offset)
-	result := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}
+	return model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}, limit, offset
+}
+
+func (s *Service) CatalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+	return s.catalogReleases(ctx, workID, selection, opts, nil, options...)
+}
+
+func (s *Service) catalogReleases(ctx context.Context, workID int64, selection model.CatalogSelection, opts model.ListOptions, visitor *PublicInstallation, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
+	result, _, _ := newCatalogReleaseList(opts)
 	if visitor != nil {
 		var err error
 		_, err = s.PublicSearchAccess(ctx, visitor)
@@ -160,12 +164,7 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 // Metadata-backed and direct torrent searches share formatting, availability,
 // private-source safeguards and download actions.
 func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resource, rows []store.CatalogRecord, opts model.ListOptions, visitor *PublicInstallation, options ...model.CatalogReleaseFilters) (model.List[model.CatalogRelease], error) {
-	limit := opts.Limit
-	if limit < 1 || limit > 200 {
-		limit = 50
-	}
-	offset := max(0, opts.Offset)
-	result := model.List[model.CatalogRelease]{Items: []model.CatalogRelease{}, Limit: limit, Offset: offset}
+	result, limit, offset := newCatalogReleaseList(opts)
 	filters := model.CatalogReleaseFilters{}
 	if len(options) > 0 {
 		filters = options[0]
@@ -233,14 +232,8 @@ func (s *Service) catalogReleasePage(ctx context.Context, workID int64, r Resour
 	if visitor == nil {
 		availability, err = s.availability(ctx, c, resource, hashes, "manual")
 	} else {
-		filtered := *visitor
-		filtered.Services = map[string]string{}
-		for service, key := range visitor.Services {
-			if AllowsInstallation(visitor.Preferences, "", service, r.Type) {
-				filtered.Services[service] = key
-			}
-		}
-		availability, err = s.publicAvailability(ctx, c, resource, hashes, &filtered)
+		filtered := visitor.withAllowedServices(visitor.Preferences, r.Type)
+		availability, err = s.publicAvailability(ctx, c, resource, hashes, filtered)
 		clear(filtered.Services)
 		if err == nil {
 			announces, err = s.visitorAnnounces(ctx, c, visitor)
@@ -503,15 +496,19 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	return result, downloadErr
 }
 
+func (s *Service) retireUnavailableOperationDownload(ctx context.Context, operationID string, err error) {
+	if operationID != "" && (errors.Is(err, model.ErrNotFound) || errors.Is(err, model.ErrConflict)) {
+		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = s.DB.UnavailableOperationDownload(final, operationID)
+	}
+}
+
 // Following a saved preparation never starts an uncached download. It also
 // cannot reuse an object ID after the administrator changes provider accounts.
 func (s *Service) CheckOperationDownload(ctx context.Context, id string, selectedFiles ...string) (result model.CatalogDownload, checkErr error) {
 	defer func() {
-		if errors.Is(checkErr, model.ErrNotFound) || errors.Is(checkErr, model.ErrConflict) {
-			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			defer cancel()
-			_ = s.DB.UnavailableOperationDownload(final, id)
-		}
+		s.retireUnavailableOperationDownload(ctx, id, checkErr)
 	}()
 	saved, err := s.DB.OperationDownload(ctx, id)
 	if err != nil {

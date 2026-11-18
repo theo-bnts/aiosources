@@ -41,6 +41,15 @@ export const statusLabels: Record<RunStatus, string> = {
 export function number(value: number) {
   return integers.format(value)
 }
+export function isWholeNumberString(
+  value: string | undefined | null,
+  min = 0,
+  max = Number.MAX_SAFE_INTEGER,
+) {
+  if (!value || !/^\d+$/.test(value)) return false
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max
+}
 export function useDate() {
   const preferences = useBrowserPreferences()
   return useMemo(() => {

@@ -175,7 +175,7 @@ func rawItemFragmentsBytes(original, data []byte) ([][]byte, error) {
 			return result, errProtocol
 		case xml.StartElement:
 			path = append(path, token.Name.Local)
-			if len(path) > 128 {
+			if len(path) > maxXMLDepth {
 				return result, errors.New("torznab: XML nesting exceeds the limit")
 			}
 			if len(path) == 3 && path[0] == "rss" && path[1] == "channel" && path[2] == "item" {

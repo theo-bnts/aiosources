@@ -2,9 +2,71 @@ package aiosource
 
 import (
 	"context"
+	"sort"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+func (v *PublicInstallation) withAllowedServices(prefs model.StreamPreferences, mediaType string) *PublicInstallation {
+	if v == nil {
+		return nil
+	}
+	copy := *v
+	copy.Services = map[string]string{}
+	for service, key := range v.Services {
+		if AllowsInstallation(prefs, "", service, mediaType) {
+			copy.Services[service] = key
+		}
+	}
+	return &copy
+}
+
+func browserCredentialSummary(visitor *PublicInstallation, instanceServices bool) PublicBrowserCredential {
+	result := PublicBrowserCredential{InstanceServices: instanceServices, Services: []string{}, Announces: []string{}}
+	if visitor == nil {
+		return result
+	}
+	for _, provider := range PublicProviders {
+		if visitor.Services[provider.ID] != "" {
+			result.Services = append(result.Services, provider.ID)
+		}
+	}
+	for source := range visitor.Announces {
+		result.Announces = append(result.Announces, source)
+	}
+	sort.Strings(result.Announces)
+	return result
+}
+
+func (s *Service) validateServiceKeys(ctx context.Context, services map[string]string) error {
+	for _, provider := range PublicProviders {
+		if key := services[provider.ID]; key != "" {
+			if err := s.Providers.ValidateKey(ctx, provider.ID, key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Service) filterPersonalAnnounces(c model.AIOConfig, announces map[string]string) map[string]string {
+	retained := map[string]string{}
+	if len(announces) == 0 {
+		return retained
+	}
+	sources, err := s.publicPrivateSources(c)
+	if err != nil {
+		// An unreadable definition cannot authorize an uncached download, but
+		// must not prevent existing cached playback through an encrypted link.
+		return retained
+	}
+	for _, source := range sources {
+		if value := announces[source.ID]; value != "" {
+			retained[source.ID] = value
+		}
+	}
+	return retained
+}
 
 // Resolve authorization separately from credentials: an authenticated user is
 // not implicitly entitled to instance keys, and a public visitor may be.
@@ -78,17 +140,7 @@ func (s *Service) retainedPersonalAnnounces(ctx context.Context, access model.Pu
 	if err != nil {
 		return nil, err
 	}
-	sources, err := s.publicPrivateSources(config)
-	if err != nil {
-		return map[string]string{}, nil
-	}
-	retained := map[string]string{}
-	for _, source := range sources {
-		if value := announces[source.ID]; value != "" {
-			retained[source.ID] = value
-		}
-	}
-	return retained, nil
+	return s.filterPersonalAnnounces(config, announces), nil
 }
 
 func (s *Service) PublicInstanceSearch(ctx context.Context, audience string) (*PublicInstallation, error) {

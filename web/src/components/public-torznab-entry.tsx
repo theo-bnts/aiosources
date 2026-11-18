@@ -9,6 +9,7 @@ import {
   isCurrentPublicCredential,
   type PublicCredential,
 } from '@/lib/public-credentials'
+import { parseHttpEndpoint } from '@/lib/connection-options'
 import { torznabPreferenceKey, torznabPreferenceError } from '@/lib/torznab-preferences'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,8 @@ import { ResultSorting } from '@/components/result-controls'
 import {
   PublicAnnounceFields,
   clearPublicCredentials,
+  pruneVisitorOptions,
+  useRequestController,
   useSessionExpired,
   type PublicInfo,
 } from '@/components/public-connection-fields'
@@ -31,10 +34,9 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   const [connection, setConnection] = useState<{ url: string; api_key: string }>()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<unknown>()
-  const request = useRef<AbortController | null>(null)
+  const request = useRequestController()
   const connectionCredential = useRef('')
   const formRef = useRef<HTMLFormElement>(null)
-  useEffect(() => () => request.current?.abort(), [])
   useSessionExpired(() => {
     request.current?.abort()
     setPending(false)
@@ -50,17 +52,14 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
       request.current?.abort()
       setPending(false)
     }
-  }, [info.torznab_enabled])
+  }, [info.torznab_enabled, request])
   useEffect(() => {
-    const allowed = new Set((info.sources ?? info.private_sources ?? []).map((source) => source.id))
-    const selected = options.sources ?? []
-    const sources = selected.filter((id) => allowed.has(id))
-    const sorting = options.sorting?.filter(
-      (rule) => Boolean(info.sources) || rule.field !== 'source',
+    const next = pruneVisitorOptions(
+      options,
+      info.sources ?? info.private_sources,
+      Boolean(info.sources),
     )
-    if (selected.length !== sources.length || sorting?.length !== options.sorting?.length) {
-      setOptions({ ...options, sources, sorting })
-    }
+    if (next) setOptions(next)
   }, [info.sources, info.private_sources, options])
   async function create(form: HTMLFormElement) {
     if (request.current) return
@@ -122,15 +121,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
   }
   const credential = connection ? torznabPreferenceKey(connection.api_key, options) : ''
   const preferenceError = torznabPreferenceError(connection?.api_key ?? '', options)
-  let endpoint: URL | null = null
-  if (connection) {
-    try {
-      const parsed = new URL(connection.url, window.location.origin)
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') endpoint = parsed
-    } catch {
-      endpoint = null
-    }
-  }
+  const endpoint = connection ? parseHttpEndpoint(connection.url) : null
   const full =
     endpoint && connection ? `${connection.url}?apikey=${encodeURIComponent(credential)}` : ''
   return (

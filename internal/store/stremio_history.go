@@ -16,6 +16,23 @@ const stremioResultLimit = 1000
 
 var stremioResourceRE = regexp.MustCompile(`^(imdb:tt[0-9]+|tmdb:[0-9]+|tvdb:[0-9]+|mal:[0-9]+|kitsu:[0-9]+|anilist:[0-9]+)(:[0-9]+){0,2}$`)
 
+func validStremioOrigin(value string) bool {
+	return value == "private" || value == "public"
+}
+
+func validStremioKind(value string) bool {
+	return value == "stream" || value == "manifest" || value == "playback"
+}
+
+func validStremioOutcome(value string) bool {
+	switch value {
+	case "results", "empty", "failed", "cancelled", "invalid", "busy", "pending":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequest) error {
 	if item.Origin == "" {
 		item.Origin = "private"
@@ -23,7 +40,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	if item.Kind == "" {
 		item.Kind = "stream"
 	}
-	if (item.Origin != "private" && item.Origin != "public") || (item.Kind != "stream" && item.Kind != "manifest" && item.Kind != "playback") {
+	if !validStremioOrigin(item.Origin) || !validStremioKind(item.Kind) {
 		return model.ErrInvalid
 	}
 	if item.Service != "" && (item.Kind != "playback" || !model.IsDebridService(item.Service)) {
@@ -45,7 +62,7 @@ func (s *Store) RecordStremioRequest(ctx context.Context, item model.StremioRequ
 	}
 	if len(item.Resource) > 160 || item.DurationMS < 0 || item.LanguageExcluded < 0 || item.Matched < 0 || item.Eligible < 0 || item.InvalidHash < 0 || item.WrongEpisode < 0 || item.PrivateUnavailable < 0 || item.FileUnavailable < 0 || item.Returned < 0 ||
 		(item.MediaType != "movie" && item.MediaType != "series" && item.MediaType != "anime" && item.MediaType != "invalid") ||
-		(item.Outcome != "results" && item.Outcome != "empty" && item.Outcome != "failed" && item.Outcome != "cancelled" && item.Outcome != "invalid" && item.Outcome != "busy" && item.Outcome != "pending") {
+		!validStremioOutcome(item.Outcome) {
 		return model.ErrInvalid
 	}
 	if len(item.Results) > stremioResultLimit {
@@ -149,12 +166,10 @@ func (s *Store) ListStremioRequests(ctx context.Context, opts model.ListOptions)
 func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.ListOptions, origin, kind string) (model.List[model.StremioRequest], error) {
 	opts = pageOptions(opts)
 	out := model.List[model.StremioRequest]{Items: []model.StremioRequest{}, Limit: opts.Limit, Offset: opts.Offset}
-	if !model.ValidSelection(origin, func(value string) bool { return value == "private" || value == "public" }) || !model.ValidSelection(kind, func(value string) bool { return value == "stream" || value == "manifest" || value == "playback" }) {
+	if !model.ValidSelection(origin, validStremioOrigin) || !model.ValidSelection(kind, validStremioKind) {
 		return out, model.ErrInvalid
 	}
-	if len(opts.Query) > 160 || !model.ValidSelection(opts.Status, func(value string) bool {
-		return value == "results" || value == "empty" || value == "failed" || value == "cancelled" || value == "invalid" || value == "busy" || value == "pending"
-	}) {
+	if len(opts.Query) > 160 || !model.ValidSelection(opts.Status, validStremioOutcome) {
 		return out, model.ErrInvalid
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -174,7 +189,7 @@ func (s *Store) ListStremioRequestsFiltered(ctx context.Context, opts model.List
 		item, err := scanStremioRequest(rows, false)
 		if err != nil {
 			rows.Close()
-			return out, err
+			return out, databaseError("read Stremio requests", err)
 		}
 		out.Items = append(out.Items, item)
 	}

@@ -20,6 +20,74 @@ export function useSessionExpired(onExpired?: () => void) {
   }, [])
 }
 
+export function useRequestController() {
+  const request = useRef<AbortController | null>(null)
+  useEffect(() => () => request.current?.abort(), [])
+  return request
+}
+
+export type VisitorSection = 'stremio' | 'search' | 'torznab' | 'catalog'
+
+export function resolveVisitorSection(
+  info: PublicInfo,
+  pathname: string,
+  prefix: '/public' | '/trusted',
+): { section: VisitorSection; available: boolean; validPath: boolean; fallbackTarget: string } {
+  const isSearch = pathname === `${prefix}/search` || pathname.startsWith(`${prefix}/search/`)
+  const validPath =
+    pathname === prefix ||
+    pathname === `${prefix}/torznab` ||
+    pathname === `${prefix}/sharing` ||
+    isSearch
+  const section: VisitorSection = isSearch
+    ? 'search'
+    : pathname === `${prefix}/torznab`
+      ? 'torznab'
+      : pathname === `${prefix}/sharing`
+        ? 'catalog'
+        : 'stremio'
+  const available = Boolean(
+    section === 'search'
+      ? info.search_enabled
+      : section === 'stremio'
+        ? info.stremio_enabled
+        : section === 'torznab'
+          ? info.torznab_enabled
+          : info.catalog_enabled,
+  )
+  const fallbackTarget = info.stremio_enabled
+    ? prefix
+    : info.search_enabled
+      ? `${prefix}/search`
+      : info.torznab_enabled
+        ? `${prefix}/torznab`
+        : info.catalog_enabled
+          ? `${prefix}/sharing`
+          : ''
+  return { section, available, validPath, fallbackTarget }
+}
+
+export function pruneVisitorOptions<
+  T extends { sources?: string[]; sorting?: Array<{ field: string; direction: 'asc' | 'desc' }> },
+>(
+  options: T,
+  sources: { id: string; name: string }[] | undefined,
+  allowSourceSort = true,
+): T | null {
+  const allowed = new Set((sources ?? []).map((source) => source.id))
+  const selected = options.sources ?? []
+  const nextSources = selected.filter((id) => allowed.has(id))
+  const nextSorting = options.sorting?.filter((rule) => allowSourceSort || rule.field !== 'source')
+  if (selected.length === nextSources.length && nextSorting?.length === options.sorting?.length) {
+    return null
+  }
+  return {
+    ...options,
+    sources: nextSources,
+    ...(options.sorting ? { sorting: nextSorting } : {}),
+  }
+}
+
 export function useVisitorConfig(trusted = false, enabled = true) {
   return useQuery({
     queryKey: trusted ? ['trusted-config'] : ['public-config'],

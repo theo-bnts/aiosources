@@ -172,15 +172,7 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 			if r.PreserveKey != "" {
 				preserved = append(preserved, r.PreserveKey)
 			}
-			switch {
-			case r.Edition != nil:
-				keys = append(keys, r.Edition.Works...)
-				keys = append(keys, r.Edition.Authors...)
-			case r.Work != nil:
-				keys = append(keys, r.Work.Book.AuthorKeys...)
-			case r.Redirect != nil:
-				keys = append(keys, r.Redirect.Target)
-			}
+			keys = append(keys, bookRecordReferences(r)...)
 		}
 		if len(keys) > 0 {
 			if _, err = tx.Exec(ctx, `INSERT INTO aiosources.ol_import_references SELECT unnest($1::text[]) ON CONFLICT DO NOTHING`, keys); err != nil {
@@ -189,14 +181,7 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 		}
 		if len(preserved) > 0 {
 			for _, table := range []string{"aio_works", "ol_authors", "ol_redirects"} {
-				key := "id"
-				if table == "aio_works" {
-					key = "openlibrary_id"
-				}
-				if table == "ol_redirects" {
-					key = "source"
-				}
-				if _, err = tx.Exec(ctx, `UPDATE aiosources.`+table+` SET ol_seen=$1 WHERE `+key+`=ANY($2::text[])`, generation, preserved); err != nil {
+				if _, err = tx.Exec(ctx, `UPDATE aiosources.`+table+` SET ol_seen=$1 WHERE `+openLibraryTableKey(table)+`=ANY($2::text[])`, generation, preserved); err != nil {
 					return err
 				}
 			}
@@ -208,6 +193,17 @@ func (s *Store) saveOpenLibraryBatch(ctx context.Context, snapshot string, expec
 		}
 	}
 	return databaseError("commit book information batch", tx.Commit(ctx))
+}
+
+func openLibraryTableKey(table string) string {
+	switch table {
+	case "aio_works":
+		return "openlibrary_id"
+	case "ol_redirects":
+		return "source"
+	default:
+		return "id"
+	}
 }
 
 func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Record, refresh bool, generation int64) ([3]int64, int64, int64, error) {
@@ -338,14 +334,7 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 	}
 	if len(seenKeys) > 0 {
 		for _, table := range []string{"aio_works", "ol_editions", "ol_authors", "ol_redirects"} {
-			key := "id"
-			if table == "aio_works" {
-				key = "openlibrary_id"
-			}
-			if table == "ol_redirects" {
-				key = "source"
-			}
-			batch.Queue("UPDATE aiosources."+table+" SET ol_seen=$1 WHERE "+key+"=ANY($2::text[]) AND ol_seen<>$1", generation, seenKeys)
+			batch.Queue("UPDATE aiosources."+table+" SET ol_seen=$1 WHERE "+openLibraryTableKey(table)+"=ANY($2::text[]) AND ol_seen<>$1", generation, seenKeys)
 		}
 	}
 	if err = tx.SendBatch(ctx, batch).Close(); err != nil {

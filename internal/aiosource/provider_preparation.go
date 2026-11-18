@@ -2,9 +2,6 @@ package aiosource
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -82,33 +79,18 @@ func (s *Service) sealPreparation(service, key, hash, id string) (string, error)
 	if !model.IsDebridService(service) || !providerObjectID.MatchString(id) || !hashRE.MatchString(hash) {
 		return "", model.ErrInvalid
 	}
-	data, err := json.Marshal(providerPreparation{service, fingerprint(key), hash, id, time.Now().Add(7 * 24 * time.Hour).Unix()})
-	if err != nil {
-		return "", err
-	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal("provider-preparation-v1", data)
-	if err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(sealed), nil
+	return s.sealVaultJSON("provider-preparation-v1", providerPreparation{service, fingerprint(key), hash, id, time.Now().Add(7 * 24 * time.Hour).Unix()})
 }
 
 func (s *Service) openPreparation(service, key, hash, token string) (string, error) {
-	if len(token) < 32 || len(token) > 1024 || strings.Contains(token, "~") {
+	if len(token) < 32 || len(token) > 1024 {
 		return "", model.ErrInvalid
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(token)
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	data, err := s.Vault.Open("provider-preparation-v1", sealed)
-	if err != nil {
-		return "", model.ErrInvalid
-	}
-	defer clear(data)
 	var saved providerPreparation
-	if json.Unmarshal(data, &saved) != nil || saved.Service != service || saved.Account != fingerprint(key) || saved.Hash != hash || !providerObjectID.MatchString(saved.ID) || saved.Expires <= time.Now().Unix() {
+	if err := s.openVaultJSON("provider-preparation-v1", token, &saved); err != nil {
+		return "", model.ErrInvalid
+	}
+	if saved.Service != service || saved.Account != fingerprint(key) || saved.Hash != hash || !providerObjectID.MatchString(saved.ID) || saved.Expires <= time.Now().Unix() {
 		return "", model.ErrConflict
 	}
 	return saved.ID, nil

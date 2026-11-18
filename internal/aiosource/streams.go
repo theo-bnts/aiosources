@@ -183,17 +183,9 @@ func (s *Service) streams(ctx context.Context, base, token, mediaType, id string
 	// Filter before availability checks, so an unselected service is never
 	// contacted. The stored configuration and visitor credential remain intact.
 	c = c.RestrictDebrid(preferences.Services)
-	var filtered *PublicInstallation
-	if visitor != nil {
-		copy := *visitor
-		copy.Services = map[string]string{}
-		for service, key := range visitor.Services {
-			if AllowsInstallation(preferences, "", service, mediaType) {
-				copy.Services[service] = key
-			}
-		}
-		filtered = &copy
-		defer clear(copy.Services)
+	filtered := visitor.withAllowedServices(preferences, mediaType)
+	if filtered != nil {
+		defer clear(filtered.Services)
 	}
 	// Resolve names once for the whole response, including remote catalogs.
 	// Presentation must not prevent playback if a definition becomes unreadable.

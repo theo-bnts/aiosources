@@ -43,12 +43,13 @@ func catalogYearFilter(year string) string {
  HAVING ` + year + ` BETWEEN min(year) AND max(year))))`
 }
 
-func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
+func scanCatalogTitle(row scanner, prefix ...any) (model.CatalogTitle, error) {
 	var title model.CatalogTitle
 	var poster string
 	var cover int64
 	var platforms []byte
-	err := row.Scan(&title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms)
+	dest := append(append([]any{}, prefix...), &title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms)
+	err := row.Scan(dest...)
 	if err == nil && len(platforms) > 0 && string(platforms) != "null" {
 		err = json.Unmarshal(platforms, &title.Platforms)
 	}
@@ -56,22 +57,21 @@ func scanCatalogTitle(row scanner) (model.CatalogTitle, error) {
 	return title, err
 }
 
-type countedCatalogRow struct {
-	row   scanner
-	total *int64
-}
-
-func (r countedCatalogRow) Scan(values ...any) error {
-	return r.row.Scan(append([]any{r.total}, values...)...)
-}
-
-type rankedCatalogRow struct {
-	row  scanner
-	rank *model.CatalogSearchRanking
-}
-
-func (r rankedCatalogRow) Scan(values ...any) error {
-	return r.row.Scan(append([]any{&r.rank.Precision, &r.rank.Relevance, &r.rank.Year}, values...)...)
+func catalogWordFilter(normalized string, args []any) ([]any, string, string) {
+	terms := []string{}
+	anchor, longest := "", 0
+	for _, word := range searchWords(normalized) {
+		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
+		if len(word) > longest {
+			longest = len(word)
+			anchor = fmt.Sprintf("$%d", len(args))
+		}
+		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
+	}
+	if len(terms) < 2 || longest < 3 {
+		anchor = ""
+	}
+	return args, strings.Join(terms, " AND "), anchor
 }
 
 func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
@@ -103,21 +103,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 			media = append(media, kind)
 		}
 	}
-	args := []any{identity, media, normalized}
-	terms := []string{}
-	anchor, longest := "", 0
-	for _, word := range searchWords(normalized) {
-		args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
-		if len(word) > longest {
-			longest = len(word)
-			anchor = fmt.Sprintf("$%d", len(args))
-		}
-		terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
-	}
-	matching := strings.Join(terms, " AND ")
-	if len(terms) < 2 || longest < 3 {
-		anchor = ""
-	}
+	args, matching, anchor := catalogWordFilter(normalized, []any{identity, media, normalized})
 	bookExtras := ""
 	bookScope := ""
 	if len(media) == 0 || slices.Contains(media, "book") {
@@ -159,7 +145,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	}
 	for rows.Next() {
 		rank := &model.CatalogSearchRanking{}
-		title, e := scanCatalogTitle(rankedCatalogRow{row: countedCatalogRow{row: rows, total: &result.Total}, rank: rank})
+		title, e := scanCatalogTitle(rows, &result.Total, &rank.Precision, &rank.Relevance, &rank.Year)
 		if e != nil {
 			rows.Close()
 			return result, databaseError("read catalog title", e)
@@ -190,15 +176,10 @@ func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (
 	args := []any{id, locale}
 	alias := "NULL"
 	if len(locales) > 1 && locales[1] != "" && len(locales[1]) <= 500 {
-		normalized := locales[1]
-		args = append(args, normalized)
-		terms := []string{}
-		for _, word := range searchWords(normalized) {
-			args = append(args, "%"+escapeSearchFragment.Replace(word)+"%")
-			terms = append(terms, fmt.Sprintf(`normalized LIKE $%d ESCAPE '\'`, len(args)))
-		}
-		if len(terms) > 0 {
-			alias = catalogQueryAlias(strings.Join(terms, " AND "), "$3")
+		var matching string
+		args, matching, _ = catalogWordFilter(locales[1], append(args, locales[1]))
+		if matching != "" {
+			alias = catalogQueryAlias(matching, "$3")
 		}
 	}
 	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM aiosources.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, args...))
@@ -219,7 +200,7 @@ func (s *Store) CatalogRecords(ctx context.Context, id int64) ([]CatalogRecord, 
 	records := []model.AIORecord{}
 	for rows.Next() {
 		var occurrence, imdb, tmdb, tvdb string
-		record, e := scanAIORecord(aioStreamRow{scanner: rows, ids: []any{&occurrence, &imdb, &tmdb, &tvdb}})
+		record, e := scanAIORecord(rows, &occurrence, &imdb, &tmdb, &tvdb)
 		if e != nil {
 			rows.Close()
 			return nil, databaseError("read catalog release", e)

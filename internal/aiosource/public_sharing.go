@@ -3,9 +3,7 @@ package aiosource
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 
@@ -61,10 +59,6 @@ func DecodePublicCatalogOptions(value string) (model.PublicCatalogOptions, error
 	}
 	return options, nil
 }
-func publicCatalogOptionsHash(options string) string {
-	value := sha256.Sum256([]byte(options))
-	return hex.EncodeToString(value[:])
-}
 
 // The endpoint carries non-secret data choices; its separately sealed password
 // contains only audience, revocation counters and their integrity binding.
@@ -91,16 +85,11 @@ func (s *Service) CreatePublicCatalog(ctx context.Context, audience string, opti
 	if _, err = store.ResolvePublicCatalogShare(policy, options); err != nil {
 		return "", "", err
 	}
-	data, err := json.Marshal(publicCatalogInstallation{Version: 1, Generation: access.Generation, CatalogGeneration: access.CatalogGeneration, Audience: audience, Options: publicCatalogOptionsHash(configuration)})
+	password, err = s.sealVaultJSON(publicCatalogPurpose, publicCatalogInstallation{Version: 1, Generation: access.Generation, CatalogGeneration: access.CatalogGeneration, Audience: audience, Options: fingerprint(configuration)})
 	if err != nil {
 		return "", "", err
 	}
-	defer clear(data)
-	sealed, err := s.Vault.Seal(publicCatalogPurpose, data)
-	if err != nil {
-		return "", "", err
-	}
-	return configuration, base64.RawURLEncoding.EncodeToString(sealed), nil
+	return configuration, password, nil
 }
 func (s *Service) OpenPublicCatalog(ctx context.Context, audience, configuration, password string) (model.PublicCatalogGrant, error) {
 	var grant model.PublicCatalogGrant
@@ -118,17 +107,8 @@ func (s *Service) OpenPublicCatalog(ctx context.Context, audience, configuration
 	if !publicCatalogAvailable(access) {
 		return grant, ErrAuth
 	}
-	sealed, err := base64.RawURLEncoding.Strict().DecodeString(password)
-	if err != nil {
-		return grant, ErrAuth
-	}
-	data, err := s.Vault.Open(publicCatalogPurpose, sealed)
-	if err != nil {
-		return grant, ErrAuth
-	}
-	defer clear(data)
 	var value publicCatalogInstallation
-	if json.Unmarshal(data, &value) != nil || value.Version != 1 || value.Audience != audience || value.Generation != access.Generation || value.CatalogGeneration != access.CatalogGeneration || value.Options != publicCatalogOptionsHash(configuration) {
+	if s.openVaultJSON(publicCatalogPurpose, password, &value) != nil || value.Version != 1 || value.Audience != audience || value.Generation != access.Generation || value.CatalogGeneration != access.CatalogGeneration || value.Options != fingerprint(configuration) {
 		return grant, ErrAuth
 	}
 	grant = model.PublicCatalogGrant{PublicCatalogOptions: options, Generation: value.Generation, CatalogGeneration: value.CatalogGeneration}

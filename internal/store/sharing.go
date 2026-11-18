@@ -100,7 +100,7 @@ func ValidateShare(input model.ShareInput) error {
 	}
 	seen := make(map[string]bool, len(input.SourceIDs))
 	for _, id := range input.SourceIDs {
-		if !activityIdentity.MatchString(id) || strings.Contains(id, ".") || seen[id] {
+		if !model.ValidSourceID(id) || seen[id] {
 			return model.ErrInvalid
 		}
 		seen[id] = true

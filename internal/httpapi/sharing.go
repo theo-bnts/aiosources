@@ -238,13 +238,11 @@ func (s *server) rotateShare(w http.ResponseWriter, r *http.Request) {
 	if !s.shareRequestAllowed(w, r) {
 		return
 	}
-	var input struct {
-		Revision int64 `json:"revision"`
-	}
-	if !decodeJSON(w, r, &input) {
+	revision, ok := decodeRevision(w, r)
+	if !ok {
 		return
 	}
-	result, err := s.options.Store.RotateShare(r.Context(), r.PathValue("id"), input.Revision)
+	result, err := s.options.Store.RotateShare(r.Context(), r.PathValue("id"), revision)
 	if err != nil {
 		respondError(w, err)
 		return
@@ -257,13 +255,11 @@ func (s *server) deleteShare(w http.ResponseWriter, r *http.Request) {
 	if !s.shareRequestAllowed(w, r) {
 		return
 	}
-	var input struct {
-		Revision int64 `json:"revision"`
-	}
-	if !decodeJSON(w, r, &input) {
+	revision, ok := decodeRevision(w, r)
+	if !ok {
 		return
 	}
-	if err := s.options.Store.DeleteShare(r.Context(), r.PathValue("id"), input.Revision); err != nil {
+	if err := s.options.Store.DeleteShare(r.Context(), r.PathValue("id"), revision); err != nil {
 		respondError(w, err)
 		return
 	}
@@ -286,12 +282,61 @@ func (s *server) decodeShare(w http.ResponseWriter, r *http.Request, input *mode
 	return true
 }
 
-func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
+func prepareCatalogFeedRequest(w http.ResponseWriter, r *http.Request, readOnlyMessage string) bool {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Vary", "Authorization, "+model.CatalogEntitiesHeader+", "+model.CatalogDetailsHeader)
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
-		writeError(w, http.StatusMethodNotAllowed, "Shared catalogues are read-only")
+		writeError(w, http.StatusMethodNotAllowed, readOnlyMessage)
+		return false
+	}
+	return true
+}
+
+func (s *server) catalogFeedContext(w http.ResponseWriter, r *http.Request, unavailableMessage string) (context.Context, context.CancelFunc, *http.ResponseController, bool) {
+	budget, err := s.options.Store.ConnectionTimeout(r.Context(), "catalog")
+	if err != nil {
+		respondError(w, err)
+		return nil, nil, nil, false
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), budget)
+	controller := http.NewResponseController(w)
+	deadline, _ := ctx.Deadline()
+	if err := controller.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		cancel()
+		writeError(w, http.StatusServiceUnavailable, unavailableMessage)
+		return nil, nil, nil, false
+	}
+	return ctx, cancel, controller, true
+}
+
+func writeCatalogFeedJSON(w http.ResponseWriter, controller *http.ResponseController, head bool, payload any, encodeErrorMessage string, validate func() bool) {
+	var body []byte
+	if !head {
+		var err error
+		body, err = json.Marshal(payload)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, encodeErrorMessage)
+			return
+		}
+	}
+	if validate != nil && !validate() {
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	if !head {
+		if _, err := w.Write(body); err != nil {
+			return
+		}
+	}
+	// net/http can buffer a small response until ServeHTTP returns. Flush before
+	// releasing admission so even buffered delivery is inside the lease.
+	_ = controller.Flush()
+}
+
+func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
+	if !prepareCatalogFeedRequest(w, r, "Shared catalogues are read-only") {
 		return
 	}
 	// Configuring an HTTPS origin is the explicit reverse-proxy deployment
@@ -305,19 +350,11 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		catalogFeedError(w, store.ErrCatalogAuthentication)
 		return
 	}
-	budget, budgetErr := s.options.Store.ConnectionTimeout(r.Context(), "catalog")
-	if budgetErr != nil {
-		respondError(w, budgetErr)
+	ctx, cancel, controller, ok := s.catalogFeedContext(w, r, "Catalogue delivery is unavailable")
+	if !ok {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
-	controller := http.NewResponseController(w)
-	deadline, _ := ctx.Deadline()
-	if err := controller.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		writeError(w, http.StatusServiceUnavailable, "Catalogue delivery is unavailable")
-		return
-	}
 	request, ok := catalogPageInput(w, r)
 	if !ok {
 		return
@@ -338,28 +375,13 @@ func (s *server) catalogFeed(w http.ResponseWriter, r *http.Request) {
 		catalogFeedError(w, err)
 		return
 	}
-	var body []byte
-	if !request.Head {
-		body, err = json.Marshal(result)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "Could not encode the catalogue response")
-			return
+	writeCatalogFeedJSON(w, controller, request.Head, result, "Could not encode the catalogue response", func() bool {
+		if err := download.Validate(ctx); err != nil {
+			catalogFeedError(w, err)
+			return false
 		}
-	}
-	if err := download.Validate(ctx); err != nil {
-		catalogFeedError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if !request.Head {
-		if _, err := w.Write(body); err != nil {
-			return
-		}
-	}
-	// net/http can buffer a small response until ServeHTTP returns. Flush before
-	// releasing admission so even buffered delivery is inside the lease.
-	_ = controller.Flush()
+		return true
+	})
 }
 
 func catalogFeedError(w http.ResponseWriter, err error) {

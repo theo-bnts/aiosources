@@ -414,12 +414,8 @@ func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationH
 				_ = s.DB.GameUpdateFailure(ctx, "IGDB is temporarily unavailable or rate limited. Saved progress is preserved.", time.Now().Add(max(wait, 5*time.Minute)))
 				return &igdbError{message: "IGDB is temporarily unavailable or rate limited. Saved progress is preserved."}
 			}
-			timer := time.NewTimer(wait)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return ctx.Err()
-			case <-timer.C:
+			if err := sleepContext(ctx, wait); err != nil {
+				return err
 			}
 			continue
 		}

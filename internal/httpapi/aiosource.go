@@ -294,9 +294,17 @@ func (s *server) aioOrigin(r *http.Request) string {
 	u := url.URL{Scheme: scheme, Host: r.Host}
 	return u.String()
 }
-func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
+func parseStremioStreamResourceID(r *http.Request) (string, bool) {
 	id := r.PathValue("id")
 	if !strings.HasSuffix(id, ".json") || len(id) > 160 {
+		return "", false
+	}
+	return strings.TrimSuffix(id, ".json"), true
+}
+
+func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
+	resourceID, ok := parseStremioStreamResourceID(r)
+	if !ok {
 		s.options.AIOSource.RecordRejectedStream(r.PathValue("type"), "", false)
 		writeError(w, 400, "Invalid stream resource")
 		return
@@ -308,7 +316,7 @@ func (s *server) aioStreams(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), max(time.Second, budget-5*time.Second))
 	defer cancel()
-	streams, err := s.options.AIOSource.Streams(ctx, s.aioOrigin(r), r.PathValue("token"), r.PathValue("type"), strings.TrimSuffix(id, ".json"))
+	streams, err := s.options.AIOSource.Streams(ctx, s.aioOrigin(r), r.PathValue("token"), r.PathValue("type"), resourceID)
 	if err != nil {
 		respondError(w, err)
 		return

@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -91,11 +90,7 @@ func (s *server) registerPublicSharing(mux *http.ServeMux) {
 }
 
 func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Vary", "Authorization, "+model.CatalogEntitiesHeader+", "+model.CatalogDetailsHeader)
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		writeError(w, 405, "Shared catalogs are read-only")
+	if !prepareCatalogFeedRequest(w, r, "Shared catalogs are read-only") {
 		return
 	}
 	trusted := strings.HasPrefix(r.URL.Path, "/trusted/")
@@ -113,20 +108,13 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 		catalogFeedError(w, store.ErrCatalogAuthentication)
 		return
 	}
-	budget, err := s.options.Store.ConnectionTimeout(r.Context(), "catalog")
-	if err != nil {
-		respondError(w, err)
+	ctx, cancel, controller, ok := s.catalogFeedContext(w, r, "Catalog delivery is unavailable")
+	if !ok {
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), budget)
 	defer cancel()
-	controller := http.NewResponseController(w)
-	deadline, _ := ctx.Deadline()
-	if err := controller.SetWriteDeadline(deadline); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		writeError(w, 503, "Catalog delivery is unavailable")
-		return
-	}
 	var grant model.PublicCatalogGrant
+	var err error
 	if trusted {
 		var connection aiosource.TrustedConnection
 		connection, err = s.options.AIOSource.OpenTrustedConnection(ctx, s.connectionOrigin(), "catalog", password)
@@ -164,36 +152,23 @@ func (s *server) publicCatalogFeed(w http.ResponseWriter, r *http.Request) {
 		catalogFeedError(w, err)
 		return
 	}
-	var body []byte
-	if !request.Head {
-		body, err = json.Marshal(result)
-		if err != nil {
-			writeError(w, 500, "Could not encode the catalog response")
-			return
+	writeCatalogFeedJSON(w, controller, request.Head, result, "Could not encode the catalog response", func() bool {
+		records := len(result.Items)
+		if request.Head {
+			records = 0
 		}
-	}
-	records := len(result.Items)
-	if request.Head {
-		records = 0
-	}
-	kind := "catalog.public_exported"
-	if trusted {
-		kind = "catalog.trusted_exported"
-	}
-	if err = s.options.Store.RecordActivity(ctx, "debug", kind, "", "", "", map[string]any{"records": records, "duration_ms": time.Since(start).Milliseconds(), "done": result.NextCursor == ""}); err != nil {
-		respondError(w, err)
-		return
-	}
-	if err = s.options.Store.ValidatePublicCatalog(ctx, grant, revision); err != nil {
-		catalogFeedError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if !request.Head {
-		if _, err = w.Write(body); err != nil {
-			return
+		kind := "catalog.public_exported"
+		if trusted {
+			kind = "catalog.trusted_exported"
 		}
-	}
-	_ = controller.Flush()
+		if err = s.options.Store.RecordActivity(ctx, "debug", kind, "", "", "", map[string]any{"records": records, "duration_ms": time.Since(start).Milliseconds(), "done": result.NextCursor == ""}); err != nil {
+			respondError(w, err)
+			return false
+		}
+		if err = s.options.Store.ValidatePublicCatalog(ctx, grant, revision); err != nil {
+			catalogFeedError(w, err)
+			return false
+		}
+		return true
+	})
 }

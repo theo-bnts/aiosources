@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/aiosource"
@@ -56,49 +55,16 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 			action(w, r, visitor)
 		}
 	}
-	mux.HandleFunc("GET /trusted/stremio/{configuration}/manifest.json", protect(true, func(w http.ResponseWriter, r *http.Request, v *aiosource.PublicInstallation) {
-		s.options.AIOSource.RecordAddonRequest("private", "manifest", "", "", time.Now(), nil)
-		writeJSON(w, 200, aiosource.InstallationManifest(v.Preferences))
-	}))
-	mux.HandleFunc("GET /trusted/stremio/{configuration}/configure", protect(true, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) {
-		http.Redirect(w, r, "/trusted", http.StatusSeeOther)
-	}))
-	mux.HandleFunc("GET /trusted/stremio/{configuration}/stream/{type}/{id}", protect(false, func(w http.ResponseWriter, r *http.Request, v *aiosource.PublicInstallation) {
-		id := r.PathValue("id")
-		if !strings.HasSuffix(id, ".json") || len(id) > 160 {
+	s.registerVisitorStremioRoutes(
+		mux,
+		"/trusted/stremio",
+		"private",
+		"/trusted",
+		s.connectionOrigin,
+		func(w http.ResponseWriter, _ *http.Request) {
 			respondError(w, model.ErrInvalid)
-			return
-		}
-		streams, err := s.options.AIOSource.PublicStreams(r.Context(), s.connectionOrigin(), r.PathValue("configuration"), r.PathValue("type"), strings.TrimSuffix(id, ".json"), v)
-		if err != nil {
-			respondError(w, err)
-			return
-		}
-		if err = s.options.AIOSource.CheckPublicStremio(r.Context(), v); err != nil {
-			respondError(w, err)
-			return
-		}
-		writeJSON(w, 200, map[string]any{"streams": streams})
-	}))
-	mux.HandleFunc("GET /trusted/stremio/{configuration}/play/{service}/{source}/{type}/{id}", protect(false, func(w http.ResponseWriter, r *http.Request, v *aiosource.PublicInstallation) {
-		link, err := s.options.AIOSource.TracePlayback(r.Context(), "private", r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), func(ctx context.Context) (string, error) {
-			return s.options.AIOSource.PublicPlaybackSource(ctx, r.PathValue("source"), r.PathValue("service"), r.PathValue("type"), r.PathValue("id"), v)
-		})
-		if errors.Is(err, aiosource.ErrPending) {
-			w.Header().Set("Retry-After", "10")
-			writeError(w, 425, "Playback is being prepared. Try again shortly.")
-			return
-		}
-		if err != nil {
-			respondError(w, err)
-			return
-		}
-		if err = s.options.AIOSource.CheckPublicStremio(r.Context(), v); err != nil {
-			respondError(w, err)
-			return
-		}
-		http.Redirect(w, r, link, http.StatusTemporaryRedirect)
-	}))
-	mux.HandleFunc("OPTIONS /trusted/stremio/{rest...}", stremioOptions)
-	mux.HandleFunc("/trusted/stremio/", stremioNotFound)
+		},
+		respondError,
+		protect,
+	)
 }

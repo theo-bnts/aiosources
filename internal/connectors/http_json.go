@@ -88,7 +88,7 @@ func (c *httpJSONConnector) continuationURL(base *url.URL, value string) (*url.U
 		return nil, err
 	}
 	for name := range target.Query() {
-		if sensitiveName(name) || model.CredentialParameter(name) {
+		if sensitiveName(name) {
 			return nil, errors.New("next URL contains credential parameters")
 		}
 	}

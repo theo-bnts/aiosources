@@ -196,12 +196,8 @@ func (s *Service) bookGET(ctx context.Context, h *operationHistory, path, step s
 		if err == nil || !errors.Is(err, errBookRequest) || (status != 0 && status < 500) || attempt+1 >= policy["request_attempts"] {
 			return body, status, location, err
 		}
-		timer := time.NewTimer(time.Duration(policy["request_retry_seconds"]*(1<<attempt)) * time.Second)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, status, "", ctx.Err()
-		case <-timer.C:
+		if err := sleepContext(ctx, time.Duration(policy["request_retry_seconds"]*(1<<attempt))*time.Second); err != nil {
+			return nil, status, "", err
 		}
 	}
 }

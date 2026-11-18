@@ -4,8 +4,9 @@ import { importNumberFields as numberFields } from '@/lib/import-settings-defini
 import { Switch } from '@/components/ui/switch'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, ApiError } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { api, ApiError, commitRevisionQueryData, isRevisionConflict, queryClient } from '@/lib/api'
+import { isWholeNumberString } from '@/lib/format'
 import type { CollectionOverview, CollectionSettings } from '@/lib/collection-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -66,7 +67,6 @@ function blockSettings(scope: Scope, draft: Draft): CollectionSettings {
 }
 
 export function ImportSettingsPanel({ active }: { active: boolean }) {
-  const client = useQueryClient()
   const queryKey = ['collection-settings']
   const overview = useQuery({
     queryKey,
@@ -83,13 +83,13 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
         method: 'PUT',
         body: JSON.stringify(value),
       }),
-    onMutate: () => client.cancelQueries({ queryKey }),
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
     onSuccess: async (result, submitted) => {
-      await client.cancelQueries({ queryKey })
-      const current = client.getQueryData<CollectionOverview>(queryKey)
-      const latest =
-        current && current.settings.revision > result.settings.revision ? current : result
-      client.setQueryData(queryKey, latest)
+      const latest = await commitRevisionQueryData(
+        queryKey,
+        result,
+        (value) => value.settings.revision,
+      )
       setDrafts((previous) => {
         const next = { ...previous }
         delete next[submitted.scope]
@@ -101,12 +101,12 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
         return next
       })
       setFeedback((current) => ({ ...current, [submitted.scope]: { saved: true } }))
-      void client.invalidateQueries({ queryKey })
+      void queryClient.invalidateQueries({ queryKey })
     },
     onError: (error, submitted) => {
       setFeedback((current) => ({ ...current, [submitted.scope]: { error } }))
       if (error instanceof ApiError && error.status === 409)
-        void client.invalidateQueries({ queryKey })
+        void queryClient.invalidateQueries({ queryKey })
     },
   })
   const data = overview.data
@@ -146,20 +146,14 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
           const error = feedback[scope]?.error
           const rejected = error instanceof ApiError && error.status === 409
           const conflict = Boolean(
-            draft && (rejected || data.settings.revision !== draft.base.revision),
+            draft && isRevisionConflict(draft.base.revision, data.settings.revision, error),
           )
           const latestAvailable = Boolean(draft && data.settings.revision > draft.base.revision)
           const errors: Partial<Record<NumberField, string>> = {}
           for (const key of numberKeys) {
             if (!(group.keys as readonly string[]).includes(key)) continue
             const field = numberFields[key]
-            const value = Number(values[key])
-            if (
-              !/^\d+$/.test(values[key]) ||
-              !Number.isSafeInteger(value) ||
-              value < field.min ||
-              value > field.max
-            )
+            if (!isWholeNumberString(values[key], field.min, field.max))
               errors[key] = `Enter a whole number from ${field.min} to ${field.max}.`
           }
           const invalid = Object.keys(errors).length > 0

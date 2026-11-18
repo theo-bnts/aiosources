@@ -53,12 +53,8 @@ func (l *metadataRequestLimiter) wait(ctx context.Context) error {
 			return nil
 		}
 		l.mu.Unlock()
-		timer := time.NewTimer(time.Until(due))
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		if err := sleepContext(ctx, time.Until(due)); err != nil {
+			return err
 		}
 	}
 }

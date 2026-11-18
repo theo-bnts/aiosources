@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { useVisitorConfig } from './public-connection-fields'
+import { resolveVisitorSection, useVisitorConfig } from './public-connection-fields'
 import { PublicSharedCatalogEntry } from './public-shared-catalog-entry'
 import { PublicStremioEntry } from './public-entry'
 import { PublicTorznabEntry } from './public-torznab-entry'
@@ -22,35 +22,12 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
       </div>
     )
   const access = info.data
-  const target = access.stremio_enabled
-    ? '/trusted'
-    : access.search_enabled
-      ? '/trusted/search'
-      : access.torznab_enabled
-        ? '/trusted/torznab'
-        : access.catalog_enabled
-          ? '/trusted/sharing'
-          : ''
-  const path = location.pathname
-  const isSearch = path === '/trusted/search' || path.startsWith('/trusted/search/')
-  const validPath =
-    path === '/trusted' || path === '/trusted/torznab' || path === '/trusted/sharing' || isSearch
-  const section = isSearch
-    ? 'search'
-    : path === '/trusted/torznab'
-      ? 'torznab'
-      : path === '/trusted/sharing'
-        ? 'catalog'
-        : 'stremio'
-  const available =
-    section === 'search'
-      ? access.search_enabled
-      : section === 'stremio'
-        ? access.stremio_enabled
-        : section === 'torznab'
-          ? access.torznab_enabled
-          : access.catalog_enabled
-  if (!target)
+  const { section, available, validPath, fallbackTarget } = resolveVisitorSection(
+    access,
+    location.pathname,
+    '/trusted',
+  )
+  if (!fallbackTarget)
     return layout(
       <div className="page">
         <Empty
@@ -59,7 +36,7 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
         />
       </div>,
     )
-  if (!validPath || !available) return <Navigate to={target} replace />
+  if (!validPath || !available) return <Navigate to={fallbackTarget} replace />
   if (section === 'search') return layout(<PublicSearchEntry info={access} />)
   if (section === 'catalog')
     return layout(<PublicSharedCatalogEntry key={access.catalog_revision} trusted info={access} />)

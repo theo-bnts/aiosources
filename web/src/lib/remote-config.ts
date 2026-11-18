@@ -1,4 +1,5 @@
 import type { ProviderDocument } from './types'
+import { isWholeNumberString } from './format'
 import { parseProviderJSON } from './provider-json'
 import { isJSONAdapter } from './source-adapters'
 import { catalogEntityKeys, type CatalogEntities } from './catalog-types'
@@ -60,11 +61,7 @@ export function remoteJSON(
   secretRef: string,
 ) {
   validateRemoteURL(draft.url.trim())
-  if (
-    !/^[0-9]+$/.test(draft.intervalMinutes) ||
-    Number(draft.intervalMinutes) < 1 ||
-    Number(draft.intervalMinutes) > 525600
-  )
+  if (!isWholeNumberString(draft.intervalMinutes, 1, 525600))
     throw new Error('Enter a synchronization interval between 1 and 525600 whole minutes.')
   const json = parseProviderJSON(
     document?.json ??

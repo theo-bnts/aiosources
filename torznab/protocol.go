@@ -50,6 +50,8 @@ type xmlTokens struct {
 	declared bool
 }
 
+const maxXMLDepth = 128
+
 func (r *xmlTokens) Token() (xml.Token, error) {
 	token, err := r.decoder.Token()
 	if err != nil {
@@ -70,7 +72,7 @@ func (r *xmlTokens) Token() (xml.Token, error) {
 				}
 			}
 		}
-		if r.depth >= 128 {
+		if r.depth >= maxXMLDepth {
 			return nil, errProtocol
 		}
 		r.depth++

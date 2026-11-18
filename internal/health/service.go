@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
@@ -97,6 +98,11 @@ func (s *Service) measure(ctx context.Context) {
 		report = &model.SystemHealth{Database: model.HealthDatabase{Categories: []model.HealthStorageCategory{}}}
 		if previous != nil {
 			*report = *previous
+			report.Database.Categories = slices.Clone(previous.Database.Categories)
+			if report.Database.Categories == nil {
+				report.Database.Categories = []model.HealthStorageCategory{}
+			}
+			report.SourceStorage = slices.Clone(previous.SourceStorage)
 		}
 		report.CheckedAt = time.Now().UTC()
 		report.NextCheckAt = report.CheckedAt.Add(time.Minute)

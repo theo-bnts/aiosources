@@ -110,7 +110,7 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 	order = append(order, "t.provider_id", "t.source_id")
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		return result, err
+		return result, databaseError("begin direct torrent search", err)
 	}
 	defer rollback(tx)
 	// Bound display evidence independently of source-specific retained extras.
@@ -118,17 +118,17 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 	columns := `t.provider_id,t.source_id,(SELECT COALESCE(jsonb_object_agg(key,value),'{}'::jsonb) FROM jsonb_each(t.fields) WHERE key=ANY(` + bind(model.CompactTorrentFields()) + `::text[]) AND pg_column_size(value)<=16384),t.fields_fingerprint,t.occurrence_id`
 	limit, offset := bind(opts.Limit), bind(opts.Offset)
 	orderClause := strings.Join(order, ",")
-	pageSQL := `SELECT page.total,` + columns + ` FROM (SELECT count(*) OVER() AS total,t.provider_id,t.source_id` + filter + ` ORDER BY ` + orderClause + ` LIMIT ` + limit + ` OFFSET ` + offset + `) page JOIN aiosources.torrents AS t USING(provider_id,source_id) ORDER BY ` + orderClause
+	pageSQL := `SELECT ` + columns + `,page.total FROM (SELECT count(*) OVER() AS total,t.provider_id,t.source_id` + filter + ` ORDER BY ` + orderClause + ` LIMIT ` + limit + ` OFFSET ` + offset + `) page JOIN aiosources.torrents AS t USING(provider_id,source_id) ORDER BY ` + orderClause
 	rows, err := tx.Query(ctx, pageSQL, args...)
 	if err != nil {
 		return result, databaseError("search direct torrents", err)
 	}
 	for rows.Next() {
 		var occurrence string
-		record, e := scanAIORecord(aioStreamRow{scanner: countedCatalogRow{row: rows, total: &result.Total}, ids: []any{&occurrence}})
+		record, e := scanAIORecord(rows, &occurrence, &result.Total)
 		if e != nil {
 			rows.Close()
-			return result, e
+			return result, databaseError("read direct torrent", e)
 		}
 		result.Items = append(result.Items, CatalogRecord{AIORecord: record, OccurrenceID: occurrence})
 	}
@@ -150,14 +150,14 @@ func (s *Store) CatalogTorrent(ctx context.Context, occurrence string) (CatalogR
 	if !ValidOccurrenceID(occurrence) {
 		return result, model.ErrNotFound
 	}
-	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.occurrence_id=$1`, occurrence), ids: []any{&result.OccurrenceID}})
+	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.occurrence_id=$1`, occurrence), &result.OccurrenceID)
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }
 
 func (s *Store) CatalogSourceTorrent(ctx context.Context, provider, source string) (CatalogRecord, error) {
 	var result CatalogRecord
-	r, err := scanAIORecord(aioStreamRow{scanner: s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), ids: []any{&result.OccurrenceID}})
+	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id FROM aiosources.torrents t WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), &result.OccurrenceID)
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }

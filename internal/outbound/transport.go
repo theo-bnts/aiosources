@@ -122,10 +122,12 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 		identity = fmt.Sprintf("%s\x00%s\x00%s\x00%s", route, profile.URL, username, password)
 	}
 	key := sha256.Sum256([]byte(identity))
+	var stale []*http.Transport
 	t.mu.Lock()
 	if t.revision != settings.Revision || len(t.transports) > 32 {
+		stale = make([]*http.Transport, 0, len(t.transports))
 		for _, transport := range t.transports {
-			transport.CloseIdleConnections()
+			stale = append(stale, transport)
 		}
 		clear(t.transports)
 		t.revision = settings.Revision
@@ -139,6 +141,9 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 		t.transports[key] = transport
 	}
 	t.mu.Unlock()
+	for _, old := range stale {
+		old.CloseIdleConnections()
+	}
 	if selected != nil {
 		request = request.Clone(context.WithValue(ctx, dialKey{}, selected))
 	}

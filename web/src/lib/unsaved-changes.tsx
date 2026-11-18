@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useBlocker } from 'react-router-dom'
+import { useSessionExpired } from '@/components/public-connection-fields'
 import { changesSettingsEditor, type SettingsEditorIdentity } from './settings-editor'
 import {
   AlertDialog,
@@ -85,10 +86,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     setClosing(null)
     if (blocker.state === 'blocked') blocker.reset()
   }, [blocker])
-  useEffect(() => {
-    window.addEventListener('session-expired', cancel)
-    return () => window.removeEventListener('session-expired', cancel)
-  }, [cancel])
+  useSessionExpired(cancel)
   useEffect(() => {
     if (!entries.current.size) return
     const beforeUnload = (event: BeforeUnloadEvent) => {

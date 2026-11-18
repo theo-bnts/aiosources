@@ -230,24 +230,48 @@ func (a *authentication) checkPassword(r *http.Request, password string) bool {
 	if len(password) > 72 || len(password) < 12 {
 		return false
 	}
-	select {
-	case a.passwordChecks <- struct{}{}:
-		defer func() { <-a.passwordChecks }()
-	case <-r.Context().Done():
+	var valid bool
+	if !a.runPasswordWork(r.Context(), false, func() {
+		valid = bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)) == nil
+	}) {
 		return false
 	}
-	return bcrypt.CompareHashAndPassword(a.passwordHash, []byte(password)) == nil
+	return valid
 }
 
 func (a *authentication) admitPasswordRequest(w http.ResponseWriter) bool {
+	_, ok := a.admitPasswordRequestFor(w, false)
+	return ok
+}
+
+func (a *authentication) admitPasswordRequestFor(w http.ResponseWriter, trusted bool) (func(), bool) {
+	queue := a.passwordRequests
+	if trusted && a.trustedPasswordRequests != nil {
+		queue = a.trustedPasswordRequests
+	}
 	select {
-	case a.passwordRequests <- struct{}{}:
-		return true
+	case queue <- struct{}{}:
+		return func() { <-queue }, true
 	default:
 		w.Header().Set("Retry-After", "1")
 		writeError(w, http.StatusTooManyRequests, "Authentication is temporarily busy. Try again shortly.")
+		return nil, false
+	}
+}
+
+func (a *authentication) runPasswordWork(ctx context.Context, trusted bool, work func()) bool {
+	checks := a.passwordChecks
+	if trusted && a.trustedPasswordChecks != nil {
+		checks = a.trustedPasswordChecks
+	}
+	select {
+	case checks <- struct{}{}:
+		defer func() { <-checks }()
+	case <-ctx.Done():
 		return false
 	}
+	work()
+	return true
 }
 
 func (a *authentication) loginHandler(w http.ResponseWriter, r *http.Request) {

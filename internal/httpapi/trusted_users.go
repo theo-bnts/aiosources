@@ -53,18 +53,17 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 		}
 		hash := ""
 		if input.Password != "" {
-			if !s.auth.admitPasswordRequest(w) {
+			release, ok := s.auth.admitPasswordRequestFor(w, false)
+			if !ok {
 				return
 			}
-			defer func() { <-s.auth.passwordRequests }()
-			select {
-			case s.auth.passwordChecks <- struct{}{}:
-			case <-r.Context().Done():
-				return
-			}
+			defer release()
 			var err error
-			hash, err = hashTrustedPassword(input.Password)
-			<-s.auth.passwordChecks
+			if !s.auth.runPasswordWork(r.Context(), false, func() {
+				hash, err = hashTrustedPassword(input.Password)
+			}) {
+				return
+			}
 			input.Password = ""
 			if err != nil {
 				writeError(w, 422, "Use a password with at least 12 characters and at most 1024 bytes")
@@ -89,13 +88,11 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/trusted-users", save)
 	mux.HandleFunc("PUT /api/trusted-users/{id}", save)
 	mux.HandleFunc("DELETE /api/trusted-users/{id}", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
-		var input struct {
-			Revision int64 `json:"revision"`
-		}
-		if !decodeJSON(w, r, &input) {
+		revision, ok := decodeRevision(w, r)
+		if !ok {
 			return
 		}
-		if err := s.options.Store.DeleteTrustedUser(r.Context(), r.PathValue("id"), input.Revision); err != nil {
+		if err := s.options.Store.DeleteTrustedUser(r.Context(), r.PathValue("id"), revision); err != nil {
 			respondError(w, err)
 			return
 		}
@@ -169,12 +166,7 @@ func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
-	providers := []aiosource.PublicProvider{}
-	for _, p := range aiosource.PublicProviders {
-		if !user.UseInstanceDebrid || config.DebridSecret(p.ID) != "" {
-			providers = append(providers, p)
-		}
-	}
+	providers := availablePublicProviders(config, !user.UseInstanceDebrid)
 	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog")}
 	sources, e := s.options.AIOSource.TrustedSources(r.Context(), trustedGrant(r))
 	if e != nil {
@@ -318,15 +310,6 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 			}
 			return
 		}
-		if err != nil && !errors.Is(err, aiosource.ErrPending) {
-			respondError(w, err)
-			return
-		}
-		status := 200
-		if errors.Is(err, aiosource.ErrPending) {
-			status = 202
-			w.Header().Set("Retry-After", "15")
-		}
-		writeJSON(w, status, result)
+		writeVisitorCatalogResult(w, result, err)
 	})
 }

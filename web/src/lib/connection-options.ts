@@ -23,3 +23,17 @@ export const reviewMediaTypes = [
   { value: 'game', label: 'Games', group: 'Games' },
   { value: 'book', label: 'Books', group: 'Books' },
 ]
+
+export function parseHttpEndpoint(value: string, base = window.location.origin): URL | null {
+  if (!value) return null
+  try {
+    const parsed = new URL(value, base)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function buildStremioInstallURL(manifest: string): string {
+  return /^https?:\/\//.test(manifest) ? `stremio://${manifest.replace(/^https?:\/\//, '')}` : ''
+}

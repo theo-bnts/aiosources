@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { queryClient } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
 import {
   useSettingDestination,
@@ -46,7 +46,6 @@ function findControl(root: HTMLElement, label: string) {
 export function SettingsDestination() {
   const location = useLocation()
   const setting = useSettingDestination()
-  const client = useQueryClient()
   const notify = useNotification()
   useEffect(() => {
     if (!setting || setting.public === 'interface') return
@@ -92,7 +91,7 @@ export function SettingsDestination() {
         !control &&
         setting.fallback &&
         root.querySelector('[data-settings-editor="source"]') &&
-        !client.isFetching()
+        !queryClient.isFetching()
       ) {
         const sections = [...root.querySelectorAll<HTMLElement>('[data-settings-section]')]
         const section =
@@ -172,7 +171,7 @@ export function SettingsDestination() {
         const fallback = root?.querySelector<HTMLElement>('[role="tabpanel"]')
         if (fallback) clearHighlight = highlightSetting(fallback)
         notify({
-          message: client.isFetching()
+          message: queryClient.isFetching()
             ? 'This setting is still loading. Try the search again when the page is ready.'
             : 'This setting is not available in the current configuration. Review the selected source or connection.',
           warning: true,
@@ -186,6 +185,6 @@ export function SettingsDestination() {
       window.clearTimeout(timeout)
       clearHighlight?.()
     }
-  }, [setting, location.key, location.search, client, notify])
+  }, [setting, location.key, location.search, notify])
   return null
 }

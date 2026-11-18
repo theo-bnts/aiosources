@@ -1,8 +1,9 @@
 import { ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { runtimeSections, type RuntimeSection } from '@/lib/runtime-settings-definitions'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, ApiError } from '@/lib/api'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { api, commitRevisionQueryData, isRevisionConflict, queryClient } from '@/lib/api'
+import { isWholeNumberString } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { ErrorNotice, Loading } from '@/components/common'
 import { FormStatus } from '@/components/form-status'
@@ -24,7 +25,6 @@ export function RuntimeSettingsPanel({
   const definition = runtimeSections[section]
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
-  const client = useQueryClient()
   const queryKey = ['runtime-settings', section]
   const path = `/settings/runtime/${section}`
   const query = useQuery({
@@ -35,16 +35,13 @@ export function RuntimeSettingsPanel({
   const save = useMutation({
     mutationFn: (value: Settings) =>
       api<Settings>(path, { method: 'PUT', body: JSON.stringify(value) }),
-    onMutate: () => client.cancelQueries({ queryKey }),
+    onMutate: () => queryClient.cancelQueries({ queryKey }),
     onSuccess: async (result) => {
-      await client.cancelQueries({ queryKey })
-      client.setQueryData<Settings>(queryKey, (current) =>
-        current && current.revision > result.revision ? current : result,
-      )
+      await commitRevisionQueryData(queryKey, result)
       setDraft(null)
-      void client.invalidateQueries({ queryKey })
+      void queryClient.invalidateQueries({ queryKey })
     },
-    onError: () => void client.invalidateQueries({ queryKey }),
+    onError: () => void queryClient.invalidateQueries({ queryKey }),
   })
   const values =
     draft?.values ??
@@ -54,10 +51,9 @@ export function RuntimeSettingsPanel({
   const dirty =
     draft !== null &&
     Object.entries(draft.values).some(([key, value]) => value !== String(draft.base.values[key]))
-  const conflict =
-    draft !== null &&
-    (draft.base.revision !== query.data?.revision ||
-      (save.error instanceof ApiError && save.error.status === 409))
+  const conflict = Boolean(
+    draft !== null && isRevisionConflict(draft.base.revision, query.data?.revision, save.error),
+  )
   const relationshipIssue =
     section === 'source_retries' && Number(values.initial_seconds) > Number(values.maximum_seconds)
       ? 'The maximum retry delay must cover the initial delay.'
@@ -83,13 +79,7 @@ export function RuntimeSettingsPanel({
                 : undefined
   const invalid =
     Boolean(relationshipIssue) ||
-    definition.fields.some(
-      ([key, , min, max]) =>
-        !/^\d+$/.test(values[key] ?? '') ||
-        !Number.isSafeInteger(Number(values[key])) ||
-        Number(values[key]) < min ||
-        Number(values[key]) > max,
-    )
+    definition.fields.some(([key, , min, max]) => !isWholeNumberString(values[key], min, max))
   useUnsavedChanges(dirty, definition.title.toLowerCase(), save.isPending)
   return (
     <Disclosure
@@ -130,11 +120,7 @@ export function RuntimeSettingsPanel({
               <div className="grid items-start gap-5 md:grid-cols-2">
                 {definition.fields.map(([key, label, min, max]) => {
                   const id = `runtime-${section}-${key}`
-                  const fieldInvalid =
-                    !/^\d+$/.test(values[key] ?? '') ||
-                    !Number.isSafeInteger(Number(values[key])) ||
-                    Number(values[key]) < min ||
-                    Number(values[key]) > max
+                  const fieldInvalid = !isWholeNumberString(values[key], min, max)
                   return (
                     <div className="min-w-0 space-y-2" key={key}>
                       <Label htmlFor={id} help={`Range: ${min}–${max}.`}>

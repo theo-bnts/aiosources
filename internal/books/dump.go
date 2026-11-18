@@ -126,9 +126,6 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 	// Keep the valid bibliographic core and ignore malformed optional values.
 	text := func(key string) string { var out string; _ = json.Unmarshal(fields[key], &out); return out }
 	stringsFor := func(key string) []string { return decodeJSONStrings(fields[key]) }
-	references := func(key string) []reference { return decodeJSONReferences(fields[key]) }
-	var authorsRaw []json.RawMessage
-	_ = json.Unmarshal(fields["authors"], &authorsRaw)
 	var covers []json.RawMessage
 	_ = json.Unmarshal(fields["covers"], &covers)
 	if typ == "/type/delete" {
@@ -151,26 +148,7 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 		}
 		return s
 	}
-	authors := []string{}
-	for _, v := range authorsRaw {
-		var a struct {
-			Key    string    `json:"key"`
-			Author reference `json:"author"`
-		}
-		if json.Unmarshal(v, &a) != nil {
-			continue
-		}
-		k := Key(a.Key)
-		if k == "" {
-			k = Key(a.Author.Key)
-		}
-		if k != "" && strings.HasSuffix(k, "A") && !slices.Contains(authors, k) {
-			authors = append(authors, k)
-		}
-		if len(authors) == 100 {
-			break
-		}
-	}
+	authors := decodeAuthorKeys(fields["authors"])
 	cover := int64(0)
 	for _, c := range covers {
 		var number int64
@@ -205,35 +183,84 @@ func decodeRecord(typ, key string, body []byte) (Record, error) {
 		if !strings.HasSuffix(id, "M") || title == "" {
 			return Record{Skipped: true}, nil
 		}
-		e := Edition{ID: id, Title: title, Normalized: Normalize(title), Authors: authors, Cover: cover, Works: []string{}, ISBN: []string{}, Languages: []string{}}
-		for _, w := range references("works") {
-			if k := Key(w.Key); strings.HasSuffix(k, "W") && !slices.Contains(e.Works, k) {
-				e.Works = append(e.Works, k)
-			}
-			if len(e.Works) == 20 {
-				break
-			}
+		e := Edition{
+			ID:         id,
+			Title:      title,
+			Normalized: Normalize(title),
+			Authors:    authors,
+			Cover:      cover,
+			Works:      decodeEditionWorks(fields["works"], id),
+			ISBN:       decodeEditionISBNs(fields["isbn_10"], fields["isbn_13"]),
+			Languages:  decodeEditionLanguages(fields["languages"]),
+			Year:       publicationYear(text("publish_date")),
+			Format:     clean(text("physical_format")),
 		}
-		for _, v := range append(stringsFor("isbn_10"), stringsFor("isbn_13")...) {
-			if isbn := ISBN(v); isbn != "" && !slices.Contains(e.ISBN, isbn) && len(e.ISBN) < 50 {
-				e.ISBN = append(e.ISBN, isbn)
-			}
-		}
-		for _, l := range references("languages") {
-			lang := editionLanguage(l.Key)
-			if lang != "" && !slices.Contains(e.Languages, lang) && len(e.Languages) < 30 {
-				e.Languages = append(e.Languages, lang)
-			}
-		}
-		e.Year = publicationYear(text("publish_date"))
-		e.Format = clean(text("physical_format"))
 		e.Digital = digitalEvidence(e.Format, text("ocaid"), stringsFor("source_records"))
-		if len(e.Works) == 0 {
-			e.Works = []string{id}
-		}
 		return Record{Edition: &e}, nil
 	}
 	return Record{}, nil
+}
+
+func decodeAuthorKeys(raw json.RawMessage) []string {
+	var rows []json.RawMessage
+	_ = json.Unmarshal(raw, &rows)
+	authors := []string{}
+	for _, v := range rows {
+		var a struct {
+			Key    string    `json:"key"`
+			Author reference `json:"author"`
+		}
+		if json.Unmarshal(v, &a) != nil {
+			continue
+		}
+		k := Key(a.Key)
+		if k == "" {
+			k = Key(a.Author.Key)
+		}
+		if k != "" && strings.HasSuffix(k, "A") && !slices.Contains(authors, k) {
+			authors = append(authors, k)
+		}
+		if len(authors) == 100 {
+			break
+		}
+	}
+	return authors
+}
+
+func decodeEditionWorks(raw json.RawMessage, editionID string) []string {
+	works := []string{}
+	for _, ref := range decodeJSONReferences(raw) {
+		if key := Key(ref.Key); strings.HasSuffix(key, "W") && !slices.Contains(works, key) {
+			works = append(works, key)
+			if len(works) == 20 {
+				break
+			}
+		}
+	}
+	if len(works) == 0 {
+		works = []string{editionID}
+	}
+	return works
+}
+
+func decodeEditionISBNs(isbn10, isbn13 json.RawMessage) []string {
+	out := []string{}
+	for _, v := range append(decodeJSONStrings(isbn10), decodeJSONStrings(isbn13)...) {
+		if isbn := ISBN(v); isbn != "" && !slices.Contains(out, isbn) && len(out) < 50 {
+			out = append(out, isbn)
+		}
+	}
+	return out
+}
+
+func decodeEditionLanguages(raw json.RawMessage) []string {
+	out := []string{}
+	for _, ref := range decodeJSONReferences(raw) {
+		if value := editionLanguage(ref.Key); value != "" && !slices.Contains(out, value) && len(out) < 30 {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func decodeJSONStrings(raw json.RawMessage) []string {
