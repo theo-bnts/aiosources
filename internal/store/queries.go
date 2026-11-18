@@ -188,7 +188,8 @@ func (s *Store) ListTorrents(ctx context.Context, opts model.ListOptions) (model
 		limitParameter := "$" + strconv.Itoa(len(args)+1)
 		offsetParameter := "$" + strconv.Itoa(len(args)+2)
 		pageArgs := append(append([]any{}, args...), opts.Limit, opts.Offset)
-		rows, err := tx.Query(ctx, "SELECT count(*) OVER(),"+torrentColumns+filter+order+" LIMIT "+limitParameter+" OFFSET "+offsetParameter, pageArgs...)
+		pageSQL := "SELECT page.total," + torrentColumns + " FROM (SELECT count(*) OVER() AS total,provider_id,source_id" + filter + order + " LIMIT " + limitParameter + " OFFSET " + offsetParameter + ") page JOIN aiosources.torrents USING(provider_id,source_id)" + order
+		rows, err := tx.Query(ctx, pageSQL, pageArgs...)
 		if err != nil {
 			return result, databaseError("list torrents", err)
 		}

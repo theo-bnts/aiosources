@@ -117,7 +117,9 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 	// The original fingerprint still guards the complete current source record.
 	columns := `t.provider_id,t.source_id,(SELECT COALESCE(jsonb_object_agg(key,value),'{}'::jsonb) FROM jsonb_each(t.fields) WHERE key=ANY(` + bind(model.CompactTorrentFields()) + `::text[]) AND pg_column_size(value)<=16384),t.fields_fingerprint,t.occurrence_id`
 	limit, offset := bind(opts.Limit), bind(opts.Offset)
-	rows, err := tx.Query(ctx, `SELECT count(*) OVER(),`+columns+filter+` ORDER BY `+strings.Join(order, ",")+` LIMIT `+limit+` OFFSET `+offset, args...)
+	orderClause := strings.Join(order, ",")
+	pageSQL := `SELECT page.total,` + columns + ` FROM (SELECT count(*) OVER() AS total,t.provider_id,t.source_id` + filter + ` ORDER BY ` + orderClause + ` LIMIT ` + limit + ` OFFSET ` + offset + `) page JOIN aiosources.torrents AS t USING(provider_id,source_id) ORDER BY ` + orderClause
+	rows, err := tx.Query(ctx, pageSQL, args...)
 	if err != nil {
 		return result, databaseError("search direct torrents", err)
 	}

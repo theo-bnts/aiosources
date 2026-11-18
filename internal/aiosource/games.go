@@ -49,6 +49,11 @@ type igdbGame struct {
 	} `json:"game_localizations"`
 }
 
+var igdbRegionLanguages = map[string]string{
+	"france": "fr", "germany": "de", "italy": "it", "spain": "es", "japan": "ja",
+	"china": "zh", "korea": "ko", "brazil": "pt", "united_kingdom": "en", "north_america": "en",
+}
+
 const igdbFields = "id,name,updated_at,first_release_date,parent_game,version_parent,version_title,alternative_names.name,cover.image_id,platforms.id,platforms.name,platforms.slug,platforms.abbreviation,game_type.type,game_localizations.name,game_localizations.region.identifier,game_localizations.cover.image_id"
 
 func decodeGame(d igdbGame) (model.AIOWork, error) {
@@ -97,7 +102,7 @@ func decodeGame(d igdbGame) (model.AIOWork, error) {
 		add(local.Name)
 		// IGDB regions identify a market, not necessarily a language. Only
 		// unambiguous language regions may override a browser's title/cover.
-		lang := map[string]string{"france": "fr", "germany": "de", "italy": "it", "spain": "es", "japan": "ja", "china": "zh", "korea": "ko", "brazil": "pt", "united_kingdom": "en", "north_america": "en"}[strings.ToLower(local.Region.Identifier)]
+		lang := igdbRegionLanguages[strings.ToLower(local.Region.Identifier)]
 		if lang != "" {
 			if Normalize(local.Name) != "" {
 				w.LocalizedTitles[lang] = local.Name

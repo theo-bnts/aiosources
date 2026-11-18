@@ -88,6 +88,15 @@ func ParseID(id, mediaType string) (Resource, error) {
 	}
 	return r, err
 }
+func nfcString(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return norm.NFC.String(s)
+		}
+	}
+	return s
+}
+
 func Normalize(s string) string { return model.NormalizeTitle(s) }
 
 type Release struct {
@@ -291,7 +300,7 @@ func ParseRelease(raw string) Release {
 		cut = min(cut, at[0])
 	}
 	title := strings.Trim(s[:cut], " []()-")
-	p.Title = norm.NFC.String(title)
+	p.Title = nfcString(title)
 	p.Normalized = Normalize(title)
 	return p
 }

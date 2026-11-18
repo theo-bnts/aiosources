@@ -112,6 +112,10 @@ func projectCatalogFields(raw []byte, allowed []string) (map[string]any, error) 
 	if err := decoder.Decode(&source); err != nil {
 		return nil, errors.New("could not decode published catalogue fields")
 	}
+	return projectCatalogFieldsFromMap(source, allowed), nil
+}
+
+func projectCatalogFieldsFromMap(source map[string]any, allowed []string) map[string]any {
 	result := make(map[string]any, len(allowed))
 	for _, name := range allowed {
 		if !catalogField(name) {
@@ -138,7 +142,7 @@ func projectCatalogFields(raw []byte, allowed []string) (map[string]any, error) 
 			}
 		}
 	}
-	return result, nil
+	return result
 }
 
 // Latest local copies are resolved at the immutable high-water mark. Picking a

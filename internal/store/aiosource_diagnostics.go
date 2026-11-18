@@ -51,6 +51,7 @@ CASE WHEN status='matched' THEN COALESCE(imdb_id,'') ELSE '' END,
 CASE WHEN status='pending' THEN NULL ELSE updated_at END FROM diagnostics` + filter + `
 ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(countArgs)+1, len(countArgs)+2)
 	listArgs := append(append([]any{}, countArgs...), opts.Limit, opts.Offset)
+	selectedKeys := `SELECT provider_id,source_id,fields_fingerprint` + sourceFilter
 	if opts.Status == "ambiguous" || opts.Status == "unmatched" {
 		// Count current ambiguous/unmatched decisions without deriving every other status.
 		// Their validity depends on the source fingerprint and queue, not on a
@@ -59,13 +60,21 @@ ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(count
 		current := fmt.Sprintf(` FROM selected t
 JOIN aiosources.aio_matches m USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
-WHERE m.status=$%d AND m.fingerprint=t.fields_fingerprint AND q.provider_id IS NULL`, len(args)+1)
-		prefix := `WITH selected AS (` + selected + `)`
+WHERE m.status=$%d AND COALESCE(m.fingerprint=t.fields_fingerprint,false) AND q.provider_id IS NULL`, len(args)+1)
+		prefix := `WITH selected AS (` + selectedKeys + `)`
 		countSQL = prefix + ` SELECT count(*)` + current
 		countArgs = append(append([]any{}, args...), opts.Status)
 	}
+	if opts.Status == "matched" {
+		countSQL = `WITH selected AS (` + selectedKeys + `) SELECT count(*) FROM selected t
+JOIN aiosources.aio_matches m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id
+LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
+WHERE m.status='matched' AND m.work_id IS NOT NULL AND q.provider_id IS NULL
+AND CASE WHEN w.id IS NULL OR m.fingerprint IS DISTINCT FROM t.fields_fingerprint OR m.revision IS DISTINCT FROM w.revision THEN false ELSE true END`
+		countArgs = args
+	}
 	if opts.Status == "pending" {
-		selectedKeys := `SELECT provider_id,source_id,fields_fingerprint` + sourceFilter
 		pendingSQL := `WITH selected AS (` + selectedKeys + `), page AS (
 SELECT count(*) OVER() AS total,t.provider_id,t.source_id
 FROM selected t` + aioDiagnosticJoins + `

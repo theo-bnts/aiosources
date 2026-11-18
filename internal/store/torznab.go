@@ -216,20 +216,26 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, f.column+f.op+bind(f.value)+typ)
 		}
 	}
-	baseFrom := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND m.fingerprint=t.fields_fingerprint
-LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)`
-	from := baseFrom + `
+	countSourceJoin := "t.source_id"
+	if filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == "" && q.BookTitle == "" && q.Author == "" && q.ISBN == "" && q.Year == 0 {
+		countSourceJoin = "t.source_id||''"
+	}
+	countFrom := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=` + countSourceJoin + ` AND m.status='matched' AND COALESCE(m.fingerprint=t.fields_fingerprint,false)
+LEFT JOIN aiosources.aio_match_queue q ON q.provider_id=t.provider_id AND q.source_id=t.source_id
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND q.provider_id IS NULL`
+	from := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND COALESCE(m.fingerprint=t.fields_fingerprint,false)
+LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)
 LEFT JOIN aiosources.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(aiosources.aio_review_evidence(t.fields)::text)
 WHERE ` + strings.Join(clauses, " AND ")
 	filtered := q.Season != nil || q.Episode != nil
 	if !filtered {
-		if err = tx.QueryRow(ctx, "SELECT count(*)"+baseFrom+" WHERE "+strings.Join(clauses, " AND "), args...).Scan(&result.Total); err != nil {
+		if err = tx.QueryRow(ctx, "SELECT count(*)"+countFrom+" WHERE "+strings.Join(clauses, " AND "), args...).Scan(&result.Total); err != nil {
 			return result, databaseError("count Torznab results", err)
 		}
 	}
 	// Project only fields understood by the shared record decoder. No arbitrary
 	// JSON, source links, announce URLs, raw identities or secrets cross this boundary.
-	columns := `t.provider_id,''::text,jsonb_build_object('author',(SELECT string_agg(a.name,', ' ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))),'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
+	columns := `t.provider_id,''::text,jsonb_build_object('author',CASE WHEN w.media_type='book' THEN (SELECT string_agg(a.name,', ' ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))) END,'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,

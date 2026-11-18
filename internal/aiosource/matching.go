@@ -9,7 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/theo-bnts/aiosources/internal/model"
-	"golang.org/x/text/unicode/norm"
 )
 
 type Candidate struct {
@@ -46,6 +45,20 @@ type evidence struct {
 
 var numberRE = regexp.MustCompile(`\p{N}+`)
 
+func extractNumbers(s string) string {
+	hasDigitOrNonASCII := false
+	for i := 0; i < len(s); i++ {
+		if (s[i] >= '0' && s[i] <= '9') || s[i] >= utf8.RuneSelf {
+			hasDigitOrNonASCII = true
+			break
+		}
+	}
+	if !hasDigitOrNonASCII {
+		return ""
+	}
+	return strings.Join(numberRE.FindAllString(s, -1), ",")
+}
+
 func canonicalIMDb(s string) string {
 	s = strings.TrimPrefix(strings.ToLower(s), "tt")
 	if s != "" {
@@ -77,8 +90,12 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 		return n != nil && (*n < 0 || (len(values) > 0 && !contains(values, *n)))
 	}
 	sc, ec := conflict(observed.Season, p.Seasons), conflict(observed.Episode, p.Episodes)
-	es := []evidence{}
-	numbers := strings.Join(numberRE.FindAllString(p.Normalized, -1), ",")
+	es := make([]evidence, 0, len(candidates))
+	numbers := extractNumbers(p.Normalized)
+	pNormRunes := utf8.RuneCountInString(p.Normalized)
+	short := utf8.RuneCountInString(strings.ReplaceAll(p.Normalized, " ", "")) < 5
+	pSingleChar := utf8.RuneCountInString(nfcString(strings.TrimSpace(p.Title))) == 1
+	srcIMDb := canonicalIMDb(ids.IMDb)
 	for _, c := range candidates {
 		e := evidence{c: c}
 		compatible := 0.0
@@ -90,11 +107,11 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 			e.titleScore = max(e.titleScore, s)
 			if alias == p.Normalized {
 				e.exact = true
-				if utf8.RuneCountInString(norm.NFC.String(strings.TrimSpace(title))) == 1 && utf8.RuneCountInString(norm.NFC.String(strings.TrimSpace(p.Title))) == 1 {
+				if pSingleChar && utf8.RuneCountInString(nfcString(strings.TrimSpace(title))) == 1 {
 					exactChar = true
 				}
 			}
-			if strings.Join(numberRE.FindAllString(alias, -1), ",") == numbers {
+			if extractNumbers(alias) == numbers {
 				hasCompatible = true
 				compatible = max(compatible, s)
 			}
@@ -103,8 +120,9 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 		if compound {
 			e.exact, e.titleScore, compatible, hasCompatible = true, 1, 1, true
 		}
-		e.id = (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB == c.SourceID) || (ids.IMDb != "" && c.IDs["imdb"] != "" && canonicalIMDb(ids.IMDb) == canonicalIMDb(c.IDs["imdb"])) || (ids.TVDB != "" && ids.TVDB == c.IDs["tvdb"])
-		idConflict := (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB != c.SourceID) || (ids.IMDb != "" && c.IDs["imdb"] != "" && canonicalIMDb(ids.IMDb) != canonicalIMDb(c.IDs["imdb"])) || (ids.TVDB != "" && c.IDs["tvdb"] != "" && ids.TVDB != c.IDs["tvdb"])
+		candIMDb := canonicalIMDb(c.IDs["imdb"])
+		e.id = (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB == c.SourceID) || (ids.IMDb != "" && candIMDb != "" && srcIMDb == candIMDb) || (ids.TVDB != "" && ids.TVDB == c.IDs["tvdb"])
+		idConflict := (ids.TMDB != "" && c.Source == "tmdb" && ids.TMDB != c.SourceID) || (ids.IMDb != "" && candIMDb != "" && srcIMDb != candIMDb) || (ids.TVDB != "" && c.IDs["tvdb"] != "" && ids.TVDB != c.IDs["tvdb"])
 		unverified := (ids.TMDB != "" && c.Source != "tmdb") || (ids.IMDb != "" && c.IDs["imdb"] == "") || (ids.TVDB != "" && c.IDs["tvdb"] == "")
 		if p.Year != nil {
 			e.year = contains(c.Years, *p.Year)
@@ -135,8 +153,7 @@ func ChooseMatchWithPolicy(p Release, candidates []Candidate, ids SourceIDs, ove
 		wrongType := (p.Type != "" && p.Type != c.Type) || ((observed.Season != nil || observed.Episode != nil) && c.Type != "tv")
 		wrongYear := p.Year != nil && !e.year
 		numberConflict := !hasCompatible || (!e.exact && e.titleScore >= .92 && compatible < .92)
-		short := utf8.RuneCountInString(strings.ReplaceAll(p.Normalized, " ", "")) < 5
-		e.eligible = (utf8.RuneCountInString(p.Normalized) >= 2 || (exactChar && e.year && e.id)) && !sc && !ec && !wrongType && !wrongYear && !numberConflict && !idConflict && !unverified && ((e.exact && (e.year || e.id || (!short && p.Type != ""))) || (utf8.RuneCountInString(p.Normalized) >= 10 && compatible >= minimum && e.year && e.id))
+		e.eligible = (pNormRunes >= 2 || (exactChar && e.year && e.id)) && !sc && !ec && !wrongType && !wrongYear && !numberConflict && !idConflict && !unverified && ((e.exact && (e.year || e.id || (!short && p.Type != ""))) || (pNormRunes >= 10 && compatible >= minimum && e.year && e.id))
 		switch {
 		case sc:
 			e.reason = "source season conflict"

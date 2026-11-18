@@ -45,16 +45,13 @@ FROM aiosources.torrents t JOIN unnest($1::text[],$2::text[]) k(provider_id,sour
 		if item.Deleted || item.Origin != currentOrigin {
 			continue
 		}
-		base, err := projectCatalogFields(raw, share.Fields)
-		if err != nil {
-			return err
-		}
-		if model.CatalogFieldsFingerprint(base) != model.CatalogFieldsFingerprint(item.Fields) {
-			continue // The immutable base changed; its next delta carries the facts.
-		}
 		fields, err := decodeCatalogFields(raw)
 		if err != nil {
 			return err
+		}
+		base := projectCatalogFieldsFromMap(fields, share.Fields)
+		if model.CatalogFieldsFingerprint(base) != model.CatalogFieldsFingerprint(item.Fields) {
+			continue // The immutable base changed; its next delta carries the facts.
 		}
 		item.Details = model.ProjectCatalogDetails(fields, permissions)
 	}
@@ -88,14 +85,11 @@ ORDER BY t.catalog_details_tx,t.occurrence_id LIMIT $7`, state.DetailsLow, state
 		if err = json.Unmarshal(origin, &entry.Origin); err != nil {
 			return false, err
 		}
-		base, err := projectCatalogFields(raw, share.Fields)
-		if err != nil {
-			return false, err
-		}
 		fields, err := decodeCatalogFields(raw)
 		if err != nil {
 			return false, err
 		}
+		base := projectCatalogFieldsFromMap(fields, share.Fields)
 		entry.ID, entry.BaseFingerprint, entry.Fields = model.CatalogItemID(entry.Origin), model.CatalogFieldsFingerprint(base), model.ProjectCatalogDetails(fields, state.Entities)
 		if index, exists := indices[entry.ID]; exists {
 			result.Supplement.Torrents[index] = entry
@@ -167,16 +161,16 @@ WHERE provider_id=$1 AND source_id=ANY($2::text[]) ORDER BY source_id FOR UPDATE
 		if err = json.Unmarshal(provenance, &origin); err != nil {
 			return err
 		}
-		base, err := projectCatalogFields(raw, CatalogFields())
-		if err != nil {
-			return err
-		}
-		if origin != entry.Origin || model.CatalogFieldsFingerprint(base) != entry.BaseFingerprint {
+		if origin != entry.Origin {
 			continue
 		}
 		fields, err := decodeCatalogFields(raw)
 		if err != nil {
 			return err
+		}
+		base := projectCatalogFieldsFromMap(fields, CatalogFields())
+		if model.CatalogFieldsFingerprint(base) != entry.BaseFingerprint {
+			continue
 		}
 		data, err := json.Marshal(model.ReplaceCatalogDetails(fields, entry.Fields))
 		if err != nil {

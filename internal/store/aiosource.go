@@ -264,22 +264,39 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 	if seconds, err := strconv.ParseFloat(text("duration"), 64); err == nil && seconds > 0 && !math.IsInf(seconds, 0) && seconds <= float64(1<<53-1)/1000 {
 		r.DurationSeconds = seconds
 	}
-	for kind, dst := range map[string]*string{"imdb": &r.IMDb, "tmdb": &r.TMDB, "tvdb": &r.TVDB, "mal": &r.MAL, "igdb": &r.IGDB} {
-		values := []any{f[kind+"_id"], f[kind]}
-		if kind == "imdb" {
-			values = append(values, f["tt_id"])
+	ext, _ := f["external_ids"].(map[string]any)
+	attrs, _ := f["attributes"].(map[string]any)
+	for _, spec := range [...]struct {
+		kind, idKey, attrKey string
+		dst                  *string
+	}{
+		{"imdb", "imdb_id", "imdbid", &r.IMDb},
+		{"tmdb", "tmdb_id", "tmdbid", &r.TMDB},
+		{"tvdb", "tvdb_id", "tvdbid", &r.TVDB},
+		{"mal", "mal_id", "malid", &r.MAL},
+		{"igdb", "igdb_id", "igdbid", &r.IGDB},
+	} {
+		var values [8]any
+		n := 2
+		values[0], values[1] = f[spec.idKey], f[spec.kind]
+		if spec.kind == "imdb" {
+			values[n] = f["tt_id"]
+			n++
 		}
-		if ext, ok := f["external_ids"].(map[string]any); ok {
-			values = append(values, ext[kind], ext[kind+"_id"])
+		if ext != nil {
+			values[n], values[n+1] = ext[spec.kind], ext[spec.idKey]
+			n += 2
 		}
-		if attrs, ok := f["attributes"].(map[string]any); ok {
-			values = append(values, attrs[kind], attrs[kind+"id"])
-			if kind == "igdb" {
-				values = append(values, attrs["igdb_id"])
+		if attrs != nil {
+			values[n], values[n+1] = attrs[spec.kind], attrs[spec.attrKey]
+			n += 2
+			if spec.kind == "igdb" {
+				values[n] = attrs["igdb_id"]
+				n++
 			}
 		}
 		established := ""
-		for _, value := range values {
+		for _, value := range values[:n] {
 			v := stringValue(value)
 			if v == "invalid conflicting values" {
 				established = v
@@ -288,10 +305,10 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 			if v == "" || v == "0" || v == "null" {
 				continue
 			}
-			if kind == "imdb" {
+			if spec.kind == "imdb" {
 				v = "tt" + strings.TrimPrefix(strings.ToLower(v), "tt")
-			} else if n, err := strconv.ParseUint(v, 10, 53); err == nil {
-				v = strconv.FormatUint(n, 10)
+			} else if num, err := strconv.ParseUint(v, 10, 53); err == nil {
+				v = strconv.FormatUint(num, 10)
 			}
 			if established != "" && established != v {
 				established = "invalid conflicting values"
@@ -299,14 +316,12 @@ func scanAIORecordQueue(row scanner, queue bool) (model.AIORecord, error) {
 			}
 			established = v
 		}
-		*dst = established
+		*spec.dst = established
 	}
 	index := func(key string) *int {
 		v := text(key)
-		if v == "" {
-			if attrs, ok := f["attributes"].(map[string]any); ok {
-				v = stringValue(attrs[key])
-			}
+		if v == "" && attrs != nil {
+			v = stringValue(attrs[key])
 		}
 		if v == "" {
 			return nil

@@ -21,8 +21,14 @@ func (s *Store) SourceTorrentStats(ctx context.Context, providers []string) (mod
  SELECT DISTINCT unnest($1::text[]) AS provider_id
 ), decisions AS (
  SELECT t.provider_id,`+aioDiagnosticStatus+` AS result`+aioDiagnosticSource+`
-), counts AS (
- SELECT provider_id,result,count(*) AS total FROM decisions GROUP BY provider_id,result
+), counts AS MATERIALIZED (
+ SELECT provider_id,
+  count(*)::bigint AS total,
+  count(*) FILTER(WHERE result='matched')::bigint AS matched,
+  count(*) FILTER(WHERE result='ambiguous')::bigint AS ambiguous,
+  count(*) FILTER(WHERE result='unmatched')::bigint AS unmatched,
+  count(*) FILTER(WHERE result='pending')::bigint AS pending
+ FROM decisions GROUP BY provider_id
 ), latest_import AS (
  SELECT DISTINCT ON (provider_id) provider_id,id,status FROM aiosources.runs
  WHERE mode<>'preview'
@@ -36,16 +42,16 @@ func (s *Store) SourceTorrentStats(ctx context.Context, providers []string) (mod
  WHERE r.status IN ('queued','running','paused','failed') AND NOT t.deleted
  GROUP BY r.provider_id,r.id
 )
-SELECT requested.provider_id,COALESCE(sum(c.total),0)::bigint,
- COALESCE(sum(c.total) FILTER(WHERE c.result='matched'),0)::bigint,
- COALESCE(sum(c.total) FILTER(WHERE c.result='ambiguous'),0)::bigint,
- COALESCE(sum(c.total) FILTER(WHERE c.result='unmatched'),0)::bigint,
- COALESCE(sum(c.total) FILTER(WHERE c.result='pending'),0)::bigint,
+SELECT requested.provider_id,COALESCE(c.total,0)::bigint,
+ COALESCE(c.matched,0)::bigint,
+ COALESCE(c.ambiguous,0)::bigint,
+ COALESCE(c.unmatched,0)::bigint,
+ COALESCE(c.pending,0)::bigint,
  p.id,COALESCE(p.torrents,0),COALESCE(p.torrents-p.updates,0),COALESCE(p.updates,0),
  COALESCE((SELECT sum(total) FROM counts),0)::bigint,
  COALESCE((SELECT sum(torrents) FROM progress),0)::bigint
 FROM requested LEFT JOIN counts c USING(provider_id) LEFT JOIN progress p USING(provider_id)
-GROUP BY requested.provider_id,p.id,p.torrents,p.updates ORDER BY requested.provider_id`, providers)
+ORDER BY requested.provider_id`, providers)
 	if err != nil {
 		return result, databaseError("count source torrents", err)
 	}
