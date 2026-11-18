@@ -469,7 +469,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 			}
 		}
 		if len(pending) > 0 {
-			check, cancel := availabilityCheckContext(ctx, c.ResponseSeconds)
+			check, cancel := responseWorkContext(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 			observed, _ := s.checkPublicService(check, service, key, resource, pending)
 			cancel()
 			for _, item := range observed {
@@ -478,7 +478,7 @@ func (s *Service) publicServiceAvailability(ctx context.Context, c model.AIOConf
 		}
 
 	} else {
-		check, cancel := availabilityCheckContext(ctx, c.ResponseSeconds)
+		check, cancel := responseWorkContext(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 		observed, _ := s.checkPublicService(check, service, key, resource, missing)
 		cancel()
 		for _, item := range observed {

@@ -79,6 +79,16 @@ func (s *Service) outgoingTimeout(ctx context.Context, key string) (time.Duratio
 	return time.Duration(seconds) * time.Second, err
 }
 
+// Leave time for reading completed observations, rechecking access and
+// delivering the response when a provider is slow.
+func responseWorkContext(ctx context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := max(0, time.Until(deadline))
+		budget = min(budget, remaining-min(remaining/5, time.Second))
+	}
+	return context.WithTimeout(ctx, budget)
+}
+
 func noRedirect(*http.Request, []*http.Request) error {
 	return http.ErrUseLastResponse
 }

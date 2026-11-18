@@ -1,6 +1,7 @@
 package aiosource
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -240,7 +242,9 @@ func TestExtendedPublicPlaybackNeverUsesAdministratorAnnouncesOrPersistsVisitorS
 			if err != nil || len(streams) != 1 || streams[0].InfoHash != "" || len(streams[0].Sources) != 0 {
 				t.Fatalf("private cached result unsafe or absent: %+v %v", streams, err)
 			}
-			link, err := s.PublicPlayback(ctx, service, "private-source", "one", "movie", "tt1234567", visitor)
+			playback, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			link, err := s.PublicPlayback(playback, service, "private-source", "one", "movie", "tt1234567", visitor)
 			if err != nil || link != "https://cdn.example/ready.mkv" || adds.Load() != 0 {
 				t.Fatalf("private cached playback started a new download: %s %v", link, err)
 			}

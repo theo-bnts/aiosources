@@ -402,11 +402,13 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 	if err != nil {
 		return "", model.ErrInvalid
 	}
-	budget, err := s.DB.ConnectionTimeout(ctx, "stremio")
-	if err != nil {
-		return "", err
+	// Stremio handlers already set the connection deadline. The default here
+	// bounds browser download preparation when the caller has no deadline.
+	budget := time.Minute
+	if deadline, ok := ctx.Deadline(); ok {
+		budget = time.Until(deadline)
 	}
-	life, cancel := context.WithTimeout(ctx, max(time.Second, budget-10*time.Second))
+	life, cancel := responseWorkContext(ctx, budget)
 	defer cancel()
 	stop := context.AfterFunc(s.ctx, cancel)
 	defer stop()

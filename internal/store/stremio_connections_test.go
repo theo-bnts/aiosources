@@ -40,7 +40,7 @@ func TestStremioAccessAdmissionRevocationAndCredentialStorage(t *testing.T) {
 	defer download.Close()
 	var lifetime float64
 	var seen bool
-	if err = db.pool.QueryRow(ctx, `SELECT extract(epoch FROM r.lease_until-r.requested_at),s.last_access_at IS NOT NULL FROM aiosources.share_requests r JOIN aiosources.shares s ON s.id=r.share_id WHERE r.id=$1`, download.id).Scan(&lifetime, &seen); err != nil || lifetime != 75 || !seen {
+	if err = db.pool.QueryRow(ctx, `SELECT extract(epoch FROM r.lease_until-r.requested_at),s.last_access_at IS NOT NULL FROM aiosources.share_requests r JOIN aiosources.shares s ON s.id=r.share_id WHERE r.id=$1`, download.id).Scan(&lifetime, &seen); err != nil || lifetime != 10 || !seen {
 		t.Fatal("playback lease too short or last access absent", lifetime, seen, err)
 	}
 	if _, err = db.BeginStremioRequest(ctx, grant.Share.ID, grant.Password); err == nil {

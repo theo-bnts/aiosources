@@ -432,12 +432,20 @@ func TestTMDBRateConfigurationIsBoundedAndLegacyRequestsStillWork(t *testing.T) 
 	if !c.OpenLibraryRelevantOnly || len(c.OpenLibraryLanguages) != 0 {
 		t.Fatal("previous client did not receive the book selection defaults", c.OpenLibraryRelevantOnly, c.OpenLibraryLanguages)
 	}
-	for _, rate := range []int{0, 4, 41} {
+	for _, rate := range []int{-1, 0, 41} {
 		c.TMDBRequestsPerSecond = rate
 		body, _ = json.Marshal(c)
 		if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 422 {
 			t.Fatalf("out-of-range request limit %d accepted: %d", rate, response.Code)
 		}
+	}
+	c.TMDBRequestsPerSecond = 1
+	body, _ = json.Marshal(c)
+	if response := f.request("PUT", "/api/aiosource/config", string(body), true, ""); response.Code != 204 {
+		t.Fatalf("the minimum request rate could not be saved: %d", response.Code)
+	}
+	if saved, err := f.db.AIOConfig(f.ctx); err != nil || saved.TMDBRequestsPerSecond != 1 {
+		t.Fatal("the minimum request rate was not applied", err)
 	}
 	if response := f.request("PUT", "/api/aiosource/config", `{}`, true, ""); response.Code != 422 {
 		t.Fatal("defaulting the new field made an empty configuration valid", response.Code)

@@ -95,7 +95,7 @@ func (s *Service) limitedAvailability(ctx context.Context, c model.AIOConfig, re
 		}
 		return n
 	}
-	check, cancel := availabilityCheckContext(ctx, c.ResponseSeconds)
+	check, cancel := responseWorkContext(ctx, time.Duration(c.ResponseSeconds)*time.Second)
 	defer cancel()
 	var negativeRetryBefore time.Time
 	if !p.public && p.keys["alldebrid"] != "" {
