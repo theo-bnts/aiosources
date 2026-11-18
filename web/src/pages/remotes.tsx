@@ -627,7 +627,10 @@ function RemoteForm({
           id="remote-data"
           receiving
           value={draft}
-          onChange={(value) =>
+          onChange={(value) => {
+            setLocalError(null)
+            setReloaded(false)
+            save.reset()
             setDraft((current) => ({
               ...current,
               metadata: value.metadata ?? false,
@@ -637,7 +640,7 @@ function RemoteForm({
               technical: value.technical ?? false,
               files: value.files ?? false,
             }))
-          }
+          }}
         />
         <section
           className="space-y-4 rounded-md border border-border p-4"

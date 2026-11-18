@@ -102,7 +102,14 @@ export function LogsPage() {
           }
           for (const key of ['from', 'to']) {
             const value = String(form.get(key) ?? '')
-            if (value) next.set(key, dateTimeToISO(value, search.get(key))!)
+            if (value) {
+              const instant = dateTimeToISO(value, search.get(key))
+              if (!instant) {
+                setFilterError(new Error('Enter a valid date and time.'))
+                return
+              }
+              next.set(key, instant)
+            }
           }
           if (
             next.has('from') &&

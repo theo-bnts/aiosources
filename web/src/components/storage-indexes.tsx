@@ -97,9 +97,12 @@ export function StorageIndexesPanel() {
         method: 'PUT',
         body: JSON.stringify({ revision: value.revision, values: value.values }),
       }),
+    onMutate: () => client.cancelQueries({ queryKey }),
     onSuccess: async (value) => {
       await client.cancelQueries({ queryKey })
-      client.setQueryData(queryKey, value)
+      client.setQueryData<Settings>(queryKey, (current) =>
+        current && current.revision > value.revision ? current : value,
+      )
       setDraft(null)
       void client.invalidateQueries({ queryKey })
     },

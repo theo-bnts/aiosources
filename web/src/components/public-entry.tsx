@@ -144,6 +144,7 @@ export function PublicStremioEntry({ info }: { info: PublicInfo }) {
             }}
             sources={info.sources ?? info.private_sources ?? []}
             services={info.providers ?? []}
+            showSources={Boolean(info.sources)}
           >
             <LanguageFilter
               layout="stacked"

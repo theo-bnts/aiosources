@@ -5,6 +5,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowRightIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { bytes, number, percentage, useDate } from '@/lib/format'
+import { useListViewState } from '@/lib/detail-navigation'
 import { useSourceNames } from '@/lib/source-names'
 import type { SystemHealth, StorageCategory } from '@/lib/health-types'
 import { Button } from '@/components/ui/button'
@@ -130,6 +131,7 @@ function AllocationDetails({ category }: { category: StorageCategory }) {
 function SourceStorageDetails({ report }: { report: SystemHealth }) {
   const sourceName = useSourceNames()
   const date = useDate()
+  const listState = useListViewState()
   const [sourceOffset, setSourceOffset] = useState(0)
   const sources = [...(report.source_storage ?? [])].sort(
     (a, b) => b.bytes - a.bytes || a.provider_id.localeCompare(b.provider_id),
@@ -241,9 +243,13 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                   {report.retained_imports?.map((run) => (
                     <TableRow key={run.run_id}>
                       <TableCell className="whitespace-normal">
-                        <p className="break-words">
+                        <Link
+                          className="data-link break-words font-medium"
+                          to={`/runs/${encodeURIComponent(run.run_id)}`}
+                          state={listState}
+                        >
                           {sourceName(run.provider_id, run.provider_name)}
-                        </p>
+                        </Link>
                         <p className="help mt-1">{date(run.created_at)}</p>
                         <div className="mt-2">
                           <RunStatusBadge
@@ -262,6 +268,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                         <Button asChild variant="ghost" size="icon-sm">
                           <Link
                             to={`/runs/${encodeURIComponent(run.run_id)}`}
+                            state={listState}
                             aria-label={`Open import from ${sourceName(run.provider_id, run.provider_name)} on ${date(run.created_at)}`}
                           >
                             <ArrowRightIcon aria-hidden="true" />

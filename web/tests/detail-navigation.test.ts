@@ -54,6 +54,7 @@ test('detail return links retain the complete public list view and direct links 
     ['/remotes/history/run-one', '?tab=raw&raw_offset=50', 'Processed records'],
     ['/raw/42', '', 'Processed record'],
     ['/logs', '?service=tmdb', 'Logs'],
+    ['/health', '', 'Storage'],
     ['/providers/source-one', '', 'Source settings'],
   ]) {
     assert.deepEqual(detailBackLink(listViewState({ pathname, search }), fallback), {
@@ -93,6 +94,10 @@ test('nested details retain the original filtered view on each return', () => {
   assert.equal(back.to, '/runs/run-one?tab=raw&raw_offset=50')
   assert.deepEqual(back.state, history)
   assert.deepEqual(detailBackLink(back.state, { to: '/runs', label: 'History' }), {
+    to: '/runs?provider=example&status=failed',
+    label: 'Torrent history',
+  })
+  assert.deepEqual(detailBackLink(run, { to: '/runs', label: 'History' }, '/runs/run-one'), {
     to: '/runs?provider=example&status=failed',
     label: 'Torrent history',
   })

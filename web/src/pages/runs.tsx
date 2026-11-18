@@ -26,7 +26,14 @@ import { FilterSelect } from '@/components/filter-select'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 
-import { api, params, queryClient, refreshData } from '@/lib/api'
+import {
+  api,
+  params,
+  queryClient,
+  refreshData,
+  AUTO_REFRESH_INTERVAL,
+  COLLECTION_REFRESH_INTERVAL,
+} from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
 import { messageText, useDate, runModeLabel, number, statusLabels } from '@/lib/format'
@@ -483,9 +490,14 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
   const activeTab = ['events', 'raw', 'changes'].includes(search.get('tab') ?? '')
     ? search.get('tab')!
     : 'events'
+  const listState = useListViewState()
   const runQuery = useQuery({
     queryKey: ['run', id],
     queryFn: ({ signal }) => api<Run>(`/runs/${encodeURIComponent(id)}`, { signal }),
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' || query.state.data?.status === 'queued'
+        ? COLLECTION_REFRESH_INTERVAL()
+        : AUTO_REFRESH_INTERVAL(),
   })
   const pendingAction =
     actionMutation.isPending && actionMutation.variables.runId === id
@@ -509,7 +521,8 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         decodeSearchJSON<RunChanges>,
       ),
     enabled: Boolean(run) && activeTab === 'changes',
-    refetchInterval: run?.status === 'running' || run?.status === 'queued' ? 10000 : false,
+    refetchInterval:
+      run?.status === 'running' || run?.status === 'queued' ? COLLECTION_REFRESH_INTERVAL : false,
   })
   if (runQuery.isPending)
     return (
@@ -639,6 +652,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
               <Link
                 className="data-link"
                 to={`/runs/${encodeURIComponent(run.metadata_parent_run_id)}`}
+                state={listState}
               >
                 the parent collection
               </Link>

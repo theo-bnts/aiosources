@@ -29,6 +29,14 @@ export function PublicSharedCatalogEntry({
   const [error, setError] = useState<unknown>()
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
+  useEffect(() => {
+    const allowed = new Set((info.sources ?? []).map((source) => source.id))
+    const selected = options.sources ?? []
+    const sources = selected.filter((id) => allowed.has(id))
+    if (selected.length !== sources.length) {
+      setOptions((current) => ({ ...current, sources }))
+    }
+  }, [info.sources, options.sources])
   function change(next: Options) {
     setOptions(next)
     setConnection(undefined)

@@ -239,8 +239,15 @@ async function invalidateData(cancelRefetch: boolean) {
       'security',
       'collection-settings',
       'network-settings',
+      'network-incoming-status',
       'storage-settings',
       'storage-indexes',
+      'storage-retention',
+      'runtime-settings',
+      'public-access',
+      'public-catalog-policy',
+      'trusted-users',
+      'identification-review',
     ].map((key) =>
       queryClient.invalidateQueries(
         {

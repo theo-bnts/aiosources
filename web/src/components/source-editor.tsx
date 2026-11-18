@@ -1112,7 +1112,7 @@ function SourceScheduleSettings() {
   const metadataSupported =
     isJSONAdapter(document.get('adapter')) &&
     document.getIn(['http', 'catalog']) !== true &&
-    document.getIn(['traversal', 'id_recovery']) != null &&
+    document.kindIn(['traversal', 'id_recovery']) === 'object' &&
     document.lengthIn(['traversal', 'enrich_fields']) > 0
   const invalidPolicy =
     (mode === 'metadata' && !metadataSupported) ||
@@ -1270,7 +1270,7 @@ export function SourceEditor({
     if (destination?.entity !== 'source') return
     const stage = sourceStages.findIndex((stage) => stage.id === destination.stage)
     if (stage < 0) return
-    if (drafts.size > 0) {
+    if (drafts.size > 0 || document.errors.length > 0) {
       if (location.state?.resetSourceEditor) return
       notify({
         message: 'Finish or discard the pending field draft before opening another source stage.',

@@ -113,6 +113,7 @@ export function ResponseTimeout({
   help?: string
 }) {
   const id = useId()
+  const max = stream ? 60 : 600
   return (
     <div className="field min-w-0">
       <Label htmlFor={id} help={help}>
@@ -122,12 +123,19 @@ export function ResponseTimeout({
         id={id}
         type="number"
         min={0}
-        max={stream ? 60 : 600}
+        max={max}
         step={1}
         placeholder="Instance default"
         disabled={disabled}
         value={value || ''}
-        onChange={(event) => onChange(Number(event.target.value) || undefined)}
+        onChange={(event) => {
+          const parsed = Number(event.target.value)
+          onChange(
+            parsed > 0 && Number.isFinite(parsed)
+              ? Math.min(max, Math.max(1, Math.trunc(parsed)))
+              : undefined,
+          )
+        }}
       />
     </div>
   )

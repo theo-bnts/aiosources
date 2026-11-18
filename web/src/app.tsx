@@ -555,12 +555,10 @@ export function SessionGate({ children }: { children: ReactNode }) {
         )}
       />
     )
-  if (
-    location.pathname.startsWith('/trusted') &&
-    !location.pathname.startsWith('/trusted-users') &&
-    !session.data.authenticated
-  )
-    return <Login />
+  if (location.pathname.startsWith('/trusted') && !location.pathname.startsWith('/trusted-users')) {
+    if (!session.data.authenticated) return <Login />
+    return <Navigate to="/trusted-users" replace />
+  }
   if (location.pathname === '/public' || location.pathname.startsWith('/public/'))
     return (
       <PublicEntry

@@ -95,7 +95,8 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
         delete next[submitted.scope]
         if (latest.settings.revision === submitted.value.revision + 1) {
           for (const scope of scopes)
-            if (next[scope]) next[scope] = { ...next[scope]!, base: latest.settings }
+            if (next[scope] && next[scope]!.base.revision === submitted.value.revision)
+              next[scope] = { ...next[scope]!, base: latest.settings }
         }
         return next
       })
@@ -293,10 +294,13 @@ export function ImportSettingsPanel({ active }: { active: boolean }) {
                             variant="outline"
                             disabled={save.isPending}
                             onClick={() => {
-                              setDrafts((current) => ({
-                                ...current,
-                                [scope]: { values, base: data.settings },
-                              }))
+                              setDrafts((current) => {
+                                const next = { ...current }
+                                const nextDraft = { values, base: data.settings }
+                                if (!changed(scope, nextDraft)) delete next[scope]
+                                else next[scope] = nextDraft
+                                return next
+                              })
                               setFeedback((current) => ({ ...current, [scope]: undefined }))
                             }}
                           >

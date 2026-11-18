@@ -2,7 +2,7 @@ import { InfoTip } from '@/components/ui/info-tip'
 import { ArrowClockwiseIcon, FloppyDiskIcon, TrashIcon } from '@phosphor-icons/react'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, AUTO_REFRESH_INTERVAL } from '@/lib/api'
@@ -35,6 +35,9 @@ type StorageOverview = {
 export function StorageSettingsPanel() {
   const location = useLocation()
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
+  useEffect(() => {
+    if (location.hash === '#maintenance') setMaintenanceOpen(true)
+  }, [location.hash])
   const client = useQueryClient()
   const query = useQuery({
     queryKey: ['storage-settings'],
@@ -48,6 +51,7 @@ export function StorageSettingsPanel() {
         method: 'PUT',
         body: JSON.stringify(settings),
       }),
+    onMutate: () => client.cancelQueries({ queryKey: ['storage-settings'] }),
     onSuccess: async (result) => {
       await client.cancelQueries({ queryKey: ['storage-settings'] })
       client.setQueryData<StorageOverview>(['storage-settings'], (current) =>

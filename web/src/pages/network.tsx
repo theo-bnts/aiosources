@@ -13,7 +13,7 @@ import { randomID } from '@/lib/random-id'
 import { useSettingsEditor } from '@/lib/settings-navigation'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { api, ApiError, ConnectionError } from '@/lib/api'
@@ -272,6 +272,20 @@ function ProxyEditor({
   const dirty =
     JSON.stringify(draft) !==
     JSON.stringify(base.proxies.find((proxy) => proxy.id === draft.id) ?? initial)
+  useEffect(() => {
+    if (
+      query.data &&
+      query.data.revision !== base.revision &&
+      !dirty &&
+      !(save.error instanceof ApiError && save.error.status === 409)
+    ) {
+      const current = query.data.proxies.find((proxy) => proxy.id === draft.id)
+      if (!existing || current) {
+        setBase(query.data)
+        if (existing && current) setDraft(current)
+      }
+    }
+  }, [query.data, base.revision, dirty, save.error, existing, draft.id])
   const conflict =
     Boolean(query.data && query.data.revision !== base.revision) ||
     (save.error instanceof ApiError && save.error.status === 409)

@@ -39,17 +39,36 @@ export default function IncomingNetworkPage() {
       .filter(Boolean),
   }
   const dirty = Boolean(draft && JSON.stringify(value) !== JSON.stringify(query.data?.incoming))
+  const activeDraft = dirty ? draft : null
   const conflict =
     Boolean(dirty && draft && draft.base.revision !== query.data?.revision) ||
     (save.error instanceof ApiError && save.error.status === 409)
   useUnsavedChanges(dirty, 'incoming proxy settings', save.isPending)
   function change(change: Partial<IncomingNetwork>, text?: string) {
     if (!query.data || !current) return
-    setDraft({
-      base: draft?.base ?? query.data,
-      value: { ...current, ...change },
-      trusted: text ?? trusted,
-    })
+    const base = activeDraft?.base ?? query.data
+    const nextValue = { ...current, ...change }
+    const nextTrusted = text ?? trusted
+    const nextNormalized = {
+      ...nextValue,
+      trusted_proxies: nextTrusted
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    }
+    if (
+      base.revision === query.data.revision &&
+      JSON.stringify(nextNormalized) === JSON.stringify(query.data.incoming) &&
+      nextTrusted === query.data.incoming.trusted_proxies.join('\n')
+    ) {
+      setDraft(null)
+    } else {
+      setDraft({
+        base,
+        value: nextValue,
+        trusted: nextTrusted,
+      })
+    }
     save.reset()
   }
   return (

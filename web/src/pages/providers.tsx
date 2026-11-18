@@ -295,7 +295,7 @@ function SourceCard({
           label="Delete source"
           variant="destructive"
           trigger={
-            <Button size="sm" variant="destructive">
+            <Button size="sm" variant="destructive" disabled={active}>
               <TrashIcon />
               Delete
             </Button>
@@ -577,10 +577,11 @@ function ProviderForm({
     appliedResets.current.add(navigationKey)
     // This navigation was confirmed by the shared discard dialog. Reset only its
     // unsaved editor state; future searches and Back retain ordinary drafts.
-    setJSON(savedJSON)
+    setJSON(savedJSON || initialJSON || template?.template || '')
     setFieldDraft(false)
     setValidation(null)
     setRemote(null)
+    setMergeError('')
     validate.reset()
     save.reset()
     setEditorKey((key) => key + 1)
@@ -598,7 +599,12 @@ function ProviderForm({
   })
   const busy = validate.isPending || save.isPending
   const blocked = busy || locallyInvalid || fieldDraft
-  const issues = validation && validatedJSON === json ? validation.issues : document?.issues
+  const issues =
+    validation && validatedJSON === json
+      ? validation.issues
+      : json === savedJSON
+        ? document?.issues
+        : undefined
   return (
     <>
       <PageHeader
@@ -687,6 +693,7 @@ function ProviderForm({
                 setRevision(remote.revision)
                 setSavedJSON(remote.json)
                 setRemote(null)
+                setMergeError('')
                 save.reset()
                 setValidation(null)
                 notify(
@@ -704,6 +711,7 @@ function ProviderForm({
                 setRevision(remote.revision)
                 setSavedJSON(remote.json)
                 setRemote(null)
+                setMergeError('')
                 save.reset()
                 notify(
                   'Revision updated. Your reviewed definition is preserved; check the merge before saving.',
@@ -811,6 +819,13 @@ function ProviderForm({
         value={json}
         onChange={(value) => {
           setJSON(value)
+          if (mergeError) setMergeError('')
+          if (
+            save.error &&
+            (!(save.error instanceof ApiError && save.error.status === 409) || !sourceID)
+          ) {
+            save.reset()
+          }
         }}
         readOnly={busy}
         sourceID={sourceID}

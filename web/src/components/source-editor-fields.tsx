@@ -208,6 +208,8 @@ export function JSONField({
           label={label}
           height="150px"
           readOnly={readOnly}
+          ariaInvalid={Boolean(error)}
+          ariaDescribedBy={error ? `${id}-help` : undefined}
         />
       ) : (
         <Input

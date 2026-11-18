@@ -27,6 +27,7 @@ const viewLabels: Record<string, string> = {
   '/metadata/books/history': 'Book history',
   '/metadata/identification/history': 'Identification history',
   '/debrid/history': 'Debrid history',
+  '/health': 'Storage',
   '/logs': 'Logs',
 }
 type ListView = { pathname: string; search: string; returnView?: ListView }
@@ -75,9 +76,16 @@ export function listViewState(view: ListView, state?: unknown) {
   return { returnView: { ...current, ...(parent ? { returnView: parent } : {}) } }
 }
 
-export function detailBackLink(state: unknown, fallback?: BackLink): BackLink | undefined {
+export function detailBackLink(
+  state: unknown,
+  fallback?: BackLink,
+  currentPathname?: string,
+): BackLink | undefined {
   if (!fallback) return fallback
-  const view = viewFromState(state)
+  let view = viewFromState(state)
+  while (view && currentPathname && view.pathname === currentPathname) {
+    view = view.returnView
+  }
   if (!view) return fallback
   return {
     to: view.pathname + view.search,
@@ -92,7 +100,8 @@ export function useListViewState() {
 }
 
 export function useDetailBackLink(fallback?: BackLink) {
-  return detailBackLink(useLocation().state, fallback)
+  const { pathname, state } = useLocation()
+  return detailBackLink(state, fallback, pathname)
 }
 
 // Updating a detail tab or its filters must keep the originating list view.

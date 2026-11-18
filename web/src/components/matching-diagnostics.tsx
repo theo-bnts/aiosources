@@ -83,7 +83,7 @@ export function MatchingDiagnostics() {
   const sourceName = useSourceNames()
   const [reviewing, setReviewing] = useState<MatchDiagnostic | null>(null)
   const [search, setSearch] = useViewSearchParams()
-  const status = search.get('match_status') ?? 'all'
+  const status = search.get('match_status') || 'all'
   const provider = search.get('match_provider') ?? ''
   const q = search.get('match_q') ?? ''
   const pagination = useURLPagination({ limitKey: 'match_limit', offsetKey: 'match_offset' })
@@ -121,7 +121,7 @@ export function MatchingDiagnostics() {
           const values = new FormData(event.currentTarget)
           filter({
             match_q: String(values.get('q') ?? '').trim(),
-            match_status: String(values.get('status') ?? 'all'),
+            match_status: String(values.get('status') || 'all'),
             match_provider: String(values.get('provider') ?? ''),
           })
         }}

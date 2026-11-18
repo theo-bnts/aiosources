@@ -12,10 +12,11 @@ import {
   PageHeader,
   Pager,
 } from '@/components/common'
+import { useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
+import { api, params, AUTO_REFRESH_INTERVAL, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
 import { number, bytes, percentage, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
@@ -163,16 +164,22 @@ export function StremioHistoryPage() {
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
   })
+  const formRef = useRef<HTMLFormElement>(null)
   function filter(patch: Record<string, string>) {
     const next = new URLSearchParams(search)
     next.delete('offset')
+    if (!('q' in patch) && formRef.current) {
+      const draftQ = String(new FormData(formRef.current).get('q') ?? '').trim()
+      draftQ ? next.set('q', draftQ) : next.delete('q')
+    }
     for (const [key, value] of Object.entries(patch))
       value ? next.set(key, value) : next.delete(key)
-    setSearch(next, { flushSync: true })
+    setSearch(next, { flushSync: true, preventScrollReset: true })
   }
   return (
     <div className="page">
       <form
+        ref={formRef}
         className="toolbar items-end rounded-md border border-border p-4"
         onSubmit={(event) => {
           event.preventDefault()
@@ -186,6 +193,7 @@ export function StremioHistoryPage() {
             name="q"
             key={q}
             defaultValue={q}
+            maxLength={160}
             placeholder="IMDb, TMDB, TVDB or episode"
           />
         </div>
@@ -327,7 +335,8 @@ export function StremioRequestPage() {
     queryKey: ['stremio-request', id],
     queryFn: ({ signal }) =>
       api<StremioRequest>(`/stremio/requests/${encodeURIComponent(id)}`, { signal }),
-    refetchInterval: false,
+    refetchInterval: (query) =>
+      query.state.status === 'success' ? false : AUTO_REFRESH_INTERVAL(),
     staleTime: Infinity,
   })
   const item = query.data

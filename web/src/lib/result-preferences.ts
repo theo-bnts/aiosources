@@ -31,19 +31,31 @@ export function readResultSorting(raw: string | null): SortRule[] {
     const value: unknown = JSON.parse(raw || '[]')
     if (!Array.isArray(value) || value.length > 3) return []
     const seen = new Set<string>()
+    const normalized: SortRule[] = []
     for (const rule of value) {
       if (
         !rule ||
-        !sortFields.some((field) => field.value === rule.field) ||
-        !['asc', 'desc'].includes(rule.direction)
+        typeof rule !== 'object' ||
+        Array.isArray(rule) ||
+        Object.keys(rule).some((key) => key !== 'field' && key !== 'direction') ||
+        !sortFields.some((field) => field.value === (rule as SortRule).field) ||
+        !['asc', 'desc'].includes((rule as SortRule).direction)
       )
         return []
-      const key = ['age', 'published'].includes(rule.field) ? 'date' : rule.field
+      const typed = rule as SortRule
+      const key = ['age', 'published'].includes(typed.field) ? 'date' : typed.field
       if (seen.has(key)) return []
       seen.add(key)
+      normalized.push({ field: typed.field, direction: typed.direction })
     }
-    return value
+    return normalized
   } catch {
     return []
   }
+}
+
+export function readResponseSeconds(raw: string | null, max = 60): number | undefined {
+  if (!raw || !/^\d+$/.test(raw.trim())) return undefined
+  const value = Number(raw.trim())
+  return Number.isSafeInteger(value) && value >= 1 && value <= max ? value : undefined
 }

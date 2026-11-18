@@ -185,23 +185,13 @@ function HTMLFieldSettings({
           choices={
             identity
               ? ['text', 'integer', 'url']
-              : title
-                ? ['text']
-                : hash
-                  ? ['info_hash', 'torrent', 'text']
-                  : size
-                    ? ['size', 'integer', 'text']
-                    : count
-                      ? ['integer']
-                      : [
-                          'text',
-                          'integer',
-                          'size',
-                          'date',
-                          'url',
-                          'info_hash',
-                          ...(hash ? ['torrent'] : []),
-                        ]
+              : hash
+                ? ['info_hash', 'torrent', 'text']
+                : size
+                  ? ['size', 'integer', 'text']
+                  : count
+                    ? ['integer']
+                    : ['text', 'integer', 'size', 'date', 'url', 'info_hash']
           }
           labels={{
             text: 'Text',

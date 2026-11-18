@@ -6,7 +6,7 @@ import {
 } from '@phosphor-icons/react'
 import { ResultCount } from '@/components/common'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 import { api, params } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
@@ -265,7 +265,9 @@ function ChangeFieldDiff({ change }: { change: TorrentChange }) {
 
 function ChangeEntry({ change }: { change: TorrentChange }) {
   const date = useDate()
+  const location = useLocation()
   const listState = useListViewState()
+  const runPrefix = location.pathname.startsWith('/remotes/history') ? '/remotes/history' : '/runs'
   return (
     <Disclosure
       title={
@@ -290,7 +292,7 @@ function ChangeEntry({ change }: { change: TorrentChange }) {
       {change.run_id ? (
         <Link
           className="data-link inline-flex items-center gap-2 break-all text-xs"
-          to={`/runs/${encodeURIComponent(change.run_id)}?tab=changes`}
+          to={`${runPrefix}/${encodeURIComponent(change.run_id)}?tab=changes`}
           state={listState}
         >
           Run {change.run_id}
@@ -346,12 +348,18 @@ export function OccurrenceDialog({
     enabled: valid,
   })
   const torrent = history.data ? history.data.current : initialTorrent
+  const showFields =
+    Boolean(torrent) ||
+    (history.isPending &&
+      !history.isError &&
+      requestedTab !== 'history' &&
+      requestedTab !== 'related')
   const activeTab =
     requestedTab === 'related' ||
     requestedTab === 'history' ||
-    (requestedTab === 'fields' && torrent)
+    (requestedTab === 'fields' && showFields)
       ? requestedTab
-      : torrent
+      : showFields
         ? 'fields'
         : 'history'
   const related = useQuery({
@@ -409,11 +417,11 @@ export function OccurrenceDialog({
               onValueChange={(value) => {
                 const next = new URLSearchParams(search)
                 next.set('occurrence_tab', value)
-                setSearch(next, { replace: true })
+                setSearch(next, { replace: true, preventScrollReset: true })
               }}
             >
               <TabsList>
-                {torrent && (
+                {showFields && (
                   <TabsTrigger value="fields">
                     <DatabaseIcon aria-hidden="true" />
                     Published fields
@@ -428,41 +436,48 @@ export function OccurrenceDialog({
                   Related occurrences
                 </TabsTrigger>
               </TabsList>
-              {torrent && (
+              {showFields && (
                 <TabsContent value="fields" className="mt-5 space-y-4">
-                  <dl className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <dt className="text-muted-foreground">First seen</dt>
-                      <dd className="mt-1">{date(torrent.first_seen_at)}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Last seen</dt>
-                      <dd className="mt-1">{date(torrent.last_seen_at)}</dd>
-                    </div>
-                  </dl>
-                  <Provenance origin={torrent.origin} />
-                  {torrent.historical && (
-                    <div className="notice flex flex-wrap items-center gap-1.5">
-                      <p>Imported history.</p>
-                      <InfoTip label="Imported history">
-                        Imported normalized history. No raw original was fabricated for this data.
-                      </InfoTip>
-                    </div>
-                  )}
-                  <CodeEditor
-                    label="Interpreted torrent fields"
-                    value={exactJSON(torrent.fields ?? {})}
-                    language="json"
-                    readOnly
-                    height="400px"
-                  />
-                  {torrent.raw_id != null && (
-                    <Button asChild>
-                      <Link to={`/raw/${torrent.raw_id}`} state={listState}>
-                        View processed record
-                        <ArrowRightIcon />
-                      </Link>
-                    </Button>
+                  {torrent ? (
+                    <>
+                      <dl className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <dt className="text-muted-foreground">First seen</dt>
+                          <dd className="mt-1">{date(torrent.first_seen_at)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Last seen</dt>
+                          <dd className="mt-1">{date(torrent.last_seen_at)}</dd>
+                        </div>
+                      </dl>
+                      <Provenance origin={torrent.origin} />
+                      {torrent.historical && (
+                        <div className="notice flex flex-wrap items-center gap-1.5">
+                          <p>Imported history.</p>
+                          <InfoTip label="Imported history">
+                            Imported normalized history. No raw original was fabricated for this
+                            data.
+                          </InfoTip>
+                        </div>
+                      )}
+                      <CodeEditor
+                        label="Interpreted torrent fields"
+                        value={exactJSON(torrent.fields ?? {})}
+                        language="json"
+                        readOnly
+                        height="400px"
+                      />
+                      {torrent.raw_id != null && (
+                        <Button asChild>
+                          <Link to={`/raw/${torrent.raw_id}`} state={listState}>
+                            View processed record
+                            <ArrowRightIcon />
+                          </Link>
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <Loading />
                   )}
                 </TabsContent>
               )}

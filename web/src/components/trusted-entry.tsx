@@ -40,6 +40,8 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
           : ''
   const path = location.pathname
   const isSearch = path === '/trusted/search' || path.startsWith('/trusted/search/')
+  const validPath =
+    path === '/trusted' || path === '/trusted/torznab' || path === '/trusted/sharing' || isSearch
   const section = isSearch
     ? 'search'
     : path === '/trusted/torznab'
@@ -64,7 +66,7 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
         />
       </div>,
     )
-  if (!path.startsWith('/trusted') || !available) return <Navigate to={target} replace />
+  if (!validPath || !available) return <Navigate to={target} replace />
   if (section === 'search') return layout(<PublicSearchEntry info={access} />)
   if (section === 'catalog')
     return layout(<PublicSharedCatalogEntry key={access.catalog_revision} trusted info={access} />)

@@ -135,6 +135,7 @@ export function SettingsSearch({
     setActive(0)
     setShown(50)
     setOpen(true)
+    requestAnimationFrame(() => input.current?.focus())
   }
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {

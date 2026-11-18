@@ -45,7 +45,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     }
   }, [info.torznab_enabled])
   useEffect(() => {
-    const allowed = new Set((info.sources ?? []).map((source) => source.id))
+    const allowed = new Set((info.sources ?? info.private_sources ?? []).map((source) => source.id))
     const selected = options.sources ?? []
     const sources = selected.filter((id) => allowed.has(id))
     const sorting = options.sorting?.filter(
@@ -54,7 +54,7 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
     if (selected.length !== sources.length || sorting?.length !== options.sorting?.length) {
       setOptions({ ...options, sources, sorting })
     }
-  }, [info.sources, options])
+  }, [info.sources, info.private_sources, options])
   async function create(form: HTMLFormElement) {
     if (request.current) return
     const values = new FormData(form),
@@ -134,7 +134,8 @@ export function PublicTorznabEntry({ info }: { info: PublicInfo }) {
               <TorznabFilters
                 value={options}
                 onChange={setOptions}
-                sources={info.sources ?? []}
+                sources={info.sources ?? info.private_sources ?? []}
+                showSources={Boolean(info.sources)}
                 id="public-torznab"
               />
             </Disclosure>

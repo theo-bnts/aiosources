@@ -13,7 +13,7 @@ import { SettingsSections } from '@/components/settings-sections'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText } from '@/lib/format'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import { api, ApiError, queryClient, refreshData, LIVE_REFRESH_INTERVAL } from '@/lib/api'
@@ -104,6 +104,12 @@ export default function AIOSourcePage({
   const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const [manualActionsOpen, setManualActionsOpen] = useState(location.hash === '#maintenance')
+  useEffect(() => {
+    if (location.hash === '#maintenance') {
+      setMaintenanceOpen(true)
+      setManualActionsOpen(true)
+    }
+  }, [location.hash])
   const query = useQuery({
     queryKey: ['aiosource', 'controls'],
     queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
@@ -191,9 +197,14 @@ export default function AIOSourcePage({
       const effective =
         current && current.config.revision > latest.config.revision ? current : latest
       queryClient.setQueryData(['aiosource', 'controls'], effective)
-      setDrafts((drafts) =>
-        drafts[form] ? { ...drafts, [form]: { ...drafts[form], base: effective.config } } : drafts,
-      )
+      setDrafts((drafts) => {
+        if (!drafts[form]) return drafts
+        const next = { ...drafts }
+        const merged = applyChanges(effective.config, drafts[form].changes)
+        if (JSON.stringify(merged) === JSON.stringify(effective.config)) delete next[form]
+        else next[form] = { ...drafts[form], base: effective.config }
+        return next
+      })
       clearFeedback(form)
     },
   })
@@ -343,10 +354,17 @@ export default function AIOSourcePage({
         <Input
           id={key}
           type="number"
+          step={1}
           disabled={save.isPending}
           required
           min={min}
           max={max}
+          aria-invalid={
+            currentValue === undefined ||
+            !Number.isInteger(currentValue) ||
+            currentValue < min ||
+            currentValue > max
+          }
           value={currentValue === undefined || Number.isNaN(currentValue) ? '' : currentValue}
           onChange={(e) => update(form, { [key]: e.target.valueAsNumber })}
         />
@@ -440,6 +458,9 @@ export default function AIOSourcePage({
           dirty={Boolean(drafts[form])}
           saving={save.isPending && save.variables?.scope === form}
           saved={feedback[form]?.saved}
+          message={
+            invalidNumbers(form) ? 'Enter whole numbers within the allowed ranges.' : undefined
+          }
         />
       </div>
     </>

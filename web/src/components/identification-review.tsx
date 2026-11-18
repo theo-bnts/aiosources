@@ -5,7 +5,7 @@ import {
   ArrowsClockwiseIcon,
   CheckIcon,
 } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FilterSelect } from '@/components/filter-select'
 import { reviewMediaTypes } from '@/lib/connection-options'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -31,15 +31,24 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmAction, Empty, ErrorNotice, Loading, ResultCount } from '@/components/common'
 
-function WorkSummary({ work }: { work: ReviewWork }) {
-  const title =
+function formatWorkTitle(work: ReviewWork) {
+  return (
     work.display_title ||
     work.titles[0] ||
     (work.type === 'book'
       ? work.openlibrary || 'Untitled book'
       : work.type === 'game'
-        ? `IGDB ${work.igdb}`
-        : `TMDB ${work.tmdb}`)
+        ? work.igdb
+          ? `IGDB ${work.igdb}`
+          : 'Untitled game'
+        : work.tmdb
+          ? `TMDB ${work.tmdb}`
+          : 'Untitled work')
+  )
+}
+
+function WorkSummary({ work }: { work: ReviewWork }) {
+  const title = formatWorkTitle(work)
   const aliases = work.titles.filter((alias) => alias !== title).slice(0, 2)
   return (
     <div className="min-w-0 space-y-1">
@@ -82,6 +91,7 @@ export function IdentificationReview({
 }) {
   const language = browserLanguage()
   const [reviewVersion, setReviewVersion] = useState(0)
+  const [busy, setBusy] = useState(false)
   const detail = useQuery({
     queryKey: ['identification-review', item.occurrence_id, language],
     queryFn: ({ signal }) =>
@@ -97,7 +107,7 @@ export function IdentificationReview({
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) onClose()
+        if (!open && !busy) onClose()
       }}
     >
       <DialogContent className="sm:max-w-3xl">
@@ -117,6 +127,7 @@ export function IdentificationReview({
               detail={detail.data}
               occurrence={item.occurrence_id}
               onClose={onClose}
+              onBusyChange={setBusy}
               reload={async () => {
                 // Load candidates before a changed record can replace the edited form.
                 await queryClient.invalidateQueries(
@@ -138,14 +149,17 @@ function ReviewForm({
   detail,
   occurrence,
   onClose,
+  onBusyChange,
   reload,
 }: {
   detail: ReviewDetail
   occurrence: string
   onClose: () => void
+  onBusyChange: (busy: boolean) => void
   reload: () => Promise<void>
 }) {
   const sourceName = useSourceNames()
+  const formRef = useRef<HTMLFormElement>(null)
   const [selected, setSelected] = useState<ReviewWork | null>(null)
   const [q, setQuery] = useState(detail.suggested_query)
   const [kind, setKind] = useState('')
@@ -158,7 +172,7 @@ function ReviewForm({
   const [episode, setEpisode] = useState(
     String(detail.review?.episode ?? detail.record.episode ?? ''),
   )
-  const canSearch = q.trim().length >= 3 || /^\d+$/.test(q)
+  const canSearch = q.trim().length >= 3 || /^\d+$/.test(q.trim())
   const candidates = useQuery({
     queryKey: ['review-candidates', q, kind, year, language],
     queryFn: ({ signal }) =>
@@ -199,6 +213,12 @@ function ReviewForm({
     },
   })
   const markSaved = useUnsavedChanges(Boolean(selected), 'identification review', save.isPending)
+  useEffect(() => {
+    onBusyChange(save.isPending)
+    return () => onBusyChange(false)
+  }, [onBusyChange, save.isPending])
+  const readDraftQuery = () =>
+    formRef.current ? String(new FormData(formRef.current).get('q') ?? '').trim() : q
   const invalidEpisode =
     override &&
     selected?.type === 'tv' &&
@@ -255,6 +275,7 @@ function ReviewForm({
         </section>
       </div>
       <form
+        ref={formRef}
         className="toolbar"
         onSubmit={(event) => {
           event.preventDefault()
@@ -277,7 +298,10 @@ function ReviewForm({
             label="Media type"
             allLabel="All media"
             value={kind}
-            onChange={setKind}
+            onChange={(nextKind) => {
+              setQuery(readDraftQuery())
+              setKind(nextKind)
+            }}
             options={reviewMediaTypes}
             selectGroups
           />
@@ -293,7 +317,10 @@ function ReviewForm({
             pattern="[0-9]{4}"
             placeholder="Any year"
             value={year}
-            onChange={(event) => setYear(event.target.value)}
+            onChange={(event) => {
+              setQuery(readDraftQuery())
+              setYear(event.target.value)
+            }}
           />
         </div>
         <Button type="submit" variant="outline" className="self-end">
@@ -313,16 +340,7 @@ function ReviewForm({
         aria-busy={candidates.isFetching}
       >
         {candidates.data?.items?.map((work) => {
-          const title =
-            work.display_title ||
-            work.titles[0] ||
-            (work.type === 'book'
-              ? work.openlibrary || 'Untitled book'
-              : work.type === 'game'
-                ? work.igdb
-                  ? `IGDB ${work.igdb}`
-                  : 'Untitled game'
-                : work.tmdb)
+          const title = formatWorkTitle(work)
           return (
             <label
               key={work.id}

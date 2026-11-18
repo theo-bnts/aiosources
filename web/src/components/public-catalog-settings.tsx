@@ -43,7 +43,16 @@ export function PublicCatalogSettings() {
   const save = useMutation({
     mutationFn: (value: Policy) =>
       api('/public-catalog', { method: 'PUT', body: JSON.stringify(value) }),
-    onSuccess: async () => {
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['public-catalog-policy'] }),
+    onSuccess: async (_result, submitted) => {
+      await queryClient.cancelQueries({ queryKey: ['public-catalog-policy'] })
+      queryClient.setQueryData<CatalogSettings>(['public-catalog-policy'], (current) =>
+        current && current.policy.revision > submitted.revision
+          ? current
+          : current
+            ? { ...current, policy: { ...submitted, revision: submitted.revision + 1 } }
+            : current,
+      )
       setDraft(undefined)
       await queryClient.invalidateQueries({ queryKey: ['public-catalog-policy'] })
       await queryClient.invalidateQueries({ queryKey: ['public-config'] })
@@ -71,18 +80,16 @@ export function PublicCatalogSettings() {
         )
         catalog_entities.availability =
           Boolean(catalog_entities.availability) && fields.includes('info_hash')
-        return {
-          base: latest.policy,
-          value: {
-            ...latest.policy,
-            sources:
-              selectionKey(draft.value.sources) !== selectionKey(draft.base.sources)
-                ? draft.value.sources
-                : latest.policy.sources,
-            fields,
-            catalog_entities,
-          },
+        const value: Policy = {
+          ...latest.policy,
+          sources:
+            selectionKey(draft.value.sources) !== selectionKey(draft.base.sources)
+              ? draft.value.sources
+              : latest.policy.sources,
+          fields,
+          catalog_entities,
         }
+        return changed(value, latest.policy) ? { base: latest.policy, value } : undefined
       })
       save.reset()
     },

@@ -24,6 +24,8 @@ export function CodeEditor({
   height = '460px',
   readOnly = false,
   help,
+  ariaInvalid,
+  ariaDescribedBy,
 }: {
   value: string
   onChange?: (value: string) => void
@@ -32,15 +34,21 @@ export function CodeEditor({
   height?: string
   readOnly?: boolean
   help?: ReactNode
+  ariaInvalid?: boolean
+  ariaDescribedBy?: string
 }) {
   const extensions = useMemo(
     () => [
       editorTheme,
       EditorView.lineWrapping,
-      EditorView.contentAttributes.of({ 'aria-label': label }),
+      EditorView.contentAttributes.of({
+        'aria-label': label,
+        ...(ariaInvalid ? { 'aria-invalid': 'true' } : {}),
+        ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
+      }),
       ...(language === 'json' ? [json()] : language === 'xml' ? [xml()] : []),
     ],
-    [language, label],
+    [language, label, ariaInvalid, ariaDescribedBy],
   )
   return (
     <div className="min-w-0 space-y-2">

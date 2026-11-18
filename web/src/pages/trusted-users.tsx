@@ -196,7 +196,6 @@ function UserEditor({
       if (!controller.signal.aborted) setError(error)
     } finally {
       if (!controller.signal.aborted) {
-        setPassword('')
         setPending(false)
       }
     }
@@ -217,7 +216,10 @@ function UserEditor({
               aria-label="Enable account"
               checked={value.enabled}
               disabled={pending}
-              onCheckedChange={(enabled) => setValue({ ...value, enabled })}
+              onCheckedChange={(enabled) => {
+                if (error) setError(undefined)
+                setValue({ ...value, enabled })
+              }}
             />
           </div>
         </DialogHeader>
@@ -239,7 +241,10 @@ function UserEditor({
                 required
                 maxLength={254}
                 value={value.email}
-                onChange={(e) => setValue({ ...value, email: e.target.value })}
+                onChange={(e) => {
+                  if (error) setError(undefined)
+                  setValue({ ...value, email: e.target.value })
+                }}
               />
             </div>
             <div className="field">
@@ -263,7 +268,10 @@ function UserEditor({
                 minLength={12}
                 maxLength={1024}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  if (error) setError(undefined)
+                  setPassword(e.target.value)
+                }}
               />
             </div>
             <Disclosure

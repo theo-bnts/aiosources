@@ -11,14 +11,14 @@ import { Button } from '@/components/ui/button'
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [issues, setIssues] = useState<Map<string, RequestIssue>>(() => new Map())
-  const [dismissed, setDismissed] = useState<unknown>(null)
+  const [dismissed, setDismissed] = useState<Set<unknown>>(() => new Set())
   const [messages, setMessages] = useState<Array<Notification & { id: number }>>([])
   const nextID = useRef(0)
   useEffect(() => {
     const clear = () => {
       setMessages([])
       setIssues(new Map())
-      setDismissed(null)
+      setDismissed(new Set())
     }
     window.addEventListener('session-expired', clear)
     return () => window.removeEventListener('session-expired', clear)
@@ -40,7 +40,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       })
     }
   }, [])
-  const issue = useMemo(() => [...issues.values()].at(-1), [issues])
+  const issue = useMemo(
+    () => [...issues.values()].reverse().find((item) => !dismissed.has(item.error)),
+    [issues, dismissed],
+  )
   const connection = issue?.error instanceof ConnectionError
   return (
     <Toast.Provider duration={8000}>
@@ -54,9 +57,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               duration={Infinity}
               role="alert"
               aria-live="off"
-              open={dismissed !== issue.error}
+              open={!dismissed.has(issue.error)}
               onOpenChange={(open) => {
-                if (!open) setDismissed(issue.error)
+                if (!open) setDismissed((current) => new Set(current).add(issue.error))
               }}
               className="relative rounded-md bg-card outline-none"
             >

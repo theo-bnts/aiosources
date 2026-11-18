@@ -105,9 +105,12 @@ export function StorageRetentionPanel() {
   const save = useMutation({
     mutationFn: (value: Settings) =>
       api<Settings>('/settings/storage/retention', { method: 'PUT', body: JSON.stringify(value) }),
+    onMutate: () => client.cancelQueries({ queryKey }),
     onSuccess: async (value) => {
       await client.cancelQueries({ queryKey })
-      client.setQueryData(queryKey, value)
+      client.setQueryData<Settings>(queryKey, (current) =>
+        current && current.revision > value.revision ? current : value,
+      )
       setDraft(null)
       void client.invalidateQueries({ queryKey })
     },

@@ -1,16 +1,35 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import { settingFromHash } from './settings-catalog'
+import { debridProviders } from './debrid'
+import { settingFromHash, type Setting } from './settings-catalog'
 import { isSourceSettingsPath } from './source-navigation'
 import { settingsEditorDestination, settingsEditorNavigationKey } from './settings-editor'
 
-export function useSettingDestination() {
+export function useSettingDestination(): Setting | undefined {
   const location = useLocation()
   const setting = settingFromHash(location.hash)
-  if (!setting) return undefined
+  if (!setting) {
+    const rawHash = location.hash.startsWith('#') ? decodeURIComponent(location.hash.slice(1)) : ''
+    const debridProvider =
+      rawHash && location.pathname === '/debrid/settings'
+        ? debridProviders.find((item) => item.secret === rawHash)
+        : undefined
+    return debridProvider
+      ? {
+          id: `debrid.${debridProvider.id}`,
+          title: `${debridProvider.name} API key`,
+          group: 'Debrid / Settings',
+          route: '/debrid/settings',
+          control: debridProvider.secret,
+        }
+      : undefined
+  }
   if (setting.public === 'interface') return setting
   const path = setting.route.split('?')[0]
-  if (setting.public && location.pathname.startsWith('/trusted')) {
+  if (
+    setting.public &&
+    (location.pathname === '/trusted' || location.pathname.startsWith('/trusted/'))
+  ) {
     const route = setting.route.replace(/^\/public(?=\/|$)/, '/trusted')
     return route === location.pathname ? { ...setting, route } : undefined
   }
@@ -62,15 +81,21 @@ export function useSettingsEditor<T extends { id: string }>(
   }, [items, setting, entity, navigationKey, location, currentSelection])
 }
 
-export function revealSettingParents(element: HTMLElement) {
+export function revealSettingParents(element: HTMLElement, opened?: WeakSet<HTMLElement>) {
   const parents: HTMLDetailsElement[] = []
   for (let parent = element.parentElement; parent; parent = parent.parentElement)
     if (parent instanceof HTMLDetailsElement && !parent.open) parents.unshift(parent)
+  let revealed = false
   for (const parent of parents) {
     // Use the existing controlled toggle, preserving lazy loads and form drafts.
-    parent.querySelector<HTMLElement>(':scope > summary')?.click()
+    const summary = parent.querySelector<HTMLElement>(':scope > summary')
+    if (summary && !opened?.has(summary)) {
+      opened?.add(summary)
+      summary.click()
+      revealed = true
+    }
   }
-  return parents.length > 0
+  return revealed
 }
 
 export function highlightSetting(element: HTMLElement) {

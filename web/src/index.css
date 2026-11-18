@@ -196,7 +196,18 @@
 /* Settings navigation uses the same primary focus color without moving layout. */
 [data-app-shell]
   main
-  :is(#secrets, #verification, #sessions, #maintenance, #import-execution-settings) {
+  :is(
+    #secrets,
+    #verification,
+    #sessions,
+    #maintenance,
+    #import-execution-settings,
+    #public-request-limits,
+    #matching-results,
+    #source-storage,
+    [id^='runtime-'],
+    [data-slot='disclosure'][id]
+  ) {
   scroll-margin-top: calc(var(--app-header-height, 4rem) + 1rem);
 }
 [data-setting-highlight] {

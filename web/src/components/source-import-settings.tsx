@@ -35,7 +35,6 @@ export function SourceImportSettings() {
         id="import-execution-settings"
         ref={container}
         title="Import execution"
-        className="scroll-mt-6"
         open={open}
         onOpenChange={setOpen}
       >

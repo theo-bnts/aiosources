@@ -746,15 +746,16 @@ function ShareForm({
           method: 'PUT',
           body: JSON.stringify(body),
         })
+        await refreshData()
         onSaved()
       } else {
         const result = await api<SharePassword>(endpoint, {
           method: 'POST',
           body: JSON.stringify(body),
         })
+        await refreshData()
         onSaved(result)
       }
-      await refreshData()
     },
     onMutate: () => onSaving(true),
     onSettled: () => onSaving(false),
@@ -775,8 +776,9 @@ function ShareForm({
         if (scope === original.scope) setScope(current.scope)
         if (JSON.stringify(sourceIDs) === JSON.stringify(original.source_ids))
           setSourceIDs(current.source_ids)
-        if (JSON.stringify(fields) === JSON.stringify(original.fields)) setFields(current.fields)
-        if (JSON.stringify(catalogEntities) === JSON.stringify(original.catalog_entities ?? {}))
+        if ([...fields].sort().join(',') === [...original.fields].sort().join(','))
+          setFields(current.fields)
+        if (catalogEntitiesKey(catalogEntities) === catalogEntitiesKey(original.catalog_entities))
           setCatalogEntities(current.catalog_entities ?? {})
         if (expiresAt === (original.expires_at ?? '')) setExpiresAt(current.expires_at ?? '')
         if (requestsPerMinute === limitValue(original.requests_per_minute, requestsDefault))
@@ -823,8 +825,10 @@ function ShareForm({
       catalogEntitiesKey(catalogEntities) !== catalogEntitiesKey(original?.catalog_entities)) ||
     [...fields].sort().join(',') !== [...(original?.fields ?? data.fields)].sort().join(',') ||
     expiresAt !== (original?.expires_at ?? '') ||
-    requestsPerMinute !== limitValue(original?.requests_per_minute, requestsDefault) ||
-    maxConcurrentDownloads !== limitValue(original?.max_concurrent_downloads, concurrentDefault)
+    (connection && requestsPerMinute.trim() === '0' ? '' : requestsPerMinute) !==
+      limitValue(original?.requests_per_minute, requestsDefault) ||
+    (connection && maxConcurrentDownloads.trim() === '0' ? '' : maxConcurrentDownloads) !==
+      limitValue(original?.max_concurrent_downloads, concurrentDefault)
   useUnsavedChanges(
     dirty,
     stremio ? 'Stremio access' : torznab ? 'Torznab access' : 'catalog sharing',

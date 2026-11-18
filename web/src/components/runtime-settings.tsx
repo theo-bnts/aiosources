@@ -35,6 +35,7 @@ export function RuntimeSettingsPanel({
   const save = useMutation({
     mutationFn: (value: Settings) =>
       api<Settings>(path, { method: 'PUT', body: JSON.stringify(value) }),
+    onMutate: () => client.cancelQueries({ queryKey }),
     onSuccess: async (result) => {
       await client.cancelQueries({ queryKey })
       client.setQueryData<Settings>(queryKey, (current) =>

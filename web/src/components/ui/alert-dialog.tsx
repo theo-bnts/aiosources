@@ -37,10 +37,17 @@ function AlertDialogOverlay({
 function AlertDialogContent({
   className,
   size = 'default',
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: 'default' | 'sm'
 }) {
+  const previousFocus = React.useRef<HTMLElement | null>(null)
+  React.useLayoutEffect(() => {
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      previousFocus.current = document.activeElement
+    }
+  }, [])
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
@@ -51,6 +58,17 @@ function AlertDialogContent({
           'group/alert-dialog-content fixed top-[50%] left-[50%] z-(--layer-dialog) grid grid-cols-[minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] max-h-[90dvh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg',
           className,
         )}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          queueMicrotask(() => {
+            if (
+              (document.activeElement === document.body || document.activeElement === null) &&
+              previousFocus.current?.isConnected
+            ) {
+              previousFocus.current.focus({ preventScroll: true })
+            }
+          })
+        }}
         {...props}
       />
     </AlertDialogPortal>

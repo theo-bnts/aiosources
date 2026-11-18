@@ -6,7 +6,7 @@ import { usePublicSearch, visitorAPI } from '@/lib/public-search'
 import { useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
 import { browserLanguage } from '@/lib/language-preferences'
-import { readResultSorting } from '@/lib/result-preferences'
+import { readResponseSeconds, readResultSorting } from '@/lib/result-preferences'
 import type { CatalogRelease } from '@/lib/catalog-search-types'
 import type { Items, Page, ProviderSummary } from '@/lib/types'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
@@ -39,7 +39,7 @@ export function CatalogTorrentsPage() {
   const sorting = readResultSorting(search.get('sorting')).filter(
     (rule) => rule.field !== 'language' && (discloseSources || rule.field !== 'source'),
   )
-  const responseSeconds = Number(search.get('response_seconds')) || undefined
+  const responseSeconds = readResponseSeconds(search.get('response_seconds'))
   const sources = useQuery({
     queryKey: ['providers'],
     enabled: !visitor,
@@ -74,6 +74,7 @@ export function CatalogTorrentsPage() {
     if (key !== 'q' && formRef.current) {
       const draftQ = String(new FormData(formRef.current).get('q') || '').trim()
       if (draftQ.length >= 2) next.set('q', draftQ)
+      else if (!draftQ) next.delete('q')
     }
     value ? next.set(key, value) : next.delete(key)
     next.delete('offset')

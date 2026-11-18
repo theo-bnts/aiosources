@@ -52,29 +52,43 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     } else proceed()
   }, [])
   const guard = useMemo(() => ({ register, discard }), [register, discard])
+  const samePageBlocked = useRef(false)
   const blocker = useBlocker(
     useCallback(({ currentLocation, nextLocation }) => {
       if (!entries.current.size) return false
-      if (currentLocation.pathname !== nextLocation.pathname) return true
+      if (currentLocation.pathname !== nextLocation.pathname) {
+        samePageBlocked.current = false
+        return true
+      }
+      if (![...entries.current.values()].some((entry) => entry.scope !== null)) return false
       const editor = document.querySelector<HTMLElement>(
         '[data-settings-editor]:not([data-settings-editor="source"])',
       )
       if (!editor?.dataset.settingsEditor || !editor.dataset.settingsEntity) return false
-      return changesSettingsEditor(currentLocation, nextLocation, {
+      const blocked = changesSettingsEditor(currentLocation, nextLocation, {
         entity: editor.dataset.settingsEditor as SettingsEditorIdentity['entity'],
         id: editor.dataset.settingsEntity,
       })
+      samePageBlocked.current = blocked
+      return blocked
     }, []),
   )
-  const dirty = [...entries.current.values()].filter(
-    (entry) => !closing || closing.scope === 'all' || entry.scope === closing.scope,
+  const samePageBlocker = !closing && blocker.state === 'blocked' && samePageBlocked.current
+  const dirty = [...entries.current.values()].filter((entry) =>
+    closing
+      ? closing.scope === 'all' || entry.scope === closing.scope
+      : !samePageBlocker || entry.scope !== null,
   )
   const pending = dirty.some((entry) => entry.pending)
   const open = closing !== null || blocker.state === 'blocked'
-  const cancel = () => {
+  const cancel = useCallback(() => {
     setClosing(null)
     if (blocker.state === 'blocked') blocker.reset()
-  }
+  }, [blocker])
+  useEffect(() => {
+    window.addEventListener('session-expired', cancel)
+    return () => window.removeEventListener('session-expired', cancel)
+  }, [cancel])
   useEffect(() => {
     if (!entries.current.size) return
     const beforeUnload = (event: BeforeUnloadEvent) => {

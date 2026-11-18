@@ -15,6 +15,12 @@ function findControl(root: HTMLElement, label: string) {
     'label, [aria-label], h2, h3, h4, legend, button, summary',
   )) {
     if (
+      element.matches(
+        'form, section, nav, aside, header, main, [role="region"], [role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [role="tablist"], [role="tabpanel"]',
+      )
+    )
+      continue
+    if (
       normalizeSettingQuery(
         element.getAttribute('aria-label') ??
           (element.tagName === 'SUMMARY'
@@ -68,7 +74,7 @@ export function SettingsDestination() {
         )?.trim()
         if (title && setting.reveal?.includes(title) && !opened.has(summary)) {
           opened.add(summary)
-          revealSettingParents(summary.parentElement!)
+          revealSettingParents(summary.parentElement!, opened)
           summary.click()
           if (!summary.parentElement?.hasAttribute('open')) waitingForOpen = true
         }
@@ -104,7 +110,11 @@ export function SettingsDestination() {
       if (!control) return
       // A section destination reveals its content as well as its parent sections.
       if (control instanceof HTMLDetailsElement && !control.open) {
-        control.querySelector<HTMLElement>(':scope > summary')?.click()
+        const summary = control.querySelector<HTMLElement>(':scope > summary')
+        if (summary && !opened.has(summary)) {
+          opened.add(summary)
+          summary.click()
+        }
         return
       }
       if (
@@ -112,10 +122,13 @@ export function SettingsDestination() {
         control.parentElement instanceof HTMLDetailsElement &&
         !control.parentElement.open
       ) {
-        control.click()
+        if (!opened.has(control)) {
+          opened.add(control)
+          control.click()
+        }
         return
       }
-      if (revealSettingParents(control)) return
+      if (revealSettingParents(control, opened)) return
       if (!control.getClientRects().length) return
       // Let dialog autofocus and AppShell navigation focus finish first.
       finished = true
@@ -128,6 +141,15 @@ export function SettingsDestination() {
               ? (control.closest<HTMLElement>('.field') ?? control.parentElement ?? control)
               : control,
           )
+        } else {
+          finished = false
+          observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['open', 'data-state', 'disabled'],
+          })
+          schedule()
         }
       })
     }

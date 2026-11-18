@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, params, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
+import { useListViewState } from '@/lib/detail-navigation'
 import { bytes, number, percentage, useDate } from '@/lib/format'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
 import type { SourceTorrentOverview, SourceTorrentStats as TorrentStats } from '@/lib/types'
@@ -34,6 +35,7 @@ export function SourceTorrentStats({
   remote?: boolean
 }) {
   const date = useDate()
+  const listState = useListViewState()
   if (!counts)
     return (
       <p className={`text-sm ${unavailable ? 'text-destructive' : 'text-muted-foreground'}`}>
@@ -99,6 +101,7 @@ export function SourceTorrentStats({
           <Link
             className="data-link tabular-nums"
             to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(counts.pending_import.run_id)}`}
+            state={listState}
           >
             {number(counts.pending_import.torrents)} awaiting import completion
             {totals && (

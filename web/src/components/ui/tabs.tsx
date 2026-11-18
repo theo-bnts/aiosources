@@ -75,7 +75,12 @@ function TabsList({
     }
     revealActiveTab()
     const selection = new MutationObserver(revealActiveTab)
-    selection.observe(element, { subtree: true, attributes: true, attributeFilter: ['data-state'] })
+    selection.observe(element, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state'],
+    })
     const size = new ResizeObserver(revealActiveTab)
     size.observe(element)
     if (viewport.current) size.observe(viewport.current)
@@ -84,7 +89,7 @@ function TabsList({
       selection.disconnect()
       size.disconnect()
     }
-  }, [])
+  }, [orientation])
   const content = (
     <TabsPrimitive.List
       ref={setRef}

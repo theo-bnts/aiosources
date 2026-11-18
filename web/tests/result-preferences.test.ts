@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  readResponseSeconds,
   readResultSorting,
   resultPreferences,
   type SortRule,
@@ -43,7 +44,12 @@ test('malformed URL sorting cannot crash the search controls', () => {
     '[1]',
     '[{"field":"private","direction":"asc"}]',
     '[{"field":"name","direction":"up"}]',
+    '[{"field":"name","direction":"asc","extra":true}]',
     '[{"field":"age","direction":"asc"},{"field":"published","direction":"desc"}]',
   ])
     assert.deepEqual(readResultSorting(raw), [])
+  assert.equal(readResponseSeconds(null), undefined)
+  assert.equal(readResponseSeconds('0'), undefined)
+  assert.equal(readResponseSeconds('61'), undefined)
+  assert.equal(readResponseSeconds('15'), 15)
 })

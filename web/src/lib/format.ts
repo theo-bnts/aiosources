@@ -101,6 +101,11 @@ export function dateTimeToISO(
   // Untouched fields retain fractional seconds and the offset of a repeated DST hour.
   if (previous && localDateTime(previous, precision) === value) return previous
   const parsed = new Date(browserPreferences().timeZone === 'utc' ? value + 'Z' : value)
-  if (Number.isNaN(parsed.getTime())) return null
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getUTCFullYear() < 1 ||
+    parsed.getUTCFullYear() > 9999
+  )
+    return null
   return parsed.toISOString()
 }

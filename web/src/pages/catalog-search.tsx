@@ -7,7 +7,7 @@ import { FilterSelect } from '@/components/filter-select'
 import { catalogMediaTypes } from '@/lib/connection-options'
 import { Disclosure } from '@/components/ui/disclosure'
 import { ResultSorting, ResponseTimeout } from '@/components/result-controls'
-import { readResultSorting } from '@/lib/result-preferences'
+import { readResponseSeconds, readResultSorting } from '@/lib/result-preferences'
 import { LanguageFilter } from '@/components/language-filter'
 import {
   useLanguagePreferences,
@@ -330,7 +330,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
             : null,
         )
   ).filter((rule) => discloseSources || rule.field !== 'source')
-  const responseSeconds = Number(search.get('response_seconds')) || undefined
+  const responseSeconds = readResponseSeconds(search.get('response_seconds'))
   const cachedOnly = search.get('cached_only') === 'true'
   const provider = discloseSources ? search.get('provider') || '' : ''
   const query = params({
@@ -338,7 +338,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     language,
     language_mode: preferences.mode,
     sort,
-    sorting: search.has('sorting') ? JSON.stringify(sorting) : '',
+    sorting: search.has('sorting') && sorting.length ? JSON.stringify(sorting) : '',
     response_seconds: responseSeconds,
     provider,
     cached_only: String(cachedOnly),

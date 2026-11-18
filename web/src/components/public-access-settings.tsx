@@ -65,7 +65,14 @@ export function PublicAccessSettings() {
   const save = useMutation({
     mutationFn: (value: Access) =>
       api('/public-access', { method: 'PUT', body: JSON.stringify(value) }),
-    onSuccess: async () => {
+    onMutate: () => queryClient.cancelQueries({ queryKey: ['public-access'] }),
+    onSuccess: async (_result, submitted) => {
+      await queryClient.cancelQueries({ queryKey: ['public-access'] })
+      queryClient.setQueryData<Access>(['public-access'], (current) =>
+        current && current.revision > submitted.revision
+          ? current
+          : { ...submitted, revision: submitted.revision + 1 },
+      )
       setDraft(undefined)
       await queryClient.invalidateQueries({ queryKey: ['public-access'] })
       await queryClient.invalidateQueries({ queryKey: ['public-config'] })
@@ -77,42 +84,50 @@ export function PublicAccessSettings() {
     onSuccess: async (latest) => {
       await queryClient.cancelQueries({ queryKey: ['public-access'] })
       queryClient.setQueryData(['public-access'], latest)
-      setDraft((draft) =>
-        draft
-          ? {
-              base: latest,
-              value: {
-                ...latest,
-                use_instance_debrid:
-                  draft.value.use_instance_debrid !== draft.base.use_instance_debrid
-                    ? draft.value.use_instance_debrid
-                    : latest.use_instance_debrid,
-                use_instance_announces:
-                  draft.value.use_instance_announces !== draft.base.use_instance_announces
-                    ? draft.value.use_instance_announces
-                    : latest.use_instance_announces,
-                enabled:
-                  draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
-                search_enabled:
-                  draft.value.search_enabled !== draft.base.search_enabled
-                    ? draft.value.search_enabled
-                    : latest.search_enabled,
-                stremio_enabled:
-                  draft.value.stremio_enabled !== draft.base.stremio_enabled
-                    ? draft.value.stremio_enabled
-                    : latest.stremio_enabled,
-                torznab_enabled:
-                  draft.value.torznab_enabled !== draft.base.torznab_enabled
-                    ? draft.value.torznab_enabled
-                    : latest.torznab_enabled,
-                catalog_enabled:
-                  draft.value.catalog_enabled !== draft.base.catalog_enabled
-                    ? draft.value.catalog_enabled
-                    : latest.catalog_enabled,
-              },
-            }
-          : undefined,
-      )
+      setDraft((draft) => {
+        if (!draft) return undefined
+        const value: Access = {
+          ...latest,
+          use_instance_debrid:
+            draft.value.use_instance_debrid !== draft.base.use_instance_debrid
+              ? draft.value.use_instance_debrid
+              : latest.use_instance_debrid,
+          use_instance_announces:
+            draft.value.use_instance_announces !== draft.base.use_instance_announces
+              ? draft.value.use_instance_announces
+              : latest.use_instance_announces,
+          enabled:
+            draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
+          search_enabled:
+            draft.value.search_enabled !== draft.base.search_enabled
+              ? draft.value.search_enabled
+              : latest.search_enabled,
+          stremio_enabled:
+            draft.value.stremio_enabled !== draft.base.stremio_enabled
+              ? draft.value.stremio_enabled
+              : latest.stremio_enabled,
+          torznab_enabled:
+            draft.value.torznab_enabled !== draft.base.torznab_enabled
+              ? draft.value.torznab_enabled
+              : latest.torznab_enabled,
+          catalog_enabled:
+            draft.value.catalog_enabled !== draft.base.catalog_enabled
+              ? draft.value.catalog_enabled
+              : latest.catalog_enabled,
+        }
+        if (
+          value.enabled === latest.enabled &&
+          value.use_instance_debrid === latest.use_instance_debrid &&
+          value.use_instance_announces === latest.use_instance_announces &&
+          value.search_enabled === latest.search_enabled &&
+          value.stremio_enabled === latest.stremio_enabled &&
+          value.torznab_enabled === latest.torznab_enabled &&
+          value.catalog_enabled === latest.catalog_enabled
+        ) {
+          return undefined
+        }
+        return { base: latest, value }
+      })
       save.reset()
     },
   })
