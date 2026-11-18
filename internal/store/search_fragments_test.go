@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
@@ -108,6 +109,40 @@ func TestTorrentSearchFragmentsAndQueryOperators(t *testing.T) {
 	filtered, err := db.ListTorrents(ctx, model.ListOptions{Query: "gain OR 宇宙", Providers: []string{"remote-example"}})
 	if err != nil || filtered.Total != 1 || filtered.Items[0].ProviderID != "remote-example" {
 		t.Fatalf("query alternative bypassed the source filter: %+v %v", filtered, err)
+	}
+}
+
+func TestLongDottedTitleKeepsItsFinalSearchFragments(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	const prefix = "Archive.Journal.Feature.Restored.Edition.Volume.2024.AV1"
+	for _, entry := range []struct{ id, suffix string }{
+		{"french", "FRENCH.REMUX"},
+		{"german", "GERMAN.REMUX"},
+	} {
+		fields, err := json.Marshal(map[string]string{"title": prefix + "." + entry.suffix})
+		if err != nil {
+			t.Fatal(err)
+		}
+		publishSharingRow(t, ctx, db, "fixture", entry.id, string(fields), nil)
+	}
+	for _, test := range []struct{ query, want string }{
+		{prefix + ".FRENCH.REMUX", "french"},
+		{strings.ReplaceAll(prefix+".FRENCH.REMUX", ".", " "), "french"},
+		{"Archive -" + prefix + ".FRENCH.REMUX", "german"},
+	} {
+		opts := model.ListOptions{Query: test.query}
+		files, err := db.ListTorrents(ctx, opts)
+		if err != nil || files.Total != 1 || len(files.Items) != 1 || files.Items[0].SourceID != test.want {
+			t.Fatalf("files: unexpected results for %q: %+v, %v", test.query, files, err)
+		}
+		results, err := db.ListAIOMatchDiagnostics(ctx, opts)
+		if err != nil || results.Total != 1 || len(results.Items) != 1 || results.Items[0].SourceID != test.want {
+			t.Fatalf("identification: unexpected results for %q: %+v, %v", test.query, results, err)
+		}
+		direct, err := db.CatalogTorrentRecords(ctx, opts, nil, CatalogTorrentPolicy{CacheAfter: time.Now()})
+		if err != nil || direct.Total != 1 || len(direct.Items) != 1 || direct.Items[0].SourceID != test.want {
+			t.Fatalf("direct search: unexpected results for %q: %+v, %v", test.query, direct, err)
+		}
 	}
 }
 

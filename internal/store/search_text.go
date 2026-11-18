@@ -9,8 +9,9 @@ import (
 
 const torrentSearchTextSQL = "aiosources.torrent_search_text(provider_id,source_id,fields)"
 const (
-	maxSearchWords  = 24
-	maxSearchGroups = 8
+	maxSearchWords         = 24
+	maxSearchGroups        = 8
+	indexedSearchFragments = 8
 )
 
 func searchWords(text string) []string {
@@ -118,13 +119,21 @@ func torrentTextSearchSQLFor(alias, query string, bind func(any) string) string 
 				fragments := []string{term.text}
 				if !strings.ContainsAny(term.text, `%_\`) {
 					fragments = strings.FieldsFunc(term.text, unicode.IsPunct)
-					if len(fragments) > 8 {
-						fragments = fragments[:8]
-					}
 				}
-				parts := []string{}
-				for _, fragment := range fragments {
+				indexed := min(len(fragments), indexedSearchFragments)
+				parts := make([]string, 0, indexed+1)
+				for _, fragment := range fragments[:indexed] {
 					parts = append(parts, document+" ILIKE "+bind("%"+escapeSearchFragment.Replace(fragment)+"%")+" ESCAPE '\\'")
+				}
+				// Keep indexable predicates for the first fragments and apply
+				// the rest as one bound array. Long release names keep every
+				// fragment without adding a separate SQL expression for each one.
+				if tail := fragments[indexed:]; len(tail) > 0 {
+					patterns := make([]string, len(tail))
+					for i, fragment := range tail {
+						patterns[i] = "%" + escapeSearchFragment.Replace(fragment) + "%"
+					}
+					parts = append(parts, document+" ILIKE ALL("+bind(patterns)+"::text[])")
 				}
 				if len(parts) == 0 {
 					predicate = "FALSE"
