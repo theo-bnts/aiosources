@@ -2,7 +2,7 @@
 
 [Back to README](../README.md) · [Installation settings](SETTINGS.md)
 
-**Administration → Network** separates incoming requests from outgoing service connections. Incoming settings recognize visitors behind a reverse proxy; outgoing settings route AIOSources through an existing WARP, VPN or compatible proxy.
+**Administration → Network** separates incoming requests from outgoing service connections. Incoming settings recognize visitors behind a reverse proxy. Outgoing settings route requests through an existing WARP, VPN, standard proxy or MediaFlow Proxy Light.
 
 ## Incoming proxies
 
@@ -18,7 +18,7 @@ Public quotas are configured separately in **Administration → Security → Lim
 
 ## Outgoing proxies
 
-AIOSources uses an existing proxy; it does not install or start WARP or a VPN. Supported addresses use `http://`, `https://`, `socks5://` or `socks5h://`. HTTP proxies must support HTTPS tunneling.
+For WARP, a VPN or another standard proxy, use an address starting with `http://`, `https://`, `socks5://` or `socks5h://`. HTTP proxies must support HTTPS tunneling.
 
 1. Open **Network → Outgoing → Proxies → Add proxy**.
 2. Name the connection and enter an address reachable from AIOSources, such as `socks5://warp:40000`.
@@ -29,6 +29,26 @@ AIOSources uses an existing proxy; it does not install or start WARP or a VPN. S
 Set a default connection, or choose exceptions for individual sources, metadata, debrid services, remote catalogs and browser downloads. For an AllDebrid-only proxy, leave the default unchanged and select that proxy beside **AllDebrid**.
 
 A selected proxy that becomes unavailable blocks its assigned requests; AIOSources does not silently fall back to a direct connection. Change its assignments before deleting it. Deleting a proxy does not delete its reusable Secrets.
+
+### MediaFlow Proxy
+
+Configure MediaFlow Proxy Light with a strong API password and these environment variables:
+
+```yaml
+APP__PROXY__FOLLOW_REDIRECTS: "false"
+RUST_LOG: "info,actix_web::middleware::logger=off"
+```
+
+Current MediaFlow Proxy Light releases can log decrypted provider keys in their access logs. Disable those logs before routing requests and keep TLS verification enabled. Use the relay's default forwarding route. The Python version's forwarding endpoint follows redirects automatically and is incompatible with this setup. [MediaFlow Light settings](https://github.com/mhdzumair/mediaflow-proxy-light/blob/main/docs/configuration/environment.md#proxy) · [Python forwarding endpoint](https://github.com/mhdzumair/mediaflow-proxy/blob/main/mediaflow_proxy/routes/proxy.py)
+
+1. Under **Add proxy**, select **MediaFlow Proxy** and enter its base URL, such as `http://mediaflow-proxy:8888` on a private Docker network.
+2. Save its **API password** in Secrets and select it in the form.
+3. Save and select **Test connection**. The test verifies the relay's exit address and redirect handling using `www.cloudflare.com`.
+4. Enable the proxy and select it for a service under **Routing → Debrid**.
+
+MediaFlow forwards the selected services' API requests. Choose a separate **Browser downloads** connection if you download through those services. For an IP-bound download, use a standard proxy on the same exit IP. Stremio playback links continue to open in the player.
+
+Keep the relay on a trusted network and use HTTPS across hosts you do not control. The relay processes provider authorization and request bodies, so limit who can access it and its logs.
 
 ### WARP and Docker
 

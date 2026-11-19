@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/netip"
@@ -73,11 +74,15 @@ func (s *server) testNetworkProxy(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
+	target := ""
 	found := false
 	for i := range settings.Proxies {
 		if settings.Proxies[i].ID == input.ID {
 			// Test a saved disabled profile before directing live work through it.
 			settings.Proxies[i].Enabled = true
+			if settings.Proxies[i].Type == model.NetworkMediaFlow {
+				target = "debrid:alldebrid"
+			}
 			found = true
 			break
 		}
@@ -86,21 +91,30 @@ func (s *server) testNetworkProxy(w http.ResponseWriter, r *http.Request) {
 		respondError(w, model.ErrNotFound)
 		return
 	}
-	settings.Default, settings.Overrides = input.ID, map[string]string{}
+	settings.Default, settings.Overrides = model.NetworkSystem, map[string]string{}
+	if target == "" {
+		settings.Default = input.ID
+	} else {
+		settings.Overrides[target] = input.ID
+	}
 	router := &outbound.Router{Settings: func(context.Context) (model.NetworkSettings, error) { return settings, nil }, Secrets: s.options.Vault.Resolve}
-	transport := router.Transport("", outbound.HTTPTransport())
+	transport := router.Transport(target, outbound.HTTPTransport())
 	defer transport.CloseIdleConnections()
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	started := time.Now()
-	// Fixed public HTTPS destination: this endpoint is never an open proxy or
-	// an arbitrary URL fetcher, and sends no source or service credentials.
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.cloudflare.com/cdn-cgi/trace", nil)
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	message := "Proxy connection test failed. Check the proxy address, credentials and network access."
+	if target != "" {
+		err = checkMediaFlowRedirect(ctx, client)
+		if err != nil {
+			message = err.Error()
+		}
+	}
 	var ip, warp string
 	if err == nil {
 		var response *http.Response
-		response, err = client.Do(request)
+		response, err = networkProbe(ctx, client, "/cdn-cgi/trace")
 		if err == nil {
 			var body []byte
 			body, err = io.ReadAll(io.LimitReader(response.Body, 8193))
@@ -132,8 +146,30 @@ func (s *server) testNetworkProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if kind == "network.test_failed" {
-		writeError(w, http.StatusBadGateway, "Proxy connection test failed. Check the proxy address, credentials and network access.")
+		writeError(w, http.StatusBadGateway, message)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"exit_ip": ip, "warp": warp, "duration_ms": time.Since(started).Milliseconds()})
+}
+
+func networkProbe(ctx context.Context, client *http.Client, path string) (*http.Response, error) {
+	// Fixed public HTTPS destinations. Tests carry no service credentials.
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.cloudflare.com"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return client.Do(request)
+}
+
+func checkMediaFlowRedirect(ctx context.Context, client *http.Client) error {
+	response, err := networkProbe(ctx, client, "/ips")
+	if err != nil {
+		return outbound.ErrUnavailable
+	}
+	defer response.Body.Close()
+	location, err := response.Location()
+	if response.StatusCode < 300 || response.StatusCode >= 400 || err != nil || location.String() != "https://www.cloudflare.com/ips/" {
+		return errors.New("MediaFlow Proxy did not return the expected redirect. Check that MediaFlow Proxy Light has APP__PROXY__FOLLOW_REDIRECTS=false and can reach www.cloudflare.com")
+	}
+	return nil
 }

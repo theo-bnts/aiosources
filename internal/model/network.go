@@ -12,18 +12,29 @@ import (
 
 const NetworkSystem = "system"
 const NetworkDirect = "direct"
+const NetworkMediaFlow = "mediaflow"
 
 var networkID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 var networkSecret = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 var networkTarget = regexp.MustCompile(`^(source|metadata|debrid|download):[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$`)
 
 type NetworkProxy struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	URL         string `json:"url"`
-	Enabled     bool   `json:"enabled"`
-	UsernameRef string `json:"username_ref,omitempty"`
-	PasswordRef string `json:"password_ref,omitempty"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	Enabled        bool   `json:"enabled"`
+	Type           string `json:"type,omitempty"`
+	UsernameRef    string `json:"username_ref,omitempty"`
+	PasswordRef    string `json:"password_ref,omitempty"`
+	APIPasswordRef string `json:"api_password_ref,omitempty"`
+}
+
+func (p NetworkProxy) SupportsTarget(target string) bool {
+	if p.Type != NetworkMediaFlow {
+		return true
+	}
+	service, ok := strings.CutPrefix(target, "debrid:")
+	return ok && IsDebridService(service)
 }
 
 type NetworkSettings struct {
@@ -47,9 +58,10 @@ func (s NetworkSettings) Validate() error {
 	if s.Revision < 1 || len(s.Proxies) > 32 || len(s.Overrides) > 4096 {
 		return errors.New("Network settings exceed their limits or have an invalid revision")
 	}
-	known := map[string]bool{NetworkSystem: true, NetworkDirect: true}
+	known := map[string]NetworkProxy{NetworkSystem: {}, NetworkDirect: {}}
 	for _, proxy := range s.Proxies {
-		if !networkID.MatchString(proxy.ID) || known[proxy.ID] || strings.TrimSpace(proxy.Name) == "" || len(proxy.Name) > 160 || strings.ContainsAny(proxy.Name, "\r\n\x00") {
+		_, duplicate := known[proxy.ID]
+		if !networkID.MatchString(proxy.ID) || duplicate || strings.TrimSpace(proxy.Name) == "" || len(proxy.Name) > 160 || strings.ContainsAny(proxy.Name, "\r\n\x00") {
 			return errors.New("Each proxy needs a unique ID and a display name")
 		}
 		u, err := url.Parse(proxy.URL)
@@ -67,17 +79,40 @@ func (s NetworkSettings) Validate() error {
 				return errors.New("Proxy port must be between 1 and 65535")
 			}
 		}
-		if (proxy.UsernameRef == "") != (proxy.PasswordRef == "") || (proxy.UsernameRef != "" && (!networkSecret.MatchString(proxy.UsernameRef) || !networkSecret.MatchString(proxy.PasswordRef))) {
-			return errors.New("Proxy authentication requires both username and password secret references")
+		switch proxy.Type {
+		case "":
+			if proxy.APIPasswordRef != "" {
+				return errors.New("An API password requires a MediaFlow Proxy profile")
+			}
+			if (proxy.UsernameRef == "") != (proxy.PasswordRef == "") || (proxy.UsernameRef != "" && (!networkSecret.MatchString(proxy.UsernameRef) || !networkSecret.MatchString(proxy.PasswordRef))) {
+				return errors.New("Proxy authentication requires both username and password secret references")
+			}
+		case NetworkMediaFlow:
+			if u.Scheme != "http" && u.Scheme != "https" {
+				return errors.New("MediaFlow Proxy requires an HTTP or HTTPS address")
+			}
+			if proxy.UsernameRef != "" || proxy.PasswordRef != "" || !networkSecret.MatchString(proxy.APIPasswordRef) {
+				return errors.New("Select a MediaFlow Proxy API password from Secrets")
+			}
+		default:
+			return errors.New("Select a supported proxy type")
 		}
-		known[proxy.ID] = true
+		known[proxy.ID] = proxy
 	}
-	if !known[s.Default] {
+	defaultProxy, ok := known[s.Default]
+	if !ok {
 		return errors.New("Select an existing default connection")
 	}
+	if !defaultProxy.SupportsTarget("") {
+		return errors.New("Use MediaFlow Proxy for individual debrid services in Routing")
+	}
 	for target, route := range s.Overrides {
-		if (!networkTarget.MatchString(target) && target != "downloads") || !known[route] {
+		proxy, ok := known[route]
+		if (!networkTarget.MatchString(target) && target != "downloads") || !ok {
 			return errors.New("Each connection override needs a valid target and an existing proxy or direct connection")
+		}
+		if !proxy.SupportsTarget(target) {
+			return errors.New("MediaFlow Proxy can relay debrid API requests only")
 		}
 	}
 	return nil

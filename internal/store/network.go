@@ -74,9 +74,7 @@ func (s *Store) UpdateNetworkSettings(ctx context.Context, input model.NetworkSe
 	}
 	var references []string
 	for _, proxy := range input.Proxies {
-		if proxy.UsernameRef != "" {
-			references = append(references, proxy.UsernameRef, proxy.PasswordRef)
-		}
+		references = append(references, proxy.UsernameRef, proxy.PasswordRef, proxy.APIPasswordRef)
 	}
 	if err := lockSecretReferences(ctx, tx, references, model.ErrInvalid, "lock proxy credential"); err != nil {
 		return err

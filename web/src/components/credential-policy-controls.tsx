@@ -38,7 +38,7 @@ export function CredentialPolicyControls({
         />
         <Label
           htmlFor={`${id}-announces`}
-          help="When enabled, uncached private-source downloads can use the instance’s announce URLs. Torznab clients receive these URLs in magnets: enable only for recipients you authorize to receive them. When disabled, personal announce URLs are required for uncached private sources. Cached-only results never include an announce URL."
+          help="When enabled, uncached private-source downloads can use the instance’s announce URLs. Torznab clients receive the full URL in magnets, including any passkey. When disabled, users need personal announce URLs for uncached private sources. Cached-only results omit announce URLs."
         >
           Use instance announce URLs
         </Label>

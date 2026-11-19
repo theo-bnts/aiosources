@@ -55,4 +55,21 @@ func TestNetworkSettingsRevisionsSecretsDeletionAndAtomicLogs(t *testing.T) {
 	if err := db.DeleteSecret(ctx, "proxy-password"); err != nil {
 		t.Fatal("An unused proxy secret could not be explicitly removed")
 	}
+	saved, err = db.NetworkSettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved.Proxies = []model.NetworkProxy{{ID: "mediaflow", Name: "Relay", Type: model.NetworkMediaFlow, URL: "https://relay.example.test", APIPasswordRef: "proxy-password"}}
+	if err := db.UpdateNetworkSettings(ctx, saved); !errors.Is(err, model.ErrInvalid) {
+		t.Fatal("A password-only proxy accepted a missing secret")
+	}
+	if err := db.PutSecret(ctx, "proxy-password", []byte("synthetic-encrypted-value")); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpdateNetworkSettings(ctx, saved); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteSecret(ctx, "proxy-password"); !errors.Is(err, model.ErrConflict) {
+		t.Fatal("A password-only proxy lost its credential")
+	}
 }

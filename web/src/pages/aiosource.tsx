@@ -699,7 +699,7 @@ export default function AIOSourcePage({
                 1,
                 40,
                 'videos-requests',
-                'TMDB rate limits can vary. Lower this value if you share credentials with other services or regularly hit the provider limit.',
+                'Lower this rate if several applications use the same TMDB token or if TMDB regularly limits requests.',
               )}
               {footer('videos-requests')}
             </form>

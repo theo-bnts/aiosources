@@ -1,5 +1,5 @@
 // Package outbound routes application HTTP connections through administrator
-// selected proxies. It never changes destinations, redirects or TLS validation.
+// selected proxies and API relays.
 package outbound
 
 import (
@@ -85,6 +85,8 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 	route := settings.Route(target)
 	var selected DialFunc
+	var relay *url.URL
+	var relayPassword string
 	identity := route
 	if route != model.NetworkSystem && route != model.NetworkDirect {
 		var profile *model.NetworkProxy
@@ -94,32 +96,40 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 				break
 			}
 		}
-		if profile == nil || !profile.Enabled {
+		if profile == nil || !profile.Enabled || !profile.SupportsTarget(target) {
 			return nil, ErrUnavailable
 		}
 		u, _ := url.Parse(profile.URL) // The complete saved object was validated above.
 		username, password := "", ""
-		if profile.UsernameRef != "" {
+		passwordRef := profile.PasswordRef
+		if profile.Type == model.NetworkMediaFlow {
+			passwordRef = profile.APIPasswordRef
+		}
+		if passwordRef != "" {
 			if t.router.Secrets == nil {
 				return nil, ErrUnavailable
 			}
-			username, err = t.router.Secrets(ctx, profile.UsernameRef)
-			if err == nil {
-				password, err = t.router.Secrets(ctx, profile.PasswordRef)
+			password, err = t.router.Secrets(ctx, passwordRef)
+			if err == nil && profile.UsernameRef != "" {
+				username, err = t.router.Secrets(ctx, profile.UsernameRef)
 			}
-			if err != nil || username == "" || password == "" {
+			if err != nil || password == "" || (profile.UsernameRef != "" && username == "") {
 				if ctx.Err() != nil {
 					return nil, ctx.Err()
 				}
 				return nil, ErrUnavailable
 			}
 		}
-		selected, err = proxyDialer(u, username, password)
-		if err != nil {
-			return nil, ErrUnavailable
+		if profile.Type == model.NetworkMediaFlow {
+			relay, relayPassword = u, password
+		} else {
+			selected, err = proxyDialer(u, username, password)
+			if err != nil {
+				return nil, ErrUnavailable
+			}
 		}
 		// Distinct credentials never share authenticated proxy connections.
-		identity = fmt.Sprintf("%s\x00%s\x00%s\x00%s", route, profile.URL, username, password)
+		identity = fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s", route, profile.Type, profile.URL, username, password)
 	}
 	key := sha256.Sum256([]byte(identity))
 	var stale []*http.Transport
@@ -143,6 +153,9 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	t.mu.Unlock()
 	for _, old := range stale {
 		old.CloseIdleConnections()
+	}
+	if relay != nil {
+		return mediaFlowRoundTrip(transport, request, relay, relayPassword)
 	}
 	if selected != nil {
 		request = request.Clone(context.WithValue(ctx, dialKey{}, selected))

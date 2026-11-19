@@ -146,6 +146,9 @@ export function NetworkPage() {
                     <div className="min-w-0 flex-1">
                       <h2 className="section-title break-words">{proxy.name}</h2>
                       <p className="mono mt-1 break-all text-muted-foreground">{proxy.url}</p>
+                      {proxy.type === 'mediaflow' && (
+                        <p className="help">MediaFlow Proxy · Debrid API</p>
+                      )}
                     </div>
                     <Switch
                       checked={proxy.enabled}
@@ -267,6 +270,7 @@ function ProxyEditor({
   const query = useNetworkSettings()
   const [base, setBase] = useState(snapshot)
   const [draft, setDraft] = useState(initial)
+  const mediaFlow = draft.type === 'mediaflow'
   const save = useSaveNetwork(onClose)
   const existing = base.proxies.some((proxy) => proxy.id === draft.id)
   const dirty =
@@ -293,8 +297,10 @@ function ProxyEditor({
     save.reset()
     setDraft((current) => {
       const next = { ...current, ...change }
+      if (!next.type) delete next.type
       if (!next.username_ref) delete next.username_ref
       if (!next.password_ref) delete next.password_ref
+      if (!next.api_password_ref) delete next.api_password_ref
       return next
     })
   }
@@ -341,9 +347,33 @@ function ProxyEditor({
             />
           </div>
           <div className="field">
+            <Label htmlFor="proxy-type">Proxy type</Label>
+            <select
+              id="proxy-type"
+              className="native-select w-full"
+              value={draft.type ?? ''}
+              disabled={save.isPending}
+              onChange={(event) =>
+                update({
+                  type: event.target.value === 'mediaflow' ? 'mediaflow' : undefined,
+                  username_ref: undefined,
+                  password_ref: undefined,
+                  api_password_ref: undefined,
+                })
+              }
+            >
+              <option value="">HTTP / SOCKS5</option>
+              <option value="mediaflow">MediaFlow Proxy</option>
+            </select>
+          </div>
+          <div className="field">
             <Label
               htmlFor="proxy-url"
-              help="Connect to an existing HTTP(S) CONNECT or SOCKS5 proxy, including WARP local proxy mode. Use an address reachable from AIOSources. Keep credentials in Secrets."
+              help={
+                mediaFlow
+                  ? 'Use MediaFlow Proxy Light. On the relay, turn off redirects (APP__PROXY__FOLLOW_REDIRECTS=false) and access logs (RUST_LOG=info,actix_web::middleware::logger=off). Use HTTPS across untrusted networks.'
+                  : 'Connect to an existing HTTP(S) CONNECT or SOCKS5 proxy, including WARP local proxy mode. Use an address reachable from AIOSources. Keep credentials in Secrets.'
+              }
             >
               Proxy URL
             </Label>
@@ -351,7 +381,7 @@ function ProxyEditor({
               id="proxy-url"
               required
               maxLength={2048}
-              placeholder="socks5://warp:40000"
+              placeholder={mediaFlow ? 'http://mediaflow-proxy:8888' : 'socks5://warp:40000'}
               value={draft.url}
               autoComplete="off"
               spellCheck={false}
@@ -359,29 +389,45 @@ function ProxyEditor({
               onChange={(event) => update({ url: event.target.value })}
             />
           </div>
-          <Disclosure
-            title="Authentication"
-            help="Leave both empty if this proxy does not require authentication."
-          >
+          {mediaFlow ? (
             <SecretPicker
-              label="Username"
-              value={draft.username_ref ?? ''}
-              onChange={(username_ref) => update({ username_ref })}
-              prefix={`${draft.name || draft.id || 'proxy'}_username`}
-              addLabel="Add username"
-              valueLabel="Proxy username"
+              label="API password"
+              inputId="proxy-password"
+              value={draft.api_password_ref ?? ''}
+              onChange={(api_password_ref) => update({ api_password_ref })}
+              prefix={`${draft.name || draft.id}_api_password`}
+              addLabel="Add API password"
+              valueLabel="MediaFlow Proxy API password"
+              help="Use the password configured on the MediaFlow relay. It is stored in Secrets."
               disabled={save.isPending}
+              required
             />
-            <SecretPicker
-              label="Password"
-              value={draft.password_ref ?? ''}
-              onChange={(password_ref) => update({ password_ref })}
-              prefix={`${draft.name || draft.id || 'proxy'}_password`}
-              addLabel="Add password"
-              valueLabel="Proxy password"
-              disabled={save.isPending}
-            />
-          </Disclosure>
+          ) : (
+            <Disclosure
+              title="Authentication"
+              help="Leave both empty if this proxy does not require authentication."
+            >
+              <SecretPicker
+                label="Username"
+                value={draft.username_ref ?? ''}
+                onChange={(username_ref) => update({ username_ref })}
+                prefix={`${draft.name || draft.id}_username`}
+                addLabel="Add username"
+                valueLabel="Proxy username"
+                disabled={save.isPending}
+              />
+              <SecretPicker
+                label="Password"
+                inputId="proxy-password"
+                value={draft.password_ref ?? ''}
+                onChange={(password_ref) => update({ password_ref })}
+                prefix={`${draft.name || draft.id}_password`}
+                addLabel="Add password"
+                valueLabel="Proxy password"
+                disabled={save.isPending}
+              />
+            </Disclosure>
+          )}
           {conflict && (
             <div className="notice notice-warning space-y-3">
               <p>
@@ -436,6 +482,7 @@ function ConnectionSelect({
   onChange,
   inherit,
   disabled,
+  debridAPI,
 }: {
   id: string
   label: string
@@ -444,6 +491,7 @@ function ConnectionSelect({
   onChange: (value: string) => void
   inherit?: string
   disabled?: boolean
+  debridAPI?: boolean
 }) {
   return (
     <div className="field min-w-0">
@@ -460,12 +508,16 @@ function ConnectionSelect({
         {inherit && <option value="">{inherit}</option>}
         <option value="system">System connection</option>
         <option value="direct">Direct connection</option>
-        {[...settings.proxies].sort(compareListNames).map((proxy) => (
-          <option key={proxy.id} value={proxy.id} disabled={!proxy.enabled}>
-            {proxy.name}
-            {!proxy.enabled ? ' · disabled' : ''}
-          </option>
-        ))}
+        {settings.proxies
+          .filter((proxy) => debridAPI || proxy.type !== 'mediaflow')
+          .sort(compareListNames)
+          .map((proxy) => (
+            <option key={proxy.id} value={proxy.id} disabled={!proxy.enabled}>
+              {proxy.name}
+              {proxy.type === 'mediaflow' ? ' · MediaFlow' : ''}
+              {!proxy.enabled ? ' · disabled' : ''}
+            </option>
+          ))}
       </select>
     </div>
   )
@@ -602,7 +654,8 @@ export function NetworkRoutingPage() {
                 <h2 className="section-title">Debrid</h2>
                 <InfoTip label="Debrid">
                   Browser downloads inherit their debrid service’s connection unless overridden.
-                  Stremio playback links are opened by your player.
+                  MediaFlow relays API calls. Choose a compatible connection for browser downloads
+                  when using MediaFlow. Stremio playback links are opened by your player.
                 </InfoTip>
               </div>
               <div className="grid gap-5 md:grid-cols-2">
@@ -616,6 +669,7 @@ export function NetworkRoutingPage() {
                     label={label}
                     value={settings.overrides[target] ?? ''}
                     settings={settings}
+                    debridAPI={target !== 'downloads'}
                     inherit={
                       target === 'downloads'
                         ? 'Use debrid connection or default'

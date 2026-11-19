@@ -232,6 +232,48 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
+test('MediaFlow uses an encrypted secret reference and only appears in debrid API routing', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/network/outgoing')
+  await page.getByRole('button', { name: 'Add proxy', exact: true }).click()
+  const editor = page.getByRole('dialog', { name: 'Add proxy', exact: true })
+  await editor.getByLabel('Proxy type', { exact: true }).selectOption('mediaflow')
+  await editor.getByLabel('Name', { exact: true }).fill('MediaFlow relay')
+  await editor.getByLabel('Proxy URL', { exact: true }).fill('http://127.0.0.1:1')
+  await expect(editor.getByLabel('Username', { exact: true })).toHaveCount(0)
+  await editor.getByRole('button', { name: 'Add API password', exact: true }).click()
+  const secret = page.getByRole('dialog', { name: 'Add API password', exact: true })
+  await secret
+    .getByLabel('MediaFlow Proxy API password', { exact: true })
+    .fill('synthetic-mediaflow-value')
+  await secret.getByRole('button', { name: 'Store and select', exact: true }).click()
+  await expect(secret).toBeHidden()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await editor.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(editor).toBeHidden()
+  const current = await settings(page)
+  const proxy = current.proxies[0]
+  expect(proxy.type).toBe('mediaflow')
+  expect(proxy.enabled).toBe(false)
+  expect(proxy.username_ref).toBeUndefined()
+  expect(proxy.api_password_ref).toBeTruthy()
+  expect(JSON.stringify(current)).not.toContain('synthetic-mediaflow-value')
+  const card = page.getByRole('region', { name: 'Proxy MediaFlow relay', exact: true })
+  await card.getByRole('switch', { name: 'Enable MediaFlow relay', exact: true }).click()
+  await page.getByRole('tab', { name: 'Routing', exact: true }).click()
+  for (const label of ['Outgoing connections', 'TMDB', 'Browser downloads'])
+    await expect(
+      page.getByLabel(label, { exact: true }).locator(`option[value="${proxy.id}"]`),
+    ).toHaveCount(0)
+  await page.getByLabel('AllDebrid', { exact: true }).selectOption(proxy.id)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await page.reload()
+  await expect(page.getByLabel('AllDebrid', { exact: true })).toHaveValue(proxy.id)
+})
+
 test('incoming proxy trust and public quotas use coherent forms and apply to both public protocols', async ({
   page,
 }) => {

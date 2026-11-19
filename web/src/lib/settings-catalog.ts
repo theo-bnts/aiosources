@@ -413,19 +413,20 @@ add(
     route: '/network/outgoing',
     group: 'Administration / Network / Outgoing / Proxies',
     entity: 'proxy',
-    keywords: 'proxy VPN WARP SOCKS HTTP reseau',
+    keywords: 'proxy VPN WARP SOCKS HTTP MediaFlow reseau',
   },
   [
     ['proxy.name', 'Name'],
+    ['proxy.type', 'Proxy type'],
     ['proxy.url', 'Proxy URL'],
     ['proxy.username', 'Username'],
-    ['proxy.password', 'Password'],
+    ['proxy.password', 'Password', 'MediaFlow API password'],
   ],
 )
-for (const setting of settings.filter(
-  (entry) => entry.entity === 'proxy' && ['Username', 'Password'].includes(entry.title),
-))
-  setting.reveal = ['Authentication']
+for (const setting of settings.filter((entry) => entry.entity === 'proxy')) {
+  if (setting.id === 'proxy.username') setting.reveal = ['Authentication']
+  if (setting.id === 'proxy.password') setting.control = 'proxy-password'
+}
 settings.push({
   id: 'security.secret-references',
   title: 'Using references in JSON',

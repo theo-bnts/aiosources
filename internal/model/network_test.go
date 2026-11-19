@@ -67,3 +67,26 @@ func TestNetworkDownloadRoutingUsesOnlyExplicitOverrides(t *testing.T) {
 		t.Fatal("An explicit browser-download override was ignored")
 	}
 }
+
+func TestMediaFlowRequiresPasswordAndScopedDebridRoutes(t *testing.T) {
+	s := NetworkSettings{Revision: 1, Default: NetworkSystem, Proxies: []NetworkProxy{{ID: "flow", Name: "MediaFlow", URL: "https://relay.example.test", Type: NetworkMediaFlow, APIPasswordRef: "flow-password"}}, Overrides: map[string]string{"debrid:torbox": "flow"}}
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"source:remote-catalog", "metadata:tmdb", "download:torbox", "downloads", "debrid:unknown"} {
+		s.Overrides = map[string]string{target: "flow"}
+		if s.Validate() == nil {
+			t.Errorf("Accepted MediaFlow outside a supported debrid API route: %s", target)
+		}
+	}
+	s.Overrides = nil
+	s.Default = "flow"
+	if s.Validate() == nil {
+		t.Error("Accepted MediaFlow as the default connection")
+	}
+	s.Default = NetworkSystem
+	s.Proxies[0].APIPasswordRef = ""
+	if s.Validate() == nil {
+		t.Error("Accepted an unauthenticated MediaFlow profile")
+	}
+}

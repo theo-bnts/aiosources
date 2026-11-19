@@ -3,8 +3,10 @@ export type NetworkProxy = {
   name: string
   url: string
   enabled: boolean
+  type?: 'mediaflow'
   username_ref?: string
   password_ref?: string
+  api_password_ref?: string
 }
 
 export type IncomingNetwork = {
