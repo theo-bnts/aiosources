@@ -41,6 +41,7 @@ Save this as `compose.yaml`. Replace `XXX.XXX.XXX.XXX` with your server address 
 services:
   aiosources_postgres:
     image: postgres:18-alpine
+    command: postgres -c shared_buffers=16MB
     restart: unless-stopped
     environment:
       POSTGRES_DB: aiosources
@@ -85,6 +86,8 @@ docker compose up -d
 ```
 
 Open `http://YOUR_SERVER_IP:7000` and sign in with your administrator password. Keep both volumes: they contain your settings, catalog and credentials. For internet access, configure HTTPS and set `PUBLIC_URL` to that external address; changing this value does not enable HTTPS by itself. See [installation settings](docs/SETTINGS.md).
+
+The example gives PostgreSQL a 16 MB shared cache for servers with limited RAM. If your server has RAM to spare, increasing `shared_buffers` to `64MB` or `128MB` can make searches faster, especially when several run at once. After editing the `command` line, apply the change with `docker compose up -d aiosources_postgres`.
 
 ## First steps
 
