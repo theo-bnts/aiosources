@@ -323,6 +323,7 @@ func FieldsFromJSON(raw []byte, mapping model.Mapping, publishedAtUnit string) (
 		fields[field] = value
 	}
 	supplementExternalIDs(fields)
+	supplementMediaInfo(fields)
 	return id, model.WithoutSwarmCounts(fields), errors.Join(issues...)
 }
 
@@ -454,6 +455,14 @@ func normalizeField(name string, value any, publishedAtUnit string) (any, error)
 				}
 				return normalized, nil
 			}
+		}
+		return value, nil
+	case "mediainfo", "media_info", "bdinfo", "bd_info", "nfo", "nfo_content", "nfoContent":
+		if raw, ok := value.(string); ok && strings.IndexByte(raw, 0) >= 0 {
+			return map[string]any{
+				"encoding": "base64",
+				"data":     base64.StdEncoding.EncodeToString([]byte(raw)),
+			}, nil
 		}
 		return value, nil
 	default:

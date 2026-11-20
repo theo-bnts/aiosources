@@ -358,6 +358,7 @@ func (c *htmlConnector) Fetch(ctx context.Context, checkpoint json.RawMessage) (
 			return fail("html_field_invalid")
 		}
 		supplementExternalIDs(fields)
+		supplementMediaInfo(fields)
 		fields = model.WithoutSwarmCounts(fields)
 		page.Items = append(page.Items, model.Record{SourceID: id, Fields: fields, ContentType: "text/html", Ignored: !matchesLocalCategories(c.localCategories, fields)})
 		validRecords++

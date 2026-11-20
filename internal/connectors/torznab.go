@@ -482,6 +482,7 @@ func (c *torznabConnector) record(source sdk.RawItem) model.Record {
 	if len(item.Attributes) > 0 {
 		fields["attributes"] = item.Attributes
 	}
+	supplementMediaInfo(fields)
 	fields = model.WithoutSwarmCounts(fields)
 	id := item.GUID
 	if c.idSource != "" {

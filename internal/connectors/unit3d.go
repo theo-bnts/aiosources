@@ -51,7 +51,11 @@ func unit3dTemplate() string {
       "tvdb_id": "/attributes/tvdb_id",
       "mal_id": "/attributes/mal_id",
       "igdb_id": "/attributes/igdb_id",
-      "info_hash": "/attributes/info_hash"
+      "info_hash": "/attributes/info_hash",
+      "media_info": "/attributes/media_info",
+      "mediainfo": "/attributes/mediainfo",
+      "bd_info": "/attributes/bd_info",
+      "bdinfo": "/attributes/bdinfo"
     }
   },
   "options": {
