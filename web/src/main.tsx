@@ -5,6 +5,7 @@ import {
   GearSixIcon,
   GlobeIcon,
   IconContext,
+  LinkIcon,
   ListChecksIcon,
   PathIcon,
 } from '@phosphor-icons/react'
@@ -36,6 +37,7 @@ import { NotificationProvider } from '@/components/notifications'
 import { settingFromHash } from '@/lib/settings-catalog'
 import { filesPath, filesResultsPath } from '@/lib/source-navigation'
 import {
+  identificationCorrespondencesPath,
   identificationResultsPath,
   legacyMetadataHistory,
   metadataSections,
@@ -62,6 +64,11 @@ const TorrentsPage = lazy(() =>
 )
 const MatchingDiagnostics = lazy(() =>
   import('@/components/matching-diagnostics').then((m) => ({ default: m.MatchingDiagnostics })),
+)
+const ReleaseCorrespondences = lazy(() =>
+  import('@/components/release-correspondences').then((m) => ({
+    default: m.ReleaseCorrespondences,
+  })),
 )
 const IdentificationStatistics = lazy(() =>
   import('@/components/identification-statistics').then((m) => ({
@@ -390,6 +397,11 @@ const router = createBrowserRouter(
                   icon: ChartBarIcon,
                 },
                 { path: identificationResultsPath, label: 'Results', icon: ListChecksIcon },
+                {
+                  path: identificationCorrespondencesPath,
+                  label: 'Correspondences',
+                  icon: LinkIcon,
+                },
                 { path: '/metadata/identification/settings', label: 'Settings', icon: GearSixIcon },
                 {
                   path: '/metadata/identification/history',
@@ -405,6 +417,7 @@ const router = createBrowserRouter(
             element={<IdentificationStatisticsRoute />}
           />
           <Route path={identificationResultsPath} element={<MatchingDiagnostics />} />
+          <Route path={identificationCorrespondencesPath} element={<ReleaseCorrespondences />} />
           <Route
             path="metadata/identification/settings"
             element={<AIOSourcePage key="identification" section="identification" />}

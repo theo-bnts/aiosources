@@ -84,6 +84,7 @@ test('Identification is a separate sidebar page and shared cache statistics matc
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
     'Statistics',
     'Results',
+    'Correspondences',
     'Settings',
     'History',
   ])

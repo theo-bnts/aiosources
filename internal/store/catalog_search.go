@@ -192,19 +192,21 @@ type CatalogRecord struct {
 }
 
 func (s *Store) CatalogRecords(ctx context.Context, id int64) ([]CatalogRecord, error) {
-	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+`,t.occurrence_id,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.aio_works w JOIN aiosources.aio_matches m ON m.work_id=w.id JOIN aiosources.torrents t USING(provider_id,source_id) WHERE w.id=$1 AND `+aioPublishedMatch+` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`, id)
+	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,t.occurrence_id,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.aio_works w JOIN aiosources.aio_matches m ON m.work_id=w.id JOIN aiosources.torrents t USING(provider_id,source_id)`+aioPropagatedJoin+` WHERE w.id=$1 AND `+aioPublishedMatch+` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`, id)
 	if err != nil {
 		return nil, databaseError("find catalog releases", err)
 	}
 	out := []CatalogRecord{}
 	records := []model.AIORecord{}
 	for rows.Next() {
+		var propAudio, propSubs []string
 		var occurrence, imdb, tmdb, tvdb string
-		record, e := scanAIORecord(rows, &occurrence, &imdb, &tmdb, &tvdb)
+		record, e := scanAIORecord(rows, &propAudio, &propSubs, &occurrence, &imdb, &tmdb, &tvdb)
 		if e != nil {
 			rows.Close()
 			return nil, databaseError("read catalog release", e)
 		}
+		record.PropagatedLanguages, record.PropagatedSubtitleLanguages = propAudio, propSubs
 		record.IMDb, record.TMDB, record.TVDB = imdb, tmdb, tvdb
 		out = append(out, CatalogRecord{AIORecord: record, OccurrenceID: occurrence})
 		records = append(records, record)

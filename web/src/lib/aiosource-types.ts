@@ -80,6 +80,10 @@ export type Status = {
     ambiguous: number
     unmatched: number
     matching_pending: number
+    correspondences_pending: number
+    correspondence_groups: number
+    correspondence_members: number
+    correspondence_enriched: number
     pending: number
     cleanup_pending: number
     cleanup_failed: number
@@ -136,6 +140,64 @@ export type MatchDiagnostic = {
   reason: string
   imdb: string
   updated_at: string | null
+}
+
+export type CorrespondenceRule = 'exact_info_hash' | 'work_exact_size' | 'work_release_name'
+export type CorrespondenceConfidence = 'exact' | 'high' | 'verified'
+
+export type ReleaseCorrespondenceGroup = {
+  id: number
+  scope: 'work' | 'hash'
+  scope_key: string
+  work_id?: number | null
+  work_type?: string
+  work_title?: string
+  imdb?: string
+  tmdb?: string
+  match_rule: CorrespondenceRule
+  match_key: string
+  confidence: CorrespondenceConfidence
+  canonical_size: number
+  canonical_title: string
+  member_count: number
+  provider_count: number
+  enriched_count: number
+  providers: string[]
+  propagated_audio: string[]
+  propagated_subtitles: string[]
+  updated_at: string
+}
+
+export type ReleaseCorrespondenceMember = {
+  group_id: number
+  occurrence_id: string
+  provider_id: string
+  source_id: string
+  fingerprint: string
+  title: string
+  hash?: string
+  size: number
+  match_rule: CorrespondenceRule
+  own_audio: string[]
+  own_subtitles: string[]
+  contributed_audio: string[]
+  contributed_subtitles: string[]
+}
+
+export type ReleaseCorrespondenceExclusion = {
+  occurrence_id: string
+  provider_id: string
+  source_id: string
+  title: string
+  match_key: string
+  reason: string
+  created_at: string
+}
+
+export type ReleaseCorrespondenceDetail = {
+  group: ReleaseCorrespondenceGroup
+  members: ReleaseCorrespondenceMember[]
+  exclusions: ReleaseCorrespondenceExclusion[]
 }
 
 export type ReviewWork = {

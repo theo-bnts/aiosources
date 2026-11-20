@@ -1,7 +1,10 @@
 import { useCallback } from 'react'
 import { useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
 import { filesResultsPath, isSourceSettingsPath } from './source-navigation.ts'
-import { identificationResultsPath } from './metadata-navigation.ts'
+import {
+  identificationCorrespondencesPath,
+  identificationResultsPath,
+} from './metadata-navigation.ts'
 
 const viewLabels: Record<string, string> = {
   '/': 'Sources',
@@ -25,6 +28,7 @@ const viewLabels: Record<string, string> = {
   '/metadata/history': 'Metadata history',
   '/metadata/identification': 'Identification',
   [identificationResultsPath]: 'Identification',
+  [identificationCorrespondencesPath]: 'Correspondences',
   '/metadata/videos/history': 'Video history',
   '/metadata/games/history': 'Game history',
   '/metadata/books/history': 'Book history',

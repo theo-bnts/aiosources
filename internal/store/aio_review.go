@@ -195,6 +195,12 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
 	if version != input.Revision {
 		return model.ErrConflict
 	}
+	var prevWorkID *int64
+	_ = tx.QueryRow(ctx, `SELECT work_id FROM aiosources.aio_matches WHERE provider_id=$1 AND source_id=$2`, record.Provider, record.SourceID).Scan(&prevWorkID)
+	affectedWorks := []int64{}
+	if prevWorkID != nil && *prevWorkID > 0 {
+		affectedWorks = append(affectedWorks, *prevWorkID)
+	}
 	if input.Automatic {
 		if review == nil || !review.Active {
 			return model.ErrConflict
@@ -234,11 +240,17 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
 		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1 AND source_id=$2`, record.Provider, record.SourceID); err != nil {
 			return databaseError("finish reviewed identification", err)
 		}
+		if w.ID > 0 {
+			affectedWorks = append(affectedWorks, w.ID)
+		}
 		if input.Season != nil && w.Type == "tv" {
 			if err = requestAIOSeasons(ctx, tx, []model.AIOSeasonRequest{{TMDB: w.TMDB, Season: *input.Season}}); err != nil {
 				return databaseError("queue reviewed season", err)
 			}
 		}
+	}
+	if err = enqueueReleaseCorrespondencesTx(ctx, tx, affectedWorks, []string{record.Hash}); err != nil {
+		return err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,service,data)
  VALUES('review-'||$1||'-'||($2::bigint)::text,'info','metadata.identification_reviewed',$3,$4,'',jsonb_build_object('automatic',$5::boolean))`, occurrence, version+1, map[bool]string{true: "Identification returned to automatic matching.", false: "Identification reviewed and corrected."}[input.Automatic], record.Provider, input.Automatic)

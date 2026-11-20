@@ -63,35 +63,37 @@ type AIOWork struct {
 	Revision         int64             `json:"revision"`
 }
 type AIORecord struct {
-	IdentificationType     string              `json:"-"`
-	GameHints              GameHints           `json:"-"`
-	IGDB                   string              `json:"igdb,omitempty"`
-	VideoType              string              `json:"-"`
-	BookInformationPending bool                `json:"-"`
-	BookHints              BookHints           `json:"-"`
-	MatchingPolicy         MatchingPolicy      `json:"-"`
-	Presentation           map[string][]string `json:"-"`
-	SubtitleLanguages      []string            `json:"-"`
-	Bitrate                float64             `json:"-"`
-	ReviewedEpisode        bool                `json:"reviewed_episode,omitempty"`
-	Normalized             string              `json:"-"`
-	QueueVersion           int64               `json:"-"`
-	CandidateGeneration    int64               `json:"-"`
-	Provider               string              `json:"provider"`
-	SourceID               string              `json:"source_id"`
-	Title                  string              `json:"title"`
-	Hash                   string              `json:"hash"`
-	Size                   int64               `json:"size"`
-	IMDb                   string              `json:"imdb"`
-	TMDB                   string              `json:"tmdb"`
-	TVDB                   string              `json:"tvdb"`
-	MAL                    string              `json:"mal"`
-	Season                 *int                `json:"season"`
-	Episode                *int                `json:"episode"`
-	Languages              []string            `json:"languages"`
-	PublishedAt            *time.Time          `json:"published_at,omitempty"`
-	DurationSeconds        float64             `json:"duration_seconds,omitempty"`
-	Fingerprint            string              `json:"fingerprint"`
+	IdentificationType          string              `json:"-"`
+	GameHints                   GameHints           `json:"-"`
+	IGDB                        string              `json:"igdb,omitempty"`
+	VideoType                   string              `json:"-"`
+	BookInformationPending      bool                `json:"-"`
+	BookHints                   BookHints           `json:"-"`
+	MatchingPolicy              MatchingPolicy      `json:"-"`
+	Presentation                map[string][]string `json:"-"`
+	SubtitleLanguages           []string            `json:"-"`
+	PropagatedLanguages         []string            `json:"-"`
+	PropagatedSubtitleLanguages []string            `json:"-"`
+	Bitrate                     float64             `json:"-"`
+	ReviewedEpisode             bool                `json:"reviewed_episode,omitempty"`
+	Normalized                  string              `json:"-"`
+	QueueVersion                int64               `json:"-"`
+	CandidateGeneration         int64               `json:"-"`
+	Provider                    string              `json:"provider"`
+	SourceID                    string              `json:"source_id"`
+	Title                       string              `json:"title"`
+	Hash                        string              `json:"hash"`
+	Size                        int64               `json:"size"`
+	IMDb                        string              `json:"imdb"`
+	TMDB                        string              `json:"tmdb"`
+	TVDB                        string              `json:"tvdb"`
+	MAL                         string              `json:"mal"`
+	Season                      *int                `json:"season"`
+	Episode                     *int                `json:"episode"`
+	Languages                   []string            `json:"languages"`
+	PublishedAt                 *time.Time          `json:"published_at,omitempty"`
+	DurationSeconds             float64             `json:"duration_seconds,omitempty"`
+	Fingerprint                 string              `json:"fingerprint"`
 }
 
 // Eligibility belongs in candidate discovery, before the bounded safety cap.
@@ -224,26 +226,30 @@ type AIOCleanup struct {
 	Failed  bool
 }
 type AIOStatus struct {
-	ProviderRetryAt   *time.Time `json:"-"`
-	RecoveryStartedAt *time.Time `json:"recovery_started_at"`
-	AppliedThrough    *time.Time `json:"applied_through"`
-	MetadataDue       bool       `json:"-"`
-	Works             int64      `json:"works"`
-	VideoWorks        int64      `json:"video_works"`
-	Matched           int64      `json:"matched"`
-	Ambiguous         int64      `json:"ambiguous"`
-	Unmatched         int64      `json:"unmatched"`
-	MatchingPending   int64      `json:"matching_pending"`
-	Pending           int64      `json:"pending"`
-	CleanupPending    int64      `json:"cleanup_pending"`
-	CleanupFailed     int64      `json:"cleanup_failed"`
-	LastSync          *time.Time `json:"last_sync"`
-	LastMatch         *time.Time `json:"last_match"`
-	ChangesThrough    *time.Time `json:"changes_through"`
-	InventoryDate     string     `json:"inventory_date"`
-	SyncRetryAt       *time.Time `json:"sync_retry_at"`
-	SyncFailures      int        `json:"sync_failures"`
-	SyncError         string     `json:"sync_error"`
+	ProviderRetryAt        *time.Time `json:"-"`
+	RecoveryStartedAt      *time.Time `json:"recovery_started_at"`
+	AppliedThrough         *time.Time `json:"applied_through"`
+	MetadataDue            bool       `json:"-"`
+	Works                  int64      `json:"works"`
+	VideoWorks             int64      `json:"video_works"`
+	Matched                int64      `json:"matched"`
+	Ambiguous              int64      `json:"ambiguous"`
+	Unmatched              int64      `json:"unmatched"`
+	MatchingPending        int64      `json:"matching_pending"`
+	CorrespondencesPending int64      `json:"correspondences_pending"`
+	CorrespondenceGroups   int64      `json:"correspondence_groups"`
+	CorrespondenceMembers  int64      `json:"correspondence_members"`
+	CorrespondenceEnriched int64      `json:"correspondence_enriched"`
+	Pending                int64      `json:"pending"`
+	CleanupPending         int64      `json:"cleanup_pending"`
+	CleanupFailed          int64      `json:"cleanup_failed"`
+	LastSync               *time.Time `json:"last_sync"`
+	LastMatch              *time.Time `json:"last_match"`
+	ChangesThrough         *time.Time `json:"changes_through"`
+	InventoryDate          string     `json:"inventory_date"`
+	SyncRetryAt            *time.Time `json:"sync_retry_at"`
+	SyncFailures           int        `json:"sync_failures"`
+	SyncError              string     `json:"sync_error"`
 }
 
 type AIOAutomation struct {

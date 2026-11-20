@@ -33,6 +33,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Metadata', 'Books', '/metadata/books/history'],
     ['Metadata', 'Identification', '/metadata/identification'],
     ['Metadata', 'Identification', '/metadata/identification/results'],
+    ['Metadata', 'Identification', '/metadata/identification/correspondences'],
     ['Metadata', 'Identification', '/metadata/identification/settings'],
     ['Metadata', 'Identification', '/metadata/identification/history'],
     ['Metadata', 'Videos', '/metadata/history'],

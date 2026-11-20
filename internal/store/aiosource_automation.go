@@ -13,9 +13,10 @@ func (s *Store) AIOAutomationStatus(ctx context.Context) (model.AIOStatus, error
 	err := s.pool.QueryRow(ctx, `SELECT
  CASE WHEN EXISTS(SELECT 1 FROM aiosources.aio_works) THEN 1 ELSE 0 END,
  CASE WHEN EXISTS(SELECT 1 FROM aiosources.aio_match_queue) THEN 1 ELSE 0 END,
+ CASE WHEN EXISTS(SELECT 1 FROM aiosources.aio_release_correspondence_queue) THEN 1 ELSE 0 END,
  EXISTS(SELECT 1 FROM aiosources.aio_metadata_jobs WHERE next_attempt<=now()),
  last_sync,changes_through,inventory_date,sync_retry_at,sync_failures,sync_error,last_match,recovery_started_at,applied_through,provider_retry_at FROM aiosources.aio_state`).Scan(
-		&v.Works, &v.MatchingPending, &v.MetadataDue, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
+		&v.Works, &v.MatchingPending, &v.CorrespondencesPending, &v.MetadataDue, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt)
 	return v, databaseError("read metadata automation", err)
 }
 

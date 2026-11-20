@@ -45,7 +45,7 @@ func AutomationPlan(c model.AIOConfig, status model.AIOStatus, syncing, matching
 		switch {
 		case status.Works == 0:
 			p.Identification = "waiting_information"
-		case status.MatchingPending > 0:
+		case status.MatchingPending > 0 || status.CorrespondencesPending > 0:
 			p.Identification = "pending"
 			next := now
 			if status.LastMatch != nil {

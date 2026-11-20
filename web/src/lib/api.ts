@@ -238,6 +238,8 @@ async function invalidateData(cancelRefetch: boolean) {
       'system-health',
       'aiosource',
       'matching-diagnostics',
+      'release-correspondences',
+      'release-correspondence-detail',
       'catalog-search',
       'catalog-title',
       'catalog-releases',

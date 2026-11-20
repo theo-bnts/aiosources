@@ -225,7 +225,7 @@ LEFT JOIN aiosources.aio_match_queue q ON q.provider_id=t.provider_id AND q.sour
 LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND q.provider_id IS NULL`
 	from := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=t.source_id AND m.status='matched' AND COALESCE(m.fingerprint=t.fields_fingerprint,false)
 LEFT JOIN aiosources.aio_works w ON w.id=m.work_id AND w.revision=m.revision AND NOT w.adult AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_queue q WHERE q.provider_id=t.provider_id AND q.source_id=t.source_id)
-LEFT JOIN aiosources.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(aiosources.aio_review_evidence(t.fields)::text)
+LEFT JOIN aiosources.aio_match_reviews review ON review.provider_id=t.provider_id AND review.source_id=t.source_id AND review.active AND review.override_episode AND review.media_type=w.media_type AND review.tmdb_id=w.tmdb_id AND review.evidence_fingerprint=md5(aiosources.aio_review_evidence(t.fields)::text)` + aioPropagatedJoin + `
 WHERE ` + strings.Join(clauses, " AND ")
 	filtered := q.Season != nil || q.Episode != nil
 	if !filtered {
@@ -239,7 +239,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,
-'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,(SELECT instance_id FROM aiosources.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
+'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,` + aioPropagatedColumns + `,(SELECT instance_id FROM aiosources.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
 	order := []string{}
 	for _, rule := range q.Sorting {
 		column := ""
@@ -300,13 +300,15 @@ WHERE ` + strings.Join(clauses, " AND ")
 	}
 	for rows.Next() {
 		var item model.TorznabRecord
+		var propAudio, propSubs []string
 		var imdb, tmdb, tvdb string
 		var reviewed bool
-		rec, e := scanAIORecord(rows, &item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed)
+		rec, e := scanAIORecord(rows, &propAudio, &propSubs, &item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed)
 		if e != nil {
 			rows.Close()
 			return result, e
 		}
+		rec.PropagatedLanguages, rec.PropagatedSubtitleLanguages = propAudio, propSubs
 		rec.IMDb, rec.TMDB, rec.TVDB, rec.ReviewedEpisode = imdb, tmdb, tvdb, reviewed
 		rec.BookHints.ISBN = books.ISBN(rec.BookHints.ISBN)
 		item.AIORecord = rec

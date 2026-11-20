@@ -26,7 +26,6 @@ var compiledPresentationTags = func() []*regexp.Regexp {
 	return out
 }()
 var presentationGroup = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$`)
-var subtitleMarker = regexp.MustCompile(`(?i)\b(?:VOSTFR|SUBFRENCH)\b`)
 var presentationEncode = regexp.MustCompile(`(?i)^(?:AV1|HEVC|[HX][ .]?26[45]|MPEG[ .-]?[24]|XVID)$`)
 var presentationChannels = regexp.MustCompile(`^(?:[257]\.1(?:\.\d)?|2\.0|MONO|STEREO)$`)
 var presentationStereo = regexp.MustCompile(`^(?:3D|H[- .]?(?:SBS|OU))$`)
@@ -116,12 +115,21 @@ func formatReleasePresentation(rec model.AIORecord, hints Behavior) model.Releas
 	} else if duration != "" {
 		presentation.Highlights = append(presentation.Highlights, "⏱️ "+duration)
 	}
-	if label := streamLanguageLabel(streamLanguages(rec)); label != "" {
+	audioLanguages, subtitles := streamLanguageEvidence(rec, hints.Filename)
+	if label := streamLanguageLabel(audioLanguages); label != "" {
 		presentation.Language = "🌍 " + label
 	}
-	subtitles := streamLanguages(model.AIORecord{Languages: rec.SubtitleLanguages})
-	if subtitleMarker.MatchString(rec.Title) && !slices.ContainsFunc(subtitles, func(value streamLanguage) bool { return value.code == "fr" }) {
-		subtitles = append(subtitles, streamLanguage{code: "fr"})
+	// Drop generic MULTI from subtitles when concrete subtitle languages are already known.
+	if len(subtitles) > 1 {
+		concrete := 0
+		for _, item := range subtitles {
+			if item.code != "multi" {
+				concrete++
+			}
+		}
+		if concrete > 0 {
+			subtitles = slices.DeleteFunc(subtitles, func(item streamLanguage) bool { return item.code == "multi" })
+		}
 	}
 	if len(subtitles) > 0 {
 		if presentation.Language != "" {

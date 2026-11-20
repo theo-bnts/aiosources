@@ -134,10 +134,17 @@ count(*) FILTER(WHERE status='unmatched')::bigint AS unmatched,
 count(*) FILTER(WHERE status='pending')::bigint AS pending FROM decisions
 ), video_counts AS MATERIALIZED (
 ` + aioVideoCount + `
+), correspondence_counts AS MATERIALIZED (
+SELECT count(*)::bigint AS groups,
+COALESCE(sum(member_count),0)::bigint AS members,
+COALESCE(sum(enriched_count),0)::bigint AS enriched,
+(SELECT count(*)::bigint FROM aiosources.aio_release_correspondence_queue) AS pending
+FROM aiosources.aio_release_groups
 ) SELECT
 video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton)+(SELECT works FROM aiosources.igdb_state WHERE singleton),video_counts.total,
 counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
-` + aioUpdateStatusColumns + ` FROM aiosources.aio_state CROSS JOIN counts CROSS JOIN video_counts`
+correspondence_counts.pending,correspondence_counts.groups,correspondence_counts.members,correspondence_counts.enriched,
+` + aioUpdateStatusColumns + ` FROM aiosources.aio_state CROSS JOIN counts CROSS JOIN video_counts CROSS JOIN correspondence_counts`
 
 func aioUpdateStatusTargets(v *model.AIOStatus) []any {
 	return []any{&v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt}
@@ -145,7 +152,7 @@ func aioUpdateStatusTargets(v *model.AIOStatus) []any {
 
 func (s *Store) AIOStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
-	targets := append([]any{&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending}, aioUpdateStatusTargets(&v)...)
+	targets := append([]any{&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.CorrespondencesPending, &v.CorrespondenceGroups, &v.CorrespondenceMembers, &v.CorrespondenceEnriched}, aioUpdateStatusTargets(&v)...)
 	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(targets...)
 	return v, databaseError("read AIOSources status", err)
 }
@@ -452,12 +459,24 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {
 		return err
 	}
+	var prevWorkID *int64
+	_ = tx.QueryRow(ctx, `SELECT work_id FROM aiosources.aio_matches WHERE provider_id=$1 AND source_id=$2`, r.Provider, r.SourceID).Scan(&prevWorkID)
 	_, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,media_hint) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, id, rev, status, reason, r.Normalized, matchedBookKind(r, work), matchedMediaType(r, work))
 	if err != nil {
 		return databaseError("save correspondence", err)
 	}
 	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1 AND source_id=$2 AND version=$3`, r.Provider, r.SourceID, r.QueueVersion); err != nil {
 		return databaseError("finish matching queue", err)
+	}
+	affectedWorks := []int64{}
+	if prevWorkID != nil && *prevWorkID > 0 {
+		affectedWorks = append(affectedWorks, *prevWorkID)
+	}
+	if work != nil && work.ID > 0 {
+		affectedWorks = append(affectedWorks, work.ID)
+	}
+	if err = enqueueReleaseCorrespondencesTx(ctx, tx, affectedWorks, []string{r.Hash}); err != nil {
+		return err
 	}
 	return databaseError("publish correspondence", tx.Commit(ctx))
 }
@@ -469,9 +488,9 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 		typ = mediaType
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
-	query := `SELECT ` + aioRecordColumns + `,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
+	query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id` + aioPropagatedJoin + ` WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
 	if kind == "mal" {
-		query = `SELECT ` + aioRecordColumns + ` FROM aiosources.torrents t WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
+		query = `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + ` FROM aiosources.torrents t` + aioPropagatedJoin + ` WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
 		rows, err := s.pool.Query(ctx, query, id)
 		out, err := collectAIORecords(rows, err, false)
 		// An indexed candidate is not an established assertion: every native
@@ -496,15 +515,17 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 	defer rows.Close()
 	out := []model.AIORecord{}
 	for rows.Next() {
+		var propAudio, propSubs []string
 		var imdb, tmdb, tvdb string
-		var extra []any
+		extra := []any{&propAudio, &propSubs}
 		if publishedIDs {
-			extra = []any{&imdb, &tmdb, &tvdb}
+			extra = append(extra, &imdb, &tmdb, &tvdb)
 		}
 		v, e := scanAIORecord(rows, extra...)
 		if e != nil {
 			return nil, e
 		}
+		v.PropagatedLanguages, v.PropagatedSubtitleLanguages = propAudio, propSubs
 		if publishedIDs {
 			// This projection is already fenced by work revision, source
 			// fingerprint and an empty queue. Use its verified identifiers,
@@ -516,8 +537,10 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 	return out, databaseError("search local streams", rows.Err())
 }
 func (s *Store) AIOTorrent(ctx context.Context, provider, id string) (model.AIORecord, error) {
-	v, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+` FROM aiosources.torrents t WHERE provider_id=$1 AND source_id=$2`, provider, id))
+	var propAudio, propSubs []string
+	v, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+` FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.provider_id=$1 AND t.source_id=$2`, provider, id), &propAudio, &propSubs)
 	if err == nil {
+		v.PropagatedLanguages, v.PropagatedSubtitleLanguages = propAudio, propSubs
 		records := []model.AIORecord{v}
 		err = s.applyAIOEpisodeReviews(ctx, records)
 		v = records[0]
@@ -683,7 +706,7 @@ func (s *Store) AIOChangesThrough(ctx context.Context, at time.Time) error {
 	return databaseError("save change checkpoint", err)
 }
 func (s *Store) ResetAIOMapping(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_queue;INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents;UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL`)
+	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_release_groups;DELETE FROM aiosources.aio_release_correspondence_queue;DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_queue;INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents;UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL`)
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {

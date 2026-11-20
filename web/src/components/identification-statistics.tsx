@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom'
 import { api, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import type { Status } from '@/lib/aiosource-types'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
-import { identificationResultsPath } from '@/lib/metadata-navigation'
+import {
+  identificationCorrespondencesPath,
+  identificationResultsPath,
+} from '@/lib/metadata-navigation'
 import { number, percentage, useDate } from '@/lib/format'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Statistic } from '@/components/statistic'
@@ -46,6 +49,30 @@ export function IdentificationStatistics() {
             to={`${identificationResultsPath}?match_status=${decision}`}
           />
         ))}
+      </dl>
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Statistic
+          label="Correspondence groups"
+          value={status.status.correspondence_groups ?? 0}
+          to={identificationCorrespondencesPath}
+          help="Verified release groups linking identical torrents across multiple sources."
+        />
+        <Statistic
+          label="Linked torrents"
+          value={status.status.correspondence_members ?? 0}
+          to={identificationCorrespondencesPath}
+        />
+        <Statistic
+          label="Enriched torrents"
+          value={status.status.correspondence_enriched ?? 0}
+          to={`${identificationCorrespondencesPath}?corr_enriched=true`}
+          help="Torrents receiving additional audio or subtitle languages from verified cross-source peers."
+        />
+        <Statistic
+          label="Pending correspondences"
+          value={status.status.correspondences_pending ?? 0}
+          to={identificationCorrespondencesPath}
+        />
       </dl>
       <dl className="grid gap-3 sm:grid-cols-2">
         <Statistic

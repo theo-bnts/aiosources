@@ -105,6 +105,7 @@ test('video and book workspaces keep separate counts and histories under one Met
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
     'Statistics',
     'Results',
+    'Correspondences',
     'Settings',
     'History',
   ])
@@ -116,6 +117,15 @@ test('video and book workspaces keep separate counts and histories under one Met
   const filters = page.getByRole('form', { name: 'Identification filters', exact: true })
   await expect(filters).toBeVisible()
   expect(fullStatisticsReads, 'Results should not request global identification counts').toEqual([])
+  await page.getByRole('tab', { name: 'Correspondences', exact: true }).click()
+  await expect(page).toHaveURL(/\/metadata\/identification\/correspondences$/)
+  await expect(
+    page.getByRole('form', { name: 'Correspondence filters', exact: true }),
+  ).toBeVisible()
+  expect(
+    fullStatisticsReads,
+    'Correspondences should not request global identification counts',
+  ).toEqual([])
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   await expect(page).toHaveURL(/\/metadata\/identification$/)
   const statistics = page.getByRole('region', { name: 'Identification statistics', exact: true })

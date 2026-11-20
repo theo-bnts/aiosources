@@ -352,7 +352,10 @@ func (s *Service) match(ctx context.Context, trigger string) (matchErr error) {
 	}
 	defer func() { history.finish(ctx, matchErr) }()
 	history.checkpoint(ctx, "identification")
-	return s.drainMatching(ctx, history)
+	if err := s.drainMatching(ctx, history); err != nil {
+		return err
+	}
+	return s.drainCorrespondences(ctx, history)
 }
 
 func (s *Service) maintenance() {

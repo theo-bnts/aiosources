@@ -66,6 +66,8 @@ func (s *Store) UpdateRuntimeSection(ctx context.Context, section string, input 
 	}
 	if matchingChanged {
 		if _, err := tx.Exec(ctx, `
+DELETE FROM aiosources.aio_release_groups;
+DELETE FROM aiosources.aio_release_correspondence_queue;
 DELETE FROM aiosources.aio_matches m WHERE NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews r WHERE r.provider_id=m.provider_id AND r.source_id=m.source_id AND r.active);
 INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
  SELECT t.provider_id,t.source_id FROM aiosources.torrents t WHERE NOT EXISTS(

@@ -20,6 +20,7 @@ export const applicationPages = [
   ['books.history', '/metadata/books/history'],
   ['identification.statistics', '/metadata/identification'],
   ['identification.results', '/metadata/identification/results'],
+  ['identification.correspondences', '/metadata/identification/correspondences'],
   ['identification.settings', '/metadata/identification/settings'],
   ['identification.history', '/metadata/identification/history'],
   ['debrid.statistics', '/debrid'],

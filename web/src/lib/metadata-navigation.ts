@@ -12,6 +12,7 @@ export const metadataSections = {
 } as const
 
 export const identificationResultsPath = `${metadataSections.identification.path}/results`
+export const identificationCorrespondencesPath = `${metadataSections.identification.path}/correspondences`
 
 export function metadataOperationSection(kind: string, service: string): MetadataSection {
   if (kind === 'matching') return 'identification'

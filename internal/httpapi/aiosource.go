@@ -34,6 +34,10 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/aiosource/matches", s.auth.protect(s.aioMatches))
 	mux.HandleFunc("GET /api/aiosource/matches/{id}", s.auth.protect(s.aioReviewDetail))
 	mux.HandleFunc("PUT /api/aiosource/matches/{id}", s.auth.protect(s.aioReviewSave))
+	mux.HandleFunc("GET /api/aiosource/correspondences", s.auth.protect(s.aioCorrespondences))
+	mux.HandleFunc("GET /api/aiosource/correspondences/{id}", s.auth.protect(s.aioCorrespondenceDetail))
+	mux.HandleFunc("DELETE /api/aiosource/correspondences/{id}/members/{occurrence}", s.auth.protect(s.aioCorrespondenceUnlink))
+	mux.HandleFunc("POST /api/aiosource/correspondences/{id}/exclusions/{occurrence}/restore", s.auth.protect(s.aioCorrespondenceRestore))
 	mux.HandleFunc("GET /api/aiosource/candidates", s.auth.protect(s.aioReviewCandidates))
 	mux.HandleFunc("GET /api/stremio/statistics", s.auth.protect(s.stremioStatistics))
 	mux.HandleFunc("GET /api/stremio/requests", s.auth.protect(s.stremioRequests))
@@ -241,6 +245,8 @@ func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 		err = s.options.AIOSource.StartSync(r.Context())
 	case "match":
 		err = s.options.AIOSource.StartMatch()
+	case "recompute-correspondences":
+		err = s.options.AIOSource.StartCorrespondenceRecompute(r.Context())
 	case "stop":
 		s.options.AIOSource.Stop(true, true)
 	case "stop-sync":

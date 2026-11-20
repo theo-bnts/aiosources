@@ -100,9 +100,11 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	rows, err := tx.Query(ctx, `SELECT `+aioRecordColumns+`,q.version,
  r.active IS TRUE,COALESCE(r.revision,0),COALESCE(r.fingerprint,''),COALESCE(r.media_type,''),COALESCE(r.tmdb_id,''),r.season,r.episode,
  COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),COALESCE(r.igdb_id,''),
- CASE WHEN r.active THEN r.evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) ELSE FALSE END
+ CASE WHEN r.active THEN r.evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) ELSE FALSE END,
+ prev_m.work_id
 FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_matches prev_m USING(provider_id,source_id)
 WHERE (t.provider_id,t.source_id) IN(SELECT * FROM unnest($1::text[],$2::text[]))
 ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	if err != nil {
@@ -110,9 +112,11 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	}
 	records := []model.AIORecord{}
 	reviews := []*model.AIOMatchReview{}
+	previousWorks := []int64{}
 	for rows.Next() {
 		var review model.AIOMatchReview
-		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged)
+		var prevWork *int64
+		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged, &prevWork)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -122,6 +126,9 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		r.BookInformationPending = booksPending
 		records = append(records, r)
 		reviews = append(reviews, &review)
+		if prevWork != nil && *prevWork > 0 {
+			previousWorks = append(previousWorks, *prevWork)
+		}
 	}
 	err = rows.Err()
 	rows.Close()
@@ -179,12 +186,20 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		results, seasons = append(results, result), append(seasons, result.Seasons...)
 	}
 	batch := &pgx.Batch{}
+	affectedWorks := append([]int64(nil), previousWorks...)
+	affectedHashes := []string{}
 	for _, result := range results {
 		r := result.Record
 		var workID any
 		var revision int64
 		if result.Work != nil {
 			workID, revision = result.Work.ID, result.Work.Revision
+			if result.Work.ID > 0 {
+				affectedWorks = append(affectedWorks, result.Work.ID)
+			}
+		}
+		if len(r.Hash) == 40 {
+			affectedHashes = append(affectedHashes, r.Hash)
 		}
 		batch.Queue(`INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,media_hint)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider_id,source_id) DO UPDATE SET
@@ -196,6 +211,9 @@ fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revi
 	}
 	if err = tx.SendBatch(ctx, batch).Close(); err != nil {
 		return nil, databaseError("save correspondence batch", err)
+	}
+	if err = enqueueReleaseCorrespondencesTx(ctx, tx, affectedWorks, affectedHashes); err != nil {
+		return nil, err
 	}
 	if err = requestAIOSeasons(ctx, tx, seasons); err != nil {
 		return nil, databaseError("queue required season information", err)

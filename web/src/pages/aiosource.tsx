@@ -1,6 +1,7 @@
 import {
   ArrowClockwiseIcon,
   FloppyDiskIcon,
+  LinkIcon,
   MagnifyingGlassIcon,
   StopIcon,
   TrashIcon,
@@ -247,6 +248,7 @@ export default function AIOSourcePage({
         resetScope ||
         name === 'sync' ||
         name === 'match' ||
+        name === 'recompute-correspondences' ||
         name === 'sync-books' ||
         name === 'sync-games'
       ) {
@@ -274,7 +276,8 @@ export default function AIOSourcePage({
               ? { ...current, games: { ...current.games, running: true } }
               : current
           if (name === 'sync') return { ...current, syncing: true }
-          if (name === 'match') return { ...current, matching: true }
+          if (name === 'match' || name === 'recompute-correspondences')
+            return { ...current, matching: true }
           return current.books
             ? { ...current, books: { ...current.books, running: true } }
             : current
@@ -1019,6 +1022,14 @@ export default function AIOSourcePage({
                     >
                       <MagnifyingGlassIcon />
                       Identify torrents
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={Boolean(status.matching || resetting || action.isPending || dirty)}
+                      onClick={() => action.mutate('recompute-correspondences')}
+                    >
+                      <LinkIcon />
+                      Recompute correspondences
                     </Button>
                     {status.matching && (
                       <Button
