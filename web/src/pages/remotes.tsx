@@ -27,6 +27,7 @@ import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/
 import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
+import { filesResultsPath } from '@/lib/source-navigation'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames } from '@/lib/list-view'
 import { FormStatus } from '@/components/form-status'
@@ -334,7 +335,7 @@ export default function RemotesPage() {
                   </Button>
                   <Button size="sm" variant="outline" asChild>
                     <Link
-                      to={`/torrents?provider=${encodeURIComponent(remote.id)}`}
+                      to={`${filesResultsPath}?provider=${encodeURIComponent(remote.id)}`}
                       state={listState}
                     >
                       <MagnifyingGlassIcon />

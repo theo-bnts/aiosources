@@ -627,7 +627,12 @@ try {
     for (const [id, route] of pages) {
       await measure(
         `browser.${width}.${id}`,
-        ['sources.statistics', 'identification.statistics', 'identification.results'].includes(id)
+        [
+          'sources.statistics',
+          'files.statistics',
+          'identification.statistics',
+          'identification.results',
+        ].includes(id)
           ? 10_000
           : 5000,
         async () => {

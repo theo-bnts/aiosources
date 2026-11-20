@@ -147,11 +147,13 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   await alpha
     .getByRole('link', { name: 'View 5 imported torrents from Alpha source', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/torrents\?provider=alpha$/)
+  await expect(page).toHaveURL(/\/files\/results\?provider=alpha$/)
   await expect(
     page.getByRole('link', { name: 'Alpha identified release', exact: true }),
   ).toBeVisible()
-  await expect(page.locator('.page')).not.toContainText('Beta identified release')
+  await expect(
+    page.getByRole('link', { name: 'Beta identified release', exact: true }),
+  ).toHaveCount(0)
   await page.goto('/remotes')
   const remote = page.getByRole('region', { name: 'Remote catalog Remote copy', exact: true })
   await expect(
@@ -172,6 +174,39 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   expect(bounds!.x).toBeGreaterThanOrEqual(0)
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+
+  const fileListReads: string[] = []
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/torrents') fileListReads.push(request.url())
+  })
+  await page.goto('/files')
+  const tabs = page.getByRole('tablist', { name: 'Files views', exact: true })
+  await expect(tabs.getByRole('tab')).toHaveText(['Statistics', 'Results'])
+  await expect(tabs.getByRole('tab', { name: 'Statistics' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(page.getByRole('link', { name: 'View imported files', exact: true })).toHaveText('7')
+  await expect(
+    page.getByText('From local sources', { exact: true }).locator('..').locator('dd'),
+  ).toHaveText('6')
+  await expect(
+    page.getByText('From remote catalogs', { exact: true }).locator('..').locator('dd'),
+  ).toHaveText('1')
+  const files = page.getByRole('table', { name: 'Files by source', exact: true })
+  await expect(files.getByRole('row')).toHaveCount(4)
+  await expect(files.getByRole('row').filter({ hasText: 'Alpha source' })).toContainText('71.4%')
+  expect(fileListReads).toEqual([])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await files.getByRole('link', { name: 'Remote copy', exact: true }).click()
+  await expect(page).toHaveURL(/\/files\/results\?provider=remote$/)
+  await expect(tabs.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    page.getByRole('link', { name: 'Remote identified release', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'Alpha identified release', exact: true }),
+  ).toHaveCount(0)
   expect(server.sourceRequests()).toBe(0)
 })
 

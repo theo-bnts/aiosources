@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
-import { isSourceSettingsPath } from './source-navigation.ts'
+import { filesResultsPath, isSourceSettingsPath } from './source-navigation.ts'
 import { identificationResultsPath } from './metadata-navigation.ts'
 
 const viewLabels: Record<string, string> = {
@@ -9,6 +9,7 @@ const viewLabels: Record<string, string> = {
   '/providers/settings': 'All sources',
   '/runs': 'Torrent history',
   '/torrents': 'Files',
+  [filesResultsPath]: 'Files',
   '/search': 'Search',
   '/public/search': 'Search',
   '/trusted/search': 'Search',

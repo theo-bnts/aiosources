@@ -180,6 +180,7 @@ test('occurrence windows retain identification filters, navigation, browser hist
     expect(new URL(page.url()).pathname).toBe('/metadata/identification/results')
   }
   await page.goto('/torrents?q=Overlay')
+  await expect(page).toHaveURL(/\/files\/results\?q=Overlay$/)
   await page.getByRole('link', { name: 'Overlay Example', exact: true }).click()
   await expect(
     page.getByRole('dialog').getByRole('tab', { name: 'Published fields', exact: true }),

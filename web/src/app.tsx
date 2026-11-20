@@ -47,6 +47,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
+import { filesPath } from '@/lib/source-navigation'
 import type { Icon } from '@phosphor-icons/react'
 
 import {
@@ -149,9 +150,9 @@ const navigationGroups: NavigationGroup[] = [
         icon: CloudArrowDownIcon,
       },
       {
-        to: '/torrents',
+        to: filesPath,
         label: 'Files',
-        description: 'Search torrents imported from your sources.',
+        description: 'Browse imported files and see how they are distributed across sources.',
         icon: ListMagnifyingGlassIcon,
       },
     ],

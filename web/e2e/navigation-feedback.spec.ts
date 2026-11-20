@@ -318,7 +318,7 @@ test.describe('return navigation', () => {
     } finally {
       await db.end()
     }
-    await page.goto('/torrents?q=example&provider=search-source&sort=oldest')
+    await page.goto('/files/results?q=example&provider=search-source&sort=oldest')
     const origin = page.url()
     await page.getByRole('link', { name: 'Open processed record for record', exact: true }).click()
     await expect(page).toHaveURL(/\/raw\/[0-9]+$/)

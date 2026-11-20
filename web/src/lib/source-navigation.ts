@@ -1,3 +1,6 @@
+export const filesPath = '/files'
+export const filesResultsPath = `${filesPath}/results`
+
 // Source identifiers remain data when they match a directory or action name.
 // Ordinary URLs stay stable; only conflicting identifiers need another path.
 export function sourceSettingsPath(id: string) {

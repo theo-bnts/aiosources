@@ -222,7 +222,7 @@ test.describe('remote catalog history and ownership', () => {
       await expect(card.getByRole('link', { name: 'History', exact: true })).toHaveCount(0)
       await expect(
         card.getByRole('link', { name: 'View imported data', exact: true }),
-      ).toHaveAttribute('href', '/torrents?provider=remote-copy')
+      ).toHaveAttribute('href', '/files/results?provider=remote-copy')
       await db.query(
         `UPDATE aiosources.runs SET status='running',finished_at=NULL WHERE id='remote-copy-run'`,
       )
@@ -273,7 +273,7 @@ test.describe('remote catalog history and ownership', () => {
         page
           .getByRole('region', { name: 'Source Native source', exact: true })
           .getByRole('link', { name: 'View imported data', exact: true }),
-      ).toHaveAttribute('href', '/torrents?provider=native')
+      ).toHaveAttribute('href', '/files/results?provider=native')
     } finally {
       await db.end()
     }

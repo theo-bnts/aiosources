@@ -136,7 +136,7 @@ test('source display names stay consistent while routes and historical identity 
     await page.goto(`/addon/history/${requestID}`)
     await expect(
       page.getByRole('link', { name: `${name} · release-1`, exact: true }),
-    ).toHaveAttribute('href', `/torrents?provider=${source.id}&q=release-1`)
+    ).toHaveAttribute('href', `/files/results?provider=${source.id}&q=release-1`)
   }
   const renamed = await (await page.request.get(`/api/providers/${source.id}`)).json()
   expect(

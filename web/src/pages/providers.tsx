@@ -30,7 +30,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { sourceSettingsPath } from '@/lib/source-navigation'
+import { filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
 
 import { api, ApiError, queryClient, refreshData, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
@@ -282,7 +282,10 @@ function SourceCard({
           </Link>
         </Button>
         <Button size="sm" variant="outline" asChild>
-          <Link to={`/torrents?provider=${encodeURIComponent(source.id)}`} state={listState}>
+          <Link
+            to={`${filesResultsPath}?provider=${encodeURIComponent(source.id)}`}
+            state={listState}
+          >
             <MagnifyingGlassIcon />
             View imported data
           </Link>

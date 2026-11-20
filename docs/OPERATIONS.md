@@ -7,7 +7,7 @@
 | Page | Use it to |
 | --- | --- |
 | Search | Find identified films, series, games and books, choose an episode or file and compare releases. |
-| Files | Search records directly as imported from your sources or remote catalogs. |
+| Files | See imported counts by source in Statistics, then search those files directly in Results. |
 | Metadata → Identification | Track identification progress in Statistics, review uncertain records in Results, and manage automatic identification and its history. |
 | Sources → Indexers → Torrents | Add sources, schedule imports and inspect their history. |
 | Metadata → Catalogs → Videos / Games / Books | Each has its own statistics, update settings and history. |

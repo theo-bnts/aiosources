@@ -18,6 +18,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Sources', 'Torrents', '/pages/999999'],
     ['Sources', 'Torrents', '/runs/missing'],
     ['Sources', 'Files', '/torrents'],
+    ['Sources', 'Files', '/files'],
+    ['Sources', 'Files', '/files/results'],
     ['Metadata', 'Videos', '/metadata'],
     ['Metadata', 'Videos', '/metadata/settings'],
     ['Metadata', 'Videos', '/metadata/videos'],

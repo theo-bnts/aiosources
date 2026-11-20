@@ -34,6 +34,7 @@ import { InterfacePreferences } from '@/components/interface-preferences'
 import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
 import { settingFromHash } from '@/lib/settings-catalog'
+import { filesPath, filesResultsPath } from '@/lib/source-navigation'
 import {
   identificationResultsPath,
   legacyMetadataHistory,
@@ -55,6 +56,7 @@ const ProviderEditor = lazy(() =>
 )
 const RunsPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunsPage })))
 const RunDetailPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunDetailPage })))
+const FilesStatisticsPage = lazy(() => import('@/pages/files-statistics'))
 const TorrentsPage = lazy(() =>
   import('@/pages/library').then((m) => ({ default: m.TorrentsPage })),
 )
@@ -235,6 +237,11 @@ function IdentificationStatisticsRoute() {
   ) : (
     <IdentificationStatistics />
   )
+}
+
+function LegacyFiles() {
+  const { search, hash, state } = useLocation()
+  return <Navigate to={filesResultsPath + search + hash} state={state} replace />
 }
 
 function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' }) {
@@ -534,7 +541,21 @@ const router = createBrowserRouter(
         <Route path="notifications" element={<LegacyActivity />} />
         <Route path="webhooks" element={<LegacyActivity />} />
         <Route path="indexers" element={<Navigate to="/providers" replace />} />
-        <Route path="torrents" element={<TorrentsPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Files"
+              tabs={[
+                { path: filesPath, label: 'Statistics', icon: ChartBarIcon },
+                { path: filesResultsPath, label: 'Results', icon: ListChecksIcon },
+              ]}
+            />
+          }
+        >
+          <Route path={filesPath} element={<FilesStatisticsPage />} />
+          <Route path={filesResultsPath} element={<TorrentsPage />} />
+        </Route>
+        <Route path="torrents" element={<LegacyFiles />} />
         <Route path="search" element={<CatalogSearchPage />} />
         <Route path="search/torrents" element={<CatalogTorrentsPage />} />
         <Route path="search/:id" element={<CatalogTitlePage />} />
