@@ -71,7 +71,7 @@ test('action confirmations use the shared opaque notification, field errors stay
   await expect(dialog).toBeVisible()
   await dialog.getByLabel('Reference name', { exact: true }).fill(generatedReference)
   await dialog.getByLabel('Secret value', { exact: true }).fill('')
-  await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toBeHidden()
   // A confirmation from the authenticated console must not survive into login.
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()

@@ -1,6 +1,5 @@
 import { InfoTip } from '@/components/ui/info-tip'
 import {
-  ArrowLeftIcon,
   CheckCircleIcon,
   FloppyDiskIcon,
   PencilSimpleIcon,
@@ -36,7 +35,6 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
@@ -457,12 +455,6 @@ function ProxyEditor({
           )}
           <ErrorNotice error={save.error} />
           <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={save.isPending}>
-                <ArrowLeftIcon aria-hidden="true" />
-                Back
-              </Button>
-            </DialogClose>
             <Button type="submit" disabled={save.isPending || conflict || (existing && !dirty)}>
               <FloppyDiskIcon aria-hidden="true" />
               {save.isPending ? 'Saving…' : 'Save'}

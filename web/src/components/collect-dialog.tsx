@@ -1,5 +1,5 @@
 import { InfoTip } from '@/components/ui/info-tip'
-import { ArrowLeftIcon, PlayIcon } from '@phosphor-icons/react'
+import { PlayIcon } from '@phosphor-icons/react'
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
@@ -123,7 +123,7 @@ export function CollectDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent aria-describedby={undefined} showCloseButton={!mutation.isPending}>
         <DialogHeader>
           <DialogTitle>Run manual import</DialogTitle>
         </DialogHeader>
@@ -369,15 +369,6 @@ export function CollectDialog({
           </Disclosure>
           <ErrorNotice error={mutation.error} />
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={mutation.isPending}
-            >
-              <ArrowLeftIcon aria-hidden="true" />
-              Back
-            </Button>
             <Button
               type="submit"
               disabled={

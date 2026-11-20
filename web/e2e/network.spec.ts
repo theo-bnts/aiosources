@@ -200,7 +200,7 @@ test('network drafts survive concurrent changes and mobile proxy forms keep shar
   await editor.getByLabel('Name', { exact: true }).fill('WARP gateway')
   await editor.getByLabel('Proxy URL', { exact: true }).fill('socks5://warp:40000')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await editor.getByRole('button', { name: 'Back', exact: true }).click()
+  await editor.getByRole('button', { name: 'Close', exact: true }).click()
   const discard = page.getByRole('alertdialog', { name: 'Unsaved changes', exact: true })
   await expect(discard).toBeVisible()
   await discard.getByRole('button', { name: 'Keep editing', exact: true }).click()

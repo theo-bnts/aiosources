@@ -1,11 +1,5 @@
 import { InfoTip } from '@/components/ui/info-tip'
-import {
-  ArrowClockwiseIcon,
-  ArrowLeftIcon,
-  KeyIcon,
-  PlusIcon,
-  TrashIcon,
-} from '@phosphor-icons/react'
+import { ArrowClockwiseIcon, KeyIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react'
 import {
   ResultCount,
   ConfirmAction,
@@ -30,7 +24,6 @@ import { Label } from '@/components/ui/label'
 import { FormStatus } from '@/components/form-status'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -319,12 +312,6 @@ export default function SecretsPage() {
               saving={save.isPending}
             />
             <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={busy}>
-                  <ArrowLeftIcon aria-hidden="true" />
-                  Back
-                </Button>
-              </DialogClose>
               <Button
                 type="submit"
                 variant={editing?.rotate ? 'warning' : 'default'}
