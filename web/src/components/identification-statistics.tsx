@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { api, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import type { Status } from '@/lib/aiosource-types'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
+import { identificationResultsPath } from '@/lib/metadata-navigation'
 import { number, percentage, useDate } from '@/lib/format'
-import { ErrorNotice } from '@/components/common'
+import { ErrorNotice, Loading } from '@/components/common'
 import { Statistic } from '@/components/statistic'
 import { Badge } from '@/components/ui/badge'
 
@@ -16,7 +17,14 @@ export function IdentificationStatistics() {
     refetchInterval: COLLECTION_REFRESH_INTERVAL,
   })
   const status = query.data
-  if (!status) return <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+  const notice = <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+  if (!status)
+    return (
+      <div className="page">
+        {notice}
+        {query.isPending && <Loading label="Loading statistics" />}
+      </div>
+    )
   const total =
     status.status.matched +
     status.status.ambiguous +
@@ -24,14 +32,10 @@ export function IdentificationStatistics() {
     status.status.matching_pending
   const next = status.automation.next_identification
   return (
-    <section className="space-y-4" aria-label="Identification statistics">
-      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+    <section className="page" aria-label="Identification statistics">
+      {notice}
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Statistic
-          label="Imported torrents"
-          value={total}
-          to="/metadata/identification?match_status=all"
-        />
+        <Statistic label="Imported torrents" value={total} to={identificationResultsPath} />
         {identificationStatuses.map((decision) => (
           <Statistic
             key={decision}
@@ -39,7 +43,7 @@ export function IdentificationStatistics() {
               decision === 'matched' ? 'Identified torrents' : identificationResults[decision].label
             }
             value={`${number(status.status[decision === 'pending' ? 'matching_pending' : decision])} (${percentage(status.status[decision === 'pending' ? 'matching_pending' : decision], total)})`}
-            to={`/metadata/identification?match_status=${decision}`}
+            to={`${identificationResultsPath}?match_status=${decision}`}
           />
         ))}
       </dl>

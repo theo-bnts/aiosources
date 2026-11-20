@@ -8,7 +8,7 @@
 | --- | --- |
 | Search | Find identified films, series, games and books, choose an episode or file and compare releases. |
 | Files | Search records directly as imported from your sources or remote catalogs. |
-| Metadata → Identification | Review uncertain records, choose the correct film, series, game or book, and manage automatic identification and its history. |
+| Metadata → Identification | Track identification progress in Statistics, review uncertain records in Results, and manage automatic identification and its history. |
 | Sources → Indexers → Torrents | Add sources, schedule imports and inspect their history. |
 | Metadata → Catalogs → Videos / Games / Books | Each has its own statistics, update settings and history. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
@@ -35,7 +35,7 @@ Posters and book covers load directly from their official image services. Your i
 
 ## Review identification
 
-In **Identification**, search for a record or filter its status. Open **Review**, check the suggested title and year, then choose the correct result. You can edit the title and year search if the release name is unusual.
+In **Identification → Results**, search for a record or filter its status. Open **Review**, check the suggested title and year, then choose the correct result. You can edit the title and year search if the release name is unusual.
 
 Manual decisions take priority over automatic suggestions. An uncertain match is kept for review instead of being silently accepted. Season and episode information affects which releases appear for a selected episode.
 

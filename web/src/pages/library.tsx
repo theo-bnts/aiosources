@@ -20,6 +20,7 @@ import type { Page, RawDetail, RawRecord, Torrent } from '@/lib/types'
 import { messageText, useDate, number } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
+import { identificationResultsPath } from '@/lib/metadata-navigation'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,7 +99,7 @@ function ProcessedRecordFilters({
             <p>
               Errors and ignored records explain source import processing. Review torrent
               identification in{' '}
-              <Link className="data-link" to="/metadata/identification">
+              <Link className="data-link" to={identificationResultsPath}>
                 Identification
               </Link>
               .

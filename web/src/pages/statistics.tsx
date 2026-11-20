@@ -180,7 +180,7 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
   const automatic = book ? status?.config.openlibrary_enabled : status?.config.auto_sync
   const lastSync = book ? books?.last_sync : status?.status.last_sync
   const appliedThrough = book ? books?.changes_through : status?.status.applied_through
-  const snapshot = book ? books?.snapshot_at?.slice(0, 10) : status?.status.inventory_date
+  const snapshot = book ? books?.snapshot_at : status?.status.inventory_date
   const next = book ? books?.next_update : status?.automation.next_update
   const needsAttention = book
     ? Boolean(books?.error || books?.needs_export)
@@ -246,7 +246,11 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
                 size="sm"
                 to={`${path}/history`}
               />
-              <Statistic label="Export date" value={snapshot || 'Not established'} size="sm" />
+              <Statistic
+                label="Export date"
+                value={snapshot ? date(snapshot, 'date') : 'Not established'}
+                size="sm"
+              />
               <Statistic
                 label="Next automatic update"
                 value={

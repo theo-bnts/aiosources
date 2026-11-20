@@ -178,12 +178,12 @@ test('long source names never stretch filter fields beyond small-screen layouts'
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 })
     for (const [path, field, value] of [
-      ['/metadata/identification', 'Source', 'mobile-example'],
+      ['/metadata/identification/results', 'Source', 'mobile-example'],
       ['/runs', 'Source', 'mobile-example'],
       ['/logs', 'Source or service', 'source:mobile-example'],
     ]) {
       await page.goto(path)
-      if (path === '/metadata/identification') await openDisclosure(page, 'Filters')
+      if (path === '/metadata/identification/results') await openDisclosure(page, 'Filters')
       const control = page.getByLabel(field, { exact: true })
       await control.click()
       await expect(page.locator(`[role="menuitemcheckbox"][data-value="${value}"]`)).toHaveText(

@@ -82,11 +82,12 @@ test('Identification is a separate sidebar page and shared cache statistics matc
   await nav.getByRole('link', { name: 'Identification', exact: true }).click()
   await expect(page).toHaveURL(/\/metadata\/identification$/)
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
+    'Statistics',
     'Results',
     'Settings',
     'History',
   ])
-  await expect(page.getByRole('tab', { name: 'Results', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   )

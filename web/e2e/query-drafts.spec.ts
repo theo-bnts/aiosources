@@ -58,7 +58,7 @@ for (const view of [
   { name: 'Torrents', path: '/torrents?q=Original', input: '#torrent-search', key: 'q' },
   {
     name: 'Identification',
-    path: '/metadata/identification?match_status=all&match_q=Original',
+    path: '/metadata/identification/results?match_status=all&match_q=Original',
     input: '#matching-search',
     key: 'match_q',
   },
@@ -139,6 +139,6 @@ test.describe('processed records', () => {
       .getByRole('dialog', { name: 'About Filters', exact: true })
       .getByRole('link', { name: 'Identification', exact: true })
       .click()
-    await expect(page).toHaveURL(/\/metadata\/identification$/)
+    await expect(page).toHaveURL(/\/metadata\/identification\/results$/)
   })
 })

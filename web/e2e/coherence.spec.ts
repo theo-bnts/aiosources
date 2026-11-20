@@ -52,7 +52,7 @@ async function reviewFixture(page: Page, server: TestServer) {
   } finally {
     await db.end()
   }
-  await page.goto('/metadata/identification')
+  await page.goto('/metadata/identification/results')
   await page.getByRole('button', { name: 'Review Review Example 2024', exact: true }).click()
   const editor = page.getByRole('dialog', { name: 'Review identification', exact: true })
   await editor.getByRole('radio', { name: 'Choose Review Example', exact: true }).check()

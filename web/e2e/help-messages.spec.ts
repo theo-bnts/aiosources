@@ -25,10 +25,10 @@ for (const width of [390, 1440]) {
     const explanation =
       'Identifiers, search fields, matching evidence and playback information are always retained.'
     await expect(page.getByText(explanation, { exact: true })).toHaveCount(0)
-    const help = page.getByRole('button', { name: 'About Stored data', exact: true })
+    const help = page.getByRole('button', { name: 'About Torrent data', exact: true })
     await help.focus()
     await page.keyboard.press('Enter')
-    const popup = page.getByRole('dialog', { name: 'About Stored data', exact: true })
+    const popup = page.getByRole('dialog', { name: 'About Torrent data', exact: true })
     await expect(popup).toContainText(explanation)
     await page.keyboard.press('Escape')
     await expect(help).toBeFocused()

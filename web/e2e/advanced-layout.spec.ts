@@ -140,7 +140,7 @@ test('search pages start with closed optional panels and no implicit result rest
   })
   for (const width of [320, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
-    for (const route of ['/search', '/torrents', '/metadata/identification']) {
+    for (const route of ['/search', '/torrents', '/metadata/identification/results']) {
       await page.goto(route)
       await expect(page.locator('main details[open]')).toHaveCount(0)
       await expect(page.locator('main summary', { hasText: /^Filters$/ })).toBeVisible()
@@ -167,6 +167,9 @@ test('search pages start with closed optional panels and no implicit result rest
   expect(statuses.length).toBeGreaterThan(0)
   expect(statuses.every((status) => status === '')).toBe(true)
   await page.goto('/metadata/identification?match_status=unmatched&match_provider=example')
+  await expect(page).toHaveURL(
+    /\/metadata\/identification\/results\?match_status=unmatched&match_provider=example$/,
+  )
   await expect(page.locator('#matching-status')).toHaveText('Not identified')
   await expect(page.locator('#matching-source')).toHaveText('example')
   await expect(page.locator('main details[open]')).toHaveCount(0)

@@ -51,23 +51,25 @@ export function isWholeNumberString(
   return Number.isSafeInteger(parsed) && parsed >= min && parsed <= max
 }
 export function useDate() {
-  const preferences = useBrowserPreferences()
+  const { dateFormat, timeZone } = useBrowserPreferences()
   return useMemo(() => {
-    const dates = new Intl.DateTimeFormat(
-      preferences.dateFormat === 'browser' ? undefined : 'en-GB',
-      {
-        timeZone: preferences.timeZone === 'utc' ? 'UTC' : undefined,
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      },
-    )
-    return (value?: string) => {
+    const locale = dateFormat === 'browser' ? undefined : 'en-GB'
+    const dates = new Intl.DateTimeFormat(locale, {
+      timeZone: timeZone === 'utc' ? 'UTC' : undefined,
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
+    // Calendar and export dates keep their day in every display timezone.
+    const calendarDates = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', dateStyle: 'medium' })
+    return (value?: string, format: 'date' | 'date-time' = 'date-time') => {
       if (!value) return 'Not provided'
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) return value
-      return dates.format(parsed)
+      return (
+        format === 'date' || /^\d{4}-\d{2}-\d{2}$/.test(value) ? calendarDates : dates
+      ).format(parsed)
     }
-  }, [preferences])
+  }, [dateFormat, timeZone])
 }
 export function bytes(value: unknown) {
   if (value === null || value === undefined || value === '') return 'Not provided'

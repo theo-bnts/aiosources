@@ -30,7 +30,7 @@ async function seedInformation(page: Page, server: TestServer) {
       INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,display_title,lower(display_title) FROM aiosources.aio_works WHERE media_type IN ('movie','tv');
       INSERT INTO aiosources.ol_authors(id,name) VALUES('OL200A','Example Author');
       INSERT INTO aiosources.ol_editions(id,work_keys,title,normalized) VALUES('OL300M',ARRAY['OL100W'],'Example Book','example book');
-      UPDATE aiosources.ol_import_state SET complete=TRUE,data_complete=TRUE,position=1234,works=1,editions=1,authors=1,snapshot_at='2026-01-01',last_sync='2026-01-02';
+      UPDATE aiosources.ol_import_state SET complete=TRUE,data_complete=TRUE,position=1234,works=1,editions=1,authors=1,snapshot_at='2026-01-01T00:00:00Z',last_sync='2026-01-02';
       UPDATE aiosources.ol_changes_state SET anchor_id='100',anchor_at='2026-01-02',changes_through='2026-01-02',bootstrap_complete=TRUE;
       UPDATE aiosources.aio_state SET last_sync='2026-01-02',changes_through='2026-01-02',applied_through='2026-01-02',inventory_date='2026-01-01';
       INSERT INTO aiosources.operation_runs(id,kind,service,trigger,lock_key,status,processed,finished_at) VALUES
@@ -103,6 +103,7 @@ test('video and book workspaces keep separate counts and histories under one Met
     [],
   )
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
+    'Statistics',
     'Results',
     'Settings',
     'History',
@@ -111,6 +112,22 @@ test('video and book workspaces keep separate counts and histories under one Met
   await expect(
     page.getByRole('link', { name: 'Open run identification-update', exact: true }),
   ).toBeVisible()
+  await page.getByRole('tab', { name: 'Results', exact: true }).click()
+  const filters = page.getByRole('form', { name: 'Identification filters', exact: true })
+  await expect(filters).toBeVisible()
+  expect(fullStatisticsReads, 'Results should not request global identification counts').toEqual([])
+  await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
+  await expect(page).toHaveURL(/\/metadata\/identification$/)
+  const statistics = page.getByRole('region', { name: 'Identification statistics', exact: true })
+  await expect(statistics).toBeVisible()
+  await expect(filters).toHaveCount(0)
+  await statistics.getByRole('link', { name: 'View identified torrents', exact: true }).click()
+  await expect(page).toHaveURL(/\/metadata\/identification\/results\?match_status=matched$/)
+  await expect(page.getByRole('tab', { name: 'Results', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(filters).toBeVisible()
   await page.goto('/metadata/settings#setting=metadata.books')
   await expect(page).toHaveURL(/\/metadata\/books\/settings#setting=metadata.books$/)
   await expect(page.getByLabel('Automatically update book information')).toBeFocused()
@@ -125,6 +142,27 @@ test('video and book workspaces keep separate counts and histories under one Met
     'aria-selected',
     'true',
   )
+})
+
+test.describe('Calendar dates in metadata statistics', () => {
+  test.use({ locale: 'fr-FR', timezoneId: 'America/Los_Angeles' })
+
+  test('export dates follow interface preferences without shifting the export day', async ({
+    page,
+    server,
+  }) => {
+    await seedInformation(page, server)
+    const exportDate = page.getByText('Export date', { exact: true }).locator('..').locator('dd')
+    await page.goto('/metadata/videos')
+    await expect(exportDate).toHaveText('1 janv. 2026')
+    await page.goto('/metadata/books')
+    await expect(exportDate).toHaveText('1 janv. 2026')
+    await page.getByRole('button', { name: 'Interface preferences', exact: true }).click()
+    const preferences = page.getByRole('dialog', { name: 'Interface preferences', exact: true })
+    await preferences.getByLabel('Date format', { exact: true }).selectOption('english')
+    await preferences.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(exportDate).toHaveText('1 Jan 2026')
+  })
 })
 
 test('workspace saves preserve other provider settings and protect drafts between workspaces', async ({

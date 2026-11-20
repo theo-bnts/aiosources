@@ -126,7 +126,9 @@ test('source display names stay consistent while routes and historical identity 
       'href',
       `/providers/${source.id}`,
     )
-    await page.goto(`/metadata/identification?match_status=matched&match_provider=${source.id}`)
+    await page.goto(
+      `/metadata/identification/results?match_status=matched&match_provider=${source.id}`,
+    )
     await expect(page.getByRole('table')).toContainText(`${name} · release-1`)
     await page.getByRole('button', { name: 'Review Example Release', exact: true }).last().click()
     await expect(page.getByRole('dialog')).toContainText(`${name} · release-1`)

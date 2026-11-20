@@ -5,6 +5,7 @@ import { api, params, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
 import { bytes, number, percentage, useDate } from '@/lib/format'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
+import { identificationResultsPath } from '@/lib/metadata-navigation'
 import type { SourceTorrentOverview, SourceTorrentStats as TorrentStats } from '@/lib/types'
 
 export function useSourceTorrentStats(enabled: boolean) {
@@ -81,7 +82,7 @@ export function SourceTorrentStats({
             <dd className="mt-1">
               <Link
                 className="data-link tabular-nums"
-                to={`/metadata/identification?${params({ match_status: status, match_provider: counts.provider_id })}`}
+                to={`${identificationResultsPath}?${params({ match_status: status, match_provider: counts.provider_id })}`}
                 aria-label={`View ${number(counts[status])} ${identificationResults[status].label.toLowerCase()} torrents from ${source}`}
               >
                 {number(counts[status])}

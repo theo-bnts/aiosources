@@ -100,7 +100,7 @@ test.describe('history order and shared pagination', () => {
       ['/logs?q=Pagination%20log', 'Pagination log 0001', 'Pagination log 0103'],
       ['/torrents?q=Pagination', 'Pagination torrent 0001', 'Pagination torrent 0103'],
       [
-        '/metadata/identification?match_status=all',
+        '/metadata/identification/results?match_status=all',
         'Pagination torrent 0001',
         'Pagination torrent 0103',
       ],

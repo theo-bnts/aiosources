@@ -7,6 +7,7 @@ import type { Items } from '@/lib/types'
 import type { AdminSession } from '@/lib/security-types'
 import { PublicRequestLimitsPanel } from '@/components/public-request-limits'
 import SecretsPage, { SecretReferencesHelp } from '@/pages/secrets'
+import { PageActions } from '@/components/page-actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
@@ -69,7 +70,7 @@ export function SecuritySessionsPage() {
   return (
     <div className="page" id="sessions">
       <section className="space-y-4" aria-label="Active sessions">
-        <div className="page-heading">
+        <PageActions>
           <ConfirmAction
             title="Revoke all other sessions?"
             description="Every session except this browser will be signed out. Other browsers will need your password."
@@ -87,7 +88,7 @@ export function SecuritySessionsPage() {
               await refresh()
             }}
           />
-        </div>
+        </PageActions>
         <ErrorNotice error={sessions.error} retry={() => void sessions.refetch()} />
         {sessions.data && <ResultCount total={sessionItems.length} label="sessions" />}
         {sessions.isPending ? (

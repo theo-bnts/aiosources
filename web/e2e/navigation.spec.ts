@@ -30,6 +30,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Metadata', 'Books', '/metadata/books/settings'],
     ['Metadata', 'Books', '/metadata/books/history'],
     ['Metadata', 'Identification', '/metadata/identification'],
+    ['Metadata', 'Identification', '/metadata/identification/results'],
     ['Metadata', 'Identification', '/metadata/identification/settings'],
     ['Metadata', 'Identification', '/metadata/identification/history'],
     ['Metadata', 'Videos', '/metadata/history'],
@@ -215,7 +216,8 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   )
   await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
   await storageTabs.getByRole('tab', { name: 'Settings', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Stored data', exact: true })).toBeVisible()
+  await expect(page.getByText('Torrent data', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Stored data', exact: true })).toHaveCount(0)
   await expect(breadcrumb.getByRole('listitem')).toHaveText(['Administration/', 'Storage'])
   await expect(
     page.getByRole('button', { name: 'Reset all source data', exact: true }),
@@ -226,7 +228,9 @@ test('mobile navigation and horizontal page tabs retain their current section', 
   await navigation.getByRole('link', { name: 'Secrets', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByRole('tablist', { name: 'Security views', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Create secret', exact: true })).toBeVisible()
+  const createSecret = page.getByRole('button', { name: 'Create secret', exact: true })
+  await expect(createSecret).toBeVisible()
+  const createPosition = (await createSecret.boundingBox())!
   await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   await page
@@ -234,6 +238,12 @@ test('mobile navigation and horizontal page tabs retain their current section', 
     .getByRole('link', { name: 'Active sessions', exact: true })
     .click()
   await expect(page.getByText('This session', { exact: true })).toBeVisible()
+  const revokeOthers = page.getByRole('button', { name: 'Revoke others', exact: true })
+  await expect(revokeOthers).toBeDisabled()
+  const revokePosition = (await revokeOthers.boundingBox())!
+  expect(
+    Math.abs(createPosition.x + createPosition.width - revokePosition.x - revokePosition.width),
+  ).toBeLessThan(1)
   await expect(
     page.getByRole('heading', { name: 'Active sessions', exact: true, level: 1 }),
   ).toBeVisible()

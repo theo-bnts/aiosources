@@ -1,4 +1,3 @@
-import { InfoTip } from '@/components/ui/info-tip'
 import { ArrowClockwiseIcon, FloppyDiskIcon, TrashIcon } from '@phosphor-icons/react'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { SettingsSections } from '@/components/settings-sections'
@@ -116,41 +115,32 @@ export function StorageSettingsPanel() {
 
   return (
     <>
-      <section className="section-card">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <h2 className="section-title">Stored data</h2>
-          <InfoTip label="Stored data">
-            Identifiers, search fields, matching evidence and playback information are always
-            retained.
-          </InfoTip>
-        </div>
-
-        <ErrorNotice error={query.error} retry={() => void query.refetch()} />
-        {query.isPending && <Loading label="Loading storage settings" />}
-      </section>
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending && <Loading label="Loading storage settings" />}
       <SettingsSections>
-        <Disclosure
-          title="Torrent data"
-          help={
-            <>
-              <p>
-                Fields and processed-record choices apply to imports started after saving. Existing
-                imports retain their saved choices. Published change history switches immediately.
-                Required information cannot be disabled.
-              </p>
-              <p>
-                Changes do not rewrite existing torrent data. To populate previously omitted fields
-                or remove previously retained fields, reset source data in Maintenance, then import
-                again. Diagnostic history expires with its retention policy.
-              </p>
-              <p>
-                Impact levels describe the additional storage and processing cost of keeping each
-                optional item. The amount depends on your source fields and import volume.
-              </p>
-            </>
-          }
-        >
-          {settings && (
+        {settings && (
+          <Disclosure
+            title="Torrent data"
+            help={
+              <>
+                <p>
+                  Fields and processed-record choices apply to imports started after saving.
+                  Existing imports retain their saved choices. Published change history switches
+                  immediately. Identifiers, search fields, matching evidence and playback
+                  information are always retained.
+                </p>
+                <p>
+                  Changes do not rewrite existing torrent data. To populate previously omitted
+                  fields or remove previously retained fields, reset source data in Maintenance,
+                  then import again. Diagnostic history expires with its retention policy.
+                </p>
+                <p>
+                  Impact levels describe the additional storage and processing cost of keeping each
+                  optional item. The amount depends on your source fields and import volume.
+                </p>
+              </>
+            }
+          >
             <form
               aria-label="Torrent data"
               className="space-y-5"
@@ -271,8 +261,8 @@ export function StorageSettingsPanel() {
                 <FormStatus dirty={dirty} saving={save.isPending} saved={save.isSuccess} />
               </div>
             </form>
-          )}
-        </Disclosure>
+          </Disclosure>
+        )}
         <StorageIndexesPanel />
         <StorageRetentionPanel />
         <RuntimeSettingsPanel section="history" />

@@ -93,10 +93,13 @@ export function OccurrenceNavigationProvider({ children }: { children: ReactNode
         },
         returnFocus: () => {
           if (trigger.current?.isConnected) trigger.current.focus({ preventScroll: true })
-          else
-            document
-              .querySelector<HTMLElement>('main input, main button, main a')
-              ?.focus({ preventScroll: true })
+          else {
+            // After a reload, focusing another tab would also activate that view.
+            const fallback =
+              document.querySelector<HTMLElement>('main [role="tab"][aria-selected="true"]') ??
+              document.querySelector<HTMLElement>('main input, main button, main a')
+            fallback?.focus({ preventScroll: true })
+          }
         },
       }}
     >

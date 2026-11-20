@@ -267,7 +267,7 @@ test('search and settings inputs match on mobile and combined filters stay usabl
     await openDisclosure(page, 'Filters')
     await selectMultiple(page, 'Source', ['alpha', 'zulu'])
     await expect(page.locator('[data-result-count]')).toHaveText('2 source releases')
-    await page.goto('/metadata/identification')
+    await page.goto('/metadata/identification/results')
     await openDisclosure(page, 'Filters')
     await selectMultiple(page, 'Identification result', ['matched', 'pending'])
     await selectMultiple(page, 'Source', ['alpha', 'zulu'])
@@ -304,7 +304,7 @@ test('all three searches accept spaced and dotted title fragments and show total
     await page.goto(`/torrents?q=${encodeURIComponent(q)}`)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('main tbody tr')).toHaveCount(2)
-    await page.goto('/metadata/identification')
+    await page.goto('/metadata/identification/results')
     await expect(page.locator('#matching-status')).toHaveText('All results')
     await expect(page.locator('main details[open]')).toHaveCount(0)
     const input = page.getByLabel('Title, source ID or info hash', { exact: true })
@@ -877,7 +877,7 @@ test.describe('browser language preferences', () => {
     } finally {
       await db.end()
     }
-    await page.goto('/metadata/identification?match_status=all&match_q=example+film')
+    await page.goto('/metadata/identification/results?match_status=all&match_q=example+film')
     await page
       .getByRole('button', { name: 'Review Example-Film.New.Day.2026.1080p', exact: true })
       .click()

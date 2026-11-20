@@ -92,7 +92,7 @@ test('metadata catalogs and credential creation links have consistent navigation
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }
   }
-  await page.goto('/metadata/identification')
+  await page.goto('/metadata/identification/results')
   await expect(
     page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('listitem'),
   ).toHaveText(['Metadata/', 'Identification'])
@@ -148,13 +148,13 @@ test('occurrence windows retain identification filters, navigation, browser hist
   }
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 })
-    await page.goto('/metadata/identification?match_q=Overlay&match_limit=25')
+    await page.goto('/metadata/identification/results?match_q=Overlay&match_limit=25')
     const originalEntry = await page.evaluate(() => history.state.idx)
     const link = page.getByRole('link', { name: 'Overlay Example', exact: true })
     await link.click()
     const dialog = page.getByRole('dialog', { name: 'Source occurrence', exact: true })
     await expect(dialog).toBeVisible()
-    expect(new URL(page.url()).pathname).toBe('/metadata/identification')
+    expect(new URL(page.url()).pathname).toBe('/metadata/identification/results')
     expect(new URL(page.url()).searchParams.get('match_q')).toBe('Overlay')
     await expect(
       page
@@ -177,7 +177,7 @@ test('occurrence windows retain identification filters, navigation, browser hist
     await page.reload()
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-    expect(new URL(page.url()).pathname).toBe('/metadata/identification')
+    expect(new URL(page.url()).pathname).toBe('/metadata/identification/results')
   }
   await page.goto('/torrents?q=Overlay')
   await page.getByRole('link', { name: 'Overlay Example', exact: true }).click()

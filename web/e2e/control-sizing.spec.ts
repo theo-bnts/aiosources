@@ -95,7 +95,7 @@ for (const width of [390, 1440]) {
       '/metadata/videos/settings',
       '/metadata/games/settings',
       '/metadata/books/settings',
-      '/metadata/identification',
+      '/metadata/identification/results',
       '/metadata/identification/settings',
       '/debrid/settings',
       '/addon/settings',

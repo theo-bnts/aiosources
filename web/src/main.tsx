@@ -34,7 +34,11 @@ import { InterfacePreferences } from '@/components/interface-preferences'
 import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
 import { settingFromHash } from '@/lib/settings-catalog'
-import { legacyMetadataHistory, metadataSections } from '@/lib/metadata-navigation'
+import {
+  identificationResultsPath,
+  legacyMetadataHistory,
+  metadataSections,
+} from '@/lib/metadata-navigation'
 import './index.css'
 
 const SourceStatisticsPage = lazy(() =>
@@ -56,6 +60,11 @@ const TorrentsPage = lazy(() =>
 )
 const MatchingDiagnostics = lazy(() =>
   import('@/components/matching-diagnostics').then((m) => ({ default: m.MatchingDiagnostics })),
+)
+const IdentificationStatistics = lazy(() =>
+  import('@/components/identification-statistics').then((m) => ({
+    default: m.IdentificationStatistics,
+  })),
 )
 const StremioStatisticsPage = lazy(() =>
   import('@/pages/stremio-history').then((m) => ({ default: m.StremioStatisticsPage })),
@@ -206,21 +215,42 @@ function LegacyRawHistory() {
   )
 }
 
+function legacyIdentificationResults(search: string, hash: string) {
+  const params = new URLSearchParams(search)
+  const hasFilters = [
+    'match_status',
+    'match_provider',
+    'match_q',
+    'match_limit',
+    'match_offset',
+  ].some((key) => params.has(key))
+  return hasFilters || hash === '#matching-results' ? identificationResultsPath + search + hash : ''
+}
+
+function IdentificationStatisticsRoute() {
+  const location = useLocation()
+  const results = legacyIdentificationResults(location.search, location.hash)
+  return results ? (
+    <Navigate to={results} state={location.state} replace />
+  ) : (
+    <IdentificationStatistics />
+  )
+}
+
 function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' }) {
   const location = useLocation()
-  const search = new URLSearchParams(location.search)
-  const identification = search.has('match_status') || location.hash === '#matching-results'
+  const identification = legacyIdentificationResults(location.search, location.hash)
   const settingRoute = settingFromHash(location.hash)?.route
   const settingsPath = settingRoute?.startsWith('/metadata/')
     ? settingRoute
     : '/metadata/videos/settings'
-  const to = identification
-    ? `/metadata/identification${location.search}`
-    : view === 'history'
+  const to =
+    identification ||
+    (view === 'history'
       ? legacyMetadataHistory(location.search)
       : view === 'settings'
         ? `${settingsPath}${location.search}${location.hash}`
-        : `/metadata/videos${location.search}${location.hash}`
+        : `/metadata/videos${location.search}${location.hash}`)
   return <Navigate to={to} state={location.state} replace />
 }
 
@@ -347,7 +377,12 @@ const router = createBrowserRouter(
             <WorkspaceLayout
               title="Identification"
               tabs={[
-                { path: '/metadata/identification', label: 'Results', icon: ListChecksIcon },
+                {
+                  path: metadataSections.identification.path,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                { path: identificationResultsPath, label: 'Results', icon: ListChecksIcon },
                 { path: '/metadata/identification/settings', label: 'Settings', icon: GearSixIcon },
                 {
                   path: '/metadata/identification/history',
@@ -358,7 +393,11 @@ const router = createBrowserRouter(
             />
           }
         >
-          <Route path="metadata/identification" element={<MatchingDiagnostics />} />
+          <Route
+            path={metadataSections.identification.path}
+            element={<IdentificationStatisticsRoute />}
+          />
+          <Route path={identificationResultsPath} element={<MatchingDiagnostics />} />
           <Route
             path="metadata/identification/settings"
             element={<AIOSourcePage key="identification" section="identification" />}

@@ -101,7 +101,7 @@ export async function exerciseBookSynchronizationControls(page: Page, server: Te
   )
   await expect(page.getByText('Changes applied through', { exact: true })).toBeVisible()
   await expect(page.getByText('Export date', { exact: true }).locator('..')).toContainText(
-    '2026-01-01',
+    'Jan 1, 2026',
   )
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
