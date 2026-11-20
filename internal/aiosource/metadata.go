@@ -212,6 +212,7 @@ func decodeWork(typ, id string, b []byte) (model.AIOWork, error) {
 		return w, ErrInvalidResponse
 	}
 	w.LocalizedTitles = map[string]string{"en": primary}
+	w.OriginalLanguage = normalizeWorkOriginalLanguage(d.OriginalLanguage)
 	if lang := NormalizeLanguage(d.OriginalLanguage); lang != "" && Normalize(original) != "" {
 		w.LocalizedTitles[lang] = original
 	}

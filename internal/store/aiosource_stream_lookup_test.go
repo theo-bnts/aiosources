@@ -60,7 +60,7 @@ ANALYZE aiosources.torrents;`); err != nil {
 	}
 	b.Run("previous", func(b *testing.B) {
 		for b.Loop() {
-			rows, err := db.pool.Query(ctx, `SELECT `+aioRecordColumns+` FROM aiosources.torrents t WHERE regexp_replace(COALESCE(t.fields->>'mal_id',t.fields#>>'{external_ids,mal}',t.fields#>>'{external_ids,mal_id}',t.fields#>>'{attributes,malid,0}'),'^0+','')=$1 ORDER BY t.provider_id,t.source_id`, "21")
+			rows, err := db.pool.Query(ctx, `SELECT `+aioRecordColumns+`,ARRAY[]::text[],ARRAY[]::text[],''::text FROM aiosources.torrents t WHERE regexp_replace(COALESCE(t.fields->>'mal_id',t.fields#>>'{external_ids,mal}',t.fields#>>'{external_ids,mal_id}',t.fields#>>'{attributes,malid,0}'),'^0+','')=$1 ORDER BY t.provider_id,t.source_id`, "21")
 			out, err := collectAIORecords(rows, err, false)
 			if err != nil || len(out) != 1 {
 				b.Fatal("previous lookup fixture", out, err)

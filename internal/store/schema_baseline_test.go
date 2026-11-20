@@ -101,7 +101,7 @@ func baselineTableState(t *testing.T, ctx context.Context, db *Store, namespace 
  WHEN '`+name+`'='runtime_settings' AND to_jsonb(t)->>'section'='connections' AND to_jsonb(t)->>'revision'='1'
   AND to_jsonb(t)->'values'='{"stremio_seconds":70,"torznab_seconds":20,"catalog_seconds":20}'::jsonb
  THEN to_jsonb(t) || '{"revision":2,"values":{"stremio_seconds":5,"torznab_seconds":5,"catalog_seconds":5}}'::jsonb
- ELSE to_jsonb(t) END-'localized_posters'-'storage_options'`+map[string]string{"storage_settings": "-'options'", "aio_public_access": "-'use_instance_debrid'-'use_instance_announces'-'expose_sources'", "admin_security": "-'active_secret'-'pending_secret'-'pending_expires_at'-'pending_session_id'-'last_step'-'recovery_hashes'"}[name]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t WHERE NOT ('`+name+`'='runtime_settings' AND to_jsonb(t)->>'section'='trusted_security')) items`).Scan(&data); err != nil {
+ ELSE to_jsonb(t) END-'localized_posters'-'original_language'-'storage_options'`+map[string]string{"storage_settings": "-'options'", "aio_public_access": "-'use_instance_debrid'-'use_instance_announces'-'expose_sources'", "admin_security": "-'active_secret'-'pending_secret'-'pending_expires_at'-'pending_session_id'-'last_step'-'recovery_hashes'"}[name]+` AS j FROM `+pgx.Identifier{namespace, name}.Sanitize()+` t WHERE NOT ('`+name+`'='runtime_settings' AND to_jsonb(t)->>'section'='trusted_security')) items`).Scan(&data); err != nil {
 			t.Fatal(err)
 		}
 		state[name] = prefix + data

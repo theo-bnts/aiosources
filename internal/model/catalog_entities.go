@@ -78,6 +78,7 @@ func (e CatalogEntities) Intersect(other CatalogEntities) CatalogEntities {
 type CatalogMetadata struct {
 	PosterPath       string            `json:"poster_path,omitempty"`
 	LocalizedPosters map[string]string `json:"localized_posters,omitempty"`
+	OriginalLanguage string            `json:"original_language,omitempty"`
 	Type             string            `json:"type"`
 	TMDB             string            `json:"tmdb"`
 	IMDb             string            `json:"imdb,omitempty"`
@@ -93,11 +94,11 @@ type CatalogMetadata struct {
 }
 
 func CatalogWork(w AIOWork, updated time.Time) CatalogMetadata {
-	return CatalogMetadata{PosterPath: w.PosterPath, LocalizedPosters: w.LocalizedPosters, Type: w.Type, TMDB: w.TMDB, IMDb: w.IMDb, TVDB: w.TVDB, Adult: w.Adult, Titles: w.Titles,
+	return CatalogMetadata{PosterPath: w.PosterPath, LocalizedPosters: w.LocalizedPosters, OriginalLanguage: w.OriginalLanguage, Type: w.Type, TMDB: w.TMDB, IMDb: w.IMDb, TVDB: w.TVDB, Adult: w.Adult, Titles: w.Titles,
 		DisplayTitle: w.DisplayTitle, LocalizedTitles: w.LocalizedTitles, Years: w.Years, SeasonYears: w.SeasonYears, EpisodeYears: w.EpisodeYears, UpdatedAt: updated}
 }
 func (m CatalogMetadata) Work() AIOWork {
-	return AIOWork{PosterPath: m.PosterPath, LocalizedPosters: m.LocalizedPosters, Type: m.Type, TMDB: m.TMDB, IMDb: m.IMDb, TVDB: m.TVDB, Adult: m.Adult, Titles: m.Titles, DisplayTitle: m.DisplayTitle,
+	return AIOWork{PosterPath: m.PosterPath, LocalizedPosters: m.LocalizedPosters, OriginalLanguage: m.OriginalLanguage, Type: m.Type, TMDB: m.TMDB, IMDb: m.IMDb, TVDB: m.TVDB, Adult: m.Adult, Titles: m.Titles, DisplayTitle: m.DisplayTitle,
 		LocalizedTitles: m.LocalizedTitles, Years: m.Years, SeasonYears: m.SeasonYears, EpisodeYears: m.EpisodeYears}
 }
 
@@ -132,6 +133,7 @@ func validCatalogYear(year int) bool { return year >= 1800 && year <= 2200 }
 func (m CatalogMetadata) Valid(now time.Time) bool {
 	if (m.Type != "movie" && m.Type != "tv") || !catalogNumber.MatchString(m.TMDB) ||
 		(m.IMDb != "" && !catalogIMDb.MatchString(m.IMDb)) || (m.TVDB != "" && !catalogNumber.MatchString(m.TVDB)) ||
+		(m.OriginalLanguage != "" && !catalogLanguage.MatchString(m.OriginalLanguage)) ||
 		!catalogTime(m.UpdatedAt, now) || !catalogLabel(m.DisplayTitle, 1024) || len(m.Titles) < 1 || len(m.Titles) > 256 || len(m.LocalizedTitles) > 256 || len(m.LocalizedPosters) > 256 || (m.PosterPath != "" && !tmdbPoster.MatchString(m.PosterPath)) || len(m.Years) > 100 || len(m.SeasonYears) > 1000 || len(m.EpisodeYears) > 10000 {
 		return false
 	}

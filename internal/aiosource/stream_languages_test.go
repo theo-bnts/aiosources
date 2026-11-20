@@ -260,6 +260,171 @@ func TestPlaybackPresentationReadsSelectedFilenameLanguages(t *testing.T) {
 	}
 }
 
+func TestOriginalLanguageInferenceForVOAndSubtitleReleases(t *testing.T) {
+	tests := []struct {
+		name      string
+		rec       model.AIORecord
+		wantAudio []string
+		wantSubs  []string
+	}{
+		{
+			name:      "japanese anime VOSTFR infers ja audio + fr subs",
+			rec:       model.AIORecord{Title: "Example.Anime.S01E01.VOSTFR.1080p.WEB-DL.x264-GRP", OriginalLanguage: "ja"},
+			wantAudio: []string{"ja"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "english movie SUBFRENCH infers en audio + fr subs",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.SUBFRENCH.1080p.BluRay.x264-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"en"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "english movie STFR infers en audio + fr subs",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.STFR.1080p.WEB-DL.H264-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"en"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "french movie ENGSUB infers fr audio + en subs",
+			rec:       model.AIORecord{Title: "Example.Film.2023.1080p.BluRay.EngSub.x264-GRP", OriginalLanguage: "fr"},
+			wantAudio: []string{"fr"},
+			wantSubs:  []string{"en"},
+		},
+		{
+			name:      "korean movie VOSE infers ko audio + es subs",
+			rec:       model.AIORecord{Title: "Example.Movie.2019.VOSE.1080p.BluRay.x264-GRP", OriginalLanguage: "ko"},
+			wantAudio: []string{"ko"},
+			wantSubs:  []string{"es"},
+		},
+		{
+			name:      "german OmU infers original language without named sub",
+			rec:       model.AIORecord{Title: "Example.Movie.2022.OmU.1080p.BluRay.x264-GRP", OriginalLanguage: "ja"},
+			wantAudio: []string{"ja"},
+			wantSubs:  nil,
+		},
+		{
+			name:      "german OmEU infers original language + en subs",
+			rec:       model.AIORecord{Title: "Example.Movie.2022.OmEU.1080p.BluRay.x264-GRP", OriginalLanguage: "de"},
+			wantAudio: []string{"de"},
+			wantSubs:  []string{"en"},
+		},
+		{
+			name:      "german OV marker infers original language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.OV.1080p.WEB-DL-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"en"},
+			wantSubs:  nil,
+		},
+		{
+			name:      "french VO marker in title infers original language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.VO.1080p.WEB-DL-GRP", OriginalLanguage: "it"},
+			wantAudio: []string{"it"},
+			wantSubs:  nil,
+		},
+		{
+			name:      "structured VO + sublangs infers original language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL-GRP", Languages: []string{"VO"}, SubtitleLanguages: []string{"fr"}, OriginalLanguage: "en"},
+			wantAudio: []string{"en"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "structured Version Originale phrase infers original language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL-GRP", Languages: []string{"Version Originale"}, OriginalLanguage: "ja"},
+			wantAudio: []string{"ja"},
+			wantSubs:  nil,
+		},
+		{
+			name:      "international subbed markers legendado napisy altyazi",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL.Legendado-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"en"},
+			wantSubs:  []string{"pt"},
+		},
+		{
+			name:      "tmdb cantonese cn maps to zh",
+			rec:       model.AIORecord{Title: "Example.Movie.2000.VOSTFR.1080p.BluRay-GRP", OriginalLanguage: "cn"},
+			wantAudio: []string{"zh"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "propagated subtitle from peer unlocks original language inference",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.BluRay.x264-GRP", PropagatedSubtitleLanguages: []string{"fr"}, OriginalLanguage: "ja"},
+			wantAudio: []string{"ja"},
+			wantSubs:  []string{"fr"},
+		},
+		// Strict zero-false-positive guards:
+		{
+			name:      "VFSTFR already has French audio and never adds original_language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.VFSTFR.1080p.WEB-DL-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"fr"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "explicit dub + subtitle never adds original_language",
+			rec:       model.AIORecord{Title: "Example.Anime.2024.FRENCH.SUBENG.1080p.WEB-DL-GRP", OriginalLanguage: "ja"},
+			wantAudio: []string{"fr"},
+			wantSubs:  []string{"en"},
+		},
+		{
+			name:      "MULTI + VOSTFR keeps MULTI without overriding",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.MULTI.VOSTFR.1080p.WEB-DL-GRP", OriginalLanguage: "en"},
+			wantAudio: []string{"multi"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "cross-source propagated audio takes precedence over TMDB original_language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.VOSTFR.1080p.WEB-DL-GRP", PropagatedLanguages: []string{"en", "fr", "multi"}, OriginalLanguage: "ja"},
+			wantAudio: []string{"en", "fr", "multi"},
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "bare untagged torrent never guesses original_language",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL.x264-GRP", OriginalLanguage: "en"},
+			wantAudio: nil,
+			wantSubs:  nil,
+		},
+		{
+			name:      "generic MULTISUB alone stays conservative without inferring audio",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL.MULTISUB.x264-GRP", OriginalLanguage: "en"},
+			wantAudio: nil,
+			wantSubs:  []string{"multi"},
+		},
+		{
+			name:      "tmdb sentinel xx is ignored",
+			rec:       model.AIORecord{Title: "Example.Silent.1920.VOSTFR.1080p.BluRay-GRP", OriginalLanguage: "xx"},
+			wantAudio: nil,
+			wantSubs:  []string{"fr"},
+		},
+		{
+			name:      "structured unknown/und does not trigger original_language inference",
+			rec:       model.AIORecord{Title: "Example.Movie.2024.1080p.WEB-DL-GRP", Languages: []string{"und"}, OriginalLanguage: "en"},
+			wantAudio: nil,
+			wantSubs:  nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			audio, subs := streamLanguageEvidence(tc.rec)
+			if got := codesOf(audio); !slices.Equal(got, tc.wantAudio) {
+				t.Errorf("audio = %v, want %v", got, tc.wantAudio)
+			}
+			if got := codesOf(subs); !slices.Equal(got, tc.wantSubs) {
+				t.Errorf("subs = %v, want %v", got, tc.wantSubs)
+			}
+		})
+	}
+
+	// Verify nativeLanguageEvidence does NOT inject TMDB OriginalLanguage
+	// (so cross-source correspondences compare purely torrent-native audio).
+	nativeAudio, nativeSubs := nativeLanguageEvidence(model.AIORecord{
+		Title:            "Example.Anime.2024.VOSTFR.1080p.WEB-DL-GRP",
+		OriginalLanguage: "ja",
+	})
+	if len(nativeAudio) != 0 || !slices.Equal(codesOf(nativeSubs), []string{"fr"}) {
+		t.Fatalf("nativeLanguageEvidence leaked original_language: audio=%v subs=%v", codesOf(nativeAudio), codesOf(nativeSubs))
+	}
+}
+
 func codesOf(items []streamLanguage) []string {
 	if len(items) == 0 {
 		return nil

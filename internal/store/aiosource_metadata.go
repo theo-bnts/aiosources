@@ -177,10 +177,10 @@ func saveAIOMetadataBatch(ctx context.Context, tx pgx.Tx, inputs []AIOMetadataPu
 			return err
 		}
 	}
-	rows, err = tx.Query(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult,display_title,localized_titles,poster_path,localized_posters,catalog_import_source)
-SELECT type,tmdb,imdb,tvdb,years,adult,display_title,localized_titles,COALESCE(poster_path,''),COALESCE(localized_posters,'{}'::jsonb),$3 FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean,display_title text,localized_titles jsonb,poster_path text,localized_posters jsonb) ORDER BY type,tmdb
+	rows, err = tx.Query(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,imdb_id,tvdb_id,years,adult,display_title,localized_titles,original_language,poster_path,localized_posters,catalog_import_source)
+SELECT type,tmdb,imdb,tvdb,years,adult,display_title,localized_titles,COALESCE(original_language,''),COALESCE(poster_path,''),COALESCE(localized_posters,'{}'::jsonb),$3 FROM jsonb_to_recordset($1::jsonb) AS i(type text,tmdb text,imdb text,tvdb text,years int[],adult boolean,display_title text,localized_titles jsonb,original_language text,poster_path text,localized_posters jsonb) ORDER BY type,tmdb
 ON CONFLICT(media_type,tmdb_id) DO UPDATE SET imdb_id=EXCLUDED.imdb_id,tvdb_id=EXCLUDED.tvdb_id,years=EXCLUDED.years,adult=EXCLUDED.adult,
-display_title=EXCLUDED.display_title,localized_titles=EXCLUDED.localized_titles,poster_path=EXCLUDED.poster_path,localized_posters=EXCLUDED.localized_posters,catalog_import_source=EXCLUDED.catalog_import_source,catalog_import_updated_at=NULL,
+display_title=EXCLUDED.display_title,localized_titles=EXCLUDED.localized_titles,original_language=EXCLUDED.original_language,poster_path=EXCLUDED.poster_path,localized_posters=EXCLUDED.localized_posters,catalog_import_source=EXCLUDED.catalog_import_source,catalog_import_updated_at=NULL,
 revision=aiosources.aio_works.revision+CASE WHEN (EXCLUDED.media_type||':'||EXCLUDED.tmdb_id)=ANY($2::text[]) THEN 1 ELSE 0 END,updated_at=now()
 RETURNING id,media_type,tmdb_id`, body, changedKeys, importSource)
 	if err != nil {

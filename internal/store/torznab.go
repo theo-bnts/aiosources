@@ -239,7 +239,9 @@ WHERE ` + strings.Join(clauses, " AND ")
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,
-'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END)),t.fields_fingerprint,` + aioPropagatedColumns + `,(SELECT instance_id FROM aiosources.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
+'sublangs',CASE WHEN pg_column_size(t.fields->'sublangs')<=4096 THEN t.fields->'sublangs' END,
+'subtitles',CASE WHEN pg_column_size(t.fields->'subtitles')<=4096 THEN t.fields->'subtitles' END,
+'attributes',jsonb_build_object('language',CASE WHEN pg_column_size(t.fields#>'{attributes,language}')<=4096 THEN t.fields#>'{attributes,language}' END,'languages',CASE WHEN pg_column_size(t.fields#>'{attributes,languages}')<=4096 THEN t.fields#>'{attributes,languages}' END,'audiolangs',CASE WHEN pg_column_size(t.fields#>'{attributes,audiolangs}')<=4096 THEN t.fields#>'{attributes,audiolangs}' END,'sublangs',CASE WHEN pg_column_size(t.fields#>'{attributes,sublangs}')<=4096 THEN t.fields#>'{attributes,sublangs}' END)),t.fields_fingerprint,` + aioPropagatedColumns + `,COALESCE(w.original_language,''),(SELECT instance_id FROM aiosources.catalog_identity WHERE singleton)||':'||t.occurrence_id,` + category + `,COALESCE(w.imdb_id,''),COALESCE(w.tmdb_id,''),COALESCE(w.tvdb_id,''),review.provider_id IS NOT NULL`
 	order := []string{}
 	for _, rule := range q.Sorting {
 		column := ""
@@ -301,14 +303,15 @@ WHERE ` + strings.Join(clauses, " AND ")
 	for rows.Next() {
 		var item model.TorznabRecord
 		var propAudio, propSubs []string
-		var imdb, tmdb, tvdb string
+		var origLang, imdb, tmdb, tvdb string
 		var reviewed bool
-		rec, e := scanAIORecord(rows, &propAudio, &propSubs, &item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed)
+		rec, e := scanAIORecord(rows, &propAudio, &propSubs, &origLang, &item.OccurrenceID, &item.Category, &imdb, &tmdb, &tvdb, &reviewed)
 		if e != nil {
 			rows.Close()
 			return result, e
 		}
 		rec.PropagatedLanguages, rec.PropagatedSubtitleLanguages = propAudio, propSubs
+		rec.OriginalLanguage = origLang
 		rec.IMDb, rec.TMDB, rec.TVDB, rec.ReviewedEpisode = imdb, tmdb, tvdb, reviewed
 		rec.BookHints.ISBN = books.ISBN(rec.BookHints.ISBN)
 		item.AIORecord = rec

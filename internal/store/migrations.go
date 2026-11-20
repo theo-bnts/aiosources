@@ -52,6 +52,7 @@ var migrations = []struct {
 	{98, accessLimitsSchema},
 	{99, connectionTimeoutsSchema},
 	{100, releaseCorrespondencesSchema},
+	{101, originalLanguageSchema},
 }
 
 func schemaChecksum(sql string) string {

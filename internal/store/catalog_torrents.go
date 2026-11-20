@@ -115,7 +115,7 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 	defer rollback(tx)
 	// Bound display evidence independently of source-specific retained extras.
 	// The original fingerprint still guards the complete current source record.
-	columns := `t.provider_id,t.source_id,(SELECT COALESCE(jsonb_object_agg(key,value),'{}'::jsonb) FROM jsonb_each(t.fields) WHERE key=ANY(` + bind(model.CompactTorrentFields()) + `::text[]) AND pg_column_size(value)<=16384),t.fields_fingerprint,` + aioPropagatedColumns + `,t.occurrence_id`
+	columns := `t.provider_id,t.source_id,(SELECT COALESCE(jsonb_object_agg(key,value),'{}'::jsonb) FROM jsonb_each(t.fields) WHERE key=ANY(` + bind(model.CompactTorrentFields()) + `::text[]) AND pg_column_size(value)<=16384),t.fields_fingerprint,` + aioPropagatedColumns + `,` + aioOriginalLanguageExpr + `,t.occurrence_id`
 	limit, offset := bind(opts.Limit), bind(opts.Offset)
 	orderClause := strings.Join(order, ",")
 	pageSQL := `SELECT ` + columns + `,page.total FROM (SELECT count(*) OVER() AS total,t.provider_id,t.source_id` + filter + ` ORDER BY ` + orderClause + ` LIMIT ` + limit + ` OFFSET ` + offset + `) page JOIN aiosources.torrents AS t USING(provider_id,source_id)` + aioPropagatedJoin + ` ORDER BY ` + orderClause
@@ -125,13 +125,14 @@ func (s *Store) CatalogTorrentRecords(ctx context.Context, opts model.ListOption
 	}
 	for rows.Next() {
 		var propAudio, propSubs []string
-		var occurrence string
-		record, e := scanAIORecord(rows, &propAudio, &propSubs, &occurrence, &result.Total)
+		var origLang, occurrence string
+		record, e := scanAIORecord(rows, &propAudio, &propSubs, &origLang, &occurrence, &result.Total)
 		if e != nil {
 			rows.Close()
 			return result, databaseError("read direct torrent", e)
 		}
 		record.PropagatedLanguages, record.PropagatedSubtitleLanguages = propAudio, propSubs
+		record.OriginalLanguage = origLang
 		result.Items = append(result.Items, CatalogRecord{AIORecord: record, OccurrenceID: occurrence})
 	}
 	err = rows.Err()
@@ -153,8 +154,10 @@ func (s *Store) CatalogTorrent(ctx context.Context, occurrence string) (CatalogR
 		return result, model.ErrNotFound
 	}
 	var propAudio, propSubs []string
-	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,t.occurrence_id FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.occurrence_id=$1`, occurrence), &propAudio, &propSubs, &result.OccurrenceID)
+	var origLang string
+	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,`+aioOriginalLanguageExpr+`,t.occurrence_id FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.occurrence_id=$1`, occurrence), &propAudio, &propSubs, &origLang, &result.OccurrenceID)
 	r.PropagatedLanguages, r.PropagatedSubtitleLanguages = propAudio, propSubs
+	r.OriginalLanguage = origLang
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }
@@ -162,8 +165,10 @@ func (s *Store) CatalogTorrent(ctx context.Context, occurrence string) (CatalogR
 func (s *Store) CatalogSourceTorrent(ctx context.Context, provider, source string) (CatalogRecord, error) {
 	var result CatalogRecord
 	var propAudio, propSubs []string
-	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,t.occurrence_id FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), &propAudio, &propSubs, &result.OccurrenceID)
+	var origLang string
+	r, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,`+aioOriginalLanguageExpr+`,t.occurrence_id FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.provider_id=$1 AND t.source_id=$2`, provider, source), &propAudio, &propSubs, &origLang, &result.OccurrenceID)
 	r.PropagatedLanguages, r.PropagatedSubtitleLanguages = propAudio, propSubs
+	r.OriginalLanguage = origLang
 	result.AIORecord = r
 	return result, databaseError("read direct torrent", err)
 }

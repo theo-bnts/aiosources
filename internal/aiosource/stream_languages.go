@@ -136,7 +136,7 @@ var subtitleCompoundTokens = map[string]string{
 	"vose": "es", "vostes": "es", "subesp": "es", "subes": "es", "espsub": "es", "espsubs": "es",
 	"spanishsub": "es", "spanishsubs": "es", "subspanish": "es", "sublatino": "es", "latsub": "es",
 	"latinosub": "es", "sublat": "es", "subcastellano": "es", "castellanosub": "es", "subtitulado": "es", "subtitulada": "es",
-	"vosta": "en", "engsub": "en", "engsubs": "en", "subeng": "en", "ensub": "en", "ensubs": "en",
+	"vosta": "en", "vosten": "en", "omeu": "en", "engsub": "en", "engsubs": "en", "subeng": "en", "ensub": "en", "ensubs": "en",
 	"esub": "en", "esubs": "en", "englishsub": "en", "englishsubs": "en", "suben": "en",
 	"vostit": "it", "subita": "it", "itasub": "it", "itasubs": "it", "italiansub": "it", "subit": "it",
 	"vostde": "de", "gersub": "de", "gersubs": "de", "subger": "de", "desub": "de", "desubs": "de", "subde": "de", "germansub": "de",
@@ -396,6 +396,53 @@ func (s *languageSet) addCode(code string) {
 	s.add(streamLanguageForCode(code))
 }
 
+func normalizeWorkOriginalLanguage(raw string) string {
+	code := strings.ToLower(strings.TrimSpace(raw))
+	if code == "" {
+		return ""
+	}
+	if base, _, ok := strings.Cut(code, "-"); ok {
+		code = base
+	}
+	if base, _, ok := strings.Cut(code, "_"); ok {
+		code = base
+	}
+	switch code {
+	case "xx", "und", "zxx", "mul", "mis":
+		return ""
+	case "cn":
+		// TMDB uses "cn" for Cantonese.
+		return "zh"
+	case "sh":
+		return "sr"
+	case "mo":
+		return "ro"
+	case "iw":
+		return "he"
+	case "in":
+		return "id"
+	case "ji":
+		return "yi"
+	}
+	normalized := NormalizeLanguage(code)
+	if normalized == "" || normalized == "xx" || normalized == "und" || normalized == "zxx" || normalized == "mul" || normalized == "mis" {
+		return ""
+	}
+	if len(normalized) == 3 && normalized >= "qaa" && normalized <= "qtz" {
+		return ""
+	}
+	return normalized
+}
+
+func hasConcreteLanguage(items []streamLanguage) bool {
+	for _, item := range items {
+		if item.code != "" && item.code != "multi" {
+			return true
+		}
+	}
+	return false
+}
+
 // ReleaseLanguageCodes exposes the same bounded, normalized audio evidence used
 // by Stremio presentation. Arbitrary native strings are never exported as tags.
 func ReleaseLanguageCodes(record model.AIORecord) []string {
@@ -623,7 +670,8 @@ func isUnconditionalBackwardToken(raw, folded string) bool {
 		return true
 	}
 	switch folded {
-	case "multi", "multilingual", "multilang", "multiaudio", "dualaudio", "multilingue":
+	case "multi", "multilingual", "multilang", "multiaudio", "dualaudio", "multilingue",
+		"vost", "omu", "omeu", "fansub", "fastsub", "subbed":
 		return true
 	}
 	if isAllCapsToken(raw) && isBackwardWalkableReleaseToken(folded) {
@@ -651,7 +699,7 @@ func isTitleLanguageOrMultiToken(raw, folded string) bool {
 func isBackwardWalkableReleaseToken(folded string) bool {
 	switch folded {
 	case "multi", "multilingual", "multilang", "multiaudio", "dual", "dualaudio", "multilingue",
-		"sd", "hd", "hq", "uhd", "ad", "ld", "cp", "vo", "vost", "custom", "complete", "integrale", "hdlight", "mhd", "light",
+		"sd", "hd", "hq", "uhd", "ad", "ld", "cp", "vo", "vos", "ov", "vost", "omu", "omeu", "subbed", "custom", "complete", "integrale", "hdlight", "mhd", "light",
 		"repack", "proper", "fastsub", "fansub", "subforced", "forced", "uncensored", "extended", "unrated",
 		"remastered", "final", "limited", "internal", "readnfo", "hybrid", "dc", "theatrical", "doc", "oav", "ova",
 		"web", "dvd", "dvdr", "dvd5", "dvd9", "bd", "iso", "raw", "opus",
@@ -677,7 +725,8 @@ func isBackwardWalkableReleaseToken(folded string) bool {
 }
 
 // nativeLanguageEvidence parses only the record's own title and native fields,
-// excluding cross-source propagated languages so correspondence computation never feeds back into itself.
+// excluding cross-source propagated languages and TMDB original_language inference
+// so correspondence computation never feeds back into itself or conflicts with explicit peer audio.
 func nativeLanguageEvidence(r model.AIORecord, extraTitles ...string) ([]streamLanguage, []streamLanguage) {
 	var audio, subs languageSet
 	parseTitleLanguages(r.Title, &audio, &subs)
@@ -687,27 +736,29 @@ func nativeLanguageEvidence(r model.AIORecord, extraTitles ...string) ([]streamL
 		}
 	}
 	for _, value := range r.Languages {
-		parseStructuredLanguageValue(value, false, &audio, &subs)
+		parseStructuredLanguageValue(value, false, &audio, &subs, nil)
 	}
 	for _, value := range r.SubtitleLanguages {
-		parseStructuredLanguageValue(value, true, &audio, &subs)
+		parseStructuredLanguageValue(value, true, &audio, &subs, nil)
 	}
 	return audio.items, subs.items
 }
 
 func streamLanguageEvidence(r model.AIORecord, extraTitles ...string) ([]streamLanguage, []streamLanguage) {
 	var audio, subs languageSet
-	parseTitleLanguages(r.Title, &audio, &subs)
+	originalVersion := parseTitleLanguages(r.Title, &audio, &subs)
 	for _, extra := range extraTitles {
 		if extra != "" && extra != r.Title {
-			parseTitleLanguages(extra, &audio, &subs)
+			if parseTitleLanguages(extra, &audio, &subs) {
+				originalVersion = true
+			}
 		}
 	}
 	for _, value := range r.Languages {
-		parseStructuredLanguageValue(value, false, &audio, &subs)
+		parseStructuredLanguageValue(value, false, &audio, &subs, &originalVersion)
 	}
 	for _, value := range r.SubtitleLanguages {
-		parseStructuredLanguageValue(value, true, &audio, &subs)
+		parseStructuredLanguageValue(value, true, &audio, &subs, nil)
 	}
 	for _, code := range r.PropagatedLanguages {
 		if code == "multi" {
@@ -723,6 +774,16 @@ func streamLanguageEvidence(r model.AIORecord, extraTitles ...string) ([]streamL
 			subs.addCode(normalized)
 		}
 	}
+	// When no explicit audio language (native, MULTI/DUAL or cross-source peer) is known,
+	// combine explicit Original Version or concrete subtitle-only tags (e.g. VOSTFR,
+	// SUBFRENCH, VOSE, OmU, OV, VO, ENGSUB) with TMDB's original_language.
+	if len(audio.items) == 0 {
+		if orig := normalizeWorkOriginalLanguage(r.OriginalLanguage); orig != "" {
+			if originalVersion || hasConcreteLanguage(subs.items) {
+				audio.addCode(orig)
+			}
+		}
+	}
 	return audio.items, subs.items
 }
 
@@ -731,10 +792,11 @@ type consumedBCP47 struct {
 	code       string
 }
 
-func parseTitleLanguages(title string, audio, subs *languageSet) {
+func parseTitleLanguages(title string, audio, subs *languageSet) bool {
 	if title == "" {
-		return
+		return false
 	}
+	originalVersion := false
 	// 1. Parse explicit inline {Tags:...;A=...;S=...;F=...;} blocks (used by some anime indexers)
 	// and remove them so subtitle codes never leak into audio evidence.
 	cleaned := title
@@ -847,6 +909,9 @@ func parseTitleLanguages(title string, audio, subs *languageSet) {
 		if subCode, ok := subtitleCompoundTokens[tok]; ok {
 			if tok != "vose" || at[0] >= metadataAt || isAllCapsToken(raw) {
 				subs.addCode(subCode)
+				if strings.HasPrefix(tok, "vost") || tok == "vose" || tok == "omeu" {
+					originalVersion = true
+				}
 			}
 			continue
 		}
@@ -868,6 +933,18 @@ func parseTitleLanguages(title string, audio, subs *languageSet) {
 		}
 
 		if at[0] >= groupStart {
+			continue
+		}
+
+		// Explicit Original Version markers inside release metadata (VO, OV, VOS, VOST, OmU, Subbed, Fansub).
+		switch tok {
+		case "vost", "omu", "omeu", "fansub", "fastsub", "subbed":
+			originalVersion = true
+			continue
+		case "vo", "ov", "vos":
+			if isAllCapsToken(raw) && !isFollowedByHyphenDigits(cleaned, at[1]) {
+				originalVersion = true
+			}
 			continue
 		}
 
@@ -916,6 +993,7 @@ func parseTitleLanguages(title string, audio, subs *languageSet) {
 			}
 		}
 	}
+	return originalVersion
 }
 
 func isFollowedByHyphenDigits(s string, end int) bool {
@@ -1024,8 +1102,8 @@ func computeSubtitleTokenMask(cleaned string, indices [][]int, rawTokens, folded
 func isTrailingReleaseGroup(groupRaw string) bool {
 	trimmed := strings.Trim(groupRaw, "[]")
 	folded := foldLanguageToken(trimmed)
-	// Keep explicit trailing language/subtitle markers such as "-VOSTFR", "-Multisub", "-NLSubs", "-EngDub".
-	if strings.Contains(folded, "sub") || strings.Contains(folded, "vost") || strings.Contains(folded, "dub") {
+	// Keep explicit trailing language/subtitle markers such as "-VOSTFR", "-Multisub", "-NLSubs", "-EngDub", "-OmU".
+	if strings.Contains(folded, "sub") || strings.Contains(folded, "vost") || strings.Contains(folded, "dub") || folded == "omu" || folded == "omeu" {
 		return false
 	}
 	// Never treat an explicit single-token full language name (>=4 runes) or multi/unambiguous tag (e.g. "-FRENCH", "-ITALIAN", "-MULTI") as a release group.
@@ -1096,7 +1174,7 @@ func parseInlineTagBlock(block string, audio, subs *languageSet) {
 	}
 }
 
-func parseStructuredLanguageValue(value string, subtitleOnly bool, audio, subs *languageSet) {
+func parseStructuredLanguageValue(value string, subtitleOnly bool, audio, subs *languageSet, originalVersion *bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return
@@ -1117,17 +1195,17 @@ func parseStructuredLanguageValue(value string, subtitleOnly bool, audio, subs *
 		return r == ',' || r == ';' || r == '|'
 	})
 	for _, seg := range segments {
-		parseStructuredSegment(seg, subtitleOnly, audio, subs)
+		parseStructuredSegment(seg, subtitleOnly, audio, subs, originalVersion)
 	}
 }
 
-func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *languageSet) {
+func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *languageSet, originalVersion *bool) {
 	seg = strings.TrimSpace(seg)
 	if seg == "" {
 		return
 	}
 	// First try exact atomic lookup on the whole segment (e.g. "fr", "fr-FR", "eng", "JAPONAIS", "pt_BR", "VOSTFR").
-	if handleStructuredExact(seg, subtitleOnly, audio, subs) {
+	if handleStructuredExact(seg, subtitleOnly, audio, subs, originalVersion) {
 		return
 	}
 	// If the segment contains slash/plus lists without prose (e.g. "fr/en", "FR + EN", "VFF/TrueFrench"),
@@ -1136,7 +1214,7 @@ func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *language
 		parts := strings.FieldsFunc(seg, func(r rune) bool { return r == '/' || r == '+' || r == '&' })
 		matchedAny := false
 		for _, part := range parts {
-			if handleStructuredExact(part, subtitleOnly, audio, subs) {
+			if handleStructuredExact(part, subtitleOnly, audio, subs, originalVersion) {
 				matchedAny = true
 			}
 		}
@@ -1159,6 +1237,14 @@ func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *language
 	// "Multi VF2 (FR + QC inclus)", "Québecois (VFQ/French)", "Español (Latino)", "Subtitles: English").
 	segSubtitleOnly := subtitleOnly
 	if !segSubtitleOnly {
+		if originalVersion != nil {
+			for _, phrase := range []string{"version originale", "original version", "version original", "versione originale", "originalversion"} {
+				if strings.Contains(foldedWhole, phrase) {
+					*originalVersion = true
+					break
+				}
+			}
+		}
 		if strings.Contains(foldedWhole, "sous-titr") || strings.Contains(foldedWhole, "subtitl") || strings.Contains(foldedWhole, "subbed") {
 			segSubtitleOnly = true
 		}
@@ -1166,7 +1252,17 @@ func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *language
 	tokens := streamLanguageTokenRE.FindAllString(seg, -1)
 	for _, raw := range tokens {
 		tok := foldLanguageToken(raw)
-		if tok == "" || tok == "und" || tok == "unknown" || tok == "vo" || tok == "none" || tok == "muet" || tok == "silent" {
+		if tok == "" || tok == "und" || tok == "unknown" || tok == "none" || tok == "muet" || tok == "silent" {
+			continue
+		}
+		if tok == "vost" || tok == "omu" || tok == "fansub" || tok == "fastsub" || tok == "subbed" ||
+			(isAllCapsToken(raw) && (tok == "vo" || tok == "ov" || tok == "vos")) {
+			if !subtitleOnly && originalVersion != nil {
+				*originalVersion = true
+			}
+			continue
+		}
+		if tok == "vo" {
 			continue
 		}
 		if tok == "multi" || tok == "multilingual" || tok == "multilang" || tok == "multiaudio" || tok == "dual" || tok == "dualaudio" || tok == "multilingue" {
@@ -1179,6 +1275,9 @@ func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *language
 		}
 		if subCode, ok := subtitleCompoundTokens[tok]; ok {
 			subs.addCode(subCode)
+			if !subtitleOnly && originalVersion != nil && (strings.HasPrefix(tok, "vost") || tok == "vose" || tok == "omeu") {
+				*originalVersion = true
+			}
 			if audioCode, alsoAudio := titleUnambiguousAudio[tok]; alsoAudio && !segSubtitleOnly {
 				audio.addCode(audioCode)
 			}
@@ -1206,14 +1305,19 @@ func parseStructuredSegment(seg string, subtitleOnly bool, audio, subs *language
 	}
 }
 
-func handleStructuredExact(raw string, subtitleOnly bool, audio, subs *languageSet) bool {
+func handleStructuredExact(raw string, subtitleOnly bool, audio, subs *languageSet, originalVersion *bool) bool {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return false
 	}
 	folded := foldLanguageToken(raw)
 	switch folded {
-	case "", "und", "unknown", "vo", "zxx", "none", "muet", "silent", "na":
+	case "", "und", "unknown", "zxx", "none", "muet", "silent", "na":
+		return true
+	case "vo", "vost", "vos", "ov", "omu", "original", "original version", "version originale", "version original", "versione originale", "originalversion", "subbed", "fansub", "fastsub":
+		if !subtitleOnly && originalVersion != nil {
+			*originalVersion = true
+		}
 		return true
 	case "multi", "multilingual", "multilang", "multiaudio", "dual", "dualaudio", "multilingue":
 		if subtitleOnly {
@@ -1225,6 +1329,9 @@ func handleStructuredExact(raw string, subtitleOnly bool, audio, subs *languageS
 	}
 	if subCode, ok := subtitleCompoundTokens[folded]; ok {
 		subs.addCode(subCode)
+		if !subtitleOnly && originalVersion != nil && (strings.HasPrefix(folded, "vost") || folded == "vose" || folded == "omeu") {
+			*originalVersion = true
+		}
 		if audioCode, alsoAudio := titleUnambiguousAudio[folded]; alsoAudio && !subtitleOnly {
 			audio.addCode(audioCode)
 		}

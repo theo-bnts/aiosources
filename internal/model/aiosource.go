@@ -49,6 +49,7 @@ type AIOWork struct {
 	PosterPath       string            `json:"poster_path,omitempty"`
 	Book             BookInformation   `json:"book,omitzero"`
 	LocalizedTitles  map[string]string `json:"localized_titles"`
+	OriginalLanguage string            `json:"original_language,omitempty"`
 	DisplayTitle     string            `json:"display_title"`
 	Adult            bool              `json:"adult"`
 	ID               int64             `json:"id"`
@@ -74,6 +75,7 @@ type AIORecord struct {
 	SubtitleLanguages           []string            `json:"-"`
 	PropagatedLanguages         []string            `json:"-"`
 	PropagatedSubtitleLanguages []string            `json:"-"`
+	OriginalLanguage            string              `json:"-"`
 	Bitrate                     float64             `json:"-"`
 	ReviewedEpisode             bool                `json:"reviewed_episode,omitempty"`
 	Normalized                  string              `json:"-"`

@@ -176,7 +176,7 @@ func queueAIOAliases(ctx context.Context, tx pgx.Tx, workID int64, aliases []str
 	return queueAIOManyAliases(ctx, tx, []int64{workID}, aliases)
 }
 
-const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvdb_id,` + bookWorkYears + `,w.revision,w.adult,w.display_title,w.localized_titles,
+const aioWorkColumns = `w.id,w.media_type,COALESCE(w.tmdb_id,''),w.imdb_id,w.tvdb_id,` + bookWorkYears + `,w.revision,w.adult,w.display_title,w.localized_titles,w.original_language,
 ARRAY(SELECT title FROM aiosources.aio_titles WHERE work_id=w.id UNION SELECT w.display_title WHERE w.media_type='book'),
 CASE WHEN w.media_type='tv' THEN COALESCE((SELECT jsonb_object_agg(season,year) FROM aiosources.aio_seasons WHERE work_id=w.id),'{}') ELSE '{}'::jsonb END,
 CASE WHEN w.media_type='tv' THEN COALESCE((SELECT jsonb_object_agg(season::text||':'||episode::text,year) FROM aiosources.aio_episodes WHERE work_id=w.id),'{}') ELSE '{}'::jsonb END,w.openlibrary_id,w.poster_path,w.localized_posters,
@@ -186,7 +186,7 @@ CASE WHEN w.media_type='book' THEN w.book_data || jsonb_build_object('author_ali
 func scanAIOWork(row scanner, extra ...any) (model.AIOWork, error) {
 	var w model.AIOWork
 	var seasons, episodes, book, game []byte
-	dest := append([]any{&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book, &w.IGDB, &game}, extra...)
+	dest := append([]any{&w.ID, &w.Type, &w.TMDB, &w.IMDb, &w.TVDB, &w.Years, &w.Revision, &w.Adult, &w.DisplayTitle, &w.LocalizedTitles, &w.OriginalLanguage, &w.Titles, &seasons, &episodes, &w.OpenLibrary, &w.PosterPath, &w.LocalizedPosters, &book, &w.IGDB, &game}, extra...)
 	err := row.Scan(dest...)
 	if err != nil {
 		return w, err
@@ -480,6 +480,9 @@ func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, rea
 	}
 	return databaseError("publish correspondence", tx.Commit(ctx))
 }
+
+const aioOriginalLanguageExpr = `COALESCE((SELECT w.original_language FROM aiosources.aio_matches m JOIN aiosources.aio_works w ON w.id=m.work_id WHERE m.provider_id=t.provider_id AND m.source_id=t.source_id AND ` + aioPublishedMatch + `),'')`
+
 func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]model.AIORecord, error) {
 	// The identifier column is selected from a closed allowlist, never user SQL.
 	column := map[string]string{"imdb": "imdb_id", "tmdb": "tmdb_id", "tvdb": "tvdb_id", "openlibrary": "openlibrary_id", "igdb": "igdb_id"}[kind]
@@ -488,9 +491,9 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 		typ = mediaType
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
-	query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id` + aioPropagatedJoin + ` WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
+	query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,w.original_language,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id` + aioPropagatedJoin + ` WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
 	if kind == "mal" {
-		query = `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + ` FROM aiosources.torrents t` + aioPropagatedJoin + ` WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
+		query = `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,` + aioOriginalLanguageExpr + ` FROM aiosources.torrents t` + aioPropagatedJoin + ` WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
 		rows, err := s.pool.Query(ctx, query, id)
 		out, err := collectAIORecords(rows, err, false)
 		// An indexed candidate is not an established assertion: every native
@@ -516,8 +519,8 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 	out := []model.AIORecord{}
 	for rows.Next() {
 		var propAudio, propSubs []string
-		var imdb, tmdb, tvdb string
-		extra := []any{&propAudio, &propSubs}
+		var origLang, imdb, tmdb, tvdb string
+		extra := []any{&propAudio, &propSubs, &origLang}
 		if publishedIDs {
 			extra = append(extra, &imdb, &tmdb, &tvdb)
 		}
@@ -526,6 +529,7 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 			return nil, e
 		}
 		v.PropagatedLanguages, v.PropagatedSubtitleLanguages = propAudio, propSubs
+		v.OriginalLanguage = origLang
 		if publishedIDs {
 			// This projection is already fenced by work revision, source
 			// fingerprint and an empty queue. Use its verified identifiers,
@@ -538,9 +542,11 @@ func collectAIORecords(rows pgx.Rows, err error, publishedIDs bool) ([]model.AIO
 }
 func (s *Store) AIOTorrent(ctx context.Context, provider, id string) (model.AIORecord, error) {
 	var propAudio, propSubs []string
-	v, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+` FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.provider_id=$1 AND t.source_id=$2`, provider, id), &propAudio, &propSubs)
+	var origLang string
+	v, err := scanAIORecord(s.pool.QueryRow(ctx, `SELECT `+aioRecordColumns+`,`+aioPropagatedColumns+`,`+aioOriginalLanguageExpr+` FROM aiosources.torrents t`+aioPropagatedJoin+` WHERE t.provider_id=$1 AND t.source_id=$2`, provider, id), &propAudio, &propSubs, &origLang)
 	if err == nil {
 		v.PropagatedLanguages, v.PropagatedSubtitleLanguages = propAudio, propSubs
+		v.OriginalLanguage = origLang
 		records := []model.AIORecord{v}
 		err = s.applyAIOEpisodeReviews(ctx, records)
 		v = records[0]
