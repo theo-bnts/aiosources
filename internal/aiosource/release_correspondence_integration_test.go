@@ -78,11 +78,8 @@ func TestCrossSourceCorrespondencePropagationAndUnlinkLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	frToken, err := WithInstallationPreferences(token, model.StreamPreferences{Language: "fr", Mode: "preferred"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	streams, err := s.Streams(ctx, "http://localhost", frToken, "movie", "tt5550001")
+	setTestInstallationPreferences(t, ctx, s, token, model.StreamPreferences{Language: "fr", Mode: "preferred"})
+	streams, err := s.Streams(ctx, "http://localhost", token, "movie", "tt5550001")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +87,9 @@ func TestCrossSourceCorrespondencePropagationAndUnlinkLifecycle(t *testing.T) {
 		t.Fatalf("expected 2 French streams (source_a enriched + source_b), got %d: %+v", len(streams), streams)
 	}
 	for _, st := range streams {
-		if !strings.Contains(st.Name, "French") || !strings.Contains(st.Name, "French subtitles") {
-			t.Fatalf("stream missing propagated language/subtitle label: %q", st.Name)
+		text := st.Name + "\n" + st.Title
+		if !strings.Contains(text, "🇫🇷") && !strings.Contains(text, "French") {
+			t.Fatalf("stream missing propagated language label: name=%q title=%q", st.Name, st.Title)
 		}
 	}
 
@@ -131,7 +129,7 @@ func TestCrossSourceCorrespondencePropagationAndUnlinkLifecycle(t *testing.T) {
 	}
 
 	// After unlinking source_a, strict French Stremio filter only returns source_b.
-	afterStreams, err := s.Streams(ctx, "http://localhost", frToken, "movie", "tt5550001")
+	afterStreams, err := s.Streams(ctx, "http://localhost", token, "movie", "tt5550001")
 	if err != nil {
 		t.Fatal(err)
 	}

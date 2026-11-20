@@ -45,9 +45,15 @@ func TestCorrespondencesHTTPAPI(t *testing.T) {
 	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
 ('src-a','a1',jsonb_build_object('title','Orbit.Example.2024.1080p.BluRay.x264-GRP','size',$1::bigint,'info_hash',repeat('a',40))),
 ('src-b','b1',jsonb_build_object('title','Orbit.Example.2024.FRENCH.1080p.BluRay.x264-GRP','size',$1::bigint,'info_hash',repeat('b',40))),
-('src-c','c1',jsonb_build_object('title','Orbit.Example.2024.MULTI.1080p.BluRay.x264-GRP','size',$1::bigint,'info_hash',repeat('c',40)));
-INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
-SELECT provider_id,source_id,fields_fingerprint,$2,1,'matched','test' FROM aiosources.torrents;`, exactSize, workID); err != nil {
+('src-c','c1',jsonb_build_object('title','Orbit.Example.2024.MULTI.1080p.BluRay.x264-GRP','size',$1::bigint,'info_hash',repeat('c',40)))`, exactSize); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','test'
+FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.id=$1`, workID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `DELETE FROM aiosources.aio_match_queue`); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.db.QueueAllReleaseCorrespondences(f.ctx); err != nil {

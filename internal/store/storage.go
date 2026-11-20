@@ -140,6 +140,8 @@ func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {
  SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;
  TRUNCATE aiosources.torrents,aiosources.staged_torrents,aiosources.raw_records,aiosources.pages,
  aiosources.aio_matches,aiosources.aio_match_queue,aiosources.aio_match_reviews,
+ aiosources.aio_release_groups,aiosources.aio_release_group_members,
+ aiosources.aio_release_correspondence_exclusions,aiosources.aio_release_correspondence_queue,
  aiosources.torrent_history,aiosources.torrent_history_baselines,
  aiosources.run_filter_records,aiosources.run_scope_memberships,aiosources.run_scope_counts,
  aiosources.run_scope_refresh_candidates,aiosources.run_record_identities,aiosources.run_progress_identities;
