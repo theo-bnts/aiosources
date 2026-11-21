@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -101,10 +102,12 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
  r.active IS TRUE,COALESCE(r.revision,0),COALESCE(r.fingerprint,''),COALESCE(r.media_type,''),COALESCE(r.tmdb_id,''),r.season,r.episode,
  COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),COALESCE(r.igdb_id,''),
  CASE WHEN r.active THEN r.evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) ELSE FALSE END,
- prev_m.work_id
+ prev_m.work_id,COALESCE(prev_rg.scope,''),COALESCE(prev_rg.scope_key,'')
 FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_reviews r USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_matches prev_m USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_release_group_members prev_rgm ON prev_rgm.provider_id=t.provider_id AND prev_rgm.source_id=t.source_id
+LEFT JOIN aiosources.aio_release_groups prev_rg ON prev_rg.id=prev_rgm.group_id
 WHERE (t.provider_id,t.source_id) IN(SELECT * FROM unnest($1::text[],$2::text[]))
 ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	if err != nil {
@@ -113,10 +116,12 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	records := []model.AIORecord{}
 	reviews := []*model.AIOMatchReview{}
 	previousWorks := []int64{}
+	previousHashes := []string{}
 	for rows.Next() {
 		var review model.AIOMatchReview
 		var prevWork *int64
-		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged, &prevWork)
+		var prevScope, prevScopeKey string
+		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.SourceChanged, &prevWork, &prevScope, &prevScopeKey)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -128,6 +133,16 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		reviews = append(reviews, &review)
 		if prevWork != nil && *prevWork > 0 {
 			previousWorks = append(previousWorks, *prevWork)
+		}
+		switch prevScope {
+		case "hash":
+			if len(prevScopeKey) == 40 {
+				previousHashes = append(previousHashes, prevScopeKey)
+			}
+		case "work":
+			if wid, convErr := strconv.ParseInt(prevScopeKey, 10, 64); convErr == nil && wid > 0 {
+				previousWorks = append(previousWorks, wid)
+			}
 		}
 	}
 	err = rows.Err()
@@ -187,7 +202,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 	}
 	batch := &pgx.Batch{}
 	affectedWorks := append([]int64(nil), previousWorks...)
-	affectedHashes := []string{}
+	affectedHashes := append([]string(nil), previousHashes...)
 	for _, result := range results {
 		r := result.Record
 		var workID any

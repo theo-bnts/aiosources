@@ -172,7 +172,8 @@ sync_failures=0,sync_error='',recovery_started_at=NULL,applied_through=NULL;`); 
 		}
 	}
 	if scope == "metadata" {
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_reviews;
+		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_release_groups;DELETE FROM aiosources.aio_release_correspondence_queue;DELETE FROM aiosources.aio_release_correspondence_exclusions;
+DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_reviews;
 INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents
 ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1;
 UPDATE aiosources.aio_state SET last_match=NULL;`); err != nil {

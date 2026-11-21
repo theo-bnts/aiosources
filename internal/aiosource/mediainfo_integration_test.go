@@ -304,4 +304,83 @@ Subtitle: French / 25.00 kbps`
 	if !strings.Contains(streams[0].Title, "HDR10+") || !strings.Contains(streams[0].Title, "7.1") {
 		t.Fatalf("expected MediaInfo HDR10+ and 7.1 tags in Stremio stream title, got %q", streams[0].Title)
 	}
+
+	// 3. A discovery-only Full run on detail-source must preserve MediaInfo-derived fields
+	// when info_hash is unchanged (without dropping audiolangs/sublangs/duration/bitrate/hdr).
+	fullRun, err := s.DB.CreateRun(ctx, model.Run{
+		ProviderID:  detailProvider.ID,
+		Config:      detailProvider,
+		Mode:        model.ModeFull,
+		StorageMode: model.StorageCompact,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claimedFull, err := s.DB.ClaimNext(ctx)
+	if err != nil || claimedFull == nil || claimedFull.ID != fullRun.ID {
+		t.Fatalf("claim full run failed: %+v %v", claimedFull, err)
+	}
+	if _, err := s.DB.SavePage(ctx, *claimedFull, model.Page{
+		Items: []model.Record{{SourceID: listID, Fields: listFields, Raw: listingPayload, ContentType: "application/json"}},
+		Done:  true,
+	}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.FinishRun(ctx, claimedFull.ID, model.StatusSucceeded, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	afterFullRec, err := s.DB.AIOTorrent(ctx, "detail-source", "101")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !AllowsLanguage(afterFullRec, model.StreamPreferences{Language: "fr", Mode: "preferred"}) ||
+		!slices.Equal(afterFullRec.SubtitleLanguages, []string{"fr", "es"}) ||
+		afterFullRec.DurationSeconds != float64(2*3600+12*60) {
+		t.Fatalf("Full run wiped MediaInfo-derived fields: langs=%v subs=%v dur=%v", afterFullRec.Languages, afterFullRec.SubtitleLanguages, afterFullRec.DurationSeconds)
+	}
+
+	// 4. Verify correspondence search matches TMDB ID (with and without tmdb: prefix).
+	for _, query := range []string{"707", "tmdb:707"} {
+		list, err := s.DB.ListReleaseCorrespondences(ctx, model.ReleaseCorrespondenceOptions{
+			ListOptions: model.ListOptions{Query: query, Limit: 10},
+		})
+		if err != nil || list.Total != 1 {
+			t.Fatalf("ListReleaseCorrespondences(%q) = total %d (err=%v), want 1", query, list.Total, err)
+		}
+	}
+
+	// 5. Changing a torrent's info_hash must invalidate its previous hash-scoped correspondence cleanly.
+	hashC := strings.Repeat("c", 40)
+	if _, err := conn.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
+('hash-only-a','1',jsonb_build_object('title','Unmatched.Release.2025.FRENCH.1080p.WEB-DL-GRP','info_hash',$1::text,'size',4200000123)),
+('hash-only-b','2',jsonb_build_object('title','Unmatched.Release.2025.1080p.WEB-DL-GRP','info_hash',$1::text,'size',4200000123))`, hashC); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Match(ctx); err != nil {
+		t.Fatal(err)
+	}
+	peerHashBefore, err := s.DB.AIOTorrent(ctx, "hash-only-b", "2")
+	if err != nil || !slices.Equal(peerHashBefore.PropagatedLanguages, []string{"fr"}) {
+		t.Fatalf("expected hash-only propagation before hash change, got %v (err=%v)", peerHashBefore.PropagatedLanguages, err)
+	}
+	hashD := strings.Repeat("d", 40)
+	if _, err := conn.Exec(ctx, `UPDATE aiosources.torrents SET fields=jsonb_set(fields,'{info_hash}',to_jsonb($1::text)) WHERE provider_id='hash-only-a' AND source_id='1'`, hashD); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Match(ctx); err != nil {
+		t.Fatal(err)
+	}
+	peerHashAfter, err := s.DB.AIOTorrent(ctx, "hash-only-b", "2")
+	if err != nil || len(peerHashAfter.PropagatedLanguages) != 0 {
+		t.Fatalf("stale hash correspondence survived info_hash change: %v (err=%v)", peerHashAfter.PropagatedLanguages, err)
+	}
+
+	// 6. Deleting a source immediately prunes single-provider leftover correspondence groups.
+	if err := s.DB.DeleteSourceData(ctx, "unit3d-source", nil); err != nil {
+		t.Fatal(err)
+	}
+	var remainingGroups int
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_release_groups`).Scan(&remainingGroups); err != nil || remainingGroups != 0 {
+		t.Fatalf("expected single-provider leftover correspondence groups pruned on source deletion, got %d (err=%v)", remainingGroups, err)
+	}
 }

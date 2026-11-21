@@ -428,11 +428,19 @@ func (s *Store) ListReleaseCorrespondences(ctx context.Context, opts model.Relea
 		clauses = append(clauses, "g.enriched_count > 0")
 	}
 	if q := strings.TrimSpace(opts.Query); q != "" {
-		like := "%" + escapeSearchFragment.Replace(strings.ToLower(q)) + "%"
+		lowerQ := strings.ToLower(q)
+		like := "%" + escapeSearchFragment.Replace(lowerQ) + "%"
 		p := bind(like)
+		tmdbTerm := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(lowerQ, "tmdb:"), "tmdb "))
+		tmdbClause := ""
+		if tmdbTerm != "" {
+			tp := bind("%" + escapeSearchFragment.Replace(tmdbTerm) + "%")
+			tmdbClause = ` OR lower(COALESCE(w.tmdb_id,'')) LIKE ` + tp + ` ESCAPE '\'`
+		}
 		clauses = append(clauses, `(lower(g.canonical_title) LIKE `+p+` ESCAPE '\'
  OR lower(COALESCE(w.display_title,'')) LIKE `+p+` ESCAPE '\'
- OR lower(COALESCE(w.imdb_id,'')) LIKE `+p+` ESCAPE '\'
+ OR lower(COALESCE(w.localized_titles::text,'')) LIKE `+p+` ESCAPE '\'
+ OR lower(COALESCE(w.imdb_id,'')) LIKE `+p+` ESCAPE '\'`+tmdbClause+`
  OR EXISTS(
   SELECT 1 FROM aiosources.aio_release_group_members mq
   JOIN aiosources.torrents tq USING(provider_id,source_id)

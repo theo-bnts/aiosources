@@ -99,6 +99,7 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 		// rebuilding any other source's journal. Sequence allocation is monotonic.
 		`UPDATE aiosources.catalog_retention SET floor=GREATEST(floor,nextval(pg_get_serial_sequence('aiosources.catalog_journal','sequence'))) WHERE singleton AND (EXISTS(SELECT 1 FROM aiosources.catalog_journal WHERE provider_id=$1) OR EXISTS(SELECT 1 FROM aiosources.catalog_baselines WHERE provider_id=$1))`,
 		`DELETE FROM aiosources.torrents WHERE provider_id=$1`,
+		`DELETE FROM aiosources.aio_release_groups g WHERE $1<>'' AND (SELECT count(DISTINCT m.provider_id) FROM aiosources.aio_release_group_members m WHERE m.group_id=g.id)<2`,
 		`DELETE FROM aiosources.catalog_journal WHERE provider_id=$1`,
 		`DELETE FROM aiosources.catalog_baselines WHERE provider_id=$1`,
 		`DELETE FROM aiosources.torrent_history WHERE provider_id=$1 OR run_id IN (SELECT id FROM aiosources.runs WHERE provider_id=$1)`,

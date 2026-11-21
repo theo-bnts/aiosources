@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -116,9 +117,24 @@ func publishStaged(ctx context.Context, tx pgx.Tx, run model.Run) error {
 		// Only mapped detail-only fields and missing derived attribute keys
 		// survive a discovery-only Full. Listing values remain authoritative.
 		preserved := []string{"attributes"}
+		hasMediaInfoCarrier := false
 		for key := range run.Config.Traversal.IDRecovery.Mapping.Fields {
+			switch key {
+			case "metadata", "attributes", "description", "mediainfo", "media_info", "bdinfo", "bd_info", "nfoContent", "nfo_content", "nfo":
+				hasMediaInfoCarrier = true
+			}
 			if _, listed := run.Config.Mapping.Fields[key]; !listed && key != "attributes" {
 				preserved = append(preserved, key)
+			}
+		}
+		if hasMediaInfoCarrier {
+			// Preserve opportunistic MediaInfo/BDInfo/NFO extractions across
+			// discovery-only Full runs while still letting authoritative listing
+			// values in EXCLUDED.fields win when present.
+			for _, derived := range []string{"audiolangs", "sublangs", "duration", "bitrate", "resolution", "video_codec", "audio_codec", "audio_channels", "hdr"} {
+				if !slices.Contains(preserved, derived) {
+					preserved = append(preserved, derived)
+				}
 			}
 		}
 		fields = `CASE WHEN previous.origin IS NULL

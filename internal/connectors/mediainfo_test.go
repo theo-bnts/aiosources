@@ -325,6 +325,30 @@ Durée  : 45 min`
 		t.Fatalf("VOSTFR NFO leaked audio: %+v", gotVost)
 	}
 
+	// Inline language + VOSTFR keeps Japanese audio and French subtitles without leaking French audio.
+	inlineVostNFO := `Langue : Japonais (VOSTFR)
+Durée  : 24 min`
+	gotInlineVost := ParseMediaInfo(inlineVostNFO, false)
+	if !slices.Equal(gotInlineVost.AudioLanguages, []string{"ja"}) || !slices.Equal(gotInlineVost.SubtitleLanguages, []string{"fr"}) {
+		t.Fatalf("inline VOSTFR NFO = %+v, want audio=[ja] subs=[fr]", gotInlineVost)
+	}
+
+	// Dual-layer UHD MediaInfo merges HDR10 base + Dolby Vision enhancement layer.
+	dualHDR := `General
+Duration : 2 h 00 min
+Video #1
+Format : HEVC
+Width : 3 840 pixels
+Height : 2 160 pixels
+HDR format : SMPTE ST 2086, HDR10 compatible
+Video #2
+Format : HEVC
+HDR format : Dolby Vision, Version 1.0, Profile 7.6`
+	gotDualHDR := ParseMediaInfo(dualHDR, true)
+	if gotDualHDR.HDR != "HDR10 DV" {
+		t.Fatalf("dual-layer MediaInfo HDR = %q, want HDR10 DV", gotDualHDR.HDR)
+	}
+
 	// Free-form plot prose in description must NEVER trigger extraction.
 	proseFields := map[string]any{
 		"title":       "Example.Movie.2024.1080p.WEB-DL",

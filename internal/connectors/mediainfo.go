@@ -616,8 +616,12 @@ func buildSummaryFromSections(sections []mediaInfoSection) MediaInfoSummary {
 			if summary.VideoCodec == "" {
 				summary.VideoCodec = normalizeMediaInfoVideoCodec(sec.kv["format"], sec.kv["commercial_name"], sec.kv["codec_id"])
 			}
-			if summary.HDR == "" {
-				summary.HDR = normalizeMediaInfoHDR(sec.kv["hdr_format"], sec.kv["hdr_compat"], sec.kv["transfer"], sec.kv["primaries"])
+			if hdr := normalizeMediaInfoHDR(sec.kv["hdr_format"], sec.kv["hdr_compat"], sec.kv["transfer"], sec.kv["primaries"]); hdr != "" {
+				if summary.HDR == "" {
+					summary.HDR = hdr
+				} else if !strings.Contains(summary.HDR, hdr) {
+					summary.HDR = mergeHDRStrings(summary.HDR, hdr)
+				}
 			}
 		case "audio":
 			if isCommentaryTrack(sec.kv["title"], sec.kv["service_kind"]) {
@@ -853,6 +857,14 @@ func parseStructuredNFO(text string) (MediaInfoSummary, bool) {
 						added = true
 					}
 					continue
+				}
+				for _, tok := range mediaInfoTokenRE.FindAllString(part, -1) {
+					if subCode, isSubOnly := nfoSubtitleCompoundCode(tok); isSubOnly {
+						if len(summary.SubtitleLanguages) < maxMediaInfoLanguages && !slices.Contains(summary.SubtitleLanguages, subCode) {
+							summary.SubtitleLanguages = append(summary.SubtitleLanguages, subCode)
+							added = true
+						}
+					}
 				}
 				for _, code := range lookupAllMediaInfoLanguages(part) {
 					if len(summary.AudioLanguages) < maxMediaInfoLanguages && !slices.Contains(summary.AudioLanguages, code) {
