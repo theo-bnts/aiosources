@@ -59,6 +59,8 @@ test('About credits follow the metadata navigation order', async ({ page }) => {
   ).toEqual([
     'https://www.themoviedb.org',
     'https://www.igdb.com',
+    'https://musicbrainz.org',
+    'https://coverartarchive.org',
     'https://openlibrary.org',
     '/THIRD-PARTY-NOTICES.txt',
   ])

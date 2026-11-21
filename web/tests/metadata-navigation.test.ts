@@ -12,8 +12,14 @@ test('metadata histories separate video, book and shared identification operatio
   assert.equal(metadataOperationSection('metadata', 'igdb'), 'games')
   assert.equal(metadataHistoryPath('games'), '/metadata/games/history')
   assert.equal(metadataOperationSection('metadata', 'openlibrary'), 'books')
+  assert.equal(metadataOperationSection('metadata', 'musicbrainz'), 'music')
+  assert.equal(metadataHistoryPath('music'), '/metadata/music/history')
   assert.equal(metadataOperationSection('matching', 'local'), 'identification')
   assert.equal(metadataHistoryPath('books'), '/metadata/books/history')
+  assert.equal(
+    legacyMetadataHistory('?service=musicbrainz&kind=metadata&status=succeeded'),
+    '/metadata/music/history?status=succeeded',
+  )
   assert.equal(
     legacyMetadataHistory('?service=openlibrary&kind=metadata&status=failed&offset=50'),
     '/metadata/books/history?status=failed&offset=50',
@@ -47,6 +53,17 @@ test('existing settings identifiers point to their separated metadata workspace'
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/games/settings#'))
   for (const id of ['metadata.books', 'metadata.book-interval'])
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/books/settings#'))
+  for (const id of [
+    'metadata.music-key',
+    'metadata.music',
+    'metadata.music-interval',
+    'metadata.music-official',
+    'metadata.music-spoken',
+    'metadata.music-covers',
+    'metadata.music-types',
+    'metadata.music-languages',
+  ])
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/music/settings#'))
   for (const id of [
     'metadata.match',
     'metadata.match-interval',

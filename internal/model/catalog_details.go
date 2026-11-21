@@ -75,6 +75,8 @@ var catalogDetailGroups = map[string]string{
 	"tmdb": "identifiers", "tmdb_id": "identifiers", "tmdbid": "identifiers",
 	"tvdb": "identifiers", "tvdb_id": "identifiers", "tvdbid": "identifiers",
 	"mal": "identifiers", "mal_id": "identifiers", "malid": "identifiers", "igdb_id": "identifiers", "igdb": "identifiers", "igdbid": "identifiers", "platform": "identifiers", "platforms": "identifiers", "game_platform": "identifiers",
+	"mbid": "identifiers", "musicbrainz": "identifiers", "musicbrainz_id": "identifiers", "musicbrainz_release_group_id": "identifiers", "musicbrainz_release_id": "identifiers",
+	"discogs": "identifiers", "discogs_id": "identifiers", "wikidata": "identifiers", "wikidata_id": "identifiers", "barcode": "identifiers", "upc": "identifiers", "ean": "identifiers",
 	"category_id": "identifiers", "subcategory_id": "identifiers", "category_name": "identifiers",
 	"type": "identifiers", "media_type": "identifiers", "year": "identifiers",
 	"season": "identifiers", "seasons": "identifiers", "episode": "identifiers", "episodes": "identifiers",
@@ -91,7 +93,7 @@ var catalogDetailGroups = map[string]string{
 
 const catalogConflicting = "invalid conflicting values"
 
-var catalogEvidence = regexp.MustCompile(`(?i)^(?:tt)?[0-9]{1,16}$`)
+var catalogEvidence = regexp.MustCompile(`(?i)^(?:(?:tt)?[0-9]{1,16}|Q[1-9][0-9]{0,14}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
 var catalogSecretText = regexp.MustCompile(`(?i)(?:bearer\s|(?:api[_-]?key|passkey|password|token|secret|signature|auth)=|[a-f0-9]{32,}|eyJ[A-Za-z0-9_-]+\.)`)
 
 func safeDetailText(value string, maximum int) bool {

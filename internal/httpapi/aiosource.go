@@ -214,11 +214,42 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		games.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"games": games, "books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
+	musicStatus, err := s.options.Store.MusicStatus(r.Context())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	musicStatus.Running = s.options.AIOSource.MusicState()
+	musicStatus.LiveEnabled = c.MusicBrainzSecret != ""
+	if c.MusicBrainzEnabled && !musicStatus.Running {
+		next, err := s.options.Store.NextMusicUpdate(r.Context(), c.MusicBrainzMinutes, musicStatus.LiveEnabled)
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		musicStatus.NextUpdate = &next
+	}
+	writeJSON(w, 200, map[string]any{"music": musicStatus, "games": games, "books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
-	c := model.AIOConfig{AutoCache: defaults.AutoCache, IGDBMinutes: defaults.IGDBMinutes, IGDBRequestsPerSecond: defaults.IGDBRequestsPerSecond, IGDBReconcileDays: defaults.IGDBReconcileDays, OpenLibraryMinutes: defaults.OpenLibraryMinutes, OpenLibraryRelevantOnly: defaults.OpenLibraryRelevantOnly, OpenLibraryLanguages: defaults.OpenLibraryLanguages, TMDBRequestsPerSecond: defaults.TMDBRequestsPerSecond, MatchSeconds: defaults.MatchSeconds}
+	c := model.AIOConfig{
+		AutoCache:                defaults.AutoCache,
+		IGDBMinutes:              defaults.IGDBMinutes,
+		IGDBRequestsPerSecond:    defaults.IGDBRequestsPerSecond,
+		IGDBReconcileDays:        defaults.IGDBReconcileDays,
+		OpenLibraryMinutes:       defaults.OpenLibraryMinutes,
+		OpenLibraryRelevantOnly:  defaults.OpenLibraryRelevantOnly,
+		OpenLibraryLanguages:     defaults.OpenLibraryLanguages,
+		MusicBrainzMinutes:       defaults.MusicBrainzMinutes,
+		MusicBrainzOfficialOnly:  defaults.MusicBrainzOfficialOnly,
+		MusicBrainzExcludeSpoken: defaults.MusicBrainzExcludeSpoken,
+		MusicBrainzIncludeCovers: defaults.MusicBrainzIncludeCovers,
+		MusicBrainzTypes:         defaults.MusicBrainzTypes,
+		MusicBrainzLanguages:     defaults.MusicBrainzLanguages,
+		TMDBRequestsPerSecond:    defaults.TMDBRequestsPerSecond,
+		MatchSeconds:             defaults.MatchSeconds,
+	}
 	if !decodeJSON(w, r, &c) {
 		return
 	}
@@ -231,6 +262,12 @@ func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.PathValue("action") {
+	case "sync-music":
+		err = s.options.AIOSource.StartMusic(r.Context(), "manual")
+	case "stop-music":
+		s.options.AIOSource.StopMusic()
+	case "reset-music":
+		err = s.options.AIOSource.StartReset("music")
 	case "sync-games":
 		err = s.options.AIOSource.StartGames(r.Context(), "manual")
 	case "stop-games":

@@ -138,6 +138,27 @@ export function AboutDialog() {
             .
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
+            Music information and cover art:{' '}
+            <a
+              href="https://musicbrainz.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              MusicBrainz
+            </a>{' '}
+            and{' '}
+            <a
+              href="https://coverartarchive.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              Cover Art Archive
+            </a>{' '}
+            (MetaBrainz Foundation).
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
             Book information and covers:{' '}
             <a
               href="https://openlibrary.org"

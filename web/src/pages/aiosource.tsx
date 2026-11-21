@@ -9,6 +9,7 @@ import {
 
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { BookImportFilters } from '@/components/book-import-filters'
+import { MusicImportFilters } from '@/components/music-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
 import { SettingsSections } from '@/components/settings-sections'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
@@ -46,9 +47,11 @@ type FormScope =
   | MainScope
   | 'trackers'
   | 'book-catalog'
+  | 'music-catalog'
   | 'cache-availability'
   | 'videos-updates'
   | 'books-updates'
+  | 'music-updates'
   | 'identification-updates'
   | 'games-updates'
   | 'games-requests'
@@ -57,6 +60,7 @@ const sectionForms: Record<MainScope, FormScope[]> = {
   videos: ['videos', 'videos-updates', 'videos-requests'],
   games: ['games', 'games-updates', 'games-requests'],
   books: ['books', 'book-catalog', 'books-updates'],
+  music: ['music', 'music-catalog', 'music-updates'],
   identification: ['identification', 'identification-updates'],
   debrid: ['debrid', 'cache-availability'],
 }
@@ -67,6 +71,7 @@ type Draft = { base: Config; changes: Changes }
 const resetScopes = {
   'reset-games': 'games',
   'reset-books': 'books',
+  'reset-music': 'music',
   'reset-videos': 'videos',
   'reset-metadata': 'metadata',
   'reset-mapping': 'mapping',
@@ -109,7 +114,8 @@ export default function AIOSourcePage({
   section: MetadataSection | 'debrid' | 'stremio'
 }) {
   const location = useLocation()
-  const usesSecrets = section === 'games' || section === 'videos' || section === 'debrid'
+  const usesSecrets =
+    section === 'games' || section === 'videos' || section === 'music' || section === 'debrid'
   const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const [manualActionsOpen, setManualActionsOpen] = useState(location.hash === '#maintenance')
@@ -142,6 +148,7 @@ export default function AIOSourcePage({
     section === 'games' ||
     section === 'videos' ||
     section === 'books' ||
+    section === 'music' ||
     section === 'identification'
   const scope = section === 'stremio' ? 'debrid' : section
   const formConfig = (form: FormScope) => {
@@ -156,9 +163,11 @@ export default function AIOSourcePage({
       ? 'games-updates'
       : section === 'books'
         ? 'books-updates'
-        : section === 'identification'
-          ? 'identification-updates'
-          : 'videos-updates'
+        : section === 'music'
+          ? 'music-updates'
+          : section === 'identification'
+            ? 'identification-updates'
+            : 'videos-updates'
   const trackersDraft = drafts.trackers
   const trackersConfig = trackersDraft
     ? applyChanges(trackersDraft.base, trackersDraft.changes)
@@ -250,7 +259,8 @@ export default function AIOSourcePage({
         name === 'match' ||
         name === 'recompute-correspondences' ||
         name === 'sync-books' ||
-        name === 'sync-games'
+        name === 'sync-games' ||
+        name === 'sync-music'
       ) {
         await queryClient.cancelQueries({ queryKey: ['aiosource', 'controls'], exact: true })
         queryClient.setQueryData<Controls>(['aiosource', 'controls'], (current) => {
@@ -266,7 +276,8 @@ export default function AIOSourcePage({
                   (current.syncing ||
                     current.matching ||
                     current.books?.running ||
-                    current.games?.running)
+                    current.games?.running ||
+                    current.music?.running)
                     ? 'stopping'
                     : 'resetting',
               },
@@ -274,6 +285,10 @@ export default function AIOSourcePage({
           if (name === 'sync-games')
             return current.games
               ? { ...current, games: { ...current.games, running: true } }
+              : current
+          if (name === 'sync-music')
+            return current.music
+              ? { ...current, music: { ...current.music, running: true } }
               : current
           if (name === 'sync') return { ...current, syncing: true }
           if (name === 'match' || name === 'recompute-correspondences')
@@ -321,7 +336,7 @@ export default function AIOSourcePage({
   }
   const secret = (
     label: string,
-    key: 'tmdb_secret' | 'igdb_secret' | DebridSecret,
+    key: 'tmdb_secret' | 'igdb_secret' | 'musicbrainz_secret' | DebridSecret,
     help?: ReactNode,
   ) => (
     <SecretPicker
@@ -335,9 +350,19 @@ export default function AIOSourcePage({
           ? 'igdb_client_secret'
           : key === 'tmdb_secret'
             ? 'tmdb_api_token'
-            : `${key.replace('_secret', '')}_api_key`
+            : key === 'musicbrainz_secret'
+              ? 'musicbrainz_replication_token'
+              : `${key.replace('_secret', '')}_api_key`
       }
-      addLabel={`Add ${key === 'igdb_secret' ? 'Twitch client secret' : key === 'tmdb_secret' ? 'TMDB token' : `${debridProviders.find((provider) => provider.secret === key)?.name} key`}`}
+      addLabel={`Add ${
+        key === 'igdb_secret'
+          ? 'Twitch client secret'
+          : key === 'tmdb_secret'
+            ? 'TMDB token'
+            : key === 'musicbrainz_secret'
+              ? 'MetaBrainz token'
+              : `${debridProviders.find((provider) => provider.secret === key)?.name} key`
+      }`}
       valueLabel={label}
       disabled={save.isPending}
     />
@@ -353,7 +378,8 @@ export default function AIOSourcePage({
       | 'igdb_minutes'
       | 'igdb_requests_per_second'
       | 'igdb_reconcile_days'
-      | 'openlibrary_minutes',
+      | 'openlibrary_minutes'
+      | 'musicbrainz_minutes',
     min: number,
     max: number,
     form: FormScope = scope,
@@ -387,7 +413,13 @@ export default function AIOSourcePage({
   }
   const toggle = (
     label: string,
-    key: 'igdb_enabled' | 'auto_sync' | 'auto_match' | 'auto_cache' | 'openlibrary_enabled',
+    key:
+      | 'igdb_enabled'
+      | 'auto_sync'
+      | 'auto_match'
+      | 'auto_cache'
+      | 'openlibrary_enabled'
+      | 'musicbrainz_enabled',
     form: FormScope = scope,
     help?: ReactNode,
   ) => (
@@ -451,7 +483,8 @@ export default function AIOSourcePage({
             review.isPending ||
             conflict(form) ||
             invalidNumbers(form) ||
-            (form === 'book-catalog' && (Boolean(status.books?.running) || resetting))
+            (form === 'book-catalog' && (Boolean(status.books?.running) || resetting)) ||
+            (form === 'music-catalog' && (Boolean(status.music?.running) || resetting))
           }
         >
           <FloppyDiskIcon aria-hidden="true" />
@@ -504,7 +537,9 @@ export default function AIOSourcePage({
                 ? 'IGDB supplies game titles, platforms and cover references. Use a confidential Twitch application; no OAuth redirect or browser sign-in is required. Images stay remote.'
                 : section === 'books'
                   ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
-                  : undefined
+                  : section === 'music'
+                    ? 'MusicBrainz supplies album, artist, label, Discogs and Wikidata metadata, plus optional Cover Art Archive front-cover flags. Twice-weekly CC0 exports work without any token; adding an optional free MetaBrainz Live Data Feed token enables hourly global updates (CC BY-NC-SA 3.0) without querying external APIs per torrent. Cover images stay remote.'
+                    : undefined
             }
           >
             {section === 'videos' && (
@@ -537,6 +572,20 @@ export default function AIOSourcePage({
                 </div>
               </div>
             )}
+            {section === 'music' && (
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="min-w-0 space-y-1">
+                  {secret(
+                    'MetaBrainz Live Data Feed token (optional)',
+                    'musicbrainz_secret',
+                    'Optional. Leave blank to stay on twice-weekly public CC0 full exports. With a free non-commercial MetaBrainz Live Data Feed token, AIOSources applies hourly global replication packets (CC BY-NC-SA 3.0) and automatically recovers via a full export after long pauses.',
+                  )}
+                  <CredentialPageLink href="https://metabrainz.org/profile">
+                    Get a MetaBrainz Live Data Feed token
+                  </CredentialPageLink>
+                </div>
+              </div>
+            )}
             {section === 'debrid' && (
               <div className="grid gap-5 md:grid-cols-2">
                 {debridProviders.map((provider) => (
@@ -558,6 +607,8 @@ export default function AIOSourcePage({
             {section === 'games' && toggle('Automatically update game information', 'igdb_enabled')}
             {section === 'books' &&
               toggle('Automatically update book information', 'openlibrary_enabled')}
+            {section === 'music' &&
+              toggle('Automatically update music information', 'musicbrainz_enabled')}
             {section === 'identification' &&
               toggle('Automatically identify torrents', 'auto_match')}
             {footer(scope)}
@@ -602,12 +653,28 @@ export default function AIOSourcePage({
             />
           </form>
         )}
+        {section === 'music' && (
+          <form
+            aria-label="Music catalog filters"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submit('music-catalog')
+            }}
+          >
+            <MusicImportFilters
+              value={formConfig('music-catalog')!}
+              onChange={(patch) => update('music-catalog', patch)}
+              busy={Boolean(status.music?.running) || resetting || save.isPending}
+              footer={footer('music-catalog')}
+            />
+          </form>
+        )}
         {metadata && (
           <Disclosure
             title="Automatic updates"
             help={
               section === 'identification'
-                ? 'Pending work and timing survive restarts. This interval applies to videos, games and books; manual actions run immediately.'
+                ? 'Pending work and timing survive restarts. This interval applies to videos, games, music and books; manual actions run immediately.'
                 : undefined
             }
           >
@@ -651,6 +718,15 @@ export default function AIOSourcePage({
                   5,
                   1440,
                   automaticScope,
+                )}
+              {section === 'music' &&
+                number(
+                  'Music information update interval (minutes)',
+                  'musicbrainz_minutes',
+                  15,
+                  1440,
+                  automaticScope,
+                  'With a MetaBrainz Live Data Feed token, hourly packets are checked on this interval (default 60 minutes). Without a token, AIOSources checks twice-weekly full exports at most every 6 hours.',
                 )}
               {section === 'identification' &&
                 number(
@@ -780,6 +856,21 @@ export default function AIOSourcePage({
               }
             />
           )}
+          {section === 'music' && (
+            <ConfirmAction
+              title="Reset music information?"
+              description="Information updates and identification will be stopped first. MusicBrainz and Cover Art Archive metadata, related automatic and manual identifications, availability observations and music operation history will be removed. Source records, video, game and book information, settings and files in your debrid accounts are retained. Automatic music updates can import the catalog again."
+              label="Reset music information"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-music')}
+              trigger={
+                <Button variant="destructive" disabled={maintenanceBusy}>
+                  <TrashIcon />
+                  Reset music information
+                </Button>
+              }
+            />
+          )}
           {section === 'identification' && (
             <ConfirmAction
               title="Reset title matches?"
@@ -831,10 +922,13 @@ export default function AIOSourcePage({
           {settingsForm}
           <SettingsSections>
             {section === 'videos' && <RuntimeSettingsPanel section="metadata" />}
-            {(section === 'videos' || section === 'books' || section === 'games') && (
+            {(section === 'videos' ||
+              section === 'books' ||
+              section === 'games' ||
+              section === 'music') && (
               <RuntimeSettingsPanel
                 section="metadata_retries"
-                scopeHelp="These settings apply to video, game and book information updates."
+                scopeHelp="These settings apply to video, game, music and book information updates."
               />
             )}
             {section === 'identification' && (
@@ -904,6 +998,37 @@ export default function AIOSourcePage({
                   </InfoTip>
                 </div>
               )}
+              {section === 'music' && status.music?.schema_unsupported && (
+                <div
+                  role="status"
+                  className="notice notice-warning flex flex-wrap items-center gap-1.5"
+                >
+                  <p>
+                    MusicBrainz published a newer database schema that this AIOSources version does
+                    not support yet. Existing music information is preserved until you upgrade
+                    AIOSources.
+                  </p>
+                </div>
+              )}
+              {section === 'music' &&
+                status.music?.needs_export &&
+                !status.music.schema_unsupported && (
+                  <div
+                    role="status"
+                    className="notice notice-warning flex flex-wrap items-center gap-1.5"
+                  >
+                    <p>
+                      Live Data Feed continuity was interrupted. A fresh MusicBrainz full export
+                      will recover missing updates while keeping existing music information intact.
+                    </p>
+                  </div>
+                )}
+              {section === 'music' && status.music?.running && (
+                <p role="status" className="help">
+                  Updating music information. Progress is saved automatically and existing entries
+                  remain searchable during import.
+                </p>
+              )}
               {Boolean(
                 section === 'videos'
                   ? status.status.sync_error
@@ -911,7 +1036,9 @@ export default function AIOSourcePage({
                     ? status.games?.error
                     : section === 'books'
                       ? status.books?.error
-                      : status.matching_error,
+                      : section === 'music'
+                        ? status.music?.error
+                        : status.matching_error,
               ) && (
                 <p role="status" className="notice notice-warning">
                   {messageText(
@@ -921,7 +1048,9 @@ export default function AIOSourcePage({
                         ? status.games?.error || ''
                         : section === 'books'
                           ? status.books?.error || ''
-                          : status.matching_error || '',
+                          : section === 'music'
+                            ? status.music?.error || ''
+                            : status.matching_error || '',
                   )}{' '}
                   <Link className="data-link" to={`${metadataSections[section].path}/history`}>
                     View history
@@ -1004,6 +1133,29 @@ export default function AIOSourcePage({
                       >
                         <StopIcon />
                         Stop book information update
+                      </Button>
+                    )}
+                  </>
+                )}
+                {section === 'music' && (
+                  <>
+                    <Button
+                      disabled={Boolean(
+                        status.music?.running || resetting || action.isPending || dirty,
+                      )}
+                      onClick={() => action.mutate('sync-music')}
+                    >
+                      <ArrowClockwiseIcon />
+                      Update music information
+                    </Button>
+                    {status.music?.running && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-music')}
+                      >
+                        <StopIcon />
+                        Stop music information update
                       </Button>
                     )}
                   </>

@@ -32,7 +32,7 @@ func ValidPublicTorznabOptions(o model.PublicTorznabOptions) bool {
 		return false
 	}
 	for i, m := range o.MediaTypes {
-		if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "other"}, m) || slices.Contains(o.MediaTypes[:i], m) {
+		if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "music", "other"}, m) || slices.Contains(o.MediaTypes[:i], m) {
 			return false
 		}
 	}

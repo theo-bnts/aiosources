@@ -64,6 +64,26 @@ func releaseContentDetails(record model.AIORecord) []string {
 		}
 		return lines
 	}
+	if record.IdentificationType == "music" || (record.IdentificationType == "" && record.VideoType == "" && record.BookHints.Kind == "" && ParseMusicRelease(record).Kind != "") {
+		parsed := ParseMusicRelease(record)
+		if parsed.Kind == "" && record.IdentificationType == "music" {
+			parsed.Kind = "music"
+		}
+		if parsed.Kind != "" {
+			label := map[string]string{"music": "Music", "lossless": "Lossless", "mp3": "MP3"}[parsed.Kind]
+			if label == "" {
+				label = "Music"
+			}
+			lines := []string{"🎵 " + label}
+			if artist := strings.TrimSpace(parsed.Artist); presentationAuthor.MatchString(artist) {
+				lines = append(lines, "🎤 "+artist)
+			}
+			if catno := strings.TrimSpace(parsed.CatalogNumber); catno != "" && presentationAuthor.MatchString(catno) {
+				lines = append(lines, "🏷️ "+strings.ToUpper(catno))
+			}
+			return lines
+		}
+	}
 	if record.IdentificationType == "book" && record.BookHints.Kind == "" {
 		record.BookHints.Kind = "book"
 	}

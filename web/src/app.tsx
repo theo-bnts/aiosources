@@ -19,6 +19,7 @@ import {
   ListIcon,
   ListMagnifyingGlassIcon,
   MagnifyingGlassIcon,
+  MusicNotesIcon,
   PlayCircleIcon,
   PlugsConnectedIcon,
   ShareNetworkIcon,
@@ -166,7 +167,7 @@ const navigationGroups: NavigationGroup[] = [
       {
         to: '/metadata/catalogs',
         label: 'Catalogs',
-        description: 'Manage video, game and book information.',
+        description: 'Manage video, game, music and book information.',
         icon: DatabaseIcon,
         children: [
           {
@@ -180,6 +181,12 @@ const navigationGroups: NavigationGroup[] = [
             label: 'Games',
             description: 'Game information, updates and history.',
             icon: GameControllerIcon,
+          },
+          {
+            to: '/metadata/music',
+            label: 'Music',
+            description: 'Music release information, Cover Art Archive index and history.',
+            icon: MusicNotesIcon,
           },
           {
             to: '/metadata/books',
@@ -351,7 +358,7 @@ const publicSearchNavigation: NavigationGroup = {
       to: '/public/search',
       label: 'Search',
       description:
-        'Find films, series, games and books and download through your own debrid accounts.',
+        'Find films, series, games, music and books and download through your own debrid accounts.',
       icon: MagnifyingGlassIcon,
     },
   ],

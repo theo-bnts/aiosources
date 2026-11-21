@@ -17,19 +17,22 @@ var auxiliaryBookFile = regexp.MustCompile(`(?i)^(?:read[ ._-]?me(?:[ ._-]?first
 func (e *bookFileChoice) Error() string { return "choose a file" }
 func (e *bookFileChoice) Unwrap() error { return ErrPending }
 func fileSelectionError(files []model.AIOFile, r Resource) error {
-	if (r.Type == "book" || r.Type == "torrent" || r.Type == "game") && r.File == "" {
+	if (r.Type == "book" || r.Type == "torrent" || r.Type == "game" || r.Type == "music") && r.File == "" {
 		valid := resourceDownloadFiles(files, r)
 		if len(valid) > 1 {
 			return &bookFileChoice{Files: valid}
 		}
 	}
-	if r.Type != "book" && r.Type != "torrent" && r.Type != "game" {
+	if r.Type != "book" && r.Type != "torrent" && r.Type != "game" && r.Type != "music" {
 		return errors.New("no unambiguous matching video")
 	}
 	return newProviderError("not_found", "")
 }
 
 func resourceDownloadFiles(files []model.AIOFile, r Resource) []model.AIOFile {
+	if r.Type == "music" {
+		return musicFiles(files)
+	}
 	if r.Type != "torrent" && r.Type != "game" {
 		return bookFiles(files)
 	}
@@ -78,6 +81,20 @@ func bookFiles(files []model.AIOFile) []model.AIOFile {
 	}
 	return out
 }
+func musicFiles(files []model.AIOFile) []model.AIOFile {
+	out := []model.AIOFile{}
+	for _, f := range files {
+		ext := strings.ToLower(filepath.Ext(f.Path))
+		if auxiliaryBookFile.MatchString(strings.TrimSuffix(filepath.Base(f.Path), filepath.Ext(f.Path))) {
+			continue
+		}
+		if slices.Contains([]string{".flac", ".mp3", ".m4a", ".alac", ".aac", ".ogg", ".opus", ".wav", ".aif", ".aiff", ".wv", ".dsf", ".dff", ".ape", ".wma", ".zip", ".rar", ".7z"}, ext) && !sampleRE.MatchString(f.Path) && len(f.Path) <= 4096 && len(out) < 10000 {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 func selectBookFile(files []model.AIOFile, path string) (model.AIOFile, bool) {
 	valid := bookFiles(files)
 	if path != "" {

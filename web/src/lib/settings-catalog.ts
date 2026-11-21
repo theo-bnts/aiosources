@@ -69,7 +69,10 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   identification: ['/metadata/identification/settings', 'Metadata / Identification'],
   matching: ['/metadata/identification/settings', 'Metadata / Identification'],
   metadata: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos'],
-  metadata_retries: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos, Games & Books'],
+  metadata_retries: [
+    '/metadata/videos/settings',
+    'Metadata / Catalogs / Videos, Games, Music & Books',
+  ],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
   const definition = runtimeSections[section]
@@ -140,6 +143,52 @@ add(
     ['metadata.games-interval', 'Game information update interval (minutes)'],
     ['metadata.games-rate', 'IGDB requests per second'],
     ['metadata.games-reconcile', 'Full catalog reconciliation (days)'],
+  ],
+)
+add(
+  {
+    route: '/metadata/music/settings',
+    group: 'Metadata / Catalogs / Music / Settings',
+    keywords:
+      'MusicBrainz Cover Art Archive Discogs Wikidata music musique albums flac mp3 metadata',
+  },
+  [
+    [
+      'metadata.music-key',
+      'MetaBrainz Live Data Feed token',
+      'replication hourly updates metabrainz token',
+    ],
+    [
+      'metadata.music',
+      'Automatically update music information',
+      'MusicBrainz Cover Art Archive albums singles',
+    ],
+    [
+      'metadata.music-interval',
+      'Music information update interval (minutes)',
+      'MusicBrainz schedule frequency cadence',
+    ],
+    [
+      'metadata.music-official',
+      'Official releases only',
+      'bootleg promotional pseudo release catalog filters',
+    ],
+    [
+      'metadata.music-spoken',
+      'Exclude audiobooks and spoken word',
+      'audiobook drama spokenword catalog filters',
+    ],
+    [
+      'metadata.music-covers',
+      'Import Cover Art Archive index',
+      'cover art front artwork archive catalog filters',
+    ],
+    [
+      'metadata.music-types',
+      'Release types',
+      'album ep single broadcast primary type catalog filters',
+    ],
+    ['metadata.music-languages', 'Filter music languages', 'language release catalog filters'],
   ],
 )
 add(
@@ -395,6 +444,7 @@ add(
     ['routing.default', 'Outgoing connections', 'default connection'],
     ['routing.tmdb', 'TMDB'],
     ['routing.igdb', 'IGDB'],
+    ['routing.musicbrainz', 'MusicBrainz'],
     ['routing.openlibrary', 'Open Library'],
     ...debridProviders.map((p) => [`routing.${providerSettingSuffix(p.id)}`, p.name] as const),
     ['routing.downloads', 'Browser downloads'],

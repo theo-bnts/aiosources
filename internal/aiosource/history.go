@@ -53,6 +53,9 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 			if h.run.Service == "openlibrary" {
 				h.run.Error = "Book information update failed. Saved progress is preserved."
 			}
+			if h.run.Service == "musicbrainz" {
+				h.run.Error = "Music information update failed. Saved progress is preserved."
+			}
 		case "matching":
 			h.run.Error = "Torrent identification failed. Saved results and pending work are preserved."
 		case "cache":

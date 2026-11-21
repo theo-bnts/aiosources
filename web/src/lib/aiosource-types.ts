@@ -21,6 +21,14 @@ export type Config = {
   openlibrary_minutes: number
   openlibrary_relevant_only: boolean
   openlibrary_languages: string[]
+  musicbrainz_enabled: boolean
+  musicbrainz_minutes: number
+  musicbrainz_secret: string
+  musicbrainz_official_only: boolean
+  musicbrainz_exclude_spoken: boolean
+  musicbrainz_include_covers: boolean
+  musicbrainz_types: string[]
+  musicbrainz_languages: string[]
   sync_minutes: number
   match_seconds: number
   tmdb_requests_per_second: number
@@ -63,11 +71,42 @@ export type GameStatus = {
   retry_at: string | null
   error?: string
 }
+export type MusicStatus = {
+  running: boolean
+  complete: boolean
+  phase: string
+  selection: string
+  snapshot: string
+  snapshot_at: string | null
+  works: number
+  releases: number
+  artists: number
+  labels: number
+  covers: number
+  imported: number
+  position: number
+  filtered: number
+  skipped: number
+  last_import: string | null
+  last_sync: string | null
+  changes_through: string | null
+  last_packet_at: string | null
+  next_update: string | null
+  retry_at: string | null
+  replication_sequence: number
+  schema_sequence: number
+  live_enabled: boolean
+  needs_export: boolean
+  recovery_reason?: string
+  schema_unsupported: boolean
+  error?: string
+}
 export type Status = {
   games?: GameStatus
   books?: BookStatus
+  music?: MusicStatus
   maintenance?: {
-    scope: 'books' | 'videos' | 'games' | 'metadata' | 'mapping' | 'cache' | ''
+    scope: 'books' | 'videos' | 'games' | 'music' | 'metadata' | 'mapping' | 'cache' | ''
     status: 'running' | 'succeeded' | 'failed' | ''
     phase?: 'stopping' | 'resetting'
     error?: string
@@ -200,14 +239,29 @@ export type ReleaseCorrespondenceDetail = {
   exclusions: ReleaseCorrespondenceExclusion[]
 }
 
+export type MusicInformation = {
+  primary_type?: string
+  secondary_types?: string[]
+  artists?: string[]
+  artist_aliases?: string[]
+  labels?: string[]
+  catalog_numbers?: string[]
+  barcodes?: string[]
+  formats?: string[]
+  discogs_ids?: string[]
+  wikidata_id?: string
+  has_cover?: boolean
+}
 export type ReviewWork = {
   display_title?: string
   id: number
-  type: 'movie' | 'tv' | 'book' | 'game'
+  type: 'movie' | 'tv' | 'book' | 'game' | 'music'
   igdb?: string
   game?: { platforms?: { id: number; name: string; slug: string }[] }
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
+  musicbrainz?: string
+  music?: MusicInformation
   tmdb: string
   imdb: string
   tvdb: string
@@ -220,11 +274,13 @@ export type MatchReview = {
   active: boolean
   revision: number
   fingerprint: string
-  type: 'movie' | 'tv' | 'book' | 'game'
+  type: 'movie' | 'tv' | 'book' | 'game' | 'music'
   igdb?: string
   game?: { platforms?: { id: number; name: string; slug: string }[] }
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
+  musicbrainz?: string
+  music?: MusicInformation
   tmdb: string
   override_episode: boolean
   season: number | null
@@ -232,11 +288,23 @@ export type MatchReview = {
 }
 export type ReviewDetail = {
   book_evidence?: { isbn?: string; isbns?: string[]; openlibrary?: string; author?: string }
+  music_evidence?: {
+    mbid?: string
+    release_mbid?: string
+    discogs_id?: string
+    wikidata_id?: string
+    barcode?: string
+    catalog_number?: string
+    artist?: string
+    album?: string
+    label?: string
+  }
   suggested_query: string
   suggested_year: number | null
   record: {
     title: string
     igdb?: string
+    musicbrainz?: string
     provider: string
     source_id: string
     fingerprint: string

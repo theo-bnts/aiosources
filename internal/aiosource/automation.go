@@ -141,6 +141,15 @@ func (s *Service) runAutomation() time.Duration {
 			}
 		}
 	}
+	if c.MusicBrainzEnabled && !s.MusicState() {
+		if next, e := s.DB.NextMusicUpdate(s.ctx, c.MusicBrainzMinutes, c.MusicBrainzSecret != ""); e == nil {
+			if !next.After(time.Now()) {
+				_ = s.StartMusic(s.ctx, "automatic")
+			} else {
+				poll = min(poll, time.Until(next))
+			}
+		}
+	}
 	syncing, matching, _ := s.State()
 	now := time.Now()
 	p := AutomationPlan(c, status, syncing, matching, now)

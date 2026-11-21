@@ -19,6 +19,12 @@ type CatalogReleaseFilters struct {
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
 	Ranking     *CatalogSearchRanking `json:"ranking,omitempty"`
+	MusicBrainz string                `json:"musicbrainz,omitempty"`
+	Artists     []string              `json:"artists,omitempty"`
+	MusicType   string                `json:"music_type,omitempty"`
+	Labels      []string              `json:"labels,omitempty"`
+	DiscogsIDs  []string              `json:"discogs_ids,omitempty"`
+	WikidataID  string                `json:"wikidata_id,omitempty"`
 	IGDB        string                `json:"igdb,omitempty"`
 	Platforms   []GamePlatform        `json:"platforms,omitempty"`
 	OpenLibrary string                `json:"openlibrary,omitempty"`

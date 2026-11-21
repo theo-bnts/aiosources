@@ -57,6 +57,8 @@ type TorznabQuery struct {
 	MediaTypes              []string
 	IMDb, TMDB, TVDB        string
 	BookTitle, Author, ISBN string
+	Artist, Album, Label    string
+	Track, MBID             string
 	Season, Episode         *int
 	Year                    int
 	Limit, Offset           int

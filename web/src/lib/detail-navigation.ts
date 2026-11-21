@@ -32,6 +32,7 @@ const viewLabels: Record<string, string> = {
   '/metadata/videos/history': 'Video history',
   '/metadata/games/history': 'Game history',
   '/metadata/books/history': 'Book history',
+  '/metadata/music/history': 'Music history',
   '/metadata/identification/history': 'Identification history',
   '/debrid/history': 'Debrid history',
   '/health': 'Storage',

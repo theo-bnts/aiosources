@@ -49,6 +49,7 @@ test('statistics are the first view, settings contain configuration and statuses
     ['/providers', 'Torrents', 'Imported torrents'],
     ['/metadata/videos', 'Videos', 'Catalog entries'],
     ['/metadata/games', 'Games', 'Catalog entries'],
+    ['/metadata/music', 'Music', 'Release groups'],
     ['/metadata/books', 'Books', 'Catalog entries'],
     ['/debrid', 'Debrid', 'Configured services'],
   ]) {

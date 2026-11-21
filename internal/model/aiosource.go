@@ -5,33 +5,41 @@ import "time"
 // Credential values never enter configuration or API responses. References
 // resolve through the same encrypted vault as collection credentials.
 type AIOConfig struct {
-	Revision                int64                 `json:"revision"`
-	TMDBSecret              string                `json:"tmdb_secret"`
-	IGDBClientID            string                `json:"igdb_client_id"`
-	IGDBSecret              string                `json:"igdb_secret"`
-	IGDBEnabled             bool                  `json:"igdb_enabled"`
-	IGDBMinutes             int                   `json:"igdb_minutes"`
-	IGDBRequestsPerSecond   int                   `json:"igdb_requests_per_second"`
-	IGDBReconcileDays       int                   `json:"igdb_reconcile_days"`
-	AllDebridSecret         string                `json:"alldebrid_secret"`
-	TorBoxSecret            string                `json:"torbox_secret"`
-	DebridLinkSecret        string                `json:"debridlink_secret"`
-	DeepbridSecret          string                `json:"deepbrid_secret"`
-	PremiumizeSecret        string                `json:"premiumize_secret"`
-	RealDebridSecret        string                `json:"realdebrid_secret"`
-	AutoSync                bool                  `json:"auto_sync"`
-	AutoMatch               bool                  `json:"auto_match"`
-	AutoCache               bool                  `json:"auto_cache"`
-	OpenLibraryEnabled      bool                  `json:"openlibrary_enabled"`
-	OpenLibraryMinutes      int                   `json:"openlibrary_minutes"`
-	OpenLibraryRelevantOnly bool                  `json:"openlibrary_relevant_only"`
-	OpenLibraryLanguages    []string              `json:"openlibrary_languages"`
-	SyncMinutes             int                   `json:"sync_minutes"`
-	MatchSeconds            int                   `json:"match_seconds"`
-	TMDBRequestsPerSecond   int                   `json:"tmdb_requests_per_second"`
-	CacheMinutes            int                   `json:"cache_minutes"`
-	ResponseSeconds         int                   `json:"response_seconds"`
-	Trackers                map[string]AIOTracker `json:"trackers"`
+	Revision                 int64                 `json:"revision"`
+	TMDBSecret               string                `json:"tmdb_secret"`
+	IGDBClientID             string                `json:"igdb_client_id"`
+	IGDBSecret               string                `json:"igdb_secret"`
+	IGDBEnabled              bool                  `json:"igdb_enabled"`
+	IGDBMinutes              int                   `json:"igdb_minutes"`
+	IGDBRequestsPerSecond    int                   `json:"igdb_requests_per_second"`
+	IGDBReconcileDays        int                   `json:"igdb_reconcile_days"`
+	AllDebridSecret          string                `json:"alldebrid_secret"`
+	TorBoxSecret             string                `json:"torbox_secret"`
+	DebridLinkSecret         string                `json:"debridlink_secret"`
+	DeepbridSecret           string                `json:"deepbrid_secret"`
+	PremiumizeSecret         string                `json:"premiumize_secret"`
+	RealDebridSecret         string                `json:"realdebrid_secret"`
+	AutoSync                 bool                  `json:"auto_sync"`
+	AutoMatch                bool                  `json:"auto_match"`
+	AutoCache                bool                  `json:"auto_cache"`
+	OpenLibraryEnabled       bool                  `json:"openlibrary_enabled"`
+	OpenLibraryMinutes       int                   `json:"openlibrary_minutes"`
+	OpenLibraryRelevantOnly  bool                  `json:"openlibrary_relevant_only"`
+	OpenLibraryLanguages     []string              `json:"openlibrary_languages"`
+	MusicBrainzEnabled       bool                  `json:"musicbrainz_enabled"`
+	MusicBrainzSecret        string                `json:"musicbrainz_secret"`
+	MusicBrainzMinutes       int                   `json:"musicbrainz_minutes"`
+	MusicBrainzOfficialOnly  bool                  `json:"musicbrainz_official_only"`
+	MusicBrainzExcludeSpoken bool                  `json:"musicbrainz_exclude_spoken"`
+	MusicBrainzIncludeCovers bool                  `json:"musicbrainz_include_covers"`
+	MusicBrainzTypes         []string              `json:"musicbrainz_types"`
+	MusicBrainzLanguages     []string              `json:"musicbrainz_languages"`
+	SyncMinutes              int                   `json:"sync_minutes"`
+	MatchSeconds             int                   `json:"match_seconds"`
+	TMDBRequestsPerSecond    int                   `json:"tmdb_requests_per_second"`
+	CacheMinutes             int                   `json:"cache_minutes"`
+	ResponseSeconds          int                   `json:"response_seconds"`
+	Trackers                 map[string]AIOTracker `json:"trackers"`
 }
 type AIOTracker struct {
 	Private        bool   `json:"private"`
@@ -42,6 +50,8 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
+	MusicBrainz      string            `json:"musicbrainz,omitempty"`
+	Music            MusicInformation  `json:"music,omitzero"`
 	IGDB             string            `json:"igdb,omitempty"`
 	Game             GameInformation   `json:"game,omitzero"`
 	LocalizedPosters map[string]string `json:"localized_posters,omitempty"`
@@ -65,6 +75,9 @@ type AIOWork struct {
 }
 type AIORecord struct {
 	IdentificationType          string              `json:"-"`
+	MusicInformationPending     bool                `json:"-"`
+	MusicHints                  MusicHints          `json:"-"`
+	MusicBrainz                 string              `json:"musicbrainz,omitempty"`
 	GameHints                   GameHints           `json:"-"`
 	IGDB                        string              `json:"igdb,omitempty"`
 	VideoType                   string              `json:"-"`
@@ -101,6 +114,14 @@ type AIORecord struct {
 // Eligibility belongs in candidate discovery, before the bounded safety cap.
 // Otherwise impossible homonyms can hide the one year-compatible work.
 type AIOCandidateFilter struct {
+	MusicBrainz                   string
+	DiscogsID                     string
+	WikidataID                    string
+	Barcode                       string
+	CatalogNumber                 string
+	MusicArtist                   string
+	MusicLabel                    string
+	MusicMinimumScore             float64
 	IGDB                          string
 	Titles                        []string
 	BookTitleParts                []BookTitlePart

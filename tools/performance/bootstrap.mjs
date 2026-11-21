@@ -62,6 +62,7 @@ try {
       config.auto_cache =
       config.openlibrary_enabled =
       config.igdb_enabled =
+      config.musicbrainz_enabled =
         false;
     for (const key of Object.keys(config))
       if (key.endsWith("_secret")) config[key] = "";

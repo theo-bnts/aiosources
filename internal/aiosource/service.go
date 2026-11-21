@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/music"
 	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/store"
@@ -38,6 +39,13 @@ type Service struct {
 	booksRunning              bool
 	booksCancel               context.CancelFunc
 	booksDone                 <-chan struct{}
+	MusicHTTP                 *http.Client
+	MusicExportBase           string
+	MusicReplicationBase      string
+	musicRate                 metadataRequestLimiter
+	musicRunning              bool
+	musicCancel               context.CancelFunc
+	musicDone                 <-chan struct{}
 	Network                   *outbound.Router
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
@@ -81,6 +89,8 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	s.gameRate.setRate(3)
 	s.bookRate.setRate(1)
 	s.BookHTTP = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}
+	s.musicRate.setRate(1)
+	s.MusicHTTP = &http.Client{Transport: s.Network.Transport("metadata:musicbrainz", outbound.HTTPTransport()), CheckRedirect: trustedMusicExport}
 	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
 	s.Providers.Client.Timeout = 0 // Per-request policy supplies the deadline.
 	s.Providers.Timeout = func(ctx context.Context) (time.Duration, error) { return s.outgoingTimeout(ctx, "debrid_seconds") }
@@ -129,6 +139,9 @@ func (s *Service) Close(ctx context.Context) error {
 	if s.BookHTTP != nil {
 		defer s.BookHTTP.CloseIdleConnections()
 	}
+	if s.MusicHTTP != nil {
+		defer s.MusicHTTP.CloseIdleConnections()
+	}
 	if s.MetadataHTTP != nil {
 		defer s.MetadataHTTP.CloseIdleConnections()
 	}
@@ -173,6 +186,16 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 		return model.ErrInvalid
 	}
 	c.OpenLibraryLanguages = languages
+	musicTypes, valid := music.ImportTypes(c.MusicBrainzTypes)
+	if !valid {
+		return model.ErrInvalid
+	}
+	c.MusicBrainzTypes = musicTypes
+	musicLanguages, valid := music.ImportLanguages(c.MusicBrainzLanguages)
+	if !valid {
+		return model.ErrInvalid
+	}
+	c.MusicBrainzLanguages = musicLanguages
 	current, err := s.DB.AIOConfig(ctx)
 	if err != nil {
 		return err
@@ -186,6 +209,19 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 			return model.ErrBusy
 		}
 		defer release()
+	}
+	if store.MusicSelectionKey(current) != store.MusicSelectionKey(c) {
+		release, locked, err := s.DB.AIOLock(ctx, "musicbrainz")
+		if err != nil {
+			return err
+		}
+		if !locked {
+			return model.ErrBusy
+		}
+		defer release()
+	}
+	if c.MusicBrainzMinutes < 15 || c.MusicBrainzMinutes > 1440 {
+		return model.ErrInvalid
 	}
 	if len(c.IGDBClientID) > 128 || strings.ContainsAny(c.IGDBClientID, "\r\n\x00 ") || c.IGDBMinutes < 5 || c.IGDBMinutes > 1440 || c.IGDBRequestsPerSecond < 1 || c.IGDBRequestsPerSecond > 4 || c.IGDBReconcileDays < 1 || c.IGDBReconcileDays > 30 || c.IGDBEnabled && (c.IGDBClientID == "" || c.IGDBSecret == "") {
 		return model.ErrInvalid

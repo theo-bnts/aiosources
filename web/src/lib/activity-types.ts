@@ -6,6 +6,7 @@ export const activityServices = [
   { id: 'network', name: 'Network', to: '/network' },
   { id: 'tmdb', name: 'TMDB', to: '/metadata/videos' },
   { id: 'igdb', name: 'IGDB', to: '/metadata/games' },
+  { id: 'musicbrainz', name: 'MusicBrainz', to: '/metadata/music' },
   { id: 'openlibrary', name: 'Open Library', to: '/metadata/books' },
   ...debridProviders.map((provider) => ({ ...provider, to: '/debrid' })),
 ] as const

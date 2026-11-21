@@ -13,6 +13,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/aiosource"
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/music"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/store"
 )
@@ -35,7 +36,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 			return q, nil, model.ErrInvalid
 		}
 		switch key {
-		case "title", "author", "isbn", "t", "apikey", "q", "cat", "sources", "media", "imdbid", "tmdbid", "tvdbid", "season", "ep", "year", "limit", "offset", "extended", "attrs", "o", "minage", "maxage", "minsize", "maxsize", "services", "cached_only":
+		case "title", "author", "isbn", "artist", "album", "label", "track", "mbid", "t", "apikey", "q", "cat", "sources", "media", "imdbid", "tmdbid", "tvdbid", "season", "ep", "year", "limit", "offset", "extended", "attrs", "o", "minage", "maxage", "minsize", "maxsize", "services", "cached_only":
 		default:
 			return q, nil, model.ErrInvalid
 		}
@@ -45,7 +46,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 	if v.Has("media") {
 		q.MediaTypes = strings.Split(v.Get("media"), ",")
 		for _, typ := range q.MediaTypes {
-			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "other"}, typ) {
+			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "music", "other"}, typ) {
 				return q, v, model.ErrInvalid
 			}
 		}
@@ -67,11 +68,26 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 	q.Query = v.Get("q")
 	q.BookTitle = strings.TrimSpace(v.Get("title"))
 	q.Author = strings.TrimSpace(v.Get("author"))
-	if len(q.BookTitle) > 500 || len(q.Author) > 200 || strings.ContainsAny(q.Author+q.BookTitle, "\r\n\x00") {
+	q.Artist = strings.TrimSpace(v.Get("artist"))
+	q.Album = strings.TrimSpace(v.Get("album"))
+	q.Label = strings.TrimSpace(v.Get("label"))
+	q.Track = strings.TrimSpace(v.Get("track"))
+	if len(q.BookTitle) > 500 || len(q.Author) > 200 || strings.ContainsAny(q.Author+q.BookTitle, "\r\n\x00") ||
+		len(q.Artist) > 200 || len(q.Album) > 500 || len(q.Label) > 200 || len(q.Track) > 200 ||
+		strings.ContainsAny(q.Artist+q.Album+q.Label+q.Track, "\r\n\x00") {
 		return q, v, model.ErrInvalid
 	}
 	if (q.BookTitle != "" || q.Author != "" || v.Has("isbn")) && q.Mode != "book" {
 		return q, v, model.ErrInvalid
+	}
+	if (q.Artist != "" || q.Album != "" || q.Label != "" || q.Track != "" || v.Has("mbid")) && q.Mode != "music" {
+		return q, v, model.ErrInvalid
+	}
+	if v.Has("mbid") {
+		q.MBID = music.MBID(v.Get("mbid"))
+		if q.MBID == "" {
+			return q, v, model.ErrInvalid
+		}
 	}
 	if v.Has("isbn") {
 		q.ISBN = books.ISBN(v.Get("isbn"))
@@ -79,7 +95,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 			return q, v, model.ErrInvalid
 		}
 	}
-	if !slices.Contains([]string{"caps", "search", "movie", "tvsearch", "book"}, q.Mode) {
+	if !slices.Contains([]string{"caps", "search", "movie", "tvsearch", "book", "music"}, q.Mode) {
 		return q, v, model.ErrNotFound
 	}
 	if v.Has("o") && !strings.EqualFold(v.Get("o"), "xml") {
@@ -268,9 +284,9 @@ func torznabCaps(share model.Share, origin string) torznabCapabilities {
 	v.Limits.Max = 200
 	v.Limits.Default = 100
 	allowed := func(typ string) bool { return len(share.MediaTypes) == 0 || slices.Contains(share.MediaTypes, typ) }
-	for _, mode := range []struct{ name, params, typ string }{{"search", "q", ""}, {"tv-search", "q,imdbid,tmdbid,tvdbid,season,ep", "tv"}, {"movie-search", "q,imdbid,tmdbid,year", "movie"}, {"audio-search", "", "unsupported"}, {"book-search", "q,title,author,isbn,cat", "book"}} {
+	for _, mode := range []struct{ name, params, typ string }{{"search", "q", ""}, {"tv-search", "q,imdbid,tmdbid,tvdbid,season,ep", "tv"}, {"movie-search", "q,imdbid,tmdbid,year", "movie"}, {"audio-search", "q,artist,album,label,track,year,cat", "music"}, {"book-search", "q,title,author,isbn,cat", "book"}} {
 		available := "no"
-		if mode.typ != "unsupported" && (mode.typ == "" || allowed(mode.typ) || mode.typ == "book" && (allowed("ebook") || allowed("audiobook"))) {
+		if mode.typ == "" || allowed(mode.typ) || mode.typ == "book" && (allowed("ebook") || allowed("audiobook")) {
 			available = "yes"
 		}
 		v.Modes = append(v.Modes, torznabCapability{XMLName: xml.Name{Local: mode.name}, Available: available, Params: mode.params})
@@ -289,8 +305,16 @@ func torznabCaps(share model.Share, origin string) torznabCapabilities {
 	if allowed("ebook") || slices.Contains(share.MediaTypes, "book") {
 		v.Categories = append(v.Categories, torznabCategory{ID: 7000, Name: "Books", Subcategories: []torznabCategory{{ID: 7020, Name: "EBook"}, {ID: 7030, Name: "Comics"}}})
 	}
+	audioSubcats := []torznabCategory{}
+	if allowed("music") {
+		audioSubcats = append(audioSubcats, torznabCategory{ID: 3010, Name: "MP3"}, torznabCategory{ID: 3040, Name: "Lossless"}, torznabCategory{ID: 3050, Name: "Other"})
+	}
 	if allowed("audiobook") || slices.Contains(share.MediaTypes, "book") {
-		v.Categories = append(v.Categories, torznabCategory{ID: 3000, Name: "Audio", Subcategories: []torznabCategory{{ID: 3030, Name: "Audiobook"}}})
+		audioSubcats = append(audioSubcats, torznabCategory{ID: 3030, Name: "Audiobook"})
+	}
+	if len(audioSubcats) > 0 {
+		slices.SortFunc(audioSubcats, func(a, b torznabCategory) int { return a.ID - b.ID })
+		v.Categories = append(v.Categories, torznabCategory{ID: 3000, Name: "Audio", Subcategories: audioSubcats})
 	}
 	slices.SortFunc(v.Categories, func(a, b torznabCategory) int { return a.ID - b.ID })
 	return v
@@ -368,7 +392,7 @@ func torznabResults(result model.List[model.TorznabRecord], names map[string]str
 		if rec.Category == 7020 || rec.Category == 7030 {
 			attr("category", "7000")
 		}
-		if rec.Category == 3030 {
+		if rec.Category == 3010 || rec.Category == 3030 || rec.Category == 3040 || rec.Category == 3050 {
 			attr("category", "3000")
 		}
 		if rec.Category == 4050 {
@@ -383,6 +407,12 @@ func torznabResults(result model.List[model.TorznabRecord], names map[string]str
 			attr("booktitle", rec.BookHints.Title)
 			attr("author", rec.BookHints.Author)
 			attr("isbn", rec.BookHints.ISBN)
+		}
+		if rec.Category == 3000 || rec.Category == 3010 || rec.Category == 3040 || rec.Category == 3050 {
+			attr("artist", rec.MusicHints.Artist)
+			attr("album", rec.MusicHints.Album)
+			attr("label", rec.MusicHints.Label)
+			attr("musicbrainzid", rec.MusicBrainz)
 		}
 		if rec.Category == 5000 {
 			season, episode := rec.Season, rec.Episode

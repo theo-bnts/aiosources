@@ -7,10 +7,14 @@ import (
 
 var tmdbPoster = regexp.MustCompile(`^/[A-Za-z0-9_-]{1,128}\.(?:jpg|png|webp)$`)
 var igdbImage = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+var musicBrainzImage = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Construct image URLs from validated provider identifiers, never raw remote
 // URLs. Browsers fetch these directly; the instance stores no image bytes.
 func CoverURL(kind, poster string, cover int64) string {
+	if kind == "music" && musicBrainzImage.MatchString(poster) {
+		return "https://coverartarchive.org/release-group/" + poster + "/front-500"
+	}
 	if kind == "game" && igdbImage.MatchString(poster) {
 		return "https://images.igdb.com/igdb/image/upload/t_cover_big/" + poster + ".jpg"
 	}

@@ -41,9 +41,13 @@ function formatWorkTitle(work: ReviewWork) {
         ? work.igdb
           ? `IGDB ${work.igdb}`
           : 'Untitled game'
-        : work.tmdb
-          ? `TMDB ${work.tmdb}`
-          : 'Untitled work')
+        : work.type === 'music'
+          ? work.musicbrainz
+            ? `MusicBrainz ${work.musicbrainz}`
+            : 'Untitled release'
+          : work.tmdb
+            ? `TMDB ${work.tmdb}`
+            : 'Untitled work')
   )
 }
 
@@ -60,7 +64,9 @@ function WorkSummary({ work }: { work: ReviewWork }) {
             ? 'Book'
             : work.type === 'game'
               ? 'Game'
-              : 'Series'}{' '}
+              : work.type === 'music'
+                ? work.music?.primary_type || 'Music'
+                : 'Series'}{' '}
         · {work.years.join(', ') || 'Year unknown'}
       </p>
       <p className="mono break-words text-xs">
@@ -68,6 +74,15 @@ function WorkSummary({ work }: { work: ReviewWork }) {
           `IGDB ${work.igdb} · ${work.game?.platforms?.map((p) => p.name).join(', ') || 'Platform unknown'}`
         ) : work.type === 'book' ? (
           [work.book?.authors?.join(', '), work.openlibrary].filter(Boolean).join(' · ')
+        ) : work.type === 'music' ? (
+          [
+            work.music?.artists?.join(', '),
+            work.musicbrainz && `MBID ${work.musicbrainz}`,
+            work.music?.discogs_ids?.[0] && `Discogs ${work.music.discogs_ids[0]}`,
+            work.music?.wikidata_id,
+          ]
+            .filter(Boolean)
+            .join(' · ')
         ) : (
           <>
             {work.imdb && `${work.imdb} · `}TMDB {work.tmdb}
@@ -263,11 +278,21 @@ function ReviewForm({
           <p className="mono break-words text-xs">
             {[
               detail.record.igdb && `IGDB ${detail.record.igdb}`,
+              detail.record.musicbrainz && `MBID ${detail.record.musicbrainz}`,
               detail.record.imdb,
               detail.record.tmdb && `TMDB ${detail.record.tmdb}`,
               detail.record.tvdb && `TVDB ${detail.record.tvdb}`,
               detail.book_evidence?.isbn && `ISBN ${detail.book_evidence.isbn}`,
               detail.book_evidence?.openlibrary,
+              detail.music_evidence?.mbid &&
+                detail.music_evidence.mbid !== detail.record.musicbrainz &&
+                `MBID ${detail.music_evidence.mbid}`,
+              detail.music_evidence?.discogs_id && `Discogs ${detail.music_evidence.discogs_id}`,
+              detail.music_evidence?.wikidata_id && `Wikidata ${detail.music_evidence.wikidata_id}`,
+              detail.music_evidence?.barcode && `Barcode ${detail.music_evidence.barcode}`,
+              detail.music_evidence?.catalog_number &&
+                `CatNo ${detail.music_evidence.catalog_number}`,
+              detail.music_evidence?.artist && `Artist ${detail.music_evidence.artist}`,
             ]
               .filter(Boolean)
               .join(' · ') || 'None supplied'}

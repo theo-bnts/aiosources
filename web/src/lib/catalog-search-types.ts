@@ -2,12 +2,18 @@ import type { DebridService } from '@/lib/debrid'
 export type CatalogTitle = {
   ranking?: { precision: number; relevance: number; year: number }
   id: number
-  type: 'movie' | 'tv' | 'book' | 'game'
+  type: 'movie' | 'tv' | 'book' | 'game' | 'music'
   igdb?: string
   platforms?: { id: number; name: string; slug: string }[]
   cover?: string
   openlibrary?: string
   authors?: string[]
+  musicbrainz?: string
+  artists?: string[]
+  music_type?: string
+  labels?: string[]
+  discogs_ids?: string[]
+  wikidata_id?: string
   title: string
   years: number[]
   tmdb: string

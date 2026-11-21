@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/music"
 )
 
 const aioPublishedMatch = `m.status='matched' AND m.fingerprint=t.fields_fingerprint AND m.revision=w.revision
@@ -32,7 +33,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,w.igdb_id,w.game_data->'platforms'`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,w.igdb_id,w.game_data->'platforms',w.musicbrainz_id,w.music_data`
 }
 
 func catalogYearFilter(year string) string {
@@ -47,11 +48,24 @@ func scanCatalogTitle(row scanner, prefix ...any) (model.CatalogTitle, error) {
 	var title model.CatalogTitle
 	var poster string
 	var cover int64
-	var platforms []byte
-	dest := append(append([]any{}, prefix...), &title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms)
+	var platforms, musicData []byte
+	dest := append(append([]any{}, prefix...), &title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms, &title.MusicBrainz, &musicData)
 	err := row.Scan(dest...)
 	if err == nil && len(platforms) > 0 && string(platforms) != "null" {
 		err = json.Unmarshal(platforms, &title.Platforms)
+	}
+	if err == nil && title.Type == "music" && len(musicData) > 0 && string(musicData) != "null" {
+		var info model.MusicInformation
+		if err = json.Unmarshal(musicData, &info); err == nil {
+			title.Artists = info.Artists
+			if len(title.Artists) == 0 && info.ArtistCredit != "" {
+				title.Artists = []string{info.ArtistCredit}
+			}
+			title.MusicType = info.PrimaryType
+			title.Labels = info.Labels
+			title.DiscogsIDs = info.DiscogsIDs
+			title.WikidataID = info.WikidataID
+		}
 	}
 	title.Cover = model.CoverURL(title.Type, poster, cover)
 	return title, err
@@ -87,9 +101,17 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	identity := strings.TrimSpace(opts.Query)
 	if key := books.Key(identity); books.WorkKey(key) {
 		identity = key
+	} else if mbid := music.MBID(identity); mbid != "" {
+		identity = mbid
+	} else if wd := music.WikidataID(identity); wd != "" {
+		identity = wd
+	} else if did := music.DiscogsID(identity); did != "" {
+		identity = did
 	}
 	if isbn := books.ISBN(identity); isbn != "" {
 		identity = isbn
+	} else if bc := music.Barcode(identity); bc != "" {
+		identity = bc
 	}
 	kinds := model.SelectionValues(filters.Type)
 	media := []string{}
@@ -110,10 +132,14 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		bookScope = catalogBookScope
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
+	musicExtras := ""
+	if len(media) == 0 || slices.Contains(media, "music") {
+		musicExtras = musicCatalogCandidates("$1", "$3", matching)
+	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
  SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
- public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + `) matches GROUP BY id) candidates
+ public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + musicExtras + `) matches GROUP BY id) candidates
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")

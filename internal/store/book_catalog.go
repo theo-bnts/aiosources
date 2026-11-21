@@ -53,7 +53,7 @@ func expandTorznabCategories(cats []int) []int {
 			out = append(out, 7020, 7030)
 		}
 		if c == 3000 {
-			out = append(out, 3030)
+			out = append(out, 3010, 3030, 3040, 3050, 3060)
 		}
 		if c == 4000 {
 			out = append(out, 4050)

@@ -32,6 +32,7 @@ test('category requests preserve selected formats and query books once without d
     [
       { category: 'Videos', type: 'movie,tv', limit: 50, offset: 0 },
       { category: 'Games', type: 'game', limit: 50, offset: 0 },
+      { category: 'Music', type: 'music', limit: 50, offset: 0 },
       { category: 'Books', type: 'ebook,audiobook,book', limit: 50, offset: 0 },
     ],
   )
@@ -83,8 +84,8 @@ test('late categories use SQL ranking, including stored years and stable identif
 })
 
 test('bounded category prefixes produce the same global page and total at every supported size', () => {
-  const kinds = ['movie', 'game', 'book'] as const
-  const all = Array.from({ length: 240 }, (_, i) => title(i + 1, kinds[i % 3], 2100 - i))
+  const kinds = ['movie', 'game', 'book', 'music'] as const
+  const all = Array.from({ length: 240 }, (_, i) => title(i + 1, kinds[i % 4], 2100 - i))
   for (const limit of [25, 50, 100]) {
     for (const offset of [0, 25, 100, 175]) {
       const plan = catalogSearchPlan('', limit, offset)
@@ -92,7 +93,7 @@ test('bounded category prefixes produce the same global page and total at every 
         assert.ok(offset + limit > 200)
         assert.equal(plan.requests.length, 1)
         assert.equal(plan.requests[0].offset, offset)
-        assert.equal(plan.requests[0].categories, 3)
+        assert.equal(plan.requests[0].categories, 4)
         continue
       }
       const pages = kinds.map((kind) => {

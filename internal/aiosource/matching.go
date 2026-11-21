@@ -246,6 +246,9 @@ func WorkCandidate(w model.AIOWork) Candidate {
 	if w.Type == "book" {
 		source, id = "openlibrary", w.OpenLibrary
 	}
+	if w.Type == "music" {
+		source, id = "musicbrainz", w.MusicBrainz
+	}
 	return Candidate{EntryID: itoa64(w.ID), WorkID: itoa64(w.ID), Source: source, SourceID: id, Type: w.Type, Titles: w.Titles, Years: w.Years, SeasonYears: w.SeasonYears, EpisodeYears: w.EpisodeYears, IDs: map[string]string{"imdb": w.IMDb, "tvdb": w.TVDB}}
 }
 

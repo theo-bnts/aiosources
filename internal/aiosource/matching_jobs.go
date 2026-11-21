@@ -74,6 +74,9 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 	if game := ParseGameRelease(r); game.Game {
 		return decideGame(r, game, find)
 	}
+	if track := ParseMusicRelease(r); track.Kind != "" {
+		return decideMusic(r, track, find)
+	}
 	p := withSourceNumbering(ParseRelease(r.Title), SourceEpisode{r.Season, r.Episode})
 	r.Normalized = p.Normalized
 	r.IdentificationType = p.Type

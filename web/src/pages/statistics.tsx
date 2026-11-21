@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { number, useDate } from '@/lib/format'
-import { bookSyncLabel, metadataSyncLabel } from '@/lib/information-sync'
+import { bookSyncLabel, metadataSyncLabel, musicSyncLabel } from '@/lib/information-sync'
 
 export function SourceStatisticsPage() {
   const location = useLocation()
@@ -147,9 +147,10 @@ export function SourceStatisticsPage() {
 export function AIOStatisticsPage({
   section,
 }: {
-  section: 'videos' | 'games' | 'books' | 'debrid'
+  section: 'videos' | 'games' | 'books' | 'music' | 'debrid'
 }) {
   if (section === 'games') return <GameStatisticsPage />
+  if (section === 'music') return <MusicStatisticsPage />
   return section === 'debrid' ? (
     <DebridStatisticsPage />
   ) : (
@@ -430,6 +431,141 @@ function GameStatisticsPage() {
                   }
                   size="sm"
                 />
+              </dl>
+            </Disclosure>
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+function MusicStatisticsPage() {
+  const date = useDate()
+  const query = useQuery({
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+  })
+  const status = query.data
+  const music = status?.music
+  const resetting =
+    status?.maintenance?.status === 'running' &&
+    (status.maintenance.scope === 'music' || status.maintenance.scope === 'metadata')
+  const automatic = Boolean(status?.config.musicbrainz_enabled)
+  const needsAttention = Boolean(music?.error || music?.needs_export || music?.schema_unsupported)
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading label="Loading statistics" />
+      ) : (
+        music && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Statistic label="Release groups" value={music.works} />
+              <Statistic label="Releases" value={music.releases} />
+              <Statistic label="Artists" value={music.artists} />
+              <Statistic label="Cover Art Archive covers" value={music.covers} />
+            </dl>
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Statistic
+                label="Synchronization"
+                value={resetting ? 'Resetting information' : musicSyncLabel(music, automatic)}
+                size="sm"
+                to="/metadata/music/settings"
+              />
+              <Statistic
+                label="Update feed"
+                value={
+                  music.live_enabled
+                    ? music.replication_sequence > 0
+                      ? `Live Data Feed (#${number(music.replication_sequence)})`
+                      : 'Live Data Feed (waiting for dump)'
+                    : 'Full exports (CC0)'
+                }
+                size="sm"
+                to="/metadata/music/settings"
+              />
+              <Statistic
+                label="Last successful update"
+                value={music.last_sync ? date(music.last_sync) : 'No completed update'}
+                size="sm"
+                to="/metadata/music/history"
+              />
+              <Statistic
+                label="Changes applied through"
+                value={music.changes_through ? date(music.changes_through) : 'Not established'}
+                size="sm"
+                to="/metadata/music/history"
+              />
+              <Statistic
+                label="Export date"
+                value={music.snapshot_at ? date(music.snapshot_at, 'date') : 'Not established'}
+                size="sm"
+              />
+              <Statistic
+                label="Next automatic update"
+                value={
+                  resetting
+                    ? 'Waiting for reset'
+                    : music.running
+                      ? 'Running'
+                      : !automatic
+                        ? 'Disabled'
+                        : music.next_update
+                          ? date(music.next_update)
+                          : 'Waiting'
+                }
+                size="sm"
+                to="/metadata/music/settings"
+              />
+            </dl>
+            <div className="flex flex-wrap gap-2" aria-label="Current activity">
+              <Link to="/metadata/music/history" aria-label="View update history">
+                <Badge
+                  variant={
+                    music.running || resetting ? 'info' : needsAttention ? 'warning' : 'secondary'
+                  }
+                >
+                  {resetting
+                    ? 'Reset in progress'
+                    : music.running
+                      ? 'Update running'
+                      : needsAttention
+                        ? 'Update needs attention'
+                        : 'Update idle'}
+                </Badge>
+              </Link>
+            </div>
+            <Disclosure title="Import details">
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-sm text-muted-foreground">Export snapshot</dt>
+                  <dd className="mt-1 font-medium mono">{music.snapshot || 'Not established'}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">MusicBrainz schema</dt>
+                  <dd className="mt-1 font-medium tabular-nums">
+                    {music.schema_sequence > 0 ? `#${music.schema_sequence}` : 'Not established'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Labels</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(music.labels)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Rows read from exports</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(music.position)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Excluded by catalog filters</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(music.filtered)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Unreadable records</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(music.skipped)}</dd>
+                </div>
               </dl>
             </Disclosure>
           </>

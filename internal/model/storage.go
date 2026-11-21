@@ -193,6 +193,9 @@ type StorageOverview struct {
 var compactTorrentKeys = []string{
 	"title", "name", "info_hash", "infohash", "hash", "size", "published_at", "duration",
 	"isbn", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "author", "authors", "book_title", "book_format", "category_name", "subcategory_name",
+	"musicbrainz", "musicbrainz_id", "mbid", "musicbrainz_release_group_id", "musicbrainz_release_id", "musicbrainz_artist_id", "release_mbid", "artist_mbid",
+	"discogs", "discogs_id", "discogs_master_id", "discogs_release_id", "wikidata", "wikidata_id",
+	"barcode", "upc", "ean", "catalog_number", "catno", "label", "record_label", "artist", "artists", "album_artist", "album", "album_title", "music_format", "audio_format",
 	"category", "categories", "category_id", "subcategory_id", "type", "media_type", "year",
 	"imdb", "imdb_id", "tt_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id", "igdb", "igdb_id", "platform", "platforms", "game_platform",
 	"season", "seasons", "episode", "episodes", "episode_start", "episode_end",
@@ -203,10 +206,18 @@ var compactTorrentKeys = []string{
 	"private", "external_ids", "attributes", "metadata",
 }
 
-var compactIdentifierKeys = []string{"isbn", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "imdb", "imdb_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id", "igdb", "igdb_id"}
+var compactIdentifierKeys = []string{
+	"isbn", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id",
+	"musicbrainz", "musicbrainz_id", "mbid", "musicbrainz_release_group_id", "musicbrainz_release_id", "musicbrainz_artist_id", "release_mbid", "artist_mbid",
+	"discogs", "discogs_id", "discogs_master_id", "discogs_release_id", "wikidata", "wikidata_id", "barcode", "upc", "ean",
+	"imdb", "imdb_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id", "igdb", "igdb_id",
+}
 
 var compactAttributeKeys = []string{
 	"isbn", "isbn10", "isbn13", "isbn_10", "isbn_13", "openlibrary", "openlibrary_id", "author", "authors", "booktitle", "book_title", "book_format",
+	"musicbrainz", "musicbrainz_id", "mbid", "musicbrainz_release_group_id", "musicbrainz_release_id", "musicbrainz_artist_id", "release_mbid", "artist_mbid",
+	"discogs", "discogs_id", "discogs_master_id", "discogs_release_id", "wikidata", "wikidata_id",
+	"barcode", "upc", "ean", "catalog_number", "catno", "label", "record_label", "artist", "artists", "album_artist", "album", "album_title", "music_format", "audio_format",
 	"imdb", "imdbid", "tmdb", "tmdbid", "tvdb", "tvdbid", "mal", "malid", "igdb", "igdbid", "igdb_id", "platform", "platforms", "game_platform",
 	"season", "seasons", "episode", "episodes", "audiolangs", "languages", "language", "sublangs",
 	"category", "categories", "size", "infohash",

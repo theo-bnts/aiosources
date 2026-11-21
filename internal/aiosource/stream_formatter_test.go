@@ -130,4 +130,18 @@ func TestFormatterShowsOnlyUsableBibliographicDetails(t *testing.T) {
 	if label := strings.Join(formatReleasePresentation(audio, Behavior{}).Details, "\n"); !strings.Contains(label, "📖 Audiobook • M4B") {
 		t.Fatal(label)
 	}
+	musicRecord := model.AIORecord{
+		Title:      "Daft Punk - Discovery (2001) [FLAC]",
+		MusicHints: model.MusicHints{Kind: "lossless", Artist: "Daft Punk", CatalogNumber: "V2940"},
+	}
+	musicDetails := formatReleasePresentation(musicRecord, Behavior{}).Details
+	wantMusic := []string{"🎵 Lossless", "🎤 Daft Punk", "🏷️ V2940"}
+	if !reflect.DeepEqual(musicDetails[:min(len(musicDetails), 3)], wantMusic) {
+		t.Fatal(musicDetails, wantMusic)
+	}
+	musicRecord.MusicHints.Artist = "https://private.example/credential"
+	musicRecord.MusicHints.CatalogNumber = "https://private.example/catno"
+	if label := strings.Join(formatReleasePresentation(musicRecord, Behavior{}).Details, "\n"); strings.Contains(label, "private.example") {
+		t.Fatal("unvalidated music fields entered public presentation", label)
+	}
 }

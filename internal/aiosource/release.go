@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/music"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -40,6 +41,14 @@ func ParseID(id, mediaType string) (Resource, error) {
 			return r, errors.New("invalid book resource")
 		}
 		r.Kind, r.ID = "openlibrary", key
+		return r, nil
+	}
+	if mediaType == "music" {
+		key, ok := strings.CutPrefix(id, "musicbrainz:")
+		if !ok || music.MBID(key) == "" || music.MBID(key) != key {
+			return r, errors.New("invalid music resource")
+		}
+		r.Kind, r.ID = "musicbrainz", key
 		return r, nil
 	}
 	m := resourceRE.FindStringSubmatch(strings.TrimSpace(id))
@@ -378,7 +387,7 @@ func fileNumbering(path string) Release {
 }
 
 func SelectFile(files []model.AIOFile, r Resource) (model.AIOFile, bool) {
-	if r.Type == "torrent" || r.Type == "game" {
+	if r.Type == "torrent" || r.Type == "game" || r.Type == "music" {
 		return selectDownloadFile(files, r)
 	}
 	if r.Type == "book" {

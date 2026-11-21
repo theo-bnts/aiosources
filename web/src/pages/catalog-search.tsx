@@ -61,10 +61,14 @@ function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?
           ? 'Book'
           : title.type === 'game'
             ? 'Game'
-            : 'Series'}
+            : title.type === 'music'
+              ? title.music_type || 'Music'
+              : 'Series'}
       {!!title.platforms?.length && ` · ${title.platforms.map((p) => p.name).join(', ')}`}
       {!!title.authors?.length && ` · ${title.authors.join(', ')}`}
+      {!!title.artists?.length && ` · ${title.artists.join(', ')}`}
       {title.years.length > 0 && ` · ${title.years.join(', ')}`}
+      {!!title.labels?.length && !compact && ` · ${title.labels.slice(0, 3).join(', ')}`}
       {title.imdb && ` · ${title.imdb}`}
     </p>
   )
@@ -120,7 +124,7 @@ export function CatalogSearchPage() {
             minLength={2}
             maxLength={500}
             required
-            placeholder="Search movies, series, games and books"
+            placeholder="Search movies, series, games, music and books"
           />
         </div>
         <Disclosure title="Filters">
@@ -208,6 +212,7 @@ export function CatalogSearchPage() {
                             src={title.cover}
                             book={title.type === 'book'}
                             game={title.type === 'game'}
+                            music={title.type === 'music'}
                           />
                           <div className="min-w-0">
                             <Link
@@ -379,6 +384,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                 src={title.data.cover}
                 book={title.data.type === 'book'}
                 game={title.data.type === 'game'}
+                music={title.data.type === 'music'}
                 large
               />
               <div className="min-w-0 space-y-2">
@@ -393,6 +399,42 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                     View on Open Library
                   </a>
                 )}
+                {title.data.musicbrainz &&
+                  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+                    title.data.musicbrainz,
+                  ) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <a
+                        className="data-link text-sm"
+                        href={`https://musicbrainz.org/release-group/${title.data.musicbrainz}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View on MusicBrainz
+                      </a>
+                      {title.data.discogs_ids?.[0] &&
+                        /^(?:master|release):[1-9][0-9]*$/.test(title.data.discogs_ids[0]) && (
+                          <a
+                            className="data-link text-sm"
+                            href={`https://www.discogs.com/${title.data.discogs_ids[0].replace(':', '/')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on Discogs
+                          </a>
+                        )}
+                      {title.data.wikidata_id && /^Q[1-9][0-9]*$/.test(title.data.wikidata_id) && (
+                        <a
+                          className="data-link text-sm"
+                          href={`https://www.wikidata.org/wiki/${title.data.wikidata_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View on Wikidata
+                        </a>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
             <section aria-label="Source release filters" className="space-y-4">

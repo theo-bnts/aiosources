@@ -68,6 +68,7 @@ test('metadata catalogs and credential creation links have consistent navigation
   for (const [section, label] of [
     ['videos', 'Videos'],
     ['games', 'Games'],
+    ['music', 'Music'],
     ['books', 'Books'],
   ]) {
     await page.goto(`/metadata/${section}/settings`)
@@ -80,14 +81,21 @@ test('metadata catalogs and credential creation links have consistent navigation
     )
     if (section !== 'books') {
       const link = page.getByRole('link', {
-        name: section === 'videos' ? 'Create TMDB credentials' : 'Create Twitch credentials',
+        name:
+          section === 'videos'
+            ? 'Create TMDB credentials'
+            : section === 'games'
+              ? 'Create Twitch credentials'
+              : 'Get a MetaBrainz Live Data Feed token',
         exact: true,
       })
       await expect(link).toHaveAttribute(
         'href',
         section === 'videos'
           ? 'https://www.themoviedb.org/settings/api/request'
-          : 'https://dev.twitch.tv/console/apps/create',
+          : section === 'games'
+            ? 'https://dev.twitch.tv/console/apps/create'
+            : 'https://metabrainz.org/profile',
       )
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }

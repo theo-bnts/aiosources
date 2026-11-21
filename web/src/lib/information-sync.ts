@@ -1,4 +1,4 @@
-import type { BookStatus, Status } from './aiosource-types'
+import type { BookStatus, MusicStatus, Status } from './aiosource-types'
 
 export function metadataSyncLabel(
   status: Pick<
@@ -34,4 +34,21 @@ export function bookSyncLabel(status: BookStatus, automatic = true): string {
   if (!automatic && !status.running) return 'Automatic updates disabled'
   if (status.running) return 'Checking changes'
   return status.changes_through ? 'Following changes' : 'Preparing change tracking'
+}
+
+export function musicSyncLabel(status: MusicStatus, automatic = true): string {
+  if (status.schema_unsupported) return 'Update required (new schema)'
+  if (status.running) {
+    if (status.phase === 'recovery') return 'Recovering catalog'
+    if (status.phase === 'covers') return 'Importing cover index'
+    if (status.phase === 'project') return 'Building music catalog'
+    if (status.phase === 'replication') return 'Applying Live Data Feed'
+    return 'Importing catalog'
+  }
+  if (!status.complete) return status.position > 0 ? 'Import interrupted' : 'Not started'
+  if (status.needs_export) return 'Full export recovery pending'
+  if (status.error) return 'Retry pending'
+  if (!automatic) return 'Automatic updates disabled'
+  if (status.live_enabled) return 'Following Live Data Feed'
+  return status.snapshot ? 'Following full exports' : 'Not started'
 }

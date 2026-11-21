@@ -4,6 +4,7 @@ import "time"
 
 // Reviews are separate from imported fields and may be undone independently.
 type AIOMatchReview struct {
+	MusicBrainz     string    `json:"musicbrainz,omitempty"`
 	IGDB            string    `json:"igdb,omitempty"`
 	OpenLibrary     string    `json:"openlibrary,omitempty"`
 	SourceChanged   bool      `json:"source_changed"`
@@ -19,6 +20,7 @@ type AIOMatchReview struct {
 }
 
 type AIOReviewDetail struct {
+	MusicEvidence  MusicHints      `json:"music_evidence,omitzero"`
 	BookEvidence   BookHints       `json:"book_evidence,omitzero"`
 	SuggestedYear  *int            `json:"suggested_year"`
 	SuggestedQuery string          `json:"suggested_query"`
