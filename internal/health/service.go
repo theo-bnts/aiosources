@@ -103,6 +103,7 @@ func (s *Service) measure(ctx context.Context) {
 				report.Database.Categories = []model.HealthStorageCategory{}
 			}
 			report.SourceStorage = slices.Clone(previous.SourceStorage)
+			report.MetadataStorage = slices.Clone(previous.MetadataStorage)
 		}
 		report.CheckedAt = time.Now().UTC()
 		report.NextCheckAt = report.CheckedAt.Add(time.Minute)

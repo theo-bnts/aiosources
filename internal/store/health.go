@@ -110,6 +110,15 @@ WHERE c.relkind IN ('r','m') AND n.nspname !~ '^pg_' AND n.nspname<>'information
 		}
 	}
 	if estimateTx, err := tx.Begin(ctx); err == nil {
+		if estimates, err := metadataStorageEstimates(ctx, estimateTx); err == nil {
+			if err := estimateTx.Commit(ctx); err == nil {
+				report.MetadataStorage = estimates
+			}
+		} else {
+			rollback(estimateTx)
+		}
+	}
+	if estimateTx, err := tx.Begin(ctx); err == nil {
 		imports, total, cancelled, err := importStorageEstimates(ctx, estimateTx)
 		if err == nil {
 			if err := estimateTx.Commit(ctx); err == nil {

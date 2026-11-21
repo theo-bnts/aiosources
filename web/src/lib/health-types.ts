@@ -11,6 +11,7 @@ export type SystemHealth = {
     categories: StorageCategory[]
   }
   source_storage?: Array<{ provider_id: string; bytes: number }>
+  metadata_storage?: MetadataStorageEstimate[]
   retained_import_count?: number
   cancelled_import_count?: number
   import_storage_available?: boolean
@@ -39,4 +40,12 @@ export type StorageCategory = {
   table_bytes: number
   index_bytes: number
   details?: StorageCategory[]
+}
+
+export type MetadataStorageEstimate = {
+  type: 'videos' | 'games' | 'software' | 'music' | 'books' | string
+  bytes: number
+  table_bytes: number
+  index_bytes: number
+  estimated?: boolean
 }

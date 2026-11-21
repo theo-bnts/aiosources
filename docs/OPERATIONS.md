@@ -59,7 +59,7 @@ Historical error counts include earlier attempts and do not necessarily mean the
 
 ## Storage and retention
 
-**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series, game, software, music and book information and shared caches are counted separately.
+**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Expand **Metadata** to see space allocated by each metadata catalog (Videos, Games, Software, Music and Books), alongside shared identification data and queues. Shared debrid caches are counted separately.
 
 In **Storage → Settings**, choose what to retain in **Torrent data**. Required search, identification and playback information is always kept. Extra source fields can be selected individually; successful processed records, their field copies and published-change history are separate choices. Each option shows its relative storage and performance impact.
 

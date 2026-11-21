@@ -29,16 +29,29 @@ type HealthDisk struct {
 }
 
 type SystemHealth struct {
-	CheckedAt              time.Time               `json:"checked_at"`
-	Status                 string                  `json:"status"`
-	Database               HealthDatabase          `json:"database"`
-	Disk                   HealthDisk              `json:"disk"`
-	NextCheckAt            time.Time               `json:"next_check_at"`
-	SourceStorage          []SourceStorageEstimate `json:"source_storage,omitempty"`
-	RetainedImports        []ImportStorageEstimate `json:"retained_imports,omitempty"`
-	RetainedImportCount    int64                   `json:"retained_import_count"`
-	CancelledImportCount   int64                   `json:"cancelled_import_count"`
-	ImportStorageAvailable bool                    `json:"import_storage_available"`
+	CheckedAt              time.Time                 `json:"checked_at"`
+	Status                 string                    `json:"status"`
+	Database               HealthDatabase            `json:"database"`
+	Disk                   HealthDisk                `json:"disk"`
+	NextCheckAt            time.Time                 `json:"next_check_at"`
+	SourceStorage          []SourceStorageEstimate   `json:"source_storage,omitempty"`
+	MetadataStorage        []MetadataStorageEstimate `json:"metadata_storage,omitempty"`
+	RetainedImports        []ImportStorageEstimate   `json:"retained_imports,omitempty"`
+	RetainedImportCount    int64                     `json:"retained_import_count"`
+	CancelledImportCount   int64                     `json:"cancelled_import_count"`
+	ImportStorageAvailable bool                      `json:"import_storage_available"`
+}
+
+// MetadataStorageEstimate reports allocated PostgreSQL space per metadata
+// catalog type (videos, games, software, music, books). Dedicated catalog
+// tables are measured directly; shared aio_works/aio_titles tables are
+// apportioned from PostgreSQL ANALYZE statistics when available.
+type MetadataStorageEstimate struct {
+	Type       string `json:"type"`
+	Bytes      int64  `json:"bytes"`
+	TableBytes int64  `json:"table_bytes"`
+	IndexBytes int64  `json:"index_bytes"`
+	Estimated  bool   `json:"estimated,omitempty"`
 }
 
 // Only administrative identities and storage estimates, never source payloads.

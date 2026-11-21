@@ -54,7 +54,7 @@ const explanations: Record<string, string> = {
   'source-history':
     'Collection diagnostics and published changes. Diagnostic content follows the history retention policy; evidence needed to resume unfinished work can remain.',
   information:
-    'Local titles, identifiers, seasons, book editions and authors used for identification.',
+    'Local video, game, software, music and book catalog data used for Search and identification.',
   identification: 'Current identification decisions, manual reviews and pending work.',
   'information-queue': 'The information inventory and durable work waiting for an update.',
   availability:
@@ -124,6 +124,88 @@ function AllocationDetails({ category }: { category: StorageCategory }) {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+const metadataCatalogOrder = ['videos', 'games', 'software', 'music', 'books'] as const
+
+const metadataCatalogLabels: Record<string, string> = {
+  videos: 'Videos',
+  games: 'Games',
+  software: 'Software',
+  music: 'Music',
+  books: 'Books',
+}
+
+const metadataCatalogPaths: Record<string, string> = {
+  videos: '/metadata/videos',
+  games: '/metadata/games',
+  software: '/metadata/software',
+  music: '/metadata/music',
+  books: '/metadata/books',
+}
+
+function metadataCatalogOrderIndex(kind: string) {
+  const index = metadataCatalogOrder.indexOf(kind as (typeof metadataCatalogOrder)[number])
+  return index >= 0 ? index : metadataCatalogOrder.length
+}
+
+function MetadataStorageDetails({ report }: { report: SystemHealth }) {
+  const items = [...(report.metadata_storage ?? [])].sort(
+    (a, b) =>
+      b.bytes - a.bytes ||
+      metadataCatalogOrderIndex(a.type) - metadataCatalogOrderIndex(b.type) ||
+      a.type.localeCompare(b.type),
+  )
+  if (!items.length) return null
+  return (
+    <div className="space-y-3">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <h3 className="text-sm font-medium">By metadata type</h3>
+        <InfoTip label="By metadata type">
+          Dedicated catalog tables (TMDB seasons and inventory, IGDB state, Software
+          NVD/WinGet/Homebrew tables, MusicBrainz and Cover Art Archive tables, and Open Library
+          tables) are measured directly. Shared work and title tables are apportioned from
+          PostgreSQL statistics once analyzed. Identification decisions and global state remain
+          counted separately above.
+        </InfoTip>
+      </div>
+      <ResultCount total={items.length} label="metadata types" />
+      <div className="table-frame">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Catalog</TableHead>
+              <TableHead className="text-right">Data</TableHead>
+              <TableHead className="text-right">Indexes</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => {
+              const label = metadataCatalogLabels[item.type] || item.type
+              const path = metadataCatalogPaths[item.type]
+              return (
+                <TableRow key={item.type}>
+                  <TableCell className="min-w-40 whitespace-normal">
+                    {path ? (
+                      <Link className="data-link" to={path}>
+                        {label}
+                      </Link>
+                    ) : (
+                      label
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right mono">{bytes(item.table_bytes)}</TableCell>
+                  <TableCell className="text-right mono">{bytes(item.index_bytes)}</TableCell>
+                  <TableCell className="text-right mono">{bytes(item.bytes)}</TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }
@@ -396,6 +478,9 @@ export function StorageBreakdown({ report }: { report: SystemHealth }) {
                           <div className="min-w-0 space-y-4 overflow-hidden">
                             <AllocationDetails category={category} />
                             {category.key === 'sources' && <SourceStorageDetails report={report} />}
+                            {category.key === 'metadata' && (
+                              <MetadataStorageDetails report={report} />
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

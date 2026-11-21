@@ -198,6 +198,43 @@ for (const width of [1440, 390]) {
             free_bytes: 8000000000,
           },
           source_storage: [{ provider_id: 'local-synthetic', bytes: 1500000000 }],
+          metadata_storage: [
+            {
+              type: 'books',
+              bytes: 180000000,
+              table_bytes: 130000000,
+              index_bytes: 50000000,
+              estimated: true,
+            },
+            {
+              type: 'music',
+              bytes: 100000000,
+              table_bytes: 75000000,
+              index_bytes: 25000000,
+              estimated: true,
+            },
+            {
+              type: 'software',
+              bytes: 60000000,
+              table_bytes: 45000000,
+              index_bytes: 15000000,
+              estimated: true,
+            },
+            {
+              type: 'videos',
+              bytes: 40000000,
+              table_bytes: 30000000,
+              index_bytes: 10000000,
+              estimated: true,
+            },
+            {
+              type: 'games',
+              bytes: 20000000,
+              table_bytes: 15000000,
+              index_bytes: 5000000,
+              estimated: true,
+            },
+          ],
           import_storage_available: true,
           retained_import_count: 1,
           cancelled_import_count: 1,
@@ -261,6 +298,24 @@ for (const width of [1440, 390]) {
       storage.getByRole('link', { name: /Open import from Readable source name/ }),
     ).toHaveAttribute('href', '/runs/synthetic-cancelled')
     await expect(storage.getByText('Cancelled', { exact: true })).toBeVisible()
+    const metadata = storage.getByRole('button', { name: 'Metadata', exact: true })
+    await metadata.click()
+    await expect(metadata).toHaveAttribute('aria-expanded', 'true')
+    await expect(
+      storage.getByRole('heading', { name: 'By metadata type', exact: true }),
+    ).toBeVisible()
+    for (const [label, path] of [
+      ['Books', '/metadata/books'],
+      ['Music', '/metadata/music'],
+      ['Software', '/metadata/software'],
+      ['Videos', '/metadata/videos'],
+      ['Games', '/metadata/games'],
+    ]) {
+      await expect(storage.getByRole('link', { name: label, exact: true })).toHaveAttribute(
+        'href',
+        path,
+      )
+    }
     expect(
       await storage
         .locator('[data-slot="table-container"]')
