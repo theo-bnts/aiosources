@@ -155,7 +155,7 @@ add(
   [
     [
       'metadata.music-key',
-      'MetaBrainz Live Data Feed token',
+      'MetaBrainz Live Data Feed token (optional)',
       'replication hourly updates metabrainz token',
     ],
     [
