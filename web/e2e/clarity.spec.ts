@@ -171,7 +171,7 @@ test('closing an edited secret asks before discarding and never stores plaintext
   await page.getByRole('button', { name: 'Add AllDebrid key', exact: true }).click()
   const editor = page.getByRole('dialog')
   await editor.getByLabel('AllDebrid API key', { exact: true }).fill('synthetic-unsaved-key')
-  await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await editor.getByRole('button', { name: 'Close', exact: true }).click()
   const prompt = page.getByRole('alertdialog')
   await expect(prompt).toContainText('new secret')
   await prompt.getByRole('button', { name: 'Keep editing' }).click()
@@ -189,7 +189,7 @@ test('closing an edited secret asks before discarding and never stores plaintext
   expect(storage).not.toContain('synthetic-unsaved-key')
   await page.getByRole('button', { name: 'Add AllDebrid key', exact: true }).click()
   await expect(editor.getByLabel('AllDebrid API key', { exact: true })).toHaveValue('')
-  await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await editor.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(prompt).toHaveCount(0)
 })
 

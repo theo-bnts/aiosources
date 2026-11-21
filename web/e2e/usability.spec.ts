@@ -139,7 +139,7 @@ test('inline credentials stay encrypted, retry one owned reference and require a
     .getByRole('dialog')
     .getByLabel('TMDB read access token', { exact: true })
     .fill('synthetic-cancelled-value')
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click()
   await page
     .getByRole('alertdialog')
     .getByRole('button', { name: 'Discard changes', exact: true })

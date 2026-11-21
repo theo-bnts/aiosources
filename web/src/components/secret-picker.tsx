@@ -1,4 +1,4 @@
-import { KeyIcon, ArrowClockwiseIcon, XIcon, FloppyDiskIcon } from '@phosphor-icons/react'
+import { KeyIcon, ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
 import { useId, useState, type ReactNode } from 'react'
 import { compareListNames } from '@/lib/list-view'
 import { newSecretReference } from '@/lib/secret-reference'
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -258,12 +257,6 @@ export function SecretPicker({
                 </div>
               )}
               <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" disabled={editorBusy}>
-                    <XIcon aria-hidden="true" />
-                    Cancel
-                  </Button>
-                </DialogClose>
                 <Button
                   type="submit"
                   variant={editor.replacing ? 'warning' : 'default'}
