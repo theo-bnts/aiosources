@@ -42,11 +42,11 @@ const musicCandidateIDsSQL = `WITH candidate_ids AS (
  UNION SELECT w.id FROM aiosources.mb_release_labels rl JOIN aiosources.mb_releases r ON r.id=rl.release_id JOIN aiosources.mb_release_groups rg ON rg.id=r.release_group_id JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid
   WHERE $6<>'' AND rl.catalog_normalized=$6
  UNION SELECT id FROM aiosources.aio_works WHERE $2='' AND $3='' AND $4='' AND $5='' AND $6='' AND media_type='music' AND (
-  music_normalized=ANY($7::text[]) OR (NOT $8::boolean AND $1<>'' AND music_normalized OPERATOR(public.%) $1)
+  music_normalized=ANY($7::text[]) OR (NOT $8::boolean AND $1<>'' AND music_normalized % $1)
  )
  UNION SELECT t.work_id FROM aiosources.aio_titles t JOIN aiosources.aio_works w ON w.id=t.work_id
   WHERE $2='' AND $3='' AND $4='' AND $5='' AND $6='' AND w.media_type='music' AND (
-   t.normalized=ANY($7::text[]) OR (NOT $8::boolean AND $1<>'' AND t.normalized OPERATOR(public.%) $1)
+   t.normalized=ANY($7::text[]) OR (NOT $8::boolean AND $1<>'' AND t.normalized % $1)
   )
 )
 SELECT ` + aioWorkColumns + ` FROM candidate_ids c
@@ -117,7 +117,7 @@ func musicCatalogCandidates(queryArg, normalizedArg, matching string) string {
  UNION ALL SELECT w.id,5,1::real FROM aiosources.mb_releases r JOIN aiosources.mb_release_groups rg ON rg.id=r.release_group_id JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE (r.gid=` + queryArg + ` OR (r.barcode<>'' AND r.barcode=` + queryArg + `))
  UNION ALL SELECT w.id,5,1::real FROM aiosources.mb_urls u JOIN aiosources.mb_entity_urls eu ON eu.url_id=u.id LEFT JOIN aiosources.mb_releases r ON eu.entity='release' AND r.id=eu.entity_id JOIN aiosources.mb_release_groups rg ON rg.id=CASE WHEN eu.entity='release_group' THEN eu.entity_id ELSE r.release_group_id END JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE (u.wikidata_id<>'' AND u.wikidata_id=` + queryArg + `) OR (u.discogs_id<>'' AND ((u.discogs_kind||':'||u.discogs_id)=` + queryArg + ` OR u.discogs_id=` + queryArg + `))
  UNION ALL SELECT w.id,5,1::real FROM aiosources.mb_release_labels rl JOIN aiosources.mb_releases r ON r.id=rl.release_id JOIN aiosources.mb_release_groups rg ON rg.id=r.release_group_id JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE rl.catalog_normalized<>'' AND rl.catalog_normalized=` + queryArg + `
- UNION ALL SELECT w.id,CASE WHEN a.normalized=` + normalizedArg + ` THEN 3 ELSE 1 END,public.similarity(` + normalizedArg + `,a.normalized) FROM aiosources.mb_artists a JOIN aiosources.mb_artist_credit_names acn ON acn.artist_id=a.id JOIN aiosources.mb_release_groups rg ON rg.artist_credit=acn.artist_credit JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE ` + artistMatch + `
- UNION ALL SELECT w.id,2,public.similarity(` + normalizedArg + `,al.normalized) FROM aiosources.mb_aliases al JOIN aiosources.mb_artist_credit_names acn ON acn.artist_id=al.entity_id JOIN aiosources.mb_release_groups rg ON rg.artist_credit=acn.artist_credit JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE al.entity='artist' AND ` + aliasMatch + `
- UNION ALL SELECT w.id,1,public.similarity(` + normalizedArg + `,l.normalized) FROM aiosources.mb_labels l JOIN aiosources.mb_release_labels rl ON rl.label_id=l.id JOIN aiosources.mb_releases r ON r.id=rl.release_id JOIN aiosources.mb_release_groups rg ON rg.id=r.release_group_id JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE ` + labelMatch
+ UNION ALL SELECT w.id,CASE WHEN a.normalized=` + normalizedArg + ` THEN 3 ELSE 1 END,similarity(` + normalizedArg + `,a.normalized) FROM aiosources.mb_artists a JOIN aiosources.mb_artist_credit_names acn ON acn.artist_id=a.id JOIN aiosources.mb_release_groups rg ON rg.artist_credit=acn.artist_credit JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE ` + artistMatch + `
+ UNION ALL SELECT w.id,2,similarity(` + normalizedArg + `,al.normalized) FROM aiosources.mb_aliases al JOIN aiosources.mb_artist_credit_names acn ON acn.artist_id=al.entity_id JOIN aiosources.mb_release_groups rg ON rg.artist_credit=acn.artist_credit JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE al.entity='artist' AND ` + aliasMatch + `
+ UNION ALL SELECT w.id,1,similarity(` + normalizedArg + `,l.normalized) FROM aiosources.mb_labels l JOIN aiosources.mb_release_labels rl ON rl.label_id=l.id JOIN aiosources.mb_releases r ON r.id=rl.release_id JOIN aiosources.mb_release_groups rg ON rg.id=r.release_group_id JOIN aiosources.aio_works w ON w.media_type='music' AND w.musicbrainz_id=rg.gid WHERE ` + labelMatch
 }

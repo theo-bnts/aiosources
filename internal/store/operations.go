@@ -96,7 +96,7 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 			if run.Kind != "metadata" || (run.Service != "openlibrary" && run.Service != "musicbrainz") {
 				return model.ErrInvalid
 			}
-		case "packets_applied":
+		case "packets_applied", "export_checked":
 			if run.Kind != "metadata" || run.Service != "musicbrainz" {
 				return model.ErrInvalid
 			}

@@ -15,12 +15,18 @@ test('Music uses independent settings blocks, catalog filters and responsive nav
 
   await openDisclosure(page, 'Catalog filters')
   const catalog = page.getByRole('form', { name: 'Music catalog filters', exact: true })
-  await expect(catalog.getByLabel('Official releases only', { exact: true })).toBeChecked()
   await expect(
-    catalog.getByLabel('Exclude audiobooks and spoken word', { exact: true }),
+    catalog.getByRole('switch', { name: 'Official releases only', exact: true }),
   ).toBeChecked()
-  await expect(catalog.getByLabel('Import Cover Art Archive index', { exact: true })).toBeChecked()
-  await catalog.getByLabel('Import Cover Art Archive index', { exact: true }).uncheck()
+  await expect(
+    catalog.getByRole('switch', { name: 'Exclude audiobooks and spoken word', exact: true }),
+  ).toBeChecked()
+  const coversSwitch = catalog.getByRole('switch', {
+    name: 'Import Cover Art Archive index',
+    exact: true,
+  })
+  await expect(coversSwitch).toBeChecked()
+  await coversSwitch.uncheck()
   await catalog.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(catalog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
@@ -34,7 +40,9 @@ test('Music uses independent settings blocks, catalog filters and responsive nav
 
   await page.reload()
   await openDisclosure(page, 'Catalog filters')
-  await expect(page.getByLabel('Import Cover Art Archive index', { exact: true })).not.toBeChecked()
+  await expect(
+    page.getByRole('switch', { name: 'Import Cover Art Archive index', exact: true }),
+  ).not.toBeChecked()
   await openDisclosure(page, 'Automatic updates')
   await expect(
     page.getByLabel('Music information update interval (minutes)', { exact: true }),

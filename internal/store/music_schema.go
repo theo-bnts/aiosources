@@ -15,7 +15,7 @@ ADD CONSTRAINT aio_works_identifier_namespace CHECK(
  (media_type='music' AND tmdb_id IS NULL AND openlibrary_id='' AND igdb_id='' AND musicbrainz_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'));
 CREATE UNIQUE INDEX aio_works_musicbrainz ON aiosources.aio_works(musicbrainz_id) WHERE musicbrainz_id<>'';
 CREATE INDEX aio_works_music_normalized ON aiosources.aio_works(music_normalized) WHERE media_type='music' AND music_normalized<>'';
-CREATE INDEX aio_works_music_normalized_trgm ON aiosources.aio_works USING gin(music_normalized public.gin_trgm_ops) WHERE media_type='music' AND music_normalized<>'';
+CREATE INDEX aio_works_music_normalized_trgm ON aiosources.aio_works USING gin(music_normalized gin_trgm_ops) WHERE media_type='music' AND music_normalized<>'';
 
 ALTER TABLE aiosources.aio_matches DROP CONSTRAINT IF EXISTS aio_matches_media_hint_check;
 ALTER TABLE aiosources.aio_matches ADD CONSTRAINT aio_matches_media_hint_check CHECK(media_hint IN ('','movie','tv','book','game','music'));

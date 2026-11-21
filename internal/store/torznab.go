@@ -180,6 +180,9 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, `(EXISTS(SELECT 1 FROM aiosources.mb_release_groups rg JOIN aiosources.mb_releases r ON r.release_group_id=rg.id JOIN aiosources.mb_release_labels rl ON rl.release_id=r.id JOIN aiosources.mb_labels l ON l.id=rl.label_id WHERE rg.gid=w.musicbrainz_id AND l.normalized LIKE `+pat+` ESCAPE '\') OR `+torrentTextSearchSQLFor("t", q.Label, bind)+`)`)
 		}
 	}
+	if q.Track != "" {
+		clauses = append(clauses, torrentTextSearchSQLFor("t", q.Track, bind))
+	}
 	if q.MBID != "" {
 		clauses = append(clauses, "w.musicbrainz_id=aiosources.mb_resolve_rg("+bind(q.MBID)+")")
 	}
@@ -246,7 +249,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		}
 	}
 	countSourceJoin := "t.source_id"
-	if filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == "" && q.BookTitle == "" && q.Author == "" && q.ISBN == "" && q.Artist == "" && q.Album == "" && q.Label == "" && q.MBID == "" && q.Year == 0 {
+	if filters.Query == "" && q.IMDb == "" && q.TMDB == "" && q.TVDB == "" && q.BookTitle == "" && q.Author == "" && q.ISBN == "" && q.Artist == "" && q.Album == "" && q.Label == "" && q.Track == "" && q.MBID == "" && q.Year == 0 {
 		countSourceJoin = "t.source_id||''"
 	}
 	countFrom := ` FROM aiosources.torrents t LEFT JOIN aiosources.aio_matches m ON m.provider_id=t.provider_id AND m.source_id=` + countSourceJoin + ` AND m.status='matched' AND COALESCE(m.fingerprint=t.fields_fingerprint,false)

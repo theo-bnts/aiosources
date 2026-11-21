@@ -116,4 +116,12 @@ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('music-fixt
 			t.Fatal("music feed exposed private or misnamed data")
 		}
 	}
+	access, _ := f.db.PublicAccess(f.ctx)
+	access.Enabled, access.TorznabEnabled = true, true
+	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = addon.CreatePublicTorznab(f.ctx, "https://addon.example", model.PublicTorznabOptions{MediaTypes: []string{"movie", "tv", "game", "music", "book", "ebook", "audiobook", "other"}}, nil); err != nil {
+		t.Fatalf("an explicit selection of all supported media types was rejected: %v", err)
+	}
 }

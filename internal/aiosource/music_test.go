@@ -125,6 +125,8 @@ func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.
 		}, "\n") + "\n",
 	})
 
+	badSchemaDump := buildMusicTarBZ2(t, map[string]string{"SCHEMA_SEQUENCE": "99\n"})
+
 	var mode atomic.Int32 // 0 = initial dump + repl 101, 1 = 3-month pause recovery (snap2), 2 = unsupported schema 99 (snap3)
 	var exportCalls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,8 +143,7 @@ func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.
 		case "/fullexport/" + snap1 + "/mbdump.tar.bz2", "/fullexport/" + snap2 + "/mbdump.tar.bz2", "/fullexport/" + snap3 + "/mbdump.tar.bz2":
 			exportCalls.Add(1)
 			if mode.Load() == 2 {
-				bad := buildMusicTarBZ2(t, map[string]string{"SCHEMA_SEQUENCE": "99\n"})
-				_, _ = w.Write(bad)
+				_, _ = w.Write(badSchemaDump)
 				return
 			}
 			_, _ = w.Write(coreDump)

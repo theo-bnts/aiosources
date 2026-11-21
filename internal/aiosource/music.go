@@ -215,7 +215,7 @@ func (s *Service) musicReplicationBaseURL() string {
 
 func (s *Service) fetchLatestMusicSnapshot(ctx context.Context, h *operationHistory) (string, error) {
 	endpoint := s.musicExportBaseURL() + "/LATEST"
-	body, status, retryAfter, err := s.musicGETBytes(ctx, h, "latest_snapshot", endpoint, 256)
+	body, status, retryAfter, err := s.musicGETBytes(ctx, h, "music_snapshot", endpoint, 256)
 	if err != nil {
 		return "", err
 	}
@@ -258,7 +258,7 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 	// Phase 1: Stream mbdump.tar.bz2 (Core CC0 tables only).
 	h.checkpoint(ctx, "music_dump")
 	coreURL := s.musicExportBaseURL() + "/" + snapshot + "/mbdump.tar.bz2"
-	header, err := s.streamMusicArchive(ctx, h, "core_dump", coreURL, music.WatchedCoreTables, gen)
+	header, err := s.streamMusicArchive(ctx, h, "music_dump", coreURL, music.WatchedCoreTables, gen)
 	if err != nil {
 		if errors.Is(err, music.ErrUnsupportedSchema) {
 			_ = s.DB.MarkMusicNeedsExport(ctx, "schema_unsupported", "MusicBrainz updated its database schema. Saved music information is preserved; update AIOSources to resume updates.", true, time.Now().Add(6*time.Hour))
@@ -276,7 +276,7 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 		}
 		h.checkpoint(ctx, "music_covers")
 		coverURL := s.musicExportBaseURL() + "/" + snapshot + "/mbdump-cover-art-archive.tar.bz2"
-		if _, err = s.streamMusicArchive(ctx, h, "cover_dump", coverURL, music.WatchedCoverTables, gen); err != nil {
+		if _, err = s.streamMusicArchive(ctx, h, "music_covers", coverURL, music.WatchedCoverTables, gen); err != nil {
 			if errors.Is(err, music.ErrUnsupportedSchema) {
 				_ = s.DB.MarkMusicNeedsExport(ctx, "schema_unsupported", "MusicBrainz updated its database schema. Saved music information is preserved; update AIOSources to resume updates.", true, time.Now().Add(6*time.Hour))
 			}
@@ -460,7 +460,7 @@ func (s *Service) fetchReplicationPacket(ctx context.Context, h *operationHistor
 			status = res.StatusCode
 		}
 		if h != nil {
-			_ = s.DB.RecordProviderCall(ctx, h.run.ID, "replication_packet", status, time.Since(started).Milliseconds(), "")
+			_ = s.DB.RecordProviderCall(ctx, h.run.ID, "music_replication", status, time.Since(started).Milliseconds(), "")
 		}
 		if err != nil {
 			if ctx.Err() != nil {

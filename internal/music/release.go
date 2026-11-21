@@ -34,8 +34,8 @@ type Release struct {
 var (
 	musicLosslessRE = regexp.MustCompile(`(?i)(?:\b|[\[\(\._-])(?:FLAC|ALAC|WAV|AIFF|DSD(?:64|128|256)?|SACD|LOSSLESS|24[ ._-]?bit|16[ ._-]?bit|24-?96|24-?192|24-?48|24-?44(?:\.1)?|WEB[ ._-]?FLAC|CD[ ._-]?FLAC|VINYL[ ._-]?FLAC|APE|WV)(?:\b|[\]\)\._-])`)
 	musicMP3RE      = regexp.MustCompile(`(?i)(?:\b|[\[\(\._-])(?:MP3|320\s?kbps|CBR\s?320|V0|V2|AAC\s?256|M4A|OGG|OPUS)(?:\b|[\]\)\._-])`)
-	musicTagRE      = regexp.MustCompile(`(?i)(?:\b|[\[\(\._-])(?:FLAC|ALAC|WAV|AIFF|DSD(?:64|128|256)?|SACD|LOSSLESS|MP3|320\s?kbps|CBR\s?320|VBR|V0|V2|WEB[ ._-]?FLAC|WEB[ ._-]?RIP|CD[ ._-]?RIP|CDRIP|VINYL[ ._-]?RIP|24[ ._-]?bit|16[ ._-]?bit|24-?96|24-?192|24-?48|24-?44(?:\.1)?|44\.1kHz|48kHz|96kHz|192kHz|Hi-?Res|Qobuz|Tidal|Bandcamp|CDDA|EAC|XLD|CUE\+LOG|LOG\+CUE)(?:\b|[\]\)\._-])`)
-	musicVideoRE    = regexp.MustCompile(`(?i)\b(?:2160p|1080p|720p|480p|x264|x265|h\.?264|h\.?265|HEVC|BluRay|BDRip|WEBRip|WEB-DL|HDTV|DVDRip|S\d{1,2}E\d{1,3}|VOSTFR|MULTI)\b`)
+	musicTagRE      = regexp.MustCompile(`(?i)(?:\b|[\[\(\._-])(?:FLAC|ALAC|WAV|AIFF|DSD(?:64|128|256)?|SACD|LOSSLESS|MP3|320\s?kbps|CBR\s?320|VBR|V0|V2|WEB[ ._-]?FLAC|CD[ ._-]?RIP|CDRIP|VINYL[ ._-]?RIP|24[ ._-]?bit|16[ ._-]?bit|24-?96|24-?192|24-?48|24-?44(?:\.1)?|44\.1kHz|48kHz|96kHz|192kHz|Hi-?Res|Qobuz|Tidal|Bandcamp|CDDA|EAC|XLD|CUE\+LOG|LOG\+CUE)(?:\b|[\]\)\._-])`)
+	musicVideoRE    = regexp.MustCompile(`(?i)\b(?:2160p|1080p|720p|480p|x264|x265|h\.?264|h\.?265|HEVC|XviD|DivX|AV1|BluRay|BDRip|WEBRip|WEB-DL|HDTV|DVDRip|REMUX|HDR|MKV|MP4|AVI|S\d{1,2}E\d{1,3}|S\d{1,2}|Saison|Season|INTEGRALE|VOSTFR|VOST|MULTI|MULTISUB|VFF|VFQ|TRUEFRENCH|SUBFRENCH|OVA|OAV)\b`)
 	musicBookRE     = regexp.MustCompile(`(?i)\b(?:audiobooks?|livres?\s+audio|epub|pdf|mobi|azw3?|cb[rz]|m4b|aaxc?|narrated\s+by|unabridged)\b`)
 	musicCollRE     = regexp.MustCompile(`(?i)\b(?:discograph(?:y|ie)|complete\s+(?:discography|works|albums|studio\s+albums)|studio\s+albums\s+collection|all\s+albums|box\s*set|mega\s*pack)\b`)
 	musicYearRE     = regexp.MustCompile(`(?:\(((?:19|20|21)[0-9]{2})\)|\[((?:19|20|21)[0-9]{2})\]|\b((?:19|20|21)[0-9]{2})\b)`)
@@ -130,7 +130,7 @@ func ParseRecord(r model.AIORecord) Release {
 			isMusic = true
 		}
 	}
-	if !isMusic && musicTagRE.MatchString(r.Title) && !musicVideoRE.MatchString(r.Title) && r.IMDb == "" && r.TMDB == "" && r.TVDB == "" && r.IGDB == "" {
+	if !isMusic && musicTagRE.MatchString(r.Title) && !musicVideoRE.MatchString(r.Title) && r.VideoType == "" && r.Season == nil && r.Episode == nil && r.IMDb == "" && r.TMDB == "" && r.TVDB == "" && r.IGDB == "" {
 		isMusic = true
 	}
 	if !isMusic {
