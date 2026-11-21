@@ -321,9 +321,13 @@ func (s *Service) streamMusicArchive(ctx context.Context, h *operationHistory, c
 		return music.DumpHeader{}, err
 	}
 	// Streaming multi-gigabyte dumps relies on context cancellation, not a short
-	// whole-request deadline, while preserving connection/header timeouts.
+	// whole-request deadline, while preserving connection/header timeouts and
+	// trusted MusicBrainz/Archive.org redirect validation.
 	streamClient := client
 	streamClient.Timeout = 0
+	if s.MusicExportBase == "" {
+		streamClient.CheckRedirect = trustedMusicExport
+	}
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
@@ -505,6 +509,9 @@ func (s *Service) musicGETBytes(ctx context.Context, h *operationHistory, callNa
 	client, err := s.prepareOutgoingClient(ctx, s.MusicHTTP, "metadata_seconds", false)
 	if err != nil {
 		return nil, 0, 0, err
+	}
+	if s.MusicExportBase == "" {
+		client.CheckRedirect = trustedMusicExport
 	}
 	started := time.Now()
 	res, err := client.Do(req)

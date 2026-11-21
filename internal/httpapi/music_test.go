@@ -81,18 +81,23 @@ func TestMusicSearchAndTorznabRespectPublicVisibilityAndIdentifiers(t *testing.T
 	if err := f.db.SetAIOConfig(f.ctx, c); err != nil {
 		t.Fatal(err)
 	}
-	_, err := conn.Exec(f.ctx, `UPDATE aiosources.mb_state SET complete=TRUE,works=1 WHERE singleton;
-INSERT INTO aiosources.aio_works(media_type,musicbrainz_id,display_title,poster_path,years,music_normalized,music_data)
- VALUES('music',$1,'Neon Horizon',$1,'{2024}','neon horizon','{"primary_type":"Album","artists":["Synthetic Duo"],"labels":["Orbit Records"],"catalog_numbers":["ORB-042"],"barcodes":["0724349691728"],"discogs_ids":["master:26647"],"wikidata_id":"Q43228","has_cover":true}');
-INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Neon Horizon','neon horizon' FROM aiosources.aio_works WHERE musicbrainz_id=$1;
-INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('music-fixture','one','{"title":"Synthetic Duo - Neon Horizon (2024) [FLAC]","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","categories":[3000,3040],"size":524288000}');`, rgID)
-	if err != nil {
+	if _, err := conn.Exec(f.ctx, `UPDATE aiosources.mb_state SET complete=TRUE,works=1 WHERE singleton`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.aio_works(media_type,musicbrainz_id,display_title,poster_path,years,music_normalized,music_data)
+ VALUES('music',$1,'Neon Horizon',$1,'{2024}','neon horizon','{"primary_type":"Album","artists":["Synthetic Duo"],"labels":["Orbit Records"],"catalog_numbers":["ORB-042"],"barcodes":["0724349691728"],"discogs_ids":["master:26647"],"wikidata_id":"Q43228","has_cover":true}')`, rgID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.aio_titles(work_id,title,normalized) SELECT id,'Neon Horizon','neon horizon' FROM aiosources.aio_works WHERE musicbrainz_id=$1`, rgID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('music-fixture','one','{"title":"Synthetic Duo - Neon Horizon (2024) [FLAC]","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","categories":[3000,3040],"size":524288000}')`); err != nil {
 		t.Fatal(err)
 	}
 	if r := f.request("POST", "/api/shares", `{"name":"Catalog recipient","scope":"all","enabled":true,"fields":["title","info_hash"],"catalog_entities":{"metadata":true}}`, true, ""); r.Code != 201 {
 		t.Fatal("catalog sharing could not coexist with music", r.Code)
 	}
-	if err = addon.Match(f.ctx); err != nil {
+	if err := addon.Match(f.ctx); err != nil {
 		t.Fatal(err)
 	}
 	r := f.request("GET", "/api/catalog/search?q=Neon%20Horizon&type=music", "", true, "")
@@ -118,10 +123,10 @@ INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES('music-fixt
 	}
 	access, _ := f.db.PublicAccess(f.ctx)
 	access.Enabled, access.TorznabEnabled = true, true
-	if err = f.db.SetPublicAccess(f.ctx, access); err != nil {
+	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = addon.CreatePublicTorznab(f.ctx, "https://addon.example", model.PublicTorznabOptions{MediaTypes: []string{"movie", "tv", "game", "music", "book", "ebook", "audiobook", "other"}}, nil); err != nil {
+	if _, err := addon.CreatePublicTorznab(f.ctx, "https://addon.example", model.PublicTorznabOptions{MediaTypes: []string{"movie", "tv", "game", "music", "book", "ebook", "audiobook", "other"}}, nil); err != nil {
 		t.Fatalf("an explicit selection of all supported media types was rejected: %v", err)
 	}
 }
