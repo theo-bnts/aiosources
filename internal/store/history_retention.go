@@ -12,7 +12,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return 0, databaseError("begin history cleanup", err)
 	}

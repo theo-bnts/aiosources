@@ -240,7 +240,7 @@ func TestApplicationConnectionsPreserveConfiguredSearchPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	for _, pool := range []*pgxpool.Pool{db.pool, db.collectionPool} {
+	for _, pool := range []*pgxpool.Pool{db.pool, db.backgroundPool, db.collectionPool} {
 		var after string
 		if err = pool.QueryRow(ctx, `SHOW search_path`).Scan(&after); err != nil || after != applicationSchema+","+before {
 			t.Fatal("connection search path changed", err)

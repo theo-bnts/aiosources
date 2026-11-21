@@ -7,12 +7,17 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 func (s *Store) GameStatus(ctx context.Context) (model.GameStatus, error) {
+	return s.gameStatus(ctx, s.pool)
+}
+
+func (s *Store) gameStatus(ctx context.Context, pool *pgxpool.Pool) (model.GameStatus, error) {
 	var v model.GameStatus
-	err := s.pool.QueryRow(ctx, `SELECT complete,works,processed,total,phase,after_id,generation,started_at,last_sync,changes_through,last_reconciliation,retry_at,error FROM aiosources.igdb_state WHERE singleton`).Scan(&v.Complete, &v.Works, &v.Processed, &v.Total, &v.Phase, &v.After, &v.Generation, &v.StartedAt, &v.LastSync, &v.ChangesThrough, &v.LastReconciliation, &v.RetryAt, &v.Error)
+	err := pool.QueryRow(ctx, `SELECT complete,works,processed,total,phase,after_id,generation,started_at,last_sync,changes_through,last_reconciliation,retry_at,error FROM aiosources.igdb_state WHERE singleton`).Scan(&v.Complete, &v.Works, &v.Processed, &v.Total, &v.Phase, &v.After, &v.Generation, &v.StartedAt, &v.LastSync, &v.ChangesThrough, &v.LastReconciliation, &v.RetryAt, &v.Error)
 	v.Pending = v.StartedAt != nil
 	return v, databaseError("read game information status", err)
 }
@@ -20,13 +25,13 @@ func (s *Store) GameStatus(ctx context.Context) (model.GameStatus, error) {
 // A fixed time boundary and an ID cursor avoid both offset drift and a lossy
 // timestamp-only checkpoint when several hundred games change in one second.
 func (s *Store) BeginGameUpdate(ctx context.Context, reconcileDays int) (model.GameStatus, error) {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.igdb_state SET
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.igdb_state SET
  phase=CASE WHEN NOT complete THEN 'initial' WHEN last_reconciliation IS NULL OR last_reconciliation<now()-make_interval(days=>$1) THEN 'reconciliation' ELSE 'changes' END,
  started_at=date_trunc('second',clock_timestamp()-interval '2 minutes'),after_id=0,processed=0,generation=generation+1,error='',retry_at=NULL WHERE singleton AND started_at IS NULL`, reconcileDays)
 	if err != nil {
 		return model.GameStatus{}, databaseError("begin game information update", err)
 	}
-	return s.GameStatus(ctx)
+	return s.gameStatus(ctx, s.workerPool())
 }
 
 // Work publication, affected identifications and the provider cursor commit
@@ -58,7 +63,7 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 	if last != after {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -66,7 +71,7 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
 		return err
 	}
-	rows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type='game' AND igdb_id=ANY($1::text[])`, ids)
+	rows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type='game' AND igdb_id<>'' AND igdb_id=ANY($1::text[])`, ids)
 	if err != nil {
 		return err
 	}
@@ -131,17 +136,24 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 		return err
 	}
 	if len(changed) > 0 {
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_titles WHERE work_id IN(SELECT id FROM aiosources.aio_works WHERE media_type='game' AND igdb_id=ANY($1::text[]))`, changed); err != nil {
+		changedIDs := make([]int64, 0, len(changed))
+		worksByIGDB := make(map[string]model.AIOWork, len(works))
+		for _, w := range works {
+			worksByIGDB[w.IGDB] = w
+		}
+		for _, key := range changed {
+			if id, ok := byID[key]; ok {
+				changedIDs = append(changedIDs, id)
+			}
+		}
+		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_titles WHERE work_id=ANY($1::bigint[])`, changedIDs); err != nil {
 			return err
 		}
 		titles := []map[string]any{}
 		for _, key := range changed {
-			for _, w := range works {
-				if w.IGDB == key {
-					for _, title := range w.Titles {
-						titles = append(titles, map[string]any{"work_id": byID[key], "title": title, "normalized": model.NormalizeTitle(title)})
-					}
-				}
+			w := worksByIGDB[key]
+			for _, title := range w.Titles {
+				titles = append(titles, map[string]any{"work_id": byID[key], "title": title, "normalized": model.NormalizeTitle(title)})
 			}
 		}
 		encoded, _ := json.Marshal(titles)
@@ -189,7 +201,7 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 	if state.StartedAt == nil {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -209,7 +221,7 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 		}
 	}
 	if state.Phase != "changes" {
-		rows, err := tx.Query(ctx, `SELECT id FROM aiosources.aio_works WHERE media_type='game' AND igdb_generation<>$1`, state.Generation)
+		rows, err := tx.Query(ctx, `SELECT id FROM aiosources.aio_works WHERE media_type='game' AND igdb_id<>'' AND igdb_generation<>$1`, state.Generation)
 		if err != nil {
 			return err
 		}
@@ -239,7 +251,7 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 			}
 		}
 	}
-	tag, err := tx.Exec(ctx, `UPDATE aiosources.igdb_state SET complete=TRUE,works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='game'),last_sync=now(),changes_through=started_at,
+	tag, err := tx.Exec(ctx, `UPDATE aiosources.igdb_state SET complete=TRUE,works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='game' AND igdb_id<>''),last_sync=now(),changes_through=started_at,
  last_reconciliation=CASE WHEN phase<>'changes' THEN now() ELSE last_reconciliation END,started_at=NULL,after_id=0,error='',retry_at=NULL
  WHERE singleton AND generation=$1 AND after_id=$2 AND started_at=$3`, state.Generation, state.After, state.StartedAt)
 	if err != nil {
@@ -252,11 +264,11 @@ func (s *Store) CompleteGameUpdate(ctx context.Context, state model.GameStatus) 
 }
 
 func (s *Store) GameUpdateFailure(ctx context.Context, message string, retry time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.igdb_state SET error=$1,retry_at=GREATEST(retry_at,$2) WHERE singleton`, message, retry)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.igdb_state SET error=$1,retry_at=GREATEST(retry_at,$2) WHERE singleton`, message, retry)
 	return databaseError("retain game information retry", err)
 }
 func (s *Store) SetGameTotal(ctx context.Context, total int64) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.igdb_state SET total=$1 WHERE singleton`, total)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.igdb_state SET total=$1 WHERE singleton`, total)
 	return err
 }
 func (s *Store) ResetGameInformation(ctx context.Context) error {

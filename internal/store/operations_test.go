@@ -66,9 +66,18 @@ func TestOperationHistoryRecoveryUsesActualWorkerLocks(t *testing.T) {
 	}
 	run.Phase = "identification"
 	run.Processed = 7
-	run.Results = map[string]int64{"matched": 5, "unmatched": 2}
+	run.Results = map[string]int64{"matched": 5, "unmatched": 2, "correspondence_groups": 2, "correspondence_enriched": 3}
 	if err = db.SaveOperation(ctx, run); err != nil {
 		t.Fatal(err)
+	}
+	run.Phase = "correspondences"
+	if err = db.SaveOperation(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	wrongService := run
+	wrongService.Kind, wrongService.Service = "metadata", "tmdb"
+	if err = db.SaveOperation(ctx, wrongService); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("non-matching correspondence counters accepted: %v", err)
 	}
 	other, err := Open(ctx, dsn)
 	if err != nil {
@@ -94,7 +103,7 @@ func TestOperationHistoryRecoveryUsesActualWorkerLocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	events, err := other.OperationEvents(ctx, run.ID, model.ListOptions{Limit: 1})
-	if err != nil || events.Total != 3 || len(events.Items) != 1 || events.Items[0].Phase != "interrupted" {
+	if err != nil || events.Total != 4 || len(events.Items) != 1 || events.Items[0].Phase != "interrupted" {
 		t.Fatalf("recovery events %+v %v", events, err)
 	}
 	if err = db.SaveOperation(ctx, run); !errors.Is(err, model.ErrConflict) {

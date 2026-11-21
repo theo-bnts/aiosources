@@ -96,13 +96,13 @@ func prepareSoftwareImport(ctx context.Context, tx pgx.Tx, c model.AIOConfig) er
 
 func (s *Store) PrepareSoftwareImport(ctx context.Context, c model.AIOConfig) error {
 	key := SoftwareSelectionKey(c)
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET selection=$1,
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET selection=$1,
  complete=CASE WHEN selection<>'' AND selection<>$1 THEN FALSE ELSE complete END WHERE singleton`, key)
 	return databaseError("prepare software catalog filters", err)
 }
 
 func (s *Store) TouchSoftwareCheck(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET checked_at=now(),error='',retry_at=NULL WHERE singleton`)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET checked_at=now(),error='',retry_at=NULL WHERE singleton`)
 	return databaseError("record software check time", err)
 }
 
@@ -112,7 +112,7 @@ func (s *Store) BeginSoftwareSync(ctx context.Context, selectionKey, recoveryRea
 	if recoveryReason != "" {
 		phase = "recovery"
 	}
-	err := s.pool.QueryRow(ctx, `UPDATE aiosources.sw_sync_state SET
+	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.sw_sync_state SET
  generation=generation+1,phase=$1,selection=$2,
  imported=0,position=0,filtered=0,skipped=0,
  recovery_reason=$3,error='',retry_at=NULL,checked_at=now()
@@ -121,7 +121,7 @@ func (s *Store) BeginSoftwareSync(ctx context.Context, selectionKey, recoveryRea
 }
 
 func (s *Store) SetSoftwarePhase(ctx context.Context, phase string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase=$1 WHERE singleton`, phase)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase=$1 WHERE singleton`, phase)
 	return databaseError("update software sync phase", err)
 }
 
@@ -129,7 +129,7 @@ func (s *Store) SetSoftwarePhase(ctx context.Context, phase string) error {
 // Homebrew Cask into sw_source_entries. When incremental is true (or within the
 // same generation), array fields merge with prior entries instead of overwriting.
 func (s *Store) SaveSoftwareSourceBatch(ctx context.Context, generation int64, entries []software.SourceEntry, readCount, skippedCount int64, incremental bool) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin software source batch", err)
 	}
@@ -201,14 +201,14 @@ ON CONFLICT(source,external_id) DO UPDATE SET
 // PruneSoftwareSourceEntries deletes stale rows for one fully refreshed source
 // without touching untouched sources or live searchable aio_works.
 func (s *Store) PruneSoftwareSourceEntries(ctx context.Context, source string, generation int64) error {
-	_, err := s.pool.Exec(ctx, `DELETE FROM aiosources.sw_source_entries WHERE source=$1 AND sw_seen<$2`, source, generation)
+	_, err := s.workerPool().Exec(ctx, `DELETE FROM aiosources.sw_source_entries WHERE source=$1 AND sw_seen<$2`, source, generation)
 	return databaseError("prune software source entries", err)
 }
 
 // SaveSoftwareIcons replaces the lightweight selfh.st/icons metadata index
 // atomically (zero remote image bytes are ever downloaded or stored).
 func (s *Store) SaveSoftwareIcons(ctx context.Context, generation int64, icons []software.IconEntry, skipped int64) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin software icons save", err)
 	}
@@ -243,7 +243,7 @@ func (s *Store) SaveSoftwareIcons(ctx context.Context, generation int64, icons [
 
 // ClearSoftwareIcons drops the remote icon metadata index when disabled.
 func (s *Store) ClearSoftwareIcons(ctx context.Context) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin clear software icons", err)
 	}
@@ -265,7 +265,7 @@ func (s *Store) LoadSoftwareStaging(ctx context.Context, includeNVD, includeIcon
 	if !includeNVD {
 		query += ` WHERE source<>'nvd'`
 	}
-	rows, err := s.pool.Query(ctx, query)
+	rows, err := s.workerPool().Query(ctx, query)
 	if err != nil {
 		return nil, nil, databaseError("load software staging entries", err)
 	}
@@ -290,7 +290,7 @@ func (s *Store) LoadSoftwareStaging(ctx context.Context, includeNVD, includeIcon
 
 	var icons []software.IconEntry
 	if includeIcons {
-		iconRows, err := s.pool.Query(ctx, `SELECT reference,name,normalized FROM aiosources.sw_icons ORDER BY reference`)
+		iconRows, err := s.workerPool().Query(ctx, `SELECT reference,name,normalized FROM aiosources.sw_icons ORDER BY reference`)
 		if err != nil {
 			return nil, nil, databaseError("load software icons", err)
 		}
@@ -325,26 +325,24 @@ func (s *Store) ProjectSoftwareCatalog(ctx context.Context, generation int64, it
 			return err
 		}
 	}
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET filtered=$1 WHERE singleton`, filtered)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET filtered=$1 WHERE singleton`, filtered)
 	return databaseError("update software filtered count", err)
 }
 
 func (s *Store) projectSoftwareChunk(ctx context.Context, generation int64, chunk []software.MergedSoftware) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin software projection chunk", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
-		return err
-	}
 
 	keys := make([]string, len(chunk))
 	for i, item := range chunk {
 		keys[i] = item.SoftwareKey
 	}
 
-	// Upsert dedicated sw_catalog, sw_aliases and sw_external_ids tables.
+	// Upsert dedicated sw_catalog, sw_aliases and sw_external_ids tables before
+	// acquiring the aio_state metadata fence so catalog writes stay brief.
 	catBatch := &pgx.Batch{}
 	for _, item := range chunk {
 		catBatch.Queue(`INSERT INTO aiosources.sw_catalog(
@@ -408,8 +406,12 @@ ON CONFLICT(software_key) DO UPDATE SET
 		}
 	}
 
+	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
+		return err
+	}
+
 	// Read previous aio_works for signature diffing so unchanged rows keep their revision.
-	prevRows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type='software' AND software_key=ANY($1::text[])`, keys)
+	prevRows, err := tx.Query(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type='software' AND software_key<>'' AND software_key=ANY($1::text[])`, keys)
 	if err != nil {
 		return err
 	}
@@ -512,12 +514,14 @@ ON CONFLICT(software_key) DO UPDATE SET
 	}
 
 	if len(changed) > 0 {
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_titles WHERE work_id IN(SELECT id FROM aiosources.aio_works WHERE media_type='software' AND software_key=ANY($1::text[]))`, changed); err != nil {
-			return err
-		}
+		changedIDs := make([]int64, 0, len(changed))
 		changedSet := make(map[string]struct{}, len(changed))
 		for _, k := range changed {
 			changedSet[k] = struct{}{}
+			changedIDs = append(changedIDs, byKey[k])
+		}
+		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_titles WHERE work_id=ANY($1::bigint[])`, changedIDs); err != nil {
+			return err
 		}
 		titleRows := []map[string]any{}
 		for _, w := range works {
@@ -569,64 +573,110 @@ func softwareSignature(w model.AIOWork) string {
 	return base + "|" + w.PosterPath + "|" + string(data)
 }
 
-// FinishSoftwareSync atomically swaps/prunes stale software works and catalog
-// rows after projection finishes, queues existing software torrents once, and
-// publishes fresh source checkpoints and counters.
+// FinishSoftwareSync swaps/prunes stale software works and catalog rows after
+// projection finishes, queues existing software torrents once, and publishes
+// fresh source checkpoints and counters without holding aio_state FOR UPDATE
+// across full scans or counts.
 func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta SoftwareSyncMeta) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return databaseError("begin software finish", err)
-	}
-	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
-		return err
+	pool := s.workerPool()
+	const staleBatch = 1000
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		staleRows, err := pool.Query(ctx, `SELECT id FROM aiosources.aio_works w
+ WHERE w.media_type='software' AND w.software_key<>'' AND w.sw_generation<>$1
+  AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews rev WHERE rev.active AND rev.media_type='software' AND rev.software_key=w.software_key)
+ ORDER BY w.id LIMIT $2`, generation, staleBatch)
+		if err != nil {
+			return databaseError("scan stale software works", err)
+		}
+		staleIDs := []int64{}
+		for staleRows.Next() {
+			var id int64
+			if err = staleRows.Scan(&id); err != nil {
+				staleRows.Close()
+				return err
+			}
+			staleIDs = append(staleIDs, id)
+		}
+		err = staleRows.Err()
+		staleRows.Close()
+		if err != nil {
+			return err
+		}
+		if len(staleIDs) == 0 {
+			break
+		}
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return databaseError("begin software cleanup", err)
+		}
+		if _, err = tx.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE`); err != nil {
+			rollback(tx)
+			return err
+		}
+		confirmRows, err := tx.Query(ctx, `SELECT id FROM aiosources.aio_works w
+ WHERE w.id=ANY($1::bigint[]) AND w.media_type='software' AND w.software_key<>'' AND w.sw_generation<>$2
+  AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews rev WHERE rev.active AND rev.media_type='software' AND rev.software_key=w.software_key)`, staleIDs, generation)
+		if err != nil {
+			rollback(tx)
+			return err
+		}
+		confirmed := []int64{}
+		for confirmRows.Next() {
+			var id int64
+			if err = confirmRows.Scan(&id); err != nil {
+				confirmRows.Close()
+				rollback(tx)
+				return err
+			}
+			confirmed = append(confirmed, id)
+		}
+		err = confirmRows.Err()
+		confirmRows.Close()
+		if err != nil {
+			rollback(tx)
+			return err
+		}
+		if len(confirmed) > 0 {
+			if err = queueAIOManyAliases(ctx, tx, confirmed, nil); err != nil {
+				rollback(tx)
+				return err
+			}
+			if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_works WHERE id=ANY($1::bigint[])`, confirmed); err != nil {
+				rollback(tx)
+				return err
+			}
+			if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {
+				rollback(tx)
+				return err
+			}
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return databaseError("commit software cleanup", err)
+		}
+		if len(confirmed) == 0 || len(staleIDs) < staleBatch {
+			break
+		}
 	}
 
-	staleRows, err := tx.Query(ctx, `SELECT id FROM aiosources.aio_works w
- WHERE w.media_type='software' AND w.sw_generation<>$1
-  AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews rev WHERE rev.active AND rev.media_type='software' AND rev.software_key=w.software_key)`, generation)
-	if err != nil {
-		return err
-	}
-	staleIDs := []int64{}
-	for staleRows.Next() {
-		var id int64
-		if err = staleRows.Scan(&id); err != nil {
-			staleRows.Close()
-			return err
-		}
-		staleIDs = append(staleIDs, id)
-	}
-	err = staleRows.Err()
-	staleRows.Close()
-	if err != nil {
-		return err
-	}
-	if len(staleIDs) > 0 {
-		if err = queueAIOManyAliases(ctx, tx, staleIDs, nil); err != nil {
-			return err
-		}
-		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_works WHERE id=ANY($1::bigint[])`, staleIDs); err != nil {
-			return err
-		}
-		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {
-			return err
-		}
-	}
-	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.sw_catalog c
+	if _, err := pool.Exec(ctx, `DELETE FROM aiosources.sw_catalog c
  WHERE c.sw_generation<>$1
   AND NOT EXISTS(SELECT 1 FROM aiosources.aio_match_reviews rev WHERE rev.active AND rev.media_type='software' AND rev.software_key=c.software_key)`, generation); err != nil {
 		return databaseError("prune stale sw_catalog", err)
 	}
 
-	backfill, err := tx.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('software.matching.v1','1') ON CONFLICT DO NOTHING`)
-	if err != nil {
-		return err
-	}
 	var wasComplete bool
-	_ = tx.QueryRow(ctx, `SELECT complete FROM aiosources.sw_sync_state WHERE singleton`).Scan(&wasComplete)
+	if err := pool.QueryRow(ctx, `SELECT complete FROM aiosources.sw_sync_state WHERE singleton`).Scan(&wasComplete); err != nil {
+		return databaseError("read software completion state", err)
+	}
+	backfill, err := pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('software.matching.v1','1') ON CONFLICT DO NOTHING`)
+	if err != nil {
+		return databaseError("record software matching backfill", err)
+	}
 	if !wasComplete || backfill.RowsAffected() == 1 {
-		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
+		if _, err = pool.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
  SELECT t.provider_id,t.source_id FROM aiosources.torrents t
  WHERE NOT (COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m4050\M')
   AND (
@@ -637,18 +687,18 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
    OR t.fields->>'title' ~* '\m(Win64|Win32|macOS|OSX|AppImage|DMG|APK|IPA|VST3?|AAX|Multilingual|Portable)\M'
   )
  ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`); err != nil {
-			return err
+			return databaseError("queue software torrents for matching", err)
 		}
 	}
 
-	_, err = tx.Exec(ctx, `UPDATE aiosources.sw_sync_state SET
+	_, err = pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET
  complete=TRUE,
  phase='idle',
- works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='software'),
+ works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='software' AND software_key<>''),
  nvd_entries=(SELECT count(*) FROM aiosources.sw_source_entries WHERE source='nvd'),
  winget_entries=(SELECT count(*) FROM aiosources.sw_source_entries WHERE source='winget'),
  homebrew_entries=(SELECT count(*) FROM aiosources.sw_source_entries WHERE source='homebrew'),
- icons=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='software' AND poster_path<>''),
+ icons=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='software' AND software_key<>'' AND poster_path<>''),
  icons_indexed=(SELECT count(*) FROM aiosources.sw_icons),
  nvd_snapshot=CASE WHEN $1<>'' THEN $1 ELSE nvd_snapshot END,
  nvd_snapshot_sha256=CASE WHEN $2<>'' THEN $2 ELSE nvd_snapshot_sha256 END,
@@ -671,20 +721,17 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
 		meta.NVDSnapshot, meta.NVDSnapshotSHA256, meta.NVDSnapshotAt, meta.NVDChangesThrough,
 		meta.WinGetETag, meta.WinGetSyncedAt, meta.HomebrewETag, meta.HomebrewSyncedAt,
 		meta.IconsETag, meta.IconsSyncedAt, meta.FullImport)
-	if err != nil {
-		return databaseError("complete software catalog sync", err)
-	}
-	return databaseError("commit software catalog completion", tx.Commit(ctx))
+	return databaseError("complete software catalog sync", err)
 }
 
 func (s *Store) MarkSoftwareNeedsFullImport(ctx context.Context, reason, message string, retryAt time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase='idle',needs_full_import=TRUE,recovery_reason=$1,error=$2,retry_at=$3,checked_at=now() WHERE singleton`,
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase='idle',needs_full_import=TRUE,recovery_reason=$1,error=$2,retry_at=$3,checked_at=now() WHERE singleton`,
 		reason, message, retryAt)
 	return databaseError("mark software recovery needed", err)
 }
 
 func (s *Store) FailSoftwareUpdate(ctx context.Context, message string, retryAt time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase='idle',error=$1,retry_at=GREATEST(COALESCE(retry_at,to_timestamp(0)),$2),checked_at=now() WHERE singleton`,
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET phase='idle',error=$1,retry_at=GREATEST(COALESCE(retry_at,to_timestamp(0)),$2),checked_at=now() WHERE singleton`,
 		message, retryAt)
 	return databaseError("retain software update retry", err)
 }
@@ -711,7 +758,7 @@ func (s *Store) RecordSoftwareInformationActivity(ctx context.Context, updateErr
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,title,service,data) VALUES($1,$2,$3,$4,'Software information update','software',jsonb_build_object('records',$5::bigint))`,
+	_, err = s.workerPool().Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,title,service,data) VALUES($1,$2,$3,$4,'Software information update','software',jsonb_build_object('records',$5::bigint))`,
 		"activity-"+id, level, kind, message, processed)
 	return databaseError("record software information activity", err)
 }

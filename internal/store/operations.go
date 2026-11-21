@@ -24,7 +24,7 @@ func scanOperation(row scanner) (model.OperationRun, error) {
 // The same lock that protects the actual worker protects recovery. A live
 // worker in another instance must never be marked interrupted by this console.
 func (s *Store) RecoverOperations(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `WITH interrupted AS (
+	_, err := s.workerPool().Exec(ctx, `WITH interrupted AS (
  UPDATE aiosources.operation_runs SET status='interrupted',finished_at=now(),updated_at=now(),error='The worker was interrupted. Saved data and pending work are preserved.'
  WHERE status='running' AND pg_try_advisory_xact_lock(lock_key) RETURNING id,processed,errors
 ) INSERT INTO aiosources.operation_events(run_id,phase,processed,errors) SELECT id,'interrupted',processed,errors FROM interrupted`)
@@ -54,7 +54,7 @@ func (s *Store) BeginOperation(ctx context.Context, run model.OperationRun, lock
 	if err != nil {
 		return run, err
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return run, databaseError("begin operation history", err)
 	}
@@ -92,6 +92,10 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 		}
 		switch key {
 		case "matched", "ambiguous", "unmatched", "cached", "uncached", "cleaned":
+		case "correspondence_groups", "correspondence_enriched":
+			if run.Kind != "matching" || run.Service != "local" {
+				return model.ErrInvalid
+			}
 		case "snapshot_checked":
 			if run.Kind != "metadata" || (run.Service != "openlibrary" && run.Service != "musicbrainz" && run.Service != "software") {
 				return model.ErrInvalid
@@ -112,7 +116,7 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 	if err != nil {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin operation checkpoint", err)
 	}
@@ -201,7 +205,7 @@ func (s *Store) RecordProviderCall(ctx context.Context, runID, phase string, sta
 	if !(model.ProviderCall{Phase: phase, DurationMS: duration, HTTPStatus: status, ErrorCode: code}).Valid() {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin provider diagnostics", err)
 	}

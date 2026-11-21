@@ -77,7 +77,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	if len(picks) > AIOMaxMatchBatchSize || decide == nil {
 		return nil, model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return nil, databaseError("begin correspondence batch", err)
 	}

@@ -311,26 +311,35 @@ func (s *Service) streamMusicArchive(ctx context.Context, h *operationHistory, c
 	if err := s.musicRate.wait(ctx); err != nil {
 		return music.DumpHeader{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return music.DumpHeader{}, ErrInvalidResponse
-	}
-	req.Header.Set("User-Agent", musicBrainzAgent)
 	client, err := s.prepareOutgoingClient(ctx, s.MusicHTTP, "inventory_seconds", false)
 	if err != nil {
 		return music.DumpHeader{}, err
 	}
-	// Streaming multi-gigabyte dumps relies on context cancellation, not a short
-	// whole-request deadline, while preserving connection/header timeouts and
-	// trusted MusicBrainz/Archive.org redirect validation.
+	headerTimeout := client.Timeout
+	if headerTimeout <= 0 {
+		headerTimeout = 2 * time.Minute
+	}
+	requestCtx, requestCancel := context.WithCancel(ctx)
+	defer requestCancel()
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return music.DumpHeader{}, ErrInvalidResponse
+	}
+	req.Header.Set("User-Agent", musicBrainzAgent)
+	// Streaming multi-gigabyte dumps relies on an idle read timer rather than a
+	// short whole-request deadline, while preserving connection/header timeouts
+	// and trusted MusicBrainz/Archive.org redirect validation.
 	streamClient := client
 	streamClient.Timeout = 0
 	if s.MusicExportBase == "" {
 		streamClient.CheckRedirect = trustedMusicExport
 	}
+	idle := time.AfterFunc(headerTimeout, requestCancel)
+	defer idle.Stop()
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
+	idle.Reset(2 * time.Minute)
 	status := 0
 	if res != nil {
 		status = res.StatusCode
@@ -352,13 +361,26 @@ func (s *Service) streamMusicArchive(ctx context.Context, h *operationHistory, c
 	if res.StatusCode != http.StatusOK {
 		return music.DumpHeader{}, &musicError{message: fmt.Sprintf("MusicBrainz export returned HTTP %d.", res.StatusCode)}
 	}
-	return music.StreamDumpArchive(ctx, res.Body, watched, 2000, func(batch music.DumpTableBatch) error {
+	body := &bookExportReader{reader: res.Body, timer: idle}
+	header, err := music.StreamDumpArchive(requestCtx, body, watched, 2000, func(batch music.DumpTableBatch) error {
+		idle.Reset(2 * time.Minute)
 		if err := s.DB.SaveMusicDumpBatch(ctx, gen, batch); err != nil {
 			return err
 		}
+		idle.Reset(2 * time.Minute)
 		h.run.Processed += int64(batch.Len())
 		return nil
 	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return music.DumpHeader{}, ctx.Err()
+		}
+		if requestCtx.Err() != nil {
+			return music.DumpHeader{}, &musicError{message: "MusicBrainz export timed out while streaming. Saved progress is preserved.", retryAt: time.Now().Add(5 * time.Minute)}
+		}
+		return music.DumpHeader{}, err
+	}
+	return header, nil
 }
 
 func (s *Service) syncMusicReplication(ctx context.Context, h *operationHistory, c model.AIOConfig, state model.MusicStatus, token string) error {

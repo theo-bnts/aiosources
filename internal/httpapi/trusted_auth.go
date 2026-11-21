@@ -76,7 +76,9 @@ func (a *authentication) lookupTrusted(r *http.Request) (trustedSession, error) 
 		return trustedSession{}, store.ErrAuthentication
 	}
 	hash := sha256.Sum256([]byte(cookie.Value))
-	user, id, expires, err := a.db.TrustedSession(r.Context(), hash[:])
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	user, id, expires, err := a.db.TrustedSession(ctx, hash[:])
 	return trustedSession{User: user, ID: id, CSRF: csrfForToken(cookie.Value), Expires: expires}, err
 }
 

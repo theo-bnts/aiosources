@@ -16,7 +16,7 @@ var bookSnapshotTables = []struct {
 }
 
 func (s *Store) BookExportLoaded(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET data_complete=TRUE WHERE singleton`)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_import_state SET data_complete=TRUE WHERE singleton`)
 	return err
 }
 
@@ -25,7 +25,7 @@ func (s *Store) BookExportLoaded(ctx context.Context) error {
 // Selected catalogs instead require positive edition evidence; unreadable
 // dependent records already needed by a selected edition are marked as seen.
 func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return false, 0, err
 	}
@@ -119,7 +119,7 @@ func (s *Store) PruneBookSnapshot(ctx context.Context) (bool, int64, error) {
 				return false, 0, err
 			}
 		}
-		if _, err = tx.Exec(ctx, "DELETE FROM aiosources."+table.table+" WHERE "+table.key+"=ANY($1::text[])", keys); err != nil {
+		if _, err = tx.Exec(ctx, "DELETE FROM aiosources."+table.table+" WHERE "+table.key+"=ANY($1::text[])"+where, keys); err != nil {
 			return false, 0, err
 		}
 		if table.counter >= 0 {

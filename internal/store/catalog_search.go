@@ -146,10 +146,15 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		}
 	}
 	args, matching, anchor := catalogWordFilter(normalized, []any{identity, media, normalized})
+	scopeCTEs := []string{}
+	includeBooks := len(media) == 0 || slices.Contains(media, "book")
+	includeMusic := len(media) == 0 || slices.Contains(media, "music")
+	if includeBooks || includeMusic {
+		scopeCTEs = append(scopeCTEs, catalogMatchedScope)
+	}
 	bookExtras := ""
-	bookScope := ""
-	if len(media) == 0 || slices.Contains(media, "book") {
-		bookScope = catalogBookScope
+	if includeBooks {
+		scopeCTEs = append(scopeCTEs, catalogBookScopeCTE)
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
 	softwareExtras := ""
@@ -157,11 +162,16 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		softwareExtras = softwareCatalogCandidates("$1", "$3", matching)
 	}
 	musicExtras := ""
-	if len(media) == 0 || slices.Contains(media, "music") {
-		musicExtras = musicCatalogCandidates("$1", "$3", matching)
+	if includeMusic {
+		scopeCTEs = append(scopeCTEs, catalogMusicScopeCTE)
+		musicExtras = catalogMusicCandidates("$1", "$3", matching)
+	}
+	scopePrefix := ""
+	if len(scopeCTEs) > 0 {
+		scopePrefix = "WITH " + strings.Join(scopeCTEs, ",\n") + " "
 	}
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
- SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
+ SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
  public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
@@ -188,7 +198,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	args = append(args, locale, opts.Limit, opts.Offset)
 	// The total and visible page share the same candidate search. In particular,
 	// book editions/aliases must not be materialized twice for every search.
-	pageSQL := bookScope + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
+	pageSQL := scopePrefix + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
 	rows, err := tx.Query(ctx, pageSQL, args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)
@@ -211,7 +221,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	// An empty first page has an exact total of zero. Only an out-of-range
 	// later page needs a separate count so pagination can recover correctly.
 	if len(result.Items) == 0 && opts.Offset > 0 {
-		if err = tx.QueryRow(ctx, bookScope+`SELECT count(*)`+filter, countArgs...).Scan(&result.Total); err != nil {
+		if err = tx.QueryRow(ctx, scopePrefix+`SELECT count(*)`+filter, countArgs...).Scan(&result.Total); err != nil {
 			return result, databaseError("count catalog titles", err)
 		}
 	}

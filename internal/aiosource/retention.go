@@ -17,7 +17,9 @@ func (s *Service) retainHistory() {
 			return
 		case <-timer.C:
 		}
-		policy, policyErr := s.DB.RuntimeValues(s.ctx, "history")
+		policyCtx, policyCancel := context.WithTimeout(s.ctx, 5*time.Second)
+		policy, policyErr := s.DB.RuntimeValues(policyCtx, "history")
+		policyCancel()
 		pass := 10 * time.Second
 		if policyErr == nil {
 			pass = time.Duration(policy["pass_seconds"]) * time.Second

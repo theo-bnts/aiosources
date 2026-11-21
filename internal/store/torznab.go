@@ -170,21 +170,21 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		norm := escapeSearchFragment.Replace(model.NormalizeTitle(q.Artist))
 		if norm != "" {
 			pat := bind("%" + norm + "%")
-			clauses = append(clauses, `(EXISTS(SELECT 1 FROM aiosources.mb_release_groups rg JOIN aiosources.mb_artist_credit_names acn ON acn.artist_credit=rg.artist_credit JOIN aiosources.mb_artists a ON a.id=acn.artist_id WHERE rg.gid=w.musicbrainz_id AND (a.normalized LIKE `+pat+` ESCAPE '\' OR EXISTS(SELECT 1 FROM aiosources.mb_aliases al WHERE al.entity='artist' AND al.entity_id=a.id AND al.normalized LIKE `+pat+` ESCAPE '\'))) OR `+torrentTextSearchSQLFor("t", q.Artist, bind)+`)`)
+			clauses = append(clauses, `((w.musicbrainz_id<>'' AND EXISTS(SELECT 1 FROM aiosources.mb_release_groups rg JOIN aiosources.mb_artist_credit_names acn ON acn.artist_credit=rg.artist_credit JOIN aiosources.mb_artists a ON a.id=acn.artist_id WHERE rg.gid=w.musicbrainz_id AND (a.normalized LIKE `+pat+` ESCAPE '\' OR EXISTS(SELECT 1 FROM aiosources.mb_aliases al WHERE al.entity='artist' AND al.entity_id=a.id AND al.normalized LIKE `+pat+` ESCAPE '\')))) OR `+torrentTextSearchSQLFor("t", q.Artist, bind)+`)`)
 		}
 	}
 	if q.Label != "" {
 		norm := escapeSearchFragment.Replace(model.NormalizeTitle(q.Label))
 		if norm != "" {
 			pat := bind("%" + norm + "%")
-			clauses = append(clauses, `(EXISTS(SELECT 1 FROM aiosources.mb_release_groups rg JOIN aiosources.mb_releases r ON r.release_group_id=rg.id JOIN aiosources.mb_release_labels rl ON rl.release_id=r.id JOIN aiosources.mb_labels l ON l.id=rl.label_id WHERE rg.gid=w.musicbrainz_id AND l.normalized LIKE `+pat+` ESCAPE '\') OR `+torrentTextSearchSQLFor("t", q.Label, bind)+`)`)
+			clauses = append(clauses, `((w.musicbrainz_id<>'' AND EXISTS(SELECT 1 FROM aiosources.mb_release_groups rg JOIN aiosources.mb_releases r ON r.release_group_id=rg.id JOIN aiosources.mb_release_labels rl ON rl.release_id=r.id JOIN aiosources.mb_labels l ON l.id=rl.label_id WHERE rg.gid=w.musicbrainz_id AND l.normalized LIKE `+pat+` ESCAPE '\')) OR `+torrentTextSearchSQLFor("t", q.Label, bind)+`)`)
 		}
 	}
 	if q.Track != "" {
 		clauses = append(clauses, torrentTextSearchSQLFor("t", q.Track, bind))
 	}
 	if q.MBID != "" {
-		clauses = append(clauses, "w.musicbrainz_id=aiosources.mb_resolve_rg("+bind(q.MBID)+")")
+		clauses = append(clauses, "w.musicbrainz_id<>'' AND w.musicbrainz_id=aiosources.mb_resolve_rg("+bind(q.MBID)+")")
 	}
 	if q.BookTitle != "" {
 		clauses = append(clauses, bookTitleSearchSQL(q.BookTitle, bind))
@@ -193,7 +193,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) AND a.normalized LIKE "+bind("%"+escapeSearchFragment.Replace(model.NormalizeTitle(q.Author))+"%")+` ESCAPE '\')`)
 	}
 	if q.ISBN != "" {
-		clauses = append(clauses, "EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")
+		clauses = append(clauses, "w.media_type='book' AND w.openlibrary_id<>'' AND EXISTS(SELECT 1 FROM aiosources.ol_editions e WHERE e.work_keys && aiosources.ol_aliases(w.openlibrary_id) AND e.isbn @> ARRAY["+bind(q.ISBN)+"::text])")
 	}
 	if q.Mode == "tvsearch" {
 		clauses = append(clauses, "w.media_type='tv'")
@@ -229,9 +229,16 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 		}
 		clauses = append(clauses, category+"=ANY("+bind(types)+"::int[])")
 	}
-	for _, f := range []struct{ column, value string }{{"imdb_id", q.IMDb}, {"tmdb_id", q.TMDB}, {"tvdb_id", q.TVDB}} {
+	for _, f := range []struct {
+		column, value string
+		partial       bool
+	}{{"imdb_id", q.IMDb, true}, {"tmdb_id", q.TMDB, false}, {"tvdb_id", q.TVDB, true}} {
 		if f.value != "" {
-			clauses = append(clauses, "w."+f.column+"="+bind(f.value))
+			if f.partial {
+				clauses = append(clauses, "w."+f.column+"<>'' AND w."+f.column+"="+bind(f.value))
+			} else {
+				clauses = append(clauses, "w."+f.column+"="+bind(f.value))
+			}
 		}
 	}
 	if q.Year != 0 {

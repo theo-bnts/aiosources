@@ -73,7 +73,7 @@ ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_corres
 }
 
 func (s *Store) QueueAllReleaseCorrespondences(ctx context.Context) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin correspondence queue refresh", err)
 	}
@@ -111,7 +111,7 @@ func (s *Store) ClaimCorrespondenceScopes(ctx context.Context, limit int) ([]mod
 	}
 	// Process 'work' scopes before 'hash' scopes ('work' > 'hash' lexicographically)
 	// so work-scoped groups claim their members before hash-only fallback groups run.
-	rows, err := s.pool.Query(ctx, `SELECT scope,scope_key,version FROM aiosources.aio_release_correspondence_queue ORDER BY scope DESC,scope_key LIMIT $1`, limit)
+	rows, err := s.workerPool().Query(ctx, `SELECT scope,scope_key,version FROM aiosources.aio_release_correspondence_queue ORDER BY scope DESC,scope_key LIMIT $1`, limit)
 	if err != nil {
 		return nil, databaseError("read correspondence queue", err)
 	}
@@ -134,7 +134,7 @@ func (s *Store) ProcessCorrespondenceBatch(ctx context.Context, scopes []model.C
 	if build == nil {
 		return 0, 0, 0, model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return 0, 0, 0, databaseError("begin correspondence batch", err)
 	}

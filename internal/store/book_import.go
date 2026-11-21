@@ -17,7 +17,7 @@ func BookSelectionKey(c model.AIOConfig) string {
 // A scope change starts a new resumable snapshot. Existing information stays
 // available until the selected snapshot has been verified and reconciled.
 func (s *Store) PrepareBookImport(ctx context.Context, c model.AIOConfig) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (s *Store) BeginBookExportPart(ctx context.Context, phase int, snapshot, et
 	if !ok || phase < 1 || phase > 4 || len(snapshot) > 2048 || len(etag) > 512 {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ UPDATE aiosources.ol_import_state SET export_phase=1,position=0,phase_snapshot='
 }
 
 func (s *Store) SelectBookExportKeys(ctx context.Context, keys []string) (map[string]bool, error) {
-	return selectBookImportReferences(ctx, s.pool, keys)
+	return selectBookImportReferences(ctx, s.workerPool(), keys)
 }
 
 func selectBookImportReferences(ctx context.Context, q interface {
@@ -145,7 +145,7 @@ func selectBookImportReferences(ctx context.Context, q interface {
 }
 
 func (s *Store) FinishBookExportPart(ctx context.Context, phase int, position int64) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET export_phase=export_phase+1,phase_snapshot='',phase_etag='',phase_position=0,data_complete=($1=4) WHERE singleton AND export_phase=$1 AND phase_position=$2`, phase, position)
+	tag, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_import_state SET export_phase=export_phase+1,phase_snapshot='',phase_etag='',phase_position=0,data_complete=($1=4) WHERE singleton AND export_phase=$1 AND phase_position=$2`, phase, position)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (s *Store) FinishBookExportPart(ctx context.Context, phase int, position in
 // References absent from the export are resolved by the same durable change
 // queue as later updates (including redirects), without per-book bulk requests.
 func (s *Store) FinishBookImportReferences(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `INSERT INTO aiosources.ol_change_jobs(id,revision,changed_at)
+	_, err := s.workerPool().Exec(ctx, `INSERT INTO aiosources.ol_change_jobs(id,revision,changed_at)
  SELECT r.id,0,COALESCE(i.snapshot_at,now()) FROM aiosources.ol_import_references r CROSS JOIN aiosources.ol_import_state i
  WHERE i.singleton AND NOT EXISTS(SELECT 1 FROM aiosources.aio_works WHERE openlibrary_id=r.id AND openlibrary_id<>'')
  AND NOT EXISTS(SELECT 1 FROM aiosources.ol_authors WHERE id=r.id) AND NOT EXISTS(SELECT 1 FROM aiosources.ol_editions WHERE id=r.id)

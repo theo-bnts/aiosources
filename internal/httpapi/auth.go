@@ -100,7 +100,9 @@ func (a *authentication) lookup(r *http.Request) (session, error) {
 		return session{}, store.ErrAuthentication
 	}
 	key := sha256.Sum256([]byte(cookie.Value))
-	value, err := a.db.AdminSession(r.Context(), key[:], a.passwordHash)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	value, err := a.db.AdminSession(ctx, key[:], a.passwordHash)
 	if err != nil {
 		return session{}, err
 	}

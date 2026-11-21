@@ -5,9 +5,10 @@ import "strings"
 // Search only discovers works represented in the local source catalog. Resolve
 // their editions before applying text predicates: joining globally matching
 // editions back to these few works can traverse millions of unrelated entries.
-const catalogBookScope = `WITH catalog_matched_ids AS MATERIALIZED(
- SELECT DISTINCT work_id AS id FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL),
-catalog_book_ids AS MATERIALIZED(
+const catalogMatchedScope = `catalog_matched_ids AS MATERIALIZED(
+ SELECT DISTINCT work_id AS id FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL)`
+
+const catalogBookScopeCTE = `catalog_book_ids AS MATERIALIZED(
  SELECT w.id FROM catalog_matched_ids m JOIN aiosources.aio_works w ON w.id=m.id WHERE w.media_type='book'),
 redirected_keys AS MATERIALIZED(
  SELECT source AS id FROM aiosources.ol_redirects UNION SELECT target AS id FROM aiosources.ol_redirects),
@@ -28,7 +29,10 @@ catalog_book_authors AS MATERIALIZED(
  UNION ALL SELECT k.work_id,r.target,k.seen||r.target FROM keys k JOIN aiosources.ol_redirects r ON r.source=k.id
  WHERE cardinality(k.seen)<8 AND NOT r.target=ANY(k.seen)),
  authors AS MATERIALIZED(SELECT id,normalized FROM aiosources.ol_authors WHERE id=ANY(ARRAY(SELECT DISTINCT id FROM keys)))
- SELECT DISTINCT k.work_id,a.id,a.normalized FROM keys k JOIN authors a ON a.id=k.id) `
+ SELECT DISTINCT k.work_id,a.id,a.normalized FROM keys k JOIN authors a ON a.id=k.id)`
+
+const catalogBookScope = `WITH ` + catalogMatchedScope + `,
+` + catalogBookScopeCTE + ` `
 
 func catalogBookCandidates(query, normalized, matching, anchor string) string {
 	workMatching := strings.ReplaceAll(matching, "normalized ", "book_normalized ")

@@ -29,7 +29,7 @@ type BookChangeJob struct {
 
 func (s *Store) BookChangesState(ctx context.Context) (BookChangesState, error) {
 	var v BookChangesState
-	err := s.pool.QueryRow(ctx, `SELECT anchor_id,anchor_at,tail_since,bootstrap_day,bootstrap_complete,changes_through,last_sync,checked_at,retry_at,needs_dump_after,dump_checked_at,error,tail_start_id,provider_retry_at FROM aiosources.ol_changes_state WHERE singleton`).Scan(&v.AnchorID, &v.AnchorAt, &v.TailSince, &v.BootstrapDay, &v.BootstrapComplete, &v.ChangesThrough, &v.LastSync, &v.CheckedAt, &v.RetryAt, &v.NeedsDumpAfter, &v.DumpCheckedAt, &v.Error, &v.TailID, &v.ProviderRetryAt)
+	err := s.workerPool().QueryRow(ctx, `SELECT anchor_id,anchor_at,tail_since,bootstrap_day,bootstrap_complete,changes_through,last_sync,checked_at,retry_at,needs_dump_after,dump_checked_at,error,tail_start_id,provider_retry_at FROM aiosources.ol_changes_state WHERE singleton`).Scan(&v.AnchorID, &v.AnchorAt, &v.TailSince, &v.BootstrapDay, &v.BootstrapComplete, &v.ChangesThrough, &v.LastSync, &v.CheckedAt, &v.RetryAt, &v.NeedsDumpAfter, &v.DumpCheckedAt, &v.Error, &v.TailID, &v.ProviderRetryAt)
 	return v, databaseError("read book change progress", err)
 }
 
@@ -83,7 +83,7 @@ func queueOpenLibraryAliases(ctx context.Context, tx pgx.Tx, records []books.Rec
 		return err
 	}
 	_, err := tx.Exec(ctx, `WITH aliases AS (
- SELECT book_normalized AS normalized FROM aiosources.aio_works WHERE media_type='book' AND (openlibrary_id=ANY($1::text[]) OR (book_data->'author_keys') ?| $1::text[])
+ SELECT book_normalized AS normalized FROM aiosources.aio_works WHERE media_type='book' AND openlibrary_id<>'' AND (openlibrary_id=ANY($1::text[]) OR (book_data->'author_keys') ?| $1::text[])
  UNION SELECT normalized FROM aiosources.ol_editions WHERE id=ANY($1::text[]) OR work_keys && $1::text[] OR author_keys && $1::text[]
  ) INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
  SELECT DISTINCT m.provider_id,m.source_id FROM aliases a JOIN aiosources.aio_matches m
@@ -116,7 +116,7 @@ func (s *Store) queueBookChanges(ctx context.Context, keys []books.ChangeKey, de
 	if len(keys) > 250 {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (s *Store) AdvanceBookAnchor(ctx context.Context, expected string, head boo
 	if head.ID == "" || head.At.IsZero() {
 		return model.ErrInvalid
 	}
-	tag, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET anchor_id=$2,anchor_at=$3,tail_start_id=CASE WHEN tail_since IS NULL THEN $2 ELSE tail_start_id END,tail_since=COALESCE(tail_since,$3),checked_at=now(),retry_at=NULL,error='' WHERE singleton AND anchor_id=$1`, expected, head.ID, head.At)
+	tag, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET anchor_id=$2,anchor_at=$3,tail_start_id=CASE WHEN tail_since IS NULL THEN $2 ELSE tail_start_id END,tail_since=COALESCE(tail_since,$3),checked_at=now(),retry_at=NULL,error='' WHERE singleton AND anchor_id=$1`, expected, head.ID, head.At)
 	if err == nil && tag.RowsAffected() != 1 {
 		return model.ErrConflict
 	}
@@ -178,12 +178,12 @@ func (s *Store) AdvanceBookAnchor(ctx context.Context, expected string, head boo
 }
 
 func (s *Store) RequireBookExport(ctx context.Context, after time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET needs_dump_after=GREATEST(needs_dump_after,$1),bootstrap_complete=FALSE,dump_checked_at=NULL WHERE singleton`, after)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET needs_dump_after=GREATEST(needs_dump_after,$1),bootstrap_complete=FALSE,dump_checked_at=NULL WHERE singleton`, after)
 	return databaseError("mark book catalog recovery", err)
 }
 
 func (s *Store) RestartBookAnchor(ctx context.Context, expected string, head books.Change) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET anchor_id=$2,anchor_at=$3,tail_since=$3,tail_start_id=$2,checked_at=now(),retry_at=NULL,error='',needs_dump_after=GREATEST(needs_dump_after,$3),bootstrap_complete=FALSE,dump_checked_at=NULL WHERE singleton AND anchor_id=$1`, expected, head.ID, head.At)
+	tag, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET anchor_id=$2,anchor_at=$3,tail_since=$3,tail_start_id=$2,checked_at=now(),retry_at=NULL,error='',needs_dump_after=GREATEST(needs_dump_after,$3),bootstrap_complete=FALSE,dump_checked_at=NULL WHERE singleton AND anchor_id=$1`, expected, head.ID, head.At)
 	if err == nil && tag.RowsAffected() != 1 {
 		return model.ErrConflict
 	}
@@ -191,22 +191,22 @@ func (s *Store) RestartBookAnchor(ctx context.Context, expected string, head boo
 }
 
 func (s *Store) SetBookSnapshotDate(ctx context.Context, at time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_import_state SET snapshot_at=$1 WHERE singleton AND snapshot_at IS NULL`, at)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_import_state SET snapshot_at=$1 WHERE singleton AND snapshot_at IS NULL`, at)
 	return err
 }
 
 func (s *Store) BookFeedFailed(ctx context.Context, retry time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET retry_at=GREATEST(retry_at,$1),error='Book changes could not be retrieved. Saved progress is preserved.' WHERE singleton`, retry)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET retry_at=GREATEST(retry_at,$1),error='Book changes could not be retrieved. Saved progress is preserved.' WHERE singleton`, retry)
 	return err
 }
 
 func (s *Store) BookExportChecked(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET dump_checked_at=now() WHERE singleton`)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET dump_checked_at=now() WHERE singleton`)
 	return err
 }
 
 func (s *Store) BeginBookCatchup(ctx context.Context, snapshot time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET bootstrap_day=($1::timestamptz AT TIME ZONE 'UTC')::date,
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET bootstrap_day=($1::timestamptz AT TIME ZONE 'UTC')::date,
  bootstrap_complete=(tail_since IS NOT NULL AND tail_since<=$1),
  needs_dump_after=CASE WHEN needs_dump_after<=$1 THEN NULL ELSE needs_dump_after END
  WHERE singleton`, snapshot)
@@ -214,7 +214,7 @@ func (s *Store) BeginBookCatchup(ctx context.Context, snapshot time.Time) error 
 }
 
 func (s *Store) AdvanceBookCatchup(ctx context.Context, expected, next time.Time) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET bootstrap_day=($2::timestamptz AT TIME ZONE 'UTC')::date,
+	tag, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET bootstrap_day=($2::timestamptz AT TIME ZONE 'UTC')::date,
  bootstrap_complete=(tail_since IS NOT NULL AND ($2::timestamptz AT TIME ZONE 'UTC')::date>=(tail_since AT TIME ZONE 'UTC')::date+1)
  WHERE singleton AND bootstrap_day=($1::timestamptz AT TIME ZONE 'UTC')::date`, expected, next)
 	if err == nil && tag.RowsAffected() != 1 {
@@ -239,7 +239,7 @@ func (s *Store) bookChangeJobs(ctx context.Context, limit int, oldest bool) ([]B
 	if oldest {
 		order = "changed_at,id"
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id,revision,version,changed_at,attempts FROM aiosources.ol_change_jobs WHERE next_attempt<=now() ORDER BY `+order+` LIMIT $1`, limit)
+	rows, err := s.workerPool().Query(ctx, `SELECT id,revision,version,changed_at,attempts FROM aiosources.ol_change_jobs WHERE next_attempt<=now() ORDER BY `+order+` LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (s *Store) bookChangeJobs(ctx context.Context, limit int, oldest bool) ([]B
 }
 
 func (s *Store) AcknowledgeKnownBookChange(ctx context.Context, job BookChangeJob) (bool, error) {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM aiosources.ol_change_jobs WHERE id=$1 AND version=$2 AND EXISTS(
+	tag, err := s.workerPool().Exec(ctx, `DELETE FROM aiosources.ol_change_jobs WHERE id=$1 AND version=$2 AND EXISTS(
  SELECT 1 FROM aiosources.aio_works WHERE openlibrary_id=$1 AND openlibrary_id<>'' AND ol_revision>=$3
  UNION ALL SELECT 1 FROM aiosources.ol_editions WHERE id=$1 AND ol_revision>=$3
  UNION ALL SELECT 1 FROM aiosources.ol_authors WHERE id=$1 AND ol_revision>=$3
@@ -267,7 +267,7 @@ func (s *Store) AcknowledgeKnownBookChange(ctx context.Context, job BookChangeJo
 }
 
 func (s *Store) DeferBookChange(ctx context.Context, job BookChangeJob, delay time.Duration) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_change_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>$3) WHERE id=$1 AND version=$2`, job.ID, job.Version, delay.Seconds())
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_change_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>$3) WHERE id=$1 AND version=$2`, job.ID, job.Version, delay.Seconds())
 	return err
 }
 
@@ -280,7 +280,7 @@ func (s *Store) ApplyBookChange(ctx context.Context, job BookChangeJob, record b
 	if record.Modified == nil || record.Modified.Before(job.ChangedAt) {
 		record.Modified = &job.ChangedAt
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,7 @@ func (s *Store) ApplyBookChange(ctx context.Context, job BookChangeJob, record b
 
 func (s *Store) BookDependencies(ctx context.Context, record books.Record) ([]string, error) {
 	keys := bookRecordReferences(record)
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	tx, err := s.workerPool().BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func (s *Store) BookDependencies(ctx context.Context, record books.Record) ([]st
 }
 
 func (s *Store) FinishBookChanges(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.ol_changes_state SET changes_through=anchor_at,last_sync=now()
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.ol_changes_state SET changes_through=anchor_at,last_sync=now()
  WHERE singleton AND bootstrap_complete AND needs_dump_after IS NULL AND error='' AND anchor_at IS NOT NULL
  AND NOT EXISTS(SELECT 1 FROM aiosources.ol_change_jobs);
  UPDATE aiosources.ol_import_state SET error='',retry_at=NULL,sync_failures=0 WHERE singleton;

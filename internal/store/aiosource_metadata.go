@@ -74,7 +74,7 @@ func (s *Store) SaveAIOMetadataBatch(ctx context.Context, inputs []AIOMetadataPu
 	if len(inputs) > 100 {
 		return model.ErrInvalid
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin metadata publication", err)
 	}
@@ -305,7 +305,7 @@ SELECT provider_id,source_id FROM (
 
 // Keep v1's bounded freshness audit alongside changes and daily inventory.
 func (s *Store) QueueAIORefresh(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id)
+	_, err := s.workerPool().Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id)
 SELECT media_type,tmdb_id FROM aiosources.aio_works w WHERE media_type IN ('movie','tv') AND updated_at<now()-interval '30 days'
 AND NOT EXISTS(SELECT 1 FROM aiosources.aio_metadata_jobs j WHERE j.media_type=w.media_type AND j.tmdb_id=w.tmdb_id)
 ORDER BY updated_at,media_type,tmdb_id LIMIT 100 ON CONFLICT DO NOTHING`)

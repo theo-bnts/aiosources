@@ -259,8 +259,8 @@ func scanAIOWork(row scanner, extra ...any) (model.AIOWork, error) {
 
 const aioCandidatesQuery = `WITH candidate_ids AS (
  SELECT id FROM aiosources.aio_works WHERE $2<>'' AND tmdb_id=$2
- UNION SELECT id FROM aiosources.aio_works WHERE $3<>'' AND imdb_id=$3
- UNION SELECT id FROM aiosources.aio_works WHERE $4<>'' AND tvdb_id=$4
+ UNION SELECT id FROM aiosources.aio_works WHERE $3<>'' AND imdb_id<>'' AND imdb_id=$3
+ UNION SELECT id FROM aiosources.aio_works WHERE $4<>'' AND tvdb_id<>'' AND tvdb_id=$4
  UNION SELECT work_id FROM aiosources.aio_titles WHERE normalized=$1
  UNION SELECT work_id FROM aiosources.aio_titles WHERE normalized=ANY($10::text[])
  UNION SELECT work_id FROM aiosources.aio_titles WHERE NOT $9::boolean AND normalized OPERATOR(public.%) $1 AND public.similarity(normalized,$1)>=0.5
@@ -459,7 +459,7 @@ func stringValue(v any) string {
 	}
 }
 func (s *Store) AIOMatchBatch(ctx context.Context, limit int) ([]model.AIORecord, error) {
-	rows, err := s.pool.Query(ctx, `SELECT `+aioRecordColumns+`,q.version FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id) ORDER BY q.provider_id,q.source_id LIMIT $1`, limit)
+	rows, err := s.workerPool().Query(ctx, `SELECT `+aioRecordColumns+`,q.version FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id) ORDER BY q.provider_id,q.source_id LIMIT $1`, limit)
 	if err != nil {
 		return nil, databaseError("read matching queue", err)
 	}
@@ -475,7 +475,7 @@ func (s *Store) AIOMatchBatch(ctx context.Context, limit int) ([]model.AIORecord
 	return out, databaseError("read matching queue", rows.Err())
 }
 func (s *Store) SaveAIOMatch(ctx context.Context, r model.AIORecord, status, reason string, work *model.AIOWork) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -549,9 +549,8 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 		typ = mediaType
 	}
 	order := ` ORDER BY COALESCE(t.search_published_at,t.first_seen_at) DESC,t.provider_id,t.source_id`
-	query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,w.original_language,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id` + aioPropagatedJoin + ` WHERE ` + aioPublishedMatch + ` AND w.media_type=$2 AND w.` + column + `=$1` + order
 	if kind == "mal" {
-		query = `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,` + aioOriginalLanguageExpr + ` FROM aiosources.torrents t` + aioPropagatedJoin + ` WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
+		query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,` + aioOriginalLanguageExpr + ` FROM aiosources.torrents t` + aioPropagatedJoin + ` WHERE (` + aioMALAssertionPredicate + `) AND aiosources.aio_native_mal_candidates(t.fields) @> ARRAY[$1::text]` + order
 		rows, err := s.pool.Query(ctx, query, id)
 		out, err := collectAIORecords(rows, err, false)
 		// An indexed candidate is not an established assertion: every native
@@ -561,6 +560,11 @@ func (s *Store) AIOStreams(ctx context.Context, kind, id, mediaType string) ([]m
 	if column == "" {
 		return []model.AIORecord{}, nil
 	}
+	nonEmpty := ""
+	if column != "tmdb_id" {
+		nonEmpty = " AND w." + column + "<>''"
+	}
+	query := `SELECT ` + aioRecordColumns + `,` + aioPropagatedColumns + `,w.original_language,w.imdb_id,COALESCE(w.tmdb_id,''),w.tvdb_id FROM aiosources.torrents t JOIN aiosources.aio_matches m USING(provider_id,source_id) JOIN aiosources.aio_works w ON w.id=m.work_id` + aioPropagatedJoin + ` WHERE ` + aioPublishedMatch + ` AND w.media_type=$2` + nonEmpty + ` AND w.` + column + `=$1` + order
 	rows, err := s.pool.Query(ctx, query, id, typ)
 	records, err := collectAIORecords(rows, err, true)
 	if err == nil {

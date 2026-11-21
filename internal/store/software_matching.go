@@ -26,22 +26,22 @@ func matchedSoftwareKind(record model.AIORecord, work *model.AIOWork) string {
 // title and alias matches. Never prefix % or similarity() with public. so
 // isolated search_path tests remain compatible.
 const softwareCandidateIDsSQL = `WITH candidate_ids AS (
- SELECT id FROM aiosources.aio_works WHERE $2<>'' AND media_type='software' AND software_key=aiosources.sw_resolve_key($2)
- UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=e.software_key
+ SELECT id FROM aiosources.aio_works WHERE $2<>'' AND media_type='software' AND software_key<>'' AND software_key=aiosources.sw_resolve_key($2)
+ UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key
   WHERE $3<>'' AND e.kind='winget_id' AND e.external_lower=lower($3)
- UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=e.software_key
+ UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key
   WHERE $4<>'' AND e.kind='homebrew_cask' AND e.external_lower=lower($4)
- UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=e.software_key
+ UNION SELECT w.id FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key
   WHERE $5<>'' AND e.kind='nvd_cpe' AND e.external_lower=lower($5)
- UNION SELECT id FROM aiosources.aio_works WHERE $2='' AND $3='' AND $4='' AND $5='' AND media_type='software' AND (
+ UNION SELECT id FROM aiosources.aio_works WHERE $2='' AND $3='' AND $4='' AND $5='' AND media_type='software' AND software_normalized<>'' AND (
   software_normalized=ANY($6::text[]) OR (NOT $7::boolean AND $1<>'' AND software_normalized % $1)
  )
  UNION SELECT t.work_id FROM aiosources.aio_titles t JOIN aiosources.aio_works w ON w.id=t.work_id
   WHERE $2='' AND $3='' AND $4='' AND $5='' AND w.media_type='software' AND (
    t.normalized=ANY($6::text[]) OR (NOT $7::boolean AND $1<>'' AND t.normalized % $1)
   )
- UNION SELECT w.id FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=a.software_key
-  WHERE $2='' AND $3='' AND $4='' AND $5='' AND (
+ UNION SELECT w.id FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=a.software_key
+  WHERE $2='' AND $3='' AND $4='' AND $5='' AND a.normalized<>'' AND (
    a.normalized=ANY($6::text[]) OR (NOT $7::boolean AND $1<>'' AND a.normalized % $1)
   )
 )
@@ -83,9 +83,10 @@ func searchSoftwareCandidates(ctx context.Context, tx pgx.Tx, f model.AIOCandida
 func softwareCatalogCandidates(queryArg, normalizedArg, matching string) string {
 	aliasMatch := strings.ReplaceAll(matching, "normalized", "a.normalized")
 	vendorMatch := strings.ReplaceAll(matching, "normalized", "c.vendor_norm")
+	resolved := `(SELECT aiosources.sw_resolve_key(` + queryArg + `))`
 	return `
- UNION ALL SELECT id,5,1::real FROM aiosources.aio_works WHERE media_type='software' AND software_key<>'' AND software_key=aiosources.sw_resolve_key(` + queryArg + `)
- UNION ALL SELECT w.id,5,1::real FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=e.software_key WHERE e.external_lower=lower(` + queryArg + `)
- UNION ALL SELECT w.id,CASE WHEN a.normalized=` + normalizedArg + ` THEN 4 ELSE 2 END,similarity(` + normalizedArg + `,a.normalized) FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=a.software_key WHERE ` + aliasMatch + `
- UNION ALL SELECT w.id,CASE WHEN c.vendor_norm=` + normalizedArg + ` THEN 3 ELSE 1 END,similarity(` + normalizedArg + `,c.vendor_norm) FROM aiosources.sw_catalog c JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key=c.software_key WHERE c.vendor_norm<>'' AND ` + vendorMatch
+ UNION ALL SELECT id,5,1::real FROM aiosources.aio_works WHERE media_type='software' AND software_key<>'' AND software_key=` + resolved + `
+ UNION ALL SELECT w.id,5,1::real FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
+ UNION ALL SELECT w.id,CASE WHEN a.normalized=` + normalizedArg + ` THEN 4 ELSE 2 END,similarity(` + normalizedArg + `,a.normalized) FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=a.software_key WHERE a.normalized<>'' AND ` + aliasMatch + `
+ UNION ALL SELECT w.id,CASE WHEN c.vendor_norm=` + normalizedArg + ` THEN 3 ELSE 1 END,similarity(` + normalizedArg + `,c.vendor_norm) FROM aiosources.sw_catalog c JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=c.software_key WHERE c.vendor_norm<>'' AND ` + vendorMatch
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -35,9 +36,13 @@ func validStorageIndexes(input model.StorageIndexSettings) bool {
 }
 
 func (s *Store) StorageIndexes(ctx context.Context) (model.StorageIndexSettings, error) {
+	return s.storageIndexes(ctx, s.pool)
+}
+
+func (s *Store) storageIndexes(ctx context.Context, pool *pgxpool.Pool) (model.StorageIndexSettings, error) {
 	var result model.StorageIndexSettings
 	var encoded, failures []byte
-	if err := s.pool.QueryRow(ctx, `SELECT revision,values,errors FROM aiosources.storage_index_settings WHERE singleton`).Scan(&result.Revision, &encoded, &failures); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT revision,values,errors FROM aiosources.storage_index_settings WHERE singleton`).Scan(&result.Revision, &encoded, &failures); err != nil {
 		return result, databaseError("read optional index settings", err)
 	}
 	if json.Unmarshal(encoded, &result.Values) != nil || !validStorageIndexes(result) {
@@ -52,7 +57,7 @@ func (s *Store) StorageIndexes(ctx context.Context) (model.StorageIndexSettings,
 	for _, index := range optionalStorageIndexes {
 		names = append(names, index.name)
 	}
-	rows, err := s.pool.Query(ctx, `SELECT configured.name,c.oid IS NOT NULL,i.indisvalid IS TRUE,
+	rows, err := pool.Query(ctx, `SELECT configured.name,c.oid IS NOT NULL,i.indisvalid IS TRUE,
  CASE WHEN c.oid IS NULL THEN 0 ELSE pg_relation_size(c.oid) END
  FROM unnest($1::text[]) WITH ORDINALITY AS configured(name,position)
  LEFT JOIN pg_class c ON c.relname=configured.name AND c.relnamespace='aiosources'::regnamespace
@@ -102,7 +107,7 @@ func (s *Store) ReconcileStorageIndexes(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	defer release()
-	settings, err := s.StorageIndexes(ctx)
+	settings, err := s.storageIndexes(ctx, s.workerPool())
 	if err != nil {
 		return false, err
 	}
@@ -164,5 +169,5 @@ func (s *Store) storageIndexResult(ctx context.Context, name string, cause error
 	if cause != nil {
 		message = "This index could not be changed. Check database permissions and free disk space; the change will be retried."
 	}
-	_, _ = s.pool.Exec(ctx, `UPDATE aiosources.storage_index_settings SET errors=CASE WHEN $2='' THEN errors-$1 ELSE jsonb_set(errors,ARRAY[$1],to_jsonb($2::text)) END WHERE singleton AND COALESCE(errors->>$1,'')<>$2`, name, message)
+	_, _ = s.workerPool().Exec(ctx, `UPDATE aiosources.storage_index_settings SET errors=CASE WHEN $2='' THEN errors-$1 ELSE jsonb_set(errors,ARRAY[$1],to_jsonb($2::text)) END WHERE singleton AND COALESCE(errors->>$1,'')<>$2`, name, message)
 }

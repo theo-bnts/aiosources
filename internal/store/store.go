@@ -10,7 +10,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +28,7 @@ const notificationChannel = "aiosources_run_changes"
 type Store struct {
 	runtime        runtimeSettingsCache
 	pool           *pgxpool.Pool
+	backgroundPool *pgxpool.Pool
 	collectionPool *pgxpool.Pool
 	mu             sync.Mutex
 	leases         map[string]*runLease
@@ -34,6 +37,25 @@ type Store struct {
 	background     context.Context
 	cancel         context.CancelFunc
 	listeners      sync.WaitGroup
+}
+
+func (s *Store) workerPool() *pgxpool.Pool {
+	if s.backgroundPool != nil {
+		return s.backgroundPool
+	}
+	return s.pool
+}
+
+func hasExplicitPoolMaxConns(databaseURL string) bool {
+	if u, err := url.Parse(databaseURL); err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
+		return u.Query().Has("pool_max_conns")
+	}
+	for _, field := range strings.Fields(databaseURL) {
+		if strings.HasPrefix(field, "pool_max_conns=") {
+			return true
+		}
+	}
+	return false
 }
 
 type runLease struct {
@@ -47,7 +69,12 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	if err != nil {
 		return nil, errors.New("invalid database connection configuration")
 	}
-	// Short queries retain their own budget, independently of collection leases.
+	// Short queries retain their own budget, independently of collection leases
+	// and long-running background metadata/matching workers. Give default
+	// deployments enough API/Stremio headroom while honoring explicit URL bounds.
+	if !hasExplicitPoolMaxConns(databaseURL) && config.MaxConns < 16 {
+		config.MaxConns = 16
+	}
 	if config.MaxConns < 4 {
 		config.MaxConns = 4
 	}
@@ -69,6 +96,17 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, databaseError("connect database", err)
 	}
+	// Isolate background metadata imports, identification batches, retention and
+	// storage measurements so lock waits in workers can never starve sessions,
+	// Stremio, Torznab or administration reads.
+	backgroundConfig := config.Copy()
+	backgroundConfig.MaxConns = 12
+	backgroundConfig.MinConns, backgroundConfig.MinIdleConns = 0, 0
+	backgroundPool, err := pgxpool.NewWithConfig(ctx, backgroundConfig)
+	if err != nil {
+		pool.Close()
+		return nil, databaseError("open background database pool", err)
+	}
 	// A run retains its session advisory lock until it finishes. Keeping these
 	// sessions separate supports the entire saved 1-32 range even on small
 	// machines, without occupying API, scheduling or recovery connections.
@@ -78,11 +116,12 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	collectionConfig.MinConns, collectionConfig.MinIdleConns = 0, 0
 	collectionPool, err := pgxpool.NewWithConfig(ctx, collectionConfig)
 	if err != nil {
+		backgroundPool.Close()
 		pool.Close()
 		return nil, databaseError("open collection sessions", err)
 	}
 	background, cancel := context.WithCancel(context.Background())
-	return &Store{pool: pool, collectionPool: collectionPool, leases: make(map[string]*runLease), claimSlots: make(chan struct{}, model.MaxCollectionWorkers), background: background, cancel: cancel}, nil
+	return &Store{pool: pool, backgroundPool: backgroundPool, collectionPool: collectionPool, leases: make(map[string]*runLease), claimSlots: make(chan struct{}, model.MaxCollectionWorkers), background: background, cancel: cancel}, nil
 }
 
 func (s *Store) Close() {
@@ -105,6 +144,9 @@ func (s *Store) Close() {
 	}
 	s.listeners.Wait()
 	s.collectionPool.Close()
+	if s.backgroundPool != nil {
+		s.backgroundPool.Close()
+	}
 	s.pool.Close()
 }
 

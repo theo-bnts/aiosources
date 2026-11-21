@@ -13,7 +13,7 @@ import (
 // MeasureHealth reads relation sizes without traversing observations or holding
 // collection leases. A failed measurement never substitutes zero for old data.
 func (s *Store) MeasureHealth(ctx context.Context, disk model.HealthDisk) (*model.SystemHealth, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	tx, err := s.workerPool().BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	if err != nil {
 		return nil, databaseError("begin storage measurement", err)
 	}

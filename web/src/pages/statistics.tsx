@@ -157,14 +157,11 @@ export function AIOStatisticsPage({
   if (section === 'games') return <GameStatisticsPage />
   if (section === 'software') return <SoftwareStatisticsPage />
   if (section === 'music') return <MusicStatisticsPage />
-  return section === 'debrid' ? (
-    <DebridStatisticsPage />
-  ) : (
-    <MetadataStatisticsPage section={section} />
-  )
+  if (section === 'books') return <BookStatisticsPage />
+  return section === 'debrid' ? <DebridStatisticsPage /> : <VideoStatisticsPage />
 }
 
-function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
+function VideoStatisticsPage() {
   const date = useDate()
   const query = useQuery({
     queryKey: ['aiosource', 'information'],
@@ -177,25 +174,19 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
         : COLLECTION_REFRESH_INTERVAL(),
   })
   const status = query.data
-  const books = status?.books
-  const book = section === 'books'
-  const path = `/metadata/${section}`
-  const running = book ? Boolean(books?.running) : Boolean(status?.syncing)
+  const path = '/metadata/videos'
+  const running = Boolean(status?.syncing)
   const resetting =
     status?.maintenance?.status === 'running' &&
-    (status.maintenance.scope === section || status.maintenance.scope === 'metadata')
-  const automatic = book ? status?.config.openlibrary_enabled : status?.config.auto_sync
-  const lastSync = book ? books?.last_sync : status?.status.last_sync
-  const appliedThrough = book ? books?.changes_through : status?.status.applied_through
-  const snapshot = book ? books?.snapshot_at : status?.status.inventory_date
-  const next = book ? books?.next_update : status?.automation.next_update
-  const needsAttention = book
-    ? Boolean(books?.error || books?.needs_export)
-    : Boolean(
-        status?.status.sync_error ||
-        status?.recovery_required ||
-        status?.status.recovery_started_at,
-      )
+    (status.maintenance.scope === 'videos' || status.maintenance.scope === 'metadata')
+  const automatic = status?.config.auto_sync
+  const lastSync = status?.status.last_sync
+  const appliedThrough = status?.status.applied_through
+  const snapshot = status?.status.inventory_date
+  const next = status?.automation.next_update
+  const needsAttention = Boolean(
+    status?.status.sync_error || status?.recovery_required || status?.status.recovery_started_at,
+  )
   return (
     <div className="page">
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
@@ -204,20 +195,11 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
       ) : (
         status && (
           <>
-            <dl className={`grid grid-cols-2 gap-3 ${book ? 'lg:grid-cols-4' : ''}`}>
-              <Statistic
-                label="Catalog entries"
-                value={book ? (books?.works ?? 0) : status.status.video_works}
-              />
-              {book && (
-                <>
-                  <Statistic label="Editions" value={books?.editions ?? 0} />
-                  <Statistic label="Authors" value={books?.authors ?? 0} />
-                </>
-              )}
+            <dl className="grid grid-cols-2 gap-3">
+              <Statistic label="Catalog entries" value={status.status.video_works} />
               <Statistic
                 label="Information pending"
-                value={book ? (books?.pending ?? 0) : status.status.pending}
+                value={status.status.pending}
                 to={`${path}/history`}
               />
             </dl>
@@ -227,16 +209,7 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
                 value={
                   resetting
                     ? 'Resetting information'
-                    : book
-                      ? books
-                        ? bookSyncLabel(books, automatic)
-                        : 'Not started'
-                      : metadataSyncLabel(
-                          status.status,
-                          running,
-                          automatic,
-                          status.recovery_required,
-                        )
+                    : metadataSyncLabel(status.status, running, automatic, status.recovery_required)
                 }
                 size="sm"
                 to={`${path}/settings`}
@@ -290,7 +263,117 @@ function MetadataStatisticsPage({ section }: { section: 'videos' | 'books' }) {
                 </Badge>
               </Link>
             </div>
-            {book && books && books.position > 0 && (
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+function BookStatisticsPage() {
+  const date = useDate()
+  const query = useQuery({
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
+    refetchInterval: (query) =>
+      query.state.data?.maintenance?.status === 'running'
+        ? LIVE_REFRESH_INTERVAL()
+        : COLLECTION_REFRESH_INTERVAL(),
+  })
+  const status = query.data
+  const books = status?.books
+  const path = '/metadata/books'
+  const running = Boolean(books?.running)
+  const resetting =
+    status?.maintenance?.status === 'running' &&
+    (status.maintenance.scope === 'books' || status.maintenance.scope === 'metadata')
+  const automatic = status?.config.openlibrary_enabled
+  const lastSync = books?.last_sync
+  const appliedThrough = books?.changes_through
+  const snapshot = books?.snapshot_at
+  const next = books?.next_update
+  const needsAttention = Boolean(books?.error || books?.needs_export)
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading label="Loading statistics" />
+      ) : (
+        status && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Statistic label="Catalog entries" value={books?.works ?? 0} />
+              <Statistic label="Editions" value={books?.editions ?? 0} />
+              <Statistic label="Authors" value={books?.authors ?? 0} />
+              <Statistic
+                label="Information pending"
+                value={books?.pending ?? 0}
+                to={`${path}/history`}
+              />
+            </dl>
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Statistic
+                label="Synchronization"
+                value={
+                  resetting
+                    ? 'Resetting information'
+                    : books
+                      ? bookSyncLabel(books, automatic)
+                      : 'Not started'
+                }
+                size="sm"
+                to={`${path}/settings`}
+              />
+              <Statistic
+                label="Last successful update"
+                value={lastSync ? date(lastSync) : 'No completed update'}
+                size="sm"
+                to={`${path}/history`}
+              />
+              <Statistic
+                label="Changes applied through"
+                value={appliedThrough ? date(appliedThrough) : 'Not established'}
+                size="sm"
+                to={`${path}/history`}
+              />
+              <Statistic
+                label="Export date"
+                value={snapshot ? date(snapshot, 'date') : 'Not established'}
+                size="sm"
+              />
+              <Statistic
+                label="Next automatic update"
+                value={
+                  resetting
+                    ? 'Waiting for reset'
+                    : running
+                      ? 'Running'
+                      : !automatic
+                        ? 'Disabled'
+                        : next
+                          ? date(next)
+                          : 'Waiting'
+                }
+                size="sm"
+                to={`${path}/settings`}
+              />
+            </dl>
+            <div className="flex flex-wrap gap-2" aria-label="Current activity">
+              <Link to={`${path}/history`} aria-label="View update history">
+                <Badge
+                  variant={running || resetting ? 'info' : needsAttention ? 'warning' : 'secondary'}
+                >
+                  {resetting
+                    ? 'Reset in progress'
+                    : running
+                      ? 'Update running'
+                      : needsAttention
+                        ? 'Update needs attention'
+                        : 'Update idle'}
+                </Badge>
+              </Link>
+            </div>
+            {books && books.position > 0 && (
               <Disclosure title="Import details">
                 <dl className="grid gap-4 sm:grid-cols-3">
                   <div>
