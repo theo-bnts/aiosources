@@ -35,7 +35,7 @@ const minimumSchemaVersion = 89 // The first AIOSources 2.3.0 release.
 //go:embed schema.sql
 var initialSchema string
 
-var errUpgradeRequired = errors.New("AIOSources 2.3 or later is required before upgrading to 2.4. Upgrade this installation to the latest 2.3 build first, then retry. Your existing data has not been changed")
+var errUpgradeRequired = errors.New("AIOSources 2.3 or later is required before upgrading to 2.5. Upgrade this installation to the latest 2.3 build first, then retry. Your existing data has not been changed")
 
 var migrations = []struct {
 	version int

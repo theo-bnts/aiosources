@@ -44,9 +44,9 @@ Use a consistent database backup or stop the services before copying their volum
 
 After choosing the tag, run `docker compose pull` and `docker compose up -d`. Preserve your volumes. Read the release's upgrade guidance and back up first; switching back to an older image may require restoring the backup made before the update.
 
-**About AIOSources** shows the release followed by the build, for example `2.4.0.977dd1727684`. Select the build identifier to open its GitHub release and find the corresponding image.
+**About AIOSources** shows the release followed by the build, for example `2.5.0.977dd1727684`. Select the build identifier to open its GitHub release and find the corresponding image.
 
-Upgrading to 2.4 requires AIOSources 2.3 or later. If your installation is older, update to the latest 2.3 build first, keeping the same volumes, then install 2.4. The application refuses older databases before changing them. Fresh installations can start directly on 2.4. Back up before upgrading and update replicas that share a database together. Returning to an older image may require restoring the backup.
+Upgrading to 2.5 requires AIOSources 2.3 or later. If your installation is older, update to the latest 2.3 build first, keeping the same volumes, then install 2.5. The application refuses older databases before changing them. Fresh installations can start directly on 2.5. Back up before upgrading and update replicas that share a database together. Returning to an older image may require restoring the backup.
 
 ## Upgrade from V1
 
