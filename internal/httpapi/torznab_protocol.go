@@ -46,7 +46,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 	if v.Has("media") {
 		q.MediaTypes = strings.Split(v.Get("media"), ",")
 		for _, typ := range q.MediaTypes {
-			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "music", "other"}, typ) {
+			if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "software", "music", "other"}, typ) {
 				return q, v, model.ErrInvalid
 			}
 		}
@@ -299,8 +299,24 @@ func torznabCaps(share model.Share, origin string) torznabCapabilities {
 			v.Categories = append(v.Categories, torznabCategory{ID: cat.id, Name: cat.name})
 		}
 	}
+	pcSubcats := []torznabCategory{}
 	if allowed("game") {
-		v.Categories = append(v.Categories, torznabCategory{ID: 1000, Name: "Console"}, torznabCategory{ID: 4000, Name: "PC", Subcategories: []torznabCategory{{ID: 4050, Name: "Games"}}})
+		v.Categories = append(v.Categories, torznabCategory{ID: 1000, Name: "Console"})
+		pcSubcats = append(pcSubcats, torznabCategory{ID: 4050, Name: "Games"})
+	}
+	if allowed("software") {
+		pcSubcats = append(pcSubcats,
+			torznabCategory{ID: 4010, Name: "0day"},
+			torznabCategory{ID: 4020, Name: "ISO"},
+			torznabCategory{ID: 4030, Name: "Mac"},
+			torznabCategory{ID: 4040, Name: "Mobile-Other"},
+			torznabCategory{ID: 4060, Name: "Mobile-iOS"},
+			torznabCategory{ID: 4070, Name: "Mobile-Android"},
+		)
+	}
+	if len(pcSubcats) > 0 {
+		slices.SortFunc(pcSubcats, func(a, b torznabCategory) int { return a.ID - b.ID })
+		v.Categories = append(v.Categories, torznabCategory{ID: 4000, Name: "PC", Subcategories: pcSubcats})
 	}
 	if allowed("ebook") || slices.Contains(share.MediaTypes, "book") {
 		v.Categories = append(v.Categories, torznabCategory{ID: 7000, Name: "Books", Subcategories: []torznabCategory{{ID: 7020, Name: "EBook"}, {ID: 7030, Name: "Comics"}}})
@@ -395,7 +411,7 @@ func torznabResults(result model.List[model.TorznabRecord], names map[string]str
 		if rec.Category == 3010 || rec.Category == 3030 || rec.Category == 3040 || rec.Category == 3050 {
 			attr("category", "3000")
 		}
-		if rec.Category == 4050 {
+		if rec.Category > 4000 && rec.Category < 5000 {
 			attr("category", "4000")
 		}
 		attr("infohash", rec.Hash)

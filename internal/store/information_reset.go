@@ -8,6 +8,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/software"
 )
 
 // Capture relationships before deleting metadata. Availability belongs to a
@@ -24,15 +25,17 @@ func (s *Store) resetInformation(ctx context.Context, scope string) error {
 		}
 	} else if scope == "games" {
 		types, services, resources = []string{"game"}, []string{"igdb"}, []string{"game", "igdb"}
+	} else if scope == "software" {
+		types, services, resources = []string{"software"}, []string{"software"}, []string{"software"}
 	} else if scope == "music" {
 		types, services, resources = []string{"music"}, []string{"musicbrainz"}, []string{"music", "musicbrainz"}
 	} else if scope != "books" {
 		return model.ErrInvalid
 	}
 	if scope == "metadata" {
-		types = append(types, "game", "music")
-		services = append(services, "igdb", "musicbrainz")
-		resources = append(resources, "game", "igdb", "music", "musicbrainz")
+		types = append(types, "game", "software", "music")
+		services = append(services, "igdb", "software", "musicbrainz")
+		resources = append(resources, "game", "igdb", "software", "music", "musicbrainz")
 	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -174,6 +177,12 @@ sync_failures=0,sync_error='',recovery_started_at=NULL,applied_through=NULL;`); 
 			return databaseError("reset game information", err)
 		}
 	}
+	if scope == "software" || scope == "metadata" {
+		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.sw_source_entries,aiosources.sw_icons,aiosources.sw_catalog,aiosources.sw_aliases,aiosources.sw_external_ids;
+UPDATE aiosources.sw_sync_state SET complete=FALSE,works=0,nvd_entries=0,winget_entries=0,homebrew_entries=0,icons=0,icons_indexed=0,imported=0,position=0,filtered=0,skipped=0,phase='idle',generation=generation+1,nvd_snapshot='',nvd_snapshot_sha256='',nvd_snapshot_at=NULL,nvd_changes_through=NULL,winget_etag='',winget_synced_at=NULL,homebrew_etag='',homebrew_synced_at=NULL,icons_etag='',icons_synced_at=NULL,last_import=NULL,last_sync=NULL,needs_full_import=FALSE,recovery_reason='',retry_at=NULL,checked_at=NULL,error='' WHERE singleton`); err != nil {
+			return databaseError("reset software information", err)
+		}
+	}
 	if scope == "music" || scope == "metadata" {
 		if _, err = tx.Exec(ctx, `TRUNCATE aiosources.mb_lookups,aiosources.mb_artists,aiosources.mb_aliases,aiosources.mb_artist_credits,aiosources.mb_artist_credit_names,aiosources.mb_labels,aiosources.mb_release_groups,aiosources.mb_release_group_secondary_types,aiosources.mb_releases,aiosources.mb_release_years,aiosources.mb_release_labels,aiosources.mb_mediums,aiosources.mb_urls,aiosources.mb_entity_urls,aiosources.mb_redirects,aiosources.mb_cover_art,aiosources.mb_rg_cover_art;
 UPDATE aiosources.mb_state SET complete=FALSE,works=0,releases=0,artists=0,labels=0,covers=0,imported=0,position=0,filtered=0,skipped=0,phase='idle',snapshot='',snapshot_at=NULL,replication_sequence=0,schema_sequence=0,generation=generation+1,last_import=NULL,last_sync=NULL,changes_through=NULL,last_packet_at=NULL,needs_export=FALSE,recovery_reason='',schema_unsupported=FALSE,retry_at=NULL,checked_at=NULL,error='' WHERE singleton`); err != nil {
@@ -232,6 +241,8 @@ LEFT JOIN aiosources.aio_works w ON w.id=m.work_id`); err != nil {
 					kind = "book"
 				} else if record.IGDB != "" || record.GameHints.Kind == "game" {
 					kind = "game"
+				} else if software.ParseRecord(record).Kind != "" {
+					kind = "software"
 				} else if music.ParseRecord(record).Kind != "" {
 					kind = "music"
 				} else if decision || record.IMDb != "" || record.TMDB != "" || record.TVDB != "" || record.MAL != "" {

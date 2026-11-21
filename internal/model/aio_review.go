@@ -6,6 +6,7 @@ import "time"
 type AIOMatchReview struct {
 	MusicBrainz     string    `json:"musicbrainz,omitempty"`
 	IGDB            string    `json:"igdb,omitempty"`
+	SoftwareKey     string    `json:"software_key,omitempty"`
 	OpenLibrary     string    `json:"openlibrary,omitempty"`
 	SourceChanged   bool      `json:"source_changed"`
 	Active          bool      `json:"active"`
@@ -20,13 +21,14 @@ type AIOMatchReview struct {
 }
 
 type AIOReviewDetail struct {
-	MusicEvidence  MusicHints      `json:"music_evidence,omitzero"`
-	BookEvidence   BookHints       `json:"book_evidence,omitzero"`
-	SuggestedYear  *int            `json:"suggested_year"`
-	SuggestedQuery string          `json:"suggested_query"`
-	Record         AIORecord       `json:"record"`
-	Review         *AIOMatchReview `json:"review"`
-	Work           *AIOWork        `json:"work"`
+	SoftwareEvidence SoftwareHints   `json:"software_evidence,omitzero"`
+	MusicEvidence    MusicHints      `json:"music_evidence,omitzero"`
+	BookEvidence     BookHints       `json:"book_evidence,omitzero"`
+	SuggestedYear    *int            `json:"suggested_year"`
+	SuggestedQuery   string          `json:"suggested_query"`
+	Record           AIORecord       `json:"record"`
+	Review           *AIOMatchReview `json:"review"`
+	Work             *AIOWork        `json:"work"`
 }
 
 type AIOReviewInput struct {

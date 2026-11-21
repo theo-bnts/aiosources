@@ -143,7 +143,7 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 			clauses = append(clauses, cached)
 		}
 	}
-	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'game' THEN CASE WHEN t.fields->>'title' ~* '\m(PS[1-5]|Switch|NSW|Wii|XBOX)\M' OR EXISTS(SELECT 1 FROM unnest(t.search_categories) c WHERE c ~ '^1[0-9]{3}$') THEN 1000 ELSE 4050 END WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("m") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 WHEN ` + bookReleaseKindSQL("m") + `='ebook' THEN 7020 ELSE 7000 END WHEN 'music' THEN CASE WHEN m.music_kind='lossless' THEN 3040 WHEN m.music_kind='mp3' THEN 3010 ELSE 3000 END ELSE 8000 END`
+	category := `CASE w.media_type WHEN 'movie' THEN 2000 WHEN 'tv' THEN 5000 WHEN 'game' THEN CASE WHEN t.fields->>'title' ~* '\m(PS[1-5]|Switch|NSW|Wii|XBOX)\M' OR EXISTS(SELECT 1 FROM unnest(t.search_categories) c WHERE c ~ '^1[0-9]{3}$') THEN 1000 ELSE 4050 END WHEN 'software' THEN CASE m.software_kind WHEN '0day' THEN 4010 WHEN 'iso' THEN 4020 WHEN 'mac' THEN 4030 WHEN 'mobile' THEN 4040 WHEN 'ios' THEN 4060 WHEN 'android' THEN 4070 ELSE 4000 END WHEN 'book' THEN CASE WHEN ` + bookReleaseKindSQL("m") + `='audiobook' THEN 3030 WHEN t.fields->>'title' ~* '\m(cbz|cbr|cb7|cba|cbt)\M' THEN 7030 WHEN ` + bookReleaseKindSQL("m") + `='ebook' THEN 7020 ELSE 7000 END WHEN 'music' THEN CASE WHEN m.music_kind='lossless' THEN 3040 WHEN m.music_kind='mp3' THEN 3010 ELSE 3000 END ELSE 8000 END`
 	if len(media) > 0 {
 		// Release format and Torznab category are separate: a known comic
 		// category does not turn an unclassified release into an ebook.
@@ -209,6 +209,8 @@ func torznabRows(ctx context.Context, tx pgx.Tx, q model.TorznabQuery, scope str
 				types = append(types, 2000)
 			case "game":
 				types = append(types, 1000, 4050)
+			case "software":
+				types = append(types, 4000, 4010, 4020, 4030, 4040, 4060, 4070)
 			case "tv":
 				types = append(types, 5000)
 			case "book":
@@ -267,7 +269,7 @@ WHERE ` + strings.Join(clauses, " AND ")
 	}
 	// Project only fields understood by the shared record decoder. No arbitrary
 	// JSON, source links, announce URLs, raw identities or secrets cross this boundary.
-	columns := `t.provider_id,''::text,jsonb_build_object('author',CASE WHEN w.media_type='book' THEN (SELECT string_agg(a.name,', ' ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))) END,'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'artist',CASE WHEN w.media_type='music' THEN COALESCE(NULLIF(w.music_data->>'artist_credit',''),w.music_data->'artists'->>0) END,'album',CASE WHEN w.media_type='music' THEN w.display_title END,'label',CASE WHEN w.media_type='music' THEN w.music_data->'labels'->>0 END,'musicbrainz_id',CASE WHEN w.media_type='music' THEN w.musicbrainz_id END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
+	columns := `t.provider_id,''::text,jsonb_build_object('author',CASE WHEN w.media_type='book' THEN (SELECT string_agg(a.name,', ' ORDER BY a.id) FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]')))))) END,'book_title',CASE WHEN w.media_type='book' THEN w.display_title END,'isbn',CASE WHEN w.media_type='book' AND m.reason='verified ISBN' THEN COALESCE(t.fields->>'isbn',t.fields->>'isbn_13',t.fields->>'isbn_10',t.fields#>>'{attributes,isbn,0}') END,'software_key',CASE WHEN w.media_type='software' THEN w.software_key END,'vendor',CASE WHEN w.media_type='software' THEN w.software_data->>'vendor' END,'artist',CASE WHEN w.media_type='music' THEN COALESCE(NULLIF(w.music_data->>'artist_credit',''),w.music_data->'artists'->>0) END,'album',CASE WHEN w.media_type='music' THEN w.display_title END,'label',CASE WHEN w.media_type='music' THEN w.music_data->'labels'->>0 END,'musicbrainz_id',CASE WHEN w.media_type='music' THEN w.musicbrainz_id END,'title',left(t.fields->>'title',4096),'info_hash',t.search_info_hash,'size',t.search_size,'published_at',COALESCE(t.search_published_at,t.first_seen_at),
 'season',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.season) ELSE COALESCE(t.fields->'season',t.fields#>'{attributes,season}') END,'episode',CASE WHEN review.provider_id IS NOT NULL THEN to_jsonb(review.episode) ELSE COALESCE(t.fields->'episode',t.fields#>'{attributes,episode}') END,
 'languages',CASE WHEN pg_column_size(t.fields->'languages')<=4096 THEN t.fields->'languages' END,'language',CASE WHEN pg_column_size(t.fields->'language')<=256 THEN t.fields->'language' END,
 'audiolangs',CASE WHEN pg_column_size(t.fields->'audiolangs')<=4096 THEN t.fields->'audiolangs' END,

@@ -75,6 +75,7 @@ var catalogDetailGroups = map[string]string{
 	"tmdb": "identifiers", "tmdb_id": "identifiers", "tmdbid": "identifiers",
 	"tvdb": "identifiers", "tvdb_id": "identifiers", "tvdbid": "identifiers",
 	"mal": "identifiers", "mal_id": "identifiers", "malid": "identifiers", "igdb_id": "identifiers", "igdb": "identifiers", "igdbid": "identifiers", "platform": "identifiers", "platforms": "identifiers", "game_platform": "identifiers",
+	"software_key": "identifiers", "winget_id": "identifiers", "winget": "identifiers", "homebrew_cask": "identifiers", "brew_cask": "identifiers", "nvd_cpe": "identifiers", "cpe": "identifiers", "vendor": "identifiers", "publisher": "identifiers", "os": "identifiers",
 	"mbid": "identifiers", "musicbrainz": "identifiers", "musicbrainz_id": "identifiers", "musicbrainz_release_group_id": "identifiers", "musicbrainz_release_id": "identifiers",
 	"discogs": "identifiers", "discogs_id": "identifiers", "wikidata": "identifiers", "wikidata_id": "identifiers", "barcode": "identifiers", "upc": "identifiers", "ean": "identifiers",
 	"category_id": "identifiers", "subcategory_id": "identifiers", "category_name": "identifiers",
@@ -103,7 +104,15 @@ func safeDetailText(value string, maximum int) bool {
 }
 
 func catalogEvidenceKey(key string) bool {
-	return catalogDetailGroups[key] == "identifiers" && key != "category_name" && key != "type" && key != "media_type"
+	if catalogDetailGroups[key] != "identifiers" {
+		return false
+	}
+	switch key {
+	case "category_name", "type", "media_type", "software_key", "winget_id", "winget", "homebrew_cask", "brew_cask", "nvd_cpe", "cpe", "vendor", "publisher", "os":
+		return false
+	default:
+		return true
+	}
 }
 
 func safeDetailValue(key string, value any) any {

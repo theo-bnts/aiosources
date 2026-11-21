@@ -14,7 +14,7 @@ func (c ProviderCall) Valid() bool {
 		return false
 	}
 	switch c.Phase {
-	case "provider_request", "provider_availability", "provider_inventory", "provider_add", "provider_files", "provider_cleanup", "provider_unlock", "provider_playback", "book_changes", "book_details", "music_snapshot", "music_dump", "music_covers", "music_replication":
+	case "provider_request", "provider_availability", "provider_inventory", "provider_add", "provider_files", "provider_cleanup", "provider_unlock", "provider_playback", "book_changes", "book_details", "music_snapshot", "music_dump", "music_covers", "music_replication", "software_nvd_meta", "software_nvd_dump", "software_nvd_incremental", "software_winget", "software_homebrew", "software_icons":
 	default:
 		return false
 	}

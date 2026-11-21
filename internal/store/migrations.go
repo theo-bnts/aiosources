@@ -54,6 +54,7 @@ var migrations = []struct {
 	{100, releaseCorrespondencesSchema},
 	{101, originalLanguageSchema},
 	{102, musicSchema},
+	{103, softwareSchema},
 }
 
 func schemaChecksum(sql string) string {

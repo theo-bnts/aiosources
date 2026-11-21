@@ -20,11 +20,13 @@ The saved connection defines the sources and media types it can access. Standard
 
 Availability filters use the selected cache services. Direct torrent-only connections skip debrid availability checks. Filtering to cached results does not turn Torznab into a debrid download service: the receiving client still needs a usable torrent or magnet and its own download setup.
 
-Choose **Games** for identified game releases, using standard Console and PC/Games categories. Set up [IGDB information](GAMES.md) to identify them locally.
+Choose **Games** for identified game releases, using standard Console and PC/Games categories (`4050` PC-Games belongs strictly to Games). Set up [IGDB information](GAMES.md) to identify them locally.
+
+Choose **Software** for identified desktop and mobile applications, using standard PC and Mobile categories (`4000` PC, `4010` 0day, `4020` ISO, `4030` Mac, `4040` Mobile-Other, `4060` Mobile-iOS, `4070` Mobile-Android, strictly excluding `4050` PC-Games). Set up [Software information](SOFTWARE.md) to identify them locally.
 
 Choose **Music** for identified albums, EPs and singles, using `t=music` (`artist`, `album`, `label`, `track`, `year`, `mbid`) and standard Audio categories (`3000`, `3010 MP3`, `3040 Lossless`, `3050 Other`, keeping `3030 Audiobook` separated for Open Library). Set up [MusicBrainz information](MUSIC.md) to identify them locally.
 
-Books are available alongside films, series, games and music. Choose **Books**, **Ebooks** or **Audiobooks** in the media filters. Compatible clients can search by title, author or ISBN and use standard Books, EBook, Comics and Audio/Audiobook categories. Book identification must be set up in [Metadata](BOOKS.md).
+Books are available alongside films, series, games, software and music. Choose **Books**, **Ebooks** or **Audiobooks** in the media filters. Compatible clients can search by title, author or ISBN and use standard Books, EBook, Comics and Audio/Audiobook categories. Book identification must be set up in [Metadata](BOOKS.md).
 
 Private-source downloads need an authorized announce URL. Treat a private Torznab key as a credential and give it only to clients you trust. Catalog-sharing passwords and Stremio links are separate and cannot replace it.
 

@@ -138,6 +138,45 @@ export function AboutDialog() {
             .
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
+            Software information and icons:{' '}
+            <a
+              href="https://nvd.nist.gov"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              NIST NVD
+            </a>
+            ,{' '}
+            <a
+              href="https://github.com/microsoft/winget-pkgs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              Microsoft WinGet
+            </a>
+            ,{' '}
+            <a
+              href="https://brew.sh"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              Homebrew
+            </a>{' '}
+            and{' '}
+            <a
+              href="https://selfh.st/icons"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="data-link"
+            >
+              selfh.st/icons
+            </a>{' '}
+            (CC BY 4.0).
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
             Music information and cover art:{' '}
             <a
               href="https://musicbrainz.org"

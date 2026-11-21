@@ -78,7 +78,7 @@ func (s *Store) BeginOperation(ctx context.Context, run model.OperationRun, lock
 }
 
 func validOperation(run model.OperationRun) bool {
-	serviceOK := (run.Kind == "metadata" && (run.Service == "igdb" || run.Service == "tmdb" || run.Service == "openlibrary" || run.Service == "musicbrainz")) || (run.Kind == "matching" && run.Service == "local") || ((run.Kind == "cache" || run.Kind == "download") && model.IsDebridService(run.Service)) || (run.Kind == "cleanup" && run.Service == "alldebrid")
+	serviceOK := (run.Kind == "metadata" && (run.Service == "igdb" || run.Service == "tmdb" || run.Service == "software" || run.Service == "openlibrary" || run.Service == "musicbrainz")) || (run.Kind == "matching" && run.Service == "local") || ((run.Kind == "cache" || run.Kind == "download") && model.IsDebridService(run.Service)) || (run.Kind == "cleanup" && run.Service == "alldebrid")
 	return serviceOK && (run.Trigger == "manual" || run.Trigger == "automatic" || run.Trigger == "playback" || (run.Trigger == "public" && run.Kind == "download")) && len(run.Resource) <= 256
 }
 
@@ -93,11 +93,15 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 		switch key {
 		case "matched", "ambiguous", "unmatched", "cached", "uncached", "cleaned":
 		case "snapshot_checked":
-			if run.Kind != "metadata" || (run.Service != "openlibrary" && run.Service != "musicbrainz") {
+			if run.Kind != "metadata" || (run.Service != "openlibrary" && run.Service != "musicbrainz" && run.Service != "software") {
 				return model.ErrInvalid
 			}
 		case "packets_applied", "export_checked":
 			if run.Kind != "metadata" || run.Service != "musicbrainz" {
+				return model.ErrInvalid
+			}
+		case "sources_synced", "nvd_incremental", "full_import":
+			if run.Kind != "metadata" || run.Service != "software" {
 				return model.ErrInvalid
 			}
 		default:

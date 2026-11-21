@@ -214,6 +214,21 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		games.NextUpdate = &next
 	}
+	softwareStatus, err := s.options.Store.SoftwareStatus(r.Context())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	softwareStatus.Running = s.options.AIOSource.SoftwareState()
+	softwareStatus.NVDKeyConfigured = c.SoftwareNVDSecret != ""
+	if c.SoftwareEnabled && !softwareStatus.Running {
+		next, err := s.options.Store.NextSoftwareUpdate(r.Context(), c.SoftwareMinutes)
+		if err != nil {
+			respondError(w, err)
+			return
+		}
+		softwareStatus.NextUpdate = &next
+	}
 	musicStatus, err := s.options.Store.MusicStatus(r.Context())
 	if err != nil {
 		respondError(w, err)
@@ -229,7 +244,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		musicStatus.NextUpdate = &next
 	}
-	writeJSON(w, 200, map[string]any{"music": musicStatus, "games": games, "books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
+	writeJSON(w, 200, map[string]any{"software": softwareStatus, "music": musicStatus, "games": games, "books": books, "config": c, "status": projection, "automation": automationProjection, "syncing": syncing, "matching": matching, "maintenance": s.options.AIOSource.ResetState(), "error": message, "matching_error": matchingError, "recovery_required": recovery})
 }
 func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 	defaults := store.DefaultAIOConfig()
@@ -238,6 +253,12 @@ func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 		IGDBMinutes:              defaults.IGDBMinutes,
 		IGDBRequestsPerSecond:    defaults.IGDBRequestsPerSecond,
 		IGDBReconcileDays:        defaults.IGDBReconcileDays,
+		SoftwareMinutes:          defaults.SoftwareMinutes,
+		SoftwareIncludeNVD:       defaults.SoftwareIncludeNVD,
+		SoftwareExcludePlugins:   defaults.SoftwareExcludePlugins,
+		SoftwareIncludeOS:        defaults.SoftwareIncludeOS,
+		SoftwareIncludeIcons:     defaults.SoftwareIncludeIcons,
+		SoftwarePlatforms:        defaults.SoftwarePlatforms,
 		OpenLibraryMinutes:       defaults.OpenLibraryMinutes,
 		OpenLibraryRelevantOnly:  defaults.OpenLibraryRelevantOnly,
 		OpenLibraryLanguages:     defaults.OpenLibraryLanguages,
@@ -262,6 +283,12 @@ func (s *server) aioConfig(w http.ResponseWriter, r *http.Request) {
 func (s *server) aioAction(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.PathValue("action") {
+	case "sync-software":
+		err = s.options.AIOSource.StartSoftware(r.Context(), "manual")
+	case "stop-software":
+		s.options.AIOSource.StopSoftware()
+	case "reset-software":
+		err = s.options.AIOSource.StartReset("software")
 	case "sync-music":
 		err = s.options.AIOSource.StartMusic(r.Context(), "manual")
 	case "stop-music":

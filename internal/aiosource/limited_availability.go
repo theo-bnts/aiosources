@@ -87,7 +87,7 @@ func (s *Service) limitedAvailability(ctx context.Context, c model.AIOConfig, re
 		for _, states := range p.states {
 			for _, hash := range unique {
 				if a, ok := states[hash]; ok && a.Cached {
-					if _, file := SelectFile(a.Files, r); file || ((r.Type == "book" || r.Type == "game" || r.Type == "music") && len(resourceDownloadFiles(a.Files, r)) > 0) || (r.Episode == nil && len(a.Files) == 0 && allowNoFiles[hash]) {
+					if _, file := SelectFile(a.Files, r); file || ((r.Type == "book" || r.Type == "game" || r.Type == "software" || r.Type == "music") && len(resourceDownloadFiles(a.Files, r)) > 0) || (r.Episode == nil && len(a.Files) == 0 && allowNoFiles[hash]) {
 						n++
 					}
 				}

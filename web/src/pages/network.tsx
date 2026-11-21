@@ -631,6 +631,15 @@ export function NetworkRoutingPage() {
                   onChange={(value) => route('metadata:igdb', value)}
                 />
                 <ConnectionSelect
+                  id="network-metadata:software"
+                  label="Software"
+                  value={settings.overrides['metadata:software'] ?? ''}
+                  settings={settings}
+                  inherit="Use default connection"
+                  disabled={save.isPending}
+                  onChange={(value) => route('metadata:software', value)}
+                />
+                <ConnectionSelect
                   id="network-metadata:musicbrainz"
                   label="MusicBrainz"
                   value={settings.overrides['metadata:musicbrainz'] ?? ''}

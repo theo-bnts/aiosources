@@ -8,6 +8,7 @@ export const torznabMediaTypes = [
   { value: 'movie', label: 'Movies', group: 'Videos' },
   { value: 'tv', label: 'Series', group: 'Videos' },
   { value: 'game', label: 'Games', group: 'Games' },
+  { value: 'software', label: 'Software', group: 'Software' },
   { value: 'music', label: 'Music', group: 'Music' },
   { value: 'ebook', label: 'Ebooks', group: 'Books' },
   { value: 'audiobook', label: 'Audiobooks', group: 'Books' },
@@ -22,6 +23,7 @@ export const reviewMediaTypes = [
   { value: 'movie', label: 'Movies', group: 'Videos' },
   { value: 'tv', label: 'Series', group: 'Videos' },
   { value: 'game', label: 'Games', group: 'Games' },
+  { value: 'software', label: 'Software', group: 'Software' },
   { value: 'music', label: 'Music', group: 'Music' },
   { value: 'book', label: 'Books', group: 'Books' },
 ]

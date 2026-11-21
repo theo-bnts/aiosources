@@ -41,13 +41,15 @@ function formatWorkTitle(work: ReviewWork) {
         ? work.igdb
           ? `IGDB ${work.igdb}`
           : 'Untitled game'
-        : work.type === 'music'
-          ? work.musicbrainz
-            ? `MusicBrainz ${work.musicbrainz}`
-            : 'Untitled release'
-          : work.tmdb
-            ? `TMDB ${work.tmdb}`
-            : 'Untitled work')
+        : work.type === 'software'
+          ? work.software_key || 'Untitled software'
+          : work.type === 'music'
+            ? work.musicbrainz
+              ? `MusicBrainz ${work.musicbrainz}`
+              : 'Untitled release'
+            : work.tmdb
+              ? `TMDB ${work.tmdb}`
+              : 'Untitled work')
   )
 }
 
@@ -64,14 +66,30 @@ function WorkSummary({ work }: { work: ReviewWork }) {
             ? 'Book'
             : work.type === 'game'
               ? 'Game'
-              : work.type === 'music'
-                ? work.music?.primary_type || 'Music'
-                : 'Series'}{' '}
-        · {work.years.join(', ') || 'Year unknown'}
+              : work.type === 'software'
+                ? work.software?.part === 'o'
+                  ? 'Operating System'
+                  : 'Software'
+                : work.type === 'music'
+                  ? work.music?.primary_type || 'Music'
+                  : 'Series'}{' '}
+        ·{' '}
+        {work.type === 'software'
+          ? work.software?.vendor || 'Vendor unknown'
+          : work.years.join(', ') || 'Year unknown'}
       </p>
       <p className="mono break-words text-xs">
         {work.type === 'game' ? (
           `IGDB ${work.igdb} · ${work.game?.platforms?.map((p) => p.name).join(', ') || 'Platform unknown'}`
+        ) : work.type === 'software' ? (
+          [
+            work.software?.winget_id && `WinGet ${work.software.winget_id}`,
+            work.software?.homebrew_cask && `Homebrew ${work.software.homebrew_cask}`,
+            work.software?.nvd_cpe,
+            work.software?.platforms?.length ? work.software.platforms.join(', ') : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || work.software_key
         ) : work.type === 'book' ? (
           [work.book?.authors?.join(', '), work.openlibrary].filter(Boolean).join(' · ')
         ) : work.type === 'music' ? (
@@ -278,6 +296,13 @@ function ReviewForm({
           <p className="mono break-words text-xs">
             {[
               detail.record.igdb && `IGDB ${detail.record.igdb}`,
+              detail.record.software_key && `Software ${detail.record.software_key}`,
+              detail.software_evidence?.winget_id && `WinGet ${detail.software_evidence.winget_id}`,
+              detail.software_evidence?.homebrew_cask &&
+                `Homebrew ${detail.software_evidence.homebrew_cask}`,
+              detail.software_evidence?.nvd_cpe,
+              detail.software_evidence?.vendor && `Vendor ${detail.software_evidence.vendor}`,
+              detail.software_evidence?.version && `Version ${detail.software_evidence.version}`,
               detail.record.musicbrainz && `MBID ${detail.record.musicbrainz}`,
               detail.record.imdb,
               detail.record.tmdb && `TMDB ${detail.record.tmdb}`,

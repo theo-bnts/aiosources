@@ -1,7 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { bookSyncLabel, metadataSyncLabel, musicSyncLabel } from '../src/lib/information-sync.ts'
-import type { BookStatus, MusicStatus } from '../src/lib/aiosource-types.ts'
+import {
+  bookSyncLabel,
+  metadataSyncLabel,
+  musicSyncLabel,
+  softwareSyncLabel,
+} from '../src/lib/information-sync.ts'
+import type { BookStatus, MusicStatus, SoftwareStatus } from '../src/lib/aiosource-types.ts'
 
 const following: BookStatus = {
   snapshot_at: '2026-01-01T00:00:00Z',
@@ -101,4 +106,59 @@ test('music freshness distinguishes live feed, full exports, recovery and schema
   assert.equal(musicSyncLabel({ ...base, running: true, phase: 'covers' }), 'Importing cover index')
   assert.equal(musicSyncLabel({ ...base, running: true, phase: 'recovery' }), 'Recovering catalog')
   assert.equal(musicSyncLabel({ ...base, complete: false, position: 0 }), 'Not started')
+})
+
+test('software freshness distinguishes phases, recovery, errors and disabled automatic updates', () => {
+  const base: SoftwareStatus = {
+    running: false,
+    complete: true,
+    phase: 'idle',
+    works: 25,
+    nvd_entries: 15,
+    winget_entries: 10,
+    homebrew_entries: 8,
+    icons: 12,
+    icons_indexed: 3000,
+    imported: 33,
+    position: 33,
+    filtered: 5,
+    skipped: 0,
+    nvd_snapshot_at: '2026-11-14T00:00:00Z',
+    nvd_changes_through: '2026-11-14T02:00:00Z',
+    winget_synced_at: '2026-11-14T02:00:00Z',
+    homebrew_synced_at: '2026-11-14T02:00:00Z',
+    icons_synced_at: '2026-11-14T02:00:00Z',
+    last_import: '2026-11-14T01:00:00Z',
+    last_sync: '2026-11-14T02:00:00Z',
+    next_update: null,
+    retry_at: null,
+    nvd_key_configured: true,
+    needs_full_import: false,
+  }
+  assert.equal(softwareSyncLabel(base), 'Following updates')
+  assert.equal(softwareSyncLabel(base, false), 'Automatic updates disabled')
+  assert.equal(softwareSyncLabel({ ...base, needs_full_import: true }), 'Full re-import pending')
+  assert.equal(softwareSyncLabel({ ...base, error: 'NVD unavailable' }), 'Retry pending')
+  assert.equal(
+    softwareSyncLabel({ ...base, running: true, phase: 'nvd_dump' }),
+    'Importing NVD CPE snapshot',
+  )
+  assert.equal(
+    softwareSyncLabel({ ...base, running: true, phase: 'winget' }),
+    'Importing WinGet packages',
+  )
+  assert.equal(
+    softwareSyncLabel({ ...base, running: true, phase: 'homebrew' }),
+    'Importing Homebrew Casks',
+  )
+  assert.equal(
+    softwareSyncLabel({ ...base, running: true, phase: 'icons' }),
+    'Importing icon index',
+  )
+  assert.equal(
+    softwareSyncLabel({ ...base, running: true, phase: 'recovery' }),
+    'Recovering catalog',
+  )
+  assert.equal(softwareSyncLabel({ ...base, complete: false, position: 0 }), 'Not started')
+  assert.equal(softwareSyncLabel({ ...base, complete: false, position: 10 }), 'Import interrupted')
 })

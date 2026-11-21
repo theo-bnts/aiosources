@@ -144,4 +144,17 @@ func TestFormatterShowsOnlyUsableBibliographicDetails(t *testing.T) {
 	if label := strings.Join(formatReleasePresentation(musicRecord, Behavior{}).Details, "\n"); strings.Contains(label, "private.example") {
 		t.Fatal("unvalidated music fields entered public presentation", label)
 	}
+	softwareRecord := model.AIORecord{
+		Title:         "Adobe.Photoshop.2025.v26.0.Multilingual.x64",
+		SoftwareHints: model.SoftwareHints{Kind: "pc", Platforms: []string{"windows"}},
+	}
+	softwareDetails := formatReleasePresentation(softwareRecord, Behavior{}).Details
+	wantSoftware := []string{"💻 Windows • X64", "🏷️ 26.0 • Multilingual"}
+	if !reflect.DeepEqual(softwareDetails[:min(len(softwareDetails), 2)], wantSoftware) {
+		t.Fatal(softwareDetails, wantSoftware)
+	}
+	softwareRecord.SoftwareHints.Version = "https://private.example/secret-version"
+	if label := strings.Join(formatReleasePresentation(softwareRecord, Behavior{}).Details, "\n"); strings.Contains(label, "private.example") {
+		t.Fatal("unvalidated software fields entered public presentation", label)
+	}
 }

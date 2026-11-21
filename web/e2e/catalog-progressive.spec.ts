@@ -28,7 +28,7 @@ async function seedTitles(server: TestServer) {
 function gates() {
   const releases: Record<string, () => void> = {}
   const waiting = Object.fromEntries(
-    ['movie,tv', 'game', 'ebook,audiobook,book', 'music'].map((kind) => [
+    ['movie,tv', 'game', 'software', 'ebook,audiobook,book', 'music'].map((kind) => [
       kind,
       new Promise<void>((resolve) => (releases[kind] = resolve)),
     ]),
@@ -66,24 +66,31 @@ test('Search displays categories immediately and inserts late books in the exact
   try {
     await page.setViewportSize({ width: 320, height: 1000 })
     await page.goto('/search?q=example%20journey')
-    await expect.poll(() => dispatched.length).toBe(4)
-    expect(dispatched.sort()).toEqual(['ebook,audiobook,book', 'game', 'movie,tv', 'music'])
+    await expect.poll(() => dispatched.length).toBe(5)
+    expect(dispatched.sort()).toEqual([
+      'ebook,audiobook,book',
+      'game',
+      'movie,tv',
+      'music',
+      'software',
+    ])
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 0/4 categories complete',
+      '· 0/5 categories complete',
     )
     await expect(page.getByText('No matching titles', { exact: true })).toHaveCount(0)
     gate.releases['movie,tv']()
     await expect(rows(page)).toHaveText(['Example Video', 'Example Series'])
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 1/4 categories complete',
+      '· 1/5 categories complete',
     )
     await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
     gate.releases.game()
+    gate.releases.software()
     gate.releases.music()
     await expect(rows(page)).toHaveText(['Example Video', 'Example Game', 'Example Series'])
     gate.releases['ebook,audiobook,book']()
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 4/4 categories complete',
+      '· 5/5 categories complete',
     )
     await expect(page.locator('[data-result-count]')).toHaveText(`${expected.total} titles`)
     await expect(rows(page)).toHaveText(expected.items.map((item: { title: string }) => item.title))
@@ -114,7 +121,7 @@ test('a failed category preserves successful results and retries only the failed
   })
   await page.goto('/search?q=example%20journey')
   await expect(rows(page)).toHaveText(['Example Video', 'Example Game', 'Example Series'])
-  await expect(page.getByLabel('Category search progress')).toHaveText('· 3/4 categories complete')
+  await expect(page.getByLabel('Category search progress')).toHaveText('· 4/5 categories complete')
   await expect(page.getByRole('alert')).toHaveText(/Synthetic category failure/)
   const before = { ...requests }
   recovered = true
@@ -125,7 +132,7 @@ test('a failed category preserves successful results and retries only the failed
     'Example Game',
     'Example Series',
   ])
-  await expect(page.getByLabel('Category search progress')).toHaveText('· 4/4 categories complete')
+  await expect(page.getByLabel('Category search progress')).toHaveText('· 5/5 categories complete')
   expect(requests).toEqual({
     ...before,
     'ebook,audiobook,book': before['ebook,audiobook,book'] + 1,
@@ -146,19 +153,20 @@ test('an empty category cannot announce no matches before the other categories f
   })
   try {
     await page.goto('/search?q=unmatched')
-    await expect.poll(() => requests.length).toBe(4)
+    await expect.poll(() => requests.length).toBe(5)
     gate.releases.game()
+    gate.releases.software()
     gate.releases.music()
     gate.releases['movie,tv']()
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 3/4 categories complete',
+      '· 4/5 categories complete',
     )
     await expect(page.getByText('No matching titles', { exact: true })).toHaveCount(0)
     await expect(page.getByLabel('Searching titles')).toBeVisible()
     gate.releases['ebook,audiobook,book']()
     await expect(page.getByText('No matching titles', { exact: true })).toBeVisible()
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 4/4 categories complete',
+      '· 5/5 categories complete',
     )
   } finally {
     gate.releaseAll()
@@ -176,7 +184,7 @@ test('distant pages stay bounded and returning to the first page restores progre
     await route.continue()
   })
   await page.goto('/search?q=example%20journey&offset=250')
-  await expect(page.getByLabel('Category search progress')).toHaveText('· 4/4 categories complete')
+  await expect(page.getByLabel('Category search progress')).toHaveText('· 5/5 categories complete')
   await expect(page.getByText('No titles on this page', { exact: true })).toBeVisible()
   expect(
     requests.every(
@@ -193,7 +201,7 @@ test('distant pages stay bounded and returning to the first page restores progre
   ])
   const firstPageRequests = requests.filter((url) => url.searchParams.get('offset') === '0')
   expect(new Set(firstPageRequests.map((url) => url.searchParams.get('type')))).toEqual(
-    new Set(['movie,tv', 'game', 'ebook,audiobook,book', 'music']),
+    new Set(['movie,tv', 'game', 'software', 'ebook,audiobook,book', 'music']),
   )
   expect(
     firstPageRequests.every(
@@ -221,11 +229,11 @@ test('changing or clearing a search cannot display delayed results from the prev
   })
   try {
     await page.goto('/search?q=example')
-    await expect.poll(() => waiting).toBe(4)
+    await expect.poll(() => waiting).toBe(5)
     await page.getByLabel('Title, author or identifier', { exact: true }).fill('journey')
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.getByLabel('Category search progress')).toHaveText(
-      '· 4/4 categories complete',
+      '· 5/5 categories complete',
     )
     await expect(rows(page)).toHaveCount(4)
     gate.releaseAll()
@@ -270,7 +278,7 @@ test('public Search uses the same progressive ranking and only public authentica
       expect(request.headers().authorization).toBe(`Bearer ${credential}`)
       const kind = url.searchParams.get('type') || ''
       dispatched.push(kind)
-      const index = ['movie,tv', 'game', 'ebook,audiobook,book', 'music'].indexOf(kind)
+      const index = ['movie,tv', 'game', 'ebook,audiobook,book', 'software', 'music'].indexOf(kind)
       expect(index).toBeGreaterThanOrEqual(0)
       const item =
         index < 3
@@ -300,16 +308,17 @@ test('public Search uses the same progressive ranking and only public authentica
   try {
     const visitor = await context.newPage()
     await visitor.goto('/public/search?q=example')
-    await expect.poll(() => dispatched.length).toBe(4)
+    await expect.poll(() => dispatched.length).toBe(5)
     gate.releases['movie,tv']()
     await expect(rows(visitor)).toHaveText(['Example Video'])
     gate.releases.game()
+    gate.releases.software()
     gate.releases.music()
     await expect(rows(visitor)).toHaveText(['Example Video', 'Example Game'])
     gate.releases['ebook,audiobook,book']()
     await expect(rows(visitor)).toHaveText(['Example Video', 'Example Book', 'Example Game'])
     await expect(visitor.getByLabel('Category search progress')).toHaveText(
-      '· 4/4 categories complete',
+      '· 5/5 categories complete',
     )
     expect(privateRequests).toEqual([])
   } finally {

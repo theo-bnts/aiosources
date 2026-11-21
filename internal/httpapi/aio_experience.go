@@ -21,6 +21,10 @@ func (s *server) aioReviewDetail(w http.ResponseWriter, r *http.Request) {
 		detail.BookEvidence = detail.Record.BookHints
 	} else if game := aiosource.ParseGameRelease(detail.Record); game.Game {
 		detail.SuggestedQuery, detail.SuggestedYear = game.Title, game.Year
+	} else if app := aiosource.ParseSoftwareRelease(detail.Record); app.Kind != "" {
+		detail.SuggestedQuery = app.Title
+		detail.SuggestedYear = nil
+		detail.SoftwareEvidence = detail.Record.SoftwareHints
 	} else if track := aiosource.ParseMusicRelease(detail.Record); track.Kind != "" {
 		detail.SuggestedQuery = track.Title
 		if track.Year > 0 {

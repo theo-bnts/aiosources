@@ -7,6 +7,14 @@ export type Config = {
   igdb_minutes: number
   igdb_requests_per_second: number
   igdb_reconcile_days: number
+  software_enabled: boolean
+  software_minutes: number
+  software_nvd_secret: string
+  software_include_nvd: boolean
+  software_exclude_plugins: boolean
+  software_include_os: boolean
+  software_include_icons: boolean
+  software_platforms: string[]
   tmdb_secret: string
   alldebrid_secret: string
   torbox_secret: string
@@ -71,6 +79,35 @@ export type GameStatus = {
   retry_at: string | null
   error?: string
 }
+export type SoftwareStatus = {
+  running: boolean
+  complete: boolean
+  phase: string
+  works: number
+  nvd_entries: number
+  winget_entries: number
+  homebrew_entries: number
+  icons: number
+  icons_indexed: number
+  imported: number
+  position: number
+  filtered: number
+  skipped: number
+  nvd_snapshot?: string
+  nvd_snapshot_at: string | null
+  nvd_changes_through: string | null
+  winget_synced_at: string | null
+  homebrew_synced_at: string | null
+  icons_synced_at: string | null
+  last_import: string | null
+  last_sync: string | null
+  next_update: string | null
+  retry_at: string | null
+  nvd_key_configured: boolean
+  needs_full_import: boolean
+  recovery_reason?: string
+  error?: string
+}
 export type MusicStatus = {
   running: boolean
   complete: boolean
@@ -103,10 +140,12 @@ export type MusicStatus = {
 }
 export type Status = {
   games?: GameStatus
+  software?: SoftwareStatus
   books?: BookStatus
   music?: MusicStatus
   maintenance?: {
-    scope: 'books' | 'videos' | 'games' | 'music' | 'metadata' | 'mapping' | 'cache' | ''
+    scope:
+      'books' | 'videos' | 'games' | 'software' | 'music' | 'metadata' | 'mapping' | 'cache' | ''
     status: 'running' | 'succeeded' | 'failed' | ''
     phase?: 'stopping' | 'resetting'
     error?: string
@@ -239,6 +278,21 @@ export type ReleaseCorrespondenceDetail = {
   exclusions: ReleaseCorrespondenceExclusion[]
 }
 
+export type SoftwareInformation = {
+  vendor?: string
+  description?: string
+  license?: string
+  latest_version?: string
+  part?: string
+  platforms?: string[]
+  tags?: string[]
+  languages?: string[]
+  nvd_cpe?: string
+  winget_id?: string
+  homebrew_cask?: string
+  icon_ref?: string
+  has_icon?: boolean
+}
 export type MusicInformation = {
   primary_type?: string
   secondary_types?: string[]
@@ -255,9 +309,11 @@ export type MusicInformation = {
 export type ReviewWork = {
   display_title?: string
   id: number
-  type: 'movie' | 'tv' | 'book' | 'game' | 'music'
+  type: 'movie' | 'tv' | 'book' | 'game' | 'software' | 'music'
   igdb?: string
   game?: { platforms?: { id: number; name: string; slug: string }[] }
+  software_key?: string
+  software?: SoftwareInformation
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
   musicbrainz?: string
@@ -274,9 +330,11 @@ export type MatchReview = {
   active: boolean
   revision: number
   fingerprint: string
-  type: 'movie' | 'tv' | 'book' | 'game' | 'music'
+  type: 'movie' | 'tv' | 'book' | 'game' | 'software' | 'music'
   igdb?: string
   game?: { platforms?: { id: number; name: string; slug: string }[] }
+  software_key?: string
+  software?: SoftwareInformation
   openlibrary?: string
   book?: { authors?: string[]; cover?: number }
   musicbrainz?: string
@@ -288,6 +346,16 @@ export type MatchReview = {
 }
 export type ReviewDetail = {
   book_evidence?: { isbn?: string; isbns?: string[]; openlibrary?: string; author?: string }
+  software_evidence?: {
+    software_key?: string
+    winget_id?: string
+    homebrew_cask?: string
+    nvd_cpe?: string
+    vendor?: string
+    version?: string
+    platforms?: string[]
+    architecture?: string
+  }
   music_evidence?: {
     mbid?: string
     release_mbid?: string
@@ -304,6 +372,7 @@ export type ReviewDetail = {
   record: {
     title: string
     igdb?: string
+    software_key?: string
     musicbrainz?: string
     provider: string
     source_id: string

@@ -26,7 +26,7 @@ func (s *Service) ResetState() ResetState {
 
 func (s *Service) reserveReset(scope string) ([]<-chan struct{}, error) {
 	switch scope {
-	case "books", "videos", "games", "music", "metadata", "mapping", "cache":
+	case "books", "videos", "games", "software", "music", "metadata", "mapping", "cache":
 	default:
 		return nil, model.ErrInvalid
 	}
@@ -49,6 +49,7 @@ func (s *Service) reserveReset(scope string) ([]<-chan struct{}, error) {
 			{s.matchCancel, s.matchDone},
 			{s.booksCancel, s.booksDone},
 			{s.gamesCancel, s.gamesDone},
+			{s.softwareCancel, s.softwareDone},
 			{s.musicCancel, s.musicDone},
 		} {
 			if worker.cancel != nil {
@@ -125,6 +126,9 @@ func (s *Service) runReset(ctx context.Context, scope string, waiting []<-chan s
 		if scope == "metadata" || scope == "games" {
 			names = append(names, "igdb")
 		}
+		if scope == "metadata" || scope == "software" {
+			names = append(names, "software")
+		}
 		if scope == "metadata" || scope == "music" {
 			names = append(names, "musicbrainz")
 		}
@@ -147,6 +151,8 @@ func (s *Service) runReset(ctx context.Context, scope string, waiting []<-chan s
 		return s.DB.ResetAIOMapping(ctx)
 	case "games":
 		return s.DB.ResetGameInformation(ctx)
+	case "software":
+		return s.DB.ResetSoftwareInformation(ctx)
 	case "music":
 		return s.DB.ResetMusicInformation(ctx)
 	case "books":

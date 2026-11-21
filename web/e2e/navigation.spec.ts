@@ -28,6 +28,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Metadata', 'Games', '/metadata/games'],
     ['Metadata', 'Games', '/metadata/games/settings'],
     ['Metadata', 'Games', '/metadata/games/history'],
+    ['Metadata', 'Software', '/metadata/software'],
+    ['Metadata', 'Software', '/metadata/software/settings'],
+    ['Metadata', 'Software', '/metadata/software/history'],
     ['Metadata', 'Music', '/metadata/music'],
     ['Metadata', 'Music', '/metadata/music/settings'],
     ['Metadata', 'Music', '/metadata/music/history'],
@@ -89,7 +92,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
               ? [`${group}/`, 'Security/', label]
               : ['Public', 'Trusted'].includes(label)
                 ? [`${group}/`, 'Users/', label]
-                : ['Videos', 'Games', 'Music', 'Books'].includes(label)
+                : ['Videos', 'Games', 'Software', 'Music', 'Books'].includes(label)
                   ? [`${group}/`, 'Catalogs/', label]
                   : [`${group}/`, label]
         : [label],
@@ -147,6 +150,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Files',
     'Videos',
     'Games',
+    'Software',
     'Music',
     'Books',
     'Identification',

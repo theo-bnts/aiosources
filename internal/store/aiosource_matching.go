@@ -45,6 +45,9 @@ func searchAIOCandidates(ctx context.Context, tx pgx.Tx, filter model.AIOCandida
 	if filter.Type == "book" {
 		return searchBookCandidates(ctx, tx, filter)
 	}
+	if filter.Type == "software" {
+		return searchSoftwareCandidates(ctx, tx, filter)
+	}
 	if filter.Type == "music" {
 		return searchMusicCandidates(ctx, tx, filter)
 	}
@@ -84,11 +87,14 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 		return nil, databaseError("lock candidate generation", err)
 	}
 	var policy model.MatchingPolicy
-	var booksPending, musicPending bool
+	var booksPending, musicPending, softwarePending bool
 	if err = tx.QueryRow(ctx, `SELECT NOT complete AND last_sync IS NULL FROM aiosources.ol_import_state WHERE singleton`).Scan(&booksPending); err != nil {
 		return nil, err
 	}
 	if err = tx.QueryRow(ctx, `SELECT NOT complete AND last_sync IS NULL FROM aiosources.mb_state WHERE singleton`).Scan(&musicPending); err != nil {
+		return nil, err
+	}
+	if err = tx.QueryRow(ctx, `SELECT NOT complete AND last_sync IS NULL FROM aiosources.sw_sync_state WHERE singleton`).Scan(&softwarePending); err != nil {
 		return nil, err
 	}
 	if err = tx.QueryRow(ctx, `SELECT (values->>'minimum_similarity')::int,(values->>'ambiguity_margin')::int FROM aiosources.runtime_settings WHERE section='matching'`).Scan(&policy.MinimumSimilarity, &policy.AmbiguityMargin); err != nil {
@@ -106,7 +112,7 @@ func (s *Store) MatchAIOBatch(ctx context.Context, picks []model.AIORecord, deci
 	}
 	rows, err := tx.Query(ctx, `SELECT `+aioRecordColumns+`,q.version,
  r.active IS TRUE,COALESCE(r.revision,0),COALESCE(r.fingerprint,''),COALESCE(r.media_type,''),COALESCE(r.tmdb_id,''),r.season,r.episode,
- COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),COALESCE(r.igdb_id,''),COALESCE(r.musicbrainz_id,''),
+ COALESCE(r.override_episode,FALSE),COALESCE(r.updated_at,t.last_seen_at),COALESCE(r.openlibrary_id,''),COALESCE(r.igdb_id,''),COALESCE(r.musicbrainz_id,''),COALESCE(r.software_key,''),
  CASE WHEN r.active THEN r.evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) ELSE FALSE END,
  prev_m.work_id,COALESCE(prev_rg.scope,''),COALESCE(prev_rg.scope_key,'')
 FROM aiosources.aio_match_queue q JOIN aiosources.torrents t USING(provider_id,source_id)
@@ -127,7 +133,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		var review model.AIOMatchReview
 		var prevWork *int64
 		var prevScope, prevScopeKey string
-		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.MusicBrainz, &review.SourceChanged, &prevWork, &prevScope, &prevScopeKey)
+		r, err := scanAIORecordQueue(rows, true, &review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.MusicBrainz, &review.SoftwareKey, &review.SourceChanged, &prevWork, &prevScope, &prevScopeKey)
 		if err != nil {
 			rows.Close()
 			return nil, err
@@ -136,6 +142,7 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		r.MatchingPolicy = policy
 		r.BookInformationPending = booksPending
 		r.MusicInformationPending = musicPending
+		r.SoftwareInformationPending = softwarePending
 		records = append(records, r)
 		reviews = append(reviews, &review)
 		if prevWork != nil && *prevWork > 0 {
@@ -223,9 +230,9 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		if len(r.Hash) == 40 {
 			affectedHashes = append(affectedHashes, r.Hash)
 		}
-		batch.Queue(`INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,music_kind,media_hint)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(provider_id,source_id) DO UPDATE SET
-fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,music_kind=EXCLUDED.music_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, workID, revision, result.Status, result.Reason, r.Normalized, matchedBookKind(r, result.Work), matchedMusicKind(r, result.Work), matchedMediaType(r, result.Work))
+		batch.Queue(`INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,normalized,book_kind,music_kind,software_kind,media_hint)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(provider_id,source_id) DO UPDATE SET
+fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status=EXCLUDED.status,reason=EXCLUDED.reason,normalized=EXCLUDED.normalized,book_kind=EXCLUDED.book_kind,music_kind=EXCLUDED.music_kind,software_kind=EXCLUDED.software_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, r.Provider, r.SourceID, r.Fingerprint, workID, revision, result.Status, result.Reason, r.Normalized, matchedBookKind(r, result.Work), matchedMusicKind(r, result.Work), matchedSoftwareKind(r, result.Work), matchedMediaType(r, result.Work))
 		batch.Queue(`DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1 AND source_id=$2 AND version=$3`, r.Provider, r.SourceID, r.QueueVersion)
 	}
 	if err = lockCatalogEntityWrites(ctx, tx); err != nil {

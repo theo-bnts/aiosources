@@ -13,6 +13,7 @@ import (
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/software"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -33,6 +34,14 @@ func ParseID(id, mediaType string) (Resource, error) {
 			return r, errors.New("invalid game resource")
 		}
 		r.Kind, r.ID = "igdb", key
+		return r, nil
+	}
+	if mediaType == "software" {
+		key, ok := strings.CutPrefix(id, "software:")
+		if !ok || software.CanonicalSoftwareKey(key) == "" || software.CanonicalSoftwareKey(key) != key {
+			return r, errors.New("invalid software resource")
+		}
+		r.Kind, r.ID = "software", key
 		return r, nil
 	}
 	if mediaType == "book" {
@@ -387,7 +396,7 @@ func fileNumbering(path string) Release {
 }
 
 func SelectFile(files []model.AIOFile, r Resource) (model.AIOFile, bool) {
-	if r.Type == "torrent" || r.Type == "game" || r.Type == "music" {
+	if r.Type == "torrent" || r.Type == "game" || r.Type == "software" || r.Type == "music" {
 		return selectDownloadFile(files, r)
 	}
 	if r.Type == "book" {

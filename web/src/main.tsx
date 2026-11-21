@@ -354,7 +354,7 @@ const router = createBrowserRouter(
         <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
         <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
         <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
-        {(['videos', 'games', 'music', 'books'] as const).map((section) => {
+        {(['videos', 'games', 'software', 'music', 'books'] as const).map((section) => {
           const { path, label } = metadataSections[section]
           return (
             <Route

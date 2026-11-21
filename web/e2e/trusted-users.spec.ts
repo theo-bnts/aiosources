@@ -349,7 +349,7 @@ test('a failed third Search category preserves a trusted session and completed r
             json: { error: 'Synthetic provider credential failure.' },
           })
       }
-      if (kind === 'music') {
+      if (kind === 'software' || kind === 'music') {
         return route.fulfill({
           json: { items: [], total: 0, limit: 50, offset: 0 },
         })
@@ -389,7 +389,7 @@ test('a failed third Search category preserves a trusted session and completed r
       visitor.getByRole('heading', { name: 'Stremio', exact: true, level: 1 }),
     ).toBeVisible()
     await visitor.goto('/trusted/search?q=example')
-    await expect.poll(() => searched).toBe(4)
+    await expect.poll(() => searched).toBe(5)
     await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
       'Example Video',
       'Example Game',

@@ -13,6 +13,14 @@ type AIOConfig struct {
 	IGDBMinutes              int                   `json:"igdb_minutes"`
 	IGDBRequestsPerSecond    int                   `json:"igdb_requests_per_second"`
 	IGDBReconcileDays        int                   `json:"igdb_reconcile_days"`
+	SoftwareEnabled          bool                  `json:"software_enabled"`
+	SoftwareMinutes          int                   `json:"software_minutes"`
+	SoftwareNVDSecret        string                `json:"software_nvd_secret"`
+	SoftwareIncludeNVD       bool                  `json:"software_include_nvd"`
+	SoftwareExcludePlugins   bool                  `json:"software_exclude_plugins"`
+	SoftwareIncludeOS        bool                  `json:"software_include_os"`
+	SoftwareIncludeIcons     bool                  `json:"software_include_icons"`
+	SoftwarePlatforms        []string              `json:"software_platforms"`
 	AllDebridSecret          string                `json:"alldebrid_secret"`
 	TorBoxSecret             string                `json:"torbox_secret"`
 	DebridLinkSecret         string                `json:"debridlink_secret"`
@@ -50,34 +58,39 @@ type AIOTracker struct {
 	PasskeySecret string `json:"passkey_secret,omitempty"`
 }
 type AIOWork struct {
-	MusicBrainz      string            `json:"musicbrainz,omitempty"`
-	Music            MusicInformation  `json:"music,omitzero"`
-	IGDB             string            `json:"igdb,omitempty"`
-	Game             GameInformation   `json:"game,omitzero"`
-	LocalizedPosters map[string]string `json:"localized_posters,omitempty"`
-	OpenLibrary      string            `json:"openlibrary,omitempty"`
-	PosterPath       string            `json:"poster_path,omitempty"`
-	Book             BookInformation   `json:"book,omitzero"`
-	LocalizedTitles  map[string]string `json:"localized_titles"`
-	OriginalLanguage string            `json:"original_language,omitempty"`
-	DisplayTitle     string            `json:"display_title"`
-	Adult            bool              `json:"adult"`
-	ID               int64             `json:"id"`
-	Type             string            `json:"type"`
-	TMDB             string            `json:"tmdb"`
-	IMDb             string            `json:"imdb"`
-	TVDB             string            `json:"tvdb"`
-	Titles           []string          `json:"titles"`
-	Years            []int             `json:"years"`
-	SeasonYears      map[int]int       `json:"season_years"`
-	EpisodeYears     map[string]int    `json:"episode_years"`
-	Revision         int64             `json:"revision"`
+	MusicBrainz      string              `json:"musicbrainz,omitempty"`
+	Music            MusicInformation    `json:"music,omitzero"`
+	IGDB             string              `json:"igdb,omitempty"`
+	Game             GameInformation     `json:"game,omitzero"`
+	SoftwareKey      string              `json:"software_key,omitempty"`
+	Software         SoftwareInformation `json:"software,omitzero"`
+	LocalizedPosters map[string]string   `json:"localized_posters,omitempty"`
+	OpenLibrary      string              `json:"openlibrary,omitempty"`
+	PosterPath       string              `json:"poster_path,omitempty"`
+	Book             BookInformation     `json:"book,omitzero"`
+	LocalizedTitles  map[string]string   `json:"localized_titles"`
+	OriginalLanguage string              `json:"original_language,omitempty"`
+	DisplayTitle     string              `json:"display_title"`
+	Adult            bool                `json:"adult"`
+	ID               int64               `json:"id"`
+	Type             string              `json:"type"`
+	TMDB             string              `json:"tmdb"`
+	IMDb             string              `json:"imdb"`
+	TVDB             string              `json:"tvdb"`
+	Titles           []string            `json:"titles"`
+	Years            []int               `json:"years"`
+	SeasonYears      map[int]int         `json:"season_years"`
+	EpisodeYears     map[string]int      `json:"episode_years"`
+	Revision         int64               `json:"revision"`
 }
 type AIORecord struct {
 	IdentificationType          string              `json:"-"`
 	MusicInformationPending     bool                `json:"-"`
 	MusicHints                  MusicHints          `json:"-"`
 	MusicBrainz                 string              `json:"musicbrainz,omitempty"`
+	SoftwareInformationPending  bool                `json:"-"`
+	SoftwareHints               SoftwareHints       `json:"-"`
+	SoftwareKey                 string              `json:"software_key,omitempty"`
 	GameHints                   GameHints           `json:"-"`
 	IGDB                        string              `json:"igdb,omitempty"`
 	VideoType                   string              `json:"-"`
@@ -123,6 +136,11 @@ type AIOCandidateFilter struct {
 	MusicLabel                    string
 	MusicMinimumScore             float64
 	IGDB                          string
+	SoftwareKey                   string
+	WinGetID                      string
+	HomebrewCask                  string
+	NVDCPE                        string
+	SoftwareVendor                string
 	Titles                        []string
 	BookTitleParts                []BookTitlePart
 	BookAuthor                    string

@@ -18,28 +18,37 @@ type CatalogReleaseFilters struct {
 // CatalogTitle is a local, identified title. It never contains source payloads
 // or account credentials. The media type determines the selection controls.
 type CatalogTitle struct {
-	Ranking     *CatalogSearchRanking `json:"ranking,omitempty"`
-	MusicBrainz string                `json:"musicbrainz,omitempty"`
-	Artists     []string              `json:"artists,omitempty"`
-	MusicType   string                `json:"music_type,omitempty"`
-	Labels      []string              `json:"labels,omitempty"`
-	DiscogsIDs  []string              `json:"discogs_ids,omitempty"`
-	WikidataID  string                `json:"wikidata_id,omitempty"`
-	IGDB        string                `json:"igdb,omitempty"`
-	Platforms   []GamePlatform        `json:"platforms,omitempty"`
-	OpenLibrary string                `json:"openlibrary,omitempty"`
-	Cover       string                `json:"cover,omitempty"`
-	Authors     []string              `json:"authors,omitempty"`
-	Selection   CatalogSelection      `json:"selection"`
-	Seasons     []int                 `json:"seasons"`
-	ID          int64                 `json:"id"`
-	Type        string                `json:"type"`
-	Title       string                `json:"title"`
-	Years       []int                 `json:"years"`
-	TMDB        string                `json:"tmdb"`
-	IMDb        string                `json:"imdb"`
-	Releases    int64                 `json:"releases"`
-	Providers   []string              `json:"providers"`
+	Ranking           *CatalogSearchRanking `json:"ranking,omitempty"`
+	MusicBrainz       string                `json:"musicbrainz,omitempty"`
+	Artists           []string              `json:"artists,omitempty"`
+	MusicType         string                `json:"music_type,omitempty"`
+	Labels            []string              `json:"labels,omitempty"`
+	DiscogsIDs        []string              `json:"discogs_ids,omitempty"`
+	WikidataID        string                `json:"wikidata_id,omitempty"`
+	IGDB              string                `json:"igdb,omitempty"`
+	Platforms         []GamePlatform        `json:"platforms,omitempty"`
+	SoftwareKey       string                `json:"software_key,omitempty"`
+	Vendor            string                `json:"vendor,omitempty"`
+	SoftwarePlatforms []string              `json:"software_platforms,omitempty"`
+	Description       string                `json:"description,omitempty"`
+	License           string                `json:"license,omitempty"`
+	LatestVersion     string                `json:"latest_version,omitempty"`
+	NVDCPE            string                `json:"nvd_cpe,omitempty"`
+	WinGetID          string                `json:"winget_id,omitempty"`
+	HomebrewCask      string                `json:"homebrew_cask,omitempty"`
+	OpenLibrary       string                `json:"openlibrary,omitempty"`
+	Cover             string                `json:"cover,omitempty"`
+	Authors           []string              `json:"authors,omitempty"`
+	Selection         CatalogSelection      `json:"selection"`
+	Seasons           []int                 `json:"seasons"`
+	ID                int64                 `json:"id"`
+	Type              string                `json:"type"`
+	Title             string                `json:"title"`
+	Years             []int                 `json:"years"`
+	TMDB              string                `json:"tmdb"`
+	IMDb              string                `json:"imdb"`
+	Releases          int64                 `json:"releases"`
+	Providers         []string              `json:"providers"`
 }
 
 // Ranking mirrors the catalog's SQL ordering so independently completed media

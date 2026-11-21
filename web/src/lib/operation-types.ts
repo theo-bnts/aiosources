@@ -13,7 +13,7 @@ export type OperationRun = {
   }
   id: string
   kind: OperationKind
-  service: 'tmdb' | 'igdb' | 'openlibrary' | 'musicbrainz' | 'local' | DebridService
+  service: 'tmdb' | 'igdb' | 'software' | 'openlibrary' | 'musicbrainz' | 'local' | DebridService
   trigger: 'manual' | 'automatic' | 'playback' | 'public'
   resource?: string
   status: OperationStatus

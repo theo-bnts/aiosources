@@ -35,6 +35,7 @@ var formatRE = regexp.MustCompile(`(?i)\b(epub|pdf|mobi|azw3?|fb2|djvu|cb[rz7ta]
 var audioRE = regexp.MustCompile(`(?i)\b(?:audio[ ._-]?books?|livres?[ ._-]?audio|audiolivres?|audiobook|unabridged|abridged)\b`)
 var ebookRE = regexp.MustCompile(`(?i)\b(?:e[ ._-]?books?|ebooks?|livres?|romans?|comics?|mangas?|bandes?[ ._-]?dessin[ée]es?)\b`)
 var videoRE = regexp.MustCompile(`(?i)\b(?:[48]k|\d{3,4}[pi]|bluray|b[dr]rip|hdtv|s\d{1,3}e\d{1,4})\b|\.(?:mkv|mp4|avi|webm)$`)
+var softwarePluginRE = regexp.MustCompile(`(?i)(?:\b|[\[\(\._-])(?:VST3?|AU|CLAP|LV2|RTAS|Win64|Win32|macOS|OSX|x64|x86|Universal|Keygen|R2R|DMG|PKG|MSI|AppImage|APK|IPA)(?:\b|[\]\)\._-])`)
 var yearRE = regexp.MustCompile(`\b(?:18|19|20|21)\d{2}\b`)
 var collectionRE = regexp.MustCompile(`(?i)\b(?:pack\s*(?:de\s*)?\d+|\d+\s*(?:books?|ebooks?|livres?|epubs?)|(?:tomes?|volumes?|books?|livres?)\s*\d+\s*[-–]\s*\d+|(?:integrale|intégrale|complete)\s*(?:collection|series|saga)|(?:collection|series|saga)\s*(?:integrale|intégrale|complete))\b|(?i)\[(?:pack|integrale|intégrale|complete)\]`)
 
@@ -168,6 +169,7 @@ func Parse(raw string, hints Hints) Release {
 			}
 		}
 	}
+	hasSoftwareCat := false
 	for _, c := range hints.Categories {
 		if c == 3030 {
 			r.Kind = "audiobook"
@@ -175,6 +177,12 @@ func Parse(raw string, hints Hints) Release {
 		if c >= 7000 && c < 8000 && r.Kind == "" {
 			r.Kind = "ebook"
 		}
+		if c >= 4000 && c < 5000 {
+			hasSoftwareCat = true
+		}
+	}
+	if hasSoftwareCat && r.Kind == "" && r.OpenLibrary == "" && r.ISBN == "" && hints.Kind == "" {
+		return Release{}
 	}
 	category := strings.Join(hints.CategoryNames, " ")
 	if ebookRE.MatchString(category) {
@@ -189,7 +197,12 @@ func Parse(raw string, hints Hints) Release {
 	if matches := formatRE.FindAllStringSubmatchIndex(raw, -1); len(matches) > 0 {
 		match := matches[len(matches)-1]
 		format := strings.ToLower(raw[match[2]:match[3]])
-		if formatTailRE.MatchString(raw[match[1]:]) {
+		// Audio plugin packages (VST3/AU/AAX for Windows/macOS) use Avid's AAX
+		// format, not Audible audiobooks.
+		if format == "aax" && r.Kind == "" && softwarePluginRE.MatchString(raw) {
+			format = ""
+		}
+		if format != "" && formatTailRE.MatchString(raw[match[1]:]) {
 			r.Format = format
 			r.Kind = bookFormatKind(format)
 		}

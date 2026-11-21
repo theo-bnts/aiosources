@@ -28,11 +28,11 @@ type PublicTorznabInstallation struct {
 
 func ValidPublicTorznabOptions(o model.PublicTorznabOptions) bool {
 	cache := model.TorznabPreferences{ResultPreferences: o.ResultPreferences, Services: o.Services, CachedOnly: o.CachedOnly}
-	if !ValidStreamPreferences(model.StreamPreferences{Sources: o.Sources}) || !cache.Valid() || len(o.MediaTypes) > 8 {
+	if !ValidStreamPreferences(model.StreamPreferences{Sources: o.Sources}) || !cache.Valid() || len(o.MediaTypes) > 9 {
 		return false
 	}
 	for i, m := range o.MediaTypes {
-		if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "music", "other"}, m) || slices.Contains(o.MediaTypes[:i], m) {
+		if !slices.Contains([]string{"movie", "tv", "book", "ebook", "audiobook", "game", "software", "music", "other"}, m) || slices.Contains(o.MediaTypes[:i], m) {
 			return false
 		}
 	}

@@ -9,6 +9,7 @@ import (
 )
 
 var presentationGameVersion = regexp.MustCompile(`(?i)\b(?:v[ ._-]?\d{1,12}(?:[ ._-]\d{1,12}){1,4}|v\d{6,12}|build[ ._-]?\d{1,12})\b`)
+var presentationSoftwareVersion = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$`)
 var presentationAuthor = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} .,'’&()_-]{0,199}$`)
 
 var presentationPlatforms = map[string]string{
@@ -63,6 +64,40 @@ func releaseContentDetails(record model.AIORecord) []string {
 			lines = append(lines, "🏷️ "+strings.Join(versions, " • "))
 		}
 		return lines
+	}
+	if record.IdentificationType == "software" || (record.IdentificationType == "" && record.VideoType == "" && record.BookHints.Kind == "" && ParseSoftwareRelease(record).Kind != "") {
+		parsed := ParseSoftwareRelease(record)
+		if parsed.Kind != "" || record.IdentificationType == "software" {
+			lines := []string{}
+			platLabels := make([]string, 0, len(parsed.Platforms))
+			for _, p := range parsed.Platforms {
+				if lbl := map[string]string{"windows": "Windows", "macos": "macOS", "linux": "Linux", "android": "Android", "ios": "iOS"}[p]; lbl != "" {
+					platLabels = append(platLabels, lbl)
+				}
+			}
+			if parsed.Architecture != "" {
+				platLabels = append(platLabels, strings.ToUpper(parsed.Architecture))
+			}
+			if len(platLabels) > 0 {
+				lines = append(lines, "💻 "+strings.Join(platLabels, " • "))
+			} else {
+				lines = append(lines, "💻 Software")
+			}
+			meta := []string{}
+			if parsed.Version != "" && presentationSoftwareVersion.MatchString(parsed.Version) {
+				meta = append(meta, parsed.Version)
+			}
+			for _, tag := range parsed.Tags {
+				if len(meta) >= 5 {
+					break
+				}
+				meta = append(meta, tag)
+			}
+			if len(meta) > 0 {
+				lines = append(lines, "🏷️ "+strings.Join(meta, " • "))
+			}
+			return lines
+		}
 	}
 	if record.IdentificationType == "music" || (record.IdentificationType == "" && record.VideoType == "" && record.BookHints.Kind == "" && ParseMusicRelease(record).Kind != "") {
 		parsed := ParseMusicRelease(record)

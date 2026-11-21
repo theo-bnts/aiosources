@@ -57,8 +57,8 @@ Keep a backup of the V1 data and start V2 with fresh volumes. V1 volumes are not
 Use the settings search at the top of the application to find a control directly.
 
 - **Sources → Indexers → Torrents → Settings:** separate **Import execution** and **Temporary source errors** sections contain concurrency, retry and recovery preferences.
-- **Metadata → Catalogs → Videos / Games / Music / Books → Settings:** update schedules and provider settings, with separate **Manual actions** and **Maintenance** sections. Each workspace has its own statistics and history.
-- **Metadata → Identification → Settings:** automatic identification for videos, games, music and books, with separate processing, reliability and maintenance sections. Its **Results** and **History** tabs keep review and identification activity together.
+- **Metadata → Catalogs → Videos / Games / Software / Music / Books → Settings:** update schedules and provider settings, with separate **Manual actions** and **Maintenance** sections. Each workspace has its own statistics and history.
+- **Metadata → Identification → Settings:** automatic identification for videos, games, software, music and books, with separate processing, reliability and maintenance sections. Its **Results** and **History** tabs keep review and identification activity together.
 - **Debrid → Settings:** service accounts, availability checks, operation limits and cleanup.
 - **Storage → Settings:** retained torrent fields, optional search indexes, history retention and maintenance.
 - **Security:** Secrets, administrator and trusted user limits, public request limits, and active administrator sessions.

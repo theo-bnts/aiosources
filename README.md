@@ -4,7 +4,7 @@
 
 **Your sources, together. Find a title, choose a version and watch or download it.**
 
-AIOSources brings your own source catalogs into one searchable library. Connect it to Stremio, Nuvio, AIOStreams or a Torznab-compatible application, or use its web interface. Once configured, imports, film, series, game, music and book identification, and availability checks can run automatically.
+AIOSources brings your own source catalogs into one searchable library. Connect it to Stremio, Nuvio, AIOStreams or a Torznab-compatible application, or use its web interface. Once configured, imports, film, series, game, software, music and book identification, and availability checks can run automatically.
 
 AIOSources is open source and self-hosted. It includes no sources or media: connect services you are authorized to use and share only information you have the right to share.
 
@@ -12,7 +12,7 @@ AIOSources is open source and self-hosted. It includes no sources or media: conn
 
 ## What you can do
 
-- **Find the right version.** Search films, series, games, music and books by their familiar titles, artists or authors, choose an episode or file and compare releases. Filter by year, language, source or cached availability.
+- **Find the right version.** Search films, series, games, software, music and books by their familiar titles, vendors, artists or authors, choose an episode or file and compare releases. Filter by year, language, source or cached availability.
 - **Connect your own sources.** Use Torznab, HTML, JSON or UNIT3D templates. Configure them visually or import your own JSON, preview the results and schedule updates.
 - **Watch and download.** Connect your player, download a ready file from the browser or add a release to your debrid account and follow its preparation.
 - **Choose your debrid services.** AllDebrid, Debrid-Link, Deepbrid, Premiumize, Real-Debrid and TorBox are supported. Availability features vary by service.
@@ -30,6 +30,7 @@ Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INS
 - Access to compatible sources you are authorized to use. Source configurations are supplied by you.
 - A [TMDB API read access token](https://www.themoviedb.org/settings/api) for film and series identification. Book identification uses Open Library and needs no API key. Its optional catalog uses relevance filters by default to reduce storage; you can also limit edition languages.
 - For game identification, a [Twitch developer application](https://dev.twitch.tv/console/apps) with its client ID and client secret. [Set up games](docs/GAMES.md).
+- For software identification, NIST NVD CPE 2.0, Microsoft WinGet, Homebrew Cask and optional `selfh.st/icons` work locally with no API key required; an optional free [NVD API key](https://nvd.nist.gov/developers/request-an-api-key) accelerates incremental updates. [Set up software](docs/SOFTWARE.md).
 - For music identification, MusicBrainz and Cover Art Archive work with no API key using twice-weekly CC0 exports; an optional free [MetaBrainz Live Data Feed token](https://metabrainz.org/profile) enables hourly updates. [Set up music](docs/MUSIC.md).
 - Optionally, an account with a supported debrid service for debrid playback and downloads.
 - An HTTPS address for use over the internet. HTTP is suitable for a trusted local network.
@@ -95,11 +96,12 @@ The example gives PostgreSQL a 16 MB shared cache for servers with limited RAM. 
 1. **Add a source** in **Sources → Indexers → Torrents → Settings**. Choose a template or import your JSON, select its credential from Secrets, and save. Enable the source and use **Run manual import → Preview** to check a sample, then start an import. Choose automatic updates in the source's **Schedules** section.
 2. **Set up film and series information** in **Metadata → Catalogs → Videos → Settings** with your TMDB token and enable automatic updates.
 3. **For games**, add your Twitch client ID and client secret in **Metadata → Catalogs → Games → Settings**, then enable IGDB updates. [Game setup](docs/GAMES.md).
-4. **For music**, choose your catalog filters and enable MusicBrainz updates in **Metadata → Catalogs → Music → Settings**, optionally adding a MetaBrainz Live Data Feed token for hourly updates. [Music setup](docs/MUSIC.md).
-5. **For books**, choose your catalog filters and enable Open Library updates in **Metadata → Catalogs → Books → Settings**. The default keeps digital, audio and locally referenced editions; language filtering is optional and starts disabled. The first import can take hours; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
-6. **Review identification** in **Metadata → Identification** for videos, games, music and books. Adjust automatic identification in its **Settings** tab. Videos, Games, Music, Books and Identification each keep their own history.
-7. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
-8. **Open Search** to find a title, or create a connection for your preferred application below.
+4. **For software**, choose your catalog filters and enable Software updates in **Metadata → Catalogs → Software → Settings**, optionally adding a free NVD API key for faster incremental updates. [Software setup](docs/SOFTWARE.md).
+5. **For music**, choose your catalog filters and enable MusicBrainz updates in **Metadata → Catalogs → Music → Settings**, optionally adding a MetaBrainz Live Data Feed token for hourly updates. [Music setup](docs/MUSIC.md).
+6. **For books**, choose your catalog filters and enable Open Library updates in **Metadata → Catalogs → Books → Settings**. The default keeps digital, audio and locally referenced editions; language filtering is optional and starts disabled. The first import can take hours; later updates follow recent changes. [Book setup and recovery](docs/BOOKS.md).
+7. **Review identification** in **Metadata → Identification** for videos, games, software, music and books. Adjust automatic identification in its **Settings** tab. Videos, Games, Software, Music, Books and Identification each keep their own history.
+8. **Add your debrid keys** in **Debrid → Settings** if you want debrid playback or browser downloads. Only configured services are offered for your private connections.
+9. **Open Search** to find a title, or create a connection for your preferred application below.
 
 A new source becomes available after its first successful complete import. A paused import can usually resume; its history explains whether it is waiting for a limit, a source response or an action from you.
 
@@ -107,7 +109,7 @@ A new source becomes available after its first successful complete import. A pau
 
 ### Stremio, Nuvio and AIOStreams
 
-These connections play films and series. Use the web interface or Torznab for games, music and books.
+These connections play films and series. Use the web interface or Torznab for games, software, music and books.
 
 1. Open **Connections → Stremio → Settings** and choose **Create access**.
 2. Give the connection a name. Optionally choose **Filters**, up to three **Sorting** priorities, or adjust **Request limits** and **Expiration**.
@@ -122,7 +124,7 @@ Open **Connections → Torznab**, create and enable an access, then copy its URL
 
 ## Search, share and manage
 
-**Search** finds identified films, series, games, music and books. Open a title to compare releases, select a ready download or add one to your debrid service. **Sources → Files** searches imported source records directly. Both search your local catalog; they do not send your search text to TMDB, IGDB, MusicBrainz, Open Library or your sources. Posters and covers load from the providers’ image services without being stored on your instance. [Set up music](docs/MUSIC.md) · [Set up books](docs/BOOKS.md).
+**Search** finds identified films, series, games, software, music and books. Open a title to compare releases, select a ready download or add one to your debrid service. **Sources → Files** searches imported source records directly. Both search your local catalog; they do not send your search text to TMDB, IGDB, NVD, WinGet, Homebrew, MusicBrainz, Open Library or your sources. Posters, icons and covers load from the providers’ image services without being stored on your instance. [Set up software](docs/SOFTWARE.md) · [Set up music](docs/MUSIC.md) · [Set up books](docs/BOOKS.md).
 
 **Connections → Shared catalogs** lets you grant another instance access to selected data. **Sources → Remote catalogs** imports a catalog shared with you. Optional shared details, film and series information, and reusable cache observations require permission on both sides. Credentials and private announce URLs are never included. See [catalog sharing](docs/SHARING.md).
 
@@ -168,7 +170,7 @@ See [installation settings](docs/SETTINGS.md) before changing paths, passwords o
 ## Documentation
 
 - [Sources and schedules](docs/CONFIGURATION.md) · [HTML source setup](docs/HTML_SOURCES.md)
-- [Games](docs/GAMES.md) · [Music](docs/MUSIC.md) · [Books and audiobooks](docs/BOOKS.md) · [Search, identification, history and storage](docs/OPERATIONS.md)
+- [Games](docs/GAMES.md) · [Software](docs/SOFTWARE.md) · [Music](docs/MUSIC.md) · [Books and audiobooks](docs/BOOKS.md) · [Search, identification, history and storage](docs/OPERATIONS.md)
 - [Debrid services and downloads](docs/DEBRID.md)
 - [Stremio, Nuvio and public instances](docs/PUBLIC_INSTANCES.md) · [Torznab](docs/TORZNAB.md)
 - [Shared and remote catalogs](docs/SHARING.md)
@@ -188,7 +190,7 @@ AIOSources is distributed under the [MIT license](LICENSE). Use it only with con
 
 [Licenses and third-party notices](web/public/THIRD-PARTY-NOTICES.txt). Original copyrights are preserved.
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Game information and covers are provided by [IGDB](https://www.igdb.com); music information and cover art by [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive](https://coverartarchive.org); book information and covers by [Open Library](https://openlibrary.org).
+This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Game information and covers are provided by [IGDB](https://www.igdb.com); software information and icons by [NIST NVD](https://nvd.nist.gov), [Microsoft WinGet](https://github.com/microsoft/winget-pkgs), [Homebrew](https://brew.sh) and [selfh.st/icons](https://selfh.st/icons) (CC BY 4.0); music information and cover art by [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive](https://coverartarchive.org); book information and covers by [Open Library](https://openlibrary.org).
 
 ## Star History
 

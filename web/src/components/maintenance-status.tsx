@@ -4,10 +4,11 @@ import type { Status } from '@/lib/aiosource-types'
 
 const labels = {
   games: 'Game information',
+  software: 'Software information',
   music: 'Music information',
   books: 'Book information',
   videos: 'Video information',
-  metadata: 'Video, game, music and book information',
+  metadata: 'Video, game, software, music and book information',
   mapping: 'Automatic identifications',
   cache: 'Cache observations',
 }

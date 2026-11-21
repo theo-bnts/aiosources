@@ -8,6 +8,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/music"
 	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
+	"github.com/theo-bnts/aiosources/internal/software"
 	"github.com/theo-bnts/aiosources/internal/store"
 	"github.com/theo-bnts/aiosources/internal/vault"
 	"net/http"
@@ -32,6 +33,16 @@ type Service struct {
 	gamesRunning              bool
 	gamesCancel               context.CancelFunc
 	gamesDone                 <-chan struct{}
+	SoftwareHTTP              *http.Client
+	SoftwareNVDMetaURL        string
+	SoftwareNVDDumpURL        string
+	SoftwareNVDAPIBase        string
+	SoftwareWinGetURL         string
+	SoftwareHomebrewURL       string
+	SoftwareIconsURL          string
+	softwareRunning           bool
+	softwareCancel            context.CancelFunc
+	softwareDone              <-chan struct{}
 	BookHTTP                  *http.Client
 	BookExportURL             string
 	BookAPIURL                string
@@ -87,6 +98,7 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	s.IGDBBase, s.IGDBTokenURL = "https://api.igdb.com/v4", "https://id.twitch.tv/oauth2/token"
 	s.GameHTTP = &http.Client{Transport: s.Network.Transport("metadata:igdb", outbound.HTTPTransport()), CheckRedirect: noRedirect}
 	s.gameRate.setRate(3)
+	s.SoftwareHTTP = &http.Client{Transport: s.Network.Transport("metadata:software", outbound.HTTPTransport()), CheckRedirect: trustedSoftwareExport}
 	s.bookRate.setRate(1)
 	s.BookHTTP = &http.Client{Transport: s.Network.Transport("metadata:openlibrary", outbound.HTTPTransport()), CheckRedirect: trustedBookExport}
 	s.musicRate.setRate(1)
@@ -135,6 +147,9 @@ func (s *Service) ValidateToken(ctx context.Context, token string) error {
 func (s *Service) Close(ctx context.Context) error {
 	if s.GameHTTP != nil {
 		defer s.GameHTTP.CloseIdleConnections()
+	}
+	if s.SoftwareHTTP != nil {
+		defer s.SoftwareHTTP.CloseIdleConnections()
 	}
 	if s.BookHTTP != nil {
 		defer s.BookHTTP.CloseIdleConnections()
@@ -196,12 +211,27 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 		return model.ErrInvalid
 	}
 	c.MusicBrainzLanguages = musicLanguages
+	softwarePlatforms, valid := software.ImportPlatforms(c.SoftwarePlatforms)
+	if !valid {
+		return model.ErrInvalid
+	}
+	c.SoftwarePlatforms = softwarePlatforms
 	current, err := s.DB.AIOConfig(ctx)
 	if err != nil {
 		return err
 	}
 	if store.BookSelectionKey(current) != store.BookSelectionKey(c) {
 		release, locked, err := s.DB.AIOLock(ctx, "openlibrary")
+		if err != nil {
+			return err
+		}
+		if !locked {
+			return model.ErrBusy
+		}
+		defer release()
+	}
+	if store.SoftwareSelectionKey(current) != store.SoftwareSelectionKey(c) {
+		release, locked, err := s.DB.AIOLock(ctx, "software")
 		if err != nil {
 			return err
 		}
@@ -219,6 +249,9 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 			return model.ErrBusy
 		}
 		defer release()
+	}
+	if c.SoftwareMinutes < 15 || c.SoftwareMinutes > 1440 {
+		return model.ErrInvalid
 	}
 	if c.MusicBrainzMinutes < 15 || c.MusicBrainzMinutes > 1440 {
 		return model.ErrInvalid

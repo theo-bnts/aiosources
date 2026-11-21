@@ -243,6 +243,9 @@ func WorkCandidate(w model.AIOWork) Candidate {
 	if w.Type == "game" {
 		source, id = "igdb", w.IGDB
 	}
+	if w.Type == "software" {
+		source, id = "software", w.SoftwareKey
+	}
 	if w.Type == "book" {
 		source, id = "openlibrary", w.OpenLibrary
 	}

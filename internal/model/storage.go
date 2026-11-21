@@ -198,6 +198,7 @@ var compactTorrentKeys = []string{
 	"barcode", "upc", "ean", "catalog_number", "catno", "label", "record_label", "artist", "artists", "album_artist", "album", "album_title", "music_format", "audio_format",
 	"category", "categories", "category_id", "subcategory_id", "type", "media_type", "year",
 	"imdb", "imdb_id", "tt_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id", "igdb", "igdb_id", "platform", "platforms", "game_platform",
+	"software_key", "winget_id", "winget", "homebrew_cask", "brew_cask", "cask", "nvd_cpe", "cpe", "vendor", "publisher", "version", "software_version", "os", "architecture", "arch",
 	"season", "seasons", "episode", "episodes", "episode_start", "episode_end",
 	"audiolangs", "languages", "language", "sublangs", "subtitles",
 	"resolution", "quality", "source", "codec", "video_codec", "audio_codec", "audio_channels",
@@ -211,6 +212,7 @@ var compactIdentifierKeys = []string{
 	"musicbrainz", "musicbrainz_id", "mbid", "musicbrainz_release_group_id", "musicbrainz_release_id", "musicbrainz_artist_id", "release_mbid", "artist_mbid",
 	"discogs", "discogs_id", "discogs_master_id", "discogs_release_id", "wikidata", "wikidata_id", "barcode", "upc", "ean",
 	"imdb", "imdb_id", "tmdb", "tmdb_id", "tvdb", "tvdb_id", "mal", "mal_id", "igdb", "igdb_id",
+	"software_key", "winget_id", "winget", "homebrew_cask", "brew_cask", "nvd_cpe", "cpe",
 }
 
 var compactAttributeKeys = []string{
@@ -219,6 +221,7 @@ var compactAttributeKeys = []string{
 	"discogs", "discogs_id", "discogs_master_id", "discogs_release_id", "wikidata", "wikidata_id",
 	"barcode", "upc", "ean", "catalog_number", "catno", "label", "record_label", "artist", "artists", "album_artist", "album", "album_title", "music_format", "audio_format",
 	"imdb", "imdbid", "tmdb", "tmdbid", "tvdb", "tvdbid", "mal", "malid", "igdb", "igdbid", "igdb_id", "platform", "platforms", "game_platform",
+	"software_key", "winget_id", "winget", "homebrew_cask", "brew_cask", "cask", "nvd_cpe", "cpe", "vendor", "publisher", "version", "software_version", "os", "architecture", "arch",
 	"season", "seasons", "episode", "episodes", "audiolangs", "languages", "language", "sublangs",
 	"category", "categories", "size", "infohash",
 	"resolution", "quality", "source", "codec", "videocodec", "audiocodec", "audiochannels", "hdr",

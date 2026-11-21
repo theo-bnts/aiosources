@@ -9,6 +9,7 @@ import {
 
 import { debridProviders, type DebridSecret } from '@/lib/debrid'
 import { BookImportFilters } from '@/components/book-import-filters'
+import { SoftwareImportFilters } from '@/components/software-import-filters'
 import { MusicImportFilters } from '@/components/music-import-filters'
 import { MaintenanceStatus } from '@/components/maintenance-status'
 import { SettingsSections } from '@/components/settings-sections'
@@ -46,10 +47,12 @@ type MainScope = MetadataSection | 'debrid'
 type FormScope =
   | MainScope
   | 'trackers'
+  | 'software-catalog'
   | 'book-catalog'
   | 'music-catalog'
   | 'cache-availability'
   | 'videos-updates'
+  | 'software-updates'
   | 'books-updates'
   | 'music-updates'
   | 'identification-updates'
@@ -59,8 +62,9 @@ type FormScope =
 const sectionForms: Record<MainScope, FormScope[]> = {
   videos: ['videos', 'videos-updates', 'videos-requests'],
   games: ['games', 'games-updates', 'games-requests'],
-  books: ['books', 'book-catalog', 'books-updates'],
+  software: ['software', 'software-catalog', 'software-updates'],
   music: ['music', 'music-catalog', 'music-updates'],
+  books: ['books', 'book-catalog', 'books-updates'],
   identification: ['identification', 'identification-updates'],
   debrid: ['debrid', 'cache-availability'],
 }
@@ -70,6 +74,7 @@ type Changes = Partial<Omit<Config, 'revision' | 'trackers'>> & {
 type Draft = { base: Config; changes: Changes }
 const resetScopes = {
   'reset-games': 'games',
+  'reset-software': 'software',
   'reset-books': 'books',
   'reset-music': 'music',
   'reset-videos': 'videos',
@@ -115,7 +120,11 @@ export default function AIOSourcePage({
 }) {
   const location = useLocation()
   const usesSecrets =
-    section === 'games' || section === 'videos' || section === 'music' || section === 'debrid'
+    section === 'games' ||
+    section === 'software' ||
+    section === 'videos' ||
+    section === 'music' ||
+    section === 'debrid'
   const usesProviders = section === 'debrid'
   const [maintenanceOpen, setMaintenanceOpen] = useState(location.hash === '#maintenance')
   const [manualActionsOpen, setManualActionsOpen] = useState(location.hash === '#maintenance')
@@ -146,6 +155,7 @@ export default function AIOSourcePage({
   >({})
   const metadata =
     section === 'games' ||
+    section === 'software' ||
     section === 'videos' ||
     section === 'books' ||
     section === 'music' ||
@@ -161,13 +171,15 @@ export default function AIOSourcePage({
   const automaticScope =
     section === 'games'
       ? 'games-updates'
-      : section === 'books'
-        ? 'books-updates'
-        : section === 'music'
-          ? 'music-updates'
-          : section === 'identification'
-            ? 'identification-updates'
-            : 'videos-updates'
+      : section === 'software'
+        ? 'software-updates'
+        : section === 'books'
+          ? 'books-updates'
+          : section === 'music'
+            ? 'music-updates'
+            : section === 'identification'
+              ? 'identification-updates'
+              : 'videos-updates'
   const trackersDraft = drafts.trackers
   const trackersConfig = trackersDraft
     ? applyChanges(trackersDraft.base, trackersDraft.changes)
@@ -260,6 +272,7 @@ export default function AIOSourcePage({
         name === 'recompute-correspondences' ||
         name === 'sync-books' ||
         name === 'sync-games' ||
+        name === 'sync-software' ||
         name === 'sync-music'
       ) {
         await queryClient.cancelQueries({ queryKey: ['aiosource', 'controls'], exact: true })
@@ -277,6 +290,7 @@ export default function AIOSourcePage({
                     current.matching ||
                     current.books?.running ||
                     current.games?.running ||
+                    current.software?.running ||
                     current.music?.running)
                     ? 'stopping'
                     : 'resetting',
@@ -285,6 +299,10 @@ export default function AIOSourcePage({
           if (name === 'sync-games')
             return current.games
               ? { ...current, games: { ...current.games, running: true } }
+              : current
+          if (name === 'sync-software')
+            return current.software
+              ? { ...current, software: { ...current.software, running: true } }
               : current
           if (name === 'sync-music')
             return current.music
@@ -336,7 +354,8 @@ export default function AIOSourcePage({
   }
   const secret = (
     label: string,
-    key: 'tmdb_secret' | 'igdb_secret' | 'musicbrainz_secret' | DebridSecret,
+    key:
+      'tmdb_secret' | 'igdb_secret' | 'software_nvd_secret' | 'musicbrainz_secret' | DebridSecret,
     help?: ReactNode,
   ) => (
     <SecretPicker
@@ -350,18 +369,22 @@ export default function AIOSourcePage({
           ? 'igdb_client_secret'
           : key === 'tmdb_secret'
             ? 'tmdb_api_token'
-            : key === 'musicbrainz_secret'
-              ? 'musicbrainz_replication_token'
-              : `${key.replace('_secret', '')}_api_key`
+            : key === 'software_nvd_secret'
+              ? 'software_nvd_api_key'
+              : key === 'musicbrainz_secret'
+                ? 'musicbrainz_replication_token'
+                : `${key.replace('_secret', '')}_api_key`
       }
       addLabel={`Add ${
         key === 'igdb_secret'
           ? 'Twitch client secret'
           : key === 'tmdb_secret'
             ? 'TMDB token'
-            : key === 'musicbrainz_secret'
-              ? 'MetaBrainz token'
-              : `${debridProviders.find((provider) => provider.secret === key)?.name} key`
+            : key === 'software_nvd_secret'
+              ? 'NVD API key'
+              : key === 'musicbrainz_secret'
+                ? 'MetaBrainz token'
+                : `${debridProviders.find((provider) => provider.secret === key)?.name} key`
       }`}
       valueLabel={label}
       disabled={save.isPending}
@@ -378,6 +401,7 @@ export default function AIOSourcePage({
       | 'igdb_minutes'
       | 'igdb_requests_per_second'
       | 'igdb_reconcile_days'
+      | 'software_minutes'
       | 'openlibrary_minutes'
       | 'musicbrainz_minutes',
     min: number,
@@ -415,6 +439,7 @@ export default function AIOSourcePage({
     label: string,
     key:
       | 'igdb_enabled'
+      | 'software_enabled'
       | 'auto_sync'
       | 'auto_match'
       | 'auto_cache'
@@ -483,6 +508,7 @@ export default function AIOSourcePage({
             review.isPending ||
             conflict(form) ||
             invalidNumbers(form) ||
+            (form === 'software-catalog' && (Boolean(status.software?.running) || resetting)) ||
             (form === 'book-catalog' && (Boolean(status.books?.running) || resetting)) ||
             (form === 'music-catalog' && (Boolean(status.music?.running) || resetting))
           }
@@ -535,11 +561,13 @@ export default function AIOSourcePage({
             help={
               section === 'games'
                 ? 'IGDB supplies game titles, platforms and cover references. Use a confidential Twitch application; no OAuth redirect or browser sign-in is required. Images stay remote.'
-                : section === 'books'
-                  ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
-                  : section === 'music'
-                    ? 'MusicBrainz supplies album, artist, label, Discogs and Wikidata metadata, plus optional Cover Art Archive front-cover flags. Twice-weekly CC0 exports work without any token; adding an optional free MetaBrainz Live Data Feed token enables hourly global updates (CC BY-NC-SA 3.0) without querying external APIs per torrent. Cover images stay remote.'
-                    : undefined
+                : section === 'software'
+                  ? 'Software combines local bulk catalogs from NIST NVD CPE 2.0 (US Gov Public Domain), Microsoft WinGet (MIT) and Homebrew Cask (BSD-2-Clause), plus optional remote icon metadata from selfh.st/icons (CC BY 4.0). No external requests are made per torrent or per search. Adding an optional free NVD API key accelerates incremental NVD updates from 5 to 50 requests per 30 seconds.'
+                  : section === 'books'
+                    ? 'Open Library supplies book and audiobook information without an API key. The first import can take hours; later updates follow recent changes. Cover images stay remote.'
+                    : section === 'music'
+                      ? 'MusicBrainz supplies album, artist, label, Discogs and Wikidata metadata, plus optional Cover Art Archive front-cover flags. Twice-weekly CC0 exports work without any token; adding an optional free MetaBrainz Live Data Feed token enables hourly global updates (CC BY-NC-SA 3.0) without querying external APIs per torrent. Cover images stay remote.'
+                      : undefined
             }
           >
             {section === 'videos' && (
@@ -568,6 +596,20 @@ export default function AIOSourcePage({
                   {secret('Twitch client secret', 'igdb_secret')}
                   <CredentialPageLink href="https://dev.twitch.tv/console/apps/create">
                     Create Twitch credentials
+                  </CredentialPageLink>
+                </div>
+              </div>
+            )}
+            {section === 'software' && (
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="min-w-0 space-y-1">
+                  {secret(
+                    'NVD API key (optional)',
+                    'software_nvd_secret',
+                    'Optional. Leave blank to sync NVD CPE at the public rate (5 requests per 30 seconds). With a free NVD API key, incremental updates run at up to 50 requests per 30 seconds. Long pauses (> 110 days) automatically recover from a fresh full snapshot.',
+                  )}
+                  <CredentialPageLink href="https://nvd.nist.gov/developers/request-an-api-key">
+                    Request a free NVD API key
                   </CredentialPageLink>
                 </div>
               </div>
@@ -605,6 +647,8 @@ export default function AIOSourcePage({
             {section === 'videos' &&
               toggle('Automatically update film & series information', 'auto_sync')}
             {section === 'games' && toggle('Automatically update game information', 'igdb_enabled')}
+            {section === 'software' &&
+              toggle('Automatically update software information', 'software_enabled')}
             {section === 'books' &&
               toggle('Automatically update book information', 'openlibrary_enabled')}
             {section === 'music' &&
@@ -636,6 +680,22 @@ export default function AIOSourcePage({
               {footer('cache-availability')}
             </form>
           </Disclosure>
+        )}
+        {section === 'software' && (
+          <form
+            aria-label="Software catalog filters"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submit('software-catalog')
+            }}
+          >
+            <SoftwareImportFilters
+              value={formConfig('software-catalog')!}
+              onChange={(patch) => update('software-catalog', patch)}
+              busy={Boolean(status.software?.running) || resetting || save.isPending}
+              footer={footer('software-catalog')}
+            />
+          </form>
         )}
         {section === 'books' && (
           <form
@@ -674,7 +734,7 @@ export default function AIOSourcePage({
             title="Automatic updates"
             help={
               section === 'identification'
-                ? 'Pending work and timing survive restarts. This interval applies to videos, games, music and books; manual actions run immediately.'
+                ? 'Pending work and timing survive restarts. This interval applies to videos, games, software, music and books; manual actions run immediately.'
                 : undefined
             }
           >
@@ -710,6 +770,15 @@ export default function AIOSourcePage({
                   30,
                   automaticScope,
                   'Refresh all game details periodically to catch deleted records and changes to related information. Progress resumes after an interruption.',
+                )}
+              {section === 'software' &&
+                number(
+                  'Software information update interval (minutes)',
+                  'software_minutes',
+                  15,
+                  1440,
+                  automaticScope,
+                  'Checks NVD CPE incremental changes, WinGet, Homebrew Cask and selfh.st/icons on this interval (default 360 minutes). Conditional requests skip unchanged bulk feeds.',
                 )}
               {section === 'books' &&
                 number(
@@ -829,7 +898,7 @@ export default function AIOSourcePage({
           {section === 'games' && (
             <ConfirmAction
               title="Reset game information?"
-              description="Information updates and identification will be stopped first. IGDB information, related automatic and manual identifications, availability observations and game operation history will be removed. Source files, video and book information, settings and files in your debrid accounts are retained. Automatic game updates can import the catalog again."
+              description="Information updates and identification will be stopped first. IGDB information, related automatic and manual identifications, availability observations and game operation history will be removed. Source files, video, software, music and book information, settings and files in your debrid accounts are retained. Automatic game updates can import the catalog again."
               label="Reset game information"
               variant="destructive"
               action={() => action.mutateAsync('reset-games')}
@@ -837,6 +906,21 @@ export default function AIOSourcePage({
                 <Button variant="destructive" disabled={maintenanceBusy}>
                   <TrashIcon />
                   Reset game information
+                </Button>
+              }
+            />
+          )}
+          {section === 'software' && (
+            <ConfirmAction
+              title="Reset software information?"
+              description="Information updates and identification will be stopped first. NVD CPE, WinGet, Homebrew Cask and selfh.st icon metadata, related automatic and manual identifications, availability observations and software operation history will be removed. Source records, video, game, music and book information, settings and files in your debrid accounts are retained. Automatic software updates can import the catalog again."
+              label="Reset software information"
+              variant="destructive"
+              action={() => action.mutateAsync('reset-software')}
+              trigger={
+                <Button variant="destructive" disabled={maintenanceBusy}>
+                  <TrashIcon />
+                  Reset software information
                 </Button>
               }
             />
@@ -923,12 +1007,13 @@ export default function AIOSourcePage({
           <SettingsSections>
             {section === 'videos' && <RuntimeSettingsPanel section="metadata" />}
             {(section === 'videos' ||
-              section === 'books' ||
               section === 'games' ||
-              section === 'music') && (
+              section === 'software' ||
+              section === 'music' ||
+              section === 'books') && (
               <RuntimeSettingsPanel
                 section="metadata_retries"
-                scopeHelp="These settings apply to video, game, music and book information updates."
+                scopeHelp="These settings apply to video, game, software, music and book information updates."
               />
             )}
             {section === 'identification' && (
@@ -998,6 +1083,24 @@ export default function AIOSourcePage({
                   </InfoTip>
                 </div>
               )}
+              {section === 'software' && status.software?.needs_full_import && (
+                <div
+                  role="status"
+                  className="notice notice-warning flex flex-wrap items-center gap-1.5"
+                >
+                  <p>
+                    NVD CPE incremental continuity was exceeded. The next update will automatically
+                    re-import a fresh full snapshot while keeping existing software information
+                    searchable.
+                  </p>
+                </div>
+              )}
+              {section === 'software' && status.software?.running && (
+                <p role="status" className="help">
+                  Updating software information. Progress is saved automatically and existing
+                  entries remain searchable during import.
+                </p>
+              )}
               {section === 'music' && status.music?.schema_unsupported && (
                 <div
                   role="status"
@@ -1034,11 +1137,13 @@ export default function AIOSourcePage({
                   ? status.status.sync_error
                   : section === 'games'
                     ? status.games?.error
-                    : section === 'books'
-                      ? status.books?.error
-                      : section === 'music'
-                        ? status.music?.error
-                        : status.matching_error,
+                    : section === 'software'
+                      ? status.software?.error
+                      : section === 'books'
+                        ? status.books?.error
+                        : section === 'music'
+                          ? status.music?.error
+                          : status.matching_error,
               ) && (
                 <p role="status" className="notice notice-warning">
                   {messageText(
@@ -1046,11 +1151,13 @@ export default function AIOSourcePage({
                       ? status.status.sync_error
                       : section === 'games'
                         ? status.games?.error || ''
-                        : section === 'books'
-                          ? status.books?.error || ''
-                          : section === 'music'
-                            ? status.music?.error || ''
-                            : status.matching_error || '',
+                        : section === 'software'
+                          ? status.software?.error || ''
+                          : section === 'books'
+                            ? status.books?.error || ''
+                            : section === 'music'
+                              ? status.music?.error || ''
+                              : status.matching_error || '',
                   )}{' '}
                   <Link className="data-link" to={`${metadataSections[section].path}/history`}>
                     View history
@@ -1110,6 +1217,29 @@ export default function AIOSourcePage({
                       >
                         <StopIcon />
                         Stop game information update
+                      </Button>
+                    )}
+                  </>
+                )}
+                {section === 'software' && (
+                  <>
+                    <Button
+                      disabled={Boolean(
+                        status.software?.running || resetting || action.isPending || dirty,
+                      )}
+                      onClick={() => action.mutate('sync-software')}
+                    >
+                      <ArrowClockwiseIcon />
+                      Update software information
+                    </Button>
+                    {status.software?.running && (
+                      <Button
+                        variant="warning"
+                        disabled={action.isPending}
+                        onClick={() => action.mutate('stop-software')}
+                      >
+                        <StopIcon />
+                        Stop software information update
                       </Button>
                     )}
                   </>

@@ -68,6 +68,7 @@ test('metadata catalogs and credential creation links have consistent navigation
   for (const [section, label] of [
     ['videos', 'Videos'],
     ['games', 'Games'],
+    ['software', 'Software'],
     ['music', 'Music'],
     ['books', 'Books'],
   ]) {
@@ -86,7 +87,9 @@ test('metadata catalogs and credential creation links have consistent navigation
             ? 'Create TMDB credentials'
             : section === 'games'
               ? 'Create Twitch credentials'
-              : 'Get a MetaBrainz Live Data Feed token',
+              : section === 'software'
+                ? 'Request a free NVD API key'
+                : 'Get a MetaBrainz Live Data Feed token',
         exact: true,
       })
       await expect(link).toHaveAttribute(
@@ -95,7 +98,9 @@ test('metadata catalogs and credential creation links have consistent navigation
           ? 'https://www.themoviedb.org/settings/api/request'
           : section === 'games'
             ? 'https://dev.twitch.tv/console/apps/create'
-            : 'https://metabrainz.org/profile',
+            : section === 'software'
+              ? 'https://nvd.nist.gov/developers/request-an-api-key'
+              : 'https://metabrainz.org/profile',
       )
       await expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     }

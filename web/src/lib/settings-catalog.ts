@@ -71,7 +71,7 @@ const runtimeLocations: Record<RuntimeSection, [string, string]> = {
   metadata: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos'],
   metadata_retries: [
     '/metadata/videos/settings',
-    'Metadata / Catalogs / Videos, Games, Music & Books',
+    'Metadata / Catalogs / Videos, Games, Software, Music & Books',
   ],
 }
 for (const section of Object.keys(runtimeSections) as RuntimeSection[]) {
@@ -143,6 +143,56 @@ add(
     ['metadata.games-interval', 'Game information update interval (minutes)'],
     ['metadata.games-rate', 'IGDB requests per second'],
     ['metadata.games-reconcile', 'Full catalog reconciliation (days)'],
+  ],
+)
+add(
+  {
+    route: '/metadata/software/settings',
+    group: 'Metadata / Catalogs / Software / Settings',
+    keywords:
+      'NVD CPE NIST WinGet Microsoft Homebrew Cask selfh.st icons software applications logiciels metadata',
+  },
+  [
+    [
+      'metadata.software-key',
+      'NVD API key (optional)',
+      'NIST NVD CPE api key rate limit incremental secret',
+    ],
+    [
+      'metadata.software',
+      'Automatically update software information',
+      'NVD WinGet Homebrew software applications logiciels',
+    ],
+    [
+      'metadata.software-interval',
+      'Software information update interval (minutes)',
+      'schedule frequency cadence intervalle',
+    ],
+    [
+      'metadata.software-nvd',
+      'Include commercial & vendor catalog (NVD CPE)',
+      'NIST NVD CPE commercial vendor software catalog filters',
+    ],
+    [
+      'metadata.software-plugins',
+      'Exclude web plugins, CMS extensions and developer libraries',
+      'WordPress Drupal Joomla Jenkins npm PyPI RubyGems Maven firmware catalog filters',
+    ],
+    [
+      'metadata.software-os',
+      'Include operating systems',
+      'Windows Linux macOS ISO operating systems catalog filters',
+    ],
+    [
+      'metadata.software-icons',
+      'Include software icons index',
+      'selfh.st icons PNG remote artwork catalog filters',
+    ],
+    [
+      'metadata.software-platforms',
+      'Platforms',
+      'Windows macOS Linux Android iOS operating systems catalog filters',
+    ],
   ],
 )
 add(
@@ -444,6 +494,7 @@ add(
     ['routing.default', 'Outgoing connections', 'default connection'],
     ['routing.tmdb', 'TMDB'],
     ['routing.igdb', 'IGDB'],
+    ['routing.software', 'Software'],
     ['routing.musicbrainz', 'MusicBrainz'],
     ['routing.openlibrary', 'Open Library'],
     ...debridProviders.map((p) => [`routing.${providerSettingSuffix(p.id)}`, p.name] as const),

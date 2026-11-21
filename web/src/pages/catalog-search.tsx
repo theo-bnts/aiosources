@@ -52,6 +52,14 @@ import {
   TableCell,
 } from '@/components/ui/table'
 
+const softwarePlatformLabels: Record<string, string> = {
+  windows: 'Windows',
+  macos: 'macOS',
+  linux: 'Linux',
+  android: 'Android',
+  ios: 'iOS',
+}
+
 function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?: boolean }) {
   return (
     <p className={`help break-words ${compact ? 'line-clamp-3' : ''}`}>
@@ -61,9 +69,16 @@ function TitleDetails({ title, compact = true }: { title: CatalogTitle; compact?
           ? 'Book'
           : title.type === 'game'
             ? 'Game'
-            : title.type === 'music'
-              ? title.music_type || 'Music'
-              : 'Series'}
+            : title.type === 'software'
+              ? 'Software'
+              : title.type === 'music'
+                ? title.music_type || 'Music'
+                : 'Series'}
+      {title.vendor && ` · ${title.vendor}`}
+      {!!title.software_platforms?.length &&
+        ` · ${title.software_platforms.map((p) => softwarePlatformLabels[p] ?? p).join(', ')}`}
+      {title.latest_version && !compact && ` · v${title.latest_version.replace(/^v/i, '')}`}
+      {title.license && !compact && ` · ${title.license}`}
       {!!title.platforms?.length && ` · ${title.platforms.map((p) => p.name).join(', ')}`}
       {!!title.authors?.length && ` · ${title.authors.join(', ')}`}
       {!!title.artists?.length && ` · ${title.artists.join(', ')}`}
@@ -124,7 +139,7 @@ export function CatalogSearchPage() {
             minLength={2}
             maxLength={500}
             required
-            placeholder="Search movies, series, games, music and books"
+            placeholder="Search movies, series, games, software, music and books"
           />
         </div>
         <Disclosure title="Filters">
@@ -212,6 +227,7 @@ export function CatalogSearchPage() {
                             src={title.cover}
                             book={title.type === 'book'}
                             game={title.type === 'game'}
+                            software={title.type === 'software'}
                             music={title.type === 'music'}
                           />
                           <div className="min-w-0">
@@ -384,11 +400,59 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                 src={title.data.cover}
                 book={title.data.type === 'book'}
                 game={title.data.type === 'game'}
+                software={title.data.type === 'software'}
                 music={title.data.type === 'music'}
                 large
               />
               <div className="min-w-0 space-y-2">
                 <TitleDetails title={title.data} compact={false} />
+                {title.data.type === 'software' && title.data.description && (
+                  <p className="text-sm text-muted-foreground">{title.data.description}</p>
+                )}
+                {title.data.type === 'software' &&
+                  (title.data.winget_id || title.data.homebrew_cask || title.data.nvd_cpe) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {title.data.winget_id &&
+                        /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}\.[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/.test(
+                          title.data.winget_id,
+                        ) &&
+                        !title.data.winget_id.includes('..') && (
+                          <a
+                            className="data-link text-sm"
+                            href={`https://github.com/microsoft/winget-pkgs/tree/master/manifests/${title.data.winget_id[0].toLowerCase()}/${title.data.winget_id.split('.').map(encodeURIComponent).join('/')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on WinGet
+                          </a>
+                        )}
+                      {title.data.homebrew_cask &&
+                        /^[a-z0-9][a-z0-9@+._-]{0,127}$/.test(title.data.homebrew_cask) &&
+                        !title.data.homebrew_cask.includes('..') && (
+                          <a
+                            className="data-link text-sm"
+                            href={`https://formulae.brew.sh/cask/${encodeURIComponent(title.data.homebrew_cask)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on Homebrew
+                          </a>
+                        )}
+                      {title.data.nvd_cpe &&
+                        /^cpe:2\.3:[ao]:[a-z0-9][a-z0-9._+-]{0,127}:[a-z0-9][a-z0-9._+-]{0,127}$/.test(
+                          title.data.nvd_cpe,
+                        ) && (
+                          <a
+                            className="data-link text-sm"
+                            href={`https://nvd.nist.gov/products/cpe/search/results?namingFormat=2.3&keyword=${encodeURIComponent(title.data.nvd_cpe)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View on NVD CPE
+                          </a>
+                        )}
+                    </div>
+                  )}
                 {title.data.openlibrary && /^OL[1-9][0-9]*[MW]$/.test(title.data.openlibrary) && (
                   <a
                     className="data-link text-sm"

@@ -141,6 +141,15 @@ func (s *Service) runAutomation() time.Duration {
 			}
 		}
 	}
+	if c.SoftwareEnabled && !s.SoftwareState() {
+		if next, e := s.DB.NextSoftwareUpdate(s.ctx, c.SoftwareMinutes); e == nil {
+			if !next.After(time.Now()) {
+				_ = s.StartSoftware(s.ctx, "automatic")
+			} else {
+				poll = min(poll, time.Until(next))
+			}
+		}
+	}
 	if c.MusicBrainzEnabled && !s.MusicState() {
 		if next, e := s.DB.NextMusicUpdate(s.ctx, c.MusicBrainzMinutes, c.MusicBrainzSecret != ""); e == nil {
 			if !next.After(time.Now()) {

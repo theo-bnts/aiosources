@@ -56,7 +56,7 @@ func ParseRecord(r model.AIORecord) Release {
 		return Release{}
 	}
 	for _, c := range h.Categories {
-		if c == 3030 || (c >= 7000 && c < 8000) || (c >= 1000 && c < 2000) || c == 4050 {
+		if c == 3030 || (c >= 7000 && c < 8000) || (c >= 1000 && c < 2000) || (c >= 4000 && c < 5000) {
 			return Release{}
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/software"
 )
 
 const aioPublishedMatch = `m.status='matched' AND m.fingerprint=t.fields_fingerprint AND m.revision=w.revision
@@ -33,7 +34,7 @@ func catalogQueryAlias(matching, normalized string) string {
 
 func catalogTitleColumns(locale, alias string) string {
 	return `w.id,w.media_type,` + catalogTitleLabel(locale, alias) + `,` + bookWorkYears + `,COALESCE(w.tmdb_id,''),w.imdb_id,
- (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,w.igdb_id,w.game_data->'platforms',w.musicbrainz_id,w.music_data`
+ (SELECT count(*)` + catalogReleaseSource + `),ARRAY(SELECT DISTINCT t.provider_id` + catalogReleaseSource + ` ORDER BY t.provider_id),w.openlibrary_id,COALESCE(NULLIF(w.localized_posters->>split_part(` + locale + `,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),COALESCE(` + bookEditionLocalizedCover(locale) + `,NULLIF((w.book_data->>'cover')::bigint,0),0),CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,w.igdb_id,w.game_data->'platforms',w.musicbrainz_id,w.music_data,w.software_key,w.software_data`
 }
 
 func catalogYearFilter(year string) string {
@@ -48,8 +49,8 @@ func scanCatalogTitle(row scanner, prefix ...any) (model.CatalogTitle, error) {
 	var title model.CatalogTitle
 	var poster string
 	var cover int64
-	var platforms, musicData []byte
-	dest := append(append([]any{}, prefix...), &title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms, &title.MusicBrainz, &musicData)
+	var platforms, musicData, softwareData []byte
+	dest := append(append([]any{}, prefix...), &title.ID, &title.Type, &title.Title, &title.Years, &title.TMDB, &title.IMDb, &title.Releases, &title.Providers, &title.OpenLibrary, &poster, &cover, &title.Authors, &title.IGDB, &platforms, &title.MusicBrainz, &musicData, &title.SoftwareKey, &softwareData)
 	err := row.Scan(dest...)
 	if err == nil && len(platforms) > 0 && string(platforms) != "null" {
 		err = json.Unmarshal(platforms, &title.Platforms)
@@ -65,6 +66,19 @@ func scanCatalogTitle(row scanner, prefix ...any) (model.CatalogTitle, error) {
 			title.Labels = info.Labels
 			title.DiscogsIDs = info.DiscogsIDs
 			title.WikidataID = info.WikidataID
+		}
+	}
+	if err == nil && title.Type == "software" && len(softwareData) > 0 && string(softwareData) != "null" {
+		var info model.SoftwareInformation
+		if err = json.Unmarshal(softwareData, &info); err == nil {
+			title.Vendor = info.Vendor
+			title.SoftwarePlatforms = info.Platforms
+			title.Description = info.Description
+			title.License = info.License
+			title.LatestVersion = info.LatestVersion
+			title.NVDCPE = info.NVDCPE
+			title.WinGetID = info.WinGetID
+			title.HomebrewCask = info.HomebrewCask
 		}
 	}
 	title.Cover = model.CoverURL(title.Type, poster, cover)
@@ -101,6 +115,12 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	identity := strings.TrimSpace(opts.Query)
 	if key := books.Key(identity); books.WorkKey(key) {
 		identity = key
+	} else if swKey := software.CanonicalSoftwareKey(identity); swKey != "" {
+		identity = swKey
+	} else if cpe := software.NVDCPE(identity); cpe != "" {
+		identity = cpe
+	} else if wg := software.WinGetID(identity); wg != "" {
+		identity = wg
 	} else if mbid := music.MBID(identity); mbid != "" {
 		identity = mbid
 	} else if wd := music.WikidataID(identity); wd != "" {
@@ -132,6 +152,10 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		bookScope = catalogBookScope
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
+	softwareExtras := ""
+	if len(media) == 0 || slices.Contains(media, "software") {
+		softwareExtras = softwareCatalogCandidates("$1", "$3", matching)
+	}
 	musicExtras := ""
 	if len(media) == 0 || slices.Contains(media, "music") {
 		musicExtras = musicCatalogCandidates("$1", "$3", matching)
@@ -139,7 +163,7 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
  SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
  UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
- public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + musicExtras + `) matches GROUP BY id) candidates
+ public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")

@@ -74,6 +74,9 @@ func decideAIORecord(r model.AIORecord, find store.AIOCandidateSearch) (model.AI
 	if game := ParseGameRelease(r); game.Game {
 		return decideGame(r, game, find)
 	}
+	if app := ParseSoftwareRelease(r); app.Kind != "" {
+		return decideSoftware(r, app, find)
+	}
 	if track := ParseMusicRelease(r); track.Kind != "" {
 		return decideMusic(r, track, find)
 	}

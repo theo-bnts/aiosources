@@ -11,13 +11,14 @@ import (
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/software"
 )
 
-const reviewColumns = `active,revision,fingerprint,media_type,tmdb_id,season,episode,override_episode,updated_at,openlibrary_id,igdb_id,musicbrainz_id`
+const reviewColumns = `active,revision,fingerprint,media_type,tmdb_id,season,episode,override_episode,updated_at,openlibrary_id,igdb_id,musicbrainz_id,software_key`
 
 func readAIOReview(ctx context.Context, tx pgx.Tx, record model.AIORecord) (*model.AIOMatchReview, error) {
 	var review model.AIOMatchReview
-	err := tx.QueryRow(ctx, `SELECT `+reviewColumns+`,evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) FROM aiosources.aio_match_reviews r JOIN aiosources.torrents t USING(provider_id,source_id) WHERE r.provider_id=$1 AND r.source_id=$2`, record.Provider, record.SourceID).Scan(&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.MusicBrainz, &review.SourceChanged)
+	err := tx.QueryRow(ctx, `SELECT `+reviewColumns+`,evidence_fingerprint<>md5(aiosources.aio_review_evidence(t.fields)::text) FROM aiosources.aio_match_reviews r JOIN aiosources.torrents t USING(provider_id,source_id) WHERE r.provider_id=$1 AND r.source_id=$2`, record.Provider, record.SourceID).Scan(&review.Active, &review.Revision, &review.Fingerprint, &review.Type, &review.TMDB, &review.Season, &review.Episode, &review.OverrideEpisode, &review.UpdatedAt, &review.OpenLibrary, &review.IGDB, &review.MusicBrainz, &review.SoftwareKey, &review.SourceChanged)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -74,6 +75,12 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	query = strings.TrimSpace(query)
 	if key := books.Key(query); books.WorkKey(key) {
 		query = key
+	} else if swKey := software.CanonicalSoftwareKey(query); swKey != "" {
+		query = swKey
+	} else if cpe := software.NVDCPE(query); cpe != "" {
+		query = cpe
+	} else if wg := software.WinGetID(query); wg != "" {
+		query = wg
 	} else if mbid := music.MBID(query); mbid != "" {
 		query = mbid
 	} else if wd := music.WikidataID(query); wd != "" {
@@ -82,11 +89,11 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 		query = did
 	}
 	if len(query) > 200 || !model.ValidSelection(kind, func(value string) bool {
-		return value == "movie" || value == "tv" || value == "book" || value == "game" || value == "music"
+		return value == "movie" || value == "tv" || value == "book" || value == "game" || value == "software" || value == "music"
 	}) {
 		return out, model.ErrInvalid
 	}
-	if len([]rune(normalized)) < 3 && !reviewIMDb.MatchString(query) && !reviewNumeric.MatchString(query) && music.MBID(query) == "" && music.WikidataID(query) == "" && music.DiscogsID(query) == "" {
+	if len([]rune(normalized)) < 3 && !reviewIMDb.MatchString(query) && !reviewNumeric.MatchString(query) && software.CanonicalSoftwareKey(query) == "" && software.NVDCPE(query) == "" && software.WinGetID(query) == "" && music.MBID(query) == "" && music.WikidataID(query) == "" && music.DiscogsID(query) == "" {
 		return out, model.ErrInvalid
 	}
 	filter := model.CatalogSearchFilters{Language: "en"}
@@ -107,6 +114,10 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	if kind == "" || slices.Contains(model.SelectionValues(kind), "book") {
 		bookExtras = bookCatalogCandidates("$1", "$2", matching, anchor)
 	}
+	softwareExtras := ""
+	if kind == "" || slices.Contains(model.SelectionValues(kind), "software") {
+		softwareExtras = softwareCatalogCandidates("$1", "$2", matching)
+	}
 	musicExtras := ""
 	if kind == "" || slices.Contains(model.SelectionValues(kind), "music") {
 		musicExtras = musicCatalogCandidates("$1", "$2", matching)
@@ -115,7 +126,7 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	columns := strings.Replace(aioWorkColumns, "w.display_title", catalogTitleLabel("$5", alias), 1)
 	rows, err := s.pool.Query(ctx, `WITH candidates AS (
  SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE imdb_id=$1 OR tmdb_id=$1 OR tvdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
- UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM aiosources.aio_titles WHERE `+matching+bookExtras+musicExtras+`
+ UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM aiosources.aio_titles WHERE `+matching+bookExtras+softwareExtras+musicExtras+`
 ), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
  SELECT `+columns+` FROM (
  SELECT w.id,c.precision,c.relevance FROM ranked c JOIN aiosources.aio_works w ON w.id=c.id
@@ -156,7 +167,7 @@ func reviewedAIOResult(ctx context.Context, tx pgx.Tx, record model.AIORecord, r
 		result.Reason = "reviewed source changed"
 		return result, nil
 	}
-	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type=$1 AND ((media_type='book' AND (openlibrary_id=aiosources.ol_resolve($3) OR openlibrary_id=(SELECT aiosources.ol_resolve(e.work_keys[1]) FROM aiosources.ol_editions e WHERE e.id=aiosources.ol_resolve($3) AND cardinality(e.work_keys)=1)) AND openlibrary_id<>'') OR (media_type IN ('movie','tv') AND tmdb_id=$2) OR (media_type='game' AND igdb_id=$4 AND igdb_id<>'') OR (media_type='music' AND musicbrainz_id=aiosources.mb_resolve_rg($5) AND musicbrainz_id<>'')) AND NOT adult`, review.Type, review.TMDB, review.OpenLibrary, review.IGDB, review.MusicBrainz))
+	w, err := scanAIOWork(tx.QueryRow(ctx, `SELECT `+aioWorkColumns+` FROM aiosources.aio_works w WHERE media_type=$1 AND ((media_type='book' AND (openlibrary_id=aiosources.ol_resolve($3) OR openlibrary_id=(SELECT aiosources.ol_resolve(e.work_keys[1]) FROM aiosources.ol_editions e WHERE e.id=aiosources.ol_resolve($3) AND cardinality(e.work_keys)=1)) AND openlibrary_id<>'') OR (media_type IN ('movie','tv') AND tmdb_id=$2) OR (media_type='game' AND igdb_id=$4 AND igdb_id<>'') OR (media_type='software' AND software_key=aiosources.sw_resolve_key($6) AND software_key<>'') OR (media_type='music' AND musicbrainz_id=aiosources.mb_resolve_rg($5) AND musicbrainz_id<>'')) AND NOT adult`, review.Type, review.TMDB, review.OpenLibrary, review.IGDB, review.MusicBrainz, review.SoftwareKey))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, nil
 	}
@@ -236,16 +247,16 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
 		if w.Type != "tv" && (input.Season != nil || input.Episode != nil) {
 			return model.ErrInvalid
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode,openlibrary_id,igdb_id,musicbrainz_id)
- SELECT $1,$2,$3,md5(aiosources.aio_review_evidence(fields)::text),$4,$5,$6,$7,$8,$9,$10,$11 FROM aiosources.torrents WHERE provider_id=$1 AND source_id=$2
- ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=aiosources.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,openlibrary_id=EXCLUDED.openlibrary_id,igdb_id=EXCLUDED.igdb_id,musicbrainz_id=EXCLUDED.musicbrainz_id,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode, w.OpenLibrary, w.IGDB, w.MusicBrainz); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_match_reviews(provider_id,source_id,fingerprint,evidence_fingerprint,media_type,tmdb_id,override_episode,season,episode,openlibrary_id,igdb_id,musicbrainz_id,software_key)
+ SELECT $1,$2,$3,md5(aiosources.aio_review_evidence(fields)::text),$4,$5,$6,$7,$8,$9,$10,$11,$12 FROM aiosources.torrents WHERE provider_id=$1 AND source_id=$2
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET active=TRUE,revision=aiosources.aio_match_reviews.revision+1,fingerprint=EXCLUDED.fingerprint,evidence_fingerprint=EXCLUDED.evidence_fingerprint,media_type=EXCLUDED.media_type,tmdb_id=EXCLUDED.tmdb_id,openlibrary_id=EXCLUDED.openlibrary_id,igdb_id=EXCLUDED.igdb_id,musicbrainz_id=EXCLUDED.musicbrainz_id,software_key=EXCLUDED.software_key,override_episode=EXCLUDED.override_episode,season=EXCLUDED.season,episode=EXCLUDED.episode,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.Type, w.TMDB, input.OverrideEpisode, input.Season, input.Episode, w.OpenLibrary, w.IGDB, w.MusicBrainz, w.SoftwareKey); err != nil {
 			return databaseError("save identification review", err)
 		}
 		if err = lockCatalogEntityWrites(ctx, tx); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind,music_kind,media_hint)
- VALUES($1,$2,$3,$4,$5,'matched','manually reviewed',$6,$7,$8) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status='matched',reason='manually reviewed',book_kind=EXCLUDED.book_kind,music_kind=EXCLUDED.music_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.ID, w.Revision, matchedBookKind(record, &w), matchedMusicKind(record, &w), w.Type); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason,book_kind,music_kind,software_kind,media_hint)
+ VALUES($1,$2,$3,$4,$5,'matched','manually reviewed',$6,$7,$8,$9) ON CONFLICT(provider_id,source_id) DO UPDATE SET fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revision,status='matched',reason='manually reviewed',book_kind=EXCLUDED.book_kind,music_kind=EXCLUDED.music_kind,software_kind=EXCLUDED.software_kind,media_hint=EXCLUDED.media_hint,updated_at=now()`, record.Provider, record.SourceID, record.Fingerprint, w.ID, w.Revision, matchedBookKind(record, &w), matchedMusicKind(record, &w), matchedSoftwareKind(record, &w), w.Type); err != nil {
 			return databaseError("publish reviewed identification", err)
 		}
 		if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1 AND source_id=$2`, record.Provider, record.SourceID); err != nil {

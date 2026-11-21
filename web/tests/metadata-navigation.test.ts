@@ -11,11 +11,17 @@ test('metadata histories separate video, book and shared identification operatio
   assert.equal(metadataOperationSection('metadata', 'tmdb'), 'videos')
   assert.equal(metadataOperationSection('metadata', 'igdb'), 'games')
   assert.equal(metadataHistoryPath('games'), '/metadata/games/history')
+  assert.equal(metadataOperationSection('metadata', 'software'), 'software')
+  assert.equal(metadataHistoryPath('software'), '/metadata/software/history')
   assert.equal(metadataOperationSection('metadata', 'openlibrary'), 'books')
   assert.equal(metadataOperationSection('metadata', 'musicbrainz'), 'music')
   assert.equal(metadataHistoryPath('music'), '/metadata/music/history')
   assert.equal(metadataOperationSection('matching', 'local'), 'identification')
   assert.equal(metadataHistoryPath('books'), '/metadata/books/history')
+  assert.equal(
+    legacyMetadataHistory('?service=software&kind=metadata&status=succeeded'),
+    '/metadata/software/history?status=succeeded',
+  )
   assert.equal(
     legacyMetadataHistory('?service=musicbrainz&kind=metadata&status=succeeded'),
     '/metadata/music/history?status=succeeded',
@@ -51,6 +57,17 @@ test('existing settings identifiers point to their separated metadata workspace'
     'metadata.games-interval',
   ])
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/games/settings#'))
+  for (const id of [
+    'metadata.software-key',
+    'metadata.software',
+    'metadata.software-interval',
+    'metadata.software-nvd',
+    'metadata.software-plugins',
+    'metadata.software-os',
+    'metadata.software-icons',
+    'metadata.software-platforms',
+  ])
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/software/settings#'))
   for (const id of ['metadata.books', 'metadata.book-interval'])
     assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/books/settings#'))
   for (const id of [

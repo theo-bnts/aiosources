@@ -1,5 +1,6 @@
 import { InfoTip } from '@/components/ui/info-tip'
 import {
+  AppWindowIcon,
   ArrowClockwiseIcon,
   BookOpenIcon,
   BroadcastIcon,
@@ -167,7 +168,7 @@ const navigationGroups: NavigationGroup[] = [
       {
         to: '/metadata/catalogs',
         label: 'Catalogs',
-        description: 'Manage video, game, music and book information.',
+        description: 'Manage video, game, software, music and book information.',
         icon: DatabaseIcon,
         children: [
           {
@@ -181,6 +182,12 @@ const navigationGroups: NavigationGroup[] = [
             label: 'Games',
             description: 'Game information, updates and history.',
             icon: GameControllerIcon,
+          },
+          {
+            to: '/metadata/software',
+            label: 'Software',
+            description: 'Software application catalog, icons index and history.',
+            icon: AppWindowIcon,
           },
           {
             to: '/metadata/music',
@@ -358,7 +365,7 @@ const publicSearchNavigation: NavigationGroup = {
       to: '/public/search',
       label: 'Search',
       description:
-        'Find films, series, games, music and books and download through your own debrid accounts.',
+        'Find films, series, games, software, music and books and download through your own debrid accounts.',
       icon: MagnifyingGlassIcon,
     },
   ],

@@ -1,4 +1,4 @@
-import type { BookStatus, MusicStatus, Status } from './aiosource-types'
+import type { BookStatus, MusicStatus, SoftwareStatus, Status } from './aiosource-types'
 
 export function metadataSyncLabel(
   status: Pick<
@@ -34,6 +34,26 @@ export function bookSyncLabel(status: BookStatus, automatic = true): string {
   if (!automatic && !status.running) return 'Automatic updates disabled'
   if (status.running) return 'Checking changes'
   return status.changes_through ? 'Following changes' : 'Preparing change tracking'
+}
+
+export function softwareSyncLabel(status: SoftwareStatus, automatic = true): string {
+  if (status.running) {
+    if (status.phase === 'recovery') return 'Recovering catalog'
+    if (status.phase === 'nvd_meta') return 'Checking NVD feed'
+    if (status.phase === 'nvd_dump') return 'Importing NVD CPE snapshot'
+    if (status.phase === 'nvd_incremental') return 'Applying NVD CPE updates'
+    if (status.phase === 'winget') return 'Importing WinGet packages'
+    if (status.phase === 'homebrew') return 'Importing Homebrew Casks'
+    if (status.phase === 'icons') return 'Importing icon index'
+    if (status.phase === 'merging' || status.phase === 'projecting' || status.phase === 'cleanup')
+      return 'Building software catalog'
+    return 'Importing catalog'
+  }
+  if (!status.complete) return status.position > 0 ? 'Import interrupted' : 'Not started'
+  if (status.needs_full_import) return 'Full re-import pending'
+  if (status.error) return 'Retry pending'
+  if (!automatic) return 'Automatic updates disabled'
+  return status.last_sync ? 'Following updates' : 'Not started'
 }
 
 export function musicSyncLabel(status: MusicStatus, automatic = true): string {

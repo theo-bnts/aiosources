@@ -59,6 +59,10 @@ test('About credits follow the metadata navigation order', async ({ page }) => {
   ).toEqual([
     'https://www.themoviedb.org',
     'https://www.igdb.com',
+    'https://nvd.nist.gov',
+    'https://github.com/microsoft/winget-pkgs',
+    'https://brew.sh',
+    'https://selfh.st/icons',
     'https://musicbrainz.org',
     'https://coverartarchive.org',
     'https://openlibrary.org',

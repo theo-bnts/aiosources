@@ -50,6 +50,9 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 			if h.run.Service == "igdb" {
 				h.run.Error = "Game information update failed. Saved progress is preserved."
 			}
+			if h.run.Service == "software" {
+				h.run.Error = "Software information update failed. Saved progress is preserved."
+			}
 			if h.run.Service == "openlibrary" {
 				h.run.Error = "Book information update failed. Saved progress is preserved."
 			}

@@ -6,11 +6,11 @@
 
 | Page | Use it to |
 | --- | --- |
-| Search | Find identified films, series, games, music and books, choose an episode or file and compare releases. |
+| Search | Find identified films, series, games, software, music and books, choose an episode or file and compare releases. |
 | Files | See imported counts by source in Statistics, then search those files directly in Results. |
 | Metadata → Identification | Track identification progress in Statistics, review uncertain records in Results, and manage automatic identification and its history. |
 | Sources → Indexers → Torrents | Add sources, schedule imports and inspect their history. |
-| Metadata → Catalogs → Videos / Games / Music / Books | Each has its own statistics, update settings and history. |
+| Metadata → Catalogs → Videos / Games / Software / Music / Books | Each has its own statistics, update settings and history. |
 | Debrid | Configure accounts and follow preparation, availability checks and cleanup. |
 | Connections | Create Stremio or Torznab access and share catalogs. |
 | Administration | Manage security, network, public access, storage and Logs. |
@@ -21,7 +21,7 @@ Each settings block has its own **Save**. Saving the main settings does not appl
 
 ## Search and choose a release
 
-Search uses your imported information, including local titles and aliases. It does not contact TMDB, IGDB, MusicBrainz, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
+Search uses your imported information, including local titles and aliases. It does not contact TMDB, IGDB, NVD, WinGet, Homebrew, MusicBrainz, Open Library or your source websites for the search itself. Titles use your browser language when available, with fallbacks for missing translations.
 
 Optional **Filters** and **Sorting** start closed. New searches include all results unless you choose a restriction. Use type and year filters to narrow titles; a series spanning the selected year can match that year. Open a title, choose a season and episode when applicable, then use release **Filters** and **Sorting** to compare versions.
 
@@ -29,7 +29,7 @@ Sorting can prioritize cached status, language, size, publication date, age, nam
 
 **Search torrents directly**, below the title results, also finds releases without a metadata match. It is available before entering a search and keeps your query when you use it after searching. Results use the same release presentation, debrid download actions and file selection as a title page. Public access follows the same private-source restrictions.
 
-Posters and book covers load directly from their official image services. Your instance does not save the image files.
+Posters, software icons and book covers load directly from their official image services. Your instance does not save the image files.
 
 **Download** opens a ready file in your browser. For a book with several formats or audio tracks, use **Choose file**, then select the file you want. **Add to debrid** starts preparation, with **View operation** linking to its progress in Debrid history.
 
@@ -59,7 +59,7 @@ Historical error counts include earlier attempts and do not necessarily mean the
 
 ## Storage and retention
 
-**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series, game, music and book information and shared caches are counted separately.
+**Administration → Storage** shows which data groups occupy space, largest first. Per-source figures are estimates; they include more than the torrent fields, such as indexes, import work and retained history. Film, series, game, software, music and book information and shared caches are counted separately.
 
 In **Storage → Settings**, choose what to retain in **Torrent data**. Required search, identification and playback information is always kept. Extra source fields can be selected individually; successful processed records, their field copies and published-change history are separate choices. Each option shows its relative storage and performance impact.
 

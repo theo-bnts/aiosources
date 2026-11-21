@@ -43,7 +43,7 @@ Public exports use the same source identities as named shares, so copying throug
 
 Optional groups are off by default and must be allowed by both sender and receiver. The connection's **Data received** shows what the last successful sync included. An older instance may provide only the basic torrent catalog.
 
-Game, music and book torrent records can be shared too; their metadata and identification are built locally through IGDB, MusicBrainz and Open Library.
+Game, software, music and book torrent records can be shared too; their metadata and identification are built locally through IGDB, Software (NVD CPE, WinGet and Homebrew Cask), MusicBrainz and Open Library.
 
 Remote identification decisions and manual reviews are not imported: identification runs locally. Film and series information is combined by its identifiers without duplicating the same work; directly acquired local information takes priority. Cached observations expire normally and do not provide service access without your own credentials. Import extra information only from an owner you trust.
 

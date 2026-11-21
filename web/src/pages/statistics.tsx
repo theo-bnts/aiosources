@@ -17,7 +17,12 @@ import { Button } from '@/components/ui/button'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { DebridStatistics } from '@/components/debrid-statistics'
 import { number, useDate } from '@/lib/format'
-import { bookSyncLabel, metadataSyncLabel, musicSyncLabel } from '@/lib/information-sync'
+import {
+  bookSyncLabel,
+  metadataSyncLabel,
+  musicSyncLabel,
+  softwareSyncLabel,
+} from '@/lib/information-sync'
 
 export function SourceStatisticsPage() {
   const location = useLocation()
@@ -147,9 +152,10 @@ export function SourceStatisticsPage() {
 export function AIOStatisticsPage({
   section,
 }: {
-  section: 'videos' | 'games' | 'books' | 'music' | 'debrid'
+  section: 'videos' | 'games' | 'software' | 'music' | 'books' | 'debrid'
 }) {
   if (section === 'games') return <GameStatisticsPage />
+  if (section === 'software') return <SoftwareStatisticsPage />
   if (section === 'music') return <MusicStatisticsPage />
   return section === 'debrid' ? (
     <DebridStatisticsPage />
@@ -431,6 +437,158 @@ function GameStatisticsPage() {
                   }
                   size="sm"
                 />
+              </dl>
+            </Disclosure>
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+function SoftwareStatisticsPage() {
+  const date = useDate()
+  const query = useQuery({
+    queryKey: ['aiosource', 'controls'],
+    queryFn: ({ signal }) => api<Controls>('/aiosource/controls', { signal }),
+    refetchInterval: LIVE_REFRESH_INTERVAL,
+  })
+  const status = query.data
+  const software = status?.software
+  const resetting =
+    status?.maintenance?.status === 'running' &&
+    (status.maintenance.scope === 'software' || status.maintenance.scope === 'metadata')
+  const automatic = Boolean(status?.config.software_enabled)
+  const needsAttention = Boolean(software?.error || software?.needs_full_import)
+  return (
+    <div className="page">
+      <ErrorNotice error={query.error} retry={() => void query.refetch()} />
+      {query.isPending ? (
+        <Loading label="Loading statistics" />
+      ) : (
+        software && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Statistic label="Software applications" value={software.works} />
+              <Statistic label="NVD CPE entries" value={software.nvd_entries} />
+              <Statistic
+                label="WinGet & Homebrew"
+                value={software.winget_entries + software.homebrew_entries}
+              />
+              <Statistic label="Software icons" value={software.icons} />
+            </dl>
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Statistic
+                label="Synchronization"
+                value={resetting ? 'Resetting information' : softwareSyncLabel(software, automatic)}
+                size="sm"
+                to="/metadata/software/settings"
+              />
+              <Statistic
+                label="NVD update mode"
+                value={
+                  software.nvd_key_configured
+                    ? 'Incremental API (API key)'
+                    : 'Incremental API (public rate)'
+                }
+                size="sm"
+                to="/metadata/software/settings"
+              />
+              <Statistic
+                label="Last successful update"
+                value={software.last_sync ? date(software.last_sync) : 'No completed update'}
+                size="sm"
+                to="/metadata/software/history"
+              />
+              <Statistic
+                label="NVD changes applied through"
+                value={
+                  software.nvd_changes_through
+                    ? date(software.nvd_changes_through)
+                    : 'Not established'
+                }
+                size="sm"
+                to="/metadata/software/history"
+              />
+              <Statistic
+                label="NVD snapshot date"
+                value={
+                  software.nvd_snapshot_at
+                    ? date(software.nvd_snapshot_at, 'date')
+                    : 'Not established'
+                }
+                size="sm"
+              />
+              <Statistic
+                label="Next automatic update"
+                value={
+                  resetting
+                    ? 'Waiting for reset'
+                    : software.running
+                      ? 'Running'
+                      : !automatic
+                        ? 'Disabled'
+                        : software.next_update
+                          ? date(software.next_update)
+                          : 'Waiting'
+                }
+                size="sm"
+                to="/metadata/software/settings"
+              />
+            </dl>
+            <div className="flex flex-wrap gap-2" aria-label="Current activity">
+              <Link to="/metadata/software/history" aria-label="View update history">
+                <Badge
+                  variant={
+                    software.running || resetting
+                      ? 'info'
+                      : needsAttention
+                        ? 'warning'
+                        : 'secondary'
+                  }
+                >
+                  {resetting
+                    ? 'Reset in progress'
+                    : software.running
+                      ? 'Update running'
+                      : needsAttention
+                        ? 'Update needs attention'
+                        : 'Update idle'}
+                </Badge>
+              </Link>
+            </div>
+            <Disclosure title="Import details">
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-sm text-muted-foreground">WinGet packages</dt>
+                  <dd className="mt-1 font-medium tabular-nums">
+                    {number(software.winget_entries)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Homebrew Casks</dt>
+                  <dd className="mt-1 font-medium tabular-nums">
+                    {number(software.homebrew_entries)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Indexed selfh.st icons</dt>
+                  <dd className="mt-1 font-medium tabular-nums">
+                    {number(software.icons_indexed)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Rows processed</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(software.position)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Excluded by catalog filters</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(software.filtered)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-muted-foreground">Skipped records</dt>
+                  <dd className="mt-1 font-medium tabular-nums">{number(software.skipped)}</dd>
+                </div>
               </dl>
             </Disclosure>
           </>
