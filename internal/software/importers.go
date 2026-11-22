@@ -16,9 +16,51 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.yaml.in/yaml/v3"
 )
+
+// ErrNVDChecksumMismatch reports that a streamed nvdcpe-2.0.tar.gz archive did
+// not match the SHA-256 digest published in nvdcpe-2.0.meta.
+var ErrNVDChecksumMismatch = errors.New("nvd archive sha256 mismatch")
+
+func sanitizeUTF8(s string) string {
+	if s == "" || (!strings.ContainsRune(s, 0) && utf8.ValidString(s)) {
+		return s
+	}
+	s = strings.ToValidUTF8(s, "")
+	return strings.ReplaceAll(s, "\x00", "")
+}
+
+func sanitizeStrings(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if cleaned := strings.TrimSpace(sanitizeUTF8(s)); cleaned != "" {
+			out = append(out, cleaned)
+		}
+	}
+	return out
+}
+
+func sanitizeSourceEntry(e SourceEntry) SourceEntry {
+	e.Name = strings.TrimSpace(sanitizeUTF8(e.Name))
+	e.Vendor = strings.TrimSpace(sanitizeUTF8(e.Vendor))
+	e.VendorNorm = strings.TrimSpace(sanitizeUTF8(e.VendorNorm))
+	e.ProductNorm = strings.TrimSpace(sanitizeUTF8(e.ProductNorm))
+	e.Description = strings.TrimSpace(sanitizeUTF8(e.Description))
+	e.License = strings.TrimSpace(sanitizeUTF8(e.License))
+	e.LatestVersion = strings.TrimSpace(sanitizeUTF8(e.LatestVersion))
+	e.HomepageKey = strings.TrimSpace(sanitizeUTF8(e.HomepageKey))
+	e.Platforms = sanitizeStrings(e.Platforms)
+	e.Tags = sanitizeStrings(e.Tags)
+	e.Languages = sanitizeStrings(e.Languages)
+	e.Aliases = sanitizeStrings(e.Aliases)
+	return e
+}
 
 const (
 	// MaxNVDIncrementalWindow defines the safe maximum checkpoint age before
@@ -153,6 +195,7 @@ type NVDDumpStats struct {
 	SkippedDeprecated int64
 	SkippedHardware   int64
 	LatestModified    *time.Time
+	ContentSHA256     string
 	TarSHA256         string
 	GzSHA256          string
 }
@@ -287,26 +330,30 @@ func (a *nvdAggregate) finalize() SourceEntry {
 	e.IsPlugin = !a.hasNonPlugin
 	slices.Sort(e.Platforms)
 	slices.Sort(e.Languages)
-	return e
+	return sanitizeSourceEntry(e)
 }
 
 // StreamNVDDump streams nvdcpe-2.0.tar.gz without loading the archive into RAM,
-// verifies SHA-256 (matching either the uncompressed tar or compressed tar.gz
-// checksum reported in nvdcpe-2.0.meta), aggregates active (part, vendor, product)
-// entries, and emits bounded batches.
+// verifies SHA-256 (matching the concatenated archive file payloads reported by
+// NIST nvdcpe-2.0.meta, as well as the uncompressed tar or compressed tar.gz
+// checksum), aggregates active (part, vendor, product) entries, and emits
+// bounded batches.
 func StreamNVDDump(ctx context.Context, r io.Reader, expectedSHA256 string, batchSize int, emit func([]SourceEntry) error) (NVDDumpStats, error) {
 	if batchSize <= 0 {
 		batchSize = 1000
 	}
 	gzHasher := sha256.New()
-	gzReader, err := gzip.NewReader(io.TeeReader(r, gzHasher))
+	rawTee := io.TeeReader(r, gzHasher)
+	gzReader, err := gzip.NewReader(rawTee)
 	if err != nil {
 		return NVDDumpStats{}, fmt.Errorf("open nvd gzip archive: %w", err)
 	}
 	defer gzReader.Close()
 
 	tarHasher := sha256.New()
-	tr := tar.NewReader(io.TeeReader(gzReader, tarHasher))
+	tarTee := io.TeeReader(gzReader, tarHasher)
+	tr := tar.NewReader(tarTee)
+	contentHasher := sha256.New()
 
 	var stats NVDDumpStats
 	agg := make(map[string]*nvdAggregate, min(batchSize+16, 4096))
@@ -345,60 +392,69 @@ func StreamNVDDump(ctx context.Context, r io.Reader, expectedSHA256 string, batc
 		if err != nil {
 			return stats, fmt.Errorf("read nvd tar header: %w", err)
 		}
-		if hdr.Typeflag != tar.TypeReg || !strings.HasSuffix(strings.ToLower(hdr.Name), ".json") {
+		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
-		if err := streamNVDJSONProducts(ctx, tr, func(p nvdCPEPayload) error {
-			stats.ProductsProcessed++
-			if p.Deprecated {
-				stats.SkippedDeprecated++
+		entryReader := io.TeeReader(tr, contentHasher)
+		if strings.HasSuffix(strings.ToLower(hdr.Name), ".json") {
+			if err := streamNVDJSONProducts(ctx, entryReader, func(p nvdCPEPayload) error {
+				stats.ProductsProcessed++
+				if p.Deprecated {
+					stats.SkippedDeprecated++
+					return nil
+				}
+				c, ok := ParseCPE23(p.CPEName)
+				if !ok {
+					return nil
+				}
+				if c.Part == "h" {
+					stats.SkippedHardware++
+					return nil
+				}
+				key := c.CanonicalID()
+				if key == "" {
+					return nil
+				}
+				item, exists := agg[key]
+				if !exists {
+					item = newNVDAggregate(c)
+					agg[key] = item
+				}
+				item.absorb(c, p)
+				lastKey = key
+				if item.entry.LastModifiedAt != nil && (stats.LatestModified == nil || item.entry.LastModifiedAt.After(*stats.LatestModified)) {
+					ts := *item.entry.LastModifiedAt
+					stats.LatestModified = &ts
+				}
+				if len(agg) > batchSize {
+					return flush(true)
+				}
 				return nil
+			}); err != nil {
+				return stats, err
 			}
-			c, ok := ParseCPE23(p.CPEName)
-			if !ok {
-				return nil
-			}
-			if c.Part == "h" {
-				stats.SkippedHardware++
-				return nil
-			}
-			key := c.CanonicalID()
-			if key == "" {
-				return nil
-			}
-			item, exists := agg[key]
-			if !exists {
-				item = newNVDAggregate(c)
-				agg[key] = item
-			}
-			item.absorb(c, p)
-			lastKey = key
-			if item.entry.LastModifiedAt != nil && (stats.LatestModified == nil || item.entry.LastModifiedAt.After(*stats.LatestModified)) {
-				ts := *item.entry.LastModifiedAt
-				stats.LatestModified = &ts
-			}
-			if len(agg) > batchSize {
-				return flush(true)
-			}
-			return nil
-		}); err != nil {
-			return stats, err
+		}
+		// Drain any trailing bytes (e.g. final newline after JSON object) so
+		// contentHasher covers 100% of every regular file payload in the tar.
+		if _, err := io.Copy(io.Discard, entryReader); err != nil {
+			return stats, fmt.Errorf("drain nvd tar entry %s: %w", hdr.Name, err)
 		}
 	}
 
-	// Drain any trailing padding so both tar and gzip checksums cover full EOF.
-	if _, err := io.Copy(io.Discard, gzReader); err != nil {
+	// Drain any trailing padding so content, tar and gzip checksums cover full EOF.
+	if _, err := io.Copy(io.Discard, tarTee); err != nil {
 		return stats, fmt.Errorf("drain nvd gzip stream: %w", err)
 	}
-	if _, err := io.Copy(io.Discard, r); err != nil {
+	if _, err := io.Copy(io.Discard, rawTee); err != nil {
 		return stats, fmt.Errorf("drain nvd raw stream: %w", err)
 	}
+	stats.ContentSHA256 = hex.EncodeToString(contentHasher.Sum(nil))
 	stats.TarSHA256 = hex.EncodeToString(tarHasher.Sum(nil))
 	stats.GzSHA256 = hex.EncodeToString(gzHasher.Sum(nil))
 
 	if expected := strings.ToLower(strings.TrimSpace(expectedSHA256)); expected != "" {
-		if stats.TarSHA256 != expected && stats.GzSHA256 != expected {
-			return stats, fmt.Errorf("nvd archive sha256 mismatch: expected %s", expected)
+		if stats.ContentSHA256 != expected && stats.TarSHA256 != expected && stats.GzSHA256 != expected {
+			return stats, fmt.Errorf("%w: expected %s", ErrNVDChecksumMismatch, expected)
 		}
 	}
 	if err := flush(false); err != nil {
@@ -682,7 +738,7 @@ func (p *wingetPkgState) finalize() (SourceEntry, bool) {
 		lic = lic[:128]
 	}
 
-	return SourceEntry{
+	return sanitizeSourceEntry(SourceEntry{
 		Source:        "winget",
 		ExternalID:    id,
 		Part:          "a",
@@ -699,7 +755,7 @@ func (p *wingetPkgState) finalize() (SourceEntry, bool) {
 		Languages:     langs,
 		Aliases:       aliases,
 		IsPlugin:      false,
-	}, true
+	}), true
 }
 
 // StreamWinGetArchive streams the microsoft/winget-pkgs tar.gz archive in
@@ -963,7 +1019,7 @@ func StreamHomebrewCasks(ctx context.Context, r io.Reader, batchSize int, emit f
 			version = strings.TrimSpace(version[:comma])
 		}
 
-		batch = append(batch, SourceEntry{
+		batch = append(batch, sanitizeSourceEntry(SourceEntry{
 			Source:        "homebrew",
 			ExternalID:    token,
 			Part:          "a",
@@ -977,7 +1033,7 @@ func StreamHomebrewCasks(ctx context.Context, r io.Reader, batchSize int, emit f
 			Languages:     langs,
 			Aliases:       aliases,
 			IsPlugin:      false,
-		})
+		}))
 		if len(batch) >= batchSize {
 			if err := flush(); err != nil {
 				return stats, err
@@ -1057,7 +1113,7 @@ func ParseSelfhstIcons(r io.Reader) (entries []IconEntry, skipped int64, err err
 			continue
 		}
 		seen[ref] = struct{}{}
-		name := strings.TrimSpace(item.Name)
+		name := strings.TrimSpace(sanitizeUTF8(item.Name))
 		if name == "" {
 			name = HumanizeCPEToken(strings.ReplaceAll(ref, "-", "_"))
 		}

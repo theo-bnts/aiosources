@@ -127,6 +127,7 @@ const resultLabels: Record<string, string> = {
   correspondence_enriched: 'Enriched torrents',
   packets_applied: 'Live Data Feed packets applied',
   export_checked: 'Export snapshot checked',
+  nvd_checked: 'NVD feed checked',
   sources_synced: 'Software sources updated',
   nvd_incremental: 'NVD incremental update applied',
   full_import: 'Full NVD snapshot imported',
@@ -134,6 +135,18 @@ const resultLabels: Record<string, string> = {
   uncached: 'Not cached',
   cleaned: 'Cleaned up',
   snapshot_checked: 'Cleanup records checked',
+}
+
+function resultLabel(service: OperationRun['service'], key: string) {
+  if (key === 'snapshot_checked' && service === 'software') return 'NVD feed checked'
+  return resultLabels[key] || key
+}
+
+function isProviderCallEvent(event: OperationEvent) {
+  return (
+    event.phase.startsWith('provider_') ||
+    Boolean(event.http_status || event.duration_ms || event.error_code)
+  )
 }
 
 function OperationBadge({ run }: { run: OperationRun }) {
@@ -445,7 +458,7 @@ export function OperationDetailPage({
                 'Last checkpoint': date(result.updated_at),
                 ...Object.fromEntries(
                   Object.entries(result.results).map(([key, value]) => [
-                    resultLabels[key] || key,
+                    resultLabel(result.service, key),
                     value,
                   ]),
                 ),
@@ -499,31 +512,42 @@ export function OperationDetailPage({
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {events.data.items?.map((event) => (
-                              <TableRow key={event.id}>
-                                <TableCell className="text-xs text-muted-foreground">
-                                  {date(event.created_at)}
-                                </TableCell>
-                                <TableCell>
-                                  {phases[event.phase] || event.phase}
-                                  {event.phase.startsWith('provider_') && (
-                                    <p className="help mt-1">
-                                      {number(event.duration_ms || 0)} ms
-                                      {event.http_status ? ` · HTTP ${event.http_status}` : ''}
-                                      {event.error_code
-                                        ? ` · ${providerErrors[event.error_code] ?? 'Provider error'}`
-                                        : ''}
-                                    </p>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-xs">
-                                  {number(event.processed)}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-xs">
-                                  {number(event.errors)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {events.data.items?.map((event) => {
+                              const providerCall = isProviderCallEvent(event)
+                              return (
+                                <TableRow key={event.id}>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    {date(event.created_at)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {providerCall
+                                      ? providerSteps[event.phase] ||
+                                        phases[event.phase] ||
+                                        event.phase
+                                      : phases[event.phase] ||
+                                        providerSteps[event.phase] ||
+                                        event.phase}
+                                    {providerCall && (
+                                      <p className="help mt-1">
+                                        {number(event.duration_ms || 0)} ms
+                                        {event.http_status ? ` · HTTP ${event.http_status}` : ''}
+                                        {event.error_code
+                                          ? ` · ${providerErrors[event.error_code] ?? 'Provider error'}`
+                                          : ''}
+                                      </p>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-xs">
+                                    {providerCall && event.processed === 0
+                                      ? '—'
+                                      : number(event.processed)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-xs">
+                                    {number(event.errors)}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
                           </TableBody>
                         </Table>
                       </div>

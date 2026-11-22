@@ -6,12 +6,14 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -250,5 +252,214 @@ func TestSoftwareFullSyncIncrementalLongPauseFallbackAndReset(t *testing.T) {
 	var swWorks, gameWorks int
 	if err = conn.QueryRow(ctx, `SELECT (SELECT count(*) FROM aiosources.aio_works WHERE media_type='software'),(SELECT count(*) FROM aiosources.aio_works WHERE media_type='game')`).Scan(&swWorks, &gameWorks); err != nil || swWorks != 0 || gameWorks != 1 {
 		t.Fatalf("software reset affected wrong works: sw=%d game=%d err=%v", swWorks, gameWorks, err)
+	}
+}
+
+func TestSoftwareOperationHistoryDiagnosticsUpToDateAndFailures(t *testing.T) {
+	ctx, s, conn := testService(t)
+	now := time.Now().UTC()
+
+	nvdChunk := `{"resultsPerPage":1,"startIndex":0,"totalResults":1,"products":[{"cpe":{"deprecated":false,"cpeName":"cpe:2.3:a:videolan:vlc_media_player:3.0.21:*:*:*:*:linux:*:*","lastModified":"2026-11-19T10:00:00.000","titles":[{"title":"VideoLAN VLC Media Player 3.0.21","lang":"en"}]}}]}` + "\n"
+	contentSum := sha256.Sum256([]byte(nvdChunk))
+	nvdContentSHA := hex.EncodeToString(contentSum[:])
+	nvdDumpBytes, _ := buildSoftwareTarGz(t, map[string]string{
+		"nvdcpe-2.0-chunks/nvdcpe-2.0-chunk-00001.json": nvdChunk,
+	})
+	wingetBytes, _ := buildSoftwareTarGz(t, map[string]string{
+		"winget-pkgs-master/manifests/v/VideoLAN/VLC/3.0.21/VideoLAN.VLC.locale.en-US.yaml": "PackageIdentifier: VideoLAN.VLC\nPackageVersion: 3.0.21\nPackageLocale: en-US\nPublisher: VideoLAN\nPackageName: VLC media player\nManifestType: defaultLocale\n",
+	})
+	brewJSON := `[{"token":"vlc","name":["VLC media player"],"desc":"Multimedia player","homepage":"https://www.videolan.org/vlc/","version":"3.0.21","disabled":false}]`
+	iconsJSON := `[{"Name":"VLC","Reference":"vlc","PNG":"Yes"}]`
+
+	// mode 0 = initial full sync with NIST content SHA-256
+	// mode 1 = up-to-date sync (incremental NVD returns 0 changes, others return 304)
+	// mode 2 = NVD API key rejected (HTTP 403)
+	// mode 3 = NVD checksum mismatch on fresh dump
+	var mode atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m := mode.Load()
+		switch r.URL.Path {
+		case "/nvd/meta":
+			sha := nvdContentSHA
+			if m == 3 {
+				sha = strings.Repeat("b", 64)
+			}
+			ts := now.Add(-1 * time.Hour).Format(time.RFC3339)
+			if m >= 1 {
+				ts = now.Format(time.RFC3339)
+			}
+			fmt.Fprintf(w, "lastModifiedDate:%s\nsize:%d\nsha256:%s\n", ts, len(nvdChunk), sha)
+		case "/nvd/dump":
+			_, _ = w.Write(nvdDumpBytes)
+		case "/nvd/api":
+			if m == 2 {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, "secret-nvd-key-must-never-leak")
+				return
+			}
+			fmt.Fprint(w, `{"resultsPerPage":0,"startIndex":0,"totalResults":0,"products":[]}`)
+		case "/winget":
+			if m >= 1 && r.Header.Get("If-None-Match") == `"wg-etag"` {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			w.Header().Set("ETag", `"wg-etag"`)
+			_, _ = w.Write(wingetBytes)
+		case "/brew":
+			if m >= 1 && r.Header.Get("If-None-Match") == `"brew-etag"` {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			w.Header().Set("ETag", `"brew-etag"`)
+			_, _ = w.Write([]byte(brewJSON))
+		case "/icons":
+			if m >= 1 && r.Header.Get("If-None-Match") == `"icons-etag"` {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+			w.Header().Set("ETag", `"icons-etag"`)
+			_, _ = w.Write([]byte(iconsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer upstream.Close()
+
+	s.SoftwareNVDMetaURL = upstream.URL + "/nvd/meta"
+	s.SoftwareNVDDumpURL = upstream.URL + "/nvd/dump"
+	s.SoftwareNVDAPIBase = upstream.URL + "/nvd/api"
+	s.SoftwareWinGetURL = upstream.URL + "/winget"
+	s.SoftwareHomebrewURL = upstream.URL + "/brew"
+	s.SoftwareIconsURL = upstream.URL + "/icons"
+	s.SoftwareHTTP = upstream.Client()
+
+	if err := s.Vault.Put(ctx, "sw_history_key", "secret-nvd-key-must-never-leak"); err != nil {
+		t.Fatal(err)
+	}
+	c, _ := s.DB.AIOConfig(ctx)
+	c.SoftwareNVDSecret = "sw_history_key"
+	c.SoftwareEnabled = true
+	if err := s.SaveConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Initial sync verifies real NIST content SHA-256 and records clean results & provider calls.
+	if err := s.SyncSoftware(ctx, "manual"); err != nil {
+		t.Fatalf("initial software sync failed: %v", err)
+	}
+	runs, err := s.DB.ListOperations(ctx, model.OperationFilter{Kind: "metadata", Service: "software"})
+	if err != nil || runs.Total != 1 {
+		t.Fatalf("expected 1 software operation, got %+v %v", runs, err)
+	}
+	initial := runs.Items[0]
+	if initial.Status != "succeeded" || initial.Phase != "completed" || initial.Processed == 0 ||
+		initial.Results["nvd_checked"] != 1 || initial.Results["full_import"] != 1 || initial.Results["sources_synced"] != 4 {
+		t.Fatalf("unexpected initial software history run: %+v", initial)
+	}
+	if _, legacy := initial.Results["snapshot_checked"]; legacy {
+		t.Fatalf("unexpected snapshot_checked counter on software run: %+v", initial.Results)
+	}
+	initialEvents, err := s.DB.OperationEvents(ctx, initial.ID, model.ListOptions{Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seenHTTP := map[string]int{}
+	for _, ev := range initialEvents.Items {
+		if ev.HTTPStatus > 0 {
+			seenHTTP[ev.Phase] = ev.HTTPStatus
+		}
+	}
+	for _, wantPhase := range []string{"software_nvd_meta", "software_nvd_dump", "software_winget", "software_homebrew", "software_icons"} {
+		if seenHTTP[wantPhase] != http.StatusOK {
+			t.Fatalf("missing HTTP 200 provider event for %s: %+v", wantPhase, seenHTTP)
+		}
+	}
+	stAfterInitial, err := s.DB.SoftwareStatus(ctx)
+	if err != nil || stAfterInitial.Position == 0 || stAfterInitial.Phase != "idle" {
+		t.Fatalf("unexpected status after initial sync: %+v %v", stAfterInitial, err)
+	}
+
+	// 2. Up-to-date sync (0 incremental changes, 304 on other sources) preserves status counters,
+	// resets phase to idle, persists nvd_changes_through, and omits false nvd_incremental result.
+	mode.Store(1)
+	if err := s.SyncSoftware(ctx, "manual"); err != nil {
+		t.Fatalf("up-to-date software sync failed: %v", err)
+	}
+	stAfterUpToDate, err := s.DB.SoftwareStatus(ctx)
+	if err != nil || stAfterUpToDate.Phase != "idle" || stAfterUpToDate.Position != stAfterInitial.Position {
+		t.Fatalf("up-to-date sync corrupted status: before=%+v after=%+v err=%v", stAfterInitial, stAfterUpToDate, err)
+	}
+	if stAfterUpToDate.NVDChangesThrough == nil || !stAfterUpToDate.NVDChangesThrough.After(*stAfterInitial.NVDChangesThrough) {
+		t.Fatalf("up-to-date sync dropped updated nvd_changes_through: before=%v after=%v", stAfterInitial.NVDChangesThrough, stAfterUpToDate.NVDChangesThrough)
+	}
+	runs, err = s.DB.ListOperations(ctx, model.OperationFilter{Kind: "metadata", Service: "software"})
+	if err != nil || runs.Total != 2 {
+		t.Fatalf("expected 2 software operations, got %+v %v", runs, err)
+	}
+	upToDate := runs.Items[0]
+	if upToDate.Status != "succeeded" || upToDate.Phase != "up_to_date" || upToDate.Results["nvd_checked"] != 1 {
+		t.Fatalf("unexpected up-to-date operation: %+v", upToDate)
+	}
+	if _, applied := upToDate.Results["nvd_incremental"]; applied {
+		t.Fatalf("zero-change incremental check should not report nvd_incremental: %+v", upToDate.Results)
+	}
+
+	// 3. Rejected NVD API key persists safe diagnostic error + authentication event code without leaking secret.
+	mode.Store(2)
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.sw_sync_state SET nvd_changes_through=$1 WHERE singleton`, now.Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SyncSoftware(ctx, "manual"); err == nil {
+		t.Fatal("expected HTTP 403 NVD API key rejection to fail")
+	}
+	runs, err = s.DB.ListOperations(ctx, model.OperationFilter{Kind: "metadata", Service: "software"})
+	if err != nil || runs.Total != 3 {
+		t.Fatalf("expected 3 software operations, got %+v %v", runs, err)
+	}
+	failedAuth := runs.Items[0]
+	if failedAuth.Status != "failed" || !strings.Contains(failedAuth.Error, "rejected the configured API key") {
+		t.Fatalf("expected safe specific failure diagnostic in history, got: %+v", failedAuth)
+	}
+	encoded, _ := json.Marshal(failedAuth)
+	if strings.Contains(string(encoded), "secret-nvd-key-must-never-leak") {
+		t.Fatal("API key leaked into operation history")
+	}
+	authEvents, err := s.DB.OperationEvents(ctx, failedAuth.ID, model.ListOptions{Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundAuthErr := false
+	for _, ev := range authEvents.Items {
+		if ev.Phase == "software_nvd_incremental" && ev.HTTPStatus == http.StatusForbidden && ev.ErrorCode == "authentication" && ev.Errors == 1 {
+			foundAuthErr = true
+		}
+	}
+	if !foundAuthErr {
+		t.Fatalf("expected authentication error event for HTTP 403, got: %+v", authEvents.Items)
+	}
+
+	// 4. Automatic run during RetryAt cooldown must not record an empty succeeded operation.
+	if err := s.SyncSoftware(ctx, "automatic"); err != nil {
+		t.Fatalf("automatic cooldown check returned error: %v", err)
+	}
+	runs, err = s.DB.ListOperations(ctx, model.OperationFilter{Kind: "metadata", Service: "software"})
+	if err != nil || runs.Total != 3 {
+		t.Fatalf("automatic cooldown created unexpected history entry: total=%d", runs.Total)
+	}
+
+	// 5. Corrupted NVD dump checksum records safe integrity error in history and logs.
+	mode.Store(3)
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.sw_sync_state SET needs_full_import=TRUE,retry_at=NULL WHERE singleton`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SyncSoftware(ctx, "manual"); err == nil {
+		t.Fatal("expected NVD checksum mismatch to fail")
+	}
+	runs, err = s.DB.ListOperations(ctx, model.OperationFilter{Kind: "metadata", Service: "software"})
+	if err != nil || runs.Total != 4 {
+		t.Fatalf("expected 4 software operations, got %+v %v", runs, err)
+	}
+	if !strings.Contains(runs.Items[0].Error, "integrity verification failed") {
+		t.Fatalf("expected safe integrity error message, got: %+v", runs.Items[0])
 	}
 }

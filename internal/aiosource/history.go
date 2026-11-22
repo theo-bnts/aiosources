@@ -52,6 +52,10 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 			}
 			if h.run.Service == "software" {
 				h.run.Error = "Software information update failed. Saved progress is preserved."
+				var se *softwareError
+				if errors.As(err, &se) && se.message != "" {
+					h.run.Error = se.message
+				}
 			}
 			if h.run.Service == "openlibrary" {
 				h.run.Error = "Book information update failed. Saved progress is preserved."

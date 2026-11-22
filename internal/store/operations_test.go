@@ -36,12 +36,27 @@ func TestBookReconciliationProgressCanReachCompletedHistory(t *testing.T) {
 		key     string
 		count   int64
 		service string
-	}{{"snapshot_checked", -1, "openlibrary"}, {"unknown_counter", 1, "openlibrary"}, {"snapshot_checked", 1, "tmdb"}} {
+	}{{"snapshot_checked", -1, "openlibrary"}, {"unknown_counter", 1, "openlibrary"}, {"snapshot_checked", 1, "tmdb"}, {"nvd_checked", 1, "tmdb"}, {"nvd_checked", -1, "software"}} {
 		run.Results = map[string]int64{value.key: value.count}
 		run.Service = value.service
 		if err := db.SaveOperation(ctx, run); !errors.Is(err, model.ErrInvalid) {
 			t.Fatal("invalid progress accepted", err)
 		}
+	}
+	swRelease, swLocked, err := db.AIOLock(ctx, "software")
+	if err != nil || !swLocked {
+		t.Fatal("software worker lock", err)
+	}
+	defer swRelease()
+	swRun, err := db.BeginOperation(ctx, model.OperationRun{Kind: "metadata", Service: "software", Trigger: "manual", Resource: "software"}, "software")
+	if err != nil {
+		t.Fatal(err)
+	}
+	swRun.Phase = "software_nvd_meta"
+	swRun.Results = map[string]int64{"nvd_checked": 1, "sources_synced": 4, "full_import": 1}
+	swRun.Status = "succeeded"
+	if err := db.SaveOperation(ctx, swRun); err != nil {
+		t.Fatalf("software operation checkpoint rejected: %v", err)
 	}
 }
 

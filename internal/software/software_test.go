@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -173,8 +174,39 @@ func TestStreamImportersAndMeta(t *testing.T) {
 	if nvdEntries[0].LatestVersion != "3.0.21" || !slices.Equal(nvdEntries[0].Platforms, []string{"linux", "windows"}) {
 		t.Fatalf("unexpected aggregated NVD entry: %+v", nvdEntries[0])
 	}
-	if _, err := StreamNVDDump(context.Background(), bytes.NewReader(nvdBytes), strings.Repeat("a", 64), 10, func([]SourceEntry) error { return nil }); err == nil {
-		t.Fatal("expected SHA-256 mismatch error")
+	if _, err := StreamNVDDump(context.Background(), bytes.NewReader(nvdBytes), strings.Repeat("a", 64), 10, func([]SourceEntry) error { return nil }); !errors.Is(err, ErrNVDChecksumMismatch) {
+		t.Fatalf("expected ErrNVDChecksumMismatch, got %v", err)
+	}
+
+	// Real NIST nvdcpe-2.0.meta publishes the SHA-256 of the concatenated
+	// uncompressed JSON chunk payloads (including trailing newlines), not the tar
+	// wrapper bytes. Verify multi-chunk content SHA-256 and NUL sanitization.
+	chunk1 := `{"products":[{"cpe":{"deprecated":false,"cpeName":"cpe:2.3:a:videolan:vlc_media_player:3.0.21:*:*:*:*:linux:*:*","lastModified":"2026-11-19T10:00:00.000","titles":[{"title":"VLC\u0000 Media Player 3.0.21","lang":"en"}]}}]}` + "\n"
+	chunk2 := `{"products":[{"cpe":{"deprecated":false,"cpeName":"cpe:2.3:a:blender:blender:4.2.0:*:*:*:*:linux:*:*","lastModified":"2026-11-20T10:00:00.000","titles":[{"title":"Blender 4.2.0","lang":"en"}]}}]}` + "\n"
+	contentHash := sha256.Sum256([]byte(chunk1 + chunk2))
+	contentSHA := hex.EncodeToString(contentHash[:])
+	multiBytes, multiTarSHA, multiGzSHA := buildTarGz(t, map[string]string{
+		"nvdcpe-2.0-chunks/nvdcpe-2.0-chunk-00001.json": chunk1,
+		"nvdcpe-2.0-chunks/nvdcpe-2.0-chunk-00002.json": chunk2,
+	})
+	if contentSHA == multiTarSHA || contentSHA == multiGzSHA {
+		t.Fatal("expected content SHA-256 to differ from tar and gzip digests")
+	}
+	var multiEntries []SourceEntry
+	multiStats, err := StreamNVDDump(context.Background(), bytes.NewReader(multiBytes), contentSHA, 10, func(batch []SourceEntry) error {
+		multiEntries = append(multiEntries, batch...)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamNVDDump rejected real NIST content SHA-256: %v", err)
+	}
+	if multiStats.ContentSHA256 != contentSHA || len(multiEntries) != 2 {
+		t.Fatalf("unexpected multi-chunk stats=%+v entries=%+v", multiStats, multiEntries)
+	}
+	for _, entry := range multiEntries {
+		if strings.ContainsRune(entry.Name, 0) {
+			t.Fatalf("NUL byte leaked into sanitized software entry: %q", entry.Name)
+		}
 	}
 
 	// WinGet streaming: keeps only latest version, ignores .installer.yaml and IconUrl.

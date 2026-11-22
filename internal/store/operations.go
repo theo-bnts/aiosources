@@ -104,7 +104,7 @@ func (s *Store) SaveOperation(ctx context.Context, run model.OperationRun) error
 			if run.Kind != "metadata" || run.Service != "musicbrainz" {
 				return model.ErrInvalid
 			}
-		case "sources_synced", "nvd_incremental", "full_import":
+		case "sources_synced", "nvd_checked", "nvd_incremental", "full_import":
 			if run.Kind != "metadata" || run.Service != "software" {
 				return model.ErrInvalid
 			}

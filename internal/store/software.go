@@ -101,8 +101,19 @@ func (s *Store) PrepareSoftwareImport(ctx context.Context, c model.AIOConfig) er
 	return databaseError("prepare software catalog filters", err)
 }
 
-func (s *Store) TouchSoftwareCheck(ctx context.Context) error {
-	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET checked_at=now(),error='',retry_at=NULL WHERE singleton`)
+func (s *Store) TouchSoftwareCheck(ctx context.Context, meta SoftwareSyncMeta) error {
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET
+ phase='idle',
+ nvd_snapshot=CASE WHEN $1<>'' THEN $1 ELSE nvd_snapshot END,
+ nvd_snapshot_sha256=CASE WHEN $2<>'' THEN $2 ELSE nvd_snapshot_sha256 END,
+ nvd_snapshot_at=COALESCE($3,nvd_snapshot_at),
+ nvd_changes_through=COALESCE($4,nvd_changes_through),
+ recovery_reason='',
+ checked_at=now(),
+ error='',
+ retry_at=NULL
+ WHERE singleton`,
+		meta.NVDSnapshot, meta.NVDSnapshotSHA256, meta.NVDSnapshotAt, meta.NVDChangesThrough)
 	return databaseError("record software check time", err)
 }
 
@@ -114,10 +125,14 @@ func (s *Store) BeginSoftwareSync(ctx context.Context, selectionKey, recoveryRea
 	}
 	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.sw_sync_state SET
  generation=generation+1,phase=$1,selection=$2,
- imported=0,position=0,filtered=0,skipped=0,
  recovery_reason=$3,error='',retry_at=NULL,checked_at=now()
  WHERE singleton RETURNING generation`, phase, selectionKey, recoveryReason).Scan(&gen)
 	return gen, databaseError("begin software catalog sync", err)
+}
+
+func (s *Store) ResetSoftwareProgress(ctx context.Context) error {
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET imported=0,position=0,skipped=0 WHERE singleton`)
+	return databaseError("reset software sync progress", err)
 }
 
 func (s *Store) SetSoftwarePhase(ctx context.Context, phase string) error {
@@ -314,7 +329,7 @@ func (s *Store) LoadSoftwareStaging(ctx context.Context, includeNVD, includeIcon
 // ProjectSoftwareCatalog writes merged Software catalog entries into sw_catalog,
 // sw_aliases, sw_external_ids, aio_works and aio_titles in bounded chunks while
 // keeping existing searchable works intact until FinishSoftwareSync swaps/prunes.
-func (s *Store) ProjectSoftwareCatalog(ctx context.Context, generation int64, items []software.MergedSoftware, filtered int64) error {
+func (s *Store) ProjectSoftwareCatalog(ctx context.Context, generation int64, items []software.MergedSoftware, filtered int64, onProgress func(int64)) error {
 	const chunkSize = 500
 	for start := 0; start < len(items); start += chunkSize {
 		if err := ctx.Err(); err != nil {
@@ -323,6 +338,9 @@ func (s *Store) ProjectSoftwareCatalog(ctx context.Context, generation int64, it
 		chunk := items[start:min(start+chunkSize, len(items))]
 		if err := s.projectSoftwareChunk(ctx, generation, chunk); err != nil {
 			return err
+		}
+		if onProgress != nil {
+			onProgress(int64(len(chunk)))
 		}
 	}
 	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET filtered=$1 WHERE singleton`, filtered)
@@ -734,12 +752,14 @@ func (s *Store) FailSoftwareUpdate(ctx context.Context, message string, retryAt 
 	return databaseError("retain software update retry", err)
 }
 
-func (s *Store) RecordSoftwareInformationActivity(ctx context.Context, updateErr error, processed int64) error {
+func (s *Store) RecordSoftwareInformationActivity(ctx context.Context, updateErr error, errorMessage string, processed int64) error {
 	level, kind, message := "info", "software.sync_completed", "Software information is up to date."
 	if updateErr != nil {
 		level, kind, message = "error", "software.sync_failed", "Software information update failed. Saved progress is preserved."
 		if errors.Is(updateErr, context.Canceled) {
 			level, kind, message = "warn", "software.sync_interrupted", "Software information update interrupted. Saved progress is preserved."
+		} else if errorMessage != "" {
+			message = errorMessage
 		}
 	} else {
 		state, err := s.SoftwareStatus(ctx)

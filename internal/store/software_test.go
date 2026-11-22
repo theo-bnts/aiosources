@@ -116,7 +116,7 @@ func TestSoftwareStagingMergeProjectionAndCandidateSearch(t *testing.T) {
 	if len(merged) != 1 || stats.IconsMatched != 1 {
 		t.Fatalf("unexpected merge output: len=%d stats=%+v", len(merged), stats)
 	}
-	if err = db.ProjectSoftwareCatalog(ctx, gen, merged, stats.Filtered); err != nil {
+	if err = db.ProjectSoftwareCatalog(ctx, gen, merged, stats.Filtered, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.FinishSoftwareSync(ctx, gen, SoftwareSyncMeta{

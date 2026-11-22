@@ -1,3 +1,4 @@
+import pg from 'pg'
 import { test, expect } from './fixtures'
 import { openDisclosure } from './disclosures'
 
@@ -101,4 +102,61 @@ test('Optional NVD API key uses Secrets and never appears in configuration respo
   expect(
     (await (await page.request.get('/api/operations?kind=metadata&service=software')).json()).items,
   ).toEqual([])
+})
+
+test('Software history renders NVD feed labels, HTTP diagnostics and safe failure messages', async ({
+  page,
+  server,
+}) => {
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(`INSERT INTO aiosources.operation_runs(id,kind,service,trigger,resource,lock_key,status,phase,processed,errors,results,created_at,finished_at,error)
+      VALUES
+      ('software-ok','metadata','software','manual','software',0,'succeeded','completed',1240,0,'{"nvd_checked":1,"sources_synced":4,"full_import":1}',now()-interval '2 seconds',now(),''),
+      ('software-legacy','metadata','software','automatic','software',0,'failed','software_nvd_incremental',0,1,'{"snapshot_checked":1}',now()-interval '1 second',now(),'NIST NVD rejected the configured API key. Check the secret.')`)
+    await db.query(`INSERT INTO aiosources.operation_events(run_id,phase,processed,errors,duration_ms,http_status,error_code)
+      VALUES
+      ('software-ok','configuration',0,0,0,0,''),
+      ('software-ok','software_nvd_meta',0,0,0,0,''),
+      ('software-ok','software_nvd_meta',0,0,145,200,''),
+      ('software-ok','software_winget',820,0,0,0,''),
+      ('software-ok','software_winget',0,0,310,304,''),
+      ('software-ok','succeeded',1240,0,0,0,''),
+      ('software-legacy','software_nvd_incremental',0,0,0,0,''),
+      ('software-legacy','software_nvd_incremental',0,1,210,403,'authentication'),
+      ('software-legacy','failed',0,1,0,0,'')`)
+  } finally {
+    await db.end()
+  }
+
+  await page.goto('/metadata/software/history')
+  await expect(page.getByRole('link', { name: 'Information update', exact: true })).toHaveCount(2)
+  await expect(
+    page.getByText('NIST NVD rejected the configured API key. Check the secret.', { exact: true }),
+  ).toBeVisible()
+
+  await page.getByRole('link', { name: 'Open run software-ok', exact: true }).click()
+  await expect(page.locator('dl')).toContainText('NVD feed checked')
+  await expect(page.locator('dl')).toContainText('Software sources updated')
+  await expect(page.locator('dl')).toContainText('Full NVD snapshot imported')
+  await expect(page.locator('dl')).not.toContainText('Cleanup records checked')
+
+  const okEvents = page.getByRole('region', { name: 'Operation events', exact: true })
+  await expect(okEvents).toContainText('Checking NIST NVD CPE feed')
+  await expect(okEvents).toContainText('Request NIST NVD CPE metadata')
+  await expect(okEvents).toContainText('145 ms · HTTP 200')
+  await expect(okEvents).toContainText('Importing Microsoft WinGet packages')
+  await expect(okEvents).toContainText('Download Microsoft WinGet archive')
+  await expect(okEvents).toContainText('310 ms · HTTP 304')
+
+  await page.goto('/metadata/software/history/software-legacy')
+  await expect(page.getByRole('alert')).toHaveText(
+    'NIST NVD rejected the configured API key. Check the secret.',
+  )
+  await expect(page.locator('dl')).toContainText('NVD feed checked')
+  await expect(page.locator('dl')).not.toContainText('Cleanup records checked')
+  const failEvents = page.getByRole('region', { name: 'Operation events', exact: true })
+  await expect(failEvents).toContainText('Request NIST NVD CPE changes')
+  await expect(failEvents).toContainText('210 ms · HTTP 403 · Key or subscription rejected')
 })
