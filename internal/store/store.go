@@ -100,7 +100,7 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	// storage measurements so lock waits in workers can never starve sessions,
 	// Stremio, Torznab or administration reads.
 	backgroundConfig := config.Copy()
-	backgroundConfig.MaxConns = 12
+	backgroundConfig.MaxConns = 16
 	backgroundConfig.MinConns, backgroundConfig.MinIdleConns = 0, 0
 	backgroundPool, err := pgxpool.NewWithConfig(ctx, backgroundConfig)
 	if err != nil {

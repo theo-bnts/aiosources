@@ -283,9 +283,13 @@ SELECT rg.id, rg.gid, rg.name,
  COALESCE(ARRAY(SELECT DISTINCT r.barcode FROM aiosources.mb_releases r WHERE r.release_group_id=rg.id AND r.barcode<>'' ORDER BY r.barcode LIMIT 60),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT mf.name FROM aiosources.mb_releases r JOIN aiosources.mb_mediums m ON m.release_id=r.id JOIN aiosources.mb_lookups mf ON mf.kind='medium_format' AND mf.id=m.format_id WHERE r.release_group_id=rg.id ORDER BY mf.name LIMIT 20),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT m.track_count FROM aiosources.mb_releases r JOIN aiosources.mb_mediums m ON m.release_id=r.id WHERE r.release_group_id=rg.id AND m.track_count>0 ORDER BY m.track_count LIMIT 20),'{}'::int[]),
- COALESCE(ARRAY(SELECT DISTINCT u.discogs_kind||':'||u.discogs_id FROM aiosources.mb_entity_urls eu JOIN aiosources.mb_urls u ON u.id=eu.url_id
-  WHERE u.discogs_id<>'' AND ((eu.entity='release_group' AND eu.entity_id=rg.id) OR (eu.entity='release' AND eu.entity_id IN (SELECT id FROM aiosources.mb_releases WHERE release_group_id=rg.id)))
-  ORDER BY 1 LIMIT 30),'{}'::text[]),
+ COALESCE(ARRAY(SELECT DISTINCT discogs FROM (
+  SELECT u.discogs_kind||':'||u.discogs_id AS discogs FROM aiosources.mb_entity_urls eu JOIN aiosources.mb_urls u ON u.id=eu.url_id
+   WHERE eu.entity='release_group' AND eu.entity_id=rg.id AND u.discogs_id<>''
+  UNION ALL
+  SELECT u.discogs_kind||':'||u.discogs_id AS discogs FROM aiosources.mb_releases r JOIN aiosources.mb_entity_urls eu ON eu.entity='release' AND eu.entity_id=r.id JOIN aiosources.mb_urls u ON u.id=eu.url_id
+   WHERE r.release_group_id=rg.id AND u.discogs_id<>''
+ ) d ORDER BY 1 LIMIT 30),'{}'::text[]),
  COALESCE((SELECT u.wikidata_id FROM aiosources.mb_entity_urls eu JOIN aiosources.mb_urls u ON u.id=eu.url_id WHERE eu.entity='release_group' AND eu.entity_id=rg.id AND u.wikidata_id<>'' ORDER BY u.id LIMIT 1),''),
  COALESCE(ARRAY(SELECT DISTINCT lang.name FROM aiosources.mb_releases r JOIN aiosources.mb_lookups lang ON lang.kind='language' AND lang.id=r.language_id WHERE r.release_group_id=rg.id ORDER BY lang.name LIMIT 20),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT ry.year FROM aiosources.mb_releases r JOIN aiosources.mb_release_years ry ON ry.release_id=r.id WHERE r.release_group_id=rg.id ORDER BY ry.year),'{}'::int[]),
@@ -614,7 +618,6 @@ func writeProjectedMusicTx(ctx context.Context, tx pgx.Tx, generation int64, sel
 			return 0, 0, 0, 0, 0, databaseError("publish music information", err)
 		}
 		byGID := map[string]int64{}
-		workIDs := []int64{}
 		for retRows.Next() {
 			var id int64
 			var gid string
@@ -623,7 +626,6 @@ func writeProjectedMusicTx(ctx context.Context, tx pgx.Tx, generation int64, sel
 				return 0, 0, 0, 0, 0, err
 			}
 			byGID[gid] = id
-			workIDs = append(workIDs, id)
 		}
 		err = retRows.Err()
 		retRows.Close()
@@ -656,7 +658,7 @@ func writeProjectedMusicTx(ctx context.Context, tx pgx.Tx, generation int64, sel
 					return 0, 0, 0, 0, 0, err
 				}
 			}
-			if err = queueMusicAliases(ctx, tx, workIDs, changed, aliases); err != nil {
+			if err = queueMusicAliases(ctx, tx, changedIDs, changed, aliases); err != nil {
 				return 0, 0, 0, 0, 0, err
 			}
 			if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {

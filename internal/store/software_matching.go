@@ -77,9 +77,27 @@ func searchSoftwareCandidates(ctx context.Context, tx pgx.Tx, f model.AIOCandida
 	return out, len(out) > aioCandidateLimit, databaseError("find software candidates", rows.Err())
 }
 
-// softwareCatalogCandidates returns SQL UNION clauses allowing CatalogTitles and
-// AIOReviewCandidates to find software works by software_key, WinGet ID,
-// Homebrew Cask token, NVD CPE, alias or vendor in addition to product titles.
+// Scope catalog software search to works present in the local source catalog
+// so alias and vendor substring filters never scan unrelated software entries.
+const catalogSoftwareScopeCTE = `catalog_software_works AS MATERIALIZED(
+ SELECT id,software_key FROM catalog_matched_works WHERE media_type='software' AND software_key<>''),
+catalog_software_aliases AS MATERIALIZED(
+ SELECT w.id AS work_id,a.normalized FROM catalog_software_works w JOIN aiosources.sw_aliases a ON a.software_key=w.software_key WHERE a.normalized<>''),
+catalog_software_vendors AS MATERIALIZED(
+ SELECT w.id AS work_id,c.vendor_norm AS normalized FROM catalog_software_works w JOIN aiosources.sw_catalog c ON c.software_key=w.software_key WHERE c.vendor_norm<>'')`
+
+func catalogSoftwareCandidates(queryArg, normalizedArg, matching string) string {
+	resolved := `(SELECT aiosources.sw_resolve_key(` + queryArg + `))`
+	return `
+ UNION ALL SELECT id,5,1::real FROM catalog_software_works WHERE software_key=` + resolved + `
+ UNION ALL SELECT w.id,5,1::real FROM aiosources.sw_external_ids e JOIN catalog_software_works w ON w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
+ UNION ALL SELECT work_id,CASE WHEN normalized=` + normalizedArg + ` THEN 4 ELSE 2 END,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_aliases WHERE ` + matching + `
+ UNION ALL SELECT work_id,CASE WHEN normalized=` + normalizedArg + ` THEN 3 ELSE 1 END,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_vendors WHERE ` + matching
+}
+
+// softwareCatalogCandidates returns SQL UNION clauses allowing AIOReviewCandidates
+// to find software works by software_key, WinGet ID, Homebrew Cask token, NVD CPE,
+// alias or vendor in addition to product titles.
 func softwareCatalogCandidates(queryArg, normalizedArg, matching string) string {
 	aliasMatch := strings.ReplaceAll(matching, "normalized", "a.normalized")
 	vendorMatch := strings.ReplaceAll(matching, "normalized", "c.vendor_norm")

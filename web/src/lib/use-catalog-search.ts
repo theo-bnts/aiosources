@@ -46,6 +46,7 @@ export function useCatalogSearch({
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         read(request.type, request.limit, request.offset, signal),
       enabled,
+      refetchInterval: false,
     })),
   })
   const pages = queries.flatMap((query) => (query.data ? [query.data] : []))
@@ -57,6 +58,7 @@ export function useCatalogSearch({
     queryKey: [...prefix, 'global-order', q, type, year, language, limit, offset],
     queryFn: ({ signal }) => read(type, limit, offset, signal),
     enabled: enabled && globalOrder,
+    refetchInterval: false,
   })
   const empty: Page<CatalogTitle> = { items: [], total: 0, limit, offset }
   const data = globalOrder

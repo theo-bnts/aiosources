@@ -253,10 +253,10 @@ fingerprint=EXCLUDED.fingerprint,work_id=EXCLUDED.work_id,revision=EXCLUDED.revi
 	return results, nil
 }
 
-// Leave room for API/recovery work. Admission locks use dedicated connections.
-// Small database pools still retain at least one connection for publication.
+// Leave room for API/recovery work and concurrent metadata syncs on the
+// background pool. Small database pools still retain at least one worker.
 func (s *Store) AIOMatchWorkers() int {
-	return max(1, min(10, int(s.pool.Config().MaxConns)-3))
+	return max(1, min(4, int(s.pool.Config().MaxConns)-3))
 }
 
 func requestAIOSeasons(ctx context.Context, tx pgx.Tx, requests []model.AIOSeasonRequest) error {

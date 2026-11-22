@@ -119,7 +119,6 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 		return databaseError("publish game information", err)
 	}
 	byID := map[string]int64{}
-	workIDs := []int64{}
 	for rows.Next() {
 		var id int64
 		var key string
@@ -128,7 +127,6 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 			return err
 		}
 		byID[key] = id
-		workIDs = append(workIDs, id)
 	}
 	err = rows.Err()
 	rows.Close()
@@ -160,7 +158,7 @@ func (s *Store) PublishGames(ctx context.Context, state model.GameStatus, works 
 		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_titles SELECT * FROM jsonb_populate_recordset(NULL::aiosources.aio_titles,$1::jsonb) ON CONFLICT DO NOTHING`, encoded); err != nil {
 			return err
 		}
-		if err = queueGameAliases(ctx, tx, workIDs, ids, aliases); err != nil {
+		if err = queueGameAliases(ctx, tx, changedIDs, changed, aliases); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {

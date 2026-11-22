@@ -10,12 +10,10 @@ const catalogMatchedScope = `catalog_matched_ids AS MATERIALIZED(
 
 const catalogBookScopeCTE = `catalog_book_ids AS MATERIALIZED(
  SELECT w.id FROM catalog_matched_ids m JOIN aiosources.aio_works w ON w.id=m.id WHERE w.media_type='book'),
-redirected_keys AS MATERIALIZED(
- SELECT source AS id FROM aiosources.ol_redirects UNION SELECT target AS id FROM aiosources.ol_redirects),
 catalog_books AS MATERIALIZED(
  SELECT w.id,w.openlibrary_id,w.book_normalized,w.book_data,
  CASE WHEN w.openlibrary_id='' THEN '{}'::text[]
-      WHEN EXISTS(SELECT 1 FROM redirected_keys r WHERE r.id=w.openlibrary_id) THEN ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id)))
+      WHEN EXISTS(SELECT 1 FROM aiosources.ol_redirects r WHERE r.target=w.openlibrary_id) THEN ARRAY(SELECT unnest(aiosources.ol_aliases(w.openlibrary_id)))
       ELSE ARRAY[w.openlibrary_id] END AS aliases
  FROM aiosources.aio_works w JOIN catalog_book_ids b ON b.id=w.id),
 catalog_book_editions AS MATERIALIZED(

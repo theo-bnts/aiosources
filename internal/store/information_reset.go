@@ -37,7 +37,7 @@ func (s *Store) resetInformation(ctx context.Context, scope string) error {
 		services = append(services, "igdb", "software", "musicbrainz")
 		resources = append(resources, "game", "igdb", "software", "music", "musicbrainz")
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin information reset", err)
 	}

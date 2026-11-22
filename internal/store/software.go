@@ -496,7 +496,6 @@ ON CONFLICT(software_key) DO UPDATE SET
 		return databaseError("publish software works", err)
 	}
 	byKey := make(map[string]int64, len(works))
-	workIDs := make([]int64, 0, len(works))
 	for retRows.Next() {
 		var id int64
 		var key string
@@ -505,7 +504,6 @@ ON CONFLICT(software_key) DO UPDATE SET
 			return err
 		}
 		byKey[key] = id
-		workIDs = append(workIDs, id)
 	}
 	err = retRows.Err()
 	retRows.Close()
@@ -545,7 +543,7 @@ ON CONFLICT(software_key) DO UPDATE SET
 				return err
 			}
 		}
-		if err = queueSoftwareAliases(ctx, tx, workIDs, changed, changedAliases); err != nil {
+		if err = queueSoftwareAliases(ctx, tx, changedIDs, changed, changedAliases); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1`); err != nil {

@@ -87,9 +87,10 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 	if len(anchors) > 0 && anchors[0] != "" {
 		combined = bookCombinedCandidates(normalized, matching, anchors[0])
 	}
+	identity := `(SELECT aiosources.ol_resolve(` + query + `))`
 	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized) FROM aiosources.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
- UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=aiosources.ol_resolve(` + query + `)
- UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=aiosources.ol_resolve(` + query + `)
+ UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
+ UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=` + identity + `
  UNION ALL SELECT w.id,CASE WHEN e.normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,e.normalized)
  FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
  UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM aiosources.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE ` + matching + `)` + combined

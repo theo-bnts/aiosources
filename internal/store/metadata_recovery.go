@@ -7,14 +7,14 @@ import (
 
 // Provider-requested waits survive abrupt restarts as well as ordinary errors.
 func (s *Store) RetainAIOMetadataCooldown(ctx context.Context, until time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET provider_retry_at=GREATEST(provider_retry_at,$1),sync_retry_at=GREATEST(sync_retry_at,$1)`, until)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.aio_state SET provider_retry_at=GREATEST(provider_retry_at,$1),sync_retry_at=GREATEST(sync_retry_at,$1)`, until)
 	return databaseError("retain information provider cooldown", err)
 }
 
 // A lost provider change window requires fresh details, not erasing the local
 // catalog. Persist the refresh boundary before starting a new discovery window.
 func (s *Store) BeginAIOMetadataRecovery(ctx context.Context, at time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET recovery_started_at=$1,changes_through=$2`, at, at.Add(-24*time.Hour))
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.aio_state SET recovery_started_at=$1,changes_through=$2`, at, at.Add(-24*time.Hour))
 	return databaseError("begin information recovery", err)
 }
 
@@ -25,7 +25,7 @@ func (s *Store) QueueAIOMetadataRecovery(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id)
+	_, err = s.workerPool().Exec(ctx, `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id)
  SELECT w.media_type,w.tmdb_id FROM aiosources.aio_works w CROSS JOIN aiosources.aio_state s
  WHERE s.recovery_started_at IS NOT NULL AND w.updated_at<s.recovery_started_at
  AND w.media_type IN ('movie','tv')
@@ -37,7 +37,7 @@ func (s *Store) QueueAIOMetadataRecovery(ctx context.Context) error {
 // Discovery and application have different checkpoints. Deferred details must
 // not make a partially applied catalog look current, or lose the retry cadence.
 func (s *Store) AIOCompletedSync(ctx context.Context, next time.Time) error {
-	_, err := s.pool.Exec(ctx, `WITH progress AS MATERIALIZED (
+	_, err := s.workerPool().Exec(ctx, `WITH progress AS MATERIALIZED (
  SELECT NOT EXISTS(SELECT 1 FROM aiosources.aio_metadata_jobs)
  AND NOT EXISTS(SELECT 1 FROM aiosources.aio_works w CROSS JOIN aiosources.aio_state s
   WHERE s.recovery_started_at IS NOT NULL AND w.media_type IN ('movie','tv') AND w.updated_at<s.recovery_started_at) AS complete,

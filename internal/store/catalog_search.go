@@ -146,34 +146,37 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		}
 	}
 	args, matching, anchor := catalogWordFilter(normalized, []any{identity, media, normalized})
-	scopeCTEs := []string{}
-	includeBooks := len(media) == 0 || slices.Contains(media, "book")
-	includeMusic := len(media) == 0 || slices.Contains(media, "music")
-	if includeBooks || includeMusic {
-		scopeCTEs = append(scopeCTEs, catalogMatchedScope)
+	scopeCTEs := []string{
+		catalogMatchedScope,
+		`catalog_matched_works AS MATERIALIZED(
+ SELECT w.id,w.media_type,w.imdb_id,w.tmdb_id,w.igdb_id,w.software_key
+ FROM catalog_matched_ids m JOIN aiosources.aio_works w ON w.id=m.id
+ WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2)))`,
 	}
+	includeBooks := len(media) == 0 || slices.Contains(media, "book")
+	includeSoftware := len(media) == 0 || slices.Contains(media, "software")
+	includeMusic := len(media) == 0 || slices.Contains(media, "music")
 	bookExtras := ""
 	if includeBooks {
 		scopeCTEs = append(scopeCTEs, catalogBookScopeCTE)
 		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
 	}
 	softwareExtras := ""
-	if len(media) == 0 || slices.Contains(media, "software") {
-		softwareExtras = softwareCatalogCandidates("$1", "$3", matching)
+	if includeSoftware {
+		scopeCTEs = append(scopeCTEs, catalogSoftwareScopeCTE)
+		softwareExtras = catalogSoftwareCandidates("$1", "$3", matching)
 	}
 	musicExtras := ""
 	if includeMusic {
 		scopeCTEs = append(scopeCTEs, catalogMusicScopeCTE)
 		musicExtras = catalogMusicCandidates("$1", "$3", matching)
 	}
-	scopePrefix := ""
-	if len(scopeCTEs) > 0 {
-		scopePrefix = "WITH " + strings.Join(scopeCTEs, ",\n") + " "
-	}
+	scopePrefix := "WITH " + strings.Join(scopeCTEs, ",\n") + " "
+	titleMatching := strings.ReplaceAll(matching, "normalized ", "t.normalized ")
 	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
- SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
- UNION ALL SELECT work_id,CASE WHEN normalized=$3 THEN 4 ELSE 1 END,
- public.similarity($3,normalized) FROM aiosources.aio_titles WHERE ` + matching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
+ SELECT id,5 AS precision,1::real AS relevance FROM catalog_matched_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
+ UNION ALL SELECT t.work_id,CASE WHEN t.normalized=$3 THEN 4 ELSE 1 END,
+ public.similarity($3,t.normalized) FROM catalog_matched_works cm JOIN aiosources.aio_titles t ON t.work_id=cm.id WHERE ` + titleMatching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")

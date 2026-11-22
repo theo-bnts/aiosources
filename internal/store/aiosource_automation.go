@@ -34,7 +34,7 @@ func (s *Store) AIOControlStatus(ctx context.Context) (model.AIOStatus, error) {
 // clock. A killed process therefore retains a bounded retry delay and its queue.
 func (s *Store) AIOBeginSync(ctx context.Context) (int, error) {
 	var attempts int
-	err := s.pool.QueryRow(ctx, `UPDATE aiosources.aio_state SET
+	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.aio_state SET
  sync_failures=CASE WHEN provider_retry_at>now() THEN sync_failures ELSE LEAST(sync_failures+1,30) END,
  sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at ELSE now()+INTERVAL '1 minute' END
  RETURNING sync_failures`).Scan(&attempts)
@@ -42,7 +42,7 @@ func (s *Store) AIOBeginSync(ctx context.Context) (int, error) {
 }
 
 func (s *Store) AIOFailedSync(ctx context.Context, retry time.Time, message string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.aio_state SET
  sync_retry_at=CASE WHEN provider_retry_at>now() THEN provider_retry_at ELSE $1 END,sync_error=$2`, retry, message)
 	return databaseError("retain information update retry", err)
 }

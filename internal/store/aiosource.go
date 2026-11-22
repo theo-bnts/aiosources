@@ -620,11 +620,11 @@ func (s *Store) QueueAIOMetadata(ctx context.Context, typ string, ids []string, 
 	if refresh {
 		q = `INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id) SELECT $1,id FROM(SELECT DISTINCT unnest($2::text[]) id) i ON CONFLICT(media_type,tmdb_id) DO UPDATE SET version=aiosources.aio_metadata_jobs.version+1,next_attempt=now()`
 	}
-	_, err := s.pool.Exec(ctx, q, typ, ids)
+	_, err := s.workerPool().Exec(ctx, q, typ, ids)
 	return databaseError("queue metadata", err)
 }
 func (s *Store) QueueAIOInventory(ctx context.Context, typ string, ids []string, date string) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -641,7 +641,7 @@ func (s *Store) ReconcileAIOInventory(ctx context.Context, date string) error {
 	for {
 		// An export is a dated snapshot, not the current catalog. Keep works
 		// refreshed since its UTC day began; a subsequent export can reconcile them.
-		rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id FROM aiosources.aio_works w WHERE w.media_type IN ('movie','tv') AND w.updated_at < ($1::text::date::timestamp AT TIME ZONE 'UTC') AND NOT EXISTS(SELECT 1 FROM aiosources.aio_inventory i WHERE i.media_type=w.media_type AND i.tmdb_id=w.tmdb_id AND i.export_date=$1) LIMIT 100`, date)
+		rows, err := s.workerPool().Query(ctx, `SELECT media_type,tmdb_id FROM aiosources.aio_works w WHERE w.media_type IN ('movie','tv') AND w.updated_at < ($1::text::date::timestamp AT TIME ZONE 'UTC') AND NOT EXISTS(SELECT 1 FROM aiosources.aio_inventory i WHERE i.media_type=w.media_type AND i.tmdb_id=w.tmdb_id AND i.export_date=$1) LIMIT 100`, date)
 		if err != nil {
 			return databaseError("reconcile metadata inventory", err)
 		}
@@ -668,7 +668,7 @@ func (s *Store) ReconcileAIOInventory(ctx context.Context, date string) error {
 			}
 		}
 	}
-	_, err := s.pool.Exec(ctx, `DELETE FROM aiosources.aio_inventory WHERE export_date<>$1`, date)
+	_, err := s.workerPool().Exec(ctx, `DELETE FROM aiosources.aio_inventory WHERE export_date<>$1`, date)
 	return databaseError("finish inventory reconciliation", err)
 }
 
@@ -683,7 +683,7 @@ func (s *Store) AIOMetadataJobs(ctx context.Context) ([]AIOJob, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT media_type,tmdb_id,version,attempts FROM aiosources.aio_metadata_jobs WHERE next_attempt<=now() ORDER BY next_attempt,media_type,tmdb_id LIMIT $1`, limit)
+	rows, err := s.workerPool().Query(ctx, `SELECT media_type,tmdb_id,version,attempts FROM aiosources.aio_metadata_jobs WHERE next_attempt<=now() ORDER BY next_attempt,media_type,tmdb_id LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -701,13 +701,13 @@ func (s *Store) AIOMetadataJobs(ctx context.Context) ([]AIOJob, error) {
 func (s *Store) FinishAIOMetadata(ctx context.Context, j AIOJob, success bool) error {
 	var err error
 	if success {
-		_, err = s.pool.Exec(ctx, `DELETE FROM aiosources.aio_metadata_jobs WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version)
+		_, err = s.workerPool().Exec(ctx, `DELETE FROM aiosources.aio_metadata_jobs WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version)
 	} else {
 		policy, e := s.RuntimeValues(ctx, "metadata_retries")
 		if e != nil {
 			return e
 		}
-		_, err = s.pool.Exec(ctx, `UPDATE aiosources.aio_metadata_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>LEAST($5::int,$4::int*power(2,LEAST(attempts,20)))::int) WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version, policy["detail_retry_seconds"], policy["detail_retry_max_seconds"])
+		_, err = s.workerPool().Exec(ctx, `UPDATE aiosources.aio_metadata_jobs SET attempts=attempts+1,next_attempt=now()+make_interval(secs=>LEAST($5::int,$4::int*power(2,LEAST(attempts,20)))::int) WHERE media_type=$1 AND tmdb_id=$2 AND version=$3`, j.Type, j.ID, j.Version, policy["detail_retry_seconds"], policy["detail_retry_max_seconds"])
 	}
 	return databaseError("finish metadata job", err)
 }
@@ -722,7 +722,7 @@ func (s *Store) DeleteAIOMetadataJob(ctx context.Context, job AIOJob) error {
 }
 
 func (s *Store) deleteAIOWork(ctx context.Context, typ, id string, job *AIOJob) error {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -766,15 +766,15 @@ func (s *Store) deleteAIOWork(ctx context.Context, typ, id string, job *AIOJob) 
 	return databaseError("publish metadata removal", tx.Commit(ctx))
 }
 func (s *Store) AIOInventoryDate(ctx context.Context, date string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET inventory_date=$1`, date)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.aio_state SET inventory_date=$1`, date)
 	return databaseError("save inventory checkpoint", err)
 }
 func (s *Store) AIOChangesThrough(ctx context.Context, at time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE aiosources.aio_state SET changes_through=$1`, at)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.aio_state SET changes_through=$1`, at)
 	return databaseError("save change checkpoint", err)
 }
 func (s *Store) ResetAIOMapping(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_release_groups;DELETE FROM aiosources.aio_release_correspondence_queue;DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_queue;INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents;UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL`)
+	_, err := s.workerPool().Exec(ctx, `SELECT metadata_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_release_groups;DELETE FROM aiosources.aio_release_correspondence_queue;DELETE FROM aiosources.aio_matches;DELETE FROM aiosources.aio_match_queue;INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT provider_id,source_id FROM aiosources.torrents;UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_match=NULL`)
 	return databaseError("reset correspondence", err)
 }
 func (s *Store) ResetAIOMetadata(ctx context.Context) error {
@@ -806,7 +806,13 @@ func (s *Store) AIOLock(ctx context.Context, name string) (func(), bool, error) 
 	}, true, nil
 }
 func (s *Store) AIORequestedSeasons(ctx context.Context, tmdb, imdb, tvdb string) ([]int, error) {
-	rows, err := s.pool.Query(ctx, `SELECT season FROM aiosources.aio_season_requests WHERE tmdb_id=$1 UNION SELECT DISTINCT COALESCE(fields->>'season',(regexp_match(fields->>'title','[sS]([0-9]{1,3})[eE]'))[1])::int FROM aiosources.torrents WHERE COALESCE(fields->>'season',(regexp_match(fields->>'title','[sS]([0-9]{1,3})[eE]'))[1]) ~ '^[0-9]{1,3}$' AND (fields->>'tmdb_id'=$1 OR ($2<>'' AND regexp_replace(fields->>'imdb_id','^tt','','i')=regexp_replace($2,'^tt','')) OR ($3<>'' AND fields->>'tvdb_id'=$3)) ORDER BY 1`, tmdb, imdb, tvdb)
+	rows, err := s.workerPool().Query(ctx, `SELECT season FROM aiosources.aio_season_requests WHERE tmdb_id=$1
+UNION SELECT DISTINCT COALESCE(fields->>'season',(regexp_match(fields->>'title','[sS]([0-9]{1,3})[eE]'))[1])::int
+FROM aiosources.torrents
+WHERE COALESCE(fields->>'season',(regexp_match(fields->>'title','[sS]([0-9]{1,3})[eE]'))[1]) ~ '^[0-9]{1,3}$'
+AND (($1<>'' AND (fields->>'tmdb_id') IS NOT NULL AND fields->>'tmdb_id'=$1)
+ OR ($2<>'' AND (fields->>'imdb_id') IS NOT NULL AND regexp_replace(fields->>'imdb_id','^tt','','i')=regexp_replace($2,'^tt',''))
+ OR ($3<>'' AND (fields->>'tvdb_id') IS NOT NULL AND fields->>'tvdb_id'=$3)) ORDER BY 1`, tmdb, imdb, tvdb)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +845,7 @@ func (s *Store) RequestAIOSeason(ctx context.Context, tmdb string, season int) e
 	return tx.Commit(ctx)
 }
 func (s *Store) AIOResources(ctx context.Context, service, account string, after time.Time) ([]model.AIOResource, error) {
-	rows, err := s.pool.Query(ctx, `SELECT resource,hashes,checked_at,last_attempt,retry FROM aiosources.aio_resources WHERE service=$1 AND account=$2 AND checked_at>$3 AND EXISTS(SELECT 1 FROM unnest(hashes) h WHERE NOT EXISTS(SELECT 1 FROM aiosources.aio_availability a WHERE a.service=$1 AND a.account=$2 AND a.hash=h AND a.cached AND a.checked_at>$3 AND a.checked_at<=now())) ORDER BY last_attempt LIMIT 64`, service, account, after)
+	rows, err := s.workerPool().Query(ctx, `SELECT resource,hashes,checked_at,last_attempt,retry FROM aiosources.aio_resources WHERE service=$1 AND account=$2 AND checked_at>$3 AND EXISTS(SELECT 1 FROM unnest(hashes) h WHERE NOT EXISTS(SELECT 1 FROM aiosources.aio_availability a WHERE a.service=$1 AND a.account=$2 AND a.hash=h AND a.cached AND a.checked_at>$3 AND a.checked_at<=now())) ORDER BY last_attempt LIMIT 64`, service, account, after)
 	if err != nil {
 		return nil, err
 	}
@@ -861,6 +867,6 @@ func (s *Store) Ping(ctx context.Context) error {
 
 func (s *Store) AIOCandidateGeneration(ctx context.Context) (int64, error) {
 	var n int64
-	err := s.pool.QueryRow(ctx, `SELECT metadata_generation FROM aiosources.aio_state`).Scan(&n)
+	err := s.workerPool().QueryRow(ctx, `SELECT metadata_generation FROM aiosources.aio_state`).Scan(&n)
 	return n, databaseError("read candidate generation", err)
 }

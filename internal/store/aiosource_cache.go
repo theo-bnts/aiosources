@@ -98,7 +98,7 @@ func (s *Store) AddAIOCleanup(ctx context.Context, v model.AIOCleanup) error {
 	return databaseError("persist temporary magnet ownership", err)
 }
 func (s *Store) AIOCleanup(ctx context.Context, account string) ([]model.AIOCleanup, error) {
-	rows, err := s.pool.Query(ctx, `SELECT account,hash,magnet_id,failed FROM aiosources.aio_cleanup WHERE account=$1 ORDER BY created_at`, account)
+	rows, err := s.workerPool().Query(ctx, `SELECT account,hash,magnet_id,failed FROM aiosources.aio_cleanup WHERE account=$1 ORDER BY created_at`, account)
 	if err != nil {
 		return nil, databaseError("read temporary magnet cleanup", err)
 	}
@@ -116,14 +116,14 @@ func (s *Store) AIOCleanup(ctx context.Context, account string) ([]model.AIOClea
 func (s *Store) FinishAIOCleanup(ctx context.Context, v model.AIOCleanup, success bool) error {
 	var err error
 	if success {
-		_, err = s.pool.Exec(ctx, `DELETE FROM aiosources.aio_cleanup WHERE account=$1 AND magnet_id=$2`, v.Account, v.ID)
+		_, err = s.workerPool().Exec(ctx, `DELETE FROM aiosources.aio_cleanup WHERE account=$1 AND magnet_id=$2`, v.Account, v.ID)
 	} else {
-		_, err = s.pool.Exec(ctx, `UPDATE aiosources.aio_cleanup SET failed=TRUE WHERE account=$1 AND magnet_id=$2`, v.Account, v.ID)
+		_, err = s.workerPool().Exec(ctx, `UPDATE aiosources.aio_cleanup SET failed=TRUE WHERE account=$1 AND magnet_id=$2`, v.Account, v.ID)
 	}
 	return databaseError("finish temporary magnet cleanup", err)
 }
 func (s *Store) ResetAIOCache(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `SELECT cache_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_availability;DELETE FROM aiosources.aio_shared_availability;DELETE FROM aiosources.aio_resources;UPDATE aiosources.aio_state SET cache_generation=cache_generation+1`)
+	_, err := s.workerPool().Exec(ctx, `SELECT cache_generation FROM aiosources.aio_state FOR UPDATE;DELETE FROM aiosources.aio_availability;DELETE FROM aiosources.aio_shared_availability;DELETE FROM aiosources.aio_resources;UPDATE aiosources.aio_state SET cache_generation=cache_generation+1`)
 	return databaseError("reset availability cache", err)
 }
 
@@ -138,7 +138,7 @@ func (s *Store) AIOIncident(ctx context.Context, service string, active bool) er
 	if service == "cleanup" {
 		logService = "alldebrid"
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := s.workerPool().Begin(ctx)
 	if err != nil {
 		return databaseError("begin provider incident", err)
 	}
