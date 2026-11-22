@@ -195,12 +195,18 @@ test('source credentials are added inline without saving their surrounding edito
   await page.getByRole('tab', { name: /^Connection/ }).click()
   await page.getByLabel('Authentication type', { exact: true }).selectOption('bearer')
   await storeCredential(page, 'Add secret', 'Credential value', 'synthetic-source-token')
+  const storedNotice = page.getByText(
+    'Stored securely and selected. The selection applies when this configuration is saved. The entry remains in Secrets if you discard these changes.',
+    { exact: true },
+  )
+  await expect(storedNotice).toBeVisible()
   const reference = await page.getByLabel('Secret reference', { exact: true }).inputValue()
   expect((await source(page, 'inline-auth')).revision).toBe(original.revision)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect
     .poll(async () => (await source(page, 'inline-auth')).provider.auth.secret_ref)
     .toBe(reference)
+  await expect(storedNotice).toHaveCount(0)
   expect(JSON.stringify(await (await page.request.get('/api/secrets')).json())).not.toContain(
     'synthetic-',
   )

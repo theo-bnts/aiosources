@@ -49,6 +49,7 @@ test('credits use bundled assets and licenses without changing the current view 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 950 })
     const credits = await openAbout(page)
+    await expect(credits).toContainText('Film and series information and posters: TMDB.')
     await expect(credits).toContainText(
       'This product uses the TMDB API but is not endorsed or certified by TMDB.',
     )

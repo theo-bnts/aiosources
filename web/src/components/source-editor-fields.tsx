@@ -18,6 +18,7 @@ import { CodeEditor } from '@/components/code-editor'
 
 export interface SourceEditorContextValue {
   document: ProviderJSON
+  savedDocument?: ProviderJSON
   readOnly: boolean
   change: (edit: (document: ProviderJSON) => void) => void
   reportDraft: (id: string, invalid: boolean) => void

@@ -363,6 +363,7 @@ export default function AIOSourcePage({
       label={label}
       help={help}
       value={config?.[key] ?? ''}
+      savedValue={query.data?.config[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
       prefix={
         key === 'igdb_secret'
@@ -575,7 +576,7 @@ export default function AIOSourcePage({
                 <div className="min-w-0 space-y-1">
                   {secret('TMDB read access token', 'tmdb_secret')}
                   <CredentialPageLink href="https://www.themoviedb.org/settings/api/request">
-                    Create TMDB credentials
+                    Get TMDB read access token
                   </CredentialPageLink>
                 </div>
               </div>
@@ -595,7 +596,7 @@ export default function AIOSourcePage({
                 <div className="min-w-0 space-y-1">
                   {secret('Twitch client secret', 'igdb_secret')}
                   <CredentialPageLink href="https://dev.twitch.tv/console/apps/create">
-                    Create Twitch credentials
+                    Get Twitch credentials
                   </CredentialPageLink>
                 </div>
               </div>
@@ -609,7 +610,7 @@ export default function AIOSourcePage({
                     'Optional. Leave blank to sync NVD CPE at the public rate (5 requests per 30 seconds). With a free NVD API key, incremental updates run at up to 50 requests per 30 seconds. Long pauses (> 110 days) automatically recover from a fresh full snapshot.',
                   )}
                   <CredentialPageLink href="https://nvd.nist.gov/developers/request-an-api-key">
-                    Request a free NVD API key
+                    Get NVD API key
                   </CredentialPageLink>
                 </div>
               </div>
@@ -623,7 +624,7 @@ export default function AIOSourcePage({
                     'Optional. Leave blank to stay on twice-weekly public CC0 full exports. With a free non-commercial MetaBrainz Live Data Feed token, AIOSources applies hourly global replication packets (CC BY-NC-SA 3.0) and automatically recovers via a full export after long pauses.',
                   )}
                   <CredentialPageLink href="https://metabrainz.org/profile">
-                    Get a MetaBrainz Live Data Feed token
+                    Get MetaBrainz Live Data Feed token
                   </CredentialPageLink>
                 </div>
               </div>
@@ -1393,6 +1394,7 @@ export default function AIOSourcePage({
                           inputId={`announce-${p.id}`}
                           label="Announce URL secret"
                           value={tracker.announce_secret}
+                          savedValue={status.config.trackers[p.id]?.announce_secret ?? ''}
                           onChange={(reference) => change({ announce_secret: reference })}
                           prefix={`${p.id}_announce_url`}
                           addLabel="Add announce URL"

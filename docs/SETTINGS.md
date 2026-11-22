@@ -4,6 +4,8 @@
 
 The [README](../README.md#install-your-instance) includes a minimal Docker Compose installation using the stable image. Configure sources and service accounts in the application after signing in.
 
+For an instance using all features (all metadata catalogs, automatic identification, sources and search indexes), **4 vCPU, 8 GB RAM and 80 GB of storage** are recommended.
+
 ## Addresses and access
 
 Set `PUBLIC_URL` to the address your applications can reach, such as `http://192.0.2.10:7000` on a trusted private network or `https://catalog.example` over the internet. Use the exact origin, without a path, query or credentials.

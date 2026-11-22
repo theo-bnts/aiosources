@@ -9,17 +9,14 @@ for (const width of [390, 1440]) {
       ['/network/outgoing', 'Outgoing', 'Manage proxies and choose how services connect.'],
     ]) {
       await page.goto(path)
-      await expect(page.locator('#page-description')).toHaveCount(0)
-      const help = page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('button', {
-        name: `About ${title}`,
-        exact: true,
-      })
-      await help.click()
-      await expect(page.getByRole('dialog', { name: `About ${title}`, exact: true })).toContainText(
-        explanation,
-      )
-      await page.keyboard.press('Escape')
-      await expect(page.getByRole('dialog', { name: `About ${title}`, exact: true })).toBeHidden()
+      await expect(page.locator('#page-description')).toHaveText(explanation)
+      await expect(page.locator('#page-description')).toBeVisible()
+      await expect(
+        page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('button', {
+          name: `About ${title}`,
+          exact: true,
+        }),
+      ).toHaveCount(0)
     }
     await page.goto('/health/settings')
     const explanation =

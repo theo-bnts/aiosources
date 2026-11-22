@@ -112,16 +112,25 @@ export function AboutDialog() {
           Source definitions and service accounts are configured by you.
         </p>
         <section aria-label="Credits" className="space-y-3 border-t pt-4">
-          <div className="flex items-start gap-3">
-            <a
-              href="https://www.themoviedb.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 shrink-0"
-            >
-              <img src="/tmdb.svg" alt="TMDB" className="h-4 w-auto" />
-            </a>
+          <div className="space-y-1.5">
             <p className="text-sm leading-6 text-muted-foreground">
+              Film and series information and posters:{' '}
+              <a
+                href="https://www.themoviedb.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="data-link"
+              >
+                TMDB
+              </a>
+              .
+            </p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              <img
+                src="/tmdb.svg"
+                alt="TMDB"
+                className="mr-2 inline-block h-2 w-auto align-baseline"
+              />
               This product uses the TMDB API but is not endorsed or certified by TMDB.
             </p>
           </div>

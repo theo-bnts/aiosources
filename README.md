@@ -27,6 +27,7 @@ Using someone else's public instance? Follow the [visitor guide](docs/PUBLIC_INS
 ### Requirements
 
 - A server or computer running Docker with Docker Compose. Linux `amd64` and `arm64` images are available.
+- Recommended resources: **4 vCPU, 8 GB RAM and 80 GB of storage** if all features are used (all metadata catalogs, automatic identification, sources and search indexes). Smaller setups work when only a subset of features is enabled.
 - Access to compatible sources you are authorized to use. Source configurations are supplied by you.
 - A [TMDB API read access token](https://www.themoviedb.org/settings/api) for film and series identification. Book identification uses Open Library and needs no API key. Its optional catalog uses relevance filters by default to reduce storage; you can also limit edition languages.
 - For game identification, a [Twitch developer application](https://dev.twitch.tv/console/apps) with its client ID and client secret. [Set up games](docs/GAMES.md).
@@ -190,7 +191,7 @@ AIOSources is distributed under the [MIT license](LICENSE). Use it only with con
 
 [Licenses and third-party notices](web/public/THIRD-PARTY-NOTICES.txt). Original copyrights are preserved.
 
-This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Game information and covers are provided by [IGDB](https://www.igdb.com); software information and icons by [NIST NVD](https://nvd.nist.gov), [Microsoft WinGet](https://github.com/microsoft/winget-pkgs), [Homebrew](https://brew.sh) and [selfh.st/icons](https://selfh.st/icons) (CC BY 4.0); music information and cover art by [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive](https://coverartarchive.org); book information and covers by [Open Library](https://openlibrary.org).
+Film and series information and posters are provided by [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. TMDB branding and data remain subject to their [terms](https://developer.themoviedb.org/docs/faq). Game information and covers are provided by [IGDB](https://www.igdb.com); software information and icons by [NIST NVD](https://nvd.nist.gov), [Microsoft WinGet](https://github.com/microsoft/winget-pkgs), [Homebrew](https://brew.sh) and [selfh.st/icons](https://selfh.st/icons) (CC BY 4.0); music information and cover art by [MusicBrainz](https://musicbrainz.org) and the [Cover Art Archive](https://coverartarchive.org); book information and covers by [Open Library](https://openlibrary.org).
 
 ## Star History
 

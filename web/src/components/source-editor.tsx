@@ -128,8 +128,9 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
 }
 
 function SourceSecretField({ path, label }: { path: string[]; label: string }) {
-  const { document, change, readOnly } = useSourceEditor()
+  const { document, savedDocument, change, readOnly } = useSourceEditor()
   const current = document.getIn(path)
+  const savedCurrent = savedDocument?.getIn(path)
   const service = document.get('id') || document.get('name') || 'source'
   const purpose = sourceCredentialPurpose(
     path.at(-1) ?? '',
@@ -140,6 +141,7 @@ function SourceSecretField({ path, label }: { path: string[]; label: string }) {
     <SecretPicker
       label={label}
       value={typeof current === 'string' ? current : ''}
+      savedValue={typeof savedCurrent === 'string' ? savedCurrent : ''}
       prefix={`${service}_${purpose}`}
       addLabel={`Add ${label.replace(/ reference$/i, '').toLowerCase()}`}
       valueLabel={
@@ -1241,6 +1243,7 @@ function SourceScheduleSettings() {
 
 export function SourceEditor({
   value,
+  savedValue,
   onChange,
   readOnly,
   sourceID,
@@ -1252,6 +1255,7 @@ export function SourceEditor({
   limitKiB = 128,
 }: {
   value: string
+  savedValue?: string
   onChange: (value: string) => void
   readOnly: boolean
   sourceID?: string
@@ -1263,6 +1267,10 @@ export function SourceEditor({
   limitKiB?: number
 }) {
   const document = useMemo(() => parseProviderJSON(value), [value])
+  const savedDocument = useMemo(
+    () => (savedValue ? parseProviderJSON(savedValue) : undefined),
+    [savedValue],
+  )
   const sourceStages = document.getIn(['http', 'catalog']) === true ? remoteStages : stages
   const mode = document.errors.length ? 'json' : requestedMode
   const [selectedIndex, setSelected] = useState(() =>
@@ -1350,7 +1358,9 @@ export function SourceEditor({
   ]
   const current = sourceStages[selected]
   return (
-    <SourceEditorContext.Provider value={{ document, change, reportDraft, readOnly }}>
+    <SourceEditorContext.Provider
+      value={{ document, savedDocument, change, reportDraft, readOnly }}
+    >
       <div
         data-settings-editor="source"
         data-settings-draft={

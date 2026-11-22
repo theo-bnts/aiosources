@@ -81,9 +81,15 @@ test('Optional NVD API key uses Secrets and never appears in configuration respo
   await editor.getByLabel('NVD API key (optional)', { exact: true }).fill('synthetic-nvd-api-key')
   await editor.getByRole('button', { name: 'Store and select', exact: true }).click()
   await expect(editor).toHaveCount(0)
+  const storedNotice = page.getByText(
+    'Stored securely and selected. The selection applies when this configuration is saved. The entry remains in Secrets if you discard these changes.',
+    { exact: true },
+  )
+  await expect(storedNotice).toBeVisible()
   const main = page.getByRole('form', { name: 'Software configuration', exact: true })
   await main.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(main.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  await expect(storedNotice).toHaveCount(0)
 
   const response = await page.request.get('/api/aiosource/controls')
   const body = await response.text()

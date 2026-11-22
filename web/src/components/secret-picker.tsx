@@ -1,5 +1,5 @@
 import { KeyIcon, ArrowClockwiseIcon, FloppyDiskIcon } from '@phosphor-icons/react'
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { compareListNames } from '@/lib/list-view'
 import { newSecretReference } from '@/lib/secret-reference'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -37,6 +37,7 @@ export function SecretPicker({
   label,
   help,
   value,
+  savedValue,
   onChange,
   prefix,
   addLabel = 'Add credential',
@@ -50,6 +51,7 @@ export function SecretPicker({
   label: string
   help?: ReactNode
   value: string
+  savedValue?: string
   onChange: (reference: string) => void
   prefix: string
   addLabel?: string
@@ -64,7 +66,9 @@ export function SecretPicker({
   const id = inputId ?? generatedId
   const [editor, setEditor] = useState<SecretEditor | null>(null)
   const [secretValue, setSecretValue] = useState('')
-  const [stored, setStored] = useState<'created' | 'replaced' | null>(null)
+  const [stored, setStored] = useState<{ kind: 'created' | 'replaced'; reference: string } | null>(
+    null,
+  )
   const notify = useNotification()
   const secrets = useQuery({
     queryKey: ['secrets'],
@@ -83,7 +87,7 @@ export function SecretPicker({
     onSuccess: async ({ reference, replacing }) => {
       setSecretValue('')
       setEditor(null)
-      setStored(replacing ? 'replaced' : 'created')
+      setStored({ kind: replacing ? 'replaced' : 'created', reference })
       if (replacing) notify('Credential value replaced.')
       else onChange(reference)
       await queryClient.invalidateQueries({ queryKey: ['secrets'] })
@@ -127,6 +131,13 @@ export function SecretPicker({
   const busy = editorBusy || prepare.isPending
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const entries = [...(secrets.data?.items ?? [])].sort(compareListNames)
+  const showStored =
+    stored !== null &&
+    stored.reference === value &&
+    !(stored.kind === 'created' && savedValue !== undefined && savedValue === stored.reference)
+  useEffect(() => {
+    if (stored && !showStored) setStored(null)
+  }, [stored, showStored])
   return (
     <div className="field min-w-0 grid-cols-1">
       <Label htmlFor={id} help={help}>
@@ -166,9 +177,9 @@ export function SecretPicker({
           {prepare.isPending ? 'Loading…' : value ? replaceLabel : addLabel}
         </Button>
       </div>
-      {stored && (
+      {showStored && (
         <p className="help" role="status">
-          {stored === 'replaced'
+          {stored.kind === 'replaced'
             ? 'The encrypted value was replaced. Every configuration using this reference now uses the new value.'
             : 'Stored securely and selected. The selection applies when this configuration is saved. The entry remains in Secrets if you discard these changes.'}
         </p>

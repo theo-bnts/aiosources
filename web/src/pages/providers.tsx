@@ -818,6 +818,7 @@ function ProviderForm({
         limitKiB={definitionLimit}
         key={editorKey}
         value={json}
+        savedValue={savedJSON}
         onChange={(value) => {
           setJSON(value)
           if (mergeError) setMergeError('')

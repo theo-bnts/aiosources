@@ -589,6 +589,7 @@ function RemoteForm({
         <SecretPicker
           label="Sharing password"
           value={draft.secretRef}
+          savedValue={original?.provider.auth?.secret_ref ?? ''}
           onChange={(reference) => change('secretRef', reference)}
           prefix={`${draft.id || draft.name || 'remote_catalog'}_sharing_password`}
           addLabel="Add sharing password"

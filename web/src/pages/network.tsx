@@ -270,10 +270,9 @@ function ProxyEditor({
   const [draft, setDraft] = useState(initial)
   const mediaFlow = draft.type === 'mediaflow'
   const save = useSaveNetwork(onClose)
-  const existing = base.proxies.some((proxy) => proxy.id === draft.id)
-  const dirty =
-    JSON.stringify(draft) !==
-    JSON.stringify(base.proxies.find((proxy) => proxy.id === draft.id) ?? initial)
+  const savedProxy = base.proxies.find((proxy) => proxy.id === draft.id)
+  const existing = Boolean(savedProxy)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(savedProxy ?? initial)
   useEffect(() => {
     if (
       query.data &&
@@ -392,6 +391,7 @@ function ProxyEditor({
               label="API password"
               inputId="proxy-password"
               value={draft.api_password_ref ?? ''}
+              savedValue={savedProxy?.api_password_ref ?? ''}
               onChange={(api_password_ref) => update({ api_password_ref })}
               prefix={`${draft.name || draft.id}_api_password`}
               addLabel="Add API password"
@@ -408,6 +408,7 @@ function ProxyEditor({
               <SecretPicker
                 label="Username"
                 value={draft.username_ref ?? ''}
+                savedValue={savedProxy?.username_ref ?? ''}
                 onChange={(username_ref) => update({ username_ref })}
                 prefix={`${draft.name || draft.id}_username`}
                 addLabel="Add username"
@@ -418,6 +419,7 @@ function ProxyEditor({
                 label="Password"
                 inputId="proxy-password"
                 value={draft.password_ref ?? ''}
+                savedValue={savedProxy?.password_ref ?? ''}
                 onChange={(password_ref) => update({ password_ref })}
                 prefix={`${draft.name || draft.id}_password`}
                 addLabel="Add password"

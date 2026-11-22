@@ -110,8 +110,8 @@ test('navigation and page tabs remain coherent on every current and legacy route
       page
         .getByRole('navigation', { name: 'Breadcrumb' })
         .getByRole('button', { name: `About ${label}`, exact: true }),
-    ).toBeVisible()
-    await expect(page.locator('#page-description')).toHaveCount(0)
+    ).toHaveCount(0)
+    await expect(page.locator('#page-description')).toBeVisible()
     const layout = await page.evaluate(() => ({
       overflow: document.documentElement.scrollWidth - innerWidth,
       tabOverflow: [...document.querySelectorAll<HTMLElement>('[role="tablist"]')]

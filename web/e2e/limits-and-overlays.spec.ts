@@ -84,12 +84,12 @@ test('metadata catalogs and credential creation links have consistent navigation
       const link = page.getByRole('link', {
         name:
           section === 'videos'
-            ? 'Create TMDB credentials'
+            ? 'Get TMDB read access token'
             : section === 'games'
-              ? 'Create Twitch credentials'
+              ? 'Get Twitch credentials'
               : section === 'software'
-                ? 'Request a free NVD API key'
-                : 'Get a MetaBrainz Live Data Feed token',
+                ? 'Get NVD API key'
+                : 'Get MetaBrainz Live Data Feed token',
         exact: true,
       })
       await expect(link).toHaveAttribute(
