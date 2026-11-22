@@ -496,56 +496,175 @@ func (s *Service) inventory(ctx context.Context, typ, date string) error {
 	}
 	return metadataStorageError(s.DB.QueueAIOInventory(ctx, typ, batch, date))
 }
-func (s *Service) changes(ctx context.Context, key string, start, end time.Time) error {
-	for _, typ := range []string{"movie", "tv"} {
-		expectedPages := -1
-		seenPages := map[[sha256.Size]byte]bool{}
-		for page := 1; page <= 10000; page++ {
-			q := url.Values{"start_date": {start.UTC().Format("2006-01-02")}, "end_date": {end.UTC().Format("2006-01-02")}, "page": {strconv.Itoa(page)}}
-			var out struct {
-				Page    int  `json:"page"`
-				Pages   *int `json:"total_pages"`
-				Results []struct {
-					ID int64 `json:"id"`
-				} `json:"results"`
-			}
-			found, err := s.metadataGET(ctx, key, typ+"/changes?"+q.Encode(), &out)
-			if err != nil {
-				return err
-			}
-			if !found || out.Page != page || out.Pages == nil || *out.Pages < 0 || *out.Pages > 10000 || out.Results == nil {
-				return ErrInvalidResponse
-			}
-			if expectedPages == -1 {
-				expectedPages = *out.Pages
-			}
-			if *out.Pages != expectedPages || page > max(1, expectedPages) || expectedPages > 1 && len(out.Results) == 0 || expectedPages == 0 && len(out.Results) != 0 {
-				return ErrInvalidResponse
-			}
-			ids := []string{}
-			for _, r := range out.Results {
-				if r.ID <= 0 {
-					return ErrInvalidResponse
-				}
-				ids = append(ids, itoa64(r.ID))
-			}
-			if len(ids) > 0 {
-				slices.Sort(ids)
-				fingerprint := sha256.Sum256([]byte(strings.Join(ids, ",")))
-				if seenPages[fingerprint] {
-					return ErrInvalidResponse
-				}
-				seenPages[fingerprint] = true
-			}
-			if err = s.DB.QueueAIOMetadata(ctx, typ, ids, true); err != nil {
-				return metadataStorageError(err)
-			}
-			if page >= *out.Pages {
-				break
-			}
+func utcDay(at time.Time) time.Time {
+	u := at.UTC()
+	return time.Date(u.Year(), u.Month(), u.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func feedFailureDrainWindow(syncMinutes int) time.Duration {
+	return min(time.Duration(max(1, syncMinutes))*time.Minute, 15*time.Minute)
+}
+
+func isBlockingMetadataError(ctx context.Context, err error) bool {
+	var provider *metadataError
+	return ctx.Err() != nil || errors.Is(err, ErrAuth) || errors.Is(err, errMetadataStorage) || errors.As(err, &provider) && provider.retryAt.After(time.Now())
+}
+
+func (s *Service) queueMetadataIDs(ctx context.Context, typ string, ids []string) error {
+	for start := 0; start < len(ids); start += 1000 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		batch := ids[start:min(start+1000, len(ids))]
+		if err := s.DB.QueueAIOMetadata(ctx, typ, batch, true); err != nil {
+			return metadataStorageError(err)
 		}
 	}
-	return metadataStorageError(s.DB.AIOChangesThrough(ctx, end))
+	return nil
+}
+
+type tmdbChangeDayResult struct {
+	ids        []string
+	consistent bool
+	firstPages int
+	minPages   int
+	maxPages   int
+}
+
+func (s *Service) changeDay(ctx context.Context, key, typ, day string, liveDay bool) (tmdbChangeDayResult, error) {
+	result := tmdbChangeDayResult{firstPages: -1, consistent: true}
+	seenPages := map[[sha256.Size]byte]bool{}
+	seenIDs := map[string]bool{}
+	for page := 1; page <= 10000; page++ {
+		q := url.Values{"start_date": {day}, "end_date": {day}, "page": {strconv.Itoa(page)}}
+		var out struct {
+			Page    int  `json:"page"`
+			Pages   *int `json:"total_pages"`
+			Results []struct {
+				ID int64 `json:"id"`
+			} `json:"results"`
+		}
+		found, err := s.metadataGET(ctx, key, typ+"/changes?"+q.Encode(), &out)
+		if err != nil {
+			return tmdbChangeDayResult{}, err
+		}
+		if !found || out.Page != page || out.Pages == nil || *out.Pages < 0 || *out.Pages > 10000 || out.Results == nil {
+			return tmdbChangeDayResult{}, ErrInvalidResponse
+		}
+		pages := *out.Pages
+		if result.firstPages == -1 {
+			result.firstPages, result.minPages, result.maxPages = pages, pages, pages
+		} else if pages != result.firstPages {
+			// Closed UTC days must paginate from a single consistent total_pages
+			// before advancing the checkpoint past them. The current UTC day is
+			// still mutating and its CDN edge caches can serve per-page snapshots
+			// with different total_pages; collect all valid IDs without advancing
+			// the freshness checkpoint until a consistent pass completes.
+			if !liveDay || pages == 0 {
+				return tmdbChangeDayResult{}, ErrInvalidResponse
+			}
+			result.consistent = false
+			if pages < result.minPages {
+				result.minPages = pages
+			}
+			if pages > result.maxPages {
+				result.maxPages = pages
+			}
+		}
+		if pages == 0 {
+			if len(out.Results) != 0 {
+				return tmdbChangeDayResult{}, ErrInvalidResponse
+			}
+			break
+		}
+		if page > pages {
+			if len(out.Results) != 0 {
+				return tmdbChangeDayResult{}, ErrInvalidResponse
+			}
+			break
+		}
+		if pages > 1 && len(out.Results) == 0 {
+			return tmdbChangeDayResult{}, ErrInvalidResponse
+		}
+		pageIDs := make([]string, 0, len(out.Results))
+		for _, r := range out.Results {
+			if r.ID <= 0 {
+				return tmdbChangeDayResult{}, ErrInvalidResponse
+			}
+			id := itoa64(r.ID)
+			pageIDs = append(pageIDs, id)
+			if !seenIDs[id] {
+				seenIDs[id] = true
+				result.ids = append(result.ids, id)
+			}
+		}
+		if len(pageIDs) > 0 {
+			slices.Sort(pageIDs)
+			fingerprint := sha256.Sum256([]byte(strings.Join(pageIDs, ",")))
+			if seenPages[fingerprint] {
+				return tmdbChangeDayResult{}, ErrInvalidResponse
+			}
+			seenPages[fingerprint] = true
+		}
+		if page >= result.maxPages {
+			break
+		}
+	}
+	return result, nil
+}
+
+func (s *Service) syncChanges(ctx context.Context, key string, start, end time.Time) (time.Time, error) {
+	start = start.UTC()
+	end = end.UTC()
+	checkpoint := start
+	startDay := utcDay(start)
+	endDay := utcDay(end)
+	if endDay.Before(startDay) {
+		startDay = endDay
+	}
+	for day := startDay; !day.After(endDay); day = day.AddDate(0, 0, 1) {
+		liveDay := day.Equal(endDay)
+		dayStr := day.Format("2006-01-02")
+		dayConsistent := true
+		perType := [2][]string{}
+		for i, typ := range []string{"movie", "tv"} {
+			res, err := s.changeDay(ctx, key, typ, dayStr, liveDay)
+			if err != nil {
+				return checkpoint, err
+			}
+			perType[i] = res.ids
+			if !res.consistent {
+				dayConsistent = false
+				slog.Warn("TMDB change pagination shifted on the current UTC day; retaining checkpoint until pages stabilize",
+					"service", "tmdb", "operation", "changes", "media_type", typ, "day", dayStr, "first_total_pages", res.firstPages, "min_total_pages", res.minPages, "max_total_pages", res.maxPages)
+			}
+		}
+		for i, typ := range []string{"movie", "tv"} {
+			if err := s.queueMetadataIDs(ctx, typ, perType[i]); err != nil {
+				return checkpoint, err
+			}
+		}
+		if !dayConsistent {
+			continue
+		}
+		nextCheckpoint := end
+		if !liveDay {
+			nextCheckpoint = day.AddDate(0, 0, 1)
+		}
+		if nextCheckpoint.Before(checkpoint) {
+			nextCheckpoint = checkpoint
+		}
+		if err := s.DB.AIOChangesThrough(ctx, nextCheckpoint); err != nil {
+			return checkpoint, metadataStorageError(err)
+		}
+		checkpoint = nextCheckpoint
+	}
+	return checkpoint, nil
+}
+
+func (s *Service) changes(ctx context.Context, key string, start, end time.Time) error {
+	_, err := s.syncChanges(ctx, key, start, end)
+	return err
 }
 func (s *Service) Sync(ctx context.Context, c model.AIOConfig) error {
 	return s.syncMetadata(ctx, c, false)
@@ -661,26 +780,40 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 			return metadataStorageError(err)
 		}
 	}
-	if err = s.changes(ctx, key, start, now); err != nil {
-		var provider *metadataError
-		if ctx.Err() != nil || errors.Is(err, ErrAuth) || errors.Is(err, errMetadataStorage) || errors.As(err, &provider) && provider.retryAt.After(time.Now()) {
+	changesThrough, err := s.syncChanges(ctx, key, start, now)
+	if err != nil {
+		if isBlockingMetadataError(ctx, err) {
 			return err
 		}
 		// A feed-only failure must not starve details already saved in the
-		// queue. Apply one bounded batch, retaining the failed feed checkpoint.
+		// queue. Drain queued jobs for one bounded slice while retaining the
+		// failed feed checkpoint and deferring inventory reconciliation.
 		feedErr := err
-		stage = "storage"
-		jobs, err := s.nextMetadataJobs(ctx, status.RecoveryStartedAt != nil)
-		if err != nil {
-			return err
-		}
-		if len(jobs) > 0 {
+		deadline := time.Now().Add(feedFailureDrainWindow(c.SyncMinutes))
+		progress := metadataProgress{}
+		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			stage = "storage"
+			jobs, err := s.nextMetadataJobs(ctx, status.RecoveryStartedAt != nil)
+			if err != nil {
+				return err
+			}
+			if len(jobs) == 0 {
+				break
+			}
 			stage = "details"
 			history.checkpoint(ctx, stage)
-			progress := metadataProgress{}
 			if err = s.processMetadataJobs(ctx, key, jobs, history, &progress, c.AutoMatch); err != nil {
 				return err
 			}
+			if !time.Now().Before(deadline) {
+				break
+			}
+		}
+		if progress.deferred > 0 {
+			_ = s.DB.RecordInformationActivity(ctx, metadataDiagnostic("details", progress.firstDeferred), progress.deferred)
 		}
 		stage = "changes"
 		return feedErr
@@ -705,8 +838,10 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 	if err = s.DB.QueueAIORefresh(ctx); err != nil {
 		return metadataStorageError(err)
 	}
-	lastChanges := now
+	syncInterval := time.Duration(max(1, c.SyncMinutes)) * time.Minute
+	lastChangesCheck := now
 	progress := metadataProgress{}
+	var feedErr error
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -724,14 +859,27 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 		if err = s.processMetadataJobs(ctx, key, jobs, history, &progress, c.AutoMatch); err != nil {
 			return err
 		}
-		if time.Since(lastChanges) > time.Duration(c.SyncMinutes)*time.Minute {
+		if time.Since(lastChangesCheck) > syncInterval {
 			stage = "changes"
 			history.checkpoint(ctx, stage)
 			end := time.Now().UTC()
-			if err = s.changes(ctx, key, lastChanges, end); err != nil {
-				return err
+			if end.Sub(changesThrough) > 14*24*time.Hour {
+				if feedErr != nil {
+					return feedErr
+				}
+				return ErrInvalidResponse
 			}
-			lastChanges = end
+			lastChangesCheck = end
+			nextThrough, err := s.syncChanges(ctx, key, changesThrough, end)
+			changesThrough = nextThrough
+			if err != nil {
+				if isBlockingMetadataError(ctx, err) {
+					return err
+				}
+				feedErr = err
+			} else {
+				feedErr = nil
+			}
 		}
 	}
 	if progress.saved == 0 && progress.deferred > 0 {
@@ -741,8 +889,12 @@ func (s *Service) syncMetadata(ctx context.Context, c model.AIOConfig, automatic
 	if progress.deferred > 0 {
 		_ = s.DB.RecordInformationActivity(ctx, metadataDiagnostic("details", progress.firstDeferred), progress.deferred)
 	}
+	if feedErr != nil {
+		stage = "changes"
+		return feedErr
+	}
 	stage = "storage"
-	return s.DB.AIOCompletedSync(ctx, time.Now().Add(time.Duration(c.SyncMinutes)*time.Minute))
+	return s.DB.AIOCompletedSync(ctx, time.Now().Add(syncInterval))
 }
 
 var errMetadataStorage = errors.New("metadata storage unavailable")
