@@ -42,6 +42,7 @@ import { FormStatus } from '@/components/form-status'
 import type { Config, Controls, Tracker } from '@/lib/aiosource-types'
 import SharingPage from '@/pages/sharing'
 import { metadataSections, type MetadataSection } from '@/lib/metadata-navigation'
+import { musicRecoveryMessage, softwareRecoveryMessage } from '@/lib/information-sync'
 
 type MainScope = MetadataSection | 'debrid'
 type FormScope =
@@ -475,6 +476,12 @@ export default function AIOSourcePage({
       </div>
     )
   const status = query.data
+  const catalogRecovery =
+    section === 'music'
+      ? musicRecoveryMessage(status.music)
+      : section === 'software'
+        ? softwareRecoveryMessage(status.software)
+        : undefined
   const resetting = status.maintenance?.status === 'running'
   const maintenanceBusy = resetting || action.isPending
   const invalidNumbers = (form: FormScope) => {
@@ -1084,22 +1091,14 @@ export default function AIOSourcePage({
                   </InfoTip>
                 </div>
               )}
-              {section === 'software' && status.software?.needs_full_import && (
-                <div
-                  role="status"
-                  className="notice notice-warning flex flex-wrap items-center gap-1.5"
-                >
-                  <p>
-                    NVD CPE incremental continuity was exceeded. The next update will automatically
-                    re-import a fresh full snapshot while keeping existing software information
-                    searchable.
-                  </p>
-                </div>
+              {catalogRecovery && (
+                <p role="status" className="notice notice-warning">
+                  {catalogRecovery}
+                </p>
               )}
               {section === 'software' && status.software?.running && (
                 <p role="status" className="help">
-                  Updating software information. Progress is saved automatically and existing
-                  entries remain searchable during import.
+                  Updating software information. Existing entries remain searchable during import.
                 </p>
               )}
               {section === 'music' && status.music?.schema_unsupported && (
@@ -1114,23 +1113,9 @@ export default function AIOSourcePage({
                   </p>
                 </div>
               )}
-              {section === 'music' &&
-                status.music?.needs_export &&
-                !status.music.schema_unsupported && (
-                  <div
-                    role="status"
-                    className="notice notice-warning flex flex-wrap items-center gap-1.5"
-                  >
-                    <p>
-                      Live Data Feed continuity was interrupted. A fresh MusicBrainz full export
-                      will recover missing updates while keeping existing music information intact.
-                    </p>
-                  </div>
-                )}
               {section === 'music' && status.music?.running && (
                 <p role="status" className="help">
-                  Updating music information. Progress is saved automatically and existing entries
-                  remain searchable during import.
+                  Updating music information. Existing entries remain searchable during import.
                 </p>
               )}
               {Boolean(

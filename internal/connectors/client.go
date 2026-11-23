@@ -595,6 +595,20 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		if err != nil {
 			safeErr := safeHTTPError(networkContext, err)
 			networkCancel()
+			if code := t.readFailure(ctx, request.Method, safeErr); code != "" {
+				c.mu.Lock()
+				retryAt, canRetry := c.scheduleReadRetry(quotaKey, nil, attempt+1)
+				c.last = Response{}
+				c.mu.Unlock()
+				retry := canRetry && attempt < c.sourceRetries.Retries
+				previous = nil
+				if err := c.transientFailure(ctx, Response{ReadFailure: code}, retryAt, attempt+1, retry); err != nil {
+					return nil, err
+				}
+				if retry {
+					continue
+				}
+			}
 			if previous != nil {
 				previous.Body.(*retainedBody).err = safeErr
 				return previous, nil
@@ -626,27 +640,19 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		unexpectedHTML := readErr == nil && rateLimited && c.expectJSON && t.publicOrigin == nil &&
 			request.Method == http.MethodGet && response.StatusCode == http.StatusOK &&
 			invalidHTMLResponse(response.Header, data)
-		transient := readErr == nil && (request.Method == http.MethodGet || request.Method == http.MethodHead) &&
-			(transientHTTPStatus(response.StatusCode) || unexpectedHTML)
+		readFailure := ""
+		if response.StatusCode >= 200 && response.StatusCode < 300 && readErr != nil {
+			readFailure = t.readFailure(ctx, request.Method, readErr)
+		}
+		transient := (request.Method == http.MethodGet || request.Method == http.MethodHead) &&
+			((readErr == nil && (transientHTTPStatus(response.StatusCode) || unexpectedHTML)) || readFailure != "")
 		c.mu.Lock()
 		quota := c.quotas[quotaKey]
 		retryAt := quota.until
 		if transient {
-			now := time.Now()
-			deadline := now.Add(c.transientRetryDelay(response.Header, now, attempt+1))
-			if deadline.After(c.next) {
-				c.next = deadline
-			}
-			if c.next.After(retryAt) {
-				retryAt = c.next
-			}
-			retry = !quota.exhausted || !quota.until.IsZero()
-			if !retry {
-				// Local backoff must never invent a missing server quota reset.
-				retryAt = time.Time{}
-			}
+			retryAt, retry = c.scheduleReadRetry(quotaKey, response.Header, attempt+1)
 		}
-		retained := Response{Body: data, StatusCode: response.StatusCode, Header: response.Header.Clone(), URL: request.URL.String(), UnexpectedHTML: unexpectedHTML}
+		retained := Response{Body: data, StatusCode: response.StatusCode, Header: response.Header.Clone(), URL: request.URL.String(), UnexpectedHTML: unexpectedHTML, ReadFailure: readFailure}
 		if t.publicOrigin == nil {
 			c.last = retained
 		}
@@ -660,7 +666,7 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		if response.StatusCode == http.StatusTooManyRequests {
 			limit = c.maxQuotaRetries
 		}
-		retry = (!c.returnEveryResponse || archiveQuota || archiveTransient) && readErr == nil && retry && attempt < limit &&
+		retry = (!c.returnEveryResponse || archiveQuota || archiveTransient) && (readErr == nil || readFailure != "") && retry && attempt < limit &&
 			(request.Method == http.MethodGet || request.Method == http.MethodHead || response.StatusCode == http.StatusTooManyRequests)
 		if archiveQuota || archiveTransient {
 			// The callback owns this response boundary, including archive/control
@@ -687,6 +693,34 @@ func (t *connectorTransport) RoundTrip(original *http.Request) (*http.Response, 
 		}
 		return response, nil
 	}
+}
+
+func (t *connectorTransport) readFailure(ctx context.Context, method string, err error) string {
+	// The collection worker retains each failed read before proceeding from
+	// the same checkpoint. Keep the configured timeout as the request boundary.
+	if t.publicOrigin != nil || t.client.transientFailure == nil || ctx.Err() != nil || (method != http.MethodGet && method != http.MethodHead) {
+		return ""
+	}
+	if FailureCode(err) == "network" {
+		return "network"
+	}
+	return ""
+}
+
+// Caller holds c.mu. Honor both pacing and any upstream quota deadline.
+func (c *Client) scheduleReadRetry(key string, header http.Header, attempt int) (time.Time, bool) {
+	now := time.Now()
+	if deadline := now.Add(c.transientRetryDelay(header, now, attempt)); deadline.After(c.next) {
+		c.next = deadline
+	}
+	quota := c.quotas[key]
+	if quota.exhausted && quota.until.IsZero() {
+		return time.Time{}, false
+	}
+	if quota.until.After(c.next) {
+		return quota.until, true
+	}
+	return c.next, true
 }
 
 func invalidHTMLResponse(header http.Header, body []byte) bool {
@@ -729,6 +763,9 @@ type transientHTTPFailure struct {
 }
 
 func (e *transientHTTPFailure) Error() string {
+	if e.failure.code == "network" {
+		return fmt.Sprintf("%s after %d attempts", e.failure.Error(), e.attempt)
+	}
 	if e.invalidDocument {
 		return fmt.Sprintf("Source HTML detail page was unavailable after %d attempts", e.attempt)
 	}

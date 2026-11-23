@@ -271,14 +271,17 @@ var WatchedCoverTables = map[string]bool{
 
 // StreamDumpArchive streams a bzip2-compressed MusicBrainz tar archive
 // (mbdump.tar.bz2 or mbdump-cover-art-archive.tar.bz2) in a single pass.
-// Header metadata is validated before any watched table is emitted.
+// Use the returned header only after the complete archive has been validated.
 func StreamDumpArchive(ctx context.Context, r io.Reader, watched map[string]bool, batchSize int, onBatch func(DumpTableBatch) error) (DumpHeader, error) {
 	if batchSize < 1 {
 		batchSize = 2000
 	}
 	var header DumpHeader
-	tr := tar.NewReader(bzip2.NewReader(r))
-	schemaChecked := false
+	compressed := bzip2.NewReader(r)
+	tr := tar.NewReader(compressed)
+	var controlSequence int64
+	seen := make(map[string]bool, len(watched))
+	decoded := make(map[string]int, len(watched))
 	for {
 		if err := ctx.Err(); err != nil {
 			return header, err
@@ -309,11 +312,23 @@ func StreamDumpArchive(ctx context.Context, r io.Reader, watched map[string]bool
 			if err != nil {
 				return header, err
 			}
-			n, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
-			if err != nil || n < 0 {
-				return header, errors.New("invalid MusicBrainz REPLICATION_SEQUENCE")
+			if value := strings.TrimSpace(string(data)); value != "" {
+				n, err := strconv.ParseInt(value, 10, 64)
+				if err != nil || n < 0 {
+					return header, errors.New("invalid MusicBrainz REPLICATION_SEQUENCE")
+				}
+				header.ReplicationSequence = n
 			}
-			header.ReplicationSequence = n
+			continue
+		case "mbdump/replication_control":
+			data, err := io.ReadAll(io.LimitReader(tr, 512))
+			if err != nil {
+				return header, err
+			}
+			cols := strings.Split(strings.TrimSpace(string(data)), "\t")
+			if sequence, ok := copyInt64(cols, 2); ok && sequence >= 0 {
+				controlSequence = sequence
+			}
 			continue
 		case "SCHEMA_SEQUENCE":
 			data, err := io.ReadAll(io.LimitReader(tr, 64))
@@ -328,24 +343,42 @@ func StreamDumpArchive(ctx context.Context, r io.Reader, watched map[string]bool
 				return header, fmt.Errorf("%w: %d", ErrUnsupportedSchema, n)
 			}
 			header.SchemaSequence = n
-			schemaChecked = true
 			continue
 		}
 		table, ok := dumpTableName(name)
 		if !ok || !watched[table] {
 			continue
 		}
-		if schemaChecked && !SupportedSchema(header.SchemaSequence) {
-			return header, fmt.Errorf("%w: %d", ErrUnsupportedSchema, header.SchemaSequence)
-		}
-		if err := streamTableTSV(ctx, table, tr, batchSize, onBatch); err != nil {
+		seen[table] = true
+		if err := streamTableTSV(ctx, table, tr, batchSize, func(batch DumpTableBatch) error {
+			decoded[table] += batch.Len()
+			return onBatch(batch)
+		}); err != nil {
 			return header, err
 		}
 	}
-	if header.SchemaSequence > 0 && !SupportedSchema(header.SchemaSequence) {
-		return header, fmt.Errorf("%w: %d", ErrUnsupportedSchema, header.SchemaSequence)
+	if header.SchemaSequence == 0 {
+		return header, errors.New("MusicBrainz archive is missing SCHEMA_SEQUENCE")
 	}
-	return header, nil
+	if watched["release_group"] && watched["release"] && (decoded["release_group"] == 0 || decoded["release"] == 0) {
+		return header, errors.New("MusicBrainz core archive is missing release data")
+	}
+	if watched["cover_art"] && watched["cover_art_type"] && (!seen["cover_art"] || !seen["cover_art_type"]) {
+		return header, errors.New("MusicBrainz cover archive is missing cover data")
+	}
+	if header.ReplicationSequence == 0 {
+		header.ReplicationSequence = controlSequence
+	}
+	return header, verifyArchiveEnd(compressed)
+}
+
+func verifyArchiveEnd(decompressed io.Reader) error {
+	// The tar end markers can be read before the bzip2 footer. Read through
+	// the footer too so a truncated or corrupt download cannot be published.
+	if _, err := io.Copy(io.Discard, decompressed); err != nil {
+		return fmt.Errorf("verify MusicBrainz archive: %w", err)
+	}
+	return nil
 }
 
 func dumpTableName(entryPath string) (string, bool) {

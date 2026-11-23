@@ -169,7 +169,21 @@ func (s *Service) StopGames() {
 	}
 }
 
+func NextGameUpdate(state model.GameStatus, minutes int, now time.Time) time.Time {
+	next := now
+	if state.StartedAt == nil && state.LastSync != nil {
+		next = state.LastSync.Add(time.Duration(minutes) * time.Minute)
+	}
+	if state.RetryAt != nil && state.RetryAt.After(next) {
+		next = *state.RetryAt
+	}
+	return next
+}
+
 func (s *Service) SyncGames(ctx context.Context, trigger string) (syncErr error) {
+	if trigger != "manual" && trigger != "automatic" {
+		return model.ErrInvalid
+	}
 	release, locked, err := s.DB.AIOLock(ctx, "igdb")
 	if err != nil {
 		return err
@@ -182,6 +196,19 @@ func (s *Service) SyncGames(ctx context.Context, trigger string) (syncErr error)
 	if err != nil {
 		return err
 	}
+	if trigger == "automatic" {
+		if !c.IGDBEnabled {
+			return nil
+		}
+		state, err := s.DB.GameStatus(ctx)
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		if NextGameUpdate(state, c.IGDBMinutes, now).After(now) {
+			return nil
+		}
+	}
 	if c.IGDBClientID == "" || c.IGDBSecret == "" {
 		return model.ErrInvalid
 	}
@@ -190,12 +217,14 @@ func (s *Service) SyncGames(ctx context.Context, trigger string) (syncErr error)
 		return err
 	}
 	defer func() {
-		if syncErr != nil && !errors.Is(syncErr, context.Canceled) {
+		if syncErr != nil && (!errors.Is(syncErr, context.Canceled) || s.ctx.Err() == nil) {
 			final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()
 			message := "Game information could not be updated. Saved progress is preserved."
 			var e *igdbError
-			if errors.As(syncErr, &e) {
+			if errors.Is(syncErr, context.Canceled) {
+				message = "Game information update interrupted. Saved progress is preserved."
+			} else if errors.As(syncErr, &e) {
 				message = e.message
 			}
 			_ = s.DB.GameUpdateFailure(final, message, time.Now().Add(5*time.Minute))

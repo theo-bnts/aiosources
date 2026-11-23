@@ -14,10 +14,14 @@ func ProviderFailureMessage(code string) string {
 		return "The provider requires an active subscription or a different plan for this operation."
 	case "provider_unavailable":
 		return "The provider is temporarily unavailable. Try again later."
+	case "invalid_response":
+		return "The provider returned an invalid response."
 	case "invalid_torrent":
 		return "The provider rejected the torrent."
 	case "file_too_large":
 		return "The file exceeds the provider or account size limit."
+	case "transfer_failed":
+		return "The provider reports that this torrent transfer failed."
 	case "not_found":
 		return "The requested torrent or file is no longer available at the provider."
 	case "not_cached":

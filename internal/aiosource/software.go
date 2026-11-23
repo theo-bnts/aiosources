@@ -53,7 +53,7 @@ func (e *softwareError) Error() string { return e.message }
 
 var errSoftwareIncrementalFallback = errors.New("nvd incremental fallback required")
 
-func softwareProviderErrorCode(ctx, requestCtx context.Context, status int, err error) string {
+func catalogProviderErrorCode(ctx, requestCtx context.Context, status int, err error) string {
 	if err != nil {
 		if ctx != nil && ctx.Err() != nil {
 			return "cancelled"
@@ -82,7 +82,7 @@ func softwareProviderErrorCode(ctx, requestCtx context.Context, status int, err 
 	}
 }
 
-func recordSoftwareCall(ctx, requestCtx context.Context, h *operationHistory, phase string, status int, started time.Time, err error) {
+func recordCatalogProviderCall(ctx, requestCtx context.Context, h *operationHistory, phase string, status int, started time.Time, err error) {
 	if h == nil {
 		return
 	}
@@ -90,7 +90,7 @@ func recordSoftwareCall(ctx, requestCtx context.Context, h *operationHistory, ph
 		Phase:      phase,
 		HTTPStatus: status,
 		DurationMS: time.Since(started).Milliseconds(),
-		ErrorCode:  softwareProviderErrorCode(ctx, requestCtx, status, err),
+		ErrorCode:  catalogProviderErrorCode(ctx, requestCtx, status, err),
 	})
 }
 
@@ -252,10 +252,6 @@ func (s *Service) SyncSoftware(ctx context.Context, trigger string) (syncErr err
 	if err != nil {
 		return err
 	}
-	if err = s.DB.PrepareSoftwareImport(ctx, c); err != nil {
-		h.finish(ctx, err)
-		return err
-	}
 	defer func() {
 		h.finish(ctx, syncErr)
 		final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
@@ -285,13 +281,13 @@ func (s *Service) SyncSoftware(ctx context.Context, trigger string) (syncErr err
 	}
 
 	sel := store.SoftwareSelection(c)
-	needReproject := !state.Complete || state.Selection != sel.Key() || state.NeedsFullImport
+	needReproject := !state.Complete || state.NeedsFullImport || (state.Selection != "" && state.Selection != sel.Key())
 	recoveryReason := state.RecoveryReason
 	if c.SoftwareIncludeNVD && state.NVDChangesThrough != nil && time.Since(*state.NVDChangesThrough) > software.MaxNVDIncrementalWindow {
 		recoveryReason = "nvd_window_exceeded"
 	}
 
-	gen, err := s.DB.BeginSoftwareSync(ctx, sel.Key(), recoveryReason)
+	gen, err := s.DB.BeginSoftwareSync(ctx, sel, recoveryReason)
 	if err != nil {
 		return err
 	}
@@ -303,8 +299,11 @@ func (s *Service) SyncSoftware(ctx context.Context, trigger string) (syncErr err
 		if progressReset {
 			return nil
 		}
+		if err := s.DB.BeginSoftwareStaging(ctx); err != nil {
+			return err
+		}
 		progressReset = true
-		return s.DB.ResetSoftwareProgress(ctx)
+		return nil
 	}
 
 	// 1. NIST NVD Official CPE Dictionary 2.0 (optional, ON by default).
@@ -346,6 +345,9 @@ func (s *Service) SyncSoftware(ctx context.Context, trigger string) (syncErr err
 			sourcesUpdated++
 		}
 	} else if state.IconsIndexed > 0 || state.Icons > 0 {
+		if err = markImporting(); err != nil {
+			return err
+		}
 		if err = s.DB.ClearSoftwareIcons(ctx); err != nil {
 			return err
 		}
@@ -391,7 +393,7 @@ func (s *Service) SyncSoftware(ctx context.Context, trigger string) (syncErr err
 		return err
 	}
 	h.checkpoint(ctx, "software_cleanup")
-	if err = s.DB.FinishSoftwareSync(ctx, gen, syncMeta); err != nil {
+	if err = s.DB.FinishSoftwareSync(ctx, gen, syncMeta, sel); err != nil {
 		return err
 	}
 	h.checkpoint(ctx, "completed")
@@ -501,7 +503,7 @@ func (s *Service) fetchNVDMeta(ctx context.Context, h *operationHistory) (softwa
 	if res != nil {
 		status = res.StatusCode
 	}
-	recordSoftwareCall(ctx, nil, h, "software_nvd_meta", status, started, err)
+	recordCatalogProviderCall(ctx, nil, h, "software_nvd_meta", status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return software.NVDMeta{}, ctx.Err()
@@ -550,12 +552,12 @@ func (s *Service) streamSoftwareNVDDump(ctx context.Context, h *operationHistory
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
-	idle.Reset(2 * time.Minute)
+	idle.Stop()
 	status := 0
 	if res != nil {
 		status = res.StatusCode
 	}
-	recordSoftwareCall(ctx, requestCtx, h, "software_nvd_dump", status, started, err)
+	recordCatalogProviderCall(ctx, requestCtx, h, "software_nvd_dump", status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return software.NVDDumpStats{}, ctx.Err()
@@ -576,16 +578,14 @@ func (s *Service) streamSoftwareNVDDump(ctx context.Context, h *operationHistory
 	if err = markImporting(); err != nil {
 		return software.NVDDumpStats{}, err
 	}
-	body := &bookExportReader{reader: res.Body, timer: idle}
+	body := &archiveReader{reader: res.Body, timer: idle}
 	lastHistory := time.Now()
 	var batchErr error
 	stats, err := software.StreamNVDDump(requestCtx, body, expectedSHA256, 1000, func(batch []software.SourceEntry) error {
-		idle.Reset(2 * time.Minute)
 		if err := s.DB.SaveSoftwareSourceBatch(ctx, gen, batch, int64(len(batch)), 0, false); err != nil {
 			batchErr = err
 			return err
 		}
-		idle.Reset(2 * time.Minute)
 		h.run.Processed += int64(len(batch))
 		if time.Since(lastHistory) >= 5*time.Second {
 			h.checkpoint(ctx, "software_nvd_dump")
@@ -615,7 +615,8 @@ func (s *Service) syncSoftwareNVDIncremental(ctx context.Context, h *operationHi
 	pace := s.softwareNVDPace(apiKey != "")
 	startIndex := 0
 	pages := 0
-	anyChanges := false
+	total := 0
+	var entries []software.SourceEntry
 	startStr := since.UTC().Format("2006-01-02T15:04:05.000Z")
 	endStr := until.UTC().Format("2006-01-02T15:04:05.000Z")
 
@@ -651,16 +652,13 @@ func (s *Service) syncSoftwareNVDIncremental(ctx context.Context, h *operationHi
 		if err != nil {
 			return false, err
 		}
-		if !s.softwareUsingCustomURLs() {
-			client.CheckRedirect = trustedSoftwareExport
-		}
 		started := time.Now()
 		res, err := client.Do(req)
 		status := 0
 		if res != nil {
 			status = res.StatusCode
 		}
-		recordSoftwareCall(ctx, nil, h, "software_nvd_incremental", status, started, err)
+		recordCatalogProviderCall(ctx, nil, h, "software_nvd_incremental", status, started, err)
 		if err != nil {
 			if ctx.Err() != nil {
 				return false, ctx.Err()
@@ -687,36 +685,45 @@ func (s *Service) syncSoftwareNVDIncremental(ctx context.Context, h *operationHi
 			res.Body.Close()
 			return false, errSoftwareIncrementalFallback
 		}
-		page, parseErr := software.ParseNVDAPIResponse(io.LimitReader(res.Body, 64<<20))
+		limited := &io.LimitedReader{R: res.Body, N: (64 << 20) + 1}
+		page, parseErr := software.ParseNVDAPIResponse(limited)
 		res.Body.Close()
-		if parseErr != nil {
+		if parseErr != nil || limited.N == 0 || page.StartIndex != startIndex || (pages > 0 && page.TotalResults != total) {
 			return false, errSoftwareIncrementalFallback
 		}
-		if page.TotalResults > software.MaxNVDIncrementalResults {
+		total = page.TotalResults
+		if total > software.MaxNVDIncrementalResults {
 			return false, errSoftwareIncrementalFallback
 		}
-		if len(page.Entries) > 0 {
-			if err := markImporting(); err != nil {
-				return false, err
-			}
-			if err := s.DB.SaveSoftwareSourceBatch(ctx, gen, page.Entries, int64(len(page.Entries)), 0, true); err != nil {
-				return false, err
-			}
-			h.run.Processed += int64(len(page.Entries))
-			h.checkpoint(ctx, "software_nvd_incremental")
-			anyChanges = true
+		// A deprecated CPE can be the last active version of a product. Only a
+		// full snapshot can safely recompute the aggregated product and its versions.
+		if page.UndatedDeprecations || (page.LatestDeprecation != nil && page.LatestDeprecation.After(since)) {
+			return false, errSoftwareIncrementalFallback
 		}
+		entries = append(entries, page.Entries...)
 		pages++
-		step := page.ResultsPerPage
-		if step <= 0 {
-			step = softwareNVDPageSize
-		}
-		startIndex += step
-		if startIndex >= page.TotalResults || page.TotalResults == 0 {
+		startIndex += page.ProductCount
+		if startIndex == total {
 			break
 		}
 	}
-	return anyChanges, nil
+	if len(entries) == 0 {
+		return false, nil
+	}
+	// Only stage incremental records after validating the whole window. A
+	// full-export fallback must start without mutations from a rejected page walk.
+	if err := markImporting(); err != nil {
+		return false, err
+	}
+	for start := 0; start < len(entries); start += 1000 {
+		batch := entries[start:min(start+1000, len(entries))]
+		if err := s.DB.SaveSoftwareSourceBatch(ctx, gen, batch, int64(len(batch)), 0, true); err != nil {
+			return false, err
+		}
+		h.run.Processed += int64(len(batch))
+		h.checkpoint(ctx, "software_nvd_incremental")
+	}
+	return true, nil
 }
 
 func (s *Service) syncSoftwareWinGet(ctx context.Context, h *operationHistory, state model.SoftwareStatus, gen int64, syncMeta *store.SoftwareSyncMeta, markImporting func() error) (bool, error) {
@@ -753,12 +760,12 @@ func (s *Service) syncSoftwareWinGet(ctx context.Context, h *operationHistory, s
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
-	idle.Reset(2 * time.Minute)
+	idle.Stop()
 	status := 0
 	if res != nil {
 		status = res.StatusCode
 	}
-	recordSoftwareCall(ctx, requestCtx, h, "software_winget", status, started, err)
+	recordCatalogProviderCall(ctx, requestCtx, h, "software_winget", status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return false, ctx.Err()
@@ -769,7 +776,7 @@ func (s *Service) syncSoftwareWinGet(ctx context.Context, h *operationHistory, s
 		return false, &softwareError{message: "Microsoft WinGet repository archive could not be reached. Check network settings."}
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusNotModified {
+	if res.StatusCode == http.StatusNotModified && req.Header.Get("If-None-Match") != "" {
 		return false, nil
 	}
 	if res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 {
@@ -782,16 +789,14 @@ func (s *Service) syncSoftwareWinGet(ctx context.Context, h *operationHistory, s
 	if err = markImporting(); err != nil {
 		return false, err
 	}
-	body := &bookExportReader{reader: res.Body, timer: idle}
+	body := &archiveReader{reader: res.Body, timer: idle}
 	lastHistory := time.Now()
 	var batchErr error
 	if _, err = software.StreamWinGetArchive(requestCtx, body, 500, func(batch []software.SourceEntry) error {
-		idle.Reset(2 * time.Minute)
 		if err := s.DB.SaveSoftwareSourceBatch(ctx, gen, batch, int64(len(batch)), 0, false); err != nil {
 			batchErr = err
 			return err
 		}
-		idle.Reset(2 * time.Minute)
 		h.run.Processed += int64(len(batch))
 		if time.Since(lastHistory) >= 5*time.Second {
 			h.checkpoint(ctx, "software_winget")
@@ -853,12 +858,12 @@ func (s *Service) syncSoftwareHomebrew(ctx context.Context, h *operationHistory,
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
-	idle.Reset(2 * time.Minute)
+	idle.Stop()
 	status := 0
 	if res != nil {
 		status = res.StatusCode
 	}
-	recordSoftwareCall(ctx, requestCtx, h, "software_homebrew", status, started, err)
+	recordCatalogProviderCall(ctx, requestCtx, h, "software_homebrew", status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return false, ctx.Err()
@@ -869,7 +874,7 @@ func (s *Service) syncSoftwareHomebrew(ctx context.Context, h *operationHistory,
 		return false, &softwareError{message: "Homebrew Cask catalog could not be reached. Check network settings."}
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusNotModified {
+	if res.StatusCode == http.StatusNotModified && req.Header.Get("If-None-Match") != "" {
 		return false, nil
 	}
 	if res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 {
@@ -882,16 +887,14 @@ func (s *Service) syncSoftwareHomebrew(ctx context.Context, h *operationHistory,
 	if err = markImporting(); err != nil {
 		return false, err
 	}
-	body := &bookExportReader{reader: res.Body, timer: idle}
+	body := &archiveReader{reader: res.Body, timer: idle}
 	lastHistory := time.Now()
 	var batchErr error
 	if _, err = software.StreamHomebrewCasks(requestCtx, body, 500, func(batch []software.SourceEntry) error {
-		idle.Reset(2 * time.Minute)
 		if err := s.DB.SaveSoftwareSourceBatch(ctx, gen, batch, int64(len(batch)), 0, false); err != nil {
 			batchErr = err
 			return err
 		}
-		idle.Reset(2 * time.Minute)
 		h.run.Processed += int64(len(batch))
 		if time.Since(lastHistory) >= 5*time.Second {
 			h.checkpoint(ctx, "software_homebrew")
@@ -946,7 +949,7 @@ func (s *Service) syncSoftwareIcons(ctx context.Context, h *operationHistory, st
 	if res != nil {
 		status = res.StatusCode
 	}
-	recordSoftwareCall(ctx, nil, h, "software_icons", status, started, err)
+	recordCatalogProviderCall(ctx, nil, h, "software_icons", status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return false, ctx.Err()
@@ -954,7 +957,7 @@ func (s *Service) syncSoftwareIcons(ctx context.Context, h *operationHistory, st
 		return false, &softwareError{message: "selfh.st software icons index could not be reached. Check network settings."}
 	}
 	defer res.Body.Close()
-	if res.StatusCode == http.StatusNotModified {
+	if res.StatusCode == http.StatusNotModified && req.Header.Get("If-None-Match") != "" {
 		return false, nil
 	}
 	if res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 {

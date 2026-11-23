@@ -2,11 +2,11 @@ package store
 
 import (
 	"context"
+	"time"
 )
 
-// PruneHistory expires diagnostic content under the saved retention policy. Each pass is
-// bounded and transactional; an interrupted pass is retried without removing
-// published fields, queued work, matching decisions or recovery evidence.
+// PruneHistory expires diagnostic content under the saved retention policy.
+// Diagnostic cleanup commits independently of the shared publication journal.
 func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	batchSize, err := s.RuntimeValue(ctx, "history", "batch_size")
 	if err != nil {
@@ -18,7 +18,7 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
 	}
 	defer rollback(tx)
 	var locked bool
-	if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(1768843109,4)`).Scan(&locked); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1,$2)`, migrationLockNamespace, historyCleanupLockID).Scan(&locked); err != nil {
 		return 0, databaseError("lock history cleanup", err)
 	}
 	if !locked {
@@ -163,19 +163,42 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
  AND NOT EXISTS(SELECT 1 FROM aiosources.run_progress_identities i WHERE i.run_id=r.id)`, ids); err != nil {
 		return 0, err
 	}
-	// Serialize the immutable publication boundary with native writers. Keep
-	// the last state of each copy at that boundary plus all retained changes.
-	// Older readers must restart with Full; recent paged snapshots stay exact.
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
-		return 0, databaseError("lock catalog retention", err)
+	if err = tx.Commit(ctx); err != nil {
+		return 0, databaseError("commit diagnostic history cleanup", err)
 	}
+	shared, err := s.pruneSharedHistory(ctx, cutoffs["sharing"], batchSize)
+	return removed + shared, err
+}
+
+func (s *Store) pruneSharedHistory(ctx context.Context, cutoff time.Time, batchSize int) (int64, error) {
+	tx, err := s.workerPool().Begin(ctx)
+	if err != nil {
+		return 0, databaseError("begin shared history cleanup", err)
+	}
+	defer rollback(tx)
+	// Use the same lock order as catalog policy writers. Defer this part on
+	// contention so active publications cannot delay diagnostic retention.
+	for _, key := range []int32{catalogPublicationLockID, catalogEntityIndexLockID} {
+		var locked bool
+		if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock($1,$2)`, migrationLockNamespace, key).Scan(&locked); err != nil {
+			return 0, databaseError("lock shared history cleanup", err)
+		}
+		if !locked {
+			return 0, nil
+		}
+	}
+	if _, err = tx.Exec(ctx, `SELECT set_config('aiosources.history_retention','on',true)`); err != nil {
+		return 0, databaseError("authorize shared history cleanup", err)
+	}
+	// Keep the last state of each copy at the new boundary and all changes
+	// above it. Readers whose checkpoint has expired still restart with Full.
 	if _, err = tx.Exec(ctx, `SELECT aiosources.sync_catalog_tracking()`); err != nil {
 		return 0, databaseError("reconcile catalog storage", err)
 	}
 	if _, err = tx.Exec(ctx, `SELECT aiosources.prune_catalog_entity_index()`); err != nil {
 		return 0, databaseError("release inactive shared data index", err)
 	}
-	if err = exec(`WITH expired AS MATERIALIZED (
+	result, err := tx.Exec(ctx, `WITH expired AS MATERIALIZED (
  SELECT sequence,provider_id,source_id,origin,fields,deleted,recorded_at FROM aiosources.catalog_journal
  WHERE recorded_at<$1 ORDER BY recorded_at,sequence LIMIT $2
 ), boundary AS (
@@ -192,11 +215,12 @@ func (s *Store) PruneHistory(ctx context.Context) (int64, error) {
  sequence=EXCLUDED.sequence,recorded_at=EXCLUDED.recorded_at WHERE previous.sequence<EXCLUDED.sequence
  RETURNING 1
 )
-DELETE FROM aiosources.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoffs["sharing"], batchSize); err != nil {
-		return 0, err
+DELETE FROM aiosources.catalog_journal WHERE sequence IN (SELECT sequence FROM expired)`, cutoff, batchSize)
+	if err != nil {
+		return 0, databaseError("expire shared history batch", err)
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return 0, databaseError("commit history cleanup", err)
+		return 0, databaseError("commit shared history cleanup", err)
 	}
-	return removed, nil
+	return result.RowsAffected(), nil
 }

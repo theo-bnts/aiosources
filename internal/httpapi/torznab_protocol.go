@@ -211,6 +211,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 			}
 		}
 	}
+	now := time.Now().UTC()
 	for _, f := range []struct {
 		key string
 		dst *string
@@ -226,7 +227,7 @@ func torznabQuery(raw string) (model.TorznabQuery, url.Values, error) {
 				return q, v, e
 			}
 			if f.age {
-				*f.dst = time.Now().UTC().AddDate(0, 0, -n).Format(time.RFC3339Nano)
+				*f.dst = now.AddDate(0, 0, -n).Format(time.RFC3339Nano)
 			} else {
 				*f.dst = strconv.FormatInt(int64(n)*1024*1024, 10)
 			}

@@ -544,7 +544,7 @@ func (s *Service) CheckOperationDownload(ctx context.Context, id string, selecte
 	if key == "" || fingerprint(key) != saved.Account {
 		return model.CatalogDownload{}, model.ErrConflict
 	}
-	if len(selectedFiles) > 0 {
+	if len(selectedFiles) > 0 && selectedFiles[0] != "" {
 		if len(selectedFiles[0]) > 4096 {
 			return model.CatalogDownload{}, model.ErrInvalid
 		}

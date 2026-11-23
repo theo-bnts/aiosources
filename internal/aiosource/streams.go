@@ -573,11 +573,14 @@ func (s *Service) playbackWithPolicy(ctx context.Context, service, provider, sou
 			}
 			var item adMagnet
 			if existing != nil {
-				if *existing.Status < 0 || *existing.Status > 4 {
-					return ErrInvalidResponse
+				if *existing.Status > adReadyStatus {
+					if *existing.Status == 8 {
+						return newProviderError("file_too_large", "")
+					}
+					return newProviderError("transfer_failed", "")
 				}
 				item = *existing
-				ready := *item.Status == 4
+				ready := *item.Status == adReadyStatus
 				item.Ready = &ready
 			} else {
 				stage = "add"

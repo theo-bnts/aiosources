@@ -32,7 +32,7 @@ func (e *ProviderError) HTTPStatus() int {
 		return http.StatusForbidden
 	case "provider_unavailable", "timeout":
 		return http.StatusServiceUnavailable
-	case "invalid_torrent", "file_too_large":
+	case "invalid_torrent", "file_too_large", "transfer_failed":
 		return http.StatusUnprocessableEntity
 	case "not_found":
 		return http.StatusNotFound
@@ -128,6 +128,8 @@ func providerFailureCode(err error) string {
 		return "timeout"
 	case errors.Is(err, ErrAuth):
 		return "authentication"
+	case errors.Is(err, ErrInvalidResponse):
+		return "invalid_response"
 	}
 	var remote *ProviderError
 	if errors.As(err, &remote) {

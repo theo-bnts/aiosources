@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import {
   bookSyncLabel,
   metadataSyncLabel,
+  musicRecoveryMessage,
   musicSyncLabel,
+  softwareRecoveryMessage,
   softwareSyncLabel,
 } from '../src/lib/information-sync.ts'
 import type { BookStatus, MusicStatus, SoftwareStatus } from '../src/lib/aiosource-types.ts'
@@ -97,13 +99,23 @@ test('music freshness distinguishes live feed, full exports, recovery and schema
   }
   assert.equal(musicSyncLabel(base), 'Following Live Data Feed')
   assert.equal(musicSyncLabel({ ...base, live_enabled: false }), 'Following full exports')
+  assert.equal(musicSyncLabel({ ...base, replication_sequence: 0 }), 'Following full exports')
   assert.equal(musicSyncLabel(base, false), 'Automatic updates disabled')
-  assert.equal(musicSyncLabel({ ...base, needs_export: true }), 'Full export recovery pending')
+  const waiting = { ...base, needs_export: true, recovery_reason: 'replication_lag' }
+  assert.equal(musicSyncLabel(waiting), 'Full export recovery pending')
+  assert.equal(musicSyncLabel({ ...base, needs_export: true }), 'Import interrupted')
+  assert.equal(musicRecoveryMessage({ ...waiting, running: true }), undefined)
+  assert.match(musicRecoveryMessage(waiting) ?? '', /complete MusicBrainz export/)
+  assert.match(musicRecoveryMessage({ ...base, needs_export: true }) ?? '', /unfinished/)
   assert.equal(
     musicSyncLabel({ ...base, schema_unsupported: true }),
     'Update required (new schema)',
   )
   assert.equal(musicSyncLabel({ ...base, running: true, phase: 'covers' }), 'Importing cover index')
+  assert.equal(
+    musicSyncLabel({ ...base, running: true, phase: 'projecting' }),
+    'Building music catalog',
+  )
   assert.equal(musicSyncLabel({ ...base, running: true, phase: 'recovery' }), 'Recovering catalog')
   assert.equal(musicSyncLabel({ ...base, complete: false, position: 0 }), 'Not started')
 })
@@ -138,6 +150,14 @@ test('software freshness distinguishes phases, recovery, errors and disabled aut
   assert.equal(softwareSyncLabel(base), 'Following updates')
   assert.equal(softwareSyncLabel(base, false), 'Automatic updates disabled')
   assert.equal(softwareSyncLabel({ ...base, needs_full_import: true }), 'Full re-import pending')
+  assert.equal(
+    softwareRecoveryMessage({ ...base, needs_full_import: true, running: true }),
+    undefined,
+  )
+  assert.match(
+    softwareRecoveryMessage({ ...base, needs_full_import: true }) ?? '',
+    /recheck its sources/,
+  )
   assert.equal(softwareSyncLabel({ ...base, error: 'NVD unavailable' }), 'Retry pending')
   assert.equal(
     softwareSyncLabel({ ...base, running: true, phase: 'nvd_dump' }),

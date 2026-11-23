@@ -208,7 +208,9 @@ ORDER BY t.provider_id,t.source_id FOR UPDATE OF t SKIP LOCKED`, providers, ids)
 		if result.Work != nil {
 			var revision int64
 			var adult bool
-			if err := tx.QueryRow(ctx, `SELECT revision,adult FROM aiosources.aio_works WHERE id=$1`, result.Work.ID).Scan(&revision, &adult); err != nil || revision != result.Work.Revision || adult {
+			if err := tx.QueryRow(ctx, `SELECT revision,adult FROM aiosources.aio_works WHERE id=$1`, result.Work.ID).Scan(&revision, &adult); err != nil && err != pgx.ErrNoRows {
+				return nil, databaseError("verify chosen candidate", err)
+			} else if err != nil || revision != result.Work.Revision || adult {
 				return nil, model.ErrConflict
 			}
 		}
@@ -271,9 +273,10 @@ func requestAIOSeasons(ctx context.Context, tx pgx.Tx, requests []model.AIOSeaso
 		ids, seasons = append(ids, request.TMDB), append(seasons, request.Season)
 	}
 	_, err := tx.Exec(ctx, `WITH inserted AS (
-INSERT INTO aiosources.aio_season_requests(tmdb_id,season) SELECT DISTINCT * FROM unnest($1::text[],$2::int[])
+INSERT INTO aiosources.aio_season_requests(tmdb_id,season)
+SELECT DISTINCT tmdb_id,season FROM unnest($1::text[],$2::int[]) AS requested(tmdb_id,season) ORDER BY tmdb_id,season
 ON CONFLICT DO NOTHING RETURNING tmdb_id)
-INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id) SELECT DISTINCT 'tv',tmdb_id FROM inserted
+INSERT INTO aiosources.aio_metadata_jobs(media_type,tmdb_id) SELECT DISTINCT 'tv',tmdb_id FROM inserted ORDER BY tmdb_id
 ON CONFLICT(media_type,tmdb_id) DO UPDATE SET version=aiosources.aio_metadata_jobs.version+1,next_attempt=now()`, ids, seasons)
 	return err
 }

@@ -1,12 +1,20 @@
 package store
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
 )
+
+func TestProjectedCatalogTitlesUseTheStoredAliasIdentity(t *testing.T) {
+	got := projectedCatalogTitles("Neon Horizon", []string{"NEON-HORIZON", "Horizon néon", "horizon neon", "..."})
+	if !slices.Equal(got, []string{"Neon Horizon", "Horizon néon"}) {
+		t.Fatalf("unexpected projected titles: %v", got)
+	}
+}
 
 func TestMusicSelectionKeyChangesOnlyOnMeaningfulFilterChanges(t *testing.T) {
 	base := model.AIOConfig{
@@ -43,11 +51,8 @@ func TestMusicDumpProjectionReplicationAndCandidateSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	sel := MusicSelection(cfg)
-	if err = db.PrepareMusicImport(ctx, cfg); err != nil {
-		t.Fatal(err)
-	}
 	now := time.Now().UTC()
-	gen, err := db.BeginMusicDump(ctx, "20261114-002230", &now, sel.Key(), "")
+	gen, err := db.BeginMusicDump(ctx, sel, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,6 +77,7 @@ func TestMusicDumpProjectionReplicationAndCandidateSearch(t *testing.T) {
 		Releases: []music.ReleaseRow{
 			{ID: 40, GID: "bbbbbbbb-2222-3333-4444-555555555555", ReleaseGroupID: 30, Name: "Neon Horizon", ArtistCredit: 20, Status: 1, Barcode: "0724349691728"},
 		},
+		ReleaseDates: []music.ReleaseDateRow{{ReleaseID: 40, Year: 2024}, {ReleaseID: 40, Year: 2024}},
 		CoverArts: []music.CoverArtRow{
 			{ID: 900, ReleaseID: 40, Ordering: 1},
 		},
@@ -85,7 +91,7 @@ func TestMusicDumpProjectionReplicationAndCandidateSearch(t *testing.T) {
 	if _, _, _, err = db.ProjectMusicCatalog(ctx, gen, sel, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.FinishMusicDump(ctx, gen, music.DumpHeader{SchemaSequence: 30, ReplicationSequence: 100, Timestamp: now}, "20261114-002230", &now, true); err != nil {
+	if err = db.FinishMusicDump(ctx, gen, music.DumpHeader{SchemaSequence: 30, ReplicationSequence: 100, Timestamp: now}, "20261114-002230", &now, sel); err != nil {
 		t.Fatal(err)
 	}
 
@@ -117,6 +123,12 @@ func TestMusicDumpProjectionReplicationAndCandidateSearch(t *testing.T) {
 				Op:      "u",
 				NewData: map[string]any{"id": float64(20), "name": "Synthetic Duo Reborn"},
 			},
+			{
+				Schema:  "musicbrainz",
+				Table:   "release_country",
+				Op:      "d",
+				OldData: map[string]any{"release": 40, "country": 1, "date_year": 2024},
+			},
 		},
 	}
 	if _, err = db.ApplyMusicReplicationPacket(ctx, packet, sel); err != nil {
@@ -125,5 +137,51 @@ func TestMusicDumpProjectionReplicationAndCandidateSearch(t *testing.T) {
 	st, err := db.MusicStatus(ctx)
 	if err != nil || st.ReplicationSequence != 101 || st.Works != 1 {
 		t.Fatalf("unexpected music status after replication: %+v %v", st, err)
+	}
+	if err = tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err = db.pool.QueryRow(ctx, `SELECT occurrences FROM aiosources.mb_release_years WHERE release_id=40 AND year=2024`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("removing a country removed another country's matching year: count=%d %v", count, err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.mb_state SET selection='legacy-selection' WHERE singleton`); err != nil {
+		t.Fatal(err)
+	}
+	second, err := db.BeginMusicDump(ctx, sel, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.FailMusicUpdate(ctx, "Download interrupted", now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	st, err = db.MusicStatus(ctx)
+	if err != nil || !st.NeedsExport || st.Complete || st.Selection != sel.Key() || st.Snapshot != "20261114-002230" || st.ReplicationSequence != 101 {
+		t.Fatalf("interrupted dump changed the published checkpoint: %+v %v", st, err)
+	}
+	batch.CoverArts, batch.CoverArtTypes = nil, nil
+	if err = db.SaveMusicDumpBatch(ctx, second, batch); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err = db.ProjectMusicCatalog(ctx, second, sel, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.FinishMusicDump(ctx, second, music.DumpHeader{SchemaSequence: 30, ReplicationSequence: 102}, "20261118-002230", &now, sel); err != nil {
+		t.Fatal(err)
+	}
+	st, err = db.MusicStatus(ctx)
+	if err != nil || st.NeedsExport || !st.Complete || st.Snapshot != "20261118-002230" || st.ReplicationSequence != 102 || st.Covers != 0 {
+		t.Fatalf("replacement dump kept stale staging data: %+v %v", st, err)
+	}
+	live, err := db.NextMusicUpdate(ctx, 60, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.mb_state SET replication_sequence=0 WHERE singleton`); err != nil {
+		t.Fatal(err)
+	}
+	export, err := db.NextMusicUpdate(ctx, 60, true)
+	if err != nil || export.Sub(live) != 5*time.Hour {
+		t.Fatalf("a token without a sequence should keep the full-export interval: %v %v %v", live, export, err)
 	}
 }

@@ -201,7 +201,7 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 	defer idle.Stop()
 	requestStarted := time.Now()
 	response, err := client.Do(req)
-	idle.Reset(2 * time.Minute)
+	idle.Stop()
 	httpStatus := 0
 	if response != nil {
 		httpStatus = response.StatusCode
@@ -266,7 +266,7 @@ func (s *Service) syncBookExportPart(ctx context.Context, h *operationHistory, s
 		step = "book_import_" + books.ExportPartName(phase)
 	}
 	h.checkpoint(ctx, step)
-	body := &bookExportReader{reader: response.Body, timer: idle}
+	body := &archiveReader{reader: response.Body, timer: idle}
 	compressed, err := gzip.NewReader(body)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -517,15 +517,14 @@ func (s *Service) finishBookExport(ctx context.Context, h *operationHistory) err
 	return nil
 }
 
-type bookExportReader struct {
+type archiveReader struct {
 	reader io.Reader
 	timer  *time.Timer
 }
 
-func (r *bookExportReader) Read(p []byte) (int, error) {
-	n, err := r.reader.Read(p)
-	if n > 0 {
-		r.timer.Reset(2 * time.Minute)
-	}
-	return n, err
+func (r *archiveReader) Read(p []byte) (int, error) {
+	// A database write or decompression between reads is not a network stall.
+	r.timer.Reset(2 * time.Minute)
+	defer r.timer.Stop()
+	return r.reader.Read(p)
 }

@@ -2,12 +2,34 @@ package aiosource
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/store"
 	"golang.org/x/sync/errgroup"
 )
+
+func retryIdentificationTransaction(ctx context.Context, transaction func() error) error {
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := transaction()
+		var failure interface{ SQLState() string }
+		if attempt >= 2 || !errors.As(err, &failure) {
+			return err
+		}
+		switch failure.SQLState() {
+		case "40001", "40P01":
+			if err := sleepContext(ctx, 100*time.Millisecond<<attempt); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
 
 func (s *Service) drainMatching(ctx context.Context, history *operationHistory) error {
 	for {
@@ -35,9 +57,11 @@ func (s *Service) drainMatching(ctx context.Context, history *operationHistory) 
 		for start := 0; start < len(rows); start += batchSize {
 			chunk, index := rows[start:min(start+batchSize, len(rows))], start/batchSize
 			group.Go(func() error {
-				results, err := s.DB.MatchAIOBatch(work, chunk, decideAIORecord)
-				outcomes[index] = results
-				return err
+				return retryIdentificationTransaction(work, func() error {
+					results, err := s.DB.MatchAIOBatch(work, chunk, decideAIORecord)
+					outcomes[index] = results
+					return err
+				})
 			})
 		}
 		err = group.Wait()

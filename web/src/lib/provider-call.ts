@@ -22,6 +22,7 @@ export const providerSteps: Record<string, string> = {
 }
 export const providerErrors: Record<string, string> = {
   provider_error: 'Provider error',
+  invalid_response: 'Invalid provider response',
   authentication: 'Key or subscription rejected',
   cancelled: 'Interrupted',
   timeout: 'Timed out',
@@ -31,6 +32,7 @@ export const providerErrors: Record<string, string> = {
   provider_unavailable: 'Provider temporarily unavailable',
   invalid_torrent: 'Torrent rejected',
   file_too_large: 'File exceeds provider or plan limit',
+  transfer_failed: 'Torrent transfer failed',
   not_found: 'Torrent or file unavailable',
   not_cached: 'File no longer cached',
 }

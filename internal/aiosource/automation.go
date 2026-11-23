@@ -124,17 +124,9 @@ func (s *Service) runAutomation() time.Duration {
 	}
 	if c.IGDBEnabled && !s.GameState() {
 		if games, e := s.DB.GameStatus(s.ctx); e == nil {
-			next := time.Now()
-			if games.LastSync != nil {
-				next = games.LastSync.Add(time.Duration(c.IGDBMinutes) * time.Minute)
-			}
-			if games.StartedAt != nil {
-				next = time.Now()
-			}
-			if games.RetryAt != nil && games.RetryAt.After(next) {
-				next = *games.RetryAt
-			}
-			if !next.After(time.Now()) {
+			now := time.Now()
+			next := NextGameUpdate(games, c.IGDBMinutes, now)
+			if !next.After(now) {
 				_ = s.StartGames(s.ctx, "automatic")
 			} else {
 				poll = min(poll, time.Until(next))

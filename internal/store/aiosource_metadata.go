@@ -19,6 +19,24 @@ type AIOMetadataPublication struct {
 
 func aioWorkIdentity(w model.AIOWork) string { return w.Type + ":" + w.TMDB }
 
+// Match the one-title-per-normalized-alias representation in aio_titles while
+// keeping the display title's spelling when an alias normalizes to the same key.
+func projectedCatalogTitles(display string, aliases []string) []string {
+	titles := make([]string, 0, len(aliases)+1)
+	seen := make(map[string]bool, len(aliases)+1)
+	add := func(title string) {
+		if normalized := model.NormalizeTitle(title); normalized != "" && !seen[normalized] {
+			seen[normalized] = true
+			titles = append(titles, title)
+		}
+	}
+	add(display)
+	for _, alias := range aliases {
+		add(alias)
+	}
+	return titles
+}
+
 // Only decision-relevant data advances the revision. A routine refresh, alias
 // ordering or duplicated release year must not withdraw working streams.
 func aioWorkSignature(w model.AIOWork, normalized []string) string {

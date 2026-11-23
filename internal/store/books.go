@@ -259,11 +259,18 @@ func saveOpenLibraryRecords(ctx context.Context, tx pgx.Tx, records []books.Reco
 		if !refresh {
 			return
 		}
-		batch.Queue(`WITH affected AS (
-     UPDATE aiosources.aio_works w SET revision=revision+1,updated_at=now() WHERE w.media_type='book' AND w.openlibrary_id<>'' AND (
-      w.openlibrary_id=$1 OR w.openlibrary_id=aiosources.ol_resolve($1) OR (w.book_data->'author_keys') ?| aiosources.ol_aliases($1)
-      OR w.openlibrary_id IN(SELECT aiosources.ol_resolve(unnest(e.work_keys)) FROM aiosources.ol_editions e WHERE e.id=$1)
-     ) RETURNING id
+		// Look up each relationship through its own index. Combining the
+		// edition subquery with the other predicates in one OR can scan all works.
+		batch.Queue(`WITH related_keys(key) AS (
+     SELECT $1::text UNION SELECT aiosources.ol_resolve($1)
+     UNION SELECT aiosources.ol_resolve(unnest(e.work_keys)) FROM aiosources.ol_editions e WHERE e.id=$1
+    ), related_works AS (
+     SELECT w.id FROM related_keys k JOIN aiosources.aio_works w ON w.openlibrary_id=k.key
+     WHERE w.media_type='book' AND w.openlibrary_id<>''
+     UNION SELECT w.id FROM aiosources.aio_works w
+     WHERE w.media_type='book' AND w.openlibrary_id<>'' AND (w.book_data->'author_keys') ?| (SELECT aiosources.ol_aliases($1))
+    ), affected AS (
+     UPDATE aiosources.aio_works w SET revision=revision+1,updated_at=now() FROM related_works r WHERE w.id=r.id RETURNING w.id
     ) INSERT INTO aiosources.aio_match_queue(provider_id,source_id) SELECT m.provider_id,m.source_id FROM aiosources.aio_matches m JOIN affected a ON a.id=m.work_id ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, key)
 	}
 	nw, ne, na, skipped := int64(0), int64(0), int64(0), int64(0)

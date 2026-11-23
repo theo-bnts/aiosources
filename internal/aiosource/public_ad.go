@@ -39,11 +39,8 @@ func (s *Service) publicADObservation(ctx context.Context, key, hash string) (re
 	result.Hash = hash
 	var item adMagnet
 	if existing := existingAD(inventory, hash); existing != nil {
-		if *existing.Status < 0 || *existing.Status > 4 {
-			return result, ErrInvalidResponse
-		}
 		item = *existing
-		ready := *item.Status == 4
+		ready := *item.Status == adReadyStatus
 		item.Ready = &ready
 	} else {
 		// A bare hash never borrows a source's announce or download URL.

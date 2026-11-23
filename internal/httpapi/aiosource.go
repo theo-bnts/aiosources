@@ -202,16 +202,7 @@ func (s *server) aioStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	games.Running = s.options.AIOSource.GameState()
 	if c.IGDBEnabled && !games.Running {
-		next := time.Now()
-		if games.LastSync != nil {
-			next = games.LastSync.Add(time.Duration(c.IGDBMinutes) * time.Minute)
-		}
-		if games.StartedAt != nil {
-			next = time.Now()
-		}
-		if games.RetryAt != nil && games.RetryAt.After(next) {
-			next = *games.RetryAt
-		}
+		next := aiosource.NextGameUpdate(games, c.IGDBMinutes, time.Now())
 		games.NextUpdate = &next
 	}
 	softwareStatus, err := s.options.Store.SoftwareStatus(r.Context())

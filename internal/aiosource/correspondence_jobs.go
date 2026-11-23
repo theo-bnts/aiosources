@@ -24,7 +24,12 @@ func (s *Service) drainCorrespondences(ctx context.Context, history *operationHi
 				return err
 			}
 			chunk := scopes[start:min(start+correspondenceChunkSize, len(scopes))]
-			groups, _, enriched, err := s.DB.ProcessCorrespondenceBatch(ctx, chunk, BuildReleaseCorrespondences)
+			var groups, enriched int
+			err := retryIdentificationTransaction(ctx, func() error {
+				var err error
+				groups, _, enriched, err = s.DB.ProcessCorrespondenceBatch(ctx, chunk, BuildReleaseCorrespondences)
+				return err
+			})
 			if err != nil {
 				return err
 			}

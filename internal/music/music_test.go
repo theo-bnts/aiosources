@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,7 +17,13 @@ func buildTarBZ2(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var tarBuf bytes.Buffer
 	tw := tar.NewWriter(&tarBuf)
-	for name, body := range files {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		body := files[name]
 		hdr := &tar.Header{
 			Name: name,
 			Mode: 0644,
@@ -211,6 +218,46 @@ func TestParseReplicationPacketFiltersWatchedAndCoverTables(t *testing.T) {
 	}
 	if len(pktNoCovers.Changes) != 1 {
 		t.Fatalf("expected 1 change without covers, got %d", len(pktNoCovers.Changes))
+	}
+}
+
+func TestMusicArchivesRejectIncompleteData(t *testing.T) {
+	ctx := context.Background()
+	core := map[string]string{
+		"SCHEMA_SEQUENCE":            "31\n",
+		"REPLICATION_SEQUENCE":       "\n",
+		"mbdump/replication_control": "1\t31\t100\t2026-11-21 12:00:00+00\n",
+		"mbdump/release_group":       "30\t46f5c7ea-410c-3769-838a-81d80d7e3962\tDiscovery\t20\t1\n",
+		"mbdump/release":             "40\t11111111-1111-1111-1111-111111111111\tDiscovery\t20\t30\t1\n",
+	}
+	acceptBatch := func(DumpTableBatch) error { return nil }
+	archive := buildTarBZ2(t, core)
+	header, err := StreamDumpArchive(ctx, bytes.NewReader(archive), WatchedCoreTables, 100, acceptBatch)
+	if err != nil || header.ReplicationSequence != 100 {
+		t.Fatalf("dump replication control was not restored: %+v, %v", header, err)
+	}
+	if _, err := StreamDumpArchive(ctx, bytes.NewReader(archive[:len(archive)-4]), WatchedCoreTables, 100, acceptBatch); err == nil {
+		t.Fatal("truncated bzip2 footer was accepted")
+	}
+	delete(core, "mbdump/release")
+	if _, err := StreamDumpArchive(ctx, bytes.NewReader(buildTarBZ2(t, core)), WatchedCoreTables, 100, acceptBatch); err == nil {
+		t.Fatal("a dump missing releases was accepted")
+	}
+	packet := map[string]string{"SCHEMA_SEQUENCE": "31\n", "REPLICATION_SEQUENCE": "101\n"}
+	missing := buildTarBZ2(t, packet)
+	if _, err := ParseReplicationPacket(ctx, bytes.NewReader(missing), false); !errors.Is(err, ErrIncompleteReplication) {
+		t.Fatalf("a complete archive missing pending data must trigger export recovery: %v", err)
+	}
+	if _, err := ParseReplicationPacket(ctx, bytes.NewReader(missing[:len(missing)-4]), false); err == nil || errors.Is(err, ErrIncompleteReplication) {
+		t.Fatalf("a truncated transfer should be retried as a transfer failure: %v", err)
+	}
+	packet["mbdump/dbmirror2.pending_data"] = "1\tmusicbrainz.release\ti\t101\t\\N\tinvalid-json\n"
+	if _, err := ParseReplicationPacket(ctx, bytes.NewReader(buildTarBZ2(t, packet)), false); !errors.Is(err, ErrIncompleteReplication) {
+		t.Fatalf("a packet with an unreadable release change must trigger recovery: %v", err)
+	}
+	packet["mbdump/dbmirror2.pending_data"] = ""
+	if _, err := ParseReplicationPacket(ctx, bytes.NewReader(buildTarBZ2(t, packet)), false); err != nil {
+		t.Fatalf("a valid packet with no changes failed: %v", err)
 	}
 }
 

@@ -30,9 +30,8 @@ type Environment struct {
 	// retryAt is zero when the source supplied no deadline; retry reports
 	// whether the transport can make another automatic attempt.
 	RateLimited func(ctx context.Context, response Response, retryAt time.Time, retry bool) error
-	// TransientFailure retains complete GET/HEAD responses with HTTP 500, 502,
-	// 503, 504 or temporary gateway 520–524, including the final exhausted
-	// response. attempt is the
+	// TransientFailure retains temporary GET/HEAD failures, including transport
+	// failures and the final exhausted response. attempt is the
 	// one-based network attempt; retry reports whether another attempt is
 	// allowed. retryAt includes pacing and known quota deadlines, or is zero
 	// when an exhausted quota has no known reset. Callback errors stop retries.
@@ -82,12 +81,16 @@ type Response struct {
 	// A successful HTML detail response omitted its configured page container.
 	// This is eligible for bounded read retries, never for accepting an empty page.
 	InvalidDocument bool
+	// Safe retryable network category, including partial responses.
+	ReadFailure string
 }
 
 func (r Response) TransientError(attempt int) error {
 	code := "http"
 	if r.UnexpectedHTML || r.InvalidDocument {
 		code = "parse"
+	} else if r.ReadFailure != "" {
+		code = r.ReadFailure
 	}
 	return &transientHTTPFailure{failure: FailureError{code: code}, status: r.StatusCode, attempt: attempt, unexpectedHTML: r.UnexpectedHTML, invalidDocument: r.InvalidDocument}
 }

@@ -22,6 +22,7 @@ const (
 	musicBrainzAgent                = "AIOSources/" + Version + " (+https://github.com/theo-bnts/aiosources)"
 	musicReplicationMaxLag          = 7 * 24 * time.Hour
 	musicReplicationMaxPacketsInRun = 168
+	musicSchemaMessage              = "MusicBrainz updated its database schema. Update AIOSources to resume updates."
 )
 
 func trustedMusicExport(r *http.Request, via []*http.Request) error {
@@ -129,13 +130,16 @@ func (s *Service) SyncMusic(ctx context.Context, trigger string) (syncErr error)
 			return err
 		}
 	}
-
-	h, err := s.beginOperation(ctx, "metadata", "musicbrainz", trigger, "music", "musicbrainz")
+	state, err := s.DB.MusicStatus(ctx)
 	if err != nil {
 		return err
 	}
-	if err = s.DB.PrepareMusicImport(ctx, c); err != nil {
-		h.finish(ctx, err)
+	if trigger == "automatic" && state.RetryAt != nil && state.RetryAt.After(time.Now()) {
+		return nil
+	}
+
+	h, err := s.beginOperation(ctx, "metadata", "musicbrainz", trigger, "music", "musicbrainz")
+	if err != nil {
 		return err
 	}
 	defer func() {
@@ -152,7 +156,9 @@ func (s *Service) SyncMusic(ctx context.Context, trigger string) (syncErr error)
 					retryAt = me.retryAt
 				}
 			}
-			if !errors.Is(syncErr, music.ErrUnsupportedSchema) {
+			if errors.Is(syncErr, music.ErrUnsupportedSchema) {
+				_ = s.DB.MarkMusicNeedsExport(final, "schema_unsupported", musicSchemaMessage, true, time.Now().Add(6*time.Hour))
+			} else {
 				_ = s.DB.FailMusicUpdate(final, msg, retryAt)
 			}
 		} else if errors.Is(syncErr, context.Canceled) {
@@ -161,16 +167,8 @@ func (s *Service) SyncMusic(ctx context.Context, trigger string) (syncErr error)
 		_ = s.DB.RecordMusicInformationActivity(final, syncErr, h.run.Processed)
 	}()
 
-	state, err := s.DB.MusicStatus(ctx)
-	if err != nil {
-		return err
-	}
-	if trigger == "automatic" && state.RetryAt != nil && state.RetryAt.After(time.Now()) {
-		return nil
-	}
-
 	// Case 1: Initial import, changed catalog filters, or pending export recovery.
-	if !state.Complete || state.NeedsExport {
+	if !state.Complete || state.NeedsExport || (state.Selection != "" && state.Selection != store.MusicSelectionKey(c)) {
 		return s.syncMusicExport(ctx, h, c, state, state.RecoveryReason)
 	}
 
@@ -187,16 +185,17 @@ func (s *Service) SyncMusic(ctx context.Context, trigger string) (syncErr error)
 
 	// Case 3: Dump-only mode (no token, 100% CC0 core): poll LATEST and import
 	// only when a newer twice-weekly snapshot is published.
+	h.checkpoint(ctx, "music_snapshot")
 	latest, err := s.fetchLatestMusicSnapshot(ctx, h)
 	if err != nil {
 		return err
 	}
 	h.run.Results["export_checked"] = 1
-	if latest == state.Snapshot {
+	if latest <= state.Snapshot {
 		h.checkpoint(ctx, "up_to_date")
 		return s.DB.TouchMusicCheck(ctx)
 	}
-	return s.syncMusicExport(ctx, h, c, state, "")
+	return s.importMusicSnapshot(ctx, h, c, latest, "")
 }
 
 func (s *Service) musicExportBaseURL() string {
@@ -239,18 +238,27 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 		return err
 	}
 	h.run.Results["export_checked"] = 1
-	// If recovering from a replication gap or schema bump, wait cleanly if the
-	// upstream fullexport has not yet caught up past our existing snapshot.
-	if recoveryReason != "" && state.Complete && state.Snapshot != "" && snapshot <= state.Snapshot {
-		return s.DB.MarkMusicNeedsExport(ctx, recoveryReason, "A newer MusicBrainz export is needed to recover missing changes. Existing music information is preserved.", false, time.Now().Add(6*time.Hour))
+	if musicNeedsNewerExport(state.Snapshot, snapshot, recoveryReason != "") {
+		message := "A newer MusicBrainz export is needed to continue. Existing music information is preserved."
+		if state.SchemaUnsupported {
+			message = musicSchemaMessage
+		}
+		return s.DB.MarkMusicNeedsExport(ctx, recoveryReason, message, state.SchemaUnsupported, time.Now().Add(6*time.Hour))
 	}
+	return s.importMusicSnapshot(ctx, h, c, snapshot, recoveryReason)
+}
 
+func musicNeedsNewerExport(published, latest string, recoveringContinuity bool) bool {
+	return published != "" && (latest < published || (recoveringContinuity && latest == published))
+}
+
+func (s *Service) importMusicSnapshot(ctx context.Context, h *operationHistory, c model.AIOConfig, snapshot, recoveryReason string) error {
 	var snapshotAt *time.Time
 	if at, ok := music.ExportDate(snapshot); ok {
 		snapshotAt = &at
 	}
 	sel := store.MusicSelection(c)
-	gen, err := s.DB.BeginMusicDump(ctx, snapshot, snapshotAt, sel.Key(), recoveryReason)
+	gen, err := s.DB.BeginMusicDump(ctx, sel, recoveryReason)
 	if err != nil {
 		return err
 	}
@@ -260,15 +268,8 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 	coreURL := s.musicExportBaseURL() + "/" + snapshot + "/mbdump.tar.bz2"
 	header, err := s.streamMusicArchive(ctx, h, "music_dump", coreURL, music.WatchedCoreTables, gen)
 	if err != nil {
-		if errors.Is(err, music.ErrUnsupportedSchema) {
-			_ = s.DB.MarkMusicNeedsExport(ctx, "schema_unsupported", "MusicBrainz updated its database schema. Saved music information is preserved; update AIOSources to resume updates.", true, time.Now().Add(6*time.Hour))
-		}
 		return err
 	}
-	if err = s.DB.PruneUnlinkedMusicURLs(ctx); err != nil {
-		return err
-	}
-
 	// Phase 2: Stream mbdump-cover-art-archive.tar.bz2 (optional, on by default).
 	if c.MusicBrainzIncludeCovers {
 		if err = s.DB.SetMusicPhase(ctx, "covers"); err != nil {
@@ -276,11 +277,12 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 		}
 		h.checkpoint(ctx, "music_covers")
 		coverURL := s.musicExportBaseURL() + "/" + snapshot + "/mbdump-cover-art-archive.tar.bz2"
-		if _, err = s.streamMusicArchive(ctx, h, "music_covers", coverURL, music.WatchedCoverTables, gen); err != nil {
-			if errors.Is(err, music.ErrUnsupportedSchema) {
-				_ = s.DB.MarkMusicNeedsExport(ctx, "schema_unsupported", "MusicBrainz updated its database schema. Saved music information is preserved; update AIOSources to resume updates.", true, time.Now().Add(6*time.Hour))
-			}
+		covers, err := s.streamMusicArchive(ctx, h, "music_covers", coverURL, music.WatchedCoverTables, gen)
+		if err != nil {
 			return err
+		}
+		if covers.SchemaSequence != header.SchemaSequence || (covers.ReplicationSequence > 0 && covers.ReplicationSequence != header.ReplicationSequence) {
+			return &musicError{message: "The MusicBrainz and cover art archives describe different snapshots. Saved progress is preserved."}
 		}
 	}
 
@@ -289,18 +291,23 @@ func (s *Service) syncMusicExport(ctx context.Context, h *operationHistory, c mo
 		return err
 	}
 	h.checkpoint(ctx, "music_projecting")
-	worksCount, _, _, err := s.DB.ProjectMusicCatalog(ctx, gen, sel, nil)
-	if err != nil {
+	lastHistory := time.Now()
+	if _, _, _, err = s.DB.ProjectMusicCatalog(ctx, gen, sel, func(projected int64) {
+		h.run.Processed += projected
+		if time.Since(lastHistory) >= 5*time.Second {
+			h.checkpoint(ctx, "music_projecting")
+			lastHistory = time.Now()
+		}
+	}); err != nil {
 		return err
 	}
-	h.run.Processed += worksCount
 
 	// Phase 4: Prune old generation rows & commit final state + backfill queue.
 	if err = s.DB.SetMusicPhase(ctx, "cleanup"); err != nil {
 		return err
 	}
 	h.checkpoint(ctx, "music_cleanup")
-	if err = s.DB.FinishMusicDump(ctx, gen, header, snapshot, snapshotAt, c.MusicBrainzIncludeCovers); err != nil {
+	if err = s.DB.FinishMusicDump(ctx, gen, header, snapshot, snapshotAt, sel); err != nil {
 		return err
 	}
 	h.checkpoint(ctx, "completed")
@@ -339,14 +346,12 @@ func (s *Service) streamMusicArchive(ctx context.Context, h *operationHistory, c
 
 	started := time.Now()
 	res, err := streamClient.Do(req)
-	idle.Reset(2 * time.Minute)
+	idle.Stop()
 	status := 0
 	if res != nil {
 		status = res.StatusCode
 	}
-	if h != nil {
-		_ = s.DB.RecordProviderCall(ctx, h.run.ID, callName, status, time.Since(started).Milliseconds(), "")
-	}
+	recordCatalogProviderCall(ctx, requestCtx, h, callName, status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return music.DumpHeader{}, ctx.Err()
@@ -361,14 +366,17 @@ func (s *Service) streamMusicArchive(ctx context.Context, h *operationHistory, c
 	if res.StatusCode != http.StatusOK {
 		return music.DumpHeader{}, &musicError{message: fmt.Sprintf("MusicBrainz export returned HTTP %d.", res.StatusCode)}
 	}
-	body := &bookExportReader{reader: res.Body, timer: idle}
+	body := &archiveReader{reader: res.Body, timer: idle}
+	lastHistory := time.Now()
 	header, err := music.StreamDumpArchive(requestCtx, body, watched, 2000, func(batch music.DumpTableBatch) error {
-		idle.Reset(2 * time.Minute)
 		if err := s.DB.SaveMusicDumpBatch(ctx, gen, batch); err != nil {
 			return err
 		}
-		idle.Reset(2 * time.Minute)
 		h.run.Processed += int64(batch.Len())
+		if time.Since(lastHistory) >= 5*time.Second {
+			h.checkpoint(ctx, callName)
+			lastHistory = time.Now()
+		}
 		return nil
 	})
 	if err != nil {
@@ -405,8 +413,8 @@ func (s *Service) syncMusicReplication(ctx context.Context, h *operationHistory,
 		endpoint := s.musicReplicationBaseURL() + "/replication-" + strconv.FormatInt(nextSeq, 10) + "-v2.tar.bz2?token=" + url.QueryEscape(token)
 		packet, status, retryAfter, err := s.fetchReplicationPacket(ctx, h, endpoint, c.MusicBrainzIncludeCovers)
 		if err != nil {
-			if errors.Is(err, music.ErrUnsupportedSchema) {
-				_ = s.DB.MarkMusicNeedsExport(ctx, "schema_unsupported", "MusicBrainz updated its database schema. Saved music information is preserved; update AIOSources to resume updates.", true, time.Now().Add(6*time.Hour))
+			if errors.Is(err, music.ErrIncompleteReplication) {
+				return s.syncMusicExport(ctx, h, c, state, "packet_invalid")
 			}
 			return err
 		}
@@ -421,16 +429,14 @@ func (s *Service) syncMusicReplication(ctx context.Context, h *operationHistory,
 			if applied == 0 && state.ChangesThrough != nil && time.Since(*state.ChangesThrough) > 24*time.Hour {
 				return s.syncMusicExport(ctx, h, c, state, "packet_expired")
 			}
-			if applied == 0 {
-				if err = s.DB.TouchMusicCheck(ctx); err != nil {
-					return err
-				}
+			if err = s.DB.TouchMusicCheck(ctx); err != nil {
+				return err
 			}
 			h.checkpoint(ctx, "completed")
 			return nil
 		case http.StatusOK:
 			if packet.ReplicationSequence != nextSeq {
-				return &musicError{message: "MusicBrainz replication packet sequence did not match the requested packet."}
+				return s.syncMusicExport(ctx, h, c, state, "packet_invalid")
 			}
 			// Schema upgrade between packets: recover cleanly via fresh fullexport.
 			if state.SchemaSequence > 0 && packet.SchemaSequence != state.SchemaSequence {
@@ -485,9 +491,7 @@ func (s *Service) fetchReplicationPacket(ctx context.Context, h *operationHistor
 		if res != nil {
 			status = res.StatusCode
 		}
-		if h != nil {
-			_ = s.DB.RecordProviderCall(ctx, h.run.ID, "music_replication", status, time.Since(started).Milliseconds(), "")
-		}
+		recordCatalogProviderCall(ctx, nil, h, "music_replication", status, started, err)
 		if err != nil {
 			if ctx.Err() != nil {
 				return music.ReplicationPacket{}, 0, 0, ctx.Err()
@@ -541,9 +545,7 @@ func (s *Service) musicGETBytes(ctx context.Context, h *operationHistory, callNa
 	if res != nil {
 		status = res.StatusCode
 	}
-	if h != nil {
-		_ = s.DB.RecordProviderCall(ctx, h.run.ID, callName, status, time.Since(started).Milliseconds(), "")
-	}
+	recordCatalogProviderCall(ctx, nil, h, callName, status, started, err)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, 0, 0, ctx.Err()

@@ -55,6 +55,31 @@ func drainHistory(t *testing.T, ctx context.Context, db *Store) {
 	t.Fatal("history cleanup did not settle")
 }
 
+func TestDiagnosticRetentionCommitsWhileCatalogPublicationIsBusy(t *testing.T) {
+	ctx, _, db := activityDatabase(t)
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,created_at) VALUES('old-log','info','service.started','Started',now()-interval '8 days')`); err != nil {
+		t.Fatal(err)
+	}
+	publisher, err := db.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rollback(publisher)
+	if _, err = publisher.Exec(ctx, `SELECT pg_advisory_xact_lock($1,$2)`, migrationLockNamespace, catalogPublicationLockID); err != nil {
+		t.Fatal(err)
+	}
+	pass, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	removed, err := db.PruneHistory(pass)
+	if err != nil || removed != 1 {
+		t.Fatalf("catalog publication delayed diagnostic cleanup: %d %v", removed, err)
+	}
+	var left int
+	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.activity_logs WHERE event_id='old-log'`).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("diagnostic cleanup did not commit: %d %v", left, err)
+	}
+}
+
 func TestHistoryRetentionPreservesPublishedDataAndCollectionBaseline(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
 	provider := model.Provider{ID: "retained-source", Adapter: "http_json"}
@@ -429,7 +454,7 @@ func TestHistoryRetentionDetachesRecentReferencesToExpiredArchives(t *testing.T)
 	}
 }
 
-func TestHistoryRetentionRollsBackWhenPublicationIsBusy(t *testing.T) {
+func TestHistoryRetentionRollsBackWhenDiagnosticRowIsBusy(t *testing.T) {
 	ctx, _, db := activityDatabase(t)
 	// This scenario verifies the optional complete processing history.
 	setStorageMode(t, ctx, db, model.StorageFull)
@@ -447,7 +472,7 @@ func TestHistoryRetentionRollsBackWhenPublicationIsBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer rollback(reader)
-	if _, err = reader.Exec(ctx, `SELECT pg_advisory_xact_lock(1768843109,3)`); err != nil {
+	if _, err = reader.Exec(ctx, `SELECT id FROM aiosources.raw_records WHERE run_id=$1 FOR UPDATE`, run.ID); err != nil {
 		t.Fatal(err)
 	}
 	deadline, cancel := context.WithTimeout(ctx, 200*time.Millisecond)

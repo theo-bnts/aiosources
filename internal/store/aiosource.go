@@ -162,7 +162,7 @@ func (s *Store) SetAIOConfigAndSecrets(ctx context.Context, c model.AIOConfig, e
 		}
 	}
 	if SoftwareSelectionKey(old) != SoftwareSelectionKey(c) {
-		if err = prepareSoftwareImport(ctx, tx, c); err != nil {
+		if err = prepareSoftwareImport(ctx, tx, c, !old.SoftwareIncludeNVD && c.SoftwareIncludeNVD); err != nil {
 			return err
 		}
 	}

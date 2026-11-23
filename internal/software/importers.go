@@ -151,8 +151,8 @@ func ParseNVDMeta(r io.Reader) (NVDMeta, error) {
 	if err := scanner.Err(); err != nil {
 		return NVDMeta{}, err
 	}
-	if meta.LastModifiedRaw == "" && meta.SHA256 == "" {
-		return NVDMeta{}, errors.New("nvd meta file missing lastModifiedDate and sha256")
+	if meta.SHA256 == "" {
+		return NVDMeta{}, errors.New("nvd meta file is missing a valid sha256")
 	}
 	return meta, nil
 }
@@ -228,7 +228,7 @@ type nvdAggregate struct {
 	hasEnglishTitle bool
 }
 
-func (a *nvdAggregate) absorb(c CPE23, p nvdCPEPayload) {
+func (a *nvdAggregate) absorb(c CPE23, p nvdCPEPayload, modified time.Time) {
 	var refs []string
 	var bestHomepage string
 	var fallbackHomepage string
@@ -293,11 +293,8 @@ func (a *nvdAggregate) absorb(c CPE23, p nvdCPEPayload) {
 	if !IsPluginOrLibrary(c, rawTitle, refs) {
 		a.hasNonPlugin = true
 	}
-	if ts, ok := parseNVDTime(p.LastModified); ok {
-		if a.entry.LastModifiedAt == nil || ts.After(*a.entry.LastModifiedAt) {
-			copyTS := ts
-			a.entry.LastModifiedAt = &copyTS
-		}
+	if !modified.IsZero() && (a.entry.LastModifiedAt == nil || modified.After(*a.entry.LastModifiedAt)) {
+		a.entry.LastModifiedAt = &modified
 	}
 }
 
@@ -399,6 +396,10 @@ func StreamNVDDump(ctx context.Context, r io.Reader, expectedSHA256 string, batc
 		if strings.HasSuffix(strings.ToLower(hdr.Name), ".json") {
 			if err := streamNVDJSONProducts(ctx, entryReader, func(p nvdCPEPayload) error {
 				stats.ProductsProcessed++
+				modified, validTime := parseNVDTime(p.LastModified)
+				if validTime && (stats.LatestModified == nil || modified.After(*stats.LatestModified)) {
+					stats.LatestModified = &modified
+				}
 				if p.Deprecated {
 					stats.SkippedDeprecated++
 					return nil
@@ -420,12 +421,8 @@ func StreamNVDDump(ctx context.Context, r io.Reader, expectedSHA256 string, batc
 					item = newNVDAggregate(c)
 					agg[key] = item
 				}
-				item.absorb(c, p)
+				item.absorb(c, p, modified)
 				lastKey = key
-				if item.entry.LastModifiedAt != nil && (stats.LatestModified == nil || item.entry.LastModifiedAt.After(*stats.LatestModified)) {
-					ts := *item.entry.LastModifiedAt
-					stats.LatestModified = &ts
-				}
 				if len(agg) > batchSize {
 					return flush(true)
 				}
@@ -460,6 +457,9 @@ func StreamNVDDump(ctx context.Context, r io.Reader, expectedSHA256 string, batc
 	if err := flush(false); err != nil {
 		return stats, err
 	}
+	if stats.EntriesEmitted == 0 {
+		return stats, errors.New("NVD CPE archive contains no usable products")
+	}
 	return stats, nil
 }
 
@@ -472,6 +472,7 @@ func streamNVDJSONProducts(ctx context.Context, r io.Reader, handle func(nvdCPEP
 	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
 		return errors.New("expected nvd json object")
 	}
+	hasProducts := false
 	for dec.More() {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -488,6 +489,10 @@ func streamNVDJSONProducts(ctx context.Context, r io.Reader, handle func(nvdCPEP
 			}
 			continue
 		}
+		if hasProducts {
+			return errors.New("duplicate NVD products array")
+		}
+		hasProducts = true
 		arrTok, err := dec.Token()
 		if err != nil {
 			return err
@@ -512,46 +517,80 @@ func streamNVDJSONProducts(ctx context.Context, r io.Reader, handle func(nvdCPEP
 			return err
 		}
 	}
-	// Consume closing '}'.
-	_, err = dec.Token()
-	return err
+	if _, err = dec.Token(); err != nil {
+		return err
+	}
+	if !hasProducts {
+		return errors.New("NVD CPE file is missing the products array")
+	}
+	return requireJSONEnd(dec)
+}
+
+func requireJSONEnd(dec *json.Decoder) error {
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return errors.New("unexpected content after JSON document")
+	}
+	return nil
 }
 
 // NVDAPIResponse captures one page from the NVD CPE 2.0 REST API.
 type NVDAPIResponse struct {
-	ResultsPerPage    int
-	StartIndex        int
-	TotalResults      int
-	Entries           []SourceEntry
-	SkippedDeprecated int
-	SkippedHardware   int
-	LatestModified    *time.Time
+	ResultsPerPage      int
+	StartIndex          int
+	TotalResults        int
+	ProductCount        int
+	Entries             []SourceEntry
+	SkippedDeprecated   int
+	SkippedHardware     int
+	LatestModified      *time.Time
+	LatestDeprecation   *time.Time
+	UndatedDeprecations bool
 }
 
 // ParseNVDAPIResponse decodes one paginated NVD CPE 2.0 REST API response and
 // aggregates active (part, vendor, product) entries.
 func ParseNVDAPIResponse(r io.Reader) (NVDAPIResponse, error) {
 	var raw struct {
-		ResultsPerPage int                 `json:"resultsPerPage"`
-		StartIndex     int                 `json:"startIndex"`
-		TotalResults   int                 `json:"totalResults"`
+		ResultsPerPage *int                `json:"resultsPerPage"`
+		StartIndex     *int                `json:"startIndex"`
+		TotalResults   *int                `json:"totalResults"`
 		Products       []nvdProductWrapper `json:"products"`
 	}
-	if err := json.NewDecoder(r).Decode(&raw); err != nil {
+	dec := json.NewDecoder(r)
+	if err := dec.Decode(&raw); err != nil {
 		return NVDAPIResponse{}, err
 	}
+	if err := requireJSONEnd(dec); err != nil {
+		return NVDAPIResponse{}, err
+	}
+	if raw.ResultsPerPage == nil || raw.StartIndex == nil || raw.TotalResults == nil || raw.Products == nil {
+		return NVDAPIResponse{}, errors.New("NVD CPE page is missing pagination or product data")
+	}
 	out := NVDAPIResponse{
-		ResultsPerPage: raw.ResultsPerPage,
-		StartIndex:     raw.StartIndex,
-		TotalResults:   raw.TotalResults,
+		ResultsPerPage: *raw.ResultsPerPage,
+		StartIndex:     *raw.StartIndex,
+		TotalResults:   *raw.TotalResults,
+		ProductCount:   len(raw.Products),
+	}
+	if out.ResultsPerPage < 0 || out.StartIndex < 0 || out.TotalResults < out.StartIndex ||
+		out.ProductCount != min(out.ResultsPerPage, out.TotalResults-out.StartIndex) ||
+		(out.StartIndex < out.TotalResults && out.ProductCount == 0) {
+		return NVDAPIResponse{}, errors.New("incomplete NVD CPE page")
 	}
 	agg := make(map[string]*nvdAggregate, len(raw.Products))
 	for _, w := range raw.Products {
+		c, ok := ParseCPE23(w.CPE.CPEName)
 		if w.CPE.Deprecated {
 			out.SkippedDeprecated++
+			if ok && c.Part != "h" {
+				if modified, ok := parseNVDTime(w.CPE.LastModified); !ok {
+					out.UndatedDeprecations = true
+				} else if out.LatestDeprecation == nil || modified.After(*out.LatestDeprecation) {
+					out.LatestDeprecation = &modified
+				}
+			}
 			continue
 		}
-		c, ok := ParseCPE23(w.CPE.CPEName)
 		if !ok {
 			continue
 		}
@@ -568,7 +607,8 @@ func ParseNVDAPIResponse(r io.Reader) (NVDAPIResponse, error) {
 			item = newNVDAggregate(c)
 			agg[key] = item
 		}
-		item.absorb(c, w.CPE)
+		modified, _ := parseNVDTime(w.CPE.LastModified)
+		item.absorb(c, w.CPE, modified)
 		if item.entry.LastModifiedAt != nil && (out.LatestModified == nil || item.entry.LastModifiedAt.After(*out.LatestModified)) {
 			ts := *item.entry.LastModifiedAt
 			out.LatestModified = &ts
@@ -859,11 +899,17 @@ func StreamWinGetArchive(ctx context.Context, r io.Reader, batchSize int, emit f
 		stats.ManifestsRead++
 		cur.addManifest(doc, pathLocale)
 	}
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		return stats, fmt.Errorf("verify WinGet gzip archive: %w", err)
+	}
 	if err := commitCurrent(); err != nil {
 		return stats, err
 	}
 	if err := flushBatch(); err != nil {
 		return stats, err
+	}
+	if stats.PackagesEmitted == 0 {
+		return stats, errors.New("WinGet archive contains no usable packages")
 	}
 	return stats, nil
 }
@@ -1043,6 +1089,12 @@ func StreamHomebrewCasks(ctx context.Context, r io.Reader, batchSize int, emit f
 	if _, err := dec.Token(); err != nil {
 		return stats, err
 	}
+	if err := requireJSONEnd(dec); err != nil {
+		return stats, err
+	}
+	if stats.CasksRead == 0 {
+		return stats, errors.New("Homebrew catalog contains no casks")
+	}
 	if err := flush(); err != nil {
 		return stats, err
 	}
@@ -1124,6 +1176,9 @@ func ParseSelfhstIcons(r io.Reader) (entries []IconEntry, skipped int64, err err
 		})
 	}
 	if _, err := dec.Token(); err != nil {
+		return nil, skipped, err
+	}
+	if err := requireJSONEnd(dec); err != nil {
 		return nil, skipped, err
 	}
 	return entries, skipped, nil

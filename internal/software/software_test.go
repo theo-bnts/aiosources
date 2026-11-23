@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -322,6 +323,42 @@ func TestMergeCatalogFiltersAndNoFalseMerges(t *testing.T) {
 	mergedNoNVD, _ := MergeCatalog(entries, nil, sel)
 	if len(mergedNoNVD) != 0 {
 		t.Fatalf("expected 0 entries when IncludeNVD=false, got %+v", mergedNoNVD)
+	}
+}
+
+func TestSoftwareCatalogDistinguishesProductsOnTheSameWebsite(t *testing.T) {
+	entries := []SourceEntry{
+		{Source: "winget", ExternalID: "Serif.AffinityDesigner", Name: "Affinity Designer", VendorNorm: "serif", ProductNorm: "affinity designer", HomepageKey: "host:affinity.serif.com"},
+		{Source: "winget", ExternalID: "Serif.AffinityPhoto", Name: "Affinity Photo", VendorNorm: "serif", ProductNorm: "affinity photo", HomepageKey: "host:affinity.serif.com"},
+		{Source: "nvd", ExternalID: "cpe:2.3:a:serif:affinity_photo", Name: "Affinity Photo", VendorNorm: "serif", ProductNorm: "affinity photo", HomepageKey: "host:affinity.serif.com"},
+	}
+	works, _ := MergeCatalog(entries, nil, DefaultImportSelection())
+	if len(works) != 2 || works[0].Info.NVDCPE != "" || works[1].Info.NVDCPE != entries[2].ExternalID {
+		t.Fatalf("the wrong product absorbed the NVD identifier: %+v", works)
+	}
+}
+
+func TestNVDRejectsIncompletePagination(t *testing.T) {
+	for _, body := range []string{
+		`{"resultsPerPage":0,"totalResults":0,"products":[]}`,
+		`{"resultsPerPage":0,"startIndex":0,"totalResults":0}`,
+		`{"resultsPerPage":10,"startIndex":0,"totalResults":10,"products":[]}`,
+		`{"resultsPerPage":10,"startIndex":11,"totalResults":10,"products":[]}`,
+		`{"resultsPerPage":0,"startIndex":0,"totalResults":0,"products":[]} trailing`,
+	} {
+		if _, err := ParseNVDAPIResponse(strings.NewReader(body)); err == nil {
+			t.Fatalf("accepted invalid paginated response: %s", body)
+		}
+	}
+	const lastPage = `{"resultsPerPage":2,"startIndex":2,"totalResults":3,"products":[{"cpe":{"cpeName":"cpe:2.3:h:example:device:*:*:*:*:*:*:*:*"}}]}`
+	page, err := ParseNVDAPIResponse(strings.NewReader(lastPage))
+	if err != nil || page.ProductCount != 1 || len(page.Entries) != 0 || page.SkippedHardware != 1 {
+		t.Fatalf("pagination should count even filtered source records: %+v, %v", page, err)
+	}
+	const deprecatedPage = `{"resultsPerPage":1,"startIndex":0,"totalResults":1,"products":[{"cpe":{"deprecated":true,"cpeName":"cpe:2.3:a:example:app:1.2:*:*:*:*:*:*:*","lastModified":"2026-11-20T12:00:00.000"}}]}`
+	page, err = ParseNVDAPIResponse(strings.NewReader(deprecatedPage))
+	if err != nil || page.LatestDeprecation == nil || page.LatestDeprecation.Format(time.RFC3339) != "2026-11-20T12:00:00Z" || len(page.Entries) != 0 {
+		t.Fatalf("deprecation must be distinguishable from a page of filtered records: %+v, %v", page, err)
 	}
 }
 

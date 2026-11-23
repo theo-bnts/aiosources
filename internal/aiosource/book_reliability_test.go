@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -143,6 +144,49 @@ func TestBookFeedFailureDoesNotBlockAlreadyQueuedDocuments(t *testing.T) {
 	after, err := s.DB.BookChangesState(ctx)
 	if err != nil || after.ProviderRetryAt != nil || after.ChangesThrough == nil || before.ChangesThrough == nil || !after.ChangesThrough.Equal(*before.ChangesThrough) {
 		t.Fatal("a feed error became a global quota or advanced freshness", before, after, err)
+	}
+}
+
+func TestBookFeedUsesDatedPagesWhenTheGlobalFeedRejectsOffsets(t *testing.T) {
+	ctx, s, conn := testService(t)
+	f := newBookAPIFixture(t, s)
+	f.mu.Lock()
+	f.rejectGlobalOffset = true
+	f.day = time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -2)
+	f.time = f.day.Add(23 * time.Hour)
+	f.rows[0].Timestamp = f.time.Format(time.RFC3339Nano)
+	s.BookExportURL = s.BookAPIURL + "/ol_dump_" + f.day.Format("2006-01-02") + ".txt.gz"
+	f.mu.Unlock()
+	if err := s.SyncBooks(ctx, "manual"); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	nextDay := f.day.AddDate(0, 0, 1)
+	rows := make([]bookAPIEvent, 0, bookChangePageSize+1+len(f.rows))
+	for i := bookChangePageSize + 1; i > 0; i-- {
+		rows = append(rows, bookAPIEvent{ID: strconv.Itoa(100 + i), Timestamp: nextDay.Add(time.Duration(i) * time.Second).Format(time.RFC3339Nano), Changes: []map[string]any{}})
+	}
+	rows[len(rows)-1].Changes = []map[string]any{{"key": "/works/OL100W", "revision": 2}}
+	f.documents["OL100W"]["revision"] = 2
+	f.documents["OL100W"]["title"] = "A Title From The Next Page"
+	f.rows = append(rows, f.rows...)
+	f.mu.Unlock()
+	if err := s.SyncBooks(ctx, "manual"); err != nil {
+		t.Fatal(err)
+	}
+	state, err := s.DB.BookChangesState(ctx)
+	if err != nil || state.AnchorID != rows[0].ID || state.NeedsDumpAfter != nil || !state.BootstrapComplete || state.AnchorAt == nil || state.ChangesThrough == nil || !state.ChangesThrough.Equal(*state.AnchorAt) {
+		t.Fatalf("the dated scan did not publish the verified anchor: %+v %v", state, err)
+	}
+	var title string
+	if err = conn.QueryRow(ctx, `SELECT display_title FROM aiosources.aio_works WHERE openlibrary_id='OL100W'`).Scan(&title); err != nil || title != "A Title From The Next Page" {
+		t.Fatalf("a change outside the first page was not applied: %q %v", title, err)
+	}
+	f.mu.Lock()
+	global, dated := f.requests["/recentchanges.json"], f.requests["/recentchanges/"+nextDay.Format("2006/01/02")+".json"]
+	f.mu.Unlock()
+	if global != 2 || dated != 2 {
+		t.Fatalf("expected a single global request per run and two overlapping pages for the next day: %d %d", global, dated)
 	}
 }
 

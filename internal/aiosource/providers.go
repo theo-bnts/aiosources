@@ -67,7 +67,11 @@ func maxTime(a, b time.Time) time.Time {
 	}
 	return b
 }
-func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path string, body io.Reader, contentType string) (payload json.RawMessage, requestErr error) {
+func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path string, body io.Reader, contentType string) (json.RawMessage, error) {
+	return p.requestData(ctx, service, key, method, path, body, contentType, nil)
+}
+
+func (p *ProviderHTTP) requestData(ctx context.Context, service, key, method, path string, body io.Reader, contentType string, validate func(json.RawMessage) error) (payload json.RawMessage, requestErr error) {
 	started, meta := time.Now(), providerResponseMetadata{}
 	defer func() { recordProviderCall(ctx, strings.Split(path, "?")[0], meta.Status, started, requestErr) }()
 	b, err := p.exchange(ctx, service, key, method, path, body, contentType, &meta)
@@ -125,18 +129,25 @@ func (p *ProviderHTTP) request(ctx context.Context, service, key, method, path s
 	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
 		return nil, ErrInvalidResponse
 	}
+	if validate != nil {
+		if err := validate(envelope.Data); err != nil {
+			return nil, err
+		}
+	}
 	return envelope.Data, nil
 }
-func (p *ProviderHTTP) ad(ctx context.Context, key, path string, form url.Values, out any) error {
-	b, err := p.request(ctx, "alldebrid", key, "POST", path, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded")
-	if err != nil {
-		return err
-	}
-	if json.Unmarshal(b, out) != nil {
-		return ErrInvalidResponse
-	}
-	return nil
+func (p *ProviderHTTP) ad(ctx context.Context, key, path string, form url.Values, out any, validate func() error) error {
+	_, err := p.requestData(ctx, "alldebrid", key, "POST", path, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", func(data json.RawMessage) error {
+		if json.Unmarshal(data, out) != nil {
+			return ErrInvalidResponse
+		}
+		return validate()
+	})
+	return err
 }
+
+const adReadyStatus = 4
+const adLastFailureStatus = 15
 
 type adMagnet struct {
 	ID     int64           `json:"id"`
@@ -153,16 +164,19 @@ func (p *ProviderHTTP) ADInventory(ctx context.Context, key string) ([]adMagnet,
 	var out struct {
 		Magnets []adMagnet `json:"magnets"`
 	}
-	if err := p.ad(ctx, key, "v4.1/magnet/status", url.Values{}, &out); err != nil {
-		return nil, err
-	}
-	if out.Magnets == nil {
-		return nil, ErrInvalidResponse
-	}
-	for _, m := range out.Magnets {
-		if !validAD(m) || m.Status == nil {
-			return nil, ErrInvalidResponse
+	err := p.ad(ctx, key, "v4.1/magnet/status", url.Values{}, &out, func() error {
+		if out.Magnets == nil {
+			return ErrInvalidResponse
 		}
+		for _, m := range out.Magnets {
+			if !validAD(m) || m.Status == nil || *m.Status < 0 || *m.Status > adLastFailureStatus {
+				return ErrInvalidResponse
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out.Magnets, nil
 }
@@ -170,24 +184,27 @@ func (p *ProviderHTTP) ADAdd(ctx context.Context, key, hash, magnet string) (adM
 	var out struct {
 		Magnets []adMagnet `json:"magnets"`
 	}
-	if err := p.ad(ctx, key, "v4/magnet/upload", url.Values{"magnets[]": {magnet}}, &out); err != nil {
-		return adMagnet{}, err
-	}
-	if len(out.Magnets) != 1 || !validAD(out.Magnets[0]) || !strings.EqualFold(out.Magnets[0].Hash, hash) {
-		return adMagnet{}, ErrInvalidResponse
-	}
-	m := out.Magnets[0]
-	if m.Ready == nil {
-		return m, ErrInvalidResponse
-	}
-	return m, nil
+	var m adMagnet
+	err := p.ad(ctx, key, "v4/magnet/upload", url.Values{"magnets[]": {magnet}}, &out, func() error {
+		if len(out.Magnets) != 1 || !validAD(out.Magnets[0]) || !strings.EqualFold(out.Magnets[0].Hash, hash) {
+			return ErrInvalidResponse
+		}
+		// Keep the verified ID on failure so callers can clean up only a
+		// transfer they actually created.
+		m = out.Magnets[0]
+		if m.Ready == nil {
+			return ErrInvalidResponse
+		}
+		return nil
+	})
+	return m, err
 }
 func existingAD(items []adMagnet, hash string) *adMagnet {
 	var found *adMagnet
 	for i := range items {
 		m := &items[i]
 		if strings.EqualFold(m.Hash, hash) {
-			if found == nil || *m.Status == 4 {
+			if found == nil || *m.Status == adReadyStatus || (*found.Status > adReadyStatus && *m.Status < adReadyStatus) {
 				found = m
 			}
 		}
@@ -244,36 +261,41 @@ func (p *ProviderHTTP) ADFiles(ctx context.Context, key string, id int64) ([]mod
 			Error json.RawMessage `json:"error"`
 		} `json:"magnets"`
 	}
-	if err := p.ad(ctx, key, "v4/magnet/files", url.Values{"id[]": {itoa64(id)}}, &out); err != nil {
-		return nil, err
-	}
-	for _, m := range out.Magnets {
-		if m.ID.String() == itoa64(id) && (len(m.Error) == 0 || string(m.Error) == "null") {
-			return flattenAD(m.Files, "", 0)
+	var files []model.AIOFile
+	err := p.ad(ctx, key, "v4/magnet/files", url.Values{"id[]": {itoa64(id)}}, &out, func() error {
+		for _, m := range out.Magnets {
+			if m.ID.String() == itoa64(id) && (len(m.Error) == 0 || string(m.Error) == "null") {
+				var err error
+				files, err = flattenAD(m.Files, "", 0)
+				return err
+			}
 		}
-	}
-	return nil, ErrInvalidResponse
+		return ErrInvalidResponse
+	})
+	return files, err
 }
 func (p *ProviderHTTP) ADDelete(ctx context.Context, key string, id int64) error {
 	var out struct {
 		Message string `json:"message"`
 	}
-	if err := p.ad(ctx, key, "v4/magnet/delete", url.Values{"id": {itoa64(id)}}, &out); err != nil {
-		return err
-	}
-	if out.Message == "" {
-		return ErrInvalidResponse
-	}
-	return nil
+	return p.ad(ctx, key, "v4/magnet/delete", url.Values{"id": {itoa64(id)}}, &out, func() error {
+		if out.Message == "" {
+			return ErrInvalidResponse
+		}
+		return nil
+	})
 }
 func (p *ProviderHTTP) ADUnlock(ctx context.Context, key, link string) (string, error) {
 	var out struct {
 		Link string `json:"link"`
 	}
-	if err := p.ad(ctx, key, "v4/link/unlock", url.Values{"link": {link}}, &out); err != nil {
-		return "", err
-	}
-	return HTTPSLink(out.Link)
+	var unlocked string
+	err := p.ad(ctx, key, "v4/link/unlock", url.Values{"link": {link}}, &out, func() error {
+		var err error
+		unlocked, err = HTTPSLink(out.Link)
+		return err
+	})
+	return unlocked, err
 }
 func HTTPSLink(s string) (string, error) {
 	if len(s) > 8192 || strings.ContainsAny(s, "\r\n\x00") {

@@ -56,7 +56,7 @@ type mergeCluster struct {
 	descPriority  int
 	vendPriority  int
 	allPlugins    bool
-	tokens        map[string]struct{}
+	productNames  map[string]struct{}
 }
 
 // MergeCatalog deterministically deduplicates source entries across Microsoft
@@ -273,11 +273,7 @@ func sourceOrder(source string) int {
 }
 
 func newMergeCluster(e SourceEntry) *mergeCluster {
-	c := &mergeCluster{
-		part:       defaultPart(e.Part),
-		allPlugins: e.IsPlugin,
-		tokens:     make(map[string]struct{}),
-	}
+	c := &mergeCluster{part: defaultPart(e.Part), allPlugins: e.IsPlugin, productNames: make(map[string]struct{})}
 	c.absorb(e)
 	return c
 }
@@ -361,10 +357,8 @@ func (c *mergeCluster) absorb(e SourceEntry) {
 		if !slices.Contains(c.aliases, a) && len(c.aliases) < 32 {
 			c.aliases = append(c.aliases, a)
 		}
-		for _, tok := range strings.Fields(Normalize(a)) {
-			if len(tok) >= 2 {
-				c.tokens[tok] = struct{}{}
-			}
+		if name := Normalize(a); name != "" {
+			c.productNames[name] = struct{}{}
 		}
 	}
 	addAlias(e.Name)
@@ -372,11 +366,7 @@ func (c *mergeCluster) absorb(e SourceEntry) {
 		addAlias(a)
 	}
 	if e.ProductNorm != "" {
-		for _, tok := range strings.Fields(e.ProductNorm) {
-			if len(tok) >= 2 {
-				c.tokens[tok] = struct{}{}
-			}
-		}
+		c.productNames[e.ProductNorm] = struct{}{}
 	}
 }
 
@@ -415,7 +405,7 @@ func findMergeTarget(
 			if cand.part != entryPart || hasSameSourceConflict(cand, e.Source) {
 				continue
 			}
-			if isRepo || compatibleHomepageCandidate(cand, e) {
+			if isRepo || namesOverlap(cand, e) {
 				return cand
 			}
 		}
@@ -477,42 +467,17 @@ func hasSameSourceConflict(c *mergeCluster, source string) bool {
 	}
 }
 
-func compatibleHomepageCandidate(c *mergeCluster, e SourceEntry) bool {
-	if c.vendorNorm != "" && e.VendorNorm != "" && c.vendorNorm != e.VendorNorm {
-		// Different explicit vendors can still share a single-product domain when
-		// one is an alias or organization rename, provided product names overlap.
-		if !namesOverlap(c, e) {
-			return false
-		}
-	}
-	return namesOverlap(c, e)
-}
-
 func namesOverlap(c *mergeCluster, e SourceEntry) bool {
-	en := Normalize(e.Name)
-	cn := Normalize(c.name)
-	if en != "" && cn != "" && (en == cn || strings.Contains(cn, en) || strings.Contains(en, cn)) {
+	// A publisher's domain and one shared token can describe several products.
+	if _, ok := c.productNames[Normalize(e.Name)]; ok {
 		return true
 	}
-	if c.productNorm != "" && e.ProductNorm != "" && (c.productNorm == e.ProductNorm || strings.Contains(c.productNorm, e.ProductNorm) || strings.Contains(e.ProductNorm, c.productNorm)) {
+	if _, ok := c.productNames[e.ProductNorm]; ok {
 		return true
-	}
-	for _, tok := range strings.Fields(en) {
-		if len(tok) < 3 {
-			continue
-		}
-		if _, ok := c.tokens[tok]; ok {
-			return true
-		}
 	}
 	for _, alias := range e.Aliases {
-		for _, tok := range strings.Fields(Normalize(alias)) {
-			if len(tok) < 3 {
-				continue
-			}
-			if _, ok := c.tokens[tok]; ok {
-				return true
-			}
+		if _, ok := c.productNames[Normalize(alias)]; ok {
+			return true
 		}
 	}
 	return false

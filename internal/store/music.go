@@ -51,12 +51,12 @@ func (s *Store) NextMusicUpdate(ctx context.Context, minutes int, live bool) (ti
 		return time.Time{}, model.ErrInvalid
 	}
 	var next time.Time
-	// Without a Live Data Feed token, fullexport snapshots publish twice weekly;
-	// still honor the configured polling interval for checking LATEST.
+	// An export-only catalog follows the bulk polling interval until it has
+	// both a Live Data Feed token and a published replication sequence.
 	err := s.pool.QueryRow(ctx, `SELECT GREATEST(COALESCE(retry_at,to_timestamp(0)),
  CASE WHEN NOT complete THEN now()
-      WHEN needs_export THEN COALESCE(checked_at+interval '6 hours',now())
-      WHEN $2 THEN COALESCE(GREATEST(last_sync,checked_at)+make_interval(mins=>$1),now())
+      WHEN needs_export THEN COALESCE(retry_at,now())
+      WHEN $2 AND replication_sequence>0 THEN COALESCE(GREATEST(last_sync,checked_at)+make_interval(mins=>$1),now())
       ELSE COALESCE(GREATEST(last_sync,checked_at)+make_interval(mins=>GREATEST($1,360)),now())
  END) FROM aiosources.mb_state WHERE singleton`, minutes, live).Scan(&next)
 	return next, databaseError("read music update schedule", err)
@@ -72,33 +72,27 @@ func (s *Store) MusicDue(ctx context.Context, minutes int, live bool) (bool, err
 
 func prepareMusicImport(ctx context.Context, tx pgx.Tx, c model.AIOConfig) error {
 	key := MusicSelectionKey(c)
-	_, err := tx.Exec(ctx, `UPDATE aiosources.mb_state SET selection=$1,complete=CASE WHEN selection<>'' AND selection<>$1 THEN FALSE ELSE complete END,
- phase=CASE WHEN selection<>'' AND selection<>$1 THEN 'idle' ELSE phase END,
+	_, err := tx.Exec(ctx, `UPDATE aiosources.mb_state SET selection=$1,complete=FALSE,
  retry_at=NULL,error='' WHERE singleton`, key)
 	return databaseError("prepare music catalog filters", err)
 }
 
-func (s *Store) PrepareMusicImport(ctx context.Context, c model.AIOConfig) error {
-	key := MusicSelectionKey(c)
-	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.mb_state SET selection=$1,complete=CASE WHEN selection<>'' AND selection<>$1 THEN FALSE ELSE complete END WHERE singleton`, key)
-	return databaseError("prepare music catalog filters", err)
-}
-
 func (s *Store) TouchMusicCheck(ctx context.Context) error {
-	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.mb_state SET checked_at=now(),error='',retry_at=NULL WHERE singleton`)
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.mb_state SET phase='idle',checked_at=now(),error='',retry_at=NULL WHERE singleton`)
 	return databaseError("record music check time", err)
 }
 
-func (s *Store) BeginMusicDump(ctx context.Context, snapshot string, snapshotAt *time.Time, selectionKey, recoveryReason string) (int64, error) {
+func (s *Store) BeginMusicDump(ctx context.Context, sel music.ImportSelection, recoveryReason string) (int64, error) {
 	var gen int64
 	phase := "dump"
 	if recoveryReason != "" {
 		phase = "recovery"
 	}
-	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.mb_state SET generation=generation+1,phase=$1,selection=$2,
- snapshot=$3,snapshot_at=$4,imported=0,position=0,filtered=0,skipped=0,
- recovery_reason=$5,schema_unsupported=FALSE,error='',retry_at=NULL,checked_at=now()
- WHERE singleton RETURNING generation`, phase, selectionKey, snapshot, snapshotAt, recoveryReason).Scan(&gen)
+	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.mb_state SET generation=generation+1,phase=$1,
+ complete=complete AND (selection='' OR selection=$2),selection=$2,
+ imported=0,position=0,filtered=0,skipped=0,needs_export=TRUE,
+ recovery_reason=$3,schema_unsupported=FALSE,error='',retry_at=NULL,checked_at=now()
+ WHERE singleton RETURNING generation`, phase, sel.Key(), recoveryReason).Scan(&gen)
 	return gen, databaseError("begin music catalog import", err)
 }
 
@@ -156,8 +150,9 @@ func (s *Store) SaveMusicDumpBatch(ctx context.Context, generation int64, b musi
 			r.ID, r.GID, r.ReleaseGroupID, r.Name, model.NormalizeTitle(r.Name), r.ArtistCredit, r.Status, r.LanguageID, r.Barcode, generation)
 	}
 	for _, r := range b.ReleaseDates {
-		batch.Queue(`INSERT INTO aiosources.mb_release_years(release_id,year,mb_seen) VALUES($1,$2,$3)
- ON CONFLICT(release_id,year) DO UPDATE SET mb_seen=EXCLUDED.mb_seen`, r.ReleaseID, r.Year, generation)
+		batch.Queue(`INSERT INTO aiosources.mb_release_years(release_id,year,mb_seen,occurrences) VALUES($1,$2,$3,1)
+ ON CONFLICT(release_id,year) DO UPDATE SET mb_seen=EXCLUDED.mb_seen,
+ occurrences=CASE WHEN aiosources.mb_release_years.mb_seen=EXCLUDED.mb_seen THEN aiosources.mb_release_years.occurrences+1 ELSE 1 END`, r.ReleaseID, r.Year, generation)
 	}
 	for _, r := range b.Labels {
 		batch.Queue(`INSERT INTO aiosources.mb_labels(id,gid,name,normalized,mb_seen) VALUES($1,$2,$3,$4,$5)
@@ -227,7 +222,7 @@ func (s *Store) SaveMusicDumpBatch(ctx context.Context, generation int64, b musi
 // PruneUnlinkedMusicURLs removes entity_url links whose url_id is not a kept
 // Discogs/Wikidata URL in bounded batches so mb_entity_urls stays small after
 // streaming a dump without holding a single multi-million-row transaction.
-func (s *Store) PruneUnlinkedMusicURLs(ctx context.Context) error {
+func (s *Store) pruneUnlinkedMusicURLs(ctx context.Context) error {
 	const batchSize = 50000
 	for {
 		if err := ctx.Err(); err != nil {
@@ -275,9 +270,9 @@ const projectMusicChunkSQL = `
 SELECT rg.id, rg.gid, rg.name,
  COALESCE(ac.name,''),
  COALESCE(ARRAY(SELECT DISTINCT a.name FROM aiosources.mb_artist_credit_names acn JOIN aiosources.mb_artists a ON a.id=acn.artist_id WHERE acn.artist_credit=rg.artist_credit ORDER BY a.name),'{}'::text[]),
- COALESCE(ARRAY(SELECT DISTINCT al.name FROM aiosources.mb_artist_credit_names acn JOIN aiosources.mb_aliases al ON al.entity='artist' AND al.entity_id=acn.artist_id WHERE acn.artist_credit=rg.artist_credit LIMIT 100),'{}'::text[]),
+ COALESCE(ARRAY(SELECT DISTINCT al.name FROM aiosources.mb_artist_credit_names acn JOIN aiosources.mb_aliases al ON al.entity='artist' AND al.entity_id=acn.artist_id WHERE acn.artist_credit=rg.artist_credit ORDER BY al.name LIMIT 100),'{}'::text[]),
  COALESCE(lower(pt.name),''),
- COALESCE(ARRAY(SELECT DISTINCT lower(st.name) FROM aiosources.mb_release_group_secondary_types rgs JOIN aiosources.mb_lookups st ON st.kind='release_group_secondary_type' AND st.id=rgs.secondary_type_id WHERE rgs.release_group_id=rg.id),'{}'::text[]),
+ COALESCE(ARRAY(SELECT DISTINCT lower(st.name) FROM aiosources.mb_release_group_secondary_types rgs JOIN aiosources.mb_lookups st ON st.kind='release_group_secondary_type' AND st.id=rgs.secondary_type_id WHERE rgs.release_group_id=rg.id ORDER BY lower(st.name)),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT l.name FROM aiosources.mb_releases r JOIN aiosources.mb_release_labels rl ON rl.release_id=r.id JOIN aiosources.mb_labels l ON l.id=rl.label_id WHERE r.release_group_id=rg.id ORDER BY l.name LIMIT 40),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT rl.catalog_number FROM aiosources.mb_releases r JOIN aiosources.mb_release_labels rl ON rl.release_id=r.id WHERE r.release_group_id=rg.id AND rl.catalog_number<>'' ORDER BY rl.catalog_number LIMIT 60),'{}'::text[]),
  COALESCE(ARRAY(SELECT DISTINCT r.barcode FROM aiosources.mb_releases r WHERE r.release_group_id=rg.id AND r.barcode<>'' ORDER BY r.barcode LIMIT 60),'{}'::text[]),
@@ -298,7 +293,7 @@ SELECT rg.id, rg.gid, rg.name,
   UNION ALL SELECT name FROM aiosources.mb_aliases WHERE entity='release_group' AND entity_id=rg.id
   UNION ALL SELECT name FROM aiosources.mb_releases WHERE release_group_id=rg.id
   UNION ALL SELECT al.name FROM aiosources.mb_releases r JOIN aiosources.mb_aliases al ON al.entity='release' AND al.entity_id=r.id WHERE r.release_group_id=rg.id
- ) t WHERE title<>'' LIMIT 100),'{}'::text[]),
+ ) t WHERE title<>'' ORDER BY title LIMIT 100),'{}'::text[]),
  (SELECT count(*) FROM aiosources.mb_releases r LEFT JOIN aiosources.mb_lookups rs ON rs.kind='release_status' AND rs.id=r.status WHERE r.release_group_id=rg.id AND lower(COALESCE(rs.name,''))='official')::int,
  ($1::boolean AND (
   EXISTS(SELECT 1 FROM aiosources.mb_rg_cover_art c JOIN aiosources.mb_cover_art ca ON ca.release_id=c.release_id AND ca.is_front WHERE c.release_group_id=rg.id)
@@ -357,10 +352,6 @@ func (rg projectedReleaseGroup) toWork() model.AIOWork {
 	if years == nil {
 		years = []int{}
 	}
-	titles := rg.Titles
-	if len(titles) == 0 {
-		titles = []string{rg.Name}
-	}
 	return model.AIOWork{
 		Type:         "music",
 		MusicBrainz:  rg.GID,
@@ -371,7 +362,7 @@ func (rg projectedReleaseGroup) toWork() model.AIOWork {
 		LocalizedPosters: map[string]string{},
 		PosterPath:       poster,
 		Years:            years,
-		Titles:           titles,
+		Titles:           projectedCatalogTitles(rg.Name, rg.Titles),
 		Music: model.MusicInformation{
 			ArtistCredit:   rg.ArtistCredit,
 			Artists:        rg.Artists,
@@ -422,32 +413,10 @@ func readProjectedMusicChunk(ctx context.Context, q sqlQueryer, includeCovers bo
 	return ordered, nil
 }
 
-// ProjectMusicCatalog materializes eligible MusicBrainz release groups into
-// aiosources.aio_works + aio_titles. When onlyRGIDs is nil, all release groups
-// are projected in bounded ID chunks; otherwise only the specified IDs are
-// projected (and newly ineligible or deleted ones are removed).
-func (s *Store) ProjectMusicCatalog(ctx context.Context, generation int64, sel music.ImportSelection, onlyRGIDs []int) (worksCount, filteredCount, coversCount int64, err error) {
-	if onlyRGIDs != nil {
-		if len(onlyRGIDs) == 0 {
-			return 0, 0, 0, nil
-		}
-		ordered, err := readProjectedMusicChunk(ctx, s.workerPool(), sel.IncludeCovers, onlyRGIDs)
-		if err != nil {
-			return 0, 0, 0, err
-		}
-		tx, err := s.workerPool().Begin(ctx)
-		if err != nil {
-			return 0, 0, 0, databaseError("begin music projection", err)
-		}
-		defer rollback(tx)
-		w, f, c, _, _, err := writeProjectedMusicTx(ctx, tx, generation, sel, ordered, true)
-		if err != nil {
-			return 0, 0, 0, err
-		}
-		if err = tx.Commit(ctx); err != nil {
-			return 0, 0, 0, databaseError("commit music projection", err)
-		}
-		return w, f, c, nil
+// ProjectMusicCatalog materializes the validated snapshot into searchable works.
+func (s *Store) ProjectMusicCatalog(ctx context.Context, generation int64, sel music.ImportSelection, onChunk func(int64)) (worksCount, filteredCount, coversCount int64, err error) {
+	if err = s.pruneMusicDumpRows(ctx, generation, sel.IncludeCovers); err != nil {
+		return 0, 0, 0, err
 	}
 
 	after := 0
@@ -504,6 +473,9 @@ func (s *Store) ProjectMusicCatalog(ctx context.Context, generation int64, sel m
 		worksCount += w
 		filteredCount += f
 		coversCount += c
+		if onChunk != nil {
+			onChunk(w)
+		}
 	}
 	return worksCount, filteredCount, coversCount, nil
 }
@@ -639,14 +611,8 @@ func writeProjectedMusicTx(ctx context.Context, tx pgx.Tx, generation int64, sel
 				wid := byGID[gid]
 				changedIDs = append(changedIDs, wid)
 				w := worksByGID[gid]
-				seen := map[string]bool{}
 				for _, t := range w.Titles {
-					n := model.NormalizeTitle(t)
-					if n == "" || seen[n] {
-						continue
-					}
-					seen[n] = true
-					titleRows = append(titleRows, map[string]any{"work_id": wid, "title": t, "normalized": n})
+					titleRows = append(titleRows, map[string]any{"work_id": wid, "title": t, "normalized": model.NormalizeTitle(t)})
 				}
 			}
 			if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_titles WHERE work_id=ANY($1::bigint[])`, changedIDs); err != nil {
@@ -723,14 +689,10 @@ func musicSignature(w model.AIOWork) string {
 	}
 	base := aioWorkSignature(w, aliases)
 	data, _ := json.Marshal(w.Music)
-	return base + "|" + w.PosterPath + "|" + string(data)
+	return base + "|" + w.DisplayTitle + "|" + w.PosterPath + "|" + string(data)
 }
 
-// FinishMusicDump prunes rows absent from the completed dump generation,
-// publishes fresh catalog counters and queues existing music torrents once.
-// Heavy staging deletes, torrent backfills and catalog counts run outside the
-// aio_state metadata fence so matching and API reads stay responsive.
-func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header music.DumpHeader, snapshot string, snapshotAt *time.Time, includeCovers bool) error {
+func (s *Store) pruneMusicDumpRows(ctx context.Context, generation int64, includeCovers bool) error {
 	pool := s.workerPool()
 	pruneTables := []string{
 		"mb_artists", "mb_aliases", "mb_artist_credits", "mb_artist_credit_names",
@@ -760,7 +722,12 @@ func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header mu
 			}
 		}
 	}
+	return s.pruneUnlinkedMusicURLs(ctx)
+}
 
+// FinishMusicDump removes stale works and publishes the snapshot and its cursor.
+func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header music.DumpHeader, snapshot string, snapshotAt *time.Time, sel music.ImportSelection) error {
+	pool := s.workerPool()
 	// Remove stale music works in bounded short transactions so aio_state FOR UPDATE
 	// is never held across a large full-catalog cleanup.
 	const staleBatch = 1000
@@ -844,21 +811,20 @@ func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header mu
 	if err := pool.QueryRow(ctx, `SELECT complete FROM aiosources.mb_state WHERE singleton`).Scan(&wasComplete); err != nil {
 		return databaseError("read music completion state", err)
 	}
-	backfill, err := pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('musicbrainz.matching.v1','1') ON CONFLICT DO NOTHING`)
-	if err != nil {
-		return databaseError("record music matching backfill", err)
-	}
-	if !wasComplete || backfill.RowsAffected() == 1 {
-		if _, err = pool.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
+	_, err := pool.Exec(ctx, `WITH backfill AS (
+ INSERT INTO aiosources.settings(key,value) VALUES('musicbrainz.matching.v1','1') ON CONFLICT DO NOTHING RETURNING 1
+)
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
  SELECT t.provider_id,t.source_id FROM aiosources.torrents t
- WHERE lower(COALESCE(t.fields->>'media_type',t.fields->>'type','')) IN ('music','audio','album','flac','mp3','lossless')
+ WHERE (NOT $1::boolean OR EXISTS(SELECT 1 FROM backfill)) AND (
+  lower(COALESCE(t.fields->>'media_type',t.fields->>'type','')) IN ('music','audio','album','flac','mp3','lossless')
   OR t.fields ?| ARRAY['musicbrainz','musicbrainz_id','mbid','musicbrainz_release_group_id','discogs','discogs_id','discogs_master_id','barcode','upc','ean','catalog_number','catno','artist','album']
   OR COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m(3000|3010|3040|3050|3060)\M'
   OR concat_ws(' ',t.fields->>'category_name',t.fields->>'subcategory_name') ~* '(musi[cq]|flac|lossless|albums?|mp3)'
   OR t.fields->>'title' ~* '\m(FLAC|ALAC|LOSSLESS|MP3|320\s?kbps|24bit|16bit|SACD|DSD|WEB-FLAC)\M'
- ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`); err != nil {
-			return databaseError("queue music torrents for matching", err)
-		}
+	 ) ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, wasComplete)
+	if err != nil {
+		return databaseError("queue music torrents for matching", err)
 	}
 
 	changesThrough := snapshotAt
@@ -866,7 +832,7 @@ func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header mu
 		ts := header.Timestamp
 		changesThrough = &ts
 	}
-	_, err = pool.Exec(ctx, `UPDATE aiosources.mb_state SET
+	tag, err := pool.Exec(ctx, `UPDATE aiosources.mb_state SET
  complete=TRUE,
  phase='idle',
  works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='music' AND musicbrainz_id<>''),
@@ -876,19 +842,25 @@ func (s *Store) FinishMusicDump(ctx context.Context, generation int64, header mu
  covers=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='music' AND musicbrainz_id<>'' AND poster_path<>''),
  snapshot=$1,
  snapshot_at=$2,
- replication_sequence=CASE WHEN $3>0 THEN $3 ELSE replication_sequence END,
- schema_sequence=CASE WHEN $4>0 THEN $4 ELSE schema_sequence END,
+ replication_sequence=$3,
+ schema_sequence=$4,
  last_import=now(),
  last_sync=now(),
  changes_through=COALESCE($5,now()),
- last_packet_at=COALESCE($5,now()),
+ last_packet_at=NULL,
  needs_export=FALSE,
  recovery_reason='',
  schema_unsupported=FALSE,
  retry_at=NULL,
  error=''
- WHERE singleton`, snapshot, snapshotAt, header.ReplicationSequence, header.SchemaSequence, changesThrough)
-	return databaseError("complete music catalog import", err)
+ WHERE singleton AND selection=$6 AND generation=$7`, snapshot, snapshotAt, header.ReplicationSequence, header.SchemaSequence, changesThrough, sel.Key(), generation)
+	if err != nil {
+		return databaseError("complete music catalog import", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return model.ErrConflict
+	}
+	return nil
 }
 
 type musicReplicationDelta struct {
@@ -910,11 +882,15 @@ func (s *Store) ApplyMusicReplicationPacket(ctx context.Context, packet music.Re
 	defer rollback(tx)
 
 	var currentSeq, gen int64
-	if err = tx.QueryRow(ctx, `SELECT replication_sequence,generation FROM aiosources.mb_state WHERE singleton FOR UPDATE`).Scan(&currentSeq, &gen); err != nil {
+	var needsExport bool
+	if err = tx.QueryRow(ctx, `SELECT replication_sequence,generation,needs_export FROM aiosources.mb_state WHERE singleton FOR UPDATE`).Scan(&currentSeq, &gen, &needsExport); err != nil {
 		return 0, err
 	}
 	if packet.ReplicationSequence <= currentSeq {
 		return 0, tx.Commit(ctx)
+	}
+	if needsExport || packet.ReplicationSequence != currentSeq+1 {
+		return 0, model.ErrConflict
 	}
 
 	affectedRGs := map[int]bool{}
@@ -1291,24 +1267,7 @@ func applyReplicationChangeTx(
 		return err
 
 	case "musicbrainz.release_country", "musicbrainz.release_unknown_country":
-		relID, ok := music.JSONInt(row, "release")
-		if !ok {
-			return nil
-		}
-		affectedReleases[relID] = true
-		if oldYear, okOld := music.JSONInt(ch.OldData, "date_year"); okOld && oldYear >= 1850 && oldYear <= 2200 && ch.Op != "i" {
-			if _, err := tx.Exec(ctx, `DELETE FROM aiosources.mb_release_years WHERE release_id=$1 AND year=$2`, relID, oldYear); err != nil {
-				return err
-			}
-		}
-		if ch.Op != "d" {
-			if year, okYear := music.JSONInt(ch.NewData, "date_year"); okYear && year >= 1850 && year <= 2200 {
-				if _, err := tx.Exec(ctx, `INSERT INTO aiosources.mb_release_years(release_id,year,mb_seen) VALUES($1,$2,$3) ON CONFLICT(release_id,year) DO UPDATE SET mb_seen=EXCLUDED.mb_seen`, relID, year, gen); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		return applyMusicReleaseDate(ctx, tx, gen, ch, affectedReleases)
 
 	case "musicbrainz.label":
 		id, ok := music.JSONInt(row, "id")
@@ -1421,7 +1380,8 @@ func applyReplicationChangeTx(
 			return err
 		}
 		if !exists {
-			return nil
+			_, err := tx.Exec(ctx, `DELETE FROM aiosources.mb_entity_urls WHERE entity=$1 AND link_id=$2`, entity, linkID)
+			return err
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO aiosources.mb_entity_urls(entity,link_id,entity_id,url_id,mb_seen) VALUES($1,$2,$3,$4,$5)
  ON CONFLICT(entity,link_id) DO UPDATE SET entity_id=EXCLUDED.entity_id,url_id=EXCLUDED.url_id,mb_seen=EXCLUDED.mb_seen`, entity, linkID, entityID, urlID, gen)
@@ -1489,6 +1449,34 @@ func applyReplicationChangeTx(
 		}
 		_, err := tx.Exec(ctx, `INSERT INTO aiosources.mb_rg_cover_art(release_group_id,release_id,mb_seen) VALUES($1,$2,$3)
  ON CONFLICT(release_group_id) DO UPDATE SET release_id=EXCLUDED.release_id,mb_seen=EXCLUDED.mb_seen`, rgID, relID, gen)
+		return err
+	}
+	return nil
+}
+
+func applyMusicReleaseDate(ctx context.Context, tx pgx.Tx, gen int64, ch music.ReplicationChange, affectedReleases map[int]bool) error {
+	oldRelease, _ := music.JSONInt(ch.OldData, "release")
+	newRelease, _ := music.JSONInt(ch.NewData, "release")
+	oldYear, _ := music.JSONInt(ch.OldData, "date_year")
+	newYear, _ := music.JSONInt(ch.NewData, "date_year")
+	if oldRelease == newRelease && oldYear == newYear {
+		return nil
+	}
+	if oldRelease > 0 && oldYear >= 1850 && oldYear <= 2200 {
+		affectedReleases[oldRelease] = true
+		// Older imports kept one row regardless of how many countries shared a
+		// date. Their unknown counts are recovered by the next full snapshot.
+		if _, err := tx.Exec(ctx, `DELETE FROM aiosources.mb_release_years WHERE release_id=$1 AND year=$2 AND occurrences=1`, oldRelease, oldYear); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE aiosources.mb_release_years SET occurrences=occurrences-1 WHERE release_id=$1 AND year=$2 AND occurrences>1`, oldRelease, oldYear); err != nil {
+			return err
+		}
+	}
+	if newRelease > 0 && newYear >= 1850 && newYear <= 2200 {
+		affectedReleases[newRelease] = true
+		_, err := tx.Exec(ctx, `INSERT INTO aiosources.mb_release_years(release_id,year,mb_seen,occurrences) VALUES($1,$2,$3,1)
+ ON CONFLICT(release_id,year) DO UPDATE SET occurrences=aiosources.mb_release_years.occurrences+1,mb_seen=EXCLUDED.mb_seen`, newRelease, newYear, gen)
 		return err
 	}
 	return nil

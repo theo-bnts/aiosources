@@ -22,9 +22,12 @@ import (
 const bookChangePageSize = 1000
 const bookChangeMaxOffset = 10000
 const bookChangeOverlap = 25
+const bookChangePageStride = bookChangePageSize - bookChangeOverlap
+const bookChangeMaxPages = 1 + (bookChangeMaxOffset+bookChangePageStride-1)/bookChangePageStride
 
 var errBookContinuity = errors.New("Open Library change continuity could not be verified")
 var errBookRequest = errors.New("Open Library information could not be retrieved")
+var errBookDetailsBudget = errors.New("Open Library document processing exceeded its time limit without settling a record")
 
 func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error) {
 	if trigger != "manual" && trigger != "automatic" {
@@ -91,12 +94,14 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 	if err != nil {
 		return err
 	}
-	feedErr := s.collectBookTailIfDue(ctx, h, c.OpenLibraryMinutes, trigger == "manual")
+	feedRetry := s.bookSyncRetryDelay(ctx, attempt)
+	h.checkpoint(ctx, "book_changes")
+	feedErr := s.collectBookTailIfDue(ctx, h, c.OpenLibraryMinutes, trigger == "manual", feedRetry)
 	var retry *bookRequestFailure
 	if errors.As(feedErr, &retry) {
 		return feedErr
 	}
-	stop := s.keepBookTail(ctx, h, c.OpenLibraryMinutes)
+	stop := s.keepBookTail(ctx, h, c.OpenLibraryMinutes, feedRetry)
 	defer stop()
 	state, err := s.DB.OpenLibraryStatus(ctx)
 	if err != nil {
@@ -144,17 +149,20 @@ func (s *Service) SyncBooks(ctx context.Context, trigger string) (syncErr error)
 		return err
 	}
 	stop()
-	if feedErr != nil {
-		return feedErr
-	}
 	changes, err = s.DB.BookChangesState(ctx)
 	if err != nil {
 		return err
+	}
+	if feedErr != nil && (changes.CheckedAt == nil || changes.Error != "" ||
+		(priorChanges.CheckedAt != nil && !changes.CheckedAt.After(*priorChanges.CheckedAt))) {
+		h.checkpoint(ctx, "book_changes")
+		return feedErr
 	}
 	if changes.ProviderRetryAt != nil && changes.ProviderRetryAt.After(time.Now()) {
 		return &bookRequestFailure{retryAt: *changes.ProviderRetryAt}
 	}
 	if changes.Error != "" {
+		h.checkpoint(ctx, "book_changes")
 		return errBookRequest
 	}
 	return s.DB.FinishBookChanges(ctx)
@@ -249,22 +257,7 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 	if response != nil {
 		status = response.StatusCode
 	}
-	code := ""
-	if err != nil {
-		code = "provider_error"
-		if errors.Is(err, context.DeadlineExceeded) {
-			code = "timeout"
-		}
-	} else if status == 429 {
-		code = "rate_limit"
-	} else if status >= 500 {
-		code = "provider_unavailable"
-	} else if status == 404 {
-		code = "not_found"
-	} else if status >= 400 {
-		code = "provider_error"
-	}
-	_ = s.DB.RecordProviderCall(ctx, h.run.ID, step, status, time.Since(started).Milliseconds(), code)
+	defer func() { recordCatalogProviderCall(ctx, requestCtx, h, step, status, started, err) }()
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, status, "", ctx.Err()
@@ -282,18 +275,25 @@ func (s *Service) bookGETOnce(ctx context.Context, h *operationHistory, path, st
 		return nil, status, "", errBookRequest
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
-	if err != nil || len(body) > 8<<20 {
+	if len(body) > 8<<20 {
+		err = ErrInvalidResponse
+	}
+	if err != nil {
 		return nil, status, "", errBookRequest
 	}
 	return body, status, "", nil
 }
 
 func (s *Service) bookChangePage(ctx context.Context, h *operationHistory, path string, offset int) ([]books.Change, error) {
-	body, status, _, err := s.bookGET(ctx, h, path+"?limit="+strconv.Itoa(bookChangePageSize)+"&offset="+strconv.Itoa(offset), "book_changes")
+	query := path + "?limit=" + strconv.Itoa(bookChangePageSize)
+	if offset > 0 {
+		query += "&offset=" + strconv.Itoa(offset)
+	}
+	body, status, _, err := s.bookGET(ctx, h, query, "book_changes")
 	if err != nil {
 		return nil, err
 	}
-	if status != 200 {
+	if status != http.StatusOK {
 		return nil, errBookRequest
 	}
 	return books.DecodeChanges(body, time.Now().UTC())
@@ -366,44 +366,80 @@ func (s *Service) collectBookTail(ctx context.Context, h *operationHistory) erro
 		}
 		return s.DB.AdvanceBookAnchor(ctx, "", head)
 	}
-	previous := []books.Change(nil)
-	for offset := 0; ; {
-		if !bookPageOverlaps(previous, page) {
-			return s.DB.RestartBookAnchor(ctx, state.AnchorID, head)
-		}
-		boundary := -1
-		for i, row := range page {
-			if row.ID == state.AnchorID {
-				if state.AnchorAt == nil || !row.At.Equal(*state.AnchorAt) {
-					return errBookContinuity
-				}
-				boundary = i
-				break
-			}
-		}
-		newRows := page
-		if boundary >= 0 {
-			newRows = page[:boundary]
-		}
-		if err = s.queueBookPage(ctx, newRows); err != nil {
-			return err
-		}
-		if boundary >= 0 {
-			return s.DB.AdvanceBookAnchor(ctx, state.AnchorID, head)
-		}
-		if len(page) < bookChangePageSize || offset == bookChangeMaxOffset {
-			return s.DB.RestartBookAnchor(ctx, state.AnchorID, head)
-		}
-		previous = page
-		offset = min(offset+bookChangePageSize-bookChangeOverlap, bookChangeMaxOffset)
-		page, err = s.bookChangePage(ctx, h, "/recentchanges.json", offset)
+	reached, err := s.queueBookTailPage(ctx, state, page)
+	if err != nil {
+		return err
+	}
+	if !reached && len(page) == bookChangePageSize {
+		// The global feed rejects an explicit offset. Its dated feeds support
+		// pagination, with the last global event tying the two scans together.
+		reached, err = s.collectBookTailDays(ctx, h, state, page[len(page)-1])
 		if err != nil {
 			return err
 		}
 	}
+	if !reached {
+		return s.DB.RestartBookAnchor(ctx, state.AnchorID, head)
+	}
+	return s.DB.AdvanceBookAnchor(ctx, state.AnchorID, head)
 }
 
-func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory, minutes int, force bool) error {
+func (s *Service) queueBookTailPage(ctx context.Context, state store.BookChangesState, page []books.Change) (bool, error) {
+	for i, row := range page {
+		if row.ID == state.AnchorID {
+			if state.AnchorAt == nil || !row.At.Equal(*state.AnchorAt) {
+				return false, errBookContinuity
+			}
+			return true, s.queueBookPage(ctx, page[:i])
+		}
+	}
+	return false, s.queueBookPage(ctx, page)
+}
+
+func (s *Service) collectBookTailDays(ctx context.Context, h *operationHistory, state store.BookChangesState, covered books.Change) (bool, error) {
+	if state.AnchorAt == nil {
+		return false, errBookContinuity
+	}
+	anchorDay := state.AnchorAt.UTC().Truncate(24 * time.Hour)
+	coveredDay := covered.At.UTC().Truncate(24 * time.Hour)
+	coveredFound, reached := false, false
+	pagesLeft := bookChangeMaxPages
+	for day := coveredDay; !day.Before(anchorDay); day = day.AddDate(0, 0, -1) {
+		complete, err := s.walkBookChangeDay(ctx, h, day, func(page []books.Change) (bool, error) {
+			pagesLeft--
+			if !coveredFound {
+				for _, row := range page {
+					if row.ID != covered.ID {
+						continue
+					}
+					if !row.At.Equal(covered.At) {
+						return false, errBookContinuity
+					}
+					coveredFound = true
+					break
+				}
+			}
+			if day.Equal(coveredDay) {
+				// Keep ties at the boundary, since the two feeds may order
+				// equal timestamps differently.
+				start := sort.Search(len(page), func(i int) bool { return !page[i].At.After(covered.At) })
+				page = page[start:]
+			}
+			var err error
+			reached, err = s.queueBookTailPage(ctx, state, page)
+			return reached || pagesLeft == 0, err
+		})
+		if err != nil {
+			return false, err
+		}
+		if reached || !complete || !coveredFound || pagesLeft == 0 {
+			return reached && coveredFound, nil
+		}
+	}
+	return false, nil
+}
+
+func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory, minutes int, force bool, delay time.Duration) error {
 	state, err := s.DB.BookChangesState(ctx)
 	if err != nil {
 		return err
@@ -416,7 +452,7 @@ func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory,
 		return nil
 	}
 	if err = s.collectBookTail(ctx, h); err != nil {
-		retryAt := time.Now().Add(s.bookSyncRetryDelay(ctx, 1))
+		retryAt := time.Now().Add(delay)
 		var retry *bookRequestFailure
 		if errors.As(err, &retry) {
 			retryAt = retry.retryAt
@@ -430,7 +466,7 @@ func (s *Service) collectBookTailIfDue(ctx context.Context, h *operationHistory,
 
 // Collect while the large gzip stream or a backlog is being processed. The
 // collector stores only compact jobs and never mutates the bibliographic data.
-func (s *Service) keepBookTail(ctx context.Context, h *operationHistory, minutes int) func() {
+func (s *Service) keepBookTail(ctx context.Context, h *operationHistory, minutes int, retry time.Duration) func() {
 	life, cancel := context.WithCancel(ctx)
 	var group sync.WaitGroup
 	group.Add(1)
@@ -443,7 +479,7 @@ func (s *Service) keepBookTail(ctx context.Context, h *operationHistory, minutes
 			case <-life.Done():
 				return
 			case <-ticker.C:
-				_ = s.collectBookTailIfDue(life, h, minutes, false)
+				_ = s.collectBookTailIfDue(life, h, minutes, false, retry)
 			}
 		}
 	}()
@@ -464,40 +500,56 @@ func (s *Service) catchUpBookDay(ctx context.Context, h *operationHistory) error
 		return errBookContinuity
 	}
 	day := state.BootstrapDay.UTC()
-	path := "/recentchanges/" + day.Format("2006/01/02") + ".json"
 	needsBoundary := day.Format("2006-01-02") == state.TailSince.UTC().Format("2006-01-02")
 	foundBoundary := false
-	var previous []books.Change
-	for offset := 0; ; {
-		page, err := s.bookChangePage(ctx, h, path, offset)
-		if err != nil {
-			return err
-		}
-		if !bookPageOverlaps(previous, page) {
-			return s.DB.RequireBookExport(ctx, *state.TailSince)
-		}
+	complete, err := s.walkBookChangeDay(ctx, h, day, func(page []books.Change) (bool, error) {
 		for _, change := range page {
-			if change.At.Before(day) || !change.At.Before(day.AddDate(0, 0, 1)) {
-				return books.ErrChanges
-			}
 			if change.ID == state.TailID && change.At.Equal(*state.TailSince) {
 				foundBoundary = true
 			}
 		}
-		if err = s.queueBookPage(ctx, page); err != nil {
-			return err
+		return false, s.queueBookPage(ctx, page)
+	})
+	if err != nil {
+		return err
+	}
+	if !complete || (needsBoundary && !foundBoundary) {
+		return s.DB.RequireBookExport(ctx, *state.TailSince)
+	}
+	return s.DB.AdvanceBookCatchup(ctx, day, day.AddDate(0, 0, 1))
+}
+
+// Walk a UTC day until the visitor finds its boundary or the provider
+// reaches the end. A repeated page or the offset cap leaves coverage unproven.
+func (s *Service) walkBookChangeDay(ctx context.Context, h *operationHistory, day time.Time, visit func([]books.Change) (bool, error)) (bool, error) {
+	path := "/recentchanges/" + day.Format("2006/01/02") + ".json"
+	nextDay := day.AddDate(0, 0, 1)
+	var previous []books.Change
+	for offset := 0; ; {
+		page, err := s.bookChangePage(ctx, h, path, offset)
+		if err != nil {
+			return false, err
 		}
-		if len(page) < bookChangePageSize {
-			if needsBoundary && !foundBoundary {
-				return s.DB.RequireBookExport(ctx, *state.TailSince)
+		if !bookPageOverlaps(previous, page) {
+			return false, nil
+		}
+		for _, change := range page {
+			if change.At.Before(day) || !change.At.Before(nextDay) {
+				return false, books.ErrChanges
 			}
-			return s.DB.AdvanceBookCatchup(ctx, day, day.AddDate(0, 0, 1))
+		}
+		stop, err := visit(page)
+		if err != nil {
+			return false, err
+		}
+		if stop || len(page) < bookChangePageSize {
+			return true, nil
 		}
 		if offset == bookChangeMaxOffset {
-			return s.DB.RequireBookExport(ctx, *state.TailSince)
+			return false, nil
 		}
 		previous = page
-		offset = min(offset+bookChangePageSize-bookChangeOverlap, bookChangeMaxOffset)
+		offset = min(offset+bookChangePageStride, bookChangeMaxOffset)
 	}
 }
 
@@ -578,13 +630,24 @@ func (s *Service) readBookDocuments(ctx context.Context, h *operationHistory, jo
 	return records, true, nil
 }
 
-func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) error {
+func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) (applyErr error) {
 	policy, err := s.DB.RuntimeValues(ctx, "metadata_retries")
 	if err != nil {
 		return err
 	}
 	work, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+	settled := false
+	defer func() {
+		// A bounded pass can yield after settling jobs. Hitting the limit
+		// repeatedly on the first job requires a diagnostic and backoff.
+		if ctx.Err() == nil && work.Err() == context.DeadlineExceeded && (applyErr == nil || errors.Is(applyErr, context.DeadlineExceeded)) {
+			applyErr = nil
+			if !settled {
+				applyErr = errBookDetailsBudget
+			}
+		}
+	}()
 	failures := 0
 	batchNumber := 0
 	groupedReads := true
@@ -607,6 +670,9 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 		if len(jobs) == 0 {
 			return nil
 		}
+		if h.run.Phase != "book_details" {
+			h.checkpoint(ctx, "book_details")
+		}
 		pending := jobs[:0]
 		for _, job := range jobs {
 			known, err := s.DB.AcknowledgeKnownBookChange(work, job)
@@ -618,6 +684,8 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 			}
 			if !known {
 				pending = append(pending, job)
+			} else {
+				settled = true
 			}
 		}
 		var records map[string]books.Record
@@ -654,6 +722,7 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 				if e := s.DB.DeferBookChange(ctx, job, delay); e != nil {
 					return e
 				}
+				settled = true
 				h.run.Errors++
 				failures++
 				if failures >= 3 {
@@ -669,6 +738,7 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 				if err = s.DB.ExcludeBookChange(work, job, record); err != nil {
 					return err
 				}
+				settled = true
 				h.run.Processed++
 				failures = 0
 				s.queueAutomaticMatching(ctx)
@@ -694,6 +764,7 @@ func (s *Service) applyBookChanges(ctx context.Context, h *operationHistory) err
 			if err = s.DB.ApplyBookChange(work, job, record); err != nil {
 				return err
 			}
+			settled = true
 			h.run.Processed++
 			s.queueAutomaticMatching(ctx)
 			failures = 0

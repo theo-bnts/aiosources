@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/store"
 )
 
 type operationHistory struct {
@@ -58,13 +60,27 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 				}
 			}
 			if h.run.Service == "openlibrary" {
-				h.run.Error = "Book information update failed. Saved progress is preserved."
+				h.run.Error = "Book information update failed. Saved progress is preserved." + operationStorageDetail(err)
+				switch {
+				case errors.Is(err, errBookDetailsBudget):
+					h.run.Error = errBookDetailsBudget.Error() + ". Saved progress is preserved."
+				case errors.Is(err, errBookContinuity):
+					h.run.Error = errBookContinuity.Error() + ". Saved progress is preserved."
+				case errors.Is(err, errBookRequest) && h.run.Phase == "book_changes":
+					h.run.Error = "Open Library changes could not be retrieved. Saved progress is preserved."
+				}
 			}
 			if h.run.Service == "musicbrainz" {
 				h.run.Error = "Music information update failed. Saved progress is preserved."
+				var me *musicError
+				if errors.As(err, &me) {
+					h.run.Error = me.message
+				} else if errors.Is(err, music.ErrUnsupportedSchema) {
+					h.run.Error = musicSchemaMessage
+				}
 			}
 		case "matching":
-			h.run.Error = "Torrent identification failed. Saved results and pending work are preserved."
+			h.run.Error = "Torrent identification failed. Saved results and pending work are preserved." + operationStorageDetail(err)
 		case "cache":
 			h.run.Error = "Cache verification failed. Saved availability is preserved and the check can be retried."
 		case "cleanup":
@@ -73,11 +89,34 @@ func (h *operationHistory) finish(ctx context.Context, err error) {
 			h.run.Error = "The download could not be prepared. Check the debrid service and try again."
 		}
 		var remote *ProviderError
-		if (h.run.Kind == "cache" || h.run.Kind == "cleanup" || h.run.Kind == "download") && errors.As(err, &remote) {
-			h.run.Error += " " + remote.Error()
+		if h.run.Kind == "cache" || h.run.Kind == "cleanup" || h.run.Kind == "download" {
+			switch {
+			case errors.As(err, &remote):
+				h.run.Error += " " + remote.Error()
+			case errors.Is(err, ErrInvalidResponse):
+				h.run.Error += " " + model.ProviderFailureMessage("invalid_response")
+			default:
+				h.run.Error += operationStorageDetail(err)
+			}
 		}
 	}
 	final, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	h.checkpoint(final, h.run.Phase)
+}
+
+func operationStorageDetail(err error) string {
+	var storage *store.DatabaseError
+	var state interface{ SQLState() string }
+	switch {
+	case errors.As(err, &storage):
+		return " " + storage.Error() + "."
+	case errors.As(err, &state):
+		return " Database operation failed (SQLSTATE " + state.SQLState() + ")."
+	case errors.Is(err, context.DeadlineExceeded):
+		return " The operation exceeded its time limit."
+	case errors.Is(err, model.ErrConflict):
+		return " Stored data changed while the operation was running."
+	}
+	return ""
 }

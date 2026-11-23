@@ -1,9 +1,11 @@
 package connectors
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,6 +36,56 @@ func TestConfiguredRequestTimeoutCancelsInflightResponse(t *testing.T) {
 	_, err = client.Do(ctx, Request{Method: http.MethodGet})
 	if err == nil || ctx.Err() != nil || calls.Load() != 1 {
 		t.Fatalf("configured timeout must stop the received request before the caller deadline: err=%v caller=%v requests=%d", err, ctx.Err(), calls.Load())
+	}
+}
+
+func TestCollectionRetainsAReadFailureBeforeReplayingTheGET(t *testing.T) {
+	for _, partial := range []bool{false, true} {
+		t.Run(fmt.Sprint(partial), func(t *testing.T) {
+			p := protocolProvider("http_json", "http://source.example")
+			var admissions, retained int
+			var dials atomic.Int32
+			client, err := NewClient(t.Context(), p, Environment{
+				SourceRetries: model.SourceRetryPolicy{Retries: 1, InitialSeconds: 1, MaximumSeconds: 1},
+				BeforeRequest: func(context.Context) error { admissions++; return nil },
+				TransientFailure: func(_ context.Context, r Response, retryAt time.Time, attempt int, retry bool) error {
+					retained++
+					if attempt != 1 || !retry || retryAt.IsZero() || r.ReadFailure != "network" || (partial && (r.StatusCode != http.StatusOK || string(r.Body) != "partial")) || (!partial && r.StatusCode != 0) {
+						t.Errorf("failure lost its response or retry context: %+v %d %t", r, attempt, retry)
+					}
+					return nil
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = client.Close() })
+			client.returnEveryResponse = true
+			client.transport.Proxy = nil
+			client.transport.DialContext = func(_ context.Context, _, _ string) (net.Conn, error) {
+				attempt := dials.Add(1)
+				if attempt == 1 && !partial {
+					return nil, errors.New("synthetic connection failure")
+				}
+				remote, local := net.Pipe()
+				go func() {
+					defer remote.Close()
+					if _, err := http.ReadRequest(bufio.NewReader(remote)); err != nil {
+						return
+					}
+					if attempt == 1 {
+						_, _ = fmt.Fprint(remote, "HTTP/1.1 200 OK\r\nContent-Length: 20\r\nConnection: close\r\n\r\npartial")
+					} else {
+						_, _ = fmt.Fprint(remote, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+					}
+				}()
+				return local, nil
+			}
+			result, err := client.Do(t.Context(), Request{Method: http.MethodGet})
+			if err != nil || string(result.Body) != "{}" || dials.Load() != 2 || admissions != 2 || retained != 1 {
+				t.Fatalf("the retry must archive once and pass normal admission: %+v %v %d %d %d", result, err, dials.Load(), admissions, retained)
+			}
+		})
 	}
 }
 

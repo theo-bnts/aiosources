@@ -61,14 +61,28 @@ export function musicSyncLabel(status: MusicStatus, automatic = true): string {
   if (status.running) {
     if (status.phase === 'recovery') return 'Recovering catalog'
     if (status.phase === 'covers') return 'Importing cover index'
-    if (status.phase === 'project') return 'Building music catalog'
+    if (status.phase === 'projecting') return 'Building music catalog'
+    if (status.phase === 'cleanup') return 'Pruning obsolete music entries'
     if (status.phase === 'replication') return 'Applying Live Data Feed'
     return 'Importing catalog'
   }
-  if (!status.complete) return status.position > 0 ? 'Import interrupted' : 'Not started'
+  if (status.needs_export && !status.recovery_reason) return 'Import interrupted'
   if (status.needs_export) return 'Full export recovery pending'
+  if (!status.complete) return status.position > 0 ? 'Import interrupted' : 'Not started'
   if (status.error) return 'Retry pending'
   if (!automatic) return 'Automatic updates disabled'
-  if (status.live_enabled) return 'Following Live Data Feed'
+  if (status.live_enabled && status.replication_sequence > 0) return 'Following Live Data Feed'
   return status.snapshot ? 'Following full exports' : 'Not started'
+}
+
+export function musicRecoveryMessage(status?: MusicStatus): string | undefined {
+  if (!status?.needs_export || status.running || status.schema_unsupported || status.error) return
+  if (status.recovery_reason)
+    return 'A complete MusicBrainz export is needed to continue updates. Existing music information remains available.'
+  return 'The next update will retry the unfinished MusicBrainz export.'
+}
+
+export function softwareRecoveryMessage(status?: SoftwareStatus): string | undefined {
+  if (!status?.needs_full_import || status.running) return
+  return 'The next software update will recheck its sources before updating the catalog. Existing entries remain searchable.'
 }

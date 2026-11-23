@@ -14,6 +14,10 @@ import (
 	"strings"
 )
 
+// ErrIncompleteReplication identifies a received archive that cannot
+// account for every change needed to advance the replication cursor.
+var ErrIncompleteReplication = errors.New("incomplete MusicBrainz replication packet")
+
 // ReplicationChange represents one row mutation from dbmirror2.pending_data.
 type ReplicationChange struct {
 	SeqID   int64
@@ -39,7 +43,9 @@ type ReplicationPacket struct {
 // tables when includeCovers is true).
 func ParseReplicationPacket(ctx context.Context, r io.Reader, includeCovers bool) (ReplicationPacket, error) {
 	var packet ReplicationPacket
-	tr := tar.NewReader(bzip2.NewReader(r))
+	compressed := bzip2.NewReader(r)
+	tr := tar.NewReader(compressed)
+	hasPendingData := false
 	for {
 		if err := ctx.Err(); err != nil {
 			return packet, err
@@ -95,6 +101,7 @@ func ParseReplicationPacket(ctx context.Context, r io.Reader, includeCovers bool
 			}
 			packet.DBMirrorVersion = n
 		case "mbdump/dbmirror2.pending_data", "mbdump/pending_data":
+			hasPendingData = true
 			if packet.SchemaSequence > 0 && !SupportedSchema(packet.SchemaSequence) {
 				return packet, fmt.Errorf("%w: %d", ErrUnsupportedSchema, packet.SchemaSequence)
 			}
@@ -103,11 +110,17 @@ func ParseReplicationPacket(ctx context.Context, r io.Reader, includeCovers bool
 			}
 		}
 	}
-	if packet.ReplicationSequence <= 0 || packet.SchemaSequence <= 0 {
-		return packet, errors.New("incomplete MusicBrainz replication packet")
+	if err := verifyArchiveEnd(compressed); err != nil {
+		return packet, err
+	}
+	if packet.ReplicationSequence <= 0 || packet.SchemaSequence <= 0 || !hasPendingData {
+		return packet, ErrIncompleteReplication
 	}
 	if !SupportedSchema(packet.SchemaSequence) {
 		return packet, fmt.Errorf("%w: %d", ErrUnsupportedSchema, packet.SchemaSequence)
+	}
+	if packet.Skipped > 0 {
+		return packet, fmt.Errorf("%w: unreadable changes", ErrIncompleteReplication)
 	}
 	return packet, nil
 }
@@ -191,6 +204,9 @@ func decodePendingDataLine(line string, includeCovers bool) (ReplicationChange, 
 			return ReplicationChange{}, false, false
 		}
 	}
+	if (op == "d" && len(oldData) == 0) || (op != "d" && len(newData) == 0) {
+		return ReplicationChange{}, false, false
+	}
 	return ReplicationChange{
 		SeqID:   seqID,
 		Schema:  schema,
@@ -212,7 +228,13 @@ func splitQualifiedTable(raw string) (schema, table string) {
 func decodeJSONObject(raw string, out *map[string]any) error {
 	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.UseNumber()
-	return dec.Decode(out)
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	if err := dec.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return errors.New("unexpected content after MusicBrainz replication row")
+	}
+	return nil
 }
 
 // JSONInt reads an integer column value from a dbmirror2 JSONB map.

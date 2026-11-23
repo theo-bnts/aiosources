@@ -40,7 +40,7 @@ eligible AS (
  OR EXISTS(SELECT 1 FROM aiosources.aio_release_groups g WHERE g.scope='work' AND g.scope_key=t.work_id::text)
 )
 INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
-SELECT 'work',work_id::text FROM eligible
+SELECT 'work',work_id::text FROM eligible ORDER BY work_id::text
 ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_correspondence_queue.version+1`, cleanWorks); err != nil {
 			return databaseError("queue work correspondences", err)
 		}
@@ -64,7 +64,7 @@ eligible AS (
  OR EXISTS(SELECT 1 FROM aiosources.aio_release_groups g WHERE g.scope='hash' AND g.scope_key=t.info_hash)
 )
 INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
-SELECT 'hash',info_hash FROM eligible
+SELECT 'hash',info_hash FROM eligible ORDER BY info_hash
 ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_correspondence_queue.version+1`, cleanHashes); err != nil {
 			return databaseError("queue hash correspondences", err)
 		}
@@ -78,29 +78,27 @@ func (s *Store) QueueAllReleaseCorrespondences(ctx context.Context) error {
 		return databaseError("begin correspondence queue refresh", err)
 	}
 	defer rollback(tx)
-	if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
-SELECT 'work', m.work_id::text
+	// The batch writers lock work scopes first and then hash scopes, in key
+	// order. A full refresh must use that order across all three inputs too.
+	if _, err = tx.Exec(ctx, `WITH scopes(scope,scope_key) AS (
+ SELECT 'work', m.work_id::text
 FROM aiosources.aio_matches m
 JOIN aiosources.aio_works w ON w.id=m.work_id
 WHERE m.status='matched' AND m.work_id IS NOT NULL AND w.media_type IN ('movie','tv') AND NOT w.adult
 GROUP BY m.work_id
 HAVING count(DISTINCT m.provider_id) >= 2
-ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_correspondence_queue.version+1`); err != nil {
-		return databaseError("queue multi-source works", err)
-	}
-	if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
-SELECT 'hash', t.search_info_hash
+ UNION
+ SELECT 'hash', t.search_info_hash
 FROM aiosources.torrents t
 WHERE t.search_info_hash IS NOT NULL AND length(t.search_info_hash) = 40
 GROUP BY t.search_info_hash
 HAVING count(DISTINCT t.provider_id) >= 2
+ UNION SELECT scope,scope_key FROM aiosources.aio_release_groups
+)
+INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
+SELECT scope,scope_key FROM scopes ORDER BY scope DESC,scope_key
 ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_correspondence_queue.version+1`); err != nil {
-		return databaseError("queue multi-source hashes", err)
-	}
-	if _, err = tx.Exec(ctx, `INSERT INTO aiosources.aio_release_correspondence_queue(scope,scope_key)
-SELECT DISTINCT scope, scope_key FROM aiosources.aio_release_groups
-ON CONFLICT(scope,scope_key) DO UPDATE SET version=aiosources.aio_release_correspondence_queue.version+1`); err != nil {
-		return databaseError("queue existing correspondence groups", err)
+		return databaseError("refresh correspondence queue", err)
 	}
 	return databaseError("commit correspondence queue refresh", tx.Commit(ctx))
 }

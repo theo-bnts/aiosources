@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -12,6 +13,16 @@ import (
 	"github.com/theo-bnts/aiosources/internal/store"
 	"github.com/theo-bnts/aiosources/torznab"
 )
+
+func TestTorznabAgeFiltersShareTheSameClock(t *testing.T) {
+	query, _, err := torznabQuery("t=search&minage=7&maxage=7")
+	if err != nil || query.PublishedAfter == "" || query.PublishedAfter != query.PublishedBefore {
+		t.Fatalf("equal age bounds should select the same instant: %+v, %v", query, err)
+	}
+	if _, _, err = torznabQuery("t=search&minage=8&maxage=7"); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("reversed age bounds returned %v", err)
+	}
+}
 
 func TestTorznabAuthenticationCapabilitiesAndClientRoundTrip(t *testing.T) {
 	f := sharingAPI(t, "https://owner.example.test")

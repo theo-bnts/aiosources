@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -90,6 +91,36 @@ func TestAllDebridItemAndNestedErrorsRemainDiagnosable(t *testing.T) {
 		if !errors.As(err, &failure) || failure.Code != "account_limit" || magnet.ID != 0 || len(history.calls) != 1 || history.calls[0].ErrorCode != "account_limit" {
 			t.Fatal("item error became a parse error or a successful call", err, history.calls)
 		}
+	}
+}
+
+func TestAllDebridInventoryAndValidationDiagnostics(t *testing.T) {
+	hash := strings.Repeat("a", 40)
+	p := NewProviderHTTP()
+	p.Client = &http.Client{Transport: metadataRoundTrip(func(r *http.Request) (*http.Response, error) {
+		var body string
+		switch r.URL.Path {
+		case "/v4.1/magnet/status":
+			body = fmt.Sprintf(`{"status":"success","data":{"magnets":[{"id":7,"hash":%q,"statusCode":15},{"id":8,"hash":%q,"statusCode":1}]}}`, hash, hash)
+		case "/v4/magnet/upload":
+			body = fmt.Sprintf(`{"status":"success","data":{"magnets":[{"id":9,"hash":%q}]}}`, hash)
+		default:
+			t.Fatalf("unexpected endpoint %s", r.URL.Path)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+	history := &playbackCalls{}
+	ctx := context.WithValue(t.Context(), providerHistoryKey{}, history)
+	inventory, err := p.ADInventory(ctx, "synthetic-key")
+	if selected := existingAD(inventory, hash); err != nil || len(inventory) != 2 || selected == nil || selected.ID != 8 {
+		t.Fatalf("active inventory entry must take priority over a failed transfer: %v %v", inventory, err)
+	}
+	added, err := p.ADAdd(ctx, "synthetic-key", hash, hash)
+	if !errors.Is(err, ErrInvalidResponse) || added.ID != 9 {
+		t.Fatalf("a malformed readiness response must retain the verified transfer ID: %v %v", added, err)
+	}
+	if len(history.calls) != 2 || history.calls[0].ErrorCode != "" || history.calls[1].HTTPStatus != http.StatusOK || history.calls[1].ErrorCode != "invalid_response" || !history.calls[1].Valid() {
+		t.Fatalf("invalid HTTP 200 should appear as a failed provider call: %+v", history.calls)
 	}
 }
 

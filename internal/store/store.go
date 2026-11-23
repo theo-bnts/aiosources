@@ -273,6 +273,22 @@ func newRunID() (string, error) {
 	return raw[:8] + "-" + raw[8:12] + "-" + raw[12:16] + "-" + raw[16:20] + "-" + raw[20:], nil
 }
 
+// DatabaseError carries the statement label and SQLSTATE without the driver
+// message, which can contain connection credentials or record data.
+type DatabaseError struct {
+	operation string
+	sqlState  string
+}
+
+func (e *DatabaseError) Error() string {
+	if e.sqlState != "" {
+		return fmt.Sprintf("%s failed (SQLSTATE %s)", e.operation, e.sqlState)
+	}
+	return e.operation + " failed"
+}
+
+func (e *DatabaseError) SQLState() string { return e.sqlState }
+
 func databaseError(operation string, err error) error {
 	if err == nil {
 		return nil
@@ -286,6 +302,7 @@ func databaseError(operation string, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return context.DeadlineExceeded
 	}
+	var sqlState string
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "23505" {
@@ -294,10 +311,9 @@ func databaseError(operation string, err error) error {
 			}
 			return model.ErrConflict
 		}
-		return fmt.Errorf("%s failed (SQLSTATE %s)", operation, pgErr.Code)
+		sqlState = pgErr.Code
 	}
-	// pgx errors can include connection strings and SQL values. Never expose them.
-	return fmt.Errorf("%s failed", operation)
+	return &DatabaseError{operation: operation, sqlState: sqlState}
 }
 
 func rollback(tx pgx.Tx) {

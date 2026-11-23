@@ -10,11 +10,30 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
 const syntheticGame = `{"id":101,"name":"Synthetic Odyssey","updated_at":1700000000,"first_release_date":1700000000,"cover":{"image_id":"synthetic_cover"},"alternative_names":[{"name":"Odyssée synthétique"}],"platforms":[{"id":6,"name":"PC (Microsoft Windows)","slug":"win"}],"game_type":{"type":"Main Game"}}`
+
+func TestGameUpdateCheckpointAndRetryTime(t *testing.T) {
+	now := time.Now()
+	lastSync := now.Add(-time.Minute)
+	state := model.GameStatus{LastSync: &lastSync}
+	if next := NextGameUpdate(state, 15, now); !next.Equal(now.Add(14 * time.Minute)) {
+		t.Fatalf("update interval returned %v", next)
+	}
+	state.StartedAt = &lastSync
+	if next := NextGameUpdate(state, 15, now); !next.Equal(now) {
+		t.Fatalf("an interrupted checkpoint should be due immediately: %v", next)
+	}
+	retry := now.Add(5 * time.Minute)
+	state.RetryAt = &retry
+	if next := NextGameUpdate(state, 15, now); !next.Equal(retry) {
+		t.Fatalf("an explicitly paused checkpoint should respect its retry time: %v", next)
+	}
+}
 
 func TestGamesPreserveSymbolOnlyNamesAndNestedReviewEvidence(t *testing.T) {
 	ctx, s, conn := testService(t)

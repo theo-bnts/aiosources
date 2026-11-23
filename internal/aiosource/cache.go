@@ -257,11 +257,8 @@ func (s *Service) adCheckOwned(ctx context.Context, key, hash string) (model.AIO
 		var id int64
 		owned := false
 		if existing != nil {
-			if *existing.Status < 0 || *existing.Status > 4 {
-				return ErrInvalidResponse
-			}
 			id = existing.ID
-			result.Cached = *existing.Status == 4
+			result.Cached = *existing.Status == adReadyStatus
 		} else {
 			added, e := s.Providers.ADAdd(ctx, key, hash, hash)
 			id = added.ID

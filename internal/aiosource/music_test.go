@@ -73,6 +73,26 @@ func TestTrustedMusicExportRedirectValidation(t *testing.T) {
 	}
 }
 
+func TestMusicExportMustCoverThePublishedSnapshot(t *testing.T) {
+	const published = "20261118-002230"
+	for _, tc := range []struct {
+		previous   string
+		latest     string
+		continuity bool
+		needsNewer bool
+	}{
+		{"", published, true, false},
+		{published, "20261114-002230", false, true},
+		{published, published, false, false},
+		{published, published, true, true},
+		{published, "20261121-002230", true, false},
+	} {
+		if got := musicNeedsNewerExport(tc.previous, tc.latest, tc.continuity); got != tc.needsNewer {
+			t.Errorf("published %q, latest %q, recovering continuity %v: needs newer = %v", tc.previous, tc.latest, tc.continuity, got)
+		}
+	}
+}
+
 func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.T) {
 	ctx, s, conn := testService(t)
 	rgID := "11111111-2222-3333-4444-555555555555"
@@ -126,8 +146,9 @@ func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.
 	})
 
 	badSchemaDump := buildMusicTarBZ2(t, map[string]string{"SCHEMA_SEQUENCE": "99\n"})
+	incompletePacket := buildMusicTarBZ2(t, map[string]string{"SCHEMA_SEQUENCE": "30\n", "REPLICATION_SEQUENCE": "102\n"})
 
-	var mode atomic.Int32 // 0 = initial dump + repl 101, 1 = 3-month pause recovery (snap2), 2 = unsupported schema 99 (snap3)
+	var mode atomic.Int32 // 0 = initial dump, 1 = long pause, 2 = unsupported schema, 3 = incomplete replication
 	var exportCalls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -160,6 +181,10 @@ func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.
 			}
 			_, _ = w.Write(repl101)
 		case "/replication/replication-102-v2.tar.bz2":
+			if mode.Load() == 3 {
+				_, _ = w.Write(incompletePacket)
+				return
+			}
 			w.WriteHeader(http.StatusNotFound)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -216,8 +241,18 @@ func TestMusicFullDumpCoversLiveReplicationLongPauseRecoveryAndReset(t *testing.
 		t.Fatalf("spokenword/audiobook leaked into music catalog: %d %v", spokenCount, err)
 	}
 
-	// 2. Simulate 3-month pause (changes_through = 90 days ago) -> automatic fullexport recovery.
-	if _, err = conn.Exec(ctx, `UPDATE aiosources.mb_state SET changes_through=$1,last_packet_at=$1,replication_sequence=100 WHERE singleton`, now.Add(-90*24*time.Hour)); err != nil {
+	// With no newer export, an incomplete packet must leave the last cursor in place.
+	mode.Store(3)
+	if err = s.SyncMusic(ctx, "manual"); err != nil {
+		t.Fatalf("incomplete replication did not wait for an export: %v", err)
+	}
+	st, err = s.DB.MusicStatus(ctx)
+	if err != nil || !st.NeedsExport || st.RecoveryReason != "packet_invalid" || st.ReplicationSequence != 101 || st.Snapshot != snap1 || st.RetryAt == nil {
+		t.Fatalf("incomplete replication changed the published snapshot: %+v %v", st, err)
+	}
+
+	// 2. Simulate a long pause without a pending recovery.
+	if _, err = conn.Exec(ctx, `UPDATE aiosources.mb_state SET changes_through=$1,last_packet_at=$1,replication_sequence=100,needs_export=FALSE,recovery_reason='',retry_at=NULL WHERE singleton`, now.Add(-90*24*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	mode.Store(1)

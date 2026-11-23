@@ -77,6 +77,10 @@ func TestGameDownloadChoosesArchivesWithoutPrivateAnnouncements(t *testing.T) {
 	if err != nil || selected.Status != "ready" || selected.URL != "https://files.example/game.part2.rar" {
 		t.Fatal("game file could not be downloaded", err)
 	}
+	selected, err = s.CheckOperationDownload(ctx, result.OperationID, "")
+	if err != nil || selected.Status != "ready" || selected.URL != "https://files.example/game.part2.rar" {
+		t.Fatal("reopening a download lost the saved file choice", err)
+	}
 	for _, scope := range []string{"books", "videos"} {
 		if err = s.Reset(ctx, scope); err != nil {
 			t.Fatal(err)

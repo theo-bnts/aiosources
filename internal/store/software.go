@@ -71,7 +71,7 @@ func (s *Store) NextSoftwareUpdate(ctx context.Context, minutes int) (time.Time,
 	var next time.Time
 	err := s.pool.QueryRow(ctx, `SELECT GREATEST(COALESCE(retry_at,to_timestamp(0)),
  CASE WHEN NOT complete THEN now()
-      WHEN needs_full_import THEN COALESCE(checked_at+interval '6 hours',now())
+      WHEN needs_full_import THEN COALESCE(retry_at,now())
       ELSE COALESCE(GREATEST(last_sync,checked_at)+make_interval(mins=>$1),now())
  END) FROM aiosources.sw_sync_state WHERE singleton`, minutes).Scan(&next)
 	return next, databaseError("read software update schedule", err)
@@ -85,19 +85,11 @@ func (s *Store) SoftwareDue(ctx context.Context, minutes int) (bool, error) {
 	return !next.After(time.Now()), nil
 }
 
-func prepareSoftwareImport(ctx context.Context, tx pgx.Tx, c model.AIOConfig) error {
+func prepareSoftwareImport(ctx context.Context, tx pgx.Tx, c model.AIOConfig, nvdReenabled bool) error {
 	key := SoftwareSelectionKey(c)
 	_, err := tx.Exec(ctx, `UPDATE aiosources.sw_sync_state SET selection=$1,
- complete=CASE WHEN selection<>'' AND selection<>$1 THEN FALSE ELSE complete END,
- phase=CASE WHEN selection<>'' AND selection<>$1 THEN 'idle' ELSE phase END,
- retry_at=NULL,error='' WHERE singleton`, key)
-	return databaseError("prepare software catalog filters", err)
-}
-
-func (s *Store) PrepareSoftwareImport(ctx context.Context, c model.AIOConfig) error {
-	key := SoftwareSelectionKey(c)
-	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET selection=$1,
- complete=CASE WHEN selection<>'' AND selection<>$1 THEN FALSE ELSE complete END WHERE singleton`, key)
+	 complete=FALSE,nvd_changes_through=CASE WHEN $2::boolean THEN NULL ELSE nvd_changes_through END,
+ retry_at=NULL,error='' WHERE singleton`, key, nvdReenabled)
 	return databaseError("prepare software catalog filters", err)
 }
 
@@ -117,22 +109,24 @@ func (s *Store) TouchSoftwareCheck(ctx context.Context, meta SoftwareSyncMeta) e
 	return databaseError("record software check time", err)
 }
 
-func (s *Store) BeginSoftwareSync(ctx context.Context, selectionKey, recoveryReason string) (int64, error) {
+func (s *Store) BeginSoftwareSync(ctx context.Context, sel software.ImportSelection, recoveryReason string) (int64, error) {
 	var gen int64
 	phase := "nvd_meta"
 	if recoveryReason != "" {
 		phase = "recovery"
 	}
 	err := s.workerPool().QueryRow(ctx, `UPDATE aiosources.sw_sync_state SET
- generation=generation+1,phase=$1,selection=$2,
+ generation=generation+1,phase=$1,
+ complete=complete AND (selection='' OR selection=$2),selection=$2,
  recovery_reason=$3,error='',retry_at=NULL,checked_at=now()
- WHERE singleton RETURNING generation`, phase, selectionKey, recoveryReason).Scan(&gen)
+ WHERE singleton RETURNING generation`, phase, sel.Key(), recoveryReason).Scan(&gen)
 	return gen, databaseError("begin software catalog sync", err)
 }
 
-func (s *Store) ResetSoftwareProgress(ctx context.Context) error {
-	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET imported=0,position=0,skipped=0 WHERE singleton`)
-	return databaseError("reset software sync progress", err)
+func (s *Store) BeginSoftwareStaging(ctx context.Context) error {
+	// A failed refresh can leave staged rows ahead of the published source cursors.
+	_, err := s.workerPool().Exec(ctx, `UPDATE aiosources.sw_sync_state SET imported=0,position=0,skipped=0,needs_full_import=TRUE WHERE singleton`)
+	return databaseError("begin software staging", err)
 }
 
 func (s *Store) SetSoftwarePhase(ctx context.Context, phase string) error {
@@ -151,8 +145,39 @@ func (s *Store) SaveSoftwareSourceBatch(ctx context.Context, generation int64, e
 	defer rollback(tx)
 
 	if len(entries) > 0 {
+		var nvdIDs []string
+		for _, entry := range entries {
+			if entry.Source == "nvd" {
+				nvdIDs = append(nvdIDs, entry.ExternalID)
+			}
+		}
+		latestVersions := make(map[string]string)
+		if len(nvdIDs) > 0 {
+			rows, err := tx.Query(ctx, `SELECT external_id,latest_version FROM aiosources.sw_source_entries
+ WHERE source='nvd' AND external_id=ANY($1::text[]) AND (sw_seen=$2 OR $3::boolean)`, nvdIDs, generation, incremental)
+			if err != nil {
+				return databaseError("read staged CPE versions", err)
+			}
+			for rows.Next() {
+				var id, version string
+				if err = rows.Scan(&id, &version); err != nil {
+					rows.Close()
+					return databaseError("read staged CPE version", err)
+				}
+				latestVersions[id] = version
+			}
+			if err = rows.Err(); err != nil {
+				return databaseError("read staged CPE versions", err)
+			}
+		}
 		batch := &pgx.Batch{}
 		for _, e := range entries {
+			if e.Source == "nvd" {
+				if previous := latestVersions[e.ExternalID]; software.CompareVersions(previous, e.LatestVersion) > 0 {
+					e.LatestVersion = previous
+				}
+				latestVersions[e.ExternalID] = e.LatestVersion
+			}
 			part := e.Part
 			if part != "o" {
 				part = "a"
@@ -171,10 +196,10 @@ ON CONFLICT(source,external_id) DO UPDATE SET
  vendor=CASE WHEN EXCLUDED.vendor<>'' THEN EXCLUDED.vendor ELSE aiosources.sw_source_entries.vendor END,
  vendor_norm=CASE WHEN EXCLUDED.vendor_norm<>'' THEN EXCLUDED.vendor_norm ELSE aiosources.sw_source_entries.vendor_norm END,
  product_norm=CASE WHEN EXCLUDED.product_norm<>'' THEN EXCLUDED.product_norm ELSE aiosources.sw_source_entries.product_norm END,
- description=CASE WHEN EXCLUDED.description<>'' THEN EXCLUDED.description ELSE aiosources.sw_source_entries.description END,
- license=CASE WHEN EXCLUDED.license<>'' THEN EXCLUDED.license ELSE aiosources.sw_source_entries.license END,
- latest_version=CASE WHEN EXCLUDED.latest_version<>'' THEN EXCLUDED.latest_version ELSE aiosources.sw_source_entries.latest_version END,
- homepage_key=CASE WHEN EXCLUDED.homepage_key<>'' THEN EXCLUDED.homepage_key ELSE aiosources.sw_source_entries.homepage_key END,
+ description=CASE WHEN EXCLUDED.description='' AND ($19::boolean OR aiosources.sw_source_entries.sw_seen=EXCLUDED.sw_seen) THEN aiosources.sw_source_entries.description ELSE EXCLUDED.description END,
+ license=CASE WHEN EXCLUDED.license='' AND ($19::boolean OR aiosources.sw_source_entries.sw_seen=EXCLUDED.sw_seen) THEN aiosources.sw_source_entries.license ELSE EXCLUDED.license END,
+ latest_version=EXCLUDED.latest_version,
+ homepage_key=CASE WHEN EXCLUDED.homepage_key='' AND ($19::boolean OR aiosources.sw_source_entries.sw_seen=EXCLUDED.sw_seen) THEN aiosources.sw_source_entries.homepage_key ELSE EXCLUDED.homepage_key END,
  platforms=CASE WHEN $19::boolean OR aiosources.sw_source_entries.sw_seen=EXCLUDED.sw_seen
   THEN ARRAY(SELECT DISTINCT x FROM unnest(aiosources.sw_source_entries.platforms || EXCLUDED.platforms) AS x ORDER BY x)
   ELSE EXCLUDED.platforms END,
@@ -452,10 +477,6 @@ ON CONFLICT(software_key) DO UPDATE SET
 	changed := []string{}
 	changedAliases := []string{}
 	for i, item := range chunk {
-		titles := item.Aliases
-		if len(titles) == 0 {
-			titles = []string{item.Name}
-		}
 		w := model.AIOWork{
 			Type:             "software",
 			SoftwareKey:      item.SoftwareKey,
@@ -464,7 +485,7 @@ ON CONFLICT(software_key) DO UPDATE SET
 			LocalizedPosters: map[string]string{},
 			PosterPath:       item.Info.IconRef,
 			Years:            []int{},
-			Titles:           titles,
+			Titles:           projectedCatalogTitles(item.Name, item.Aliases),
 			Software:         item.Info,
 		}
 		works[i] = w
@@ -545,14 +566,8 @@ ON CONFLICT(software_key) DO UPDATE SET
 				continue
 			}
 			wid := byKey[w.SoftwareKey]
-			seen := map[string]bool{}
 			for _, t := range w.Titles {
-				n := model.NormalizeTitle(t)
-				if n == "" || seen[n] {
-					continue
-				}
-				seen[n] = true
-				titleRows = append(titleRows, map[string]any{"work_id": wid, "title": t, "normalized": n})
+				titleRows = append(titleRows, map[string]any{"work_id": wid, "title": t, "normalized": model.NormalizeTitle(t)})
 			}
 		}
 		if len(titleRows) > 0 {
@@ -586,14 +601,14 @@ func softwareSignature(w model.AIOWork) string {
 	}
 	base := aioWorkSignature(w, aliases)
 	data, _ := json.Marshal(w.Software)
-	return base + "|" + w.PosterPath + "|" + string(data)
+	return base + "|" + w.DisplayTitle + "|" + w.PosterPath + "|" + string(data)
 }
 
 // FinishSoftwareSync swaps/prunes stale software works and catalog rows after
 // projection finishes, queues existing software torrents once, and publishes
 // fresh source checkpoints and counters without holding aio_state FOR UPDATE
 // across full scans or counts.
-func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta SoftwareSyncMeta) error {
+func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta SoftwareSyncMeta, sel software.ImportSelection) error {
 	pool := s.workerPool()
 	const staleBatch = 1000
 	for {
@@ -687,14 +702,13 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
 	if err := pool.QueryRow(ctx, `SELECT complete FROM aiosources.sw_sync_state WHERE singleton`).Scan(&wasComplete); err != nil {
 		return databaseError("read software completion state", err)
 	}
-	backfill, err := pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES('software.matching.v1','1') ON CONFLICT DO NOTHING`)
-	if err != nil {
-		return databaseError("record software matching backfill", err)
-	}
-	if !wasComplete || backfill.RowsAffected() == 1 {
-		if _, err = pool.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
+	_, err := pool.Exec(ctx, `WITH backfill AS (
+ INSERT INTO aiosources.settings(key,value) VALUES('software.matching.v1','1') ON CONFLICT DO NOTHING RETURNING 1
+)
+INSERT INTO aiosources.aio_match_queue(provider_id,source_id)
  SELECT t.provider_id,t.source_id FROM aiosources.torrents t
- WHERE NOT (COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m4050\M')
+ WHERE (NOT $1::boolean OR EXISTS(SELECT 1 FROM backfill))
+  AND NOT (COALESCE(t.fields->'categories',t.fields->'category','null')::text ~ '\m4050\M')
   AND (
    lower(COALESCE(t.fields->>'media_type',t.fields->>'type','')) IN ('software','app','application','apps','0day','iso','mac','macos','mobile','ios','android','apk')
    OR t.fields ?| ARRAY['software_key','winget_id','winget','homebrew_cask','brew_cask','nvd_cpe','cpe']
@@ -702,12 +716,12 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
    OR concat_ws(' ',t.fields->>'category_name',t.fields->>'subcategory_name') ~* '(software|logiciel|application|0day|macos|android|apk)'
    OR t.fields->>'title' ~* '\m(Win64|Win32|macOS|OSX|AppImage|DMG|APK|IPA|VST3?|AAX|Multilingual|Portable)\M'
   )
- ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`); err != nil {
-			return databaseError("queue software torrents for matching", err)
-		}
+ ON CONFLICT(provider_id,source_id) DO UPDATE SET version=aiosources.aio_match_queue.version+1`, wasComplete)
+	if err != nil {
+		return databaseError("queue software torrents for matching", err)
 	}
 
-	_, err = pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET
+	tag, err := pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET
  complete=TRUE,
  phase='idle',
  works=(SELECT count(*) FROM aiosources.aio_works WHERE media_type='software' AND software_key<>''),
@@ -720,11 +734,11 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
  nvd_snapshot_sha256=CASE WHEN $2<>'' THEN $2 ELSE nvd_snapshot_sha256 END,
  nvd_snapshot_at=COALESCE($3,nvd_snapshot_at),
  nvd_changes_through=COALESCE($4,nvd_changes_through),
- winget_etag=CASE WHEN $5<>'' THEN $5 ELSE winget_etag END,
+ winget_etag=CASE WHEN $6::timestamptz IS NOT NULL THEN $5 ELSE winget_etag END,
  winget_synced_at=COALESCE($6,winget_synced_at),
- homebrew_etag=CASE WHEN $7<>'' THEN $7 ELSE homebrew_etag END,
+ homebrew_etag=CASE WHEN $8::timestamptz IS NOT NULL THEN $7 ELSE homebrew_etag END,
  homebrew_synced_at=COALESCE($8,homebrew_synced_at),
- icons_etag=CASE WHEN $9<>'' THEN $9 ELSE icons_etag END,
+ icons_etag=CASE WHEN $10::timestamptz IS NOT NULL THEN $9 ELSE icons_etag END,
  icons_synced_at=COALESCE($10,icons_synced_at),
  last_import=CASE WHEN $11::boolean OR last_import IS NULL THEN now() ELSE last_import END,
  last_sync=now(),
@@ -733,11 +747,17 @@ func (s *Store) FinishSoftwareSync(ctx context.Context, generation int64, meta S
  retry_at=NULL,
  checked_at=now(),
  error=''
- WHERE singleton`,
+ WHERE singleton AND selection=$12 AND generation=$13`,
 		meta.NVDSnapshot, meta.NVDSnapshotSHA256, meta.NVDSnapshotAt, meta.NVDChangesThrough,
 		meta.WinGetETag, meta.WinGetSyncedAt, meta.HomebrewETag, meta.HomebrewSyncedAt,
-		meta.IconsETag, meta.IconsSyncedAt, meta.FullImport)
-	return databaseError("complete software catalog sync", err)
+		meta.IconsETag, meta.IconsSyncedAt, meta.FullImport, sel.Key(), generation)
+	if err != nil {
+		return databaseError("complete software catalog sync", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return model.ErrConflict
+	}
+	return nil
 }
 
 func (s *Store) MarkSoftwareNeedsFullImport(ctx context.Context, reason, message string, retryAt time.Time) error {

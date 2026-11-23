@@ -48,10 +48,10 @@ func TestSoftwareStagingMergeProjectionAndCandidateSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	sel := SoftwareSelection(cfg)
-	if err = db.PrepareSoftwareImport(ctx, cfg); err != nil {
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.sw_sync_state SET selection='legacy-selection',complete=TRUE WHERE singleton`); err != nil {
 		t.Fatal(err)
 	}
-	gen, err := db.BeginSoftwareSync(ctx, sel.Key(), "")
+	gen, err := db.BeginSoftwareSync(ctx, sel, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,12 +127,12 @@ func TestSoftwareStagingMergeProjectionAndCandidateSearch(t *testing.T) {
 		HomebrewSyncedAt:  &now,
 		IconsSyncedAt:     &now,
 		FullImport:        true,
-	}); err != nil {
+	}, sel); err != nil {
 		t.Fatal(err)
 	}
 
 	st, err := db.SoftwareStatus(ctx)
-	if err != nil || !st.Complete || st.Works != 1 || st.NVDEntries != 1 || st.WinGetEntries != 1 || st.HomebrewEntries != 1 || st.Icons != 1 || st.IconsIndexed != 1 {
+	if err != nil || !st.Complete || st.Selection != sel.Key() || st.Works != 1 || st.NVDEntries != 1 || st.WinGetEntries != 1 || st.HomebrewEntries != 1 || st.Icons != 1 || st.IconsIndexed != 1 {
 		t.Fatalf("unexpected software status: %+v err=%v", st, err)
 	}
 

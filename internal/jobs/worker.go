@@ -296,6 +296,9 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 	environment.TransientFailure = func(ctx context.Context, response connectors.Response, retryAt time.Time, attempt int, retry bool) (callbackErr error) {
 		defer func() { responseErr = callbackErr }()
 		message, failureCode := fmt.Sprintf("Source returned HTTP %d on attempt %d", response.StatusCode, attempt), "http"
+		if response.ReadFailure != "" {
+			message, failureCode = fmt.Sprintf("Source request could not be read on attempt %d", attempt), response.ReadFailure
+		}
 		if response.UnexpectedHTML {
 			message, failureCode = "Source returned HTML instead of JSON after a rate limit", "parse"
 		}
@@ -306,9 +309,12 @@ func (m *Manager) collect(ctx context.Context, run model.Run) (status model.RunS
 			Body: response.Body, ContentType: response.Header.Get("Content-Type"),
 			Error: message,
 			Metadata: map[string]any{
-				"failure_code": failureCode, "http_status": response.StatusCode,
+				"failure_code":  failureCode,
 				"retry_attempt": attempt, "retry": retry,
 			},
+		}
+		if response.StatusCode != 0 {
+			page.Metadata["http_status"] = response.StatusCode
 		}
 		if response.InvalidDocument {
 			page.Metadata["failure_reason"] = "html_detail_missing"

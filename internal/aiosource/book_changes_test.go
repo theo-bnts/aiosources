@@ -31,19 +31,20 @@ func (e bookAPIEvent) MarshalJSON() ([]byte, error) {
 }
 
 type bookAPIFixture struct {
-	mu             sync.Mutex
-	day, time      time.Time
-	rows           []bookAPIEvent
-	documents      map[string]map[string]any
-	dumpDocuments  map[string]map[string]any
-	documentStatus int
-	batchStatus    int
-	feedStatus     int
-	retryAfter     string
-	ignoreOffsets  bool
-	dumpCalls      int
-	brokenDumpPart string
-	requests       map[string]int
+	mu                 sync.Mutex
+	day, time          time.Time
+	rows               []bookAPIEvent
+	documents          map[string]map[string]any
+	dumpDocuments      map[string]map[string]any
+	documentStatus     int
+	batchStatus        int
+	feedStatus         int
+	rejectGlobalOffset bool
+	retryAfter         string
+	ignoreOffsets      bool
+	dumpCalls          int
+	brokenDumpPart     string
+	requests           map[string]int
 }
 
 func bookAPIRecord(id string, revision int, fields map[string]any) map[string]any {
@@ -80,6 +81,10 @@ func newBookAPIFixture(t testing.TB, s *Service) *bookAPIFixture {
 		if r.URL.Path == "/recentchanges.json" || strings.HasPrefix(r.URL.Path, "/recentchanges/") {
 			if f.feedStatus != 0 {
 				w.WriteHeader(f.feedStatus)
+				return
+			}
+			if f.rejectGlobalOffset && r.URL.Path == "/recentchanges.json" && r.URL.Query().Has("offset") {
+				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			rows := f.rows
@@ -621,7 +626,7 @@ func TestBookLiveCollectorKeepsCompactJobsWhileTheCatalogIsBusy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stop := s.keepBookTail(ctx, h, 15)
+	stop := s.keepBookTail(ctx, h, 15, s.bookSyncRetryDelay(ctx, 1))
 	defer func() {
 		stop()
 		h.finish(ctx, nil)

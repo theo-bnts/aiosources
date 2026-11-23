@@ -33,7 +33,7 @@ func (s *Service) retainHistory() {
 		cancel()
 		activity, stop := context.WithTimeout(s.ctx, 5*time.Second)
 		if err != nil && !failed {
-			slog.Warn("History cleanup will be retried")
+			slog.Warn("History cleanup will be retried" + operationStorageDetail(err))
 			_ = s.DB.RecordActivity(activity, "warn", "history.retention_failed", "", "", "", nil)
 		} else if err == nil && failed {
 			_ = s.DB.RecordActivity(activity, "info", "history.retention_recovered", "", "", "", nil)

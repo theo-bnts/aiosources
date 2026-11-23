@@ -55,7 +55,19 @@ var migrations = []struct {
 	{101, originalLanguageSchema},
 	{102, musicSchema},
 	{103, softwareSchema},
+	{104, repairCatalogSyncCheckpoints},
 }
+
+// Older workers could advance the visible MusicBrainz snapshot before the
+// import committed, or leave changed software staging behind saved cursors.
+const repairCatalogSyncCheckpoints = `
+ALTER TABLE aiosources.mb_release_years ADD COLUMN occurrences INTEGER;
+UPDATE aiosources.mb_state SET needs_export=TRUE,recovery_reason=''
+ WHERE phase IN ('dump','covers','projecting','cleanup','recovery')
+ OR (snapshot<>'' AND (last_import IS NULL OR snapshot_at>last_import));
+UPDATE aiosources.sw_sync_state SET needs_full_import=TRUE
+ WHERE phase<>'idle' OR (error<>'' AND position>0);
+`
 
 func schemaChecksum(sql string) string {
 	sum := sha256.Sum256([]byte(sql))
