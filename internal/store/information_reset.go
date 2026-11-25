@@ -204,7 +204,11 @@ UPDATE aiosources.aio_state SET last_match=NULL;`); err != nil {
 	if err = notify(ctx, tx); err != nil {
 		return databaseError("notify information reset", err)
 	}
-	return databaseError("commit information reset", tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return databaseError("commit information reset", err)
+	}
+	s.invalidateDecisionCounts()
+	return nil
 }
 
 func selectResetInformationRecords(ctx context.Context, tx pgx.Tx, types []string) error {

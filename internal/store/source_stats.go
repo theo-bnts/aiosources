@@ -2,71 +2,87 @@ package store
 
 import (
 	"context"
+	"slices"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
-// SourceTorrentStats uses one statement snapshot for publication and matching
-// counts. Group by the shared decision predicate once, avoiding a fingerprint
-// calculation for every separate counter or a query for every source.
+// SourceTorrentStats combines shared per-source identification counts with
+// live pending-import progress from active/interrupted runs.
 // Totals cover the entire catalog, so filtering the displayed sources does not
-// change percentages. Indexed existence checks avoid a second large catalog
-// join when separating new prepared records from updates.
+// change percentages.
 func (s *Store) SourceTorrentStats(ctx context.Context, providers []string) (model.SourceTorrentOverview, error) {
 	result := model.SourceTorrentOverview{Items: []model.SourceTorrentStats{}}
 	if len(providers) == 0 {
 		return result, nil
 	}
-	rows, err := s.pool.Query(ctx, `WITH requested AS (
- SELECT DISTINCT unnest($1::text[]) AS provider_id
-), decisions AS (
- SELECT t.provider_id,`+aioDiagnosticStatus+` AS result`+aioDiagnosticSource+`
-), counts AS MATERIALIZED (
- SELECT provider_id,
-  count(*)::bigint AS total,
-  count(*) FILTER(WHERE result='matched')::bigint AS matched,
-  count(*) FILTER(WHERE result='ambiguous')::bigint AS ambiguous,
-  count(*) FILTER(WHERE result='unmatched')::bigint AS unmatched,
-  count(*) FILTER(WHERE result='pending')::bigint AS pending
- FROM decisions GROUP BY provider_id
-), latest_import AS (
+
+	counts, err := s.decisionCounts(ctx)
+	if err != nil {
+		return result, err
+	}
+
+	// Collect unique requested providers sorted identically to ORDER BY provider_id.
+	unique := make([]string, 0, len(providers))
+	seen := make(map[string]struct{}, len(providers))
+	for _, p := range providers {
+		if _, ok := seen[p]; !ok {
+			seen[p] = struct{}{}
+			unique = append(unique, p)
+		}
+	}
+	slices.Sort(unique)
+
+	pendingByProvider := map[string]*model.SourcePendingImport{}
+	rows, err := s.pool.Query(ctx, `WITH latest_import AS (
  SELECT DISTINCT ON (provider_id) provider_id,id,status FROM aiosources.runs
  WHERE mode<>'preview'
  AND (mode='full' OR (config->>'adapter' IN ('json','http_json') AND config->'http'->>'catalog'='true'))
  ORDER BY provider_id,(status IN ('queued','running')) DESC,created_at DESC,id DESC
 ), progress AS (
- SELECT r.provider_id,r.id,count(*) AS torrents,
+ SELECT r.provider_id,r.id,count(*)::bigint AS torrents,
  count(*) FILTER(WHERE EXISTS(SELECT 1 FROM aiosources.torrents published
-  WHERE published.provider_id=r.provider_id AND published.source_id=t.source_id)) AS updates FROM latest_import r
+  WHERE published.provider_id=r.provider_id AND published.source_id=t.source_id))::bigint AS updates FROM latest_import r
  JOIN aiosources.staged_torrents t ON t.run_id=r.id
  WHERE r.status IN ('queued','running','paused','failed') AND NOT t.deleted
  GROUP BY r.provider_id,r.id
 )
-SELECT requested.provider_id,COALESCE(c.total,0)::bigint,
- COALESCE(c.matched,0)::bigint,
- COALESCE(c.ambiguous,0)::bigint,
- COALESCE(c.unmatched,0)::bigint,
- COALESCE(c.pending,0)::bigint,
- p.id,COALESCE(p.torrents,0),COALESCE(p.torrents-p.updates,0),COALESCE(p.updates,0),
- COALESCE((SELECT sum(total) FROM counts),0)::bigint,
- COALESCE((SELECT sum(torrents) FROM progress),0)::bigint
-FROM requested LEFT JOIN counts c USING(provider_id) LEFT JOIN progress p USING(provider_id)
-ORDER BY requested.provider_id`, providers)
+SELECT provider_id,id,torrents,torrents-updates,updates FROM progress`)
 	if err != nil {
-		return result, databaseError("count source torrents", err)
+		return result, databaseError("count source pending imports", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var item model.SourceTorrentStats
-		var runID *string
-		var staged, newTorrents, updates int64
-		if err := rows.Scan(&item.ProviderID, &item.Imported, &item.Matched, &item.Ambiguous, &item.Unmatched, &item.Pending, &runID, &staged, &newTorrents, &updates, &result.Totals.Imported, &result.Totals.AwaitingImport); err != nil {
-			return result, databaseError("read source torrent counts", err)
+		var providerID, runID string
+		var torrents, newTorrents, updates int64
+		if err := rows.Scan(&providerID, &runID, &torrents, &newTorrents, &updates); err != nil {
+			return result, databaseError("read source pending imports", err)
 		}
-		if runID != nil {
-			item.PendingImport = &model.SourcePendingImport{RunID: *runID, Torrents: staged, New: newTorrents, Updates: updates}
+		result.Totals.AwaitingImport += torrents
+		pendingByProvider[providerID] = &model.SourcePendingImport{
+			RunID:    runID,
+			Torrents: torrents,
+			New:      newTorrents,
+			Updates:  updates,
 		}
-		result.Items = append(result.Items, item)
 	}
-	return result, databaseError("count source torrents", rows.Err())
+	if err := rows.Err(); err != nil {
+		return result, databaseError("count source pending imports", err)
+	}
+
+	result.Totals.Imported = counts.totals.total
+	result.Items = make([]model.SourceTorrentStats, 0, len(unique))
+	for _, providerID := range unique {
+		c := counts.byProvider[providerID]
+		result.Items = append(result.Items, model.SourceTorrentStats{
+			ProviderID:    providerID,
+			Imported:      c.total,
+			Matched:       c.matched,
+			Ambiguous:     c.ambiguous,
+			Unmatched:     c.unmatched,
+			Pending:       c.pending,
+			PendingImport: pendingByProvider[providerID],
+		})
+	}
+	return result, nil
 }

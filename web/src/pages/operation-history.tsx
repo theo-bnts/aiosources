@@ -13,6 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
 import { ArrowRightIcon } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { messageText, number, statusLabels, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
@@ -192,6 +193,12 @@ export function OperationHistoryPage({
         { signal },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1] === section &&
+      (!metadataSection ||
+        (previousQuery?.queryKey[2] === kind && previousQuery?.queryKey[3] === service))
+        ? previousData
+        : undefined,
   })
   function filter(key: string, value: string) {
     const next = new URLSearchParams(search)
@@ -256,7 +263,12 @@ export function OperationHistoryPage({
         <Loading />
       ) : (
         query.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              query.isPlaceholderData && query.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={query.data.total} label="operations" />
             {query.data.items?.length ? (
               <div className="table-frame">
@@ -345,7 +357,7 @@ export function OperationHistoryPage({
               busy={query.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
     </div>
@@ -385,6 +397,8 @@ export function OperationDetailPage({
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
     enabled: Boolean(run.data && targetHistory === historyPath),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1] === id ? previousData : undefined,
   })
   const result = run.data
   if (result && targetHistory !== historyPath)
@@ -498,7 +512,12 @@ export function OperationDetailPage({
                 <Loading />
               ) : (
                 events.data && (
-                  <>
+                  <div
+                    className={cn(
+                      'space-y-4 transition-opacity duration-150',
+                      events.isPlaceholderData && events.isFetching && 'opacity-70',
+                    )}
+                  >
                     <ResultCount total={events.data.total} label="events" />
                     {events.data.items?.length ? (
                       <div className="table-frame">
@@ -566,7 +585,7 @@ export function OperationDetailPage({
                       busy={events.isFetching}
                       onChange={pagination.setOffset}
                     />
-                  </>
+                  </div>
                 )
               )}
             </section>

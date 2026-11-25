@@ -37,6 +37,12 @@ func (s *Store) ListAIOMatchDiagnostics(ctx context.Context, opts model.ListOpti
 		return result, databaseError("begin identification diagnostics", err)
 	}
 	defer rollback(tx)
+	if opts.Status != "" {
+		// Prevent parallel gather hash tables from exhausting small container /dev/shm.
+		if _, err = tx.Exec(ctx, `SET LOCAL max_parallel_workers_per_gather = 0`); err != nil {
+			return result, databaseError("configure identification diagnostics parallelism", err)
+		}
+	}
 	sourceFilter, _, args, _ := torrentSearchSQL(opts)
 	selected := `SELECT occurrence_id,provider_id,source_id,fields,fields_fingerprint` + sourceFilter
 	projection := `WITH selected AS (` + selected + `), diagnostics AS (SELECT t.occurrence_id,t.provider_id,t.source_id,
@@ -53,17 +59,39 @@ ORDER BY provider_id,source_id` + fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(count
 	listArgs := append(append([]any{}, countArgs...), opts.Limit, opts.Offset)
 	selectedKeys := `SELECT provider_id,source_id,fields_fingerprint` + sourceFilter
 	if opts.Status == "ambiguous" || opts.Status == "unmatched" {
-		// Count current ambiguous/unmatched decisions without deriving every other status.
-		// Their validity depends on the source fingerprint and queue, not on a
-		// work revision. Keep the ordered listing's original plan: restricting
-		// its joins here can make PostgreSQL sort all rows before LIMIT.
-		current := fmt.Sprintf(` FROM selected t
+		simpleTorrentFilter := opts.Query == "" && opts.Category == "" && opts.InfoHash == "" && opts.MinSize == "" && opts.MaxSize == "" && opts.PublishedAfter == "" && opts.PublishedBefore == ""
+		if simpleTorrentFilter {
+			// Drive directly from aio_matches_diagnostic_status in (provider_id, source_id)
+			// order so listing/counting unmatched or ambiguous rows skips matched torrents
+			// and never touches aio_works.
+			directArgs := []any{opts.Status}
+			where := `m.status=$1`
+			if len(opts.Providers) > 0 {
+				directArgs = append(directArgs, opts.Providers)
+				where += ` AND m.provider_id=ANY($2::text[])`
+			}
+			directFrom := ` FROM aiosources.aio_matches m
+JOIN aiosources.torrents t USING(provider_id,source_id)
+LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
+WHERE ` + where + ` AND COALESCE(m.fingerprint=t.fields_fingerprint,false) AND q.provider_id IS NULL`
+			countSQL = `SELECT count(*)` + directFrom
+			countArgs = directArgs
+			listSQL = `SELECT t.occurrence_id,m.provider_id,m.source_id,COALESCE(t.fields->>'title',''),m.status,COALESCE(m.reason,''),'',m.updated_at` +
+				directFrom + fmt.Sprintf(` ORDER BY m.provider_id,m.source_id LIMIT $%d OFFSET $%d`, len(directArgs)+1, len(directArgs)+2)
+			listArgs = append(append([]any{}, directArgs...), opts.Limit, opts.Offset)
+		} else {
+			// Count current ambiguous/unmatched decisions without deriving every other status.
+			// Their validity depends on the source fingerprint and queue, not on a
+			// work revision. Keep the ordered listing's original plan: restricting
+			// its joins here can make PostgreSQL sort all rows before LIMIT.
+			current := fmt.Sprintf(` FROM selected t
 JOIN aiosources.aio_matches m USING(provider_id,source_id)
 LEFT JOIN aiosources.aio_match_queue q USING(provider_id,source_id)
 WHERE m.status=$%d AND COALESCE(m.fingerprint=t.fields_fingerprint,false) AND q.provider_id IS NULL`, len(args)+1)
-		prefix := `WITH selected AS (` + selectedKeys + `)`
-		countSQL = prefix + ` SELECT count(*)` + current
-		countArgs = append(append([]any{}, args...), opts.Status)
+			prefix := `WITH selected AS (` + selectedKeys + `)`
+			countSQL = prefix + ` SELECT count(*)` + current
+			countArgs = append(append([]any{}, args...), opts.Status)
+		}
 	}
 	if opts.Status == "matched" {
 		countSQL = `WITH selected AS (` + selectedKeys + `) SELECT count(*) FROM selected t

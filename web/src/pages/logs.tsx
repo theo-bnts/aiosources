@@ -4,8 +4,9 @@ import { FilterSelect } from '@/components/filter-select'
 import { selectionValues } from '@/lib/filter-values'
 import { ResultCount } from '@/components/common'
 import { useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useViewSearchParams } from '@/lib/detail-navigation'
+import { cn } from '@/lib/utils'
 
 import { api, params } from '@/lib/api'
 import { activityLevels, activityServices, type LogEntry } from '@/lib/activity-types'
@@ -63,6 +64,7 @@ export function LogsPage() {
   const logs = useQuery({
     queryKey: ['logs', query],
     queryFn: ({ signal }) => api<Page<LogEntry>>(`/logs?${query}`, { signal }),
+    placeholderData: keepPreviousData,
   })
   const providers = useQuery({
     queryKey: ['providers'],
@@ -219,7 +221,12 @@ export function LogsPage() {
         <Loading label="Loading logs" />
       ) : (
         logs.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              logs.isPlaceholderData && logs.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={logs.data.total} label="log entries" />
             {logs.data.items?.length ? (
               <div className="table-frame">
@@ -300,7 +307,7 @@ export function LogsPage() {
               busy={logs.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
       <Dialog

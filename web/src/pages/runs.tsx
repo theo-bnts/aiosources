@@ -23,8 +23,9 @@ import {
 } from '@/components/common'
 import { useRef } from 'react'
 import { FilterSelect } from '@/components/filter-select'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 
 import {
   api,
@@ -143,6 +144,8 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
         `/runs?${params({ source_kind: remote ? 'remote' : 'source', provider, status, offset, limit })}`,
         { signal },
       ),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1] === remote ? previousData : undefined,
   })
   const providers = useQuery({
     queryKey: ['providers'],
@@ -197,7 +200,12 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
         <Loading />
       ) : (
         runs.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              runs.isPlaceholderData && runs.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={runs.data.total} label="runs" />
             {runs.data.items?.length ? (
               <RunsTable runs={runs.data.items} remote={remote} />
@@ -221,7 +229,7 @@ export function RunsPage({ remote = false }: { remote?: boolean }) {
               busy={runs.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
     </div>
@@ -332,6 +340,7 @@ function EventsView({ runId }: { runId: string }) {
         `/runs/${encodeURIComponent(runId)}/events?${params({ limit: pageSize, offset })}`,
         { signal },
       ),
+    placeholderData: keepPreviousData,
   })
   const items = events.data?.items ?? []
   const pageCount = Math.max(1, Math.ceil((events.data?.total ?? 0) / pageSize))
@@ -353,7 +362,12 @@ function EventsView({ runId }: { runId: string }) {
       {events.isPending ? (
         <Loading />
       ) : items.length ? (
-        <div className="table-frame">
+        <div
+          className={cn(
+            'table-frame transition-opacity duration-150',
+            events.isPlaceholderData && events.isFetching && 'opacity-70',
+          )}
+        >
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
@@ -779,6 +793,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
         </TabsContent>
         <TabsContent value="raw" className="mt-5">
           <RawTableView
+            key={run.id}
             runId={run.id}
             compact={
               !(run.storage_options?.successful_records ?? run.storage_mode === 'full') &&

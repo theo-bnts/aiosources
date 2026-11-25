@@ -49,6 +49,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
+import { prefetchRoute, schedulePrimaryRoutePrefetch } from '@/lib/route-prefetch'
 import { filesPath } from '@/lib/source-navigation'
 import type { Icon } from '@phosphor-icons/react'
 
@@ -474,6 +475,9 @@ function AppNavigation({
         aria-current={activeItem === item ? 'page' : undefined}
         className={navigationLinkClassName}
         onClick={handleNavigate}
+        onMouseEnter={() => prefetchRoute(item.to)}
+        onFocus={() => prefetchRoute(item.to)}
+        onPointerDown={() => prefetchRoute(item.to)}
       >
         <item.icon size={19} aria-hidden="true" className="shrink-0" />
         {item.label}
@@ -705,6 +709,10 @@ export function AppShell({
   const storageKey = publicMode ? 'aiosources.public.navigation.groups' : navigationStorageKey
   const discard = useDiscardChanges('all')
   useLiveUpdates(!publicMode)
+  useEffect(() => {
+    if (publicMode || trustedMode) return
+    return schedulePrimaryRoutePrefetch()
+  }, [publicMode, trustedMode])
   const location = useLocation()
   let navigationPath = publicMode
     ? location.pathname === '/public/trending'

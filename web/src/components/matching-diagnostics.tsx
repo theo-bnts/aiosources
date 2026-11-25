@@ -11,7 +11,8 @@ import {
   Pager,
 } from '@/components/common'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { OccurrenceLink } from '@/lib/occurrence-navigation'
 import { api, params, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
@@ -100,6 +101,7 @@ export function MatchingDiagnostics() {
         { signal },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
+    placeholderData: keepPreviousData,
   })
   function filter(patch: Record<string, string>) {
     const next = new URLSearchParams(search)
@@ -185,7 +187,12 @@ export function MatchingDiagnostics() {
         <Loading />
       ) : (
         records.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              records.isPlaceholderData && records.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={records.data.total} label="torrents" />
             {records.data.items?.length ? (
               <>
@@ -308,7 +315,7 @@ export function MatchingDiagnostics() {
               onChange={pagination.setOffset}
               busy={records.isFetching}
             />
-          </>
+          </div>
         )
       )}
       {reviewing && (

@@ -6,7 +6,8 @@ import {
   XIcon,
 } from '@phosphor-icons/react'
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { cn } from '@/lib/utils'
 import { Disclosure } from '@/components/ui/disclosure'
 import { FilterSelect } from '@/components/filter-select'
 import { compareListNames } from '@/lib/list-view'
@@ -157,6 +158,7 @@ export function ReleaseCorrespondences() {
         { signal },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
+    placeholderData: keepPreviousData,
   })
 
   function filter(patch: Record<string, string>) {
@@ -257,7 +259,12 @@ export function ReleaseCorrespondences() {
         <Loading />
       ) : (
         groups.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              groups.isPlaceholderData && groups.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount
               total={groups.data.total}
               label="correspondence groups"
@@ -420,7 +427,7 @@ export function ReleaseCorrespondences() {
               onChange={pagination.setOffset}
               busy={groups.isFetching}
             />
-          </>
+          </div>
         )
       )}
       {inspectingId !== null && (

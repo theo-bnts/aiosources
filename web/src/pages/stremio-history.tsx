@@ -13,8 +13,9 @@ import {
   Pager,
 } from '@/components/common'
 import { useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 
 import { api, params, AUTO_REFRESH_INTERVAL, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
@@ -164,6 +165,7 @@ export function StremioHistoryPage() {
         },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
+    placeholderData: keepPreviousData,
   })
   const formRef = useRef<HTMLFormElement>(null)
   function filter(patch: Record<string, string>) {
@@ -244,7 +246,12 @@ export function StremioHistoryPage() {
         <Loading />
       ) : (
         query.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              query.isPlaceholderData && query.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={query.data.total} label="requests" />
             {query.data.items?.length ? (
               <div className="table-frame">
@@ -321,7 +328,7 @@ export function StremioHistoryPage() {
               busy={query.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
     </div>

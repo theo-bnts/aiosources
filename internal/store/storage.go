@@ -161,5 +161,9 @@ func (s *Store) ResetSourceData(ctx context.Context, revision int64) error {
 	if err := recordActivityTx(ctx, tx, "info", "storage.sources_reset", "", "", "", nil); err != nil {
 		return err
 	}
-	return databaseError("commit source data reset", tx.Commit(ctx))
+	if err := tx.Commit(ctx); err != nil {
+		return databaseError("commit source data reset", err)
+	}
+	s.invalidateDecisionCounts()
+	return nil
 }

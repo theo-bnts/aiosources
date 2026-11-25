@@ -437,6 +437,7 @@ func (s *Service) warmTrending() {
 		return
 	case <-initial.C:
 	}
+	_ = s.DB.WarmDecisionCounts(s.ctx)
 	_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -446,6 +447,7 @@ func (s *Service) warmTrending() {
 			return
 		case <-ticker.C:
 		}
+		_ = s.DB.WarmDecisionCounts(s.ctx)
 		_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
 	}
 }

@@ -60,6 +60,7 @@ var migrations = []struct {
 	{105, trendingIndexSchema},
 	{106, trendingEpisodeKeySchema},
 	{107, trendingSnapshotSchema},
+	{108, diagnosticStatusIndexSchema},
 }
 
 // Older workers could advance the visible MusicBrainz snapshot before the

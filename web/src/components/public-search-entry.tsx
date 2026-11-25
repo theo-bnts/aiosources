@@ -1,26 +1,18 @@
-import { lazy, Suspense, useMemo } from 'react'
+import { Suspense, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { usePublicCredential } from '@/lib/public-credentials'
 import { randomID } from '@/lib/random-id'
 import { PublicSearchContext } from '@/lib/public-search'
+import {
+  CatalogSearchPage,
+  CatalogTitlePage,
+  CatalogTorrentsPage,
+  CatalogTrendingPage,
+} from '@/lib/route-prefetch'
 import { Loading } from './common'
 import { Disclosure } from './ui/disclosure'
 import { PublicCredentialsForm } from './public-credentials-form'
 import { PublicAnnounceFields, type PublicInfo } from './public-connection-fields'
-
-const CatalogSearchPage = lazy(() =>
-  import('@/pages/catalog-search').then((module) => ({ default: module.CatalogSearchPage })),
-)
-const CatalogTrendingPage = lazy(() =>
-  import('@/pages/catalog-trending').then((module) => ({ default: module.CatalogTrendingPage })),
-)
-const CatalogTorrentsPage = lazy(() =>
-  import('@/pages/catalog-torrents').then((module) => ({ default: module.CatalogTorrentsPage })),
-)
-
-const CatalogTitlePage = lazy(() =>
-  import('@/pages/catalog-search').then((module) => ({ default: module.CatalogTitlePage })),
-)
 
 export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   const saved = usePublicCredential(info.credential_scope)

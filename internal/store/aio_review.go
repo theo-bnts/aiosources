@@ -279,7 +279,11 @@ func (s *Store) SaveAIOReview(ctx context.Context, occurrence string, input mode
 	if err != nil {
 		return databaseError("record identification correction", err)
 	}
-	return databaseError("commit identification correction", tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return databaseError("commit identification correction", err)
+	}
+	s.invalidateDecisionCounts()
+	return nil
 }
 
 // Apply only a review made against this exact published record. The file list

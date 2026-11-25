@@ -142,5 +142,9 @@ func (s *Store) DeleteSourceData(ctx context.Context, providerID string, remove 
 			return err
 		}
 	}
-	return databaseError("commit source deletion", tx.Commit(ctx))
+	if err = tx.Commit(ctx); err != nil {
+		return databaseError("commit source deletion", err)
+	}
+	s.invalidateDecisionCounts()
+	return nil
 }

@@ -11,8 +11,9 @@ import {
 import { ResultCount } from '@/components/common'
 import { FilterSelect } from '@/components/filter-select'
 import { useEffect, useRef } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
+import { cn } from '@/lib/utils'
 
 import { api, ApiError, AUTO_REFRESH_INTERVAL, downloadBytes, params, rawPage } from '@/lib/api'
 import { useSourceNames } from '@/lib/source-names'
@@ -180,6 +181,7 @@ export function TorrentsPage() {
     queryKey: ['torrents', query.toString()],
     queryFn: ({ signal }) =>
       api<Page<Torrent>>(`/torrents?${query}`, { signal }, decodeSearchJSON<Page<Torrent>>),
+    placeholderData: keepPreviousData,
   })
   const hasFilters = Object.entries(filters).some(([key, value]) =>
     key === 'sort' ? value !== 'recent' : Array.isArray(value) ? value.length > 0 : Boolean(value),
@@ -199,7 +201,12 @@ export function TorrentsPage() {
         <Loading label="Searching published occurrences" />
       ) : (
         torrents.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-7 transition-opacity duration-150',
+              torrents.isPlaceholderData && torrents.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={torrents.data.total} label="torrents" />
             {torrents.data.items?.length ? (
               <TorrentTable items={torrents.data.items} />
@@ -231,7 +238,7 @@ export function TorrentsPage() {
               busy={torrents.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
     </div>
@@ -258,6 +265,10 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
         { signal },
         decodeSearchJSON<Page<RawRecord> & { counts: Record<string, number> }>,
       ),
+    placeholderData: (previousData, previousQuery) =>
+      (previousQuery?.queryKey[1] as { run?: string } | undefined)?.run === run
+        ? previousData
+        : undefined,
   })
   return (
     <div className="space-y-5">
@@ -296,7 +307,12 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
         <Loading />
       ) : (
         records.data && (
-          <>
+          <div
+            className={cn(
+              'space-y-5 transition-opacity duration-150',
+              records.isPlaceholderData && records.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={records.data.total} label="processed records" />
             {records.data.items?.length ? (
               <div className="table-frame">
@@ -406,7 +422,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
               busy={records.isFetching}
               onChange={pagination.setOffset}
             />
-          </>
+          </div>
         )
       )}
     </div>

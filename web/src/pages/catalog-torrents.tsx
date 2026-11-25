@@ -1,6 +1,7 @@
 import { useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { cn } from '@/lib/utils'
 import { api, params } from '@/lib/api'
 import {
   catalogAPI,
@@ -68,6 +69,7 @@ export function CatalogTorrentsPage() {
     enabled: q.trim().length >= 2,
     queryFn: ({ signal }) =>
       catalogAPI<Page<CatalogRelease>>(`/catalog/torrents?${queryParams}`, visitor, { signal }),
+    placeholderData: keepPreviousData,
   })
   const formRef = useRef<HTMLFormElement>(null)
   function filter(key: string, value: string) {
@@ -163,7 +165,13 @@ export function CatalogTorrentsPage() {
         <Loading label="Searching torrents" />
       ) : (
         query.data && (
-          <>
+          <div
+            className={cn(
+              'transition-opacity duration-150',
+              visitor ? 'space-y-6' : 'space-y-7',
+              query.isPlaceholderData && query.isFetching && 'opacity-70',
+            )}
+          >
             <ResultCount total={query.data.total} label="torrents" />
             {query.data.items?.length ? (
               <CatalogReleaseList
@@ -190,7 +198,7 @@ export function CatalogTorrentsPage() {
               onChange={pagination.setOffset}
               busy={query.isFetching}
             />
-          </>
+          </div>
         )
       )}
     </div>

@@ -39,6 +39,10 @@ type Store struct {
 	listeners       sync.WaitGroup
 	trendingMu      sync.Mutex
 	trendingFlights map[string]*trendingFlight
+	decisionMu      sync.Mutex
+	decisionCache   *decisionCountsSnapshot
+	decisionFlight  *decisionCountFlight
+	decisionGen     uint64
 }
 
 func (s *Store) workerPool() *pgxpool.Pool {

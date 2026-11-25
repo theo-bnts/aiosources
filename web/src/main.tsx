@@ -11,7 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import { OccurrenceNavigationProvider } from '@/lib/occurrence-navigation'
 import { OccurrenceDialogHost } from '@/components/occurrence-dialog-host'
-import React, { lazy } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import {
@@ -42,82 +42,51 @@ import {
   legacyMetadataHistory,
   metadataSections,
 } from '@/lib/metadata-navigation'
+import {
+  AIOSourcePage,
+  AIOStatisticsPage,
+  CatalogSearchPage,
+  CatalogTitlePage,
+  CatalogTorrentsPage,
+  CatalogTrendingPage,
+  FilesStatisticsPage,
+  HealthPage,
+  IdentificationStatistics,
+  IncomingNetworkPage,
+  LogsPage,
+  MatchingDiagnostics,
+  NetworkPage,
+  NetworkRoutingPage,
+  OperationDetailPage,
+  OperationHistoryPage,
+  ProviderEditor,
+  ProvidersPage,
+  PublicAccessPage,
+  RawDetailPage,
+  RawPageView,
+  ReleaseCorrespondences,
+  RemotesPage,
+  RemoteStatisticsPage,
+  RunDetailPage,
+  RunsPage,
+  SecurityLimitsPage,
+  SecuritySecretsPage,
+  SecuritySessionsPage,
+  SharedCatalogStatisticsPage,
+  SharingPage,
+  SourceStatisticsPage,
+  StorageSettingsPage,
+  StremioHistoryPage,
+  StremioRequestPage,
+  StremioStatisticsPage,
+  TorrentsPage,
+  TorznabPage,
+  TrustedUsersPage,
+  prefetchRoute,
+} from '@/lib/route-prefetch'
 import './index.css'
 
-const SourceStatisticsPage = lazy(() =>
-  import('@/pages/statistics').then((m) => ({ default: m.SourceStatisticsPage })),
-)
-const AIOStatisticsPage = lazy(() =>
-  import('@/pages/statistics').then((m) => ({ default: m.AIOStatisticsPage })),
-)
-const ProvidersPage = lazy(() =>
-  import('@/pages/providers').then((m) => ({ default: m.ProvidersPage })),
-)
-const ProviderEditor = lazy(() =>
-  import('@/pages/providers').then((m) => ({ default: m.ProviderEditor })),
-)
-const RunsPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunsPage })))
-const RunDetailPage = lazy(() => import('@/pages/runs').then((m) => ({ default: m.RunDetailPage })))
-const FilesStatisticsPage = lazy(() => import('@/pages/files-statistics'))
-const TorrentsPage = lazy(() =>
-  import('@/pages/library').then((m) => ({ default: m.TorrentsPage })),
-)
-const MatchingDiagnostics = lazy(() =>
-  import('@/components/matching-diagnostics').then((m) => ({ default: m.MatchingDiagnostics })),
-)
-const ReleaseCorrespondences = lazy(() =>
-  import('@/components/release-correspondences').then((m) => ({
-    default: m.ReleaseCorrespondences,
-  })),
-)
-const IdentificationStatistics = lazy(() =>
-  import('@/components/identification-statistics').then((m) => ({
-    default: m.IdentificationStatistics,
-  })),
-)
-const StremioStatisticsPage = lazy(() =>
-  import('@/pages/stremio-history').then((m) => ({ default: m.StremioStatisticsPage })),
-)
-const StremioHistoryPage = lazy(() =>
-  import('@/pages/stremio-history').then((m) => ({ default: m.StremioHistoryPage })),
-)
-const StremioRequestPage = lazy(() =>
-  import('@/pages/stremio-history').then((m) => ({ default: m.StremioRequestPage })),
-)
-const RawDetailPage = lazy(() =>
-  import('@/pages/library').then((m) => ({ default: m.RawDetailPage })),
-)
-const RawPageView = lazy(() => import('@/pages/library').then((m) => ({ default: m.RawPageView })))
-const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })))
-const NetworkPage = lazy(() => import('@/pages/network').then((m) => ({ default: m.NetworkPage })))
-const NetworkRoutingPage = lazy(() =>
-  import('@/pages/network').then((m) => ({ default: m.NetworkRoutingPage })),
-)
-const IncomingNetworkPage = lazy(() => import('@/pages/incoming-network'))
-const SharingPage = lazy(() => import('@/pages/sharing'))
-const RemotesPage = lazy(() => import('@/pages/remotes'))
-const RemoteStatisticsPage = lazy(() =>
-  import('@/pages/remotes').then((m) => ({ default: m.RemoteStatisticsPage })),
-)
-const SharedCatalogStatisticsPage = lazy(() =>
-  import('@/pages/sharing').then((m) => ({ default: m.SharedCatalogStatisticsPage })),
-)
-const PublicAccessPage = lazy(() => import('@/pages/public-access'))
-const TrustedUsersPage = lazy(() => import('@/pages/trusted-users'))
-const TorznabPage = lazy(() => import('@/pages/torznab'))
-const HealthPage = lazy(() => import('@/pages/health').then((m) => ({ default: m.HealthPage })))
-const StorageSettingsPage = lazy(() =>
-  import('@/pages/health').then((m) => ({ default: m.StorageSettingsPage })),
-)
-const SecuritySecretsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecuritySecretsPage })),
-)
-const SecurityLimitsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecurityLimitsPage })),
-)
-const SecuritySessionsPage = lazy(() =>
-  import('@/pages/security').then((m) => ({ default: m.SecuritySessionsPage })),
-)
+prefetchRoute(window.location.pathname)
 
 function LegacySecuritySettings() {
   const location = useLocation()
@@ -267,26 +236,6 @@ function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' 
         : `/metadata/videos${location.search}${location.hash}`)
   return <Navigate to={to} state={location.state} replace />
 }
-
-const AIOSourcePage = lazy(() => import('@/pages/aiosource'))
-const CatalogSearchPage = lazy(() =>
-  import('@/pages/catalog-search').then((m) => ({ default: m.CatalogSearchPage })),
-)
-const CatalogTrendingPage = lazy(() =>
-  import('@/pages/catalog-trending').then((m) => ({ default: m.CatalogTrendingPage })),
-)
-const CatalogTorrentsPage = lazy(() =>
-  import('@/pages/catalog-torrents').then((m) => ({ default: m.CatalogTorrentsPage })),
-)
-const CatalogTitlePage = lazy(() =>
-  import('@/pages/catalog-search').then((m) => ({ default: m.CatalogTitlePage })),
-)
-const OperationHistoryPage = lazy(() =>
-  import('@/pages/operation-history').then((m) => ({ default: m.OperationHistoryPage })),
-)
-const OperationDetailPage = lazy(() =>
-  import('@/pages/operation-history').then((m) => ({ default: m.OperationDetailPage })),
-)
 
 const router = createBrowserRouter(
   createRoutesFromElements(

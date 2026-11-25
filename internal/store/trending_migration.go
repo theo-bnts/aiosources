@@ -260,3 +260,12 @@ CREATE TABLE aiosources.aio_trending_state (
  duration_ms INTEGER NOT NULL DEFAULT 0
 );
 `
+
+// Cover ambiguous and unmatched identification diagnostics in primary-key order
+// so filtering by non-matched statuses skips the matched majority of torrents.
+const diagnosticStatusIndexSchema = `
+CREATE INDEX aio_matches_diagnostic_status
+ ON aiosources.aio_matches (status, provider_id, source_id)
+ INCLUDE (fingerprint, reason, updated_at)
+ WHERE status IN ('ambiguous', 'unmatched');
+`

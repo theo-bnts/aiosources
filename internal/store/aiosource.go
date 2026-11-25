@@ -173,14 +173,10 @@ const aioUpdateStatusColumns = `(SELECT count(*) FROM aiosources.aio_metadata_jo
 
 const aioVideoCount = `SELECT count(*) AS total FROM aiosources.aio_works WHERE media_type IN ('movie','tv')`
 
-// One aggregate consumes current decisions once. Referencing a large CTE from
-// four separate counts forces PostgreSQL to spool and reread the whole catalog.
-const aioStatusQuery = `WITH decisions AS (SELECT ` + aioDiagnosticStatus + ` AS status` + aioDiagnosticSource + `), counts AS MATERIALIZED (
-SELECT count(*) FILTER(WHERE status='matched')::bigint AS matched,
-count(*) FILTER(WHERE status='ambiguous')::bigint AS ambiguous,
-count(*) FILTER(WHERE status='unmatched')::bigint AS unmatched,
-count(*) FILTER(WHERE status='pending')::bigint AS pending FROM decisions
-), video_counts AS MATERIALIZED (
+// Metadata, correspondence and checkpoint totals read quickly without
+// rescanning torrents; identification decision counts come from the shared
+// singleflight/cached decisionCounts helper.
+const aioStatusMetaQuery = `WITH video_counts AS MATERIALIZED (
 ` + aioVideoCount + `
 ), correspondence_counts AS MATERIALIZED (
 SELECT count(*)::bigint AS groups,
@@ -190,9 +186,8 @@ COALESCE(sum(enriched_count),0)::bigint AS enriched,
 FROM aiosources.aio_release_groups
 ) SELECT
 video_counts.total+(SELECT works FROM aiosources.ol_import_state WHERE singleton)+(SELECT works FROM aiosources.igdb_state WHERE singleton)+(SELECT works FROM aiosources.sw_sync_state WHERE singleton)+(SELECT works FROM aiosources.mb_state WHERE singleton),video_counts.total,
-counts.matched,counts.ambiguous,counts.unmatched,counts.pending,
 correspondence_counts.pending,correspondence_counts.groups,correspondence_counts.members,correspondence_counts.enriched,
-` + aioUpdateStatusColumns + ` FROM aiosources.aio_state CROSS JOIN counts CROSS JOIN video_counts CROSS JOIN correspondence_counts`
+` + aioUpdateStatusColumns + ` FROM aiosources.aio_state CROSS JOIN video_counts CROSS JOIN correspondence_counts`
 
 func aioUpdateStatusTargets(v *model.AIOStatus) []any {
 	return []any{&v.Pending, &v.MetadataDue, &v.CleanupPending, &v.CleanupFailed, &v.LastSync, &v.ChangesThrough, &v.InventoryDate, &v.SyncRetryAt, &v.SyncFailures, &v.SyncError, &v.LastMatch, &v.RecoveryStartedAt, &v.AppliedThrough, &v.ProviderRetryAt}
@@ -200,8 +195,16 @@ func aioUpdateStatusTargets(v *model.AIOStatus) []any {
 
 func (s *Store) AIOStatus(ctx context.Context) (model.AIOStatus, error) {
 	var v model.AIOStatus
-	targets := append([]any{&v.Works, &v.VideoWorks, &v.Matched, &v.Ambiguous, &v.Unmatched, &v.MatchingPending, &v.CorrespondencesPending, &v.CorrespondenceGroups, &v.CorrespondenceMembers, &v.CorrespondenceEnriched}, aioUpdateStatusTargets(&v)...)
-	err := s.pool.QueryRow(ctx, aioStatusQuery).Scan(targets...)
+	counts, err := s.decisionCounts(ctx)
+	if err != nil {
+		return v, err
+	}
+	v.Matched = counts.totals.matched
+	v.Ambiguous = counts.totals.ambiguous
+	v.Unmatched = counts.totals.unmatched
+	v.MatchingPending = counts.totals.pending
+	targets := append([]any{&v.Works, &v.VideoWorks, &v.CorrespondencesPending, &v.CorrespondenceGroups, &v.CorrespondenceMembers, &v.CorrespondenceEnriched}, aioUpdateStatusTargets(&v)...)
+	err = s.pool.QueryRow(ctx, aioStatusMetaQuery).Scan(targets...)
 	return v, databaseError("read AIOSources status", err)
 }
 

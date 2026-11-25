@@ -2,6 +2,7 @@ import { Suspense, useState } from 'react'
 import type { Icon } from '@phosphor-icons/react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { usePageTabNavigate } from '@/lib/page-tabs'
+import { prefetchRoute } from '@/lib/route-prefetch'
 import { Loading, PageHeaderVisibility } from '@/components/common'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageActionsTarget } from '@/components/page-actions'
@@ -35,7 +36,14 @@ export function WorkspaceLayout({ title, tabs }: { title: string; tabs: Workspac
         <div className="flex min-w-0 items-start gap-3" data-workspace-toolbar>
           <TabsList aria-label={`${title} views`} containerClassName="flex-1">
             {tabs.map((tab) => (
-              <TabsTrigger key={tab.path} value={tab.path} className="shrink-0">
+              <TabsTrigger
+                key={tab.path}
+                value={tab.path}
+                className="shrink-0"
+                onMouseEnter={() => prefetchRoute(tab.path)}
+                onFocus={() => prefetchRoute(tab.path)}
+                onPointerDown={() => prefetchRoute(tab.path)}
+              >
                 <tab.icon aria-hidden="true" />
                 {tab.label}
               </TabsTrigger>
