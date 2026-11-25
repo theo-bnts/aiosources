@@ -1,5 +1,7 @@
-import { ArrowRightIcon, MagnifyingGlassIcon, TelevisionIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, TelevisionIcon } from '@phosphor-icons/react'
 import { CatalogCover } from '@/components/catalog-cover'
+import { CatalogPosterRail } from '@/components/catalog-poster-rail'
+import { catalogCardSummary, catalogTorrentCount } from '@/lib/catalog-cards'
 import { useCatalogSearch } from '@/lib/use-catalog-search'
 import { useLayoutEffect, useState } from 'react'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
@@ -43,14 +45,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from '@/components/ui/table'
 
 const softwarePlatformLabels: Record<string, string> = {
   windows: 'Windows',
@@ -95,7 +89,6 @@ export function CatalogSearchPage() {
   const language = browserLanguage()
   const [search, setSearch] = useViewSearchParams()
   const listState = useListViewState()
-  const pagination = useURLPagination()
   const q = search.get('q') || ''
   const [draftQuery, setDraftQuery] = useState(q)
   // Synchronize the shortcut before the next input event. The form keeps its
@@ -108,11 +101,14 @@ export function CatalogSearchPage() {
     type: kind,
     year,
     language,
-    limit: pagination.limit,
-    offset: pagination.offset,
   })
+  const visibleSections = query.sections.filter(
+    (section) => section.isPending || section.items.length > 0,
+  )
+  const hasMatches = query.sections.some((section) => section.items.length > 0)
+  const resetScrollKey = `${q}\0${kind}\0${year}`
   return (
-    <div className={visitor ? 'space-y-6' : 'page'}>
+    <div className={visitor ? 'min-w-0 space-y-6' : 'page min-w-0'}>
       <form
         key={`${q}:${kind}:${year}`}
         className="space-y-4 rounded-md border border-border p-4"
@@ -194,7 +190,7 @@ export function CatalogSearchPage() {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <ResultCount total={query.data.total} label="titles" />
+            <ResultCount total={query.total} label="titles" />
             <p
               className="help"
               role="status"
@@ -206,82 +202,50 @@ export function CatalogSearchPage() {
               {query.totalCategories === 1 ? 'category' : 'categories'} complete
             </p>
           </div>
-          {query.data.items?.length ? (
-            <div className="table-frame">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead className="text-right">Source releases</TableHead>
-                    <TableHead>
-                      <span className="sr-only">Open</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {query.data.items?.map((title) => (
-                    <TableRow key={title.id}>
-                      <TableCell className="whitespace-normal">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <CatalogCover
-                            src={title.cover}
-                            book={title.type === 'book'}
-                            game={title.type === 'game'}
-                            software={title.type === 'software'}
-                            music={title.type === 'music'}
-                          />
-                          <div className="min-w-0">
-                            <Link
-                              to={`${searchPath}/${title.id}?${params({ q })}`}
-                              state={listState}
-                              className="font-medium break-words"
-                            >
-                              {title.title}
-                            </Link>
-                            <TitleDetails title={title} />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right mono">{number(title.releases)}</TableCell>
-                      <TableCell>
-                        <Button asChild size="icon-sm" variant="ghost">
-                          <Link
-                            to={`${searchPath}/${title.id}?${params({ q })}`}
-                            state={listState}
-                            aria-label={`Show releases for ${title.title}`}
-                          >
-                            <ArrowRightIcon />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          {visibleSections.length > 0 ? (
+            <div
+              className="min-w-0 space-y-8"
+              aria-label={!hasMatches && query.isPending ? 'Searching titles' : undefined}
+            >
+              {visibleSections.map((section, index) => (
+                <CatalogPosterRail
+                  key={section.id}
+                  category={{ id: section.id, label: section.label, frame: section.frame }}
+                  items={section.items.map((title) => ({
+                    id: title.id,
+                    title: title.title,
+                    cover: title.cover,
+                    summary: catalogCardSummary(title),
+                    metric: catalogTorrentCount(title.releases),
+                    to: `${searchPath}/${title.id}?${params({ q })}`,
+                  }))}
+                  loading={section.isPending}
+                  loadingLabel={`Searching ${section.label.toLowerCase()}`}
+                  countLabel={
+                    section.items.length < section.total
+                      ? `${number(section.items.length)} of ${number(section.total)}`
+                      : number(section.total)
+                  }
+                  eagerRow={index === 0}
+                  listState={listState}
+                  resetScrollKey={resetScrollKey}
+                  dimmed={section.isPlaceholderData && section.isFetching}
+                  hasMore={section.hasMore}
+                  loadingMore={section.isPlaceholderData && section.isFetching}
+                  onLoadMore={section.loadMore}
+                />
+              ))}
             </div>
-          ) : query.isPending ? (
-            <Loading label="Searching titles" />
           ) : !query.error ? (
             <Empty
-              title={query.data.total > 0 ? 'No titles on this page' : 'No matching titles'}
+              title="No matching titles"
               description={
-                query.data.total > 0
-                  ? 'Use the pagination controls to return to the available titles.'
-                  : visitor
-                    ? 'No identified titles match this search.'
-                    : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing.'
+                visitor
+                  ? 'No identified titles match this search.'
+                  : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing.'
               }
             />
           ) : null}
-          {(query.complete || Boolean(query.data.items?.length)) && (
-            <Pager
-              total={query.data.total}
-              limit={query.data.limit}
-              offset={query.data.offset}
-              onChange={pagination.setOffset}
-              busy={query.isFetching || !query.complete}
-            />
-          )}
         </>
       )}
       <div className="flex flex-wrap justify-center gap-2">

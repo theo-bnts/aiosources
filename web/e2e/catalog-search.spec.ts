@@ -115,7 +115,10 @@ test('catalog covers contain every artwork shape in square areas on desktop and 
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto('/search?q=example')
-    const covers = page.locator('[data-slot="catalog-cover"] img')
+    await expect(page.locator('main h2')).toHaveText(['Videos', 'Games'])
+    const cards = page.locator('[data-slot="catalog-card"]')
+    await expect(cards).toHaveCount(3)
+    const covers = page.locator('[data-slot="catalog-card"] img')
     await expect(covers).toHaveCount(3)
     await expect
       .poll(() =>
@@ -124,52 +127,36 @@ test('catalog covers contain every artwork shape in square areas on desktop and 
         ),
       )
       .toBe(true)
-    for (const cover of await covers.all()) {
+    for (const frame of await page.locator('[data-slot="catalog-card-frame"]').all()) {
       expect(
-        await cover.evaluate((image) => {
-          const box = image.parentElement!.getBoundingClientRect()
+        await frame.evaluate((box) => {
+          const rect = box.getBoundingClientRect()
           return {
-            square: Math.abs(box.width - box.height) < 1,
-            fit: getComputedStyle(image).objectFit,
-            virtualFrame:
-              getComputedStyle(image.parentElement!).borderWidth === '0px' &&
-              getComputedStyle(image.parentElement!).backgroundColor === 'rgba(0, 0, 0, 0)',
-            imageBorder: getComputedStyle(image).borderWidth === '1px',
-            centered:
-              Math.abs(
-                image.getBoundingClientRect().left +
-                  image.getBoundingClientRect().width / 2 -
-                  box.left -
-                  box.width / 2,
-              ) < 1 &&
-              Math.abs(
-                image.getBoundingClientRect().top +
-                  image.getBoundingClientRect().height / 2 -
-                  box.top -
-                  box.height / 2,
-              ) < 1,
-            naturalShape:
-              Math.abs(
-                (image.getBoundingClientRect().width - 2) /
-                  (image.getBoundingClientRect().height - 2) -
-                  (image as HTMLImageElement).naturalWidth /
-                    (image as HTMLImageElement).naturalHeight,
-              ) < 0.03,
+            ratio: Math.abs(rect.width / rect.height - 2 / 3) < 0.03,
+            fit: getComputedStyle(box.querySelector('img')!).objectFit,
           }
         }),
-      ).toEqual({
-        square: true,
-        fit: 'contain',
-        virtualFrame: true,
-        imageBorder: true,
-        centered: true,
-        naturalShape: true,
-      })
+      ).toEqual({ ratio: true, fit: 'cover' })
     }
-    const titlePositions = await page
-      .locator('tbody tr td:first-child a')
-      .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().left))
-    expect(Math.max(...titlePositions) - Math.min(...titlePositions)).toBeLessThan(1)
+    const videoCards = page.locator('[data-slot="catalog-rail"][data-category="videos"] a')
+    await expect(videoCards).toHaveCount(2)
+    const firstBox = (await videoCards.nth(0).boundingBox())!
+    const secondBox = (await videoCards.nth(1).boundingBox())!
+    expect(Math.abs(firstBox.y - secondBox.y)).toBeLessThan(2)
+    expect(secondBox.x).toBeGreaterThan(firstBox.x + firstBox.width / 2)
+    await expect(page.locator('[data-slot="catalog-rail"][data-category="videos"]')).toContainText(
+      'Movie · 2026',
+    )
+    await expect(page.locator('[data-slot="catalog-rail"][data-category="videos"]')).toContainText(
+      'Series · 2026',
+    )
+    await expect(
+      page.locator('[data-slot="catalog-rail"][data-category="videos"]'),
+    ).not.toContainText('tt1234567')
+    await expect(page.locator('[data-slot="catalog-rail"][data-category="games"]')).toContainText(
+      'Game · 2026',
+    )
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.goto(`/search/${ids.movie}`)
     const cover = page.locator('[data-slot="catalog-cover"]')
     await expect(cover.locator('img')).toBeVisible()
@@ -336,7 +323,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await page.getByLabel('Title, author or identifier', { exact: true }).fill('example new day')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('1 title')
-  await expect(page.locator('main tbody tr')).toHaveCount(1)
+  await expect(page.locator('[data-slot="catalog-card"]')).toHaveCount(1)
   await page.getByRole('link', { name: 'Example Film: New Day', exact: true }).click()
   await expect(page).toHaveURL(
     (url) =>

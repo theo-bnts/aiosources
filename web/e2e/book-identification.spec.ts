@@ -37,8 +37,9 @@ test('real book identification publishes ebooks and audiobooks to the same Searc
     await openDisclosure(page, 'Filters')
     await selectMultiple(page, 'Type', types)
     await page.getByRole('button', { name: 'Search', exact: true }).click()
-    await expect(page.locator('main tbody tr')).toHaveCount(1)
-    await expect(page.locator('main tbody')).toContainText('The Amber Orchard')
+    await expect(page.locator('[data-slot="catalog-card"]')).toHaveCount(1)
+    await expect(page.locator('[data-slot="catalog-card"]')).toContainText('The Amber Orchard')
+    await expect(page.locator('[data-slot="catalog-card"]')).toContainText('Book · 2024')
     await expect(page.getByText('No matching titles', { exact: true })).toHaveCount(0)
   }
 })

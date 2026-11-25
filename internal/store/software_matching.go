@@ -86,13 +86,17 @@ catalog_software_aliases AS MATERIALIZED(
 catalog_software_vendors AS MATERIALIZED(
  SELECT w.id AS work_id,c.vendor_norm AS normalized FROM catalog_software_works w JOIN aiosources.sw_catalog c ON c.software_key=w.software_key WHERE c.vendor_norm<>'')`
 
-func catalogSoftwareCandidates(queryArg, normalizedArg, matching string) string {
+func catalogSoftwareCandidates(queryArg, normalizedArg, matching string, extraWordStarts ...string) string {
+	wordStarts := ""
+	if len(extraWordStarts) > 0 {
+		wordStarts = extraWordStarts[0]
+	}
 	resolved := `(SELECT aiosources.sw_resolve_key(` + queryArg + `))`
 	return `
- UNION ALL SELECT id,5,1::real FROM catalog_software_works WHERE software_key=` + resolved + `
- UNION ALL SELECT w.id,5,1::real FROM aiosources.sw_external_ids e JOIN catalog_software_works w ON w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
- UNION ALL SELECT work_id,CASE WHEN normalized=` + normalizedArg + ` THEN 4 ELSE 2 END,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_aliases WHERE ` + matching + `
- UNION ALL SELECT work_id,CASE WHEN normalized=` + normalizedArg + ` THEN 3 ELSE 1 END,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_vendors WHERE ` + matching
+ UNION ALL SELECT id,9,1::real FROM catalog_software_works WHERE software_key=` + resolved + `
+ UNION ALL SELECT w.id,9,1::real FROM aiosources.sw_external_ids e JOIN catalog_software_works w ON w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
+ UNION ALL SELECT work_id,` + catalogTitlePrecisionSQL("normalized", normalizedArg, wordStarts) + `,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_aliases WHERE ` + matching + `
+ UNION ALL SELECT work_id,CASE WHEN normalized=` + normalizedArg + ` THEN 5 ELSE 2 END,public.similarity(` + normalizedArg + `,normalized) FROM catalog_software_vendors WHERE ` + matching
 }
 
 // softwareCatalogCandidates returns SQL UNION clauses allowing AIOReviewCandidates
@@ -103,8 +107,8 @@ func softwareCatalogCandidates(queryArg, normalizedArg, matching string) string 
 	vendorMatch := strings.ReplaceAll(matching, "normalized", "c.vendor_norm")
 	resolved := `(SELECT aiosources.sw_resolve_key(` + queryArg + `))`
 	return `
- UNION ALL SELECT id,5,1::real FROM aiosources.aio_works WHERE media_type='software' AND software_key<>'' AND software_key=` + resolved + `
- UNION ALL SELECT w.id,5,1::real FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
- UNION ALL SELECT w.id,CASE WHEN a.normalized=` + normalizedArg + ` THEN 4 ELSE 2 END,similarity(` + normalizedArg + `,a.normalized) FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=a.software_key WHERE a.normalized<>'' AND ` + aliasMatch + `
- UNION ALL SELECT w.id,CASE WHEN c.vendor_norm=` + normalizedArg + ` THEN 3 ELSE 1 END,similarity(` + normalizedArg + `,c.vendor_norm) FROM aiosources.sw_catalog c JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=c.software_key WHERE c.vendor_norm<>'' AND ` + vendorMatch
+ UNION ALL SELECT id,9,1::real FROM aiosources.aio_works WHERE media_type='software' AND software_key<>'' AND software_key=` + resolved + `
+ UNION ALL SELECT w.id,9,1::real FROM aiosources.sw_external_ids e JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=e.software_key WHERE e.kind IN ('nvd_cpe','winget_id','homebrew_cask') AND e.external_lower=lower(` + queryArg + `)
+ UNION ALL SELECT w.id,` + catalogTitlePrecisionSQL("a.normalized", normalizedArg, "") + `,similarity(` + normalizedArg + `,a.normalized) FROM aiosources.sw_aliases a JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=a.software_key WHERE a.normalized<>'' AND ` + aliasMatch + `
+ UNION ALL SELECT w.id,CASE WHEN c.vendor_norm=` + normalizedArg + ` THEN 5 ELSE 2 END,similarity(` + normalizedArg + `,c.vendor_norm) FROM aiosources.sw_catalog c JOIN aiosources.aio_works w ON w.media_type='software' AND w.software_key<>'' AND w.software_key=c.software_key WHERE c.vendor_norm<>'' AND ` + vendorMatch
 }

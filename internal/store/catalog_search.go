@@ -102,6 +102,50 @@ func catalogWordFilter(normalized string, args []any) ([]any, string, string) {
 	return args, strings.Join(terms, " AND "), anchor
 }
 
+func catalogWordStartFilter(normalized string, args []any) ([]any, string) {
+	words := searchWords(normalized)
+	if len(words) < 2 {
+		return args, ""
+	}
+	terms := make([]string, 0, len(words))
+	for _, word := range words {
+		args = append(args, "% "+escapeSearchFragment.Replace(word)+"%")
+		terms = append(terms, fmt.Sprintf(`(' '||normalized) LIKE $%d ESCAPE '\'`, len(args)))
+	}
+	return args, strings.Join(terms, " AND ")
+}
+
+// catalogTitlePrecisionSQL scores a normalized candidate title from highest to
+// lowest match closeness without widening candidate discovery or adding extra scans:
+//
+//	8: exact normalized title match
+//	7: exact title with leading article ("the matrix", "le parrain")
+//	6: starts with the full query phrase at a word boundary (with or without leading article)
+//	4: full query phrase appears intact on word boundaries anywhere in the title
+//	3: query starts a word or every query word matches at a word start
+//	1: mid-word substring match
+func catalogTitlePrecisionSQL(col, normalized, wordStarts string) string {
+	esc := `replace(replace(replace(` + normalized + `,'\','\\'),'%','\%'),'_','\_')`
+	prefixTier := col + ` LIKE ` + esc + `||'%' ESCAPE '\' OR (' '||` + col + `) LIKE '% '||` + esc + `||'%' ESCAPE '\'`
+	if wordStarts != "" {
+		prefixTier += ` OR (` + strings.ReplaceAll(wordStarts, "normalized", col) + `)`
+	}
+	return `CASE` +
+		` WHEN ` + col + `=` + normalized + ` THEN 8` +
+		` WHEN ` + col + ` IN ('the '||` + normalized + `,'a '||` + normalized + `,'an '||` + normalized + `,'le '||` + normalized + `,'la '||` + normalized + `,'les '||` + normalized + `,'l '||` + normalized + `) THEN 7` +
+		` WHEN ` + col + ` LIKE ` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'the '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'a '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'an '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'le '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'la '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'les '||` + esc + `||' %' ESCAPE '\'` +
+		` OR ` + col + ` LIKE 'l '||` + esc + `||' %' ESCAPE '\' THEN 6` +
+		` WHEN (' '||` + col + `||' ') LIKE '% '||` + esc + `||' %' ESCAPE '\' THEN 4` +
+		` WHEN ` + prefixTier + ` THEN 3` +
+		` ELSE 1 END`
+}
+
 func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, normalized string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
 	opts = pageOptions(opts)
 	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
@@ -146,10 +190,11 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 		}
 	}
 	args, matching, anchor := catalogWordFilter(normalized, []any{identity, media, normalized})
+	args, wordStarts := catalogWordStartFilter(normalized, args)
 	scopeCTEs := []string{
 		catalogMatchedScope,
 		`catalog_matched_works AS MATERIALIZED(
- SELECT w.id,w.media_type,w.imdb_id,w.tmdb_id,w.igdb_id,w.software_key
+ SELECT w.id,w.media_type,w.imdb_id,w.tmdb_id,w.igdb_id,w.software_key,m.match_count
  FROM catalog_matched_ids m JOIN aiosources.aio_works w ON w.id=m.id
  WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2)))`,
 	}
@@ -159,12 +204,12 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	bookExtras := ""
 	if includeBooks {
 		scopeCTEs = append(scopeCTEs, catalogBookScopeCTE)
-		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor)
+		bookExtras = catalogBookCandidates("$1", "$3", matching, anchor, wordStarts)
 	}
 	softwareExtras := ""
 	if includeSoftware {
 		scopeCTEs = append(scopeCTEs, catalogSoftwareScopeCTE)
-		softwareExtras = catalogSoftwareCandidates("$1", "$3", matching)
+		softwareExtras = catalogSoftwareCandidates("$1", "$3", matching, wordStarts)
 	}
 	musicExtras := ""
 	if includeMusic {
@@ -173,10 +218,11 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	}
 	scopePrefix := "WITH " + strings.Join(scopeCTEs, ",\n") + " "
 	titleMatching := strings.ReplaceAll(matching, "normalized ", "t.normalized ")
-	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM (
- SELECT id,5 AS precision,1::real AS relevance FROM catalog_matched_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
- UNION ALL SELECT t.work_id,CASE WHEN t.normalized=$3 THEN 4 ELSE 1 END,
+	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS text_sim FROM (
+ SELECT id,9 AS precision,1::real AS relevance FROM catalog_matched_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (igdb_id<>'' AND igdb_id=$1)
+ UNION ALL SELECT t.work_id,` + catalogTitlePrecisionSQL("t.normalized", "$3", wordStarts) + `,
  public.similarity($3,t.normalized) FROM catalog_matched_works cm JOIN aiosources.aio_titles t ON t.work_id=cm.id WHERE ` + titleMatching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
+ JOIN catalog_matched_ids cm ON cm.id=candidates.id
  JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))
  AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
 	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")
@@ -199,9 +245,13 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	defer rollback(tx)
 	countArgs := append([]any{}, args...)
 	args = append(args, locale, opts.Limit, opts.Offset)
+	// Blend textual closeness with bounded log-popularity from catalog_matched_ids
+	// within each precision tier so well-seeded titles surface ahead of obscure
+	// homonyms without adding extra table scans.
+	relevanceExpr := `(candidates.text_sim*0.55+least(ln(greatest(cm.match_count,1)::double precision)/6.0,1.0)*0.45)::real`
 	// The total and visible page share the same candidate search. In particular,
 	// book editions/aliases must not be materialized twice for every search.
-	pageSQL := scopePrefix + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,candidates.relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,candidates.relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
+	pageSQL := scopePrefix + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,` + relevanceExpr + ` AS relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
 	rows, err := tx.Query(ctx, pageSQL, args...)
 	if err != nil {
 		return result, databaseError("search catalog titles", err)

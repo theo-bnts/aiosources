@@ -159,26 +159,31 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     }
     if (url.pathname.startsWith('/api/public/catalog/')) {
       expect(request.headers().authorization).toBe(`Bearer ${credential}`)
-      if (url.pathname.endsWith('/search'))
+      if (url.pathname.endsWith('/search')) {
+        const kinds = (url.searchParams.get('type') || '').split(',').filter(Boolean)
+        const matched = !kinds.length || kinds.includes('movie')
         return route.fulfill({
           json: {
-            items: [
-              {
-                id: 101,
-                type: 'movie',
-                title: 'Example Film',
-                years: [2026],
-                tmdb: '101',
-                imdb: 'tt1234567',
-                releases: 1,
-                providers: [],
-              },
-            ],
-            total: 1,
+            items: matched
+              ? [
+                  {
+                    id: 101,
+                    type: 'movie',
+                    title: 'Example Film',
+                    years: [2026],
+                    tmdb: '101',
+                    imdb: 'tt1234567',
+                    releases: 1,
+                    providers: [],
+                  },
+                ]
+              : [],
+            total: matched ? 1 : 0,
             limit: 50,
             offset: 0,
           },
         })
+      }
       if (url.pathname.endsWith('/releases')) {
         releaseRequests.push(url)
         return route.fulfill({

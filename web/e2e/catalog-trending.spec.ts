@@ -110,7 +110,7 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
       '11111111-1111-4111-8111-111111111111',
       'Neon Echoes',
       [2025],
-      `UPDATE aiosources.aio_works SET music_data='{"artists":["Synthwave"]}'::jsonb WHERE id=$1`,
+      `UPDATE aiosources.aio_works SET music_data='{"artists":["Synthwave"],"primary_type":"Album"}'::jsonb WHERE id=$1`,
     )
     const book = await insertWork('book', 'OL81001W', 'Orbital Manual', [2024])
 
@@ -144,12 +144,15 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
   const videosSection = page.locator('main section').first()
   const videoLinks = videosSection.getByRole('link')
   await expect(videoLinks.first()).toContainText('Weekly Saga')
-  await expect(videoLinks.first()).toContainText('2025 · 4/ep')
+  await expect(videoLinks.first()).toContainText('Series · 2025')
+  await expect(videoLinks.first()).toContainText('4/ep')
   await expect(videoLinks.first().locator('[title="8 torrents · 2 episodes (4/ep)"]')).toBeVisible()
   await expect(videoLinks.nth(1)).toContainText('Daily Spotlight')
-  await expect(videoLinks.nth(1)).toContainText('2026 · 2 torrents')
+  await expect(videoLinks.nth(1)).toContainText('Movie · 2026')
+  await expect(videoLinks.nth(1)).toContainText('2 torrents')
   await expect(videoLinks.nth(2)).toContainText('Endless Daily Soap')
-  await expect(videoLinks.nth(2)).toContainText('2024 · 1.5/ep')
+  await expect(videoLinks.nth(2)).toContainText('Series · 2024')
+  await expect(videoLinks.nth(2)).toContainText('1.5/ep')
 
   // Cards sit side by side horizontally (same row y, increasing x) without page overflow.
   const firstBox = (await videoLinks.nth(0).boundingBox())!
@@ -169,12 +172,16 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
     .poll(() => videosSection.locator('.overflow-x-auto').evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(0)
 
-  // Other categories display their top titles.
+  // Other categories display their top titles with subtype before year/context.
   await expect(page.locator('main section').nth(1)).toContainText('Arcade Horizon')
+  await expect(page.locator('main section').nth(1)).toContainText('Game · 2026')
   await expect(page.locator('main section').nth(2)).toContainText('VLC Media Player')
-  await expect(page.locator('main section').nth(2)).toContainText('VideoLAN · 2 torrents')
+  await expect(page.locator('main section').nth(2)).toContainText('Software · VideoLAN')
+  await expect(page.locator('main section').nth(2)).toContainText('2 torrents')
   await expect(page.locator('main section').nth(3)).toContainText('Neon Echoes')
+  await expect(page.locator('main section').nth(3)).toContainText('Album · 2025')
   await expect(page.locator('main section').nth(4)).toContainText('Orbital Manual')
+  await expect(page.locator('main section').nth(4)).toContainText('Book · 2024')
 
   // Switching periods updates URL and rankings accurately.
   await period.selectOption('day')

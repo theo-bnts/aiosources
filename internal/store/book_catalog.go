@@ -88,12 +88,12 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 		combined = bookCombinedCandidates(normalized, matching, anchors[0])
 	}
 	identity := `(SELECT aiosources.ol_resolve(` + query + `))`
-	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized) FROM aiosources.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
- UNION ALL SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
- UNION ALL SELECT w.id,5 AS precision,1::real AS relevance FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=` + identity + `
- UNION ALL SELECT w.id,CASE WHEN e.normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,e.normalized)
+	sql := ` UNION ALL SELECT id,` + catalogTitlePrecisionSQL("book_normalized", normalized, "") + `,public.similarity(` + normalized + `,book_normalized) FROM aiosources.aio_works WHERE media_type='book' AND ` + strings.ReplaceAll(matching, "normalized ", "book_normalized ") + `
+ UNION ALL SELECT id,9 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
+ UNION ALL SELECT w.id,9 AS precision,1::real AS relevance FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=` + identity + `
+ UNION ALL SELECT w.id,` + catalogTitlePrecisionSQL("e.normalized", normalized, "") + `,public.similarity(` + normalized + `,e.normalized)
  FROM aiosources.ol_editions e ` + bookEditionWorks + ` WHERE ` + strings.ReplaceAll(matching, "normalized ", "e.normalized ") + `
- UNION ALL SELECT w.id,1 AS precision,0.6::real AS relevance FROM aiosources.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE ` + matching + `)` + combined
+ UNION ALL SELECT w.id,2 AS precision,0.6::real AS relevance FROM aiosources.aio_works w WHERE w.media_type='book' AND (w.book_data->'author_keys') ?| ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE ` + matching + `)` + combined
 	return sql
 }
 
@@ -101,7 +101,7 @@ func bookCatalogCandidates(query, normalized, matching string, anchors ...string
 // editions. Every word may occur in a title or author without concatenating
 // or scanning the complete bibliographic catalog.
 func bookCombinedCandidates(normalized, matching, anchor string) string {
-	return ` UNION ALL SELECT id,2 AS precision,public.similarity(` + normalized + `,normalized) FROM (
+	return ` UNION ALL SELECT id,3 AS precision,public.similarity(` + normalized + `,normalized) FROM (
  WITH author_keys AS MATERIALIZED(SELECT ARRAY(SELECT unnest(aiosources.ol_aliases(id)) FROM aiosources.ol_authors WHERE normalized LIKE ` + anchor + ` ESCAPE '\') AS ids),
  author_works AS MATERIALIZED(SELECT id,openlibrary_id,book_normalized FROM aiosources.aio_works w WHERE media_type='book' AND (book_data->'author_keys') ?| (SELECT ids FROM author_keys)),
  aliases AS (

@@ -1,6 +1,17 @@
+import {
+  catalogCardContext,
+  catalogCardSummary,
+  catalogCategories,
+  catalogPrimaryYear,
+  catalogSubtypeLabel,
+  catalogTorrentCount,
+  type CatalogCardKind,
+  type CatalogCategoryID,
+} from './catalog-cards.ts'
+
 export type TrendingPeriod = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
-export type TrendingCategoryID = 'videos' | 'games' | 'software' | 'music' | 'books'
+export type TrendingCategoryID = CatalogCategoryID
 
 export const defaultTrendingPeriod: TrendingPeriod = 'week'
 
@@ -12,21 +23,11 @@ export const trendingPeriods: readonly { value: TrendingPeriod; label: string }[
   { value: 'year', label: 'Past year' },
 ]
 
-export const trendingCategories: readonly {
-  id: TrendingCategoryID
-  label: string
-  frame: 'portrait' | 'square' | 'icon'
-}[] = [
-  { id: 'videos', label: 'Videos', frame: 'portrait' },
-  { id: 'games', label: 'Games', frame: 'portrait' },
-  { id: 'software', label: 'Software', frame: 'icon' },
-  { id: 'music', label: 'Music', frame: 'square' },
-  { id: 'books', label: 'Books', frame: 'portrait' },
-]
+export const trendingCategories = catalogCategories
 
 export type CatalogTrendingItem = {
   id: number
-  type: 'movie' | 'tv' | 'game' | 'software' | 'music' | 'book'
+  type: CatalogCardKind
   title: string
   years: number[]
   cover?: string
@@ -62,24 +63,11 @@ export function trendingPeriodLabel(period: TrendingPeriod): string {
   return trendingPeriods.find((option) => option.value === period)?.label ?? 'Past week'
 }
 
-export function trendingPrimaryYear(years?: number[]): number | undefined {
-  if (!years?.length) return undefined
-  const valid = years.filter((year) => Number.isInteger(year) && year > 0)
-  return valid.length ? Math.min(...valid) : undefined
-}
-
-export function trendingItemContext(item: CatalogTrendingItem): string | undefined {
-  const year = trendingPrimaryYear(item.years)
-  if (year) return String(year)
-  if (item.vendor) return item.vendor
-  if (item.artists?.length) return item.artists[0]
-  if (item.authors?.length) return item.authors[0]
-  return undefined
-}
-
-export function trendingTorrentCount(torrents: number): string {
-  return `${torrents.toLocaleString()} ${torrents === 1 ? 'torrent' : 'torrents'}`
-}
+export const trendingPrimaryYear = catalogPrimaryYear
+export const trendingItemContext = catalogCardContext
+export const trendingItemSubtype = catalogSubtypeLabel
+export const trendingItemSummary = catalogCardSummary
+export const trendingTorrentCount = catalogTorrentCount
 
 function formatTrendingAverage(value: number): string {
   if (value >= 100) return Math.round(value).toLocaleString()
@@ -122,7 +110,5 @@ export function trendingMetricTitle(item: CatalogTrendingItem): string | undefin
 }
 
 export function formatTrendingMeta(item: CatalogTrendingItem): string {
-  const metric = trendingMetricLabel(item)
-  const context = trendingItemContext(item)
-  return context ? `${context} · ${metric}` : metric
+  return `${trendingItemSummary(item)} · ${trendingMetricLabel(item)}`
 }

@@ -125,8 +125,8 @@ func (s *Store) AIOReviewCandidates(ctx context.Context, query, normalized, kind
 	alias := catalogQueryAlias(matching, "$2")
 	columns := strings.Replace(aioWorkColumns, "w.display_title", catalogTitleLabel("$5", alias), 1)
 	rows, err := s.pool.Query(ctx, `WITH candidates AS (
- SELECT id,5 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (tvdb_id<>'' AND tvdb_id=$1) OR (igdb_id<>'' AND igdb_id=$1)
- UNION ALL SELECT work_id,CASE WHEN normalized=$2 THEN 4 ELSE 1 END,public.similarity($2,normalized) FROM aiosources.aio_titles WHERE `+matching+bookExtras+softwareExtras+musicExtras+`
+ SELECT id,9 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (tvdb_id<>'' AND tvdb_id=$1) OR (igdb_id<>'' AND igdb_id=$1)
+ UNION ALL SELECT work_id,`+catalogTitlePrecisionSQL("normalized", "$2", "")+`,public.similarity($2,normalized) FROM aiosources.aio_titles WHERE `+matching+bookExtras+softwareExtras+musicExtras+`
 ), ranked AS(SELECT id,max(precision) AS precision,max(relevance) AS relevance FROM candidates GROUP BY id)
  SELECT `+columns+` FROM (
  SELECT w.id,c.precision,c.relevance FROM ranked c JOIN aiosources.aio_works w ON w.id=c.id

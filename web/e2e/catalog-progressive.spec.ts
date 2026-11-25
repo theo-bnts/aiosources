@@ -40,20 +40,13 @@ function gates() {
   }
 }
 
-const rows = (page: Page) => page.locator('tbody tr td:first-child a')
+const cardTitles = (page: Page) => page.locator('[data-slot="catalog-card-title"]')
 
-test('Search displays categories immediately and inserts late books in the exact global order', async ({
+test('Search displays category rails progressively in Trending order and hides empty categories', async ({
   page,
   server,
 }) => {
   await seedTitles(server)
-  const expected = await (await page.request.get('/api/catalog/search?q=example%20journey')).json()
-  expect(expected.items.map((item: { title: string }) => item.title)).toEqual([
-    'Example Video',
-    'Example Book',
-    'Example Game',
-    'Example Series',
-  ])
   const gate = gates()
   const dispatched: string[] = []
   await page.route('**/api/catalog/search?**', async (route) => {
@@ -79,28 +72,33 @@ test('Search displays categories immediately and inserts late books in the exact
     )
     await expect(page.getByText('No matching titles', { exact: true })).toHaveCount(0)
     gate.releases['movie,tv']()
-    await expect(rows(page)).toHaveText(['Example Video', 'Example Series'])
+    await expect(cardTitles(page)).toHaveText(['Example Video', 'Example Series'])
     await expect(page.getByLabel('Category search progress')).toHaveText(
       '· 1/5 categories complete',
     )
-    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled()
     gate.releases.game()
     gate.releases.software()
     gate.releases.music()
-    await expect(rows(page)).toHaveText(['Example Video', 'Example Game', 'Example Series'])
+    await expect(cardTitles(page)).toHaveText(['Example Video', 'Example Series', 'Example Game'])
     gate.releases['ebook,audiobook,book']()
     await expect(page.getByLabel('Category search progress')).toHaveText(
       '· 5/5 categories complete',
     )
-    await expect(page.locator('[data-result-count]')).toHaveText(`${expected.total} titles`)
-    await expect(rows(page)).toHaveText(expected.items.map((item: { title: string }) => item.title))
+    await expect(page.locator('[data-result-count]')).toHaveText('4 titles')
+    await expect(page.locator('main h2')).toHaveText(['Videos', 'Games', 'Books'])
+    await expect(cardTitles(page)).toHaveText([
+      'Example Video',
+      'Example Series',
+      'Example Game',
+      'Example Book',
+    ])
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   } finally {
     gate.releaseAll()
   }
 })
 
-test('a failed category preserves successful results and retries only the failed request', async ({
+test('a failed category preserves successful rails and retries only the failed request', async ({
   page,
   server,
 }) => {
@@ -120,17 +118,17 @@ test('a failed category preserves successful results and retries only the failed
     await route.continue()
   })
   await page.goto('/search?q=example%20journey')
-  await expect(rows(page)).toHaveText(['Example Video', 'Example Game', 'Example Series'])
+  await expect(cardTitles(page)).toHaveText(['Example Video', 'Example Series', 'Example Game'])
   await expect(page.getByLabel('Category search progress')).toHaveText('· 4/5 categories complete')
   await expect(page.getByRole('alert')).toHaveText(/Synthetic category failure/)
   const before = { ...requests }
   recovered = true
   await page.getByRole('button', { name: 'Try again', exact: true }).click()
-  await expect(rows(page)).toHaveText([
+  await expect(cardTitles(page)).toHaveText([
     'Example Video',
-    'Example Book',
-    'Example Game',
     'Example Series',
+    'Example Game',
+    'Example Book',
   ])
   await expect(page.getByLabel('Category search progress')).toHaveText('· 5/5 categories complete')
   expect(requests).toEqual({
@@ -149,7 +147,7 @@ test('an empty category cannot announce no matches before the other categories f
     const kind = new URL(route.request().url()).searchParams.get('type')!
     requests.push(kind)
     await gate.waiting[kind]
-    await route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } })
+    await route.fulfill({ json: { items: [], total: 0, limit: 24, offset: 0 } })
   })
   try {
     await page.goto('/search?q=unmatched')
@@ -173,41 +171,50 @@ test('an empty category cannot announce no matches before the other categories f
   }
 })
 
-test('distant pages stay bounded and returning to the first page restores progressive Search', async ({
+test('Show more expands only the requested category rail without refetching others', async ({
   page,
-  server,
 }) => {
-  await seedTitles(server)
-  const requests: URL[] = []
+  const requests: { type: string; limit: string }[] = []
   await page.route('**/api/catalog/search?**', async (route) => {
-    requests.push(new URL(route.request().url()))
-    await route.continue()
+    const url = new URL(route.request().url())
+    const type = url.searchParams.get('type') || ''
+    const limit = Number(url.searchParams.get('limit') || '24')
+    requests.push({ type, limit: String(limit) })
+    if (type === 'movie,tv') {
+      const count = Math.min(limit, 30)
+      return route.fulfill({
+        json: {
+          items: Array.from({ length: count }, (_, i) => ({
+            id: i + 1,
+            type: 'movie',
+            title: `Video Match ${i + 1}`,
+            years: [2026],
+            releases: 2,
+            providers: [],
+            tmdb: '',
+            imdb: '',
+            seasons: null,
+            selection: {},
+          })),
+          total: 30,
+          limit,
+          offset: 0,
+        },
+      })
+    }
+    return route.fulfill({ json: { items: [], total: 0, limit, offset: 0 } })
   })
-  await page.goto('/search?q=example%20journey&offset=250')
-  await expect(page.getByLabel('Category search progress')).toHaveText('· 5/5 categories complete')
-  await expect(page.getByText('No titles on this page', { exact: true })).toBeVisible()
-  expect(
-    requests.every(
-      (url) => url.searchParams.get('offset') === '250' && !url.searchParams.has('type'),
-    ),
-  ).toBe(true)
+  await page.goto('/search?q=video')
+  const videosRail = page.locator('[data-slot="catalog-rail"][data-category="videos"]')
+  await expect(videosRail.locator('[data-slot="catalog-card"]')).toHaveCount(24)
+  await expect(videosRail).toContainText('24 of 30')
+  const showMore = videosRail.getByRole('button', { name: 'Show more Videos', exact: true })
+  await expect(showMore).toBeVisible()
   requests.length = 0
-  await page.getByRole('button', { name: 'First', exact: true }).click()
-  await expect(rows(page)).toHaveText([
-    'Example Video',
-    'Example Book',
-    'Example Game',
-    'Example Series',
-  ])
-  const firstPageRequests = requests.filter((url) => url.searchParams.get('offset') === '0')
-  expect(new Set(firstPageRequests.map((url) => url.searchParams.get('type')))).toEqual(
-    new Set(['movie,tv', 'game', 'software', 'ebook,audiobook,book', 'music']),
-  )
-  expect(
-    firstPageRequests.every(
-      (url) => url.searchParams.get('limit') === '50' && url.searchParams.get('offset') === '0',
-    ),
-  ).toBe(true)
+  await showMore.click()
+  await expect(videosRail.locator('[data-slot="catalog-card"]')).toHaveCount(30)
+  await expect(showMore).toHaveCount(0)
+  expect(requests).toEqual([{ type: 'movie,tv', limit: '48' }])
 })
 
 test('changing or clearing a search cannot display delayed results from the previous query', async ({
@@ -235,19 +242,19 @@ test('changing or clearing a search cannot display delayed results from the prev
     await expect(page.getByLabel('Category search progress')).toHaveText(
       '· 5/5 categories complete',
     )
-    await expect(rows(page)).toHaveCount(4)
+    await expect(cardTitles(page)).toHaveCount(4)
     gate.releaseAll()
     await expect(page.getByText('Stale older result', { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
     await expect(page.getByText('Find a title', { exact: true })).toBeVisible()
-    await expect(rows(page)).toHaveCount(0)
+    await expect(cardTitles(page)).toHaveCount(0)
     await expect(page.getByLabel('Category search progress')).toHaveCount(0)
   } finally {
     gate.releaseAll()
   }
 })
 
-test('public Search uses the same progressive ranking and only public authenticated endpoints', async ({
+test('public Search uses the same progressive category rails and only public authenticated endpoints', async ({
   page,
   server,
   browser,
@@ -289,12 +296,12 @@ test('public Search uses the same progressive ranking and only public authentica
               years: [2026],
               releases: 1,
               providers: [],
-              ranking: { precision: 4, relevance: 1, year: [2026, 2010, 2020][index] },
+              ranking: { precision: 8, relevance: 1, year: [2026, 2010, 2020][index] },
             }
           : null
       await gate.waiting[kind]
       return route.fulfill({
-        json: { items: item ? [item] : [], total: item ? 1 : 0, limit: 50, offset: 0 },
+        json: { items: item ? [item] : [], total: item ? 1 : 0, limit: 24, offset: 0 },
       })
     }
     if (
@@ -310,13 +317,13 @@ test('public Search uses the same progressive ranking and only public authentica
     await visitor.goto('/public/search?q=example')
     await expect.poll(() => dispatched.length).toBe(5)
     gate.releases['movie,tv']()
-    await expect(rows(visitor)).toHaveText(['Example Video'])
+    await expect(cardTitles(visitor)).toHaveText(['Example Video'])
     gate.releases.game()
     gate.releases.software()
     gate.releases.music()
-    await expect(rows(visitor)).toHaveText(['Example Video', 'Example Game'])
+    await expect(cardTitles(visitor)).toHaveText(['Example Video', 'Example Game'])
     gate.releases['ebook,audiobook,book']()
-    await expect(rows(visitor)).toHaveText(['Example Video', 'Example Book', 'Example Game'])
+    await expect(cardTitles(visitor)).toHaveText(['Example Video', 'Example Game', 'Example Book'])
     await expect(visitor.getByLabel('Category search progress')).toHaveText(
       '· 5/5 categories complete',
     )

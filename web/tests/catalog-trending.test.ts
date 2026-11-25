@@ -5,6 +5,7 @@ import {
   formatTrendingMeta,
   parseTrendingPeriod,
   trendingCategories,
+  trendingItemSummary,
   trendingMetricLabel,
   trendingMetricTitle,
   trendingPeriodLabel,
@@ -38,7 +39,7 @@ test('trending categories keep Videos first followed by the remaining catalog ca
   )
 })
 
-test('trending card captions surface primary year or fallback context alongside torrent counts', () => {
+test('trending card captions surface subtype before primary year or fallback context', () => {
   assert.equal(trendingPrimaryYear([2026, 2024, 0, -5]), 2024)
   assert.equal(trendingPrimaryYear([]), undefined)
   assert.equal(
@@ -49,7 +50,7 @@ test('trending card captions surface primary year or fallback context alongside 
       years: [2026],
       torrents: 1,
     }),
-    '2026 · 1 torrent',
+    'Movie · 2026 · 1 torrent',
   )
   assert.equal(
     formatTrendingMeta({
@@ -59,7 +60,7 @@ test('trending card captions surface primary year or fallback context alongside 
       years: [2025, 2024],
       torrents: 12,
     }),
-    '2024 · 12 torrents',
+    'Series · 2024 · 12 torrents',
   )
   assert.equal(
     formatTrendingMeta({
@@ -70,7 +71,7 @@ test('trending card captions surface primary year or fallback context alongside 
       vendor: 'VideoLAN',
       torrents: 5,
     }),
-    'VideoLAN · 5 torrents',
+    'Software · VideoLAN · 5 torrents',
   )
   assert.equal(
     formatTrendingMeta({
@@ -81,7 +82,19 @@ test('trending card captions surface primary year or fallback context alongside 
       artists: ['The Synths'],
       torrents: 3,
     }),
-    'The Synths · 3 torrents',
+    'Music · The Synths · 3 torrents',
+  )
+  assert.equal(
+    trendingItemSummary({
+      id: 40,
+      type: 'music',
+      music_type: 'Album',
+      title: 'Midnight Echo',
+      years: [2025],
+      artists: ['The Synths'],
+      torrents: 3,
+    }),
+    'Album · 2025',
   )
   assert.equal(
     formatTrendingMeta({
@@ -92,7 +105,7 @@ test('trending card captions surface primary year or fallback context alongside 
       authors: ['Ada Lovelace'],
       torrents: 2,
     }),
-    'Ada Lovelace · 2 torrents',
+    'Book · Ada Lovelace · 2 torrents',
   )
   assert.equal(
     formatTrendingMeta({
@@ -102,7 +115,7 @@ test('trending card captions surface primary year or fallback context alongside 
       years: [],
       torrents: 7,
     }),
-    '7 torrents',
+    'Game · 7 torrents',
   )
 })
 
@@ -117,7 +130,7 @@ test('trending TV metrics format per-episode and per-season averages with explan
     torrents_per_episode: 35,
   }
   assert.equal(trendingMetricLabel(episodic), '35/ep')
-  assert.equal(formatTrendingMeta(episodic), '2025 · 35/ep')
+  assert.equal(formatTrendingMeta(episodic), 'Series · 2025 · 35/ep')
   assert.equal(trendingMetricTitle(episodic), '140 torrents · 4 episodes (35/ep)')
 
   const fractional = {
@@ -130,7 +143,7 @@ test('trending TV metrics format per-episode and per-season averages with explan
     torrents_per_episode: 2.5,
   }
   assert.equal(trendingMetricLabel(fractional), '2.5/ep')
-  assert.equal(formatTrendingMeta(fractional), '2024 · 2.5/ep')
+  assert.equal(formatTrendingMeta(fractional), 'Series · 2024 · 2.5/ep')
   assert.equal(trendingMetricTitle(fractional), '25 torrents · 10 episodes (2.5/ep)')
 
   const singleEp = {
@@ -155,7 +168,7 @@ test('trending TV metrics format per-episode and per-season averages with explan
     torrents_per_season: 2.2,
   }
   assert.equal(trendingMetricLabel(multiSeason), '2.2/season')
-  assert.equal(formatTrendingMeta(multiSeason), '2020 · 2.2/season')
+  assert.equal(formatTrendingMeta(multiSeason), 'Series · 2020 · 2.2/season')
   assert.equal(trendingMetricTitle(multiSeason), '11 torrents · 5 seasons (2.2/season)')
 
   const movie = {

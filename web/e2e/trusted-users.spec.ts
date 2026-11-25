@@ -391,7 +391,7 @@ test('a failed third Search category preserves a trusted session and completed r
     ).toBeVisible()
     await visitor.goto('/trusted/search?q=example')
     await expect.poll(() => searched).toBe(5)
-    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+    await expect(visitor.locator('[data-slot="catalog-card-title"]')).toHaveText([
       'Example Video',
       'Example Game',
     ])
@@ -404,14 +404,14 @@ test('a failed third Search category preserves a trusted session and completed r
     ).toBeVisible()
     await expect.poll(() => sessionProbes).toBeGreaterThanOrEqual(2)
     await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toHaveCount(0)
-    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+    await expect(visitor.locator('[data-slot="catalog-card-title"]')).toHaveText([
       'Example Video',
       'Example Game',
     ])
     expect((await context.request.get('/api/trusted/config')).status()).toBe(200)
     recovered = true
     await visitor.getByRole('button', { name: 'Try again', exact: true }).click()
-    await expect(visitor.locator('tbody tr td:first-child a')).toHaveText([
+    await expect(visitor.locator('[data-slot="catalog-card-title"]')).toHaveText([
       'Example Video',
       'Example Game',
       'Example Book',

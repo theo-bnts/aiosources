@@ -5,8 +5,10 @@ import "strings"
 // Search only discovers works represented in the local source catalog. Resolve
 // their editions before applying text predicates: joining globally matching
 // editions back to these few works can traverse millions of unrelated entries.
+// Aggregating match_count uses the same index-only scan on aio_matches_published_work
+// so popularity ranking costs zero extra heap reads.
 const catalogMatchedScope = `catalog_matched_ids AS MATERIALIZED(
- SELECT DISTINCT work_id AS id FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL)`
+ SELECT work_id AS id,count(*)::integer AS match_count FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL GROUP BY work_id)`
 
 const catalogBookScopeCTE = `catalog_book_ids AS MATERIALIZED(
  SELECT w.id FROM catalog_matched_ids m JOIN aiosources.aio_works w ON w.id=m.id WHERE w.media_type='book'),
@@ -32,22 +34,26 @@ catalog_book_authors AS MATERIALIZED(
 const catalogBookScope = `WITH ` + catalogMatchedScope + `,
 ` + catalogBookScopeCTE + ` `
 
-func catalogBookCandidates(query, normalized, matching, anchor string) string {
+func catalogBookCandidates(query, normalized, matching, anchor string, extraWordStarts ...string) string {
+	wordStarts := ""
+	if len(extraWordStarts) > 0 {
+		wordStarts = extraWordStarts[0]
+	}
 	workMatching := strings.ReplaceAll(matching, "normalized ", "book_normalized ")
 	// This input is identical for every candidate. An InitPlan resolves it once,
 	// instead of repeating the recursive lookup for each locally known edition.
 	identity := `(SELECT aiosources.ol_resolve(` + query + `))`
-	sql := ` UNION ALL SELECT id,CASE WHEN book_normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,book_normalized)
+	sql := ` UNION ALL SELECT id,` + catalogTitlePrecisionSQL("book_normalized", normalized, wordStarts) + `,public.similarity(` + normalized + `,book_normalized)
  FROM catalog_books WHERE ` + workMatching + `
- UNION ALL SELECT id,5,1::real FROM catalog_books WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
- UNION ALL SELECT w.id,5,1::real FROM aiosources.ol_editions e JOIN catalog_books w ON e.work_keys && w.aliases WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=` + identity + `
- UNION ALL SELECT work_id,CASE WHEN normalized=` + normalized + ` THEN 4 ELSE 1 END,public.similarity(` + normalized + `,normalized)
+ UNION ALL SELECT id,9,1::real FROM catalog_books WHERE openlibrary_id<>'' AND openlibrary_id=` + identity + `
+ UNION ALL SELECT w.id,9,1::real FROM aiosources.ol_editions e JOIN catalog_books w ON e.work_keys && w.aliases WHERE e.isbn @> ARRAY[` + query + `::text] OR e.id=` + identity + `
+ UNION ALL SELECT work_id,` + catalogTitlePrecisionSQL("normalized", normalized, wordStarts) + `,public.similarity(` + normalized + `,normalized)
  FROM catalog_book_editions WHERE ` + matching + `
- UNION ALL SELECT work_id,1,0.6::real FROM catalog_book_authors WHERE ` + matching
+ UNION ALL SELECT work_id,2,0.6::real FROM catalog_book_authors WHERE ` + matching
 	if anchor != "" {
 		// Preserve combined title/author ranking and the same longest-word
 		// anchor used by full-catalog review, without a global edition scan.
-		sql += ` UNION ALL SELECT id,2,public.similarity(` + normalized + `,normalized) FROM (
+		sql += ` UNION ALL SELECT id,3,public.similarity(` + normalized + `,normalized) FROM (
  WITH author_works AS MATERIALIZED(
  SELECT DISTINCT work_id AS id FROM catalog_book_authors WHERE normalized LIKE ` + anchor + ` ESCAPE '\'),
  aliases AS MATERIALIZED(

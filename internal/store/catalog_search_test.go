@@ -331,3 +331,94 @@ func TestCatalogLocalTitlesUseBrowserQueryEnglishFallbackAndRelevance(t *testing
 		t.Fatal("English fallback lost", detail, err)
 	}
 }
+
+func TestCatalogSearchRelevanceRanksExactArticlePrefixWholeWordPopularityAndMultiWord(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	type fixture struct {
+		tmdb       string
+		title      string
+		normalized string
+		year       int
+		torrents   int
+	}
+	works := []fixture{
+		// Single-word "star" relevance ladder:
+		{"501", "Star", "star", 2005, 1},
+		{"502", "The Star", "the star", 2017, 1},
+		{"503", "Star Wars", "star wars", 1977, 25},
+		{"504", "Star X", "star x", 2025, 1},
+		{"505", "A Star Is Born", "a star is born", 2018, 10},
+		{"506", "Starcraft", "starcraft", 2010, 5},
+		{"507", "Bastard", "bastard", 2025, 50},
+		// Exact homonym popularity:
+		{"601", "Avatar", "avatar", 2009, 25},
+		{"602", "Avatar", "avatar", 2024, 1},
+		// French article-stripped exact match:
+		{"701", "Le Parrain", "le parrain", 1972, 10},
+		{"702", "Le Parrain 2", "le parrain 2", 1974, 10},
+		// Multi-word boundary vs mid-word accidental substring:
+		{"801", "The Lord of the Rings", "the lord of the rings", 2001, 2},
+		{"802", "Landlord Earrings", "landlord earrings", 2025, 20},
+	}
+	for _, w := range works {
+		if err := db.SaveAIOWork(ctx, model.AIOWork{
+			Type:            "movie",
+			TMDB:            w.tmdb,
+			Titles:          []string{w.title},
+			Years:           []int{w.year},
+			LocalizedTitles: map[string]string{"en": w.title},
+		}, []string{w.normalized}); err != nil {
+			t.Fatal(err)
+		}
+		for i := range w.torrents {
+			sourceID := fmt.Sprintf("%s-%d", w.tmdb, i)
+			publishSharingRow(t, ctx, db, "fixture", sourceID, `{"title":"Release","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`, nil)
+			if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT t.provider_id,t.source_id,t.fields_fingerprint,w.id,w.revision,'matched','fixture'
+FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.tmdb_id=$1
+WHERE t.provider_id='fixture' AND t.source_id=$2`, w.tmdb, sourceID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue`); err != nil {
+		t.Fatal(err)
+	}
+
+	starPage, err := db.CatalogTitles(ctx, model.ListOptions{Query: "star", Limit: 20}, "star", model.CatalogSearchFilters{Type: "movie,tv"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotStar := make([]string, 0, len(starPage.Items))
+	for _, item := range starPage.Items {
+		gotStar = append(gotStar, item.TMDB)
+	}
+	wantStar := []string{"501", "502", "503", "504", "505", "506", "507"}
+	if !slices.Equal(gotStar, wantStar) {
+		t.Fatalf("star ranking = %v, want %v (items=%+v)", gotStar, wantStar, starPage.Items)
+	}
+
+	avatarPage, err := db.CatalogTitles(ctx, model.ListOptions{Query: "avatar", Limit: 10}, "avatar", model.CatalogSearchFilters{Type: "movie,tv"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(avatarPage.Items) != 2 || avatarPage.Items[0].TMDB != "601" || avatarPage.Items[1].TMDB != "602" {
+		t.Fatalf("popular exact homonym should rank first: %+v", avatarPage.Items)
+	}
+
+	parrainPage, err := db.CatalogTitles(ctx, model.ListOptions{Query: "parrain", Limit: 10}, "parrain", model.CatalogSearchFilters{Type: "movie,tv"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parrainPage.Items) != 2 || parrainPage.Items[0].TMDB != "701" || parrainPage.Items[1].TMDB != "702" {
+		t.Fatalf("article-stripped exact title should beat prefix sequel: %+v", parrainPage.Items)
+	}
+
+	lordPage, err := db.CatalogTitles(ctx, model.ListOptions{Query: "lord rings", Limit: 10}, "lord rings", model.CatalogSearchFilters{Type: "movie,tv"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lordPage.Items) != 2 || lordPage.Items[0].TMDB != "801" || lordPage.Items[1].TMDB != "802" {
+		t.Fatalf("multi-word boundary match should beat mid-word substring despite higher torrents: %+v", lordPage.Items)
+	}
+}

@@ -1,11 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  catalogSearchCategories,
   catalogSearchPlan,
   compareCatalogTitles,
+  DEFAULT_SEARCH_RAIL_LIMIT,
   hasCatalogRanking,
+  MAX_SEARCH_RAIL_LIMIT,
   mergeCatalogPages,
+  nextSearchRailLimit,
 } from '../src/lib/catalog-search-results.ts'
+import { catalogCardSummary, catalogSubtypeLabel } from '../src/lib/catalog-cards.ts'
 import type { CatalogTitle } from '../src/lib/catalog-search-types.ts'
 
 function title(id: number, type: CatalogTitle['type'], year: number): CatalogTitle {
@@ -115,4 +120,31 @@ test('bounded category prefixes produce the same global page and total at every 
     mergeCatalogPages([{ items: null, total: 0, limit: 50, offset: 0 }], 50, 0).items,
     [],
   )
+})
+
+test('catalogSearchCategories matches Trending category order and frames while preserving filters', () => {
+  assert.deepEqual(catalogSearchCategories(''), [
+    { id: 'videos', label: 'Videos', frame: 'portrait', type: 'movie,tv' },
+    { id: 'games', label: 'Games', frame: 'portrait', type: 'game' },
+    { id: 'software', label: 'Software', frame: 'icon', type: 'software' },
+    { id: 'music', label: 'Music', frame: 'square', type: 'music' },
+    { id: 'books', label: 'Books', frame: 'portrait', type: 'ebook,audiobook,book' },
+  ])
+  assert.deepEqual(catalogSearchCategories('tv,ebook'), [
+    { id: 'videos', label: 'Videos', frame: 'portrait', type: 'tv' },
+    { id: 'books', label: 'Books', frame: 'portrait', type: 'ebook' },
+  ])
+  assert.deepEqual(catalogSearchCategories('unknown'), [
+    { id: 'catalog', label: 'Catalog', frame: 'portrait', type: 'unknown' },
+  ])
+  assert.equal(DEFAULT_SEARCH_RAIL_LIMIT, 24)
+  assert.equal(nextSearchRailLimit(24), 48)
+  assert.equal(nextSearchRailLimit(48), 96)
+  assert.equal(nextSearchRailLimit(96), 150)
+  assert.equal(nextSearchRailLimit(150), MAX_SEARCH_RAIL_LIMIT)
+  assert.equal(catalogSubtypeLabel({ type: 'movie' }), 'Movie')
+  assert.equal(catalogSubtypeLabel({ type: 'tv' }), 'Series')
+  assert.equal(catalogSubtypeLabel({ type: 'music', music_type: 'EP' }), 'EP')
+  assert.equal(catalogCardSummary({ type: 'tv', years: [2024, 2026] }), 'Series · 2024')
+  assert.equal(catalogCardSummary({ type: 'movie', years: [2026] }), 'Movie · 2026')
 })

@@ -1,6 +1,51 @@
+import {
+  catalogCategoryByGroup,
+  type CatalogCardFrame,
+  type CatalogCategoryID,
+} from './catalog-cards.ts'
 import { catalogMediaTypes } from './connection-options.ts'
 import type { CatalogTitle } from './catalog-search-types.ts'
 import type { Page } from './types.ts'
+
+export const DEFAULT_SEARCH_RAIL_LIMIT = 24
+export const MAX_SEARCH_RAIL_LIMIT = 200
+
+export type CatalogSearchCategoryRequest = {
+  id: CatalogCategoryID | 'catalog'
+  label: string
+  frame: CatalogCardFrame
+  type: string
+}
+
+export function nextSearchRailLimit(current: number): number {
+  if (current < 48) return 48
+  if (current < 96) return 96
+  if (current < 150) return 150
+  return MAX_SEARCH_RAIL_LIMIT
+}
+
+export function catalogSearchCategories(type: string): CatalogSearchCategoryRequest[] {
+  const selected = type ? [...new Set(type.split(',').map((value) => value.trim()))] : []
+  const valid = selected.every((value) =>
+    catalogMediaTypes.some((option) => option.value === value),
+  )
+  if (!valid) {
+    return [{ id: 'catalog', label: 'Catalog', frame: 'portrait', type }]
+  }
+  const groups = [...new Set(catalogMediaTypes.map((option) => option.group || 'Catalog'))]
+  return groups.flatMap((group) => {
+    const values = catalogMediaTypes
+      .filter(
+        (option) =>
+          (option.group || 'Catalog') === group &&
+          (!selected.length || selected.includes(option.value)),
+      )
+      .map((option) => option.value)
+    if (!values.length) return []
+    const spec = catalogCategoryByGroup(group)
+    return [{ id: spec.id, label: spec.label, frame: spec.frame, type: values.join(',') }]
+  })
+}
 
 export type CatalogSearchRequest = {
   category: string
