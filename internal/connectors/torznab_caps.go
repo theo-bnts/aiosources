@@ -484,11 +484,28 @@ func normalizeTorznabSearches(searches map[sdk.SearchMode]sdk.SearchCapability) 
 }
 
 func convertTorznabCategories(categories []sdk.Category) []model.TorznabCategoryCapability {
+	seen := make(map[int]int)
+	return convertTorznabCategoryLevel(categories, seen)
+}
+
+func convertTorznabCategoryLevel(categories []sdk.Category, seen map[int]int) []model.TorznabCategoryCapability {
 	result := make([]model.TorznabCategoryCapability, 0, len(categories))
+	indexByID := make(map[int]int, len(categories))
 	for _, category := range categories {
 		if category.ID < 0 {
 			continue
 		}
+		if _, duplicate := seen[category.ID]; duplicate {
+			// If a duplicate parent appears at the same level, merge any unseen subcategories into it.
+			if existingIdx, sameLevel := indexByID[category.ID]; sameLevel && len(category.Subcategories) > 0 {
+				merged := convertTorznabCategoryLevel(category.Subcategories, seen)
+				if len(merged) > 0 {
+					result[existingIdx].Subcategories = append(result[existingIdx].Subcategories, merged...)
+				}
+			}
+			continue
+		}
+		seen[category.ID] = 1
 		name := sanitizeCapabilityText(category.Name, 160)
 		if name == "" {
 			name = fmt.Sprintf("Category %d", category.ID)
@@ -498,8 +515,11 @@ func convertTorznabCategories(categories []sdk.Category) []model.TorznabCategory
 			Name: name,
 		}
 		if len(category.Subcategories) > 0 {
-			item.Subcategories = convertTorznabCategories(category.Subcategories)
+			if subs := convertTorznabCategoryLevel(category.Subcategories, seen); len(subs) > 0 {
+				item.Subcategories = subs
+			}
 		}
+		indexByID[category.ID] = len(result)
 		result = append(result, item)
 	}
 	return result

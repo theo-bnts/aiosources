@@ -103,6 +103,7 @@ export function TorznabCapabilitiesProvider({
   const [fetchedKey, setFetchedKey] = useState<string | null>(null)
   const [error, setError] = useState<unknown>(null)
   const requestCounter = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
   const pendingScrollToCategories = useRef(false)
 
   const inspect = useMutation({
@@ -111,9 +112,11 @@ export function TorznabCapabilitiesProvider({
       sourceId?: string
       connectionKey: string
       requestId: number
+      signal: AbortSignal
     }) => {
       const result = await api<TorznabCapabilitiesResult>('/providers/torznab-capabilities', {
         method: 'POST',
+        signal: variables.signal,
         body: JSON.stringify({
           json: variables.json,
           source_id: variables.sourceId ?? '',
@@ -127,6 +130,7 @@ export function TorznabCapabilitiesProvider({
     },
     onSuccess: ({ result, connectionKey, requestId }) => {
       if (requestId !== requestCounter.current) return
+      abortRef.current = null
       setCapabilities(result)
       setFetchedKey(connectionKey)
       setError(null)
@@ -138,14 +142,28 @@ export function TorznabCapabilitiesProvider({
       )
     },
     onError: (caught, variables) => {
-      if (variables.requestId !== requestCounter.current) return
+      if (
+        variables.requestId !== requestCounter.current ||
+        (caught instanceof Error && caught.name === 'AbortError')
+      ) {
+        return
+      }
+      abortRef.current = null
       setError(caught)
     },
   })
 
   useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!isTorznab) {
       requestCounter.current += 1
+      abortRef.current?.abort()
+      abortRef.current = null
       setCapabilities(null)
       setFetchedKey(null)
       setError(null)
@@ -165,17 +183,23 @@ export function TorznabCapabilitiesProvider({
     }
     const requestId = requestCounter.current + 1
     requestCounter.current = requestId
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setError(null)
     inspect.mutate({
       json: rawJSON,
       sourceId: sourceID,
       connectionKey: torznabConnectionKey(document),
       requestId,
+      signal: controller.signal,
     })
   }, [isTorznab, readOnly, blocked, inspect, rawJSON, sourceID, document, onJumpToStage, notify])
 
   const clearCapabilities = useCallback(() => {
     requestCounter.current += 1
+    abortRef.current?.abort()
+    abortRef.current = null
     setCapabilities(null)
     setFetchedKey(null)
     setError(null)
@@ -457,6 +481,12 @@ export function TorznabCapabilitiesBanner({ currentStage }: { currentStage: stri
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {!expanded && categoryCount > 0 && currentStage !== 'connection' && (
+                <Button type="button" size="sm" variant="outline" onClick={jumpToCategories}>
+                  <ListChecksIcon aria-hidden="true" />
+                  Categories
+                </Button>
+              )}
               <Button
                 type="button"
                 size="sm"
@@ -676,22 +706,33 @@ export function TorznabCapabilitiesBanner({ currentStage }: { currentStage: stri
                         </Button>
                       )}
                       {item.field === 'page_size' &&
-                        capabilities.limits.default &&
-                        capabilities.limits.max &&
-                        capabilities.limits.default !== capabilities.limits.max &&
-                        currentPageSize !== capabilities.limits.default && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={readOnly}
-                            onClick={() =>
-                              applyField('page_size', capabilities.limits.default!, 'Page size')
-                            }
-                          >
-                            Use default ({capabilities.limits.default})
-                          </Button>
-                        )}
+                        (() => {
+                          const effectiveDefault = capabilities.limits.default
+                            ? Math.min(capabilities.limits.default, 10000)
+                            : 0
+                          const effectiveMax = capabilities.limits.max
+                            ? Math.min(capabilities.limits.max, 10000)
+                            : 0
+                          if (
+                            !effectiveDefault ||
+                            !effectiveMax ||
+                            effectiveDefault === effectiveMax ||
+                            currentPageSize === effectiveDefault
+                          ) {
+                            return null
+                          }
+                          return (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={readOnly}
+                              onClick={() => applyField('page_size', effectiveDefault, 'Page size')}
+                            >
+                              Use default ({effectiveDefault})
+                            </Button>
+                          )
+                        })()}
                     </div>
                   </div>
                 ))}

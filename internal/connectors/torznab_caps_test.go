@@ -152,6 +152,40 @@ func TestInspectTorznabCapabilitiesPreservesNonReservedQueryAndCleansCapsParam(t
 	}
 }
 
+func TestInspectTorznabCapabilitiesDeduplicatesCategoryIDs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(`<caps>
+			<server title="Duplicate Cats"/>
+			<categories>
+				<category id="2000" name="Movies">
+					<subcat id="2040" name="HD"/>
+					<subcat id="2040" name="HD Duplicate"/>
+				</category>
+				<category id="2000" name="Movies Duplicate">
+					<subcat id="2045" name="UHD"/>
+				</category>
+			</categories>
+		</caps>`))
+	}))
+	defer server.Close()
+
+	result, err := InspectTorznabCapabilities(context.Background(), model.Provider{
+		Adapter: "torznab",
+		URL:     server.URL + "/api",
+		Auth:    model.Auth{Type: "none"},
+	}, Environment{})
+	if err != nil {
+		t.Fatalf("InspectTorznabCapabilities failed: %v", err)
+	}
+	if len(result.Categories) != 1 || result.Categories[0].ID != 2000 {
+		t.Fatalf("expected 1 deduplicated parent category, got %+v", result.Categories)
+	}
+	if len(result.Categories[0].Subcategories) != 2 || result.Categories[0].Subcategories[0].ID != 2040 || result.Categories[0].Subcategories[1].ID != 2045 {
+		t.Fatalf("expected merged unique subcategories [2040, 2045], got %+v", result.Categories[0].Subcategories)
+	}
+}
+
 func TestInspectTorznabCapabilitiesErrorsDoNotLeakSecrets(t *testing.T) {
 	const wrongKey = "never-echo-this-secret-value"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

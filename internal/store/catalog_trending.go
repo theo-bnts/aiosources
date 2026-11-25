@@ -79,6 +79,7 @@ ranked AS (
  FROM period_counts c
  JOIN aiosources.aio_works w ON w.id=c.work_id AND w.revision=c.revision
  WHERE NOT w.adult
+  AND w.media_type IN ('movie','tv','game','software','music','book')
 )
 SELECT r.category,r.torrents,w.id,w.media_type,` + catalogTitleLabel("$2", "NULL") + `,` + bookWorkYears + `,
  COALESCE(NULLIF(w.localized_posters->>split_part($2,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),

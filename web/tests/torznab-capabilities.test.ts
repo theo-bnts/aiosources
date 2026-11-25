@@ -239,3 +239,23 @@ test('staleness ignores canonical endpoint adoption but flags other connection e
   doc.setIn(['auth', 'secret_ref'], 'different_secret')
   assert.equal(isTorznabCapabilitiesStale(fetchedKey, doc, sampleCaps), true)
 })
+
+test('minimal Torznab JSON without search, options or page_size applies capabilities cleanly', () => {
+  const doc = parseProviderJSON(`{
+    "version": 1,
+    "id": "minimal_source",
+    "name": "Minimal",
+    "adapter": "torznab",
+    "url": "https://tracker.example/api",
+    "enabled": false
+  }`)
+
+  applyTorznabCategories(doc, [5070, 2040])
+  assert.deepEqual(readSelectedCategoryIDs(doc), [2040, 5070])
+
+  applyTorznabCapabilityField(doc, 'page_size', 200)
+  applyTorznabCapabilityField(doc, 'search_mode', 'tvsearch')
+  assert.equal(doc.get('page_size'), 200)
+  assert.equal(doc.getIn(['options', 'search_mode']), 'tvsearch')
+  assert.deepEqual(doc.errors, [])
+})

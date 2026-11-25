@@ -330,25 +330,27 @@ export function CatalogTrendingPage() {
 
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
 
-      <div
-        className={cn(
-          'min-w-0 space-y-8 transition-opacity duration-150',
-          query.isPlaceholderData && query.isFetching && 'opacity-70',
-        )}
-      >
-        {trendingCategories.map((category, index) => (
-          <TrendingCategoryRail
-            key={category.id}
-            category={category}
-            items={itemsByCategory.get(category.id) ?? []}
-            periodLabel={periodLabel}
-            loading={query.isPending}
-            eagerRow={index === 0}
-            searchPath={searchPath}
-            listState={listState}
-          />
-        ))}
-      </div>
+      {(!query.isError || Boolean(query.data)) && (
+        <div
+          className={cn(
+            'min-w-0 space-y-8 transition-opacity duration-150',
+            query.isPlaceholderData && query.isFetching && 'opacity-70',
+          )}
+        >
+          {trendingCategories.map((category, index) => (
+            <TrendingCategoryRail
+              key={category.id}
+              category={category}
+              items={itemsByCategory.get(category.id) ?? []}
+              periodLabel={periodLabel}
+              loading={query.isPending}
+              eagerRow={index === 0}
+              searchPath={searchPath}
+              listState={listState}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
