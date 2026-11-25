@@ -119,44 +119,44 @@ test('trending card captions surface subtype before primary year or fallback con
   )
 })
 
-test('trending TV metrics format per-episode and per-season averages with explanatory tooltips', () => {
+test('trending TV metrics round per-episode and per-season averages consistently with torrent counts', () => {
   const episodic = {
     id: 10,
     type: 'tv' as const,
     title: 'Weekly Hit',
     years: [2025, 2026],
-    torrents: 140,
+    torrents: 262,
     episodes: 4,
-    torrents_per_episode: 35,
+    torrents_per_episode: 65.5,
   }
-  assert.equal(trendingMetricLabel(episodic), '35/ep')
-  assert.equal(formatTrendingMeta(episodic), 'Series · 2025 · 35/ep')
-  assert.equal(trendingMetricTitle(episodic), '140 torrents · 4 episodes (35/ep)')
+  assert.equal(trendingMetricLabel(episodic), '66 torrents/episode')
+  assert.equal(formatTrendingMeta(episodic), 'Series · 2025 · 66 torrents/episode')
+  assert.equal(trendingMetricTitle(episodic), '262 torrents · 4 episodes (66 torrents/episode)')
 
-  const fractional = {
+  const singularEp = {
     id: 11,
     type: 'tv' as const,
     title: 'Daily Soap',
     years: [2024],
-    torrents: 25,
+    torrents: 12,
     episodes: 10,
-    torrents_per_episode: 2.5,
+    torrents_per_episode: 1.2,
   }
-  assert.equal(trendingMetricLabel(fractional), '2.5/ep')
-  assert.equal(formatTrendingMeta(fractional), 'Series · 2024 · 2.5/ep')
-  assert.equal(trendingMetricTitle(fractional), '25 torrents · 10 episodes (2.5/ep)')
+  assert.equal(trendingMetricLabel(singularEp), '1 torrent/episode')
+  assert.equal(formatTrendingMeta(singularEp), 'Series · 2024 · 1 torrent/episode')
+  assert.equal(trendingMetricTitle(singularEp), '12 torrents · 10 episodes (1 torrent/episode)')
 
   const singleEp = {
     id: 12,
     type: 'tv' as const,
     title: 'Premiere',
     years: [2026],
-    torrents: 125.4,
+    torrents: 125,
     episodes: 1,
     torrents_per_episode: 125.4,
   }
-  assert.equal(trendingMetricLabel(singleEp), '125/ep')
-  assert.equal(trendingMetricTitle(singleEp), '125.4 torrents · 1 episode (125/ep)')
+  assert.equal(trendingMetricLabel(singleEp), '125 torrents/episode')
+  assert.equal(trendingMetricTitle(singleEp), '125 torrents · 1 episode (125 torrents/episode)')
 
   const multiSeason = {
     id: 13,
@@ -167,9 +167,21 @@ test('trending TV metrics format per-episode and per-season averages with explan
     seasons: 5,
     torrents_per_season: 2.2,
   }
-  assert.equal(trendingMetricLabel(multiSeason), '2.2/season')
-  assert.equal(formatTrendingMeta(multiSeason), 'Series · 2020 · 2.2/season')
-  assert.equal(trendingMetricTitle(multiSeason), '11 torrents · 5 seasons (2.2/season)')
+  assert.equal(trendingMetricLabel(multiSeason), '2 torrents/season')
+  assert.equal(formatTrendingMeta(multiSeason), 'Series · 2020 · 2 torrents/season')
+  assert.equal(trendingMetricTitle(multiSeason), '11 torrents · 5 seasons (2 torrents/season)')
+
+  const singleSeasonRate = {
+    id: 15,
+    type: 'tv' as const,
+    title: 'Boxed Anthology',
+    years: [2021],
+    torrents: 2,
+    seasons: 2,
+    torrents_per_season: 1,
+  }
+  assert.equal(trendingMetricLabel(singleSeasonRate), '1 torrent/season')
+  assert.equal(trendingMetricTitle(singleSeasonRate), '2 torrents · 2 seasons (1 torrent/season)')
 
   const movie = {
     id: 14,

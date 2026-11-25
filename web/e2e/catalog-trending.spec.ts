@@ -145,14 +145,16 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
   const videoLinks = videosSection.getByRole('link')
   await expect(videoLinks.first()).toContainText('Weekly Saga')
   await expect(videoLinks.first()).toContainText('Series · 2025')
-  await expect(videoLinks.first()).toContainText('4/ep')
-  await expect(videoLinks.first().locator('[title="8 torrents · 2 episodes (4/ep)"]')).toBeVisible()
+  await expect(videoLinks.first()).toContainText('4 torrents/episode')
+  await expect(
+    videoLinks.first().locator('[title="8 torrents · 2 episodes (4 torrents/episode)"]'),
+  ).toBeVisible()
   await expect(videoLinks.nth(1)).toContainText('Daily Spotlight')
   await expect(videoLinks.nth(1)).toContainText('Movie · 2026')
   await expect(videoLinks.nth(1)).toContainText('2 torrents')
   await expect(videoLinks.nth(2)).toContainText('Endless Daily Soap')
   await expect(videoLinks.nth(2)).toContainText('Series · 2024')
-  await expect(videoLinks.nth(2)).toContainText('1.5/ep')
+  await expect(videoLinks.nth(2)).toContainText('2 torrents/episode')
 
   // Cards sit side by side horizontally (same row y, increasing x) without page overflow.
   const firstBox = (await videoLinks.nth(0).boundingBox())!

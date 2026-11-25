@@ -69,18 +69,17 @@ export const trendingItemSubtype = catalogSubtypeLabel
 export const trendingItemSummary = catalogCardSummary
 export const trendingTorrentCount = catalogTorrentCount
 
-function formatTrendingAverage(value: number): string {
-  if (value >= 100) return Math.round(value).toLocaleString()
-  const rounded = Math.round(value * 10) / 10
-  return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1)
+function formatTrendingRate(value: number, unit: 'episode' | 'season'): string {
+  const rounded = Math.max(1, Math.round(value))
+  return `${catalogTorrentCount(rounded)}/${unit}`
 }
 
 export function trendingMetricLabel(item: CatalogTrendingItem): string {
   if (item.type === 'tv' && item.torrents_per_episode && item.torrents_per_episode > 0) {
-    return `${formatTrendingAverage(item.torrents_per_episode)}/ep`
+    return formatTrendingRate(item.torrents_per_episode, 'episode')
   }
   if (item.type === 'tv' && item.torrents_per_season && item.torrents_per_season > 0) {
-    return `${formatTrendingAverage(item.torrents_per_season)}/season`
+    return formatTrendingRate(item.torrents_per_season, 'season')
   }
   return trendingTorrentCount(item.torrents)
 }
@@ -94,7 +93,7 @@ export function trendingMetricTitle(item: CatalogTrendingItem): string | undefin
     item.episodes > 0
   ) {
     const episodes = `${item.episodes.toLocaleString()} ${item.episodes === 1 ? 'episode' : 'episodes'}`
-    return `${trendingTorrentCount(item.torrents)} · ${episodes} (${formatTrendingAverage(item.torrents_per_episode)}/ep)`
+    return `${trendingTorrentCount(item.torrents)} · ${episodes} (${formatTrendingRate(item.torrents_per_episode, 'episode')})`
   }
   if (
     item.type === 'tv' &&
@@ -104,7 +103,7 @@ export function trendingMetricTitle(item: CatalogTrendingItem): string | undefin
     item.seasons > 0
   ) {
     const seasons = `${item.seasons.toLocaleString()} ${item.seasons === 1 ? 'season' : 'seasons'}`
-    return `${trendingTorrentCount(item.torrents)} · ${seasons} (${formatTrendingAverage(item.torrents_per_season)}/season)`
+    return `${trendingTorrentCount(item.torrents)} · ${seasons} (${formatTrendingRate(item.torrents_per_season, 'season')})`
   }
   return undefined
 }
