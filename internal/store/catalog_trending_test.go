@@ -1,13 +1,16 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/testutil"
 )
@@ -654,5 +657,165 @@ func TestMigration106BackfillsExistingTorrentEpisodeKeys(t *testing.T) {
 	}
 	if len(got) != 2 || got["ep1"] != "e:3:7" || got["pack1"] != "s:1-2" {
 		t.Fatalf("unexpected migration 106 backfill keys: %+v", got)
+	}
+}
+
+func TestCatalogTrendingSnapshotsSingleflightStaleRefreshAndHardenedBookData(t *testing.T) {
+	ctx, db := sharingDatabase(t)
+	now := time.Now().UTC()
+
+	// Empty DB: RefreshStaleCatalogTrending is a fast no-op and writes no snapshots.
+	if err := db.RefreshStaleCatalogTrending(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var stateRows int
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_trending_state`).Scan(&stateRows); err != nil || stateRows != 0 {
+		t.Fatalf("expected 0 state rows on empty DB, got %d err=%v", stateRows, err)
+	}
+
+	// Seed a movie and a book with malformed book_data (empty cover string, JSON null author_keys).
+	var movieID, bookID int64
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(
+ media_type,tmdb_id,display_title,localized_titles,years
+) VALUES('movie','77001','Original Hit','{"en":"Original Hit","fr":"Succes Original"}'::jsonb,ARRAY[2026]) RETURNING id`).Scan(&movieID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(
+ media_type,openlibrary_id,display_title,years,book_data
+) VALUES('book','OL77001W','Edge Case Book',ARRAY[2026],'{"cover":"","author_keys":null}'::jsonb) RETURNING id`).Scan(&bookID); err != nil {
+		t.Fatal(err)
+	}
+	addMatch := func(sourceID string, workID int64, age time.Duration) {
+		t.Helper()
+		ts := now.Add(-age)
+		payload := fmt.Sprintf(`{"title":"Release %s","info_hash":"%040x","published_at":%q}`, sourceID, len(sourceID)*1000+int(workID), ts.Format(time.RFC3339))
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields,first_seen_at) VALUES('snap',$1,$2::jsonb,$3)`, sourceID, payload, ts); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+ SELECT t.provider_id,t.source_id,t.fields_fingerprint,$2,w.revision,'matched','fixture'
+ FROM aiosources.torrents t JOIN aiosources.aio_works w ON w.id=$2
+ WHERE t.provider_id='snap' AND t.source_id=$1`, sourceID, workID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue WHERE provider_id='snap' AND source_id=$1`, sourceID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	addMatch("m1", movieID, 60*24*time.Hour)
+	addMatch("b1", bookID, 60*24*time.Hour)
+
+	// Concurrent cold requests for quarter coalesce via singleflight without races or errors.
+	var wg sync.WaitGroup
+	errs := make(chan error, 8)
+	for i := range 8 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			lang := "en"
+			if i%2 == 0 {
+				lang = "fr"
+			}
+			res, err := db.CatalogTrending(ctx, model.CatalogTrendingOptions{Period: "quarter", Language: lang, Limit: 20})
+			if err != nil {
+				errs <- err
+				return
+			}
+			if len(res.Categories[0].Items) != 1 || len(res.Categories[4].Items) != 1 {
+				errs <- fmt.Errorf("unexpected items: %+v", res)
+				return
+			}
+			wantTitle := "Original Hit"
+			if lang == "fr" {
+				wantTitle = "Succes Original"
+			}
+			if res.Categories[0].Items[0].Title != wantTitle {
+				errs <- fmt.Errorf("lang %s title = %q, want %q", lang, res.Categories[0].Items[0].Title, wantTitle)
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+
+	// Verify snapshot was persisted in aio_trending_snapshots and aio_trending_state.
+	var snapCount int
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_trending_snapshots WHERE period='quarter'`).Scan(&snapCount); err != nil || snapCount != 2 {
+		t.Fatalf("expected 2 quarter snapshot rows, got %d err=%v", snapCount, err)
+	}
+
+	// Stale-while-revalidate: add a stronger movie, backdate snapshot state, first call returns cached
+	// snapshot immediately and triggers async refresh, then subsequent call sees the new leader.
+	var movie2ID int64
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,display_title,years) VALUES('movie','77002','New Quarter Leader',ARRAY[2026]) RETURNING id`).Scan(&movie2ID); err != nil {
+		t.Fatal(err)
+	}
+	addMatch("m2a", movie2ID, 50*24*time.Hour)
+	addMatch("m2b", movie2ID, 50*24*time.Hour)
+	addMatch("m2c", movie2ID, 50*24*time.Hour)
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_trending_state SET computed_at=now()-interval '3 hours' WHERE period='quarter'`); err != nil {
+		t.Fatal(err)
+	}
+	cached, err := db.CatalogTrending(ctx, model.CatalogTrendingOptions{Period: "quarter", Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cached.Categories[0].Items) == 0 || cached.Categories[0].Items[0].ID != movieID {
+		t.Fatalf("expected stale-while-revalidate to return prior snapshot first, got %+v", cached.Categories[0].Items)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		refreshed, err := db.CatalogTrending(ctx, model.CatalogTrendingOptions{Period: "quarter", Language: "en"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(refreshed.Categories[0].Items) == 2 && refreshed.Categories[0].Items[0].ID == movie2ID {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("async stale refresh did not update quarter snapshot in time: %+v", refreshed.Categories[0].Items)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	// Background RefreshStaleCatalogTrending warms all 5 periods cleanly.
+	if err := db.RefreshStaleCatalogTrending(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_trending_state`).Scan(&stateRows); err != nil || stateRows != 5 {
+		t.Fatalf("expected all 5 trending periods warmed, got %d err=%v", stateRows, err)
+	}
+
+	// Marking a work adult immediately hides it even before snapshot refresh.
+	if _, err := db.pool.Exec(ctx, `UPDATE aiosources.aio_works SET adult=TRUE WHERE id=$1`, movie2ID); err != nil {
+		t.Fatal(err)
+	}
+	filtered, err := db.CatalogTrending(ctx, model.CatalogTrendingOptions{Period: "quarter", Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range filtered.Categories[0].Items {
+		if item.ID == movie2ID {
+			t.Fatalf("adult work leaked from trending snapshot: %+v", item)
+		}
+	}
+
+	// Verify PostgreSQL SQLSTATE 57014 maps cleanly to context.DeadlineExceeded.
+	if got := databaseError("compute trending snapshot", &pgconn.PgError{Code: "57014"}); !errors.Is(got, context.DeadlineExceeded) {
+		t.Fatalf("expected SQLSTATE 57014 -> DeadlineExceeded, got %v", got)
+	}
+
+	// Verify ResetSourceData clears trending snapshots cleanly.
+	overview, err := db.StorageOverview(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.ResetSourceData(ctx, overview.Settings.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM aiosources.aio_trending_snapshots`).Scan(&snapCount); err != nil || snapCount != 0 {
+		t.Fatalf("expected ResetSourceData to clear snapshots, got %d err=%v", snapCount, err)
 	}
 }

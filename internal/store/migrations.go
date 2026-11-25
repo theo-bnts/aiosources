@@ -27,6 +27,7 @@ const (
 	sourceDataLockID         int32 = 5
 	catalogEntityIndexLockID int32 = 8
 	catalogPolicyLockID      int32 = 9
+	trendingSnapshotLockID   int32 = 10
 )
 
 const applicationSchema = "aiosources"
@@ -58,6 +59,7 @@ var migrations = []struct {
 	{104, repairCatalogSyncCheckpoints},
 	{105, trendingIndexSchema},
 	{106, trendingEpisodeKeySchema},
+	{107, trendingSnapshotSchema},
 }
 
 // Older workers could advance the visible MusicBrainz snapshot before the

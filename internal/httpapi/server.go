@@ -177,7 +177,12 @@ func respondError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusServiceUnavailable, "Operation interrupted or timed out")
 	default:
 		// Do not expose database connection strings, source URLs or payloads.
-		fmt.Fprintf(os.Stderr, "administration operation failed (%T)\n", err)
+		var dbErr *store.DatabaseError
+		if errors.As(err, &dbErr) {
+			fmt.Fprintf(os.Stderr, "administration operation failed: %s\n", dbErr.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "administration operation failed (%T)\n", err)
+		}
 		writeError(w, http.StatusInternalServerError, "The operation failed. Check the service status.")
 	}
 }

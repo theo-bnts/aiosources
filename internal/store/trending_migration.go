@@ -235,3 +235,28 @@ FROM (
 ) extracted
 WHERE ep_key <> '';
 `
+
+// Precomputed per-period top-50 trending snapshots so large quarter/year
+// windows never repeat multi-million-row joins on page loads and remain
+// instantaneous while localized metadata stays resolved from aio_works.
+const trendingSnapshotSchema = `
+CREATE TABLE aiosources.aio_trending_snapshots (
+ period TEXT NOT NULL CHECK (period IN ('day','week','month','quarter','year')),
+ category TEXT NOT NULL CHECK (category IN ('videos','games','software','music','books')),
+ rank INTEGER NOT NULL CHECK (rank >= 1 AND rank <= 50),
+ work_id BIGINT NOT NULL REFERENCES aiosources.aio_works(id) ON DELETE CASCADE,
+ revision BIGINT NOT NULL,
+ torrents BIGINT NOT NULL,
+ episodes BIGINT NOT NULL DEFAULT 0,
+ seasons BIGINT NOT NULL DEFAULT 0,
+ score DOUBLE PRECISION NOT NULL,
+ score_unit TEXT NOT NULL DEFAULT '' CHECK (score_unit IN ('','episode','season')),
+ PRIMARY KEY (period, category, rank)
+);
+
+CREATE TABLE aiosources.aio_trending_state (
+ period TEXT PRIMARY KEY CHECK (period IN ('day','week','month','quarter','year')),
+ computed_at TIMESTAMPTZ NOT NULL,
+ duration_ms INTEGER NOT NULL DEFAULT 0
+);
+`

@@ -132,7 +132,7 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 		}
 		return s.options.AIOSource.PublicCatalogSearch(r.Context(), visitor, opts, filters)
 	}))
-	mux.HandleFunc("GET "+prefix+"/catalog/trending", handler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/trending", handler(30*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, ok := catalogTrendingInput(w, r)
 		if !ok {
 			return nil, nil

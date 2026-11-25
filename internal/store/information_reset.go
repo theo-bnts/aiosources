@@ -198,7 +198,7 @@ UPDATE aiosources.aio_state SET last_match=NULL;`); err != nil {
 			return databaseError("reset identification", err)
 		}
 	}
-	if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,cache_generation=cache_generation+1;`); err != nil {
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.aio_trending_snapshots;DELETE FROM aiosources.aio_trending_state;UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,cache_generation=cache_generation+1;`); err != nil {
 		return databaseError("advance information generation", err)
 	}
 	if err = notify(ctx, tx); err != nil {

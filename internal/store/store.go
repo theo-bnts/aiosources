@@ -26,17 +26,19 @@ import (
 const notificationChannel = "aiosources_run_changes"
 
 type Store struct {
-	runtime        runtimeSettingsCache
-	pool           *pgxpool.Pool
-	backgroundPool *pgxpool.Pool
-	collectionPool *pgxpool.Pool
-	mu             sync.Mutex
-	leases         map[string]*runLease
-	claimSlots     chan struct{}
-	closed         bool
-	background     context.Context
-	cancel         context.CancelFunc
-	listeners      sync.WaitGroup
+	runtime         runtimeSettingsCache
+	pool            *pgxpool.Pool
+	backgroundPool  *pgxpool.Pool
+	collectionPool  *pgxpool.Pool
+	mu              sync.Mutex
+	leases          map[string]*runLease
+	claimSlots      chan struct{}
+	closed          bool
+	background      context.Context
+	cancel          context.CancelFunc
+	listeners       sync.WaitGroup
+	trendingMu      sync.Mutex
+	trendingFlights map[string]*trendingFlight
 }
 
 func (s *Store) workerPool() *pgxpool.Pool {
@@ -305,6 +307,9 @@ func databaseError(operation string, err error) error {
 	var sqlState string
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
+		if pgErr.Code == "57014" {
+			return context.DeadlineExceeded
+		}
 		if pgErr.Code == "23505" {
 			if pgErr.ConstraintName == "runs_one_active_provider" {
 				return model.ErrBusy

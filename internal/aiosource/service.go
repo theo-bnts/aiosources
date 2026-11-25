@@ -126,11 +126,12 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 		cancel()
 		return nil, err
 	}
-	s.wg.Add(4)
+	s.wg.Add(5)
 	go s.storageIndexes()
 	go s.retainHistory()
 	go s.maintenance()
 	go s.automation()
+	go s.warmTrending()
 	return s, nil
 }
 func (s *Service) Authorized(ctx context.Context, token string) bool {
@@ -425,6 +426,28 @@ func (s *Service) match(ctx context.Context, trigger string) (matchErr error) {
 		return err
 	}
 	return s.drainCorrespondences(ctx, history)
+}
+
+func (s *Service) warmTrending() {
+	defer s.wg.Done()
+	initial := time.NewTimer(10 * time.Second)
+	defer initial.Stop()
+	select {
+	case <-s.ctx.Done():
+		return
+	case <-initial.C:
+	}
+	_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+	}
 }
 
 func (s *Service) maintenance() {

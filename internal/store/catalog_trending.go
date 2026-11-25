@@ -3,8 +3,11 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/theo-bnts/aiosources/internal/model"
 )
 
@@ -16,45 +19,176 @@ const trendingCategoryCase = `CASE
  WHEN w.media_type='book' THEN 'books'
 END`
 
-// CatalogTrending ranks identified works in each catalog category by published
-// matched torrent activity within the selected rolling window. TV series are
-// ranked by average torrents per active episode (or per active season when
-// dominated by multi-season packs) so long-running/daily series do not crowd
-// out higher-demand titles. Grouping runs in two hash-aggregate passes over
-// torrents_trending_recent before touching aio_works, and localized title,
-// cover and author projections run only on the final per-category top-N winners.
-func (s *Store) CatalogTrending(ctx context.Context, opts model.CatalogTrendingOptions) (model.CatalogTrending, error) {
-	period := opts.Period
-	if period == "" {
-		period = model.DefaultTrendingPeriod
+type trendingFlight struct {
+	done chan struct{}
+	err  error
+}
+
+type trendingSnapshotRow struct {
+	category  string
+	rank      int32
+	workID    int64
+	revision  int64
+	torrents  int64
+	episodes  int64
+	seasons   int64
+	score     float64
+	scoreUnit string
+}
+
+var trendingPeriodsOrder = []string{
+	model.TrendingPeriodDay,
+	model.TrendingPeriodWeek,
+	model.TrendingPeriodMonth,
+	model.TrendingPeriodQuarter,
+	model.TrendingPeriodYear,
+}
+
+func trendingSnapshotTTL(period string) time.Duration {
+	switch period {
+	case model.TrendingPeriodDay:
+		return 5 * time.Minute
+	case model.TrendingPeriodWeek:
+		return 15 * time.Minute
+	case model.TrendingPeriodMonth:
+		return 30 * time.Minute
+	case model.TrendingPeriodQuarter:
+		return time.Hour
+	case model.TrendingPeriodYear:
+		return 2 * time.Hour
+	default:
+		return 15 * time.Minute
 	}
+}
+
+// RefreshCatalogTrending computes and stores the top-50 per-category trending
+// snapshot for period. Concurrent callers for the same period coalesce onto one
+// in-flight refresh, and the aggregation runs without parallel gather workers
+// so large quarter/year windows never exhaust small container /dev/shm limits.
+func (s *Store) RefreshCatalogTrending(ctx context.Context, period string) error {
+	if _, ok := model.TrendingPeriodDays(period); !ok {
+		return model.ErrInvalid
+	}
+	flight, err := s.startTrendingRefresh(period)
+	if err != nil {
+		return err
+	}
+	select {
+	case <-flight.done:
+		return flight.err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *Store) refreshCatalogTrendingAsync(period string) {
+	_, _ = s.startTrendingRefresh(period)
+}
+
+func (s *Store) startTrendingRefresh(period string) (*trendingFlight, error) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return nil, context.Canceled
+	}
+	s.trendingMu.Lock()
+	if s.trendingFlights == nil {
+		s.trendingFlights = map[string]*trendingFlight{}
+	}
+	if existing, ok := s.trendingFlights[period]; ok {
+		s.trendingMu.Unlock()
+		s.mu.Unlock()
+		return existing, nil
+	}
+	flight := &trendingFlight{done: make(chan struct{})}
+	s.trendingFlights[period] = flight
+	s.listeners.Add(1)
+	s.trendingMu.Unlock()
+	s.mu.Unlock()
+
+	go func() {
+		defer s.listeners.Done()
+		defer func() {
+			s.trendingMu.Lock()
+			delete(s.trendingFlights, period)
+			s.trendingMu.Unlock()
+			close(flight.done)
+		}()
+		parent := s.background
+		if parent == nil {
+			parent = context.Background()
+		}
+		refreshCtx, cancel := context.WithTimeout(parent, 3*time.Minute)
+		defer cancel()
+		flight.err = s.computeAndStoreTrending(refreshCtx, period)
+	}()
+	return flight, nil
+}
+
+// RefreshStaleCatalogTrending warms missing or expired period snapshots in the
+// background whenever identified matches exist.
+func (s *Store) RefreshStaleCatalogTrending(ctx context.Context) error {
+	var hasMatches bool
+	if err := s.workerPool().QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM aiosources.aio_matches WHERE status='matched' AND work_id IS NOT NULL)`).Scan(&hasMatches); err != nil {
+		return databaseError("check trending matches", err)
+	}
+	if !hasMatches {
+		return nil
+	}
+	for _, period := range trendingPeriodsOrder {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		computedAt, hasItems, err := s.trendingSnapshotStatus(ctx, period)
+		if err != nil {
+			return err
+		}
+		if hasItems && time.Since(computedAt) <= trendingSnapshotTTL(period) {
+			continue
+		}
+		if err := s.RefreshCatalogTrending(ctx, period); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) trendingSnapshotStatus(ctx context.Context, period string) (time.Time, bool, error) {
+	var computedAt time.Time
+	var hasItems bool
+	err := s.pool.QueryRow(ctx, `SELECT st.computed_at, EXISTS(SELECT 1 FROM aiosources.aio_trending_snapshots sp WHERE sp.period=$1)
+ FROM aiosources.aio_trending_state st
+ WHERE st.period=$1`, period).Scan(&computedAt, &hasItems)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, databaseError("read trending snapshot status", err)
+	}
+	return computedAt, hasItems, nil
+}
+
+func (s *Store) computeAndStoreTrending(ctx context.Context, period string) error {
 	days, ok := model.TrendingPeriodDays(period)
 	if !ok {
-		return model.CatalogTrending{}, model.ErrInvalid
+		return model.ErrInvalid
 	}
-	limit := opts.Limit
-	if limit == 0 {
-		limit = model.DefaultTrendingLimit
-	}
-	if limit < 1 || limit > model.MaxTrendingLimit {
-		return model.CatalogTrending{}, model.ErrInvalid
-	}
-	locale := "en"
-	if opts.Language != "" {
-		locale = opts.Language
-	}
+	started := time.Now()
+	pool := s.workerPool()
 
-	result := model.CatalogTrending{
-		Period:     period,
-		Categories: make([]model.CatalogTrendingCategory, len(model.TrendingCategories)),
+	readTx, err := pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return databaseError("begin trending snapshot computation", err)
 	}
-	byCategory := make(map[string]int, len(model.TrendingCategories))
-	for i, id := range model.TrendingCategories {
-		result.Categories[i] = model.CatalogTrendingCategory{
-			ID:    id,
-			Items: []model.CatalogTrendingItem{},
-		}
-		byCategory[id] = i
+	defer rollback(readTx)
+	// Disable parallel gather workers for the large window aggregation so
+	// PostgreSQL uses process-private work_mem/temp storage instead of dynamic
+	// shared memory in container /dev/shm (commonly capped at 64 MiB in Docker).
+	if _, err := readTx.Exec(ctx, `SET LOCAL max_parallel_workers_per_gather = 0`); err != nil {
+		return databaseError("configure trending snapshot parallelism", err)
+	}
+	if _, err := readTx.Exec(ctx, `SET LOCAL statement_timeout = '180s'`); err != nil {
+		return databaseError("configure trending snapshot timeout", err)
 	}
 
 	query := `WITH matched_rows AS (
@@ -108,7 +242,7 @@ period_counts AS (
  GROUP BY work_id,revision
 ),
 scored AS (
- SELECT w.id,` + trendingCategoryCase + ` AS category,
+ SELECT w.id,w.revision,` + trendingCategoryCase + ` AS category,
   c.torrents,
   CASE WHEN w.media_type='tv' THEN c.episode_count ELSE 0 END AS episodes,
   CASE WHEN w.media_type='tv' THEN c.season_count ELSE 0 END AS seasons,
@@ -143,24 +277,174 @@ scored AS (
   AND w.media_type IN ('movie','tv','game','software','music','book')
 ),
 ranked AS (
- SELECT id,category,torrents,episodes,seasons,score,score_unit,
+ SELECT id,revision,category,torrents,episodes,seasons,score,score_unit,
   row_number() OVER (
    PARTITION BY category
    ORDER BY score DESC,torrents DESC,latest_at DESC,id ASC
-  ) AS rn
+  )::int4 AS rn
  FROM scored
 )
-SELECT r.category,r.torrents,r.episodes,r.seasons,r.score,r.score_unit,w.id,w.media_type,` + catalogTitleLabel("$2", "NULL") + `,` + bookWorkYears + `,
- COALESCE(NULLIF(w.localized_posters->>split_part($2,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path),
- COALESCE(` + bookEditionLocalizedCover("$2") + `,NULLIF((w.book_data->>'cover')::bigint,0),0),
- CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(COALESCE(w.book_data->'author_keys','[]'))))) ORDER BY a.id) ELSE '{}'::text[] END,
- w.music_data,w.software_data
-FROM ranked r
-JOIN aiosources.aio_works w ON w.id=r.id
-WHERE r.rn<=$3
-ORDER BY r.category,r.rn`
+SELECT category,rn,id,revision,torrents,episodes,seasons,score,score_unit
+FROM ranked
+WHERE rn<=$2
+ORDER BY category,rn`
 
-	rows, err := s.pool.Query(ctx, query, days, locale, limit)
+	rows, err := readTx.Query(ctx, query, days, model.MaxTrendingLimit)
+	if err != nil {
+		return databaseError("compute trending snapshot", err)
+	}
+	entries := make([]trendingSnapshotRow, 0, len(model.TrendingCategories)*model.DefaultTrendingLimit)
+	for rows.Next() {
+		var entry trendingSnapshotRow
+		if err := rows.Scan(
+			&entry.category,
+			&entry.rank,
+			&entry.workID,
+			&entry.revision,
+			&entry.torrents,
+			&entry.episodes,
+			&entry.seasons,
+			&entry.score,
+			&entry.scoreUnit,
+		); err != nil {
+			rows.Close()
+			return databaseError("read trending snapshot row", err)
+		}
+		entries = append(entries, entry)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return databaseError("compute trending snapshot", err)
+	}
+	rows.Close()
+	if err := readTx.Commit(ctx); err != nil {
+		return databaseError("finish trending snapshot read", err)
+	}
+
+	writeTx, err := pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin trending snapshot save", err)
+	}
+	defer rollback(writeTx)
+	if _, err := writeTx.Exec(ctx, `SELECT pg_advisory_xact_lock($1,$2)`, migrationLockNamespace, trendingSnapshotLockID); err != nil {
+		return databaseError("lock trending snapshot", err)
+	}
+	if _, err := writeTx.Exec(ctx, `DELETE FROM aiosources.aio_trending_snapshots WHERE period=$1`, period); err != nil {
+		return databaseError("clear trending snapshot", err)
+	}
+	if len(entries) > 0 {
+		categories := make([]string, len(entries))
+		ranks := make([]int32, len(entries))
+		workIDs := make([]int64, len(entries))
+		revisions := make([]int64, len(entries))
+		torrents := make([]int64, len(entries))
+		episodes := make([]int64, len(entries))
+		seasons := make([]int64, len(entries))
+		scores := make([]float64, len(entries))
+		scoreUnits := make([]string, len(entries))
+		for i, e := range entries {
+			categories[i] = e.category
+			ranks[i] = e.rank
+			workIDs[i] = e.workID
+			revisions[i] = e.revision
+			torrents[i] = e.torrents
+			episodes[i] = e.episodes
+			seasons[i] = e.seasons
+			scores[i] = e.score
+			scoreUnits[i] = e.scoreUnit
+		}
+		if _, err := writeTx.Exec(ctx, `INSERT INTO aiosources.aio_trending_snapshots(
+ period,category,rank,work_id,revision,torrents,episodes,seasons,score,score_unit
+)
+SELECT $1,u.category,u.rank,u.work_id,u.revision,u.torrents,u.episodes,u.seasons,u.score,u.score_unit
+FROM unnest($2::text[],$3::int4[],$4::int8[],$5::int8[],$6::int8[],$7::int8[],$8::int8[],$9::float8[],$10::text[])
+ AS u(category,rank,work_id,revision,torrents,episodes,seasons,score,score_unit)
+JOIN aiosources.aio_works w ON w.id=u.work_id AND w.revision=u.revision AND NOT w.adult`,
+			period, categories, ranks, workIDs, revisions, torrents, episodes, seasons, scores, scoreUnits,
+		); err != nil {
+			return databaseError("save trending snapshot", err)
+		}
+	}
+	elapsed := time.Since(started).Milliseconds()
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	if elapsed > math.MaxInt32 {
+		elapsed = math.MaxInt32
+	}
+	if _, err := writeTx.Exec(ctx, `INSERT INTO aiosources.aio_trending_state(period,computed_at,duration_ms)
+ VALUES($1,now(),$2)
+ ON CONFLICT(period) DO UPDATE SET computed_at=EXCLUDED.computed_at,duration_ms=EXCLUDED.duration_ms`,
+		period, int32(elapsed),
+	); err != nil {
+		return databaseError("save trending snapshot state", err)
+	}
+	return databaseError("commit trending snapshot", writeTx.Commit(ctx))
+}
+
+// CatalogTrending ranks identified works in each catalog category by published
+// matched torrent activity within the selected rolling window. TV series are
+// ranked by average torrents per active episode (or per active season when
+// dominated by multi-season packs) so long-running/daily series do not crowd
+// out higher-demand titles. Rankings are served from per-period precomputed
+// snapshots with stale-while-revalidate refresh, while localized title, cover
+// and author projections are resolved live from aio_works for the final winners.
+func (s *Store) CatalogTrending(ctx context.Context, opts model.CatalogTrendingOptions) (model.CatalogTrending, error) {
+	period := opts.Period
+	if period == "" {
+		period = model.DefaultTrendingPeriod
+	}
+	if _, ok := model.TrendingPeriodDays(period); !ok {
+		return model.CatalogTrending{}, model.ErrInvalid
+	}
+	limit := opts.Limit
+	if limit == 0 {
+		limit = model.DefaultTrendingLimit
+	}
+	if limit < 1 || limit > model.MaxTrendingLimit {
+		return model.CatalogTrending{}, model.ErrInvalid
+	}
+	locale := "en"
+	if opts.Language != "" {
+		locale = opts.Language
+	}
+
+	result := model.CatalogTrending{
+		Period:     period,
+		Categories: make([]model.CatalogTrendingCategory, len(model.TrendingCategories)),
+	}
+	byCategory := make(map[string]int, len(model.TrendingCategories))
+	for i, id := range model.TrendingCategories {
+		result.Categories[i] = model.CatalogTrendingCategory{
+			ID:    id,
+			Items: []model.CatalogTrendingItem{},
+		}
+		byCategory[id] = i
+	}
+
+	computedAt, hasItems, err := s.trendingSnapshotStatus(ctx, period)
+	if err != nil {
+		return result, err
+	}
+	if !hasItems {
+		if err := s.RefreshCatalogTrending(ctx, period); err != nil {
+			return result, err
+		}
+	} else if time.Since(computedAt) > trendingSnapshotTTL(period) {
+		s.refreshCatalogTrendingAsync(period)
+	}
+
+	query := `SELECT s.category,s.torrents,s.episodes,s.seasons,s.score,s.score_unit,w.id,w.media_type,` + catalogTitleLabel("$3", "NULL") + `,` + bookWorkYears + `,
+ COALESCE(NULLIF(w.localized_posters->>split_part($3,'-',1),''),NULLIF(w.localized_posters->>'en',''),w.poster_path,''),
+ COALESCE(` + bookEditionLocalizedCover("$3") + `,CASE WHEN (w.book_data->>'cover') ~ '^[0-9]{1,18}$' THEN NULLIF((w.book_data->>'cover')::bigint,0) END,0),
+ CASE WHEN w.media_type='book' THEN ARRAY(SELECT a.name FROM aiosources.ol_authors a WHERE a.id=ANY(ARRAY(SELECT aiosources.ol_resolve(jsonb_array_elements_text(CASE WHEN jsonb_typeof(w.book_data->'author_keys')='array' THEN w.book_data->'author_keys' ELSE '[]'::jsonb END)))) ORDER BY a.id) ELSE '{}'::text[] END,
+ w.music_data,w.software_data
+FROM aiosources.aio_trending_snapshots s
+JOIN aiosources.aio_works w ON w.id=s.work_id AND w.revision=s.revision
+WHERE s.period=$1 AND s.rank<=$2 AND NOT w.adult
+ORDER BY s.category,s.rank`
+
+	rows, err := s.pool.Query(ctx, query, period, limit, locale)
 	if err != nil {
 		return result, databaseError("list trending catalog titles", err)
 	}
