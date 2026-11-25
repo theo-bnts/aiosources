@@ -31,6 +31,10 @@ export type CatalogTrendingItem = {
   years: number[]
   cover?: string
   torrents: number
+  episodes?: number
+  seasons?: number
+  torrents_per_episode?: number
+  torrents_per_season?: number
   artists?: string[]
   authors?: string[]
   vendor?: string
@@ -77,8 +81,48 @@ export function trendingTorrentCount(torrents: number): string {
   return `${torrents.toLocaleString()} ${torrents === 1 ? 'torrent' : 'torrents'}`
 }
 
+function formatTrendingAverage(value: number): string {
+  if (value >= 100) return Math.round(value).toLocaleString()
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(1)
+}
+
+export function trendingMetricLabel(item: CatalogTrendingItem): string {
+  if (item.type === 'tv' && item.torrents_per_episode && item.torrents_per_episode > 0) {
+    return `${formatTrendingAverage(item.torrents_per_episode)}/ep`
+  }
+  if (item.type === 'tv' && item.torrents_per_season && item.torrents_per_season > 0) {
+    return `${formatTrendingAverage(item.torrents_per_season)}/season`
+  }
+  return trendingTorrentCount(item.torrents)
+}
+
+export function trendingMetricTitle(item: CatalogTrendingItem): string | undefined {
+  if (
+    item.type === 'tv' &&
+    item.torrents_per_episode &&
+    item.torrents_per_episode > 0 &&
+    item.episodes &&
+    item.episodes > 0
+  ) {
+    const episodes = `${item.episodes.toLocaleString()} ${item.episodes === 1 ? 'episode' : 'episodes'}`
+    return `${trendingTorrentCount(item.torrents)} · ${episodes} (${formatTrendingAverage(item.torrents_per_episode)}/ep)`
+  }
+  if (
+    item.type === 'tv' &&
+    item.torrents_per_season &&
+    item.torrents_per_season > 0 &&
+    item.seasons &&
+    item.seasons > 0
+  ) {
+    const seasons = `${item.seasons.toLocaleString()} ${item.seasons === 1 ? 'season' : 'seasons'}`
+    return `${trendingTorrentCount(item.torrents)} · ${seasons} (${formatTrendingAverage(item.torrents_per_season)}/season)`
+  }
+  return undefined
+}
+
 export function formatTrendingMeta(item: CatalogTrendingItem): string {
-  const count = trendingTorrentCount(item.torrents)
+  const metric = trendingMetricLabel(item)
   const context = trendingItemContext(item)
-  return context ? `${context} · ${count}` : count
+  return context ? `${context} · ${metric}` : metric
 }

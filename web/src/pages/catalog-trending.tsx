@@ -18,9 +18,10 @@ import {
   parseTrendingPeriod,
   trendingCategories,
   trendingItemContext,
+  trendingMetricLabel,
+  trendingMetricTitle,
   trendingPeriodLabel,
   trendingPeriods,
-  trendingTorrentCount,
   type CatalogTrending,
   type CatalogTrendingItem,
   type TrendingCategoryID,
@@ -67,7 +68,8 @@ function TrendingPosterCard({
   const [failedSrc, setFailedSrc] = useState('')
   const showImage = isAllowedCoverURL(item.cover) && failedSrc !== item.cover
   const context = trendingItemContext(item)
-  const count = trendingTorrentCount(item.torrents)
+  const metric = trendingMetricLabel(item)
+  const metricTitle = trendingMetricTitle(item)
   return (
     <Link
       to={to}
@@ -108,17 +110,17 @@ function TrendingPosterCard({
         <p className="line-clamp-2 text-sm leading-snug font-medium text-foreground transition-colors group-hover:text-primary">
           {item.title}
         </p>
-        <p className="flex items-center text-xs text-muted-foreground">
+        <p title={metricTitle} className="flex items-center text-xs text-muted-foreground">
           {context ? (
             <>
               <span className="min-w-0 truncate">{context}</span>
               <span aria-hidden="true" className="shrink-0 whitespace-pre">
                 {' · '}
               </span>
-              <span className="shrink-0">{count}</span>
+              <span className="shrink-0">{metric}</span>
             </>
           ) : (
-            <span className="truncate">{count}</span>
+            <span className="truncate">{metric}</span>
           )}
         </p>
       </div>

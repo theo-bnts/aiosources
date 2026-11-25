@@ -46,17 +46,23 @@ type CatalogTrendingCategory struct {
 }
 
 // CatalogTrendingItem contains only identified public metadata and the matched
-// torrent count within the requested period. No source identities or payloads
-// cross this boundary.
+// torrent metrics within the requested period. TV series are ranked by average
+// torrents per active episode (or per active season for season-pack-only titles)
+// within the selected window. No source identities or payloads cross this
+// boundary.
 type CatalogTrendingItem struct {
-	ID        int64    `json:"id"`
-	Type      string   `json:"type"`
-	Title     string   `json:"title"`
-	Years     []int    `json:"years"`
-	Cover     string   `json:"cover,omitempty"`
-	Torrents  int64    `json:"torrents"`
-	Artists   []string `json:"artists,omitempty"`
-	Authors   []string `json:"authors,omitempty"`
-	Vendor    string   `json:"vendor,omitempty"`
-	MusicType string   `json:"music_type,omitempty"`
+	ID                 int64    `json:"id"`
+	Type               string   `json:"type"`
+	Title              string   `json:"title"`
+	Years              []int    `json:"years"`
+	Cover              string   `json:"cover,omitempty"`
+	Torrents           int64    `json:"torrents"`
+	Episodes           int64    `json:"episodes,omitempty"`
+	Seasons            int64    `json:"seasons,omitempty"`
+	TorrentsPerEpisode float64  `json:"torrents_per_episode,omitempty"`
+	TorrentsPerSeason  float64  `json:"torrents_per_season,omitempty"`
+	Artists            []string `json:"artists,omitempty"`
+	Authors            []string `json:"authors,omitempty"`
+	Vendor             string   `json:"vendor,omitempty"`
+	MusicType          string   `json:"music_type,omitempty"`
 }

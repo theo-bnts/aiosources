@@ -9,7 +9,7 @@ import (
 
 // Keep source attribution aligned with the Storage page. Shared metadata and
 // provider caches belong to their own categories, not to an individual source.
-const sourceStorageRelations = `(c.relname IN ('torrents','staged_torrents','raw_records','pages','events','runs','collection_state','legacy_imports','schedule_clocks','torrent_history','torrent_history_baselines','torrent_history_metadata') OR c.relname LIKE 'run_%')`
+const sourceStorageRelations = `(c.relname IN ('torrents','torrent_episode_keys','staged_torrents','raw_records','pages','events','runs','collection_state','legacy_imports','schedule_clocks','torrent_history','torrent_history_baselines','torrent_history_metadata') OR c.relname LIKE 'run_%')`
 
 // Expand only identifier distributions, shared by source and run estimates.
 const storageDistributionSQL = ` CROSS JOIN LATERAL (

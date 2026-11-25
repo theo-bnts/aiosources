@@ -37,7 +37,7 @@ WHEN n.nspname='aiosources' AND c.relname IN ('activity_logs','operation_runs','
 WHEN n.nspname='aiosources' AND (c.relname IN ('aio_public_access','secrets','security_settings','security_attempts','trusted_users','trusted_sessions') OR c.relname LIKE 'admin_%') THEN 'access'
 ELSE 'other' END AS category,
 CASE
- WHEN c.relname='torrents' THEN 'published'
+ WHEN c.relname IN ('torrents','torrent_episode_keys') THEN 'published'
  WHEN c.relname='staged_torrents' OR c.relname LIKE 'run_%' THEN 'imports'
  WHEN c.relname IN ('raw_records','pages','events','torrent_history','torrent_history_baselines','torrent_history_metadata') THEN 'source-history'
  WHEN c.relname IN ('igdb_state','sw_sync_state','sw_source_entries','sw_icons','sw_catalog','sw_aliases','sw_external_ids','mb_state','mb_lookups','mb_artists','mb_aliases','mb_artist_credits','mb_artist_credit_names','mb_labels','mb_release_groups','mb_release_group_secondary_types','mb_releases','mb_release_years','mb_release_labels','mb_mediums','mb_urls','mb_entity_urls','mb_redirects','mb_cover_art','mb_rg_cover_art','ol_import_references','ol_redirects','ol_authors','ol_editions','ol_import_state','ol_changes_state','ol_change_jobs','ol_deleted','aio_works','aio_titles','aio_seasons','aio_episodes') THEN 'information'

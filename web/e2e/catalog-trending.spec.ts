@@ -36,7 +36,13 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
     }
 
     let seq = 0
-    const addTorrents = async (workID: number, count: number, daysAgo: number, hoursAgo = 1) => {
+    const addTorrents = async (
+      workID: number,
+      count: number,
+      daysAgo: number,
+      hoursAgo = 1,
+      titleForIndex?: (index: number) => string,
+    ) => {
       for (let i = 0; i < count; i++) {
         seq++
         const sourceID = `trend-${seq}`
@@ -46,7 +52,7 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
           [
             sourceID,
             JSON.stringify({
-              title: `Release ${seq}`,
+              title: titleForIndex ? titleForIndex(i) : `Release ${seq}`,
               info_hash: seq.toString(16).padStart(40, '0'),
               published_at: publishedAt,
             }),
@@ -65,12 +71,22 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
 
     const dailyMovie = await insertWork('movie', '91001', 'Daily Spotlight', [2026])
     const weeklySeries = await insertWork('tv', '91002', 'Weekly Saga', [2025, 2026])
+    const dailySoap = await insertWork('tv', '91006', 'Endless Daily Soap', [2024, 2026])
     const monthlyMovie = await insertWork('movie', '91003', 'Monthly Hit', [2024])
     const quarterMovie = await insertWork('movie', '91004', 'Quarter Favorite', [2023])
     const yearlyMovie = await insertWork('movie', '91005', 'Yearly Champion', [2022])
 
     await addTorrents(dailyMovie, 2, 0, 2)
-    await addTorrents(weeklySeries, 4, 3)
+    // Weekly Saga: 2 episodes x 4 torrents = 8 total -> 4/ep (top in week).
+    await addTorrents(weeklySeries, 8, 3, 1, (i) => `Weekly.Saga.S02E0${(i % 2) + 1}.R${i}.1080p`)
+    // Endless Daily Soap: 10 episodes x 1.5 avg (15 torrents across 10 eps = 1.5/ep) -> more raw torrents than Weekly Saga and Daily Spotlight, yet ranked below both!
+    await addTorrents(
+      dailySoap,
+      15,
+      3,
+      1,
+      (i) => `Endless.Daily.Soap.S08E${String((i % 10) + 1).padStart(2, '0')}.R${i}.1080p`,
+    )
     await addTorrents(monthlyMovie, 6, 15)
     await addTorrents(quarterMovie, 8, 60)
     await addTorrents(yearlyMovie, 10, 200)
@@ -128,8 +144,12 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
   const videosSection = page.locator('main section').first()
   const videoLinks = videosSection.getByRole('link')
   await expect(videoLinks.first()).toContainText('Weekly Saga')
-  await expect(videoLinks.first()).toContainText('2025 · 4 torrents')
+  await expect(videoLinks.first()).toContainText('2025 · 4/ep')
+  await expect(videoLinks.first().locator('[title="8 torrents · 2 episodes (4/ep)"]')).toBeVisible()
   await expect(videoLinks.nth(1)).toContainText('Daily Spotlight')
+  await expect(videoLinks.nth(1)).toContainText('2026 · 2 torrents')
+  await expect(videoLinks.nth(2)).toContainText('Endless Daily Soap')
+  await expect(videoLinks.nth(2)).toContainText('2024 · 1.5/ep')
 
   // Cards sit side by side horizontally (same row y, increasing x) without page overflow.
   const firstBox = (await videoLinks.nth(0).boundingBox())!

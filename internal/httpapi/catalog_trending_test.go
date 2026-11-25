@@ -19,7 +19,7 @@ func TestCatalogTrendingAdminPublicAndValidation(t *testing.T) {
 		t.Fatalf("anonymous admin trending status = %d, want 401", got.Code)
 	}
 
-	// Seed a movie work and a matched torrent with private fields that must never leak.
+	// Seed a movie work and a multi-episode TV series with private fields that must never leak.
 	if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{
 		Type:   "movie",
 		TMDB:   "4242",
@@ -29,23 +29,41 @@ func TestCatalogTrendingAdminPublicAndValidation(t *testing.T) {
 	}, []string{"trending film"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := f.db.SaveAIOWork(f.ctx, model.AIOWork{
+		Type:   "tv",
+		TMDB:   "4243",
+		IMDb:   "tt0004243",
+		Titles: []string{"Trending Series"},
+		Years:  []int{2026},
+	}, []string{"trending series"}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := conn.Exec(f.ctx, `INSERT INTO aiosources.torrents(provider_id,source_id,fields) VALUES
  ('hidden-source','secret-native-id','{"title":"Trending.Film.2026.1080p","info_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","imdb_id":"tt0004242","announce":"https://tracker.invalid/secret"}'),
- ('hidden-source','secret-native-id-2','{"title":"Trending.Film.2026.2160p","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","imdb_id":"tt0004242"}')`); err != nil {
+ ('hidden-source','secret-native-id-2','{"title":"Trending.Film.2026.2160p","info_hash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","imdb_id":"tt0004242"}'),
+ ('hidden-source','secret-tv-1','{"title":"Trending.Series.S01E01.1080p","info_hash":"1111111111111111111111111111111111111111","imdb_id":"tt0004243"}'),
+ ('hidden-source','secret-tv-2','{"title":"Trending.Series.S01E02.1080p","info_hash":"2222222222222222222222222222222222222222","imdb_id":"tt0004243"}'),
+ ('hidden-source','secret-tv-3','{"title":"Trending.Series.S01E03.1080p","info_hash":"3333333333333333333333333333333333333333","imdb_id":"tt0004243"}')`); err != nil {
 		t.Fatal(err)
 	}
 	if err := addon.Match(f.ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	// Admin default period is week.
+	// Admin default period is week: movie (2 torrents) ranks ahead of 3-episode series (3 torrents / 3 eps = 1/ep).
 	res := f.request("GET", "/api/catalog/trending", "", true, "")
 	var payload model.CatalogTrending
 	if res.Code != 200 || json.Unmarshal(res.Body.Bytes(), &payload) != nil {
 		t.Fatalf("admin trending failed: %d %s", res.Code, res.Body)
 	}
-	if payload.Period != "week" || len(payload.Categories) != 5 || payload.Categories[0].ID != "videos" || len(payload.Categories[0].Items) != 1 || payload.Categories[0].Items[0].Torrents != 2 {
+	if payload.Period != "week" || len(payload.Categories) != 5 || payload.Categories[0].ID != "videos" || len(payload.Categories[0].Items) != 2 {
 		t.Fatalf("unexpected admin trending payload: %+v", payload)
+	}
+	if got := payload.Categories[0].Items[0]; got.Type != "movie" || got.Torrents != 2 || got.Episodes != 0 || got.TorrentsPerEpisode != 0 {
+		t.Fatalf("expected movie ranked first, got %+v", got)
+	}
+	if got := payload.Categories[0].Items[1]; got.Type != "tv" || got.Torrents != 3 || got.Episodes != 3 || got.TorrentsPerEpisode != 1 {
+		t.Fatalf("expected 3-episode TV series ranked second at 1/ep, got %+v", got)
 	}
 	for _, leaked := range []string{"hidden-source", "secret-native-id", "tracker.invalid", "aaaaaaaa"} {
 		if strings.Contains(res.Body.String(), leaked) {
@@ -108,7 +126,7 @@ func TestCatalogTrendingAdminPublicAndValidation(t *testing.T) {
 	}
 	pub := send("GET", "/api/public/catalog/trending?period=month", "", installed.Credential)
 	var pubPayload model.CatalogTrending
-	if pub.Code != 200 || json.Unmarshal(pub.Body.Bytes(), &pubPayload) != nil || pubPayload.Period != "month" || len(pubPayload.Categories[0].Items) != 1 {
+	if pub.Code != 200 || json.Unmarshal(pub.Body.Bytes(), &pubPayload) != nil || pubPayload.Period != "month" || len(pubPayload.Categories[0].Items) != 2 {
 		t.Fatalf("public trending failed: %d %s", pub.Code, pub.Body)
 	}
 	for _, leaked := range []string{"hidden-source", "secret-native-id", "tracker.invalid", key} {
