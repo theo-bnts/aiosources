@@ -142,7 +142,7 @@ func (s *Service) StartGames(ctx context.Context, trigger string) error {
 	if s.closed {
 		return model.ErrConflict
 	}
-	if s.gamesRunning || s.reset.Status == "running" {
+	if s.gamesRunning || s.maintenanceActiveLocked() {
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)

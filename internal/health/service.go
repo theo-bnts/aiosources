@@ -25,6 +25,7 @@ type Service struct {
 	closed   bool
 	cancel   context.CancelFunc
 	done     chan struct{}
+	refresh  chan struct{}
 	err      error
 	report   *model.SystemHealth
 }
@@ -41,7 +42,18 @@ func New(db *store.Store, stateDir string) (*Service, error) {
 	if err != nil || !info.IsDir() {
 		return nil, errors.New("health state directory is unavailable")
 	}
-	return &Service{db: db, stateDir: absolute, done: make(chan struct{})}, nil
+	return &Service{db: db, stateDir: absolute, done: make(chan struct{}), refresh: make(chan struct{}, 1)}, nil
+}
+
+// Refresh schedules an immediate storage measurement outside the minute ticker.
+func (s *Service) Refresh() {
+	if s == nil || s.refresh == nil {
+		return
+	}
+	select {
+	case s.refresh <- struct{}{}:
+	default:
+	}
 }
 
 func (s *Service) Start(ctx context.Context) error {
@@ -79,11 +91,15 @@ func (s *Service) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		case <-s.refresh:
 		}
 	}
 }
 
 func (s *Service) measure(ctx context.Context) {
+	if s.db.Restoring() {
+		return
+	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	disk := localDisk(s.stateDir)

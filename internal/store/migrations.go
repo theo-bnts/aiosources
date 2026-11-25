@@ -99,6 +99,9 @@ func (s *Store) migrateThrough(ctx context.Context, version int) error {
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1,$2)", migrationLockNamespace, migrationLockID); err != nil {
 		return databaseError("lock schema migration", err)
 	}
+	if err = recoverInterruptedDatabaseRestore(ctx, tx); err != nil {
+		return err
+	}
 	adopted, err := adoptApplicationSchema(ctx, tx)
 	if err != nil {
 		return err

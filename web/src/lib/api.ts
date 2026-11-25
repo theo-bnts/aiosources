@@ -189,6 +189,92 @@ export async function rawPage(id: string, signal?: AbortSignal) {
   }
 }
 
+export function uploadBinary<T>(
+  path: string,
+  file: Blob,
+  options: {
+    headers?: Record<string, string>
+    onProgress?: (loaded: number, total: number) => void
+    signal?: AbortSignal
+  } = {},
+): Promise<T> {
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    return Promise.reject(new ApiError(0, 'Invalid API request path.'))
+  }
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const abort = () => xhr.abort()
+    if (options.signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    options.signal?.addEventListener('abort', abort, { once: true })
+    const cleanup = () => options.signal?.removeEventListener('abort', abort)
+
+    xhr.open('POST', `/api${path}`, true)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+    if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken)
+    if (options.headers) {
+      for (const [key, value] of Object.entries(options.headers)) {
+        xhr.setRequestHeader(key, value)
+      }
+    }
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) options.onProgress?.(event.loaded, event.total)
+    }
+    xhr.onabort = () => {
+      cleanup()
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    xhr.onerror = () => {
+      cleanup()
+      reject(new ConnectionError('The server is unreachable. Check your connection and try again.'))
+    }
+    xhr.onload = () => {
+      cleanup()
+      const status = xhr.status
+      const text = xhr.responseText ?? ''
+      if (status < 200 || status >= 300) {
+        let payload: { error?: string; details?: string[]; code?: string } = {}
+        try {
+          const value: unknown = JSON.parse(text)
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const fields = value as Record<string, unknown>
+            payload = {
+              error: typeof fields.error === 'string' ? fields.error : undefined,
+              code: typeof fields.code === 'string' ? fields.code : undefined,
+              details: Array.isArray(fields.details)
+                ? fields.details.filter((item): item is string => typeof item === 'string')
+                : [],
+            }
+          }
+        } catch {
+          /* A proxy may return a non-JSON error. */
+        }
+        if (status === 401) void checkSessionExpiry()
+        if (status === 403) void queryClient.invalidateQueries({ queryKey: ['session'] })
+        const fallback =
+          status === 403
+            ? 'The security session must be refreshed. Try again after refreshing.'
+            : `The request failed (HTTP ${status}).`
+        reject(new ApiError(status, payload.error || fallback, payload.details ?? [], payload.code))
+        return
+      }
+      if (status === 204) {
+        resolve(undefined as T)
+        return
+      }
+      try {
+        resolve(JSON.parse(text) as T)
+      } catch {
+        reject(new ApiError(0, 'The server returned an invalid response. Try refreshing the page.'))
+      }
+    }
+    xhr.send(file)
+  })
+}
+
 export async function downloadBytes(path: string, filename: string) {
   const response = await checkedResponse(path)
   const bytes = await readBody(() => response.arrayBuffer())
@@ -255,6 +341,7 @@ async function invalidateData(cancelRefetch: boolean) {
       'storage-settings',
       'storage-indexes',
       'storage-retention',
+      'database-backup',
       'runtime-settings',
       'public-access',
       'public-catalog-policy',

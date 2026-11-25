@@ -15,6 +15,7 @@ func (s *server) registerStorageRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/settings/storage/indexes", s.auth.protect(s.updateStorageIndexes))
 	mux.HandleFunc("GET /api/settings/storage/retention", s.auth.protect(s.storageRetention))
 	mux.HandleFunc("PUT /api/settings/storage/retention", s.auth.protect(s.updateStorageRetention))
+	s.registerDatabaseBackupRoutes(mux)
 }
 
 func (s *server) storageRetention(w http.ResponseWriter, r *http.Request) {

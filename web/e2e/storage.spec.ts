@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { openDisclosure } from './disclosures'
 import pg from 'pg'
 import { test, expect } from './fixtures'
@@ -208,4 +209,103 @@ test('granular data, indexes and retention save independently on mobile', async 
   const saved = await (await page.request.get('/api/settings/storage/retention')).json()
   expect(saved.days.requests).toBe(30)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
+test('Database backup exports, validates and restores PostgreSQL archives with confirmation', async ({
+  page,
+  server,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/health/settings')
+  await expect(page.locator('details#database-backup')).not.toHaveAttribute('open', '')
+  await openDisclosure(page, 'Database backup')
+
+  const section = page.locator('details#database-backup')
+  const exportButton = section.getByRole('button', { name: 'Export database', exact: true })
+  const importButton = section.getByRole('button', { name: 'Import database', exact: true })
+  await expect(exportButton).toBeVisible()
+  await expect(importButton).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+
+  const status = await (await page.request.get('/api/settings/storage/database')).json()
+  if (!status.tools.export_available || !status.tools.import_available) {
+    await expect(exportButton).toBeDisabled()
+    await expect(importButton).toBeDisabled()
+    await expect(section.locator('#database-export-status')).not.toHaveText('')
+    return
+  }
+
+  await expect(exportButton).toBeEnabled()
+  await expect(importButton).toBeEnabled()
+
+  // Seed a setting before exporting.
+  const db = new pg.Client({ connectionString: server.databaseURL })
+  await db.connect()
+  try {
+    await db.query(
+      `INSERT INTO aiosources.settings(key,value) VALUES('e2e.backup.marker','before-export')
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`,
+    )
+  } finally {
+    await db.end()
+  }
+
+  // Export streams a real PGDMP custom archive via browser download.
+  const downloadPromise = page.waitForEvent('download')
+  await exportButton.click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/^aiosources-backup-.*\.dump$/)
+  const dumpPath = await download.path()
+  expect(dumpPath).toBeTruthy()
+  const dumpBytes = await readFile(dumpPath!)
+  expect(dumpBytes.subarray(0, 5).toString('ascii')).toBe('PGDMP')
+
+  // Reject a non-PGDMP file client-side before opening confirmation.
+  const fileInput = section.locator('input[type="file"]')
+  await fileInput.setInputFiles({
+    name: 'not-a-backup.dump',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('not a postgres dump'),
+  })
+  await expect(
+    section.getByText('The selected file is not a PostgreSQL custom backup archive (.dump).'),
+  ).toBeVisible()
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+  // Mutate the live DB, then restore from the exported archive.
+  const mutateDB = new pg.Client({ connectionString: server.databaseURL })
+  await mutateDB.connect()
+  try {
+    await mutateDB.query(
+      `UPDATE aiosources.settings SET value='after-mutation' WHERE key='e2e.backup.marker'`,
+    )
+  } finally {
+    await mutateDB.end()
+  }
+
+  await fileInput.setInputFiles(dumpPath!)
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('Import database backup?')
+  await expect(dialog).toContainText('This replaces the entire AIOSources PostgreSQL database')
+  await dialog.getByRole('button', { name: 'Replace database', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(section.getByText('Database backup restored', { exact: false })).toBeVisible({
+    timeout: 30_000,
+  })
+
+  // Calling session remains signed in and original DB state is back.
+  const session = await (await page.request.get('/api/session')).json()
+  expect(session.authenticated).toBe(true)
+
+  const verifyDB = new pg.Client({ connectionString: server.databaseURL })
+  await verifyDB.connect()
+  try {
+    const res = await verifyDB.query(
+      `SELECT value FROM aiosources.settings WHERE key='e2e.backup.marker'`,
+    )
+    expect(res.rows).toEqual([{ value: 'before-export' }])
+  } finally {
+    await verifyDB.end()
+  }
 })

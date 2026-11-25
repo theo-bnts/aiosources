@@ -83,11 +83,15 @@ UPDATE aiosources.aio_state SET metadata_generation=metadata_generation+1,last_m
 	if err := tx.Commit(ctx); err != nil {
 		return databaseError("commit runtime settings", err)
 	}
+	s.invalidateRuntimeSettings()
+	return nil
+}
+
+func (s *Store) invalidateRuntimeSettings() {
 	s.runtime.mu.Lock()
 	s.runtime.until = time.Time{}
 	s.runtime.epoch++
 	s.runtime.mu.Unlock()
-	return nil
 }
 
 // A shared one-second snapshot avoids a database read for every provider call.

@@ -26,9 +26,15 @@ const envelopeVersion byte = 1
 
 var secretName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
 
+// ErrMasterKeyMismatch indicates a restored database contains encrypted secrets
+// sealed by a different vault master key.
+var ErrMasterKeyMismatch = errors.New("this backup contains encrypted secrets created with a different master key; restore using the original instance master key")
+
 type Vault struct {
-	db   *store.Store
-	aead cipher.AEAD
+	db          *store.Store
+	aead        cipher.AEAD
+	fingerprint []byte
+	hexPrint    string
 }
 
 func New(ctx context.Context, db *store.Store, key []byte) (*Vault, error) {
@@ -68,7 +74,8 @@ func New(ctx context.Context, db *store.Store, key []byte) (*Vault, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("cannot read vault initialization")
 	}
-	stored, err := db.SetSettingOnce(ctx, fingerprintSetting, hex.EncodeToString(fingerprint))
+	hexPrint := hex.EncodeToString(fingerprint)
+	stored, err := db.SetSettingOnce(ctx, fingerprintSetting, hexPrint)
 	if err != nil {
 		return nil, fmt.Errorf("cannot verify vault master key")
 	}
@@ -76,7 +83,33 @@ func New(ctx context.Context, db *store.Store, key []byte) (*Vault, error) {
 	if err != nil || len(expected) != sha256.Size || subtle.ConstantTimeCompare(expected, fingerprint) != 1 {
 		return nil, fmt.Errorf("vault master key does not match the established key")
 	}
-	return &Vault{db: db, aead: aead}, nil
+	return &Vault{db: db, aead: aead, fingerprint: fingerprint, hexPrint: hexPrint}, nil
+}
+
+// VerifyRestoredDatabase checks that a restored database's vault fingerprint
+// matches this instance's master key. If the restored database contains no
+// encrypted secrets, it adopts the running instance's fingerprint seamlessly.
+func (v *Vault) VerifyRestoredDatabase(ctx context.Context) error {
+	stored, err := v.db.Setting(ctx, fingerprintSetting)
+	if err == nil {
+		expected, decodeErr := hex.DecodeString(stored)
+		if decodeErr == nil && len(expected) == sha256.Size && subtle.ConstantTimeCompare(expected, v.fingerprint) == 1 {
+			return nil
+		}
+	} else if !errors.Is(err, model.ErrNotFound) {
+		return fmt.Errorf("cannot read restored vault fingerprint")
+	}
+	hasSecrets, inspectErr := v.db.HasEncryptedMaterial(ctx)
+	if inspectErr != nil {
+		return fmt.Errorf("cannot inspect restored encrypted secrets")
+	}
+	if hasSecrets {
+		return ErrMasterKeyMismatch
+	}
+	if err := v.db.SetSetting(ctx, fingerprintSetting, v.hexPrint); err != nil {
+		return fmt.Errorf("cannot record vault master key fingerprint")
+	}
+	return nil
 }
 
 func checkName(name string) error {

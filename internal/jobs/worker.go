@@ -51,10 +51,11 @@ func (m *Manager) worker() {
 		// Capture the generation before claiming, so an enqueue between the
 		// empty claim and waiting cannot be lost.
 		m.mu.Lock()
-		wake, connected := m.work, m.connected
+		wake := m.work
 		m.mu.Unlock()
-		if connected {
+		if release, ok := m.beginDBWork(); ok {
 			run, err := m.db.ClaimNext(m.ctx)
+			release()
 			if err != nil {
 				if m.ctx.Err() == nil {
 					m.fail(errPersistence)

@@ -17,13 +17,11 @@ func (m *Manager) scheduler() {
 		if m.ctx.Err() != nil {
 			return
 		}
-		m.mu.Lock()
-		connected := m.connected
-		m.mu.Unlock()
 		var next time.Time
-		if connected {
+		if release, ok := m.beginDBWork(); ok {
 			var err error
 			next, err = m.scheduleDue(m.ctx, time.Now())
+			release()
 			if err != nil {
 				if m.ctx.Err() == nil {
 					m.fail(err)

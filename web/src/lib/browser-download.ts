@@ -14,9 +14,11 @@ export function prepareBrowserDownload() {
           destination.origin !== window.location.origin ||
           destination.username ||
           destination.password ||
-          !['/api/catalog-downloads/', '/api/public/catalog-downloads/'].some((prefix) =>
-            destination.pathname.startsWith(prefix),
-          ) ||
+          ![
+            '/api/catalog-downloads/',
+            '/api/public/catalog-downloads/',
+            '/api/settings/storage/database/export/',
+          ].some((prefix) => destination.pathname.startsWith(prefix)) ||
           destination.search ||
           destination.hash
         )

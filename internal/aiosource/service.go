@@ -62,8 +62,10 @@ type Service struct {
 	ctx                       context.Context
 	cancel                    context.CancelFunc
 	mu                        sync.Mutex
+	bgWork                    sync.RWMutex
 	wg                        sync.WaitGroup
 	closed                    bool
+	dbMaintenance             bool
 	syncCancel, matchCancel   context.CancelFunc
 	syncDone, matchDone       <-chan struct{}
 	syncRunning, matchRunning bool
@@ -335,7 +337,7 @@ func (s *Service) startJob(syncJob bool, run func(context.Context) error) error 
 	if s.closed {
 		return model.ErrConflict
 	}
-	if s.reset.Status == "running" || (syncJob && s.syncRunning) || (!syncJob && s.matchRunning) {
+	if s.maintenanceActiveLocked() || (syncJob && s.syncRunning) || (!syncJob && s.matchRunning) {
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)
@@ -437,8 +439,11 @@ func (s *Service) warmTrending() {
 		return
 	case <-initial.C:
 	}
-	_ = s.DB.WarmDecisionCounts(s.ctx)
-	_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+	if release, ok := s.beginBackgroundTick(); ok {
+		_ = s.DB.WarmDecisionCounts(s.ctx)
+		_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+		release()
+	}
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 	for {
@@ -447,8 +452,11 @@ func (s *Service) warmTrending() {
 			return
 		case <-ticker.C:
 		}
-		_ = s.DB.WarmDecisionCounts(s.ctx)
-		_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+		if release, ok := s.beginBackgroundTick(); ok {
+			_ = s.DB.WarmDecisionCounts(s.ctx)
+			_ = s.DB.RefreshStaleCatalogTrending(s.ctx)
+			release()
+		}
 	}
 }
 
@@ -462,12 +470,18 @@ func (s *Service) maintenance() {
 			return
 		case <-timer.C:
 		}
+		release, ok := s.beginBackgroundTick()
+		if !ok {
+			continue
+		}
 		c, err := s.DB.AIOConfig(s.ctx)
 		if err != nil {
+			release()
 			continue
 		}
 		_ = s.DB.RecoverOperations(s.ctx)
 		s.maintainDebrid(s.ctx, c)
+		release()
 	}
 }
 

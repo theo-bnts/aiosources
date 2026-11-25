@@ -126,6 +126,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 		case "network.settings_changed", "network.test_completed", "network.test_failed":
 		case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 			"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset",
+			"storage.database_exported", "storage.database_imported",
 			"torznab.searched", "torznab.failed", "torznab.public_searched", "torznab.public_failed":
 		default:
 			return model.ErrInvalid
@@ -177,6 +178,12 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	}
 	if kind == "catalog.trusted_failed" {
 		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user catalog export failed'", 1)
+	}
+	if kind == "storage.database_exported" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Database backup exported'", 1)
+	}
+	if kind == "storage.database_imported" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Database backup restored'", 1)
 	}
 	if strings.HasPrefix(kind, "network.") {
 		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'network')`

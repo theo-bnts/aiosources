@@ -35,6 +35,9 @@ test('browser downloads accept only authenticated application attachment URLs an
       '/api/public/catalog-downloads/%2e%2e/secrets',
       '/api/public/catalog-downloads/ticket?target=external',
       '/api/public/catalog-downloads/ticket#fragment',
+      '/api/settings/storage/database/export/%2e%2e/secrets',
+      '/api/settings/storage/database/export/ticket?target=external',
+      '/api/settings/storage/database/export/ticket#fragment',
       'javascript:alert(1)',
       'data:text/html,example',
     ])
@@ -49,6 +52,11 @@ test('browser downloads accept only authenticated application attachment URLs an
     assert.equal(frames[0].referrerPolicy, 'no-referrer')
     assert.equal(prepareBrowserDownload().start('/api/public/catalog-downloads/ticket'), true)
     assert.equal(frames[1].src, 'https://admin.example/api/public/catalog-downloads/ticket')
+    assert.equal(
+      prepareBrowserDownload().start('/api/settings/storage/database/export/ticket'),
+      true,
+    )
+    assert.equal(frames[2].src, 'https://admin.example/api/settings/storage/database/export/ticket')
   } finally {
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
     else delete (globalThis as any).window

@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -30,6 +31,9 @@ type Store struct {
 	pool            *pgxpool.Pool
 	backgroundPool  *pgxpool.Pool
 	collectionPool  *pgxpool.Pool
+	connEnv         []string
+	databaseName    string
+	restoring       atomic.Bool
 	mu              sync.Mutex
 	leases          map[string]*runLease
 	claimSlots      chan struct{}
@@ -127,7 +131,37 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		return nil, databaseError("open collection sessions", err)
 	}
 	background, cancel := context.WithCancel(context.Background())
-	return &Store{pool: pool, backgroundPool: backgroundPool, collectionPool: collectionPool, leases: make(map[string]*runLease), claimSlots: make(chan struct{}, model.MaxCollectionWorkers), background: background, cancel: cancel}, nil
+	return &Store{
+		pool: pool, backgroundPool: backgroundPool, collectionPool: collectionPool,
+		connEnv: buildPostgresEnv(databaseURL, config.ConnConfig), databaseName: config.ConnConfig.Database,
+		leases: make(map[string]*runLease), claimSlots: make(chan struct{}, model.MaxCollectionWorkers),
+		background: background, cancel: cancel,
+	}, nil
+}
+
+// Restoring reports whether a full schema restore is actively replacing
+// application tables. Background workers use this to pause non-essential ticks.
+func (s *Store) Restoring() bool {
+	return s != nil && s.restoring.Load()
+}
+
+// ResetPools discards pooled connections and in-memory query caches so
+// recreated tables never collide with cached prepared statement OIDs.
+func (s *Store) ResetPools() {
+	if s == nil {
+		return
+	}
+	if s.pool != nil {
+		s.pool.Reset()
+	}
+	if s.backgroundPool != nil {
+		s.backgroundPool.Reset()
+	}
+	if s.collectionPool != nil {
+		s.collectionPool.Reset()
+	}
+	s.invalidateRuntimeSettings()
+	s.invalidateDecisionCounts()
 }
 
 func (s *Store) Close() {

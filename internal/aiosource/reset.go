@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
@@ -24,6 +25,108 @@ func (s *Service) ResetState() ResetState {
 	return s.reset
 }
 
+func (s *Service) maintenanceActiveLocked() bool {
+	return s.reset.Status == "running" || s.dbMaintenance
+}
+
+func (s *Service) beginBackgroundTick() (func(), bool) {
+	s.bgWork.RLock()
+	s.mu.Lock()
+	blocked := s.closed || s.dbMaintenance
+	s.mu.Unlock()
+	if blocked {
+		s.bgWork.RUnlock()
+		return nil, false
+	}
+	return s.bgWork.RUnlock, true
+}
+
+// DatabaseMaintenanceBusy reports whether metadata sync, matching or another
+// maintenance operation is active and should finish before restoring a backup.
+func (s *Service) DatabaseMaintenanceBusy() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.maintenanceActiveLocked() || s.syncRunning || s.matchRunning || s.booksRunning || s.gamesRunning || s.softwareRunning || s.musicRunning
+}
+
+// PauseForDatabaseMaintenance blocks new metadata, matching, debrid cache and
+// background maintenance ticks, stops any active catalog workers and waits for
+// them to release PostgreSQL connections before a full schema restore runs.
+func (s *Service) PauseForDatabaseMaintenance(ctx context.Context) (func(ctx context.Context, restored bool), error) {
+	s.mu.Lock()
+	if s.closed || s.maintenanceActiveLocked() {
+		s.mu.Unlock()
+		return nil, model.ErrBusy
+	}
+	s.dbMaintenance = true
+	var waiting []<-chan struct{}
+	for _, worker := range []struct {
+		cancel context.CancelFunc
+		done   <-chan struct{}
+	}{
+		{s.syncCancel, s.syncDone},
+		{s.matchCancel, s.matchDone},
+		{s.booksCancel, s.booksDone},
+		{s.gamesCancel, s.gamesDone},
+		{s.softwareCancel, s.softwareDone},
+		{s.musicCancel, s.musicDone},
+	} {
+		if worker.cancel != nil {
+			worker.cancel()
+		}
+		if worker.done != nil {
+			waiting = append(waiting, worker.done)
+		}
+	}
+	for _, f := range s.flights {
+		f.cancel()
+	}
+	s.mu.Unlock()
+
+	releaseOnError := func() {
+		s.mu.Lock()
+		s.dbMaintenance = false
+		s.mu.Unlock()
+		s.wakeAutomation()
+	}
+	for _, done := range waiting {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			releaseOnError()
+			return nil, ctx.Err()
+		}
+	}
+	drained := make(chan struct{})
+	go func() {
+		s.bgWork.Lock()
+		s.bgWork.Unlock()
+		close(drained)
+	}()
+	select {
+	case <-drained:
+	case <-ctx.Done():
+		releaseOnError()
+		return nil, ctx.Err()
+	}
+
+	var once sync.Once
+	return func(resumeCtx context.Context, restored bool) {
+		once.Do(func() {
+			if restored {
+				s.gameTokenMu.Lock()
+				s.gameToken = igdbToken{}
+				s.gameTokenMu.Unlock()
+				_ = s.DB.RecoverOperations(resumeCtx)
+			}
+			s.mu.Lock()
+			s.dbMaintenance = false
+			s.mu.Unlock()
+			s.wakeAutomation()
+		})
+	}, nil
+}
+
 func (s *Service) reserveReset(scope string) ([]<-chan struct{}, error) {
 	switch scope {
 	case "books", "videos", "games", "software", "music", "metadata", "mapping", "cache":
@@ -32,7 +135,7 @@ func (s *Service) reserveReset(scope string) ([]<-chan struct{}, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed || s.reset.Status == "running" {
+	if s.closed || s.maintenanceActiveLocked() {
 		return nil, model.ErrBusy
 	}
 	// Reserve maintenance before cancelling workers so automation cannot take

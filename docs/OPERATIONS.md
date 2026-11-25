@@ -71,6 +71,8 @@ Field and processed-record choices apply to newly started imports. Existing impo
 
 History retention defaults to seven days and is configurable. It cleans up eligible diagnostic history, not your published catalog. Some saved work for resumable imports can remain longer. Removing rows can free reusable space without immediately shrinking the PostgreSQL volume.
 
+**Database backup** lets administrators export a compressed PostgreSQL custom archive (`pg_dump -Fc`) of the `aiosources` schema directly as a browser download without blocking reads, and restore an archive with `pg_restore`. Restoring replaces the entire AIOSources database after validating the archive, checking schema compatibility and verifying the encryption key, and automatically rolls back to the previous database if restoration fails. Keep the instance encryption key (`master-key` / `MASTER_KEY`) and source definitions (`providers`) alongside database backups.
+
 **Maintenance → Reset all source data** clears collected source data so it can be imported again. Read the confirmation carefully and expect sources to need another import. Source definitions and reusable Secrets are kept. Other resets are scoped to the page where they appear, such as matching or debrid caches.
 
 Back up before resetting or deleting data you may need. See [installation and backups](SETTINGS.md#preserve-your-data).

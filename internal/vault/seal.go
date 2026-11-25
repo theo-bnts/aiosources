@@ -42,7 +42,7 @@ func internalPurpose(purpose string) bool {
 	switch purpose {
 	case "trusted-connection-v1", "public-catalog-v1", "provider-preparation-v1",
 		"public-catalog-source-v1", "public-catalog-preparation-v1", "public-catalog-file-v1",
-		"catalog-browser-download-v1", "public-installation-v1", "public-playback-v1", "public-torznab-v1":
+		"catalog-browser-download-v1", "database-backup-export-v1", "public-installation-v1", "public-playback-v1", "public-torznab-v1":
 		return true
 	default:
 		return false

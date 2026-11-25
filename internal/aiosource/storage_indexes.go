@@ -17,9 +17,15 @@ func (s *Service) storageIndexes() {
 			return
 		case <-timer.C:
 		}
+		release, ok := s.beginBackgroundTick()
+		if !ok {
+			timer.Reset(10 * time.Second)
+			continue
+		}
 		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Minute)
 		changed, err := s.DB.ReconcileStorageIndexes(ctx)
 		cancel()
+		release()
 		if s.ctx.Err() != nil {
 			return
 		}

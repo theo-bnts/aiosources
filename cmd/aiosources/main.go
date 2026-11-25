@@ -368,7 +368,7 @@ func serve(ctx context.Context, c config, db *store.Store, registry *providers.R
 	finishStage = startupStage(true, "sign-in protection")
 	handler, err := httpapi.New(httpapi.Options{
 		Store: db, Providers: registry, Jobs: manager, Vault: secretVault, AIOSource: addon,
-		Health: monitor, AdminPassword: password,
+		Health: monitor, AdminPassword: password, DataDir: c.dataDir,
 		PublicURL: c.publicURL, Frontend: frontend, Version: buildinfo.Display(version),
 	})
 	if err != nil {

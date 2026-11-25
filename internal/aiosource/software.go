@@ -118,7 +118,7 @@ func (s *Service) StartSoftware(ctx context.Context, trigger string) error {
 	if s.closed {
 		return model.ErrConflict
 	}
-	if s.softwareRunning || s.reset.Status == "running" {
+	if s.softwareRunning || s.maintenanceActiveLocked() {
 		return model.ErrBusy
 	}
 	runCtx, cancel := context.WithCancel(s.ctx)

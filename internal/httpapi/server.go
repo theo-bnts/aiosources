@@ -40,6 +40,7 @@ type Options struct {
 	Health        *health.Service
 	AdminPassword string
 	PublicURL     string
+	DataDir       string
 	Frontend      fs.FS
 	Version       string
 }
@@ -56,6 +57,7 @@ type server struct {
 	policies       *requestPolicyCache
 	torznab        chan struct{}
 	torznabCaps    chan struct{}
+	backup         databaseBackupController
 }
 
 func New(options Options) (http.Handler, error) {
@@ -70,6 +72,7 @@ func New(options Options) (http.Handler, error) {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
 	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), torznabCaps: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
+	cleanupStaleDatabaseRestores(options.DataDir)
 	s.initRequestPolicy()
 	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
 	s.fileClient.Transport = network.Transport("downloads", s.fileClient.Transport.(*http.Transport))
@@ -133,7 +136,7 @@ func New(options Options) (http.Handler, error) {
 		writeError(w, http.StatusNotFound, "API route not found")
 	}))
 	mux.Handle("/", staticFrontend(options.Frontend, auth.origin, options.Version))
-	return securityHeaders(recoverRequests(mux)), nil
+	return securityHeaders(recoverRequests(s.databaseMaintenanceGate(mux))), nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

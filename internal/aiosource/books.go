@@ -38,7 +38,7 @@ func (s *Service) StartBooks(trigger string) error {
 	if s.closed {
 		return model.ErrConflict
 	}
-	if s.booksRunning || s.reset.Status == "running" {
+	if s.booksRunning || s.maintenanceActiveLocked() {
 		return model.ErrBusy
 	}
 	ctx, cancel := context.WithCancel(s.ctx)

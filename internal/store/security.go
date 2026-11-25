@@ -50,6 +50,57 @@ type SecuritySessionCreate struct {
 	Replaces  SessionReplacements
 }
 
+// AdminSessionRecord captures an active administrator session so a full
+// database restore can keep the operator signed in while discarding stale
+// sessions from the backup archive.
+type AdminSessionRecord struct {
+	ID         string
+	TokenHash  []byte
+	UserAgent  string
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+}
+
+func (s *Store) AdminSessionSnapshot(ctx context.Context, id string) (AdminSessionRecord, error) {
+	var record AdminSessionRecord
+	err := s.pool.QueryRow(ctx, `SELECT id,token_hash,user_agent,created_at,last_seen_at,expires_at
+ FROM aiosources.admin_sessions WHERE id=$1 AND expires_at>now()`, id).Scan(
+		&record.ID, &record.TokenHash, &record.UserAgent, &record.CreatedAt, &record.LastSeenAt, &record.ExpiresAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return record, ErrAuthentication
+	}
+	return record, databaseError("snapshot administrator session", err)
+}
+
+// SyncRestoredAdminAuth aligns the restored database with the running server's
+// configured administrator password verifier and restores only the calling
+// administrator's active session.
+func (s *Store) SyncRestoredAdminAuth(ctx context.Context, passwordHash []byte, active *AdminSessionRecord) error {
+	if len(passwordHash) == 0 {
+		return model.ErrInvalid
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return databaseError("begin restored authentication sync", err)
+	}
+	defer rollback(tx)
+	if _, err = tx.Exec(ctx, `UPDATE aiosources.admin_security SET password_hash=$1 WHERE singleton`, passwordHash); err != nil {
+		return databaseError("sync administrator verifier", err)
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.admin_sessions`); err != nil {
+		return databaseError("clear restored administrator sessions", err)
+	}
+	if active != nil && active.ID != "" && len(active.TokenHash) == 32 && active.ExpiresAt.After(time.Now()) {
+		if _, err = tx.Exec(ctx, `INSERT INTO aiosources.admin_sessions(id,token_hash,user_agent,created_at,last_seen_at,expires_at)
+ VALUES($1,$2,$3,$4,$5,$6)`, active.ID, active.TokenHash, active.UserAgent, active.CreatedAt, active.LastSeenAt, active.ExpiresAt); err != nil {
+			return databaseError("preserve calling administrator session", err)
+		}
+	}
+	return databaseError("commit restored authentication sync", tx.Commit(ctx))
+}
+
 // InitializeAdminPassword keeps bcrypt's random salt stable across restarts.
 // A real configured-password change invalidates all established sessions.
 func (s *Store) InitializeAdminPassword(ctx context.Context, password string, candidate []byte) ([]byte, error) {

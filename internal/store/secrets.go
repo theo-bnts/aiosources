@@ -166,3 +166,12 @@ func (s *Store) SetSettingOnce(ctx context.Context, key, value string) (string, 
 ON CONFLICT(key) DO UPDATE SET value=aiosources.settings.value RETURNING value`, key, value).Scan(&established)
 	return established, databaseError("establish application setting", err)
 }
+
+func (s *Store) SetSetting(ctx context.Context, key, value string) error {
+	if key == "" {
+		return model.ErrInvalid
+	}
+	_, err := s.pool.Exec(ctx, `INSERT INTO aiosources.settings(key,value) VALUES($1,$2)
+ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`, key, value)
+	return databaseError("save application setting", err)
+}

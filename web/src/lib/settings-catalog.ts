@@ -368,15 +368,37 @@ add(
     ],
   ],
 )
-settings.push({
-  id: 'storage.reset',
-  title: 'Reset all source data',
-  route: '/health/settings',
-  group: 'Administration / Storage / Maintenance',
-  label: 'Reset all source data',
-  reveal: ['Maintenance'],
-  keywords: 'reset delete reinitialiser supprimer maintenance',
-})
+settings.push(
+  {
+    id: 'storage.database.export',
+    title: 'Export database',
+    route: '/health/settings',
+    group: 'Administration / Storage / Database backup',
+    label: 'Export database',
+    control: 'database-backup-export',
+    reveal: ['Database backup'],
+    keywords: 'backup export dump pg_dump sauvegarde exporter base donnees',
+  },
+  {
+    id: 'storage.database.import',
+    title: 'Import database',
+    route: '/health/settings',
+    group: 'Administration / Storage / Database backup',
+    label: 'Import database',
+    control: 'database-backup-import',
+    reveal: ['Database backup'],
+    keywords: 'backup import restore dump pg_restore restaurer importer base donnees',
+  },
+  {
+    id: 'storage.reset',
+    title: 'Reset all source data',
+    route: '/health/settings',
+    group: 'Administration / Storage / Maintenance',
+    label: 'Reset all source data',
+    reveal: ['Maintenance'],
+    keywords: 'reset delete reinitialiser supprimer maintenance',
+  },
+)
 add(
   {
     route: '/network/incoming',

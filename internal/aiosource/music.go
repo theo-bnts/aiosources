@@ -68,7 +68,7 @@ func (s *Service) StartMusic(ctx context.Context, trigger string) error {
 	if s.closed {
 		return model.ErrConflict
 	}
-	if s.musicRunning || s.reset.Status == "running" {
+	if s.musicRunning || s.maintenanceActiveLocked() {
 		return model.ErrBusy
 	}
 	runCtx, cancel := context.WithCancel(s.ctx)

@@ -102,6 +102,11 @@ func (s *Service) automation() {
 
 func (s *Service) runAutomation() time.Duration {
 	poll := 30 * time.Second
+	release, ok := s.beginBackgroundTick()
+	if !ok {
+		return poll
+	}
+	defer release()
 	c, err := s.DB.AIOConfig(s.ctx)
 	if err != nil {
 		return poll

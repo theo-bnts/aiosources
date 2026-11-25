@@ -36,7 +36,7 @@ Keep both Compose volumes: the PostgreSQL volume and the AIOSources data volume.
 
 Never replace an existing encryption key as a routine update. Losing it can make stored credentials unreadable. Keep backups and exported source configurations private.
 
-Use a consistent database backup or stop the services before copying their volumes with your backup tool. Do not copy a running PostgreSQL data directory as though it were an ordinary folder. `docker compose down -v` deletes named volumes.
+Use a consistent database backup or stop the services before copying their volumes with your backup tool. Do not copy a running PostgreSQL data directory as though it were an ordinary folder. You can also export and restore compressed PostgreSQL custom backups (`pg_dump` / `pg_restore`) directly from **Administration → Storage → Settings → Database backup** while keeping your `DATA_DIR` encryption key and source definitions backed up alongside them. `docker compose down -v` deletes named volumes.
 
 ## Update channels
 
@@ -62,7 +62,7 @@ Use the settings search at the top of the application to find a control directly
 - **Metadata → Catalogs → Videos / Games / Software / Music / Books → Settings:** update schedules and provider settings, with separate **Manual actions** and **Maintenance** sections. Each workspace has its own statistics and history.
 - **Metadata → Identification → Settings:** automatic identification for videos, games, software, music and books, with separate processing, reliability and maintenance sections. Its **Results** and **History** tabs keep review and identification activity together.
 - **Debrid → Settings:** service accounts, availability checks, operation limits and cleanup.
-- **Storage → Settings:** retained torrent fields, optional search indexes, history retention and maintenance.
+- **Storage → Settings:** retained torrent fields, optional search indexes, history retention, database backup/restore and maintenance.
 - **Security:** Secrets, administrator and trusted user limits, public request limits, and active administrator sessions.
 - **Network:** trusted incoming proxies and outgoing connections.
 - **Users → Public:** offered visitor pages and credential permissions.

@@ -49,9 +49,11 @@ type Manager struct {
 
 	lifecycle   sync.Mutex
 	mu          sync.Mutex
+	dbWork      sync.RWMutex
 	started     bool
 	closed      bool
 	connected   bool
+	paused      bool
 	ctx         context.Context
 	cancel      context.CancelCauseFunc
 	failure     error
@@ -381,7 +383,70 @@ func (m *Manager) accepting() error {
 	if m.closed || (m.ctx != nil && m.ctx.Err() != nil) {
 		return fmt.Errorf("%w: collection manager is shutting down", model.ErrConflict)
 	}
+	if m.paused {
+		return model.ErrBusy
+	}
 	return nil
+}
+
+// PauseForDatabaseMaintenance temporarily stops new collection claims,
+// scheduling ticks and cancellation reconciliation while a full database
+// restore runs. Returns ErrBusy if any collection attempt is active.
+func (m *Manager) PauseForDatabaseMaintenance() (func(ctx context.Context, restored bool), error) {
+	m.mu.Lock()
+	if m.closed || m.paused || len(m.active) > 0 {
+		m.mu.Unlock()
+		return nil, model.ErrBusy
+	}
+	m.paused = true
+	m.mu.Unlock()
+
+	// Wait for any in-flight ClaimNext / scheduleDue / reconcile tick to finish.
+	m.dbWork.Lock()
+	m.dbWork.Unlock()
+
+	m.mu.Lock()
+	if len(m.active) > 0 {
+		m.paused = false
+		m.mu.Unlock()
+		m.signalWork()
+		m.signalSchedule()
+		return nil, model.ErrBusy
+	}
+	started := m.started
+	m.mu.Unlock()
+
+	var once sync.Once
+	return func(ctx context.Context, restored bool) {
+		once.Do(func() {
+			if restored && started {
+				if err := m.recoverInterrupted(ctx); err != nil {
+					_ = err
+				}
+				_ = m.db.InitializeCollectionSettings(ctx, m.initialWorkers)
+			}
+			m.mu.Lock()
+			m.paused = false
+			m.mu.Unlock()
+			m.signalWork()
+			m.signalSchedule()
+			if restored {
+				m.Notify("database", "restored")
+			}
+		})
+	}, nil
+}
+
+func (m *Manager) beginDBWork() (func(), bool) {
+	m.dbWork.RLock()
+	m.mu.Lock()
+	allowed := !m.closed && !m.paused && m.connected
+	m.mu.Unlock()
+	if !allowed {
+		m.dbWork.RUnlock()
+		return nil, false
+	}
+	return m.dbWork.RUnlock, true
 }
 
 func (m *Manager) withDefinition(id string, fn func(model.ProviderDocument) error) error {
@@ -522,11 +587,15 @@ func (m *Manager) observeChanges(changes <-chan struct{}, unsubscribe func()) {
 		case <-m.ctx.Done():
 			return
 		case <-m.recovery:
-			if err := m.recoverInterrupted(m.ctx); err != nil {
-				if m.ctx.Err() == nil {
-					m.fail(errPersistence)
+			if release, ok := m.beginDBWork(); ok {
+				err := m.recoverInterrupted(m.ctx)
+				release()
+				if err != nil {
+					if m.ctx.Err() == nil {
+						m.fail(errPersistence)
+					}
+					return
 				}
-				return
 			}
 		case _, ok := <-changes:
 			if !ok {
@@ -584,6 +653,11 @@ func stopSubscription(changes <-chan struct{}, unsubscribe func()) {
 }
 
 func (m *Manager) reconcileCancellations() {
+	release, ok := m.beginDBWork()
+	if !ok {
+		return
+	}
+	defer release()
 	m.mu.Lock()
 	active := make(map[string]context.CancelCauseFunc, len(m.active))
 	for id, attempt := range m.active {

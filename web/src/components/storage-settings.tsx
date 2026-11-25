@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch'
 import { MultiSelect } from '@/components/ui/multi-select'
 import { StorageIndexesPanel, StorageImpact } from '@/components/storage-indexes'
 import { StorageRetentionPanel } from '@/components/storage-retention'
+import { DatabaseBackupPanel } from '@/components/database-backup'
 import { Disclosure } from '@/components/ui/disclosure'
 
 type StorageOptions = {
@@ -266,6 +267,7 @@ export function StorageSettingsPanel() {
         <StorageIndexesPanel />
         <StorageRetentionPanel />
         <RuntimeSettingsPanel section="history" />
+        <DatabaseBackupPanel />
         <Disclosure
           id="maintenance"
           title="Maintenance"
