@@ -232,9 +232,16 @@ test('refresh covers mutable source data and diagnostics without invalidating im
     'operation-history',
     'operation',
     'operation-events',
+    'identification-review',
   ]
   for (const key of keys) queryClient.setQueryData([key, 'fixture'], { retained: true })
   queryClient.setQueryData(['raw-page', 'fixture'], { text: 'Original archive bytes' })
+  await refreshLiveData()
+  assert.equal(
+    queryClient.getQueryState(['identification-review', 'fixture'])?.isInvalidated,
+    false,
+    'live background updates must not silently replace an open identification review',
+  )
   await refreshData()
   for (const key of keys)
     assert.equal(queryClient.getQueryState([key, 'fixture'])?.isInvalidated, true, key)

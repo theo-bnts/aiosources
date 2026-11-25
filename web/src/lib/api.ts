@@ -265,6 +265,10 @@ async function invalidateData(cancelRefetch: boolean) {
         {
           queryKey: [key],
           predicate: (query) => {
+            // An open identification review holds explicit conflict-resolution state
+            // keyed by source fingerprint; live background events must not silently
+            // replace it before the administrator chooses to load the latest data.
+            if (!cancelRefetch && key === 'identification-review') return false
             const heavy =
               key === 'source-torrent-stats' ||
               key === 'debrid-statistics' ||
