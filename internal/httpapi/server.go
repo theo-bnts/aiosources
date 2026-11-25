@@ -55,6 +55,7 @@ type server struct {
 	public         *publicAdmission
 	policies       *requestPolicyCache
 	torznab        chan struct{}
+	torznabCaps    chan struct{}
 }
 
 func New(options Options) (http.Handler, error) {
@@ -68,7 +69,7 @@ func New(options Options) (http.Handler, error) {
 	if _, err := fs.Stat(options.Frontend, "index.html"); err != nil {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
-	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
+	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), torznabCaps: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
 	s.initRequestPolicy()
 	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
 	s.fileClient.Transport = network.Transport("downloads", s.fileClient.Transport.(*http.Transport))
@@ -96,6 +97,7 @@ func New(options Options) (http.Handler, error) {
 	mux.HandleFunc("PUT /api/providers/{id}", auth.protect(s.saveProvider))
 	mux.HandleFunc("DELETE /api/providers/{id}", auth.protect(s.deleteProvider))
 	mux.HandleFunc("POST /api/providers/validate", auth.protect(s.validateProvider))
+	mux.HandleFunc("POST /api/providers/torznab-capabilities", auth.protect(s.inspectTorznabCapabilities))
 	mux.HandleFunc("GET /api/adapters", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"items": connectors.Adapters()})
 	}))

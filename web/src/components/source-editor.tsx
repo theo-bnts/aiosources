@@ -35,6 +35,17 @@ import {
   SourceHTMLCompatibility,
 } from '@/components/source-html-fields'
 import {
+  TorznabCapabilitiesBanner,
+  TorznabCapabilitiesProvider,
+  TorznabCapabilitiesToolbarAction,
+  TorznabCategoryPicker,
+  TorznabConnectionDiscoveryBox,
+  TorznabFieldHint,
+  TorznabIdentityIntro,
+  TorznabPageSizeHint,
+  TorznabSearchModeHints,
+} from '@/components/torznab-capabilities'
+import {
   OptionalSection,
   ArrayField,
   BooleanField,
@@ -89,18 +100,25 @@ function IdentitySettings({ sourceID }: { sourceID?: string }) {
   const jsonAdapter = document.get('adapter') === 'http_json' ? 'http_json' : 'json'
   return (
     <FieldSection title="Source identity">
+      <TorznabIdentityIntro />
       <FieldGrid>
-        <TextField path={['name']} label="Display name" placeholder="Archive name" />
-        <TextField
-          path={['id']}
-          label="Source identifier"
-          placeholder="archive-main"
-          help={
-            sourceID
-              ? 'Keep this identifier stable. Invalid definitions can be repaired before saving.'
-              : 'Use a unique, safe identifier such as archive-main.'
-          }
-        />
+        <div className="min-w-0">
+          <TextField path={['name']} label="Display name" placeholder="Archive name" />
+          <TorznabFieldHint field="name" buttonLabel="Apply name" />
+        </div>
+        <div className="min-w-0">
+          <TextField
+            path={['id']}
+            label="Source identifier"
+            placeholder="archive-main"
+            help={
+              sourceID
+                ? 'Keep this identifier stable. Invalid definitions can be repaired before saving.'
+                : 'Use a unique, safe identifier such as archive-main.'
+            }
+          />
+          {!sourceID && <TorznabFieldHint field="id" buttonLabel="Apply identifier" />}
+        </div>
         <SelectField
           path={['adapter']}
           label="Source type"
@@ -274,13 +292,20 @@ function ConnectionSettings() {
         title="Endpoint"
         description="Use credential-free URLs. Secrets are resolved from the vault when a run starts."
       >
-        <TextField
-          path={['url']}
-          label="Source URL"
-          placeholder={
-            html ? 'https://archive.example/catalog' : 'https://archive.example/api/items'
-          }
-        />
+        <div className="min-w-0">
+          <TextField
+            path={['url']}
+            label="Source URL"
+            placeholder={
+              html
+                ? 'https://archive.example/catalog'
+                : torznab
+                  ? 'https://indexer.example/api'
+                  : 'https://archive.example/api/items'
+            }
+          />
+          {torznab && <TorznabFieldHint field="url" buttonLabel="Use discovered URL" />}
+        </div>
         {!torznab && (
           <SelectField
             path={['http', 'method']}
@@ -291,6 +316,7 @@ function ConnectionSettings() {
         )}
       </FieldSection>
       <AuthenticationSettings />
+      {torznab && <TorznabConnectionDiscoveryBox />}
       {!torznab && (
         <FieldSection title="Request parameters">
           <MapField
@@ -341,19 +367,24 @@ function ConnectionSettings() {
               help="Use separate requests when the source limits each category independently."
             />
           </FieldGrid>
+          <TorznabSearchModeHints />
           <TextField
             path={['search', 'query']}
             label="Search query"
             help="Optional title filter sent to this source."
           />
-          <ArrayField
-            path={['search', 'categories']}
-            label="Categories"
-            initial={0}
-            help="Numeric category identifiers, especially for Torznab."
-          >
-            {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
-          </ArrayField>
+          <TorznabCategoryPicker
+            fallback={
+              <ArrayField
+                path={['search', 'categories']}
+                label="Categories"
+                initial={0}
+                help="Numeric category identifiers, especially for Torznab."
+              >
+                {(path, index) => <JSONField path={path} label={`Category ${index + 1}`} integer />}
+              </ArrayField>
+            }
+          />
         </FieldSection>
       )}
 
@@ -578,6 +609,7 @@ function PaginationSettings() {
           placeholder="100"
           help="Records requested per page. Use the maximum allowed by your source."
         />
+        {torznab && <TorznabPageSizeHint />}
       </FieldSection>
       {torznab ? (
         <>
@@ -1357,140 +1389,165 @@ export function SourceEditor({
     text(['schedule', 'every'], text(['schedule', 'cron'], 'Manual only')),
   ]
   const current = sourceStages[selected]
+  const jumpToStage = useCallback(
+    (stageID: 'identity' | 'connection' | 'pagination') => {
+      if (drafts.size > 0 || document.errors.length > 0) return
+      const index = sourceStages.findIndex((stage) => stage.id === stageID)
+      if (index >= 0) {
+        setSelected(index)
+        onModeChange('visual')
+      }
+    },
+    [drafts.size, document.errors.length, sourceStages, onModeChange],
+  )
   return (
     <SourceEditorContext.Provider
       value={{ document, savedDocument, change, reportDraft, readOnly }}
     >
-      <div
-        data-settings-editor="source"
-        data-settings-draft={
-          drafts.size > 0 || Boolean(editError) || document.errors.length > 0 || undefined
-        }
-        className="space-y-4"
+      <TorznabCapabilitiesProvider
+        rawJSON={value}
+        sourceID={sourceID}
+        blocked={drafts.size > 0 || Boolean(editError) || document.errors.length > 0}
+        onJumpToStage={jumpToStage}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div
-            className="inline-flex gap-1 rounded-md border border-border bg-card p-1"
-            role="group"
-            aria-label="Definition editor mode"
-          >
-            <Button
-              size="sm"
-              variant={mode === 'visual' ? 'secondary' : 'ghost'}
-              aria-pressed={mode === 'visual'}
-              disabled={document.errors.length > 0 || drafts.size > 0}
-              onClick={() => onModeChange('visual')}
+        <div
+          data-settings-editor="source"
+          data-settings-draft={
+            drafts.size > 0 || Boolean(editError) || document.errors.length > 0 || undefined
+          }
+          className="space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div
+              className="inline-flex gap-1 rounded-md border border-border bg-card p-1"
+              role="group"
+              aria-label="Definition editor mode"
             >
-              <FlowArrowIcon />
-              Visual stages
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === 'json' ? 'secondary' : 'ghost'}
-              aria-pressed={mode === 'json'}
-              disabled={drafts.size > 0}
-              onClick={() => onModeChange('json')}
-            >
-              <BracketsCurlyIcon />
-              JSON
-            </Button>
+              <Button
+                size="sm"
+                variant={mode === 'visual' ? 'secondary' : 'ghost'}
+                aria-pressed={mode === 'visual'}
+                disabled={document.errors.length > 0 || drafts.size > 0}
+                onClick={() => onModeChange('visual')}
+              >
+                <FlowArrowIcon />
+                Visual stages
+              </Button>
+              <Button
+                size="sm"
+                variant={mode === 'json' ? 'secondary' : 'ghost'}
+                aria-pressed={mode === 'json'}
+                disabled={drafts.size > 0}
+                onClick={() => onModeChange('json')}
+              >
+                <BracketsCurlyIcon />
+                JSON
+              </Button>
+            </div>
+            {mode === 'json' && jsonActions ? (
+              <div className="flex flex-wrap gap-2">{jsonActions}</div>
+            ) : mode === 'visual' ? (
+              <div className="flex flex-wrap gap-2">
+                <TorznabCapabilitiesToolbarAction />
+              </div>
+            ) : null}
           </div>
-          {mode === 'json' && jsonActions && (
-            <div className="flex flex-wrap gap-2">{jsonActions}</div>
+          {drafts.size > 0 && (
+            <p className="notice notice-warning" role="status">
+              Finish or discard the pending field draft before switching stages, validating,
+              importing or saving.
+            </p>
+          )}
+          {editError && (
+            <p className="notice notice-error" role="alert">
+              {editError}
+            </p>
+          )}
+          {document.errors.length > 0 && (sourceID || value.trim() !== '') && (
+            <div className="notice notice-error" role="alert">
+              <p className="font-medium">Repair the JSON to enable visual editing and saving.</p>
+              <ul className="mt-2 list-inside list-disc">
+                {document.errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {mode === 'json' || document.errors.length > 0 ? (
+            <>
+              <CodeEditor
+                value={value}
+                onChange={(next) => {
+                  setEditError('')
+                  onChange(next)
+                }}
+                label="Source JSON definition"
+                help={
+                  <>
+                    Strict JSON object · no comments, duplicate keys or trailing commas · {limitKiB}{' '}
+                    KiB maximum. Untouched numeric values retain their exact representation.
+                  </>
+                }
+                height="620px"
+                readOnly={readOnly}
+              />
+            </>
+          ) : (
+            <>
+              <TorznabCapabilitiesBanner currentStage={current.id} />
+              <Tabs
+                value={current.id}
+                onValueChange={(value) => {
+                  if (drafts.size === 0)
+                    setSelected(sourceStages.findIndex((stage) => stage.id === value))
+                }}
+                className="min-w-0 gap-4"
+              >
+                <TabsList aria-label="Source configuration stages">
+                  {sourceStages.map((stage, index) => {
+                    const Icon = stage.icon
+                    return (
+                      <TabsTrigger
+                        key={stage.id}
+                        value={stage.id}
+                        id={`${id}-${stage.id}`}
+                        aria-controls={`${id}-panel`}
+                        disabled={drafts.size > 0 && selected !== index}
+                      >
+                        <Icon aria-hidden="true" />
+                        {stage.label}
+                      </TabsTrigger>
+                    )
+                  })}
+                </TabsList>
+                <TabsContent
+                  value={current.id}
+                  id={`${id}-panel`}
+                  aria-labelledby={`${id}-${current.id}`}
+                  className="min-w-0 rounded-md border border-border bg-card p-4 sm:p-6"
+                >
+                  <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="mono">
+                      {String(selected + 1).padStart(2, '0')} /{' '}
+                      {String(sourceStages.length).padStart(2, '0')}
+                    </span>
+                    <InfoTip label={`${current.label} stage`}>{summaries[selected]}</InfoTip>
+                  </div>
+                  <fieldset disabled={readOnly} className="min-w-0 space-y-7 disabled:opacity-60">
+                    <legend className="sr-only">{current.label} settings</legend>
+                    {selected === 0 && <IdentitySettings sourceID={sourceID} />}
+                    {selected === 1 && <ConnectionSettings />}
+                    {selected === 2 && <PaginationSettings />}
+                    {selected === 3 && <MappingSettings />}
+                    {selected === 4 && <CollectionSettings />}
+                    {selected === 5 && <SourceScheduleSettings />}
+                  </fieldset>
+                </TabsContent>
+              </Tabs>
+            </>
           )}
         </div>
-        {drafts.size > 0 && (
-          <p className="notice notice-warning" role="status">
-            Finish or discard the pending field draft before switching stages, validating, importing
-            or saving.
-          </p>
-        )}
-        {editError && (
-          <p className="notice notice-error" role="alert">
-            {editError}
-          </p>
-        )}
-        {document.errors.length > 0 && (sourceID || value.trim() !== '') && (
-          <div className="notice notice-error" role="alert">
-            <p className="font-medium">Repair the JSON to enable visual editing and saving.</p>
-            <ul className="mt-2 list-inside list-disc">
-              {document.errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {mode === 'json' || document.errors.length > 0 ? (
-          <>
-            <CodeEditor
-              value={value}
-              onChange={(next) => {
-                setEditError('')
-                onChange(next)
-              }}
-              label="Source JSON definition"
-              help={
-                <>
-                  Strict JSON object · no comments, duplicate keys or trailing commas · {limitKiB}{' '}
-                  KiB maximum. Untouched numeric values retain their exact representation.
-                </>
-              }
-              height="620px"
-              readOnly={readOnly}
-            />
-          </>
-        ) : (
-          <Tabs
-            value={current.id}
-            onValueChange={(value) => {
-              if (drafts.size === 0)
-                setSelected(sourceStages.findIndex((stage) => stage.id === value))
-            }}
-            className="min-w-0 gap-4"
-          >
-            <TabsList aria-label="Source configuration stages">
-              {sourceStages.map((stage, index) => {
-                const Icon = stage.icon
-                return (
-                  <TabsTrigger
-                    key={stage.id}
-                    value={stage.id}
-                    id={`${id}-${stage.id}`}
-                    aria-controls={`${id}-panel`}
-                    disabled={drafts.size > 0 && selected !== index}
-                  >
-                    <Icon aria-hidden="true" />
-                    {stage.label}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
-            <TabsContent
-              value={current.id}
-              id={`${id}-panel`}
-              aria-labelledby={`${id}-${current.id}`}
-              className="min-w-0 rounded-md border border-border bg-card p-4 sm:p-6"
-            >
-              <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="mono">
-                  {String(selected + 1).padStart(2, '0')} /{' '}
-                  {String(sourceStages.length).padStart(2, '0')}
-                </span>
-                <InfoTip label={`${current.label} stage`}>{summaries[selected]}</InfoTip>
-              </div>
-              <fieldset disabled={readOnly} className="min-w-0 space-y-7 disabled:opacity-60">
-                <legend className="sr-only">{current.label} settings</legend>
-                {selected === 0 && <IdentitySettings sourceID={sourceID} />}
-                {selected === 1 && <ConnectionSettings />}
-                {selected === 2 && <PaginationSettings />}
-                {selected === 3 && <MappingSettings />}
-                {selected === 4 && <CollectionSettings />}
-                {selected === 5 && <SourceScheduleSettings />}
-              </fieldset>
-            </TabsContent>
-          </Tabs>
-        )}
-      </div>
+      </TorznabCapabilitiesProvider>
     </SourceEditorContext.Provider>
   )
 }

@@ -131,6 +131,8 @@ export function SecretPicker({
   const busy = editorBusy || prepare.isPending
   const conflict = save.error instanceof ApiError && save.error.status === 409
   const entries = [...(secrets.data?.items ?? [])].sort(compareListNames)
+  const existsInVault = Boolean(value && entries.some((secret) => secret.name === value))
+  const canReplace = Boolean(value) && (!secrets.isSuccess || existsInVault)
   const showStored =
     stored !== null &&
     stored.reference === value &&
@@ -168,13 +170,13 @@ export function SecretPicker({
         </select>
         <Button
           type="button"
-          variant={value ? 'warning' : 'outline'}
+          variant={canReplace ? 'warning' : 'outline'}
           className="self-start"
           disabled={disabled || busy}
-          onClick={() => prepare.mutate(value)}
+          onClick={() => prepare.mutate(canReplace ? value : '')}
         >
           <KeyIcon aria-hidden="true" />
-          {prepare.isPending ? 'Loading…' : value ? replaceLabel : addLabel}
+          {prepare.isPending ? 'Loading…' : canReplace ? replaceLabel : addLabel}
         </Button>
       </div>
       {showStored && (
