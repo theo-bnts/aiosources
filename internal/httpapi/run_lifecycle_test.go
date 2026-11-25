@@ -219,3 +219,65 @@ func TestProviderSchemaDoesNotShadowSourceIdentity(t *testing.T) {
 		t.Fatal("authenticated schema endpoint did not return an object schema")
 	}
 }
+
+func TestStartMetadataRunWithFiltersAPI(t *testing.T) {
+	fixture := sharingAPI(t, "https://owner.example.test")
+	definition := `{
+		"version": 1,
+		"id": "meta-filter-api",
+		"name": "Metadata Filter API",
+		"adapter": "json",
+		"url": "https://source.invalid/list",
+		"enabled": true,
+		"pagination": {"type": "page", "in": "query", "page_param": "page", "size_param": "limit", "start": 1},
+		"http": {"method": "GET", "items_path": "/items"},
+		"mapping": {"id": "/id", "fields": {"title": "/title", "info_hash": "/infoHash", "category": "/category"}},
+		"traversal": {
+			"window_pages": 10,
+			"total_paths": ["/total"],
+			"scopes": [{"id": "video", "match": {"category": "2000"}}],
+			"enrich_fields": ["external_ids"],
+			"id_recovery": {
+				"discovery_query": {"sort": "desc"},
+				"first": 1,
+				"resolve_url": "/resolve/{id}",
+				"resolve_pattern": "^[a-f0-9]{40}$",
+				"detail_url": "/detail/{value}",
+				"detail_path": "",
+				"mapping": {"id": "/id", "fields": {"title": "/title", "info_hash": "/infoHash", "category": "/category", "external_ids": "/externalIds"}}
+			}
+		}
+	}`
+	body, err := json.Marshal(map[string]string{"json": definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response := fixture.request(http.MethodPut, "/api/providers/meta-filter-api", string(body), true, ""); response.Code != http.StatusOK {
+		t.Fatalf("create source: status %d body=%s", response.Code, response.Body.String())
+	}
+	// Reject filters on non-metadata modes and invalid statuses.
+	for _, payload := range []string{
+		`{"provider_id":"meta-filter-api","mode":"full","metadata_filters":{"categories":["2000"]}}`,
+		`{"provider_id":"meta-filter-api","mode":"metadata","metadata_filters":{"identification_statuses":["invalid"]}}`,
+	} {
+		if response := fixture.request(http.MethodPost, "/api/runs", payload, true, ""); response.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected 422 for %s, got %d %s", payload, response.Code, response.Body.String())
+		}
+	}
+	// Accept valid filtered Metadata run and expose normalized filters on GET /api/runs/{id}.
+	validPayload := `{"provider_id":"meta-filter-api","mode":"metadata","metadata_filters":{"categories":[" 2000 ","5000","2000"],"identification_statuses":["unmatched","ambiguous"]}}`
+	response := fixture.request(http.MethodPost, "/api/runs", validPayload, true, "")
+	var created model.Run
+	if response.Code != http.StatusAccepted || json.Unmarshal(response.Body.Bytes(), &created) != nil {
+		t.Fatalf("start filtered metadata run: status=%d body=%s", response.Code, response.Body.String())
+	}
+	want := &model.MetadataFilters{Categories: []string{"2000", "5000"}, IdentificationStatuses: []string{"unmatched", "ambiguous"}}
+	if !reflect.DeepEqual(created.MetadataFilters, want) {
+		t.Fatalf("POST /api/runs did not return normalized filters: %+v", created.MetadataFilters)
+	}
+	fetched := fixture.request(http.MethodGet, "/api/runs/"+created.ID, "", true, "")
+	var loaded model.Run
+	if fetched.Code != http.StatusOK || json.Unmarshal(fetched.Body.Bytes(), &loaded) != nil || !reflect.DeepEqual(loaded.MetadataFilters, want) {
+		t.Fatalf("GET /api/runs/{id} lost metadata filters: status=%d body=%s", fetched.Code, fetched.Body.String())
+	}
+}

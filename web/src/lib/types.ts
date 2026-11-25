@@ -1,5 +1,10 @@
 export type RunMode = 'preview' | 'incremental' | 'full' | 'metadata'
 export type RunStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed' | 'cancelled'
+export type IdentificationStatus = 'matched' | 'ambiguous' | 'unmatched' | 'pending'
+export interface MetadataFilters {
+  categories?: string[]
+  identification_statuses?: IdentificationStatus[]
+}
 export interface Schedule {
   enabled?: boolean
   every?: string
@@ -10,6 +15,7 @@ export interface Schedule {
   max_pages?: number
   known_pages?: number
   retry_failed?: boolean
+  metadata_filters?: MetadataFilters
 }
 export interface CatalogSync {
   enabled: boolean
@@ -224,6 +230,7 @@ export interface Run {
   initial_full?: boolean
   trigger?: 'manual' | 'scheduled'
   metadata_parent_run_id?: string
+  metadata_filters?: MetadataFilters
   status: RunStatus
   cancel_requested: boolean
   pause_requested: boolean
@@ -250,6 +257,7 @@ export interface StartRun {
   max_pages?: number
   max_duration_seconds?: number
   known_pages?: number
+  metadata_filters?: MetadataFilters
 }
 export interface RunEvent {
   id: number

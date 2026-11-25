@@ -278,6 +278,7 @@ func validateProvider(p model.Provider) []string {
 		issues = append(issues, err.Error())
 	}
 	add(!p.IsRemoteCatalog() && p.Schedule.Mode == model.ModeMetadata && !p.SupportsMetadata(), "schedule.mode metadata requires a native JSON source with configured detail fields")
+	add(p.IsRemoteCatalog() && p.Schedule.MetadataFilters != nil, "schedule.metadata_filters is not supported for remote catalogs")
 	add(p.Traversal != nil && p.Traversal.MetadataAfterIncremental && !p.SupportsMetadata(), "traversal.metadata_after_incremental requires a native JSON source with configured detail fields")
 	for _, category := range p.Search.Categories {
 		if category < 0 {

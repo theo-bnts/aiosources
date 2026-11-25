@@ -196,6 +196,13 @@ func (m *Manager) Enqueue(ctx context.Context, req model.StartRun) (model.Run, e
 	if req.KnownPages != nil && (mode != model.ModeIncremental || *req.KnownPages < 0 || *req.KnownPages > 10000) {
 		return model.Run{}, fmt.Errorf("%w: known_pages is only valid for Incremental and must be between 0 and 10000", model.ErrInvalid)
 	}
+	if req.MetadataFilters != nil && mode != model.ModeMetadata {
+		return model.Run{}, fmt.Errorf("%w: metadata_filters is only valid for Metadata", model.ErrInvalid)
+	}
+	metadataFilters, err := req.MetadataFilters.Normalize()
+	if err != nil {
+		return model.Run{}, fmt.Errorf("%w: metadata_filters contains invalid categories or identification statuses", model.ErrInvalid)
+	}
 	settings, err := m.db.CollectionSettings(ctx)
 	if err != nil {
 		return model.Run{}, publicStoreError(err)
@@ -241,6 +248,7 @@ func (m *Manager) Enqueue(ctx context.Context, req model.StartRun) (model.Run, e
 		input := model.Run{
 			ProviderID: config.ID, ProviderName: config.Name, Mode: mode,
 			Status: model.StatusQueued, MaxPages: maxPages, Revision: doc.Revision, Config: config, Policy: &policy,
+			MetadataFilters: metadataFilters,
 		}
 		settings.ApplyDefaults(&input)
 		if err := connectors.Validate(input.Config); err != nil {

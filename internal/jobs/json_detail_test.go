@@ -414,3 +414,130 @@ func TestIncrementalKnownPageBoundarySurvivesBudgetResume(t *testing.T) {
 		})
 	}
 }
+
+func TestFilteredMetadataRunAndExplicitFullFollowup(t *testing.T) {
+	ctx, _, db := schedulerDatabase(t)
+	var detailIDs []int64
+	hash := func(id int) string { return fmt.Sprintf("%040x", id) }
+	categories := map[int]string{1: "2000", 2: "2000", 3: "5000", 4: "3000"}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/list":
+			items := make([]string, 0, 4)
+			for id := 1; id <= 4; id++ {
+				items = append(items, fmt.Sprintf(`{"id":%d,"title":"Release %d","infoHash":%q,"category":%q,"scope":"all"}`, id, id, hash(id), categories[id]))
+			}
+			_, _ = fmt.Fprintf(w, `{"items":[%s],"total":4}`, strings.Join(items, ","))
+		case strings.HasPrefix(r.URL.Path, "/detail/"):
+			id, err := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/detail/"), 16, 64)
+			if err != nil {
+				http.Error(w, "invalid locator", http.StatusBadRequest)
+				return
+			}
+			detailIDs = append(detailIDs, id)
+			_, _ = fmt.Fprintf(w, `{"id":%d,"title":"Detail %d","infoHash":%q,"category":%q,"scope":"all","externalIds":[{"kind":"imdb","value":"tt%d"}],"metadata":{"ok":true}}`, id, id, hash(int(id)), categories[int(id)], id)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	registry, err := providers.New(t.TempDir(), connectors.Validate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = registry.Close() })
+	provider := schedulerProvider("filtered-metadata", server.URL+"/list")
+	provider.Schedule = model.Schedule{}
+	provider.PageSize = 10
+	provider.Pagination = model.Pagination{Type: "page", In: "query", PageParam: "page", SizeParam: "limit", Start: 1}
+	provider.Mapping.Fields["info_hash"] = "/infoHash"
+	provider.Mapping.Fields["category"] = "/category"
+	provider.Mapping.Fields["scope"] = "/scope"
+	provider.Traversal = &model.JSONTraversal{
+		WindowPages: 10, TotalMode: "at_least", TotalPaths: []string{"/total"},
+		Scopes:       []model.JSONScope{{ID: "all", Match: map[string]any{"scope": "all"}}},
+		EnrichFields: []string{"external_ids", "metadata"},
+		IDRecovery: &model.JSONIDRecovery{
+			First: 1, DiscoveryQuery: map[string]any{"sortOrder": "desc"},
+			ResolveURL: "/resolve/{id}", ResolvePattern: "^[a-f0-9]{40}$", DetailURL: "/detail/{value}",
+			Mapping: model.Mapping{ID: "/id", Fields: map[string]string{
+				"title": "/title", "info_hash": "/infoHash", "category": "/category", "scope": "/scope",
+				"external_ids": "/externalIds", "metadata": "/metadata",
+			}},
+		},
+	}
+	saveScheduledProvider(t, registry, provider, "")
+	manager := New(db, registry, nil, 1)
+
+	// Reject metadata_filters on non-metadata modes.
+	if _, err := manager.Enqueue(ctx, model.StartRun{
+		ProviderID:      provider.ID,
+		Mode:            model.ModeFull,
+		MetadataFilters: &model.MetadataFilters{Categories: []string{"2000"}},
+	}); err == nil {
+		t.Fatal("Enqueue accepted metadata_filters on Full mode")
+	}
+
+	// Seed 4 torrents via Full (metadata_after_incremental is false here).
+	seed, err := manager.Enqueue(ctx, model.StartRun{ProviderID: provider.ID, Mode: model.ModeFull})
+	if err != nil {
+		t.Fatal(err)
+	}
+	collectScheduledAttempt(t, ctx, manager, db, seed.ID, model.StatusSucceeded)
+
+	// Run filtered Metadata targeting only categories 2000 & 5000 with pending status.
+	filtered, err := manager.Enqueue(ctx, model.StartRun{
+		ProviderID: provider.ID,
+		Mode:       model.ModeMetadata,
+		MetadataFilters: &model.MetadataFilters{
+			Categories:             []string{"2000", "5000"},
+			IdentificationStatuses: []string{"pending"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	collectScheduledAttempt(t, ctx, manager, db, filtered.ID, model.StatusSucceeded)
+	if len(detailIDs) != 3 {
+		t.Fatalf("filtered Metadata did not restrict detail fetches to matching categories: fetched=%v", detailIDs)
+	}
+	for _, id := range detailIDs {
+		if id == 4 {
+			t.Fatalf("filtered Metadata fetched excluded audio category 3000: fetched=%v", detailIDs)
+		}
+	}
+
+	// Explicit first Full on a fresh source with metadata_after_incremental=true
+	// must automatically queue and execute a Metadata follow-up for newly inserted torrents.
+	detailIDs = nil
+	autoProvider := provider
+	autoProvider.ID = "explicit-full-auto"
+	autoProvider.Name = "Explicit Full Auto"
+	autoTraversal := *provider.Traversal
+	autoTraversal.MetadataAfterIncremental = true
+	autoProvider.Traversal = &autoTraversal
+	saveScheduledProvider(t, registry, autoProvider, "")
+	firstFull, err := manager.Enqueue(ctx, model.StartRun{ProviderID: autoProvider.ID, Mode: model.ModeFull})
+	if err != nil {
+		t.Fatal(err)
+	}
+	collectScheduledAttempt(t, ctx, manager, db, firstFull.ID, model.StatusSucceeded)
+	runs, err := db.ListRuns(ctx, model.ListOptions{ProviderID: autoProvider.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var followupID string
+	for _, run := range runs.Items {
+		if run.MetadataParentRunID == firstFull.ID {
+			followupID = run.ID
+		}
+	}
+	if followupID == "" {
+		t.Fatalf("explicit first Full did not queue automatic Metadata follow-up: %+v", runs.Items)
+	}
+	collectScheduledAttempt(t, ctx, manager, db, followupID, model.StatusSucceeded)
+	if len(detailIDs) != 4 {
+		t.Fatalf("explicit first Full follow-up did not enrich all 4 newly inserted records: fetched=%v", detailIDs)
+	}
+}

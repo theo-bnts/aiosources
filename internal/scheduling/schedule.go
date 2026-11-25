@@ -67,6 +67,14 @@ func Parse(settings model.Schedule) (Plan, error) {
 			return plan, errors.New("schedule.full_every must be a Go duration of at least 1m")
 		}
 	}
+	if settings.MetadataFilters != nil {
+		if plan.Mode != model.ModeMetadata {
+			return plan, errors.New("schedule.metadata_filters requires schedule.mode metadata")
+		}
+		if _, err := settings.MetadataFilters.Normalize(); err != nil {
+			return plan, errors.New("schedule.metadata_filters contains invalid categories or identification statuses")
+		}
+	}
 	if settings.Cron != "" {
 		if len(strings.Fields(settings.Cron)) != 5 {
 			return plan, errors.New("schedule.cron must be a standard five-field expression")
@@ -170,9 +178,10 @@ func (s Source) RunState(runs []model.Run) (state string, resume *model.Run, mes
 }
 
 func (s Source) matchesScheduledContinuation(run model.Run) bool {
-	metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && s.Plan.Mode == model.ModeIncremental
+	metadataFollowup := run.Mode == model.ModeMetadata && run.MetadataParentRunID != "" && (s.Plan.Mode == model.ModeIncremental || s.Plan.Mode == model.ModeFull)
 	initialFull := run.Mode == model.ModeFull && run.InitialFull && s.Plan.Mode == model.ModeIncremental
-	modeMatches := run.Mode == s.Plan.Mode || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) || initialFull || metadataFollowup ||
+	directMode := run.Mode == s.Plan.Mode && (run.Mode != model.ModeMetadata || run.MetadataParentRunID == "")
+	modeMatches := directMode || (s.Plan.FullEvery > 0 && run.Mode == model.ModeFull) || initialFull || metadataFollowup ||
 		(s.Provider.IsRemoteCatalog() && run.Mode == model.ModeFull)
 	return s.matchesSnapshot(run) && modeMatches
 }

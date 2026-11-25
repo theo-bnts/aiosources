@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/theo-bnts/aiosources/internal/model"
+	"github.com/theo-bnts/aiosources/internal/scheduling"
 )
 
 func metadataSource(id string) model.Provider {
@@ -262,5 +264,222 @@ func TestIncrementalInvalidatesMetadataWhenNativeHashChanges(t *testing.T) {
 	candidates, err := db.MetadataCandidates(ctx, metadata, "", 100)
 	if err != nil || len(candidates) != 1 || candidates[0].SourceID != "changed" || candidates[0].InfoHash != changed.Fields["info_hash"] {
 		t.Fatalf("replacement hash did not become eligible for its own metadata: %+v %v", candidates, err)
+	}
+}
+
+func TestMetadataCandidatesFilterByCategoryAndIdentificationStatus(t *testing.T) {
+	ctx, endpoint, db := scheduleDatabase(t)
+	provider := metadataSource("metadata-filters")
+	seed := mirrorClaim(t, ctx, db, provider, model.ModeIncremental)
+	rec := func(id string, category any, categories []any) model.Record {
+		r := coverageRecord(id)
+		if category != nil {
+			r.Fields["category"] = category
+		}
+		if categories != nil {
+			r.Fields["categories"] = categories
+		}
+		return r
+	}
+	items := []model.Record{
+		rec("01-video-matched", "2000", nil),
+		rec("02-video-unmatched", "2000", nil),
+		rec("03-series-ambiguous", nil, []any{"5000", "Séries"}),
+		rec("04-audio-unmatched", "3000", nil),
+		rec("05-video-pending-none", "2000", nil),
+		rec("06-video-pending-queued", "2000", nil),
+		rec("07-video-pending-stale-fp", "2000", nil),
+		rec("08-video-pending-stale-rev", "2000", nil),
+		rec("09-video-unmatched-complete", "2000", nil),
+	}
+	items[8].Fields["external_ids"], items[8].Fields["metadata"] = []any{}, false
+	seed, err := db.SavePage(ctx, seed, model.Page{Items: items, Done: true}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirrorFinish(t, ctx, db, seed, model.StatusSucceeded)
+
+	// Clear the trigger-populated match queue so we can establish exact statuses.
+	if _, err := db.pool.Exec(ctx, `DELETE FROM aiosources.aio_match_queue WHERE provider_id=$1`, provider.ID); err != nil {
+		t.Fatal(err)
+	}
+	var workID int64
+	if err := db.pool.QueryRow(ctx, `INSERT INTO aiosources.aio_works(media_type,tmdb_id,years,revision) VALUES('movie','101',ARRAY[2024],2) RETURNING id`).Scan(&workID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_matches(provider_id,source_id,fingerprint,work_id,revision,status,reason)
+SELECT provider_id,source_id,
+ CASE WHEN source_id='07-video-pending-stale-fp' THEN 'stale-fingerprint' ELSE fields_fingerprint END,
+ CASE WHEN source_id IN ('01-video-matched','08-video-pending-stale-rev') THEN $2::bigint ELSE NULL END,
+ CASE WHEN source_id='01-video-matched' THEN 2 WHEN source_id='08-video-pending-stale-rev' THEN 1 ELSE 0 END,
+ CASE
+  WHEN source_id IN ('01-video-matched','08-video-pending-stale-rev') THEN 'matched'
+  WHEN source_id='03-series-ambiguous' THEN 'ambiguous'
+  ELSE 'unmatched'
+ END,
+ 'fixture'
+FROM aiosources.torrents WHERE provider_id=$1 AND source_id<>'05-video-pending-none'`, provider.ID, workID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `INSERT INTO aiosources.aio_match_queue(provider_id,source_id) VALUES($1,'06-video-pending-queued')`, provider.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `ANALYZE aiosources.torrents; ANALYZE aiosources.aio_matches; ANALYZE aiosources.aio_match_queue;`); err != nil {
+		t.Fatal(err)
+	}
+
+	collectIDs := func(t *testing.T, filters *model.MetadataFilters) []string {
+		t.Helper()
+		created, err := db.CreateRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeMetadata, MetadataFilters: filters})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = db.RequestCancel(ctx, created.ID) }()
+		candidates, err := db.MetadataCandidates(ctx, created, "", 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids := make([]string, len(candidates))
+		for i, c := range candidates {
+			ids[i] = c.SourceID
+		}
+		return ids
+	}
+
+	// Category filter (case-insensitive, Unicode-safe, scalar + array).
+	if got := collectIDs(t, &model.MetadataFilters{Categories: []string{"séries", "3000"}}); !reflect.DeepEqual(got, []string{"03-series-ambiguous", "04-audio-unmatched"}) {
+		t.Fatalf("category filter mismatch: got=%v", got)
+	}
+
+	// Unmatched + ambiguous (diagnostic covering index path), skipping complete, matched, and pending.
+	if got := collectIDs(t, &model.MetadataFilters{IdentificationStatuses: []string{"unmatched", "ambiguous"}}); !reflect.DeepEqual(got, []string{"02-video-unmatched", "03-series-ambiguous", "04-audio-unmatched"}) {
+		t.Fatalf("unmatched+ambiguous filter mismatch: got=%v", got)
+	}
+
+	// Combined category + unmatched/ambiguous (the C411 video-only unresolved backfill scenario).
+	if got := collectIDs(t, &model.MetadataFilters{
+		Categories:             []string{"2000", "5000"},
+		IdentificationStatuses: []string{"unmatched", "ambiguous"},
+	}); !reflect.DeepEqual(got, []string{"02-video-unmatched", "03-series-ambiguous"}) {
+		t.Fatalf("combined video + unresolved filter mismatch: got=%v", got)
+	}
+
+	// Pending includes uncomputed, queued, stale fingerprint, and stale matched revision.
+	if got := collectIDs(t, &model.MetadataFilters{IdentificationStatuses: []string{"pending"}}); !reflect.DeepEqual(got, []string{"05-video-pending-none", "06-video-pending-queued", "07-video-pending-stale-fp", "08-video-pending-stale-rev"}) {
+		t.Fatalf("pending filter mismatch: got=%v", got)
+	}
+
+	// Matched includes only current valid matches.
+	if got := collectIDs(t, &model.MetadataFilters{IdentificationStatuses: []string{"matched"}}); !reflect.DeepEqual(got, []string{"01-video-matched"}) {
+		t.Fatalf("matched filter mismatch: got=%v", got)
+	}
+
+	// Verify PostgreSQL uses the partial covering index aio_matches_diagnostic_status
+	// for unmatched/ambiguous backfills.
+	planRun := model.Run{
+		ProviderID: provider.ID, Config: provider, Mode: model.ModeMetadata, CreatedAt: time.Now().Add(time.Minute),
+		MetadataFilters: &model.MetadataFilters{IdentificationStatuses: []string{"unmatched", "ambiguous"}},
+	}
+	query, args := metadataCandidatesQuery(planRun, "", 1, nil, planRun.MetadataFilters.IdentificationStatuses)
+	if _, err := db.pool.Exec(ctx, `SET enable_seqscan = off`); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = db.pool.Exec(ctx, `SET enable_seqscan = on`) })
+	rows, err := db.pool.Query(ctx, "EXPLAIN "+query, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var planLines []string
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			t.Fatal(err)
+		}
+		planLines = append(planLines, line)
+	}
+	rows.Close()
+	planText := strings.Join(planLines, "\n")
+	if !strings.Contains(planText, "aio_matches_diagnostic_status") {
+		t.Fatalf("expected unmatched/ambiguous candidate query to use aio_matches_diagnostic_status, plan:\n%s", planText)
+	}
+	_, _ = db.pool.Exec(ctx, `SET enable_seqscan = on`)
+
+	// Invalid filters and non-metadata modes must be rejected.
+	if _, err := db.CreateRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeFull, MetadataFilters: &model.MetadataFilters{Categories: []string{"2000"}}}); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("non-metadata mode accepted metadata filters: %v", err)
+	}
+	if _, err := db.CreateRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeMetadata, MetadataFilters: &model.MetadataFilters{IdentificationStatuses: []string{"bogus"}}}); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("invalid identification status accepted: %v", err)
+	}
+
+	// Filters must persist immutably across pause, reopen, and keyset resume.
+	filtered, err := db.CreateRun(ctx, model.Run{
+		ProviderID: provider.ID, Config: provider, Mode: model.ModeMetadata,
+		MetadataFilters: &model.MetadataFilters{
+			Categories:             []string{" 2000 ", "5000", "2000"},
+			IdentificationStatuses: []string{"unmatched", "ambiguous", "unmatched"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFilters := &model.MetadataFilters{Categories: []string{"2000", "5000"}, IdentificationStatuses: []string{"unmatched", "ambiguous"}}
+	if !reflect.DeepEqual(filtered.MetadataFilters, wantFilters) {
+		t.Fatalf("filters were not normalized on admission: %+v", filtered.MetadataFilters)
+	}
+	claimed, err := db.ClaimNext(ctx)
+	if err != nil || claimed == nil || claimed.ID != filtered.ID || !reflect.DeepEqual(claimed.MetadataFilters, wantFilters) {
+		t.Fatalf("claim lost metadata filters: %+v %v", claimed, err)
+	}
+	if _, err := db.FinishRun(ctx, claimed.ID, model.StatusPaused, "budget", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	reopened, err := Open(ctx, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(reopened.Close)
+	resumed, err := reopened.ResumeRun(ctx, filtered.ID)
+	if err != nil || !reflect.DeepEqual(resumed.MetadataFilters, wantFilters) {
+		t.Fatalf("resume lost metadata filters: %+v %v", resumed, err)
+	}
+	next, err := reopened.MetadataCandidates(ctx, resumed, "02-video-unmatched", 10)
+	if err != nil || len(next) != 1 || next[0].SourceID != "03-series-ambiguous" {
+		t.Fatalf("keyset continuation after reopen broke filter scope: %+v %v", next, err)
+	}
+	if _, err := reopened.RequestCancel(ctx, filtered.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scheduled Metadata runs inherit and preserve schedule.metadata_filters across budget ticks.
+	provider.Enabled = true
+	provider.Schedule = model.Schedule{
+		Every: "1m", Mode: model.ModeMetadata, MaxPages: 1,
+		MetadataFilters: &model.MetadataFilters{Categories: []string{"2000", "5000"}, IdentificationStatuses: []string{"unmatched", "ambiguous"}},
+	}
+	plan, err := scheduling.Parse(provider.Schedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := scheduling.Source{ID: provider.ID, Revision: "sched-meta-1", Provider: provider, Valid: true, Plan: plan}
+	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := reopened.ReconcileSchedules(ctx, []scheduling.Source{source}, start); err != nil {
+		t.Fatal(err)
+	}
+	_, schedRun, err := reopened.AttemptSchedule(ctx, source, start.Add(time.Minute), nil)
+	if err != nil || schedRun == nil || schedRun.Mode != model.ModeMetadata || !reflect.DeepEqual(schedRun.MetadataFilters, wantFilters) {
+		t.Fatalf("scheduled Metadata run lost configured filters: %+v %v", schedRun, err)
+	}
+	schedClaimed, err := reopened.ClaimNext(ctx)
+	if err != nil || schedClaimed == nil || schedClaimed.ID != schedRun.ID {
+		t.Fatalf("claim scheduled filtered Metadata: %+v %v", schedClaimed, err)
+	}
+	if _, err := reopened.FinishRun(ctx, schedClaimed.ID, model.StatusPaused, "budget", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	_, continued, err := reopened.AttemptSchedule(ctx, source, start.Add(2*time.Minute), nil)
+	if err != nil || continued == nil || continued.ID != schedRun.ID || !reflect.DeepEqual(continued.MetadataFilters, wantFilters) {
+		t.Fatalf("scheduled continuation lost metadata filters: %+v %v", continued, err)
 	}
 }

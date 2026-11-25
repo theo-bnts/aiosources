@@ -3,11 +3,19 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/theo-bnts/aiosources/internal/model"
 )
+
+// Optional filters narrow standalone Metadata runs by source category and/or
+// current identification status, frozen on the run for pause/resume safety.
+const metadataFiltersSchema = `
+ALTER TABLE aiosources.runs ADD COLUMN metadata_filters JSONB
+ CHECK (metadata_filters IS NULL OR (mode='metadata' AND metadata_parent_run_id IS NULL AND jsonb_typeof(metadata_filters)='object'));
+`
 
 // MetadataCandidates walks published native identities, not listing pages or
 // hash groups. A committed keyset cursor remains useful even for skipped rows
@@ -16,16 +24,16 @@ func (s *Store) MetadataCandidates(ctx context.Context, run model.Run, after str
 	if run.Mode != model.ModeMetadata || !run.Config.SupportsMetadata() || run.ProviderID != run.Config.ID || run.CreatedAt.IsZero() || limit < 1 || limit > 100 {
 		return nil, model.ErrInvalid
 	}
-	rows, err := s.pool.Query(ctx, `SELECT source_id,COALESCE(search_info_hash,'') FROM aiosources.torrents AS record
-WHERE provider_id=$1 AND origin IS NULL AND first_seen_at<=$2 AND source_id>$3
-AND EXISTS (SELECT 1 FROM unnest($4::text[]) AS required(name)
-    WHERE COALESCE(record.fields->required.name,'null'::jsonb)='null'::jsonb)
-AND ($6='' OR EXISTS (
-    SELECT 1 FROM aiosources.run_record_identities AS accepted
-    JOIN aiosources.runs AS parent ON parent.id=accepted.run_id
-    WHERE accepted.run_id=$6 AND accepted.source_id=record.source_id
-    AND parent.provider_id=record.provider_id AND record.first_seen_at>=parent.created_at))
-ORDER BY source_id LIMIT $5`, run.ProviderID, run.CreatedAt, after, run.MetadataFields(), limit, run.MetadataParentRunID)
+	if run.MetadataFilters != nil && (!run.MetadataFilters.Valid() || run.MetadataParentRunID != "") {
+		return nil, model.ErrInvalid
+	}
+	var categories, statuses []string
+	if run.MetadataFilters != nil {
+		categories = run.MetadataFilters.Categories
+		statuses = run.MetadataFilters.IdentificationStatuses
+	}
+	query, args := metadataCandidatesQuery(run, after, limit, categories, statuses)
+	rows, err := s.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, databaseError("read metadata candidates", err)
 	}
@@ -41,7 +49,70 @@ ORDER BY source_id LIMIT $5`, run.ProviderID, run.CreatedAt, after, run.Metadata
 	return candidates, databaseError("read metadata candidates", rows.Err())
 }
 
-// The caller has completed the Incremental or its initial Full under queue and row
+func metadataCandidatesQuery(run model.Run, after string, limit int, categories, statuses []string) (string, []any) {
+	args := []any{run.ProviderID, run.CreatedAt, after, run.MetadataFields(), limit}
+	var categoryPrefix, categoryClause string
+	if len(categories) > 0 {
+		args = append(args, categories)
+		categoryPrefix = fmt.Sprintf(`WITH wanted_categories AS (
+    SELECT array_agg(encode(sha256(convert_to(lower(c),'UTF8')),'hex')) AS hashes
+    FROM unnest($%d::text[]) AS c
+) `, len(args))
+		categoryClause = ` AND record.search_categories && (SELECT hashes FROM wanted_categories)`
+	}
+	if len(statuses) == 0 {
+		args = append(args, run.MetadataParentRunID)
+		parentParam := len(args)
+		return categoryPrefix + fmt.Sprintf(`SELECT record.source_id,COALESCE(record.search_info_hash,'') FROM aiosources.torrents AS record
+WHERE record.provider_id=$1 AND record.origin IS NULL AND record.first_seen_at<=$2 AND record.source_id>$3
+AND EXISTS (SELECT 1 FROM unnest($4::text[]) AS required(name)
+    WHERE COALESCE(record.fields->required.name,'null'::jsonb)='null'::jsonb)
+AND ($%d='' OR EXISTS (
+    SELECT 1 FROM aiosources.run_record_identities AS accepted
+    JOIN aiosources.runs AS parent ON parent.id=accepted.run_id
+    WHERE accepted.run_id=$%d AND accepted.source_id=record.source_id
+    AND parent.provider_id=record.provider_id AND record.first_seen_at>=parent.created_at))`, parentParam, parentParam) + categoryClause + `
+ORDER BY record.source_id LIMIT $5`, args
+	}
+	args = append(args, statuses)
+	statusParam := len(args)
+	if run.MetadataFilters.DiagnosticStatusesOnly() {
+		// Drive directly from aio_matches_diagnostic_status per requested status
+		// in (provider_id, source_id) order so unmatched/ambiguous backfills skip
+		// the matched majority without sorting.
+		return categoryPrefix + fmt.Sprintf(`SELECT candidate.source_id,candidate.info_hash
+FROM unnest($%d::text[]) AS wanted(status)
+CROSS JOIN LATERAL (
+    SELECT record.source_id,COALESCE(record.search_info_hash,'') AS info_hash
+    FROM aiosources.aio_matches AS m
+    JOIN aiosources.torrents AS record ON record.provider_id=m.provider_id AND record.source_id=m.source_id
+    LEFT JOIN aiosources.aio_match_queue AS q ON q.provider_id=record.provider_id AND q.source_id=record.source_id
+    WHERE m.status=wanted.status AND m.status IN ('ambiguous','unmatched')
+    AND m.provider_id=$1 AND m.source_id>$3
+    AND COALESCE(m.fingerprint=record.fields_fingerprint,FALSE) AND q.provider_id IS NULL
+    AND record.origin IS NULL AND record.first_seen_at<=$2
+    AND EXISTS (SELECT 1 FROM unnest($4::text[]) AS required(name)
+        WHERE COALESCE(record.fields->required.name,'null'::jsonb)='null'::jsonb)`+categoryClause+`
+    ORDER BY m.source_id LIMIT $5
+) AS candidate
+ORDER BY candidate.source_id LIMIT $5`, statusParam), args
+	}
+	return categoryPrefix + fmt.Sprintf(`SELECT record.source_id,COALESCE(record.search_info_hash,'')
+FROM aiosources.torrents AS record
+LEFT JOIN aiosources.aio_matches AS m ON m.provider_id=record.provider_id AND m.source_id=record.source_id
+LEFT JOIN aiosources.aio_match_queue AS q ON q.provider_id=record.provider_id AND q.source_id=record.source_id
+LEFT JOIN aiosources.aio_works AS w ON w.id=m.work_id
+WHERE record.provider_id=$1 AND record.origin IS NULL AND record.first_seen_at<=$2 AND record.source_id>$3
+AND EXISTS (SELECT 1 FROM unnest($4::text[]) AS required(name)
+    WHERE COALESCE(record.fields->required.name,'null'::jsonb)='null'::jsonb)`+categoryClause+`
+AND (CASE WHEN m.provider_id IS NULL OR q.provider_id IS NOT NULL
+    OR m.fingerprint IS DISTINCT FROM record.fields_fingerprint
+    OR (m.status='matched' AND (w.id IS NULL OR m.revision IS DISTINCT FROM w.revision))
+    THEN 'pending' ELSE m.status END)=ANY($%d::text[])
+ORDER BY record.source_id LIMIT $5`, statusParam), args
+}
+
+// The caller has completed Incremental or Full discovery under queue and row
 // locks. Copy the stored snapshot, not current defaults, and commit the child
 // and both lifecycle events atomically with the successful parent.
 func queueMetadataAfterDiscovery(ctx context.Context, tx pgx.Tx, parent model.Run) error {

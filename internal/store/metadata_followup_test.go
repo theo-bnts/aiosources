@@ -156,8 +156,8 @@ func TestIncrementalMetadataFollowupRequiresSuccessfulEligibleNewWork(t *testing
 		status  model.RunStatus
 		control string
 	}{
-		{name: "opt-out"}, {name: "unsupported"}, {name: "no-records"}, {name: "old-only"}, {name: "complete-only"}, {name: "ignored-only"}, {name: "future-only"},
-		{name: "preview", mode: model.ModePreview}, {name: "full", mode: model.ModeFull}, {name: "metadata", mode: model.ModeMetadata},
+		{name: "opt-out"}, {name: "unsupported"}, {name: "no-records"}, {name: "old-only"}, {name: "full-old-only", mode: model.ModeFull}, {name: "complete-only"}, {name: "ignored-only"}, {name: "future-only"},
+		{name: "preview", mode: model.ModePreview}, {name: "metadata", mode: model.ModeMetadata},
 		{name: "budget-pause", status: model.StatusPaused}, {name: "failed", status: model.StatusFailed}, {name: "cancelled", status: model.StatusCancelled},
 		{name: "pause-request", control: "pause"}, {name: "cancel-request", control: "cancel"}, {name: "unfinished"},
 	}
@@ -171,6 +171,22 @@ func TestIncrementalMetadataFollowupRequiresSuccessfulEligibleNewWork(t *testing
 			mode := tc.mode
 			if mode == "" {
 				mode = model.ModeIncremental
+			}
+			if tc.name == "full-old-only" {
+				seedProvider := provider
+				seedTraversal := *provider.Traversal
+				seedTraversal.MetadataAfterIncremental = false
+				seedProvider.Traversal = &seedTraversal
+				seed := mirrorClaim(t, ctx, db, seedProvider, model.ModeIncremental)
+				var seedErr error
+				seed, seedErr = db.SavePage(ctx, seed, model.Page{Items: []model.Record{coverageRecord("record")}, Done: true}, "")
+				if seedErr != nil {
+					t.Fatal(seedErr)
+				}
+				mirrorFinish(t, ctx, db, seed, model.StatusSucceeded)
+				if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=NOW()-INTERVAL '1 hour' WHERE provider_id=$1", provider.ID); err != nil {
+					t.Fatal(err)
+				}
 			}
 			parent := mirrorClaim(t, ctx, db, provider, mode)
 			record := coverageRecord("record")
@@ -441,5 +457,117 @@ func TestScheduledMetadataFollowupContinuesBudgetWithoutChangingSnapshot(t *test
 	persisted, err := reopened.GetRun(ctx, child.ID)
 	if err != nil || persisted.Status != model.StatusPaused || persisted.Revision != parent.Revision || len(metadataFollowups(t, ctx, reopened, *parent)) != 1 {
 		t.Fatalf("incompatible schedule mutated the immutable follow-up: %+v %v", persisted, err)
+	}
+}
+
+func TestExplicitFullQueuesMetadataOnlyForNewlyInsertedNativeIdentities(t *testing.T) {
+	ctx, endpoint, db := scheduleDatabase(t)
+	provider := metadataSource("explicit-full-followup")
+	provider.Enabled = true
+	provider.Traversal.MetadataAfterIncremental = true
+
+	// First explicit Full on an empty source (InitialFull is false) must queue
+	// automatic Metadata follow-up for all newly inserted native records.
+	firstQueued, err := db.EnqueueRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeFull, MaxPages: 3, Revision: "rev-1"})
+	if err != nil || firstQueued.Mode != model.ModeFull || firstQueued.InitialFull {
+		t.Fatalf("enqueue explicit first Full: %+v %v", firstQueued, err)
+	}
+	firstClaimed, err := db.ClaimNext(ctx)
+	if err != nil || firstClaimed == nil || firstClaimed.ID != firstQueued.ID {
+		t.Fatalf("claim explicit first Full: %+v %v", firstClaimed, err)
+	}
+	firstSaved, err := db.SavePage(ctx, *firstClaimed, model.Page{Items: []model.Record{coverageRecord("10-initial"), coverageRecord("20-initial")}, Done: true}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstFinished := mirrorFinish(t, ctx, db, firstSaved, model.StatusSucceeded)
+	children := metadataFollowups(t, ctx, db, firstFinished)
+	if len(children) != 1 || children[0].Mode != model.ModeMetadata || children[0].MetadataParentRunID != firstFinished.ID {
+		t.Fatalf("explicit first Full did not queue one Metadata follow-up: %+v", children)
+	}
+	candidates, err := db.MetadataCandidates(ctx, children[0], "", 100)
+	if err != nil || len(candidates) != 2 || candidates[0].SourceID != "10-initial" || candidates[1].SourceID != "20-initial" {
+		t.Fatalf("explicit first Full follow-up omitted initial candidates: %+v %v", candidates, err)
+	}
+	if _, err := db.RequestCancel(ctx, children[0].ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Age the initial torrents so a subsequent Full (Rebuild) sees them as pre-existing.
+	if _, err := db.pool.Exec(ctx, "UPDATE aiosources.torrents SET first_seen_at=NOW()-INTERVAL '1 hour' WHERE provider_id=$1", provider.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Subsequent explicit Rebuild must queue Metadata ONLY for genuinely new torrents,
+	// excluding pre-existing torrents even when their detail fields are still absent.
+	rebuildQueued, err := db.EnqueueRun(ctx, model.Run{ProviderID: provider.ID, Config: provider, Mode: model.ModeFull, MaxPages: 3, Revision: "rev-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebuildClaimed, err := db.ClaimNext(ctx)
+	if err != nil || rebuildClaimed == nil || rebuildClaimed.ID != rebuildQueued.ID {
+		t.Fatalf("claim rebuild Full: %+v %v", rebuildClaimed, err)
+	}
+	rebuildSaved, err := db.SavePage(ctx, *rebuildClaimed, model.Page{Items: []model.Record{
+		coverageRecord("10-initial"), coverageRecord("20-initial"), coverageRecord("30-new-in-rebuild"),
+	}, Done: true}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebuildFinished := mirrorFinish(t, ctx, db, rebuildSaved, model.StatusSucceeded)
+	rebuildChildren := metadataFollowups(t, ctx, db, rebuildFinished)
+	if len(rebuildChildren) != 1 {
+		t.Fatalf("rebuild Full with new torrent did not queue one follow-up: %+v", rebuildChildren)
+	}
+	candidates, err = db.MetadataCandidates(ctx, rebuildChildren[0], "", 100)
+	if err != nil || len(candidates) != 1 || candidates[0].SourceID != "30-new-in-rebuild" {
+		t.Fatalf("rebuild Full follow-up replayed pre-existing torrents or missed new one: %+v %v", candidates, err)
+	}
+	if _, err := db.RequestCancel(ctx, rebuildChildren[0].ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// A scheduled Full with a budgeted Metadata follow-up must continue cleanly on the next tick.
+	provider.Schedule = model.Schedule{Every: "1m", Mode: model.ModeFull, MaxPages: 1}
+	plan, err := scheduling.Parse(provider.Schedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := scheduling.Source{ID: provider.ID, Revision: "rev-2", Provider: provider, Valid: true, Plan: plan}
+	start := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := db.ReconcileSchedules(ctx, []scheduling.Source{source}, start); err != nil {
+		t.Fatal(err)
+	}
+	_, schedFull, err := db.AttemptSchedule(ctx, source, start.Add(time.Minute), nil)
+	if err != nil || schedFull == nil || schedFull.Mode != model.ModeFull {
+		t.Fatalf("queue scheduled Full: %+v %v", schedFull, err)
+	}
+	claimedFull, err := db.ClaimNext(ctx)
+	if err != nil || claimedFull == nil || claimedFull.ID != schedFull.ID {
+		t.Fatalf("claim scheduled Full: %+v %v", claimedFull, err)
+	}
+	savedFull, err := db.SavePage(ctx, *claimedFull, model.Page{Items: []model.Record{
+		coverageRecord("10-initial"), coverageRecord("40-sched-new"),
+	}, Done: true}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mirrorFinish(t, ctx, db, savedFull, model.StatusSucceeded)
+	claimedChild, err := db.ClaimNext(ctx)
+	if err != nil || claimedChild == nil || claimedChild.Mode != model.ModeMetadata || claimedChild.MetadataParentRunID != schedFull.ID {
+		t.Fatalf("claim scheduled Full metadata follow-up: %+v %v", claimedChild, err)
+	}
+	if _, err := db.FinishRun(ctx, claimedChild.ID, model.StatusPaused, "budget", model.PauseBudget); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	reopened, err := Open(ctx, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(reopened.Close)
+	_, continued, err := reopened.AttemptSchedule(ctx, source, start.Add(2*time.Minute), nil)
+	if err != nil || continued == nil || continued.ID != claimedChild.ID || continued.Mode != model.ModeMetadata {
+		t.Fatalf("scheduled Full did not continue budgeted metadata follow-up: %+v %v", continued, err)
 	}
 }

@@ -42,7 +42,7 @@ In the source's **Schedules** section, choose an interval or a supported schedul
 
 - **Incremental** collects updates. The first import builds a complete starting catalog.
 - **Full** rebuilds the source catalog and publishes it when successful. Existing published records stay available while it runs.
-- **Source details**, when configured, refreshes additional information for known records.
+- **Source details**, when configured, refreshes additional information for known records. Standalone runs can optionally filter by source categories and identification status (for example, unresolved records only). When **Fetch source details after imports** is enabled, newly inserted records from a successful **Incremental** or **Full** import are queued automatically.
 
 Use **Run manual import** on a source card for an immediate run. **Preview** does not publish records. Page and duration limits can pause a long import; resuming continues its saved work. A scheduled continuation can pick up eligible work on a later tick. Avoid unnecessary rebuilds when incremental updates meet your needs.
 

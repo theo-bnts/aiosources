@@ -257,6 +257,20 @@ WHERE id=$1 AND NOT pause_requested AND NOT cancel_requested AND
 				if mode == model.ModeMetadata && !config.SupportsMetadata() {
 					return clock, nil, model.ErrInvalid
 				}
+				var metadataFilters []byte
+				if mode == model.ModeMetadata && config.Schedule.MetadataFilters != nil {
+					normalized, filterErr := config.Schedule.MetadataFilters.Normalize()
+					if filterErr != nil {
+						return clock, nil, model.ErrInvalid
+					}
+					if normalized != nil {
+						var encodeErr error
+						metadataFilters, encodeErr = json.Marshal(normalized)
+						if encodeErr != nil {
+							return clock, nil, errors.New("scheduled metadata filters cannot be encoded")
+						}
+					}
+				}
 				if err := lockProviderSecrets(ctx, tx, config); err != nil {
 					return clock, nil, err
 				}
@@ -284,8 +298,8 @@ WHERE id=$1 AND NOT pause_requested AND NOT cancel_requested AND
 				if err != nil {
 					return clock, nil, err
 				}
-				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full,storage_mode,storage_options)
-VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM aiosources.storage_settings WHERE singleton),(SELECT options FROM aiosources.storage_settings WHERE singleton)) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull))
+				run, err = scanRun(tx.QueryRow(ctx, `INSERT INTO aiosources.runs(id,provider_id,provider_name,mode,status,max_pages,revision,config,trigger,policy,initial_full,storage_mode,storage_options,metadata_filters)
+VALUES($1,$2,$3,$4,'queued',$5,$6,$7,'scheduled',$8,$9,(SELECT mode FROM aiosources.storage_settings WHERE singleton),(SELECT options FROM aiosources.storage_settings WHERE singleton),$10) RETURNING `+runColumns, id, source.ID, config.Name, mode, config.Schedule.MaxPages, source.Revision, encoded, policy, initialFull, metadataFilters))
 				if err == nil {
 					err = lifecycleEvent(ctx, tx, run.ID, "queued", "Scheduled collection queued")
 				}

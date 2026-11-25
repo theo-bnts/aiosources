@@ -5,14 +5,30 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import { api, refreshData } from '@/lib/api'
-import type { Items, ProviderDocument, ProviderSummary, Run, RunMode, StartRun } from '@/lib/types'
+import type {
+  IdentificationStatus,
+  Items,
+  ProviderDocument,
+  ProviderSummary,
+  Run,
+  RunMode,
+  StartRun,
+} from '@/lib/types'
 import { supportsMetadata } from '@/lib/collection-types'
 import { isWholeNumberString, modeLabels } from '@/lib/format'
+import {
+  buildMetadataFilters,
+  formatMetadataFiltersSummary,
+  metadataIdentificationOptions,
+  parseMetadataCategories,
+  suggestedProviderCategories,
+} from '@/lib/metadata-filters'
 import { useListViewState } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MultiSelect } from '@/components/ui/multi-select'
 import {
   Dialog,
   DialogTrigger,
@@ -38,6 +54,8 @@ export function CollectDialog({
   const [maxPages, setMaxPages] = useState('')
   const [maxDuration, setMaxDuration] = useState('')
   const [knownPages, setKnownPages] = useState('')
+  const [categoriesText, setCategoriesText] = useState('')
+  const [identificationStatuses, setIdentificationStatuses] = useState<IdentificationStatus[]>([])
   const navigate = useNavigate()
   const returnView = useListViewState()
   const sources = useQuery({
@@ -70,6 +88,15 @@ export function CollectDialog({
     knownPages !== '' &&
     !isWholeNumberString(knownPages, 0, 10000)
   const invalidDuration = maxDuration !== '' && !isWholeNumberString(maxDuration, 0, 604800)
+  const parsedCategories = parseMetadataCategories(categoriesText)
+  const invalidMetadataFilters = !remote && mode === 'metadata' && Boolean(parsedCategories.error)
+  const activeMetadataFilters =
+    !remote && mode === 'metadata'
+      ? buildMetadataFilters(parsedCategories.values, identificationStatuses)
+      : undefined
+  const activeMetadataSummary = formatMetadataFiltersSummary(activeMetadataFilters)
+  const suggestedCategories =
+    !remote && mode === 'metadata' ? suggestedProviderCategories(definition.data?.provider) : []
   const mutation = useMutation({
     mutationFn: (request: StartRun) =>
       api<Run>('/runs', { method: 'POST', body: JSON.stringify(request) }),
@@ -111,6 +138,8 @@ export function CollectDialog({
             setMaxPages('')
             setMaxDuration('')
             setKnownPages('')
+            setCategoriesText('')
+            setIdentificationStatuses([])
           }
         }
       }}
@@ -138,6 +167,7 @@ export function CollectDialog({
               !invalidPages &&
               !invalidDuration &&
               !invalidKnownPages &&
+              !invalidMetadataFilters &&
               !mutation.isPending
             )
               mutation.mutate({
@@ -148,6 +178,7 @@ export function CollectDialog({
                 ...(!remote && mode === 'incremental' && knownPages !== ''
                   ? { known_pages: Number(knownPages) }
                   : {}),
+                ...(activeMetadataFilters ? { metadata_filters: activeMetadataFilters } : {}),
               })
           }}
         >
@@ -186,15 +217,16 @@ export function CollectDialog({
                   {!remote && (
                     <p>
                       Fetching source details requires a JSON source with ID recovery and configured
-                      missing-metadata fields. It does not update metadata or identify torrents.
+                      missing-metadata fields. Updated records are queued for local identification
+                      automatically.
                     </p>
                   )}
-                  {mode === 'incremental' && metadataFollowup && (
+                  {(mode === 'incremental' || mode === 'full') && metadataFollowup && (
                     <p>
-                      After successful Incremental or initial Full completion, a separate
-                      source-details import will fill configured missing fields only for newly
-                      inserted native torrents. Existing torrents encountered by this run are
-                      excluded. No eligible new torrents means no follow-up.
+                      After successful completion, a separate source-details import will fill
+                      configured missing fields only for newly inserted native torrents. Existing
+                      torrents encountered by this run are excluded. No eligible new torrents means
+                      no follow-up.
                     </p>
                   )}
                 </>
@@ -211,6 +243,10 @@ export function CollectDialog({
                 const next = event.target.value as RunMode
                 setMode(next)
                 setMaxPages('')
+                if (next !== 'metadata') {
+                  setCategoriesText('')
+                  setIdentificationStatuses([])
+                }
               }}
             >
               {Object.entries(actions).map(([value, text]) => (
@@ -247,13 +283,100 @@ export function CollectDialog({
               {Number(maxPages || defaultPages) === 0
                 ? 'unlimited pages'
                 : `${(maxPages || defaultPages) ?? '…'} pages`}{' '}
-              · {Number(maxDuration || 0) === 0 ? 'unlimited duration' : `${maxDuration} seconds`}.
+              · {Number(maxDuration || 0) === 0 ? 'unlimited duration' : `${maxDuration} seconds`}
+              {!remote && mode === 'metadata' && activeMetadataSummary.length > 0
+                ? ` · ${activeMetadataSummary.join(' · ')}`
+                : ''}
+              .
             </p>
             <InfoTip label="Applied limits">
               Imports pause when a limit is reached and can resume from the saved point. Limits
               apply only to this run.
             </InfoTip>
           </div>
+          {!remote && mode === 'metadata' && (
+            <Disclosure
+              title={
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span>Target filters</span>
+                  {activeMetadataSummary.length > 0 && (
+                    <span className="text-xs font-normal text-muted-foreground">Configured</span>
+                  )}
+                </span>
+              }
+            >
+              <div className="field">
+                <Label
+                  htmlFor="collect-metadata-statuses"
+                  help="Leave unset to process all torrents missing configured source detail fields. Select Not identified and Needs review to target unresolved releases."
+                >
+                  Identification status
+                </Label>
+                <MultiSelect
+                  id="collect-metadata-statuses"
+                  label="Identification status"
+                  allLabel="All identification statuses"
+                  value={identificationStatuses}
+                  options={metadataIdentificationOptions}
+                  disabled={mutation.isPending}
+                  onChange={(values) =>
+                    setIdentificationStatuses(values as IdentificationStatus[])
+                  }
+                />
+              </div>
+              <div className="field">
+                <Label
+                  htmlFor="collect-metadata-categories"
+                  help="Optional comma-separated source categories (exact match, ignoring case). Leave empty to include every category."
+                >
+                  Categories
+                </Label>
+                <Input
+                  id="collect-metadata-categories"
+                  value={categoriesText}
+                  placeholder="Exact categories, comma-separated (e.g. 2000, 5000)"
+                  aria-invalid={invalidMetadataFilters}
+                  aria-describedby={invalidMetadataFilters ? 'collect-categories-error' : undefined}
+                  disabled={mutation.isPending}
+                  onChange={(event) => setCategoriesText(event.target.value)}
+                />
+                {invalidMetadataFilters && (
+                  <p id="collect-categories-error" role="alert" className="text-sm text-destructive">
+                    {parsedCategories.error}
+                  </p>
+                )}
+                {suggestedCategories.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-xs text-muted-foreground">Configured on source:</span>
+                    {suggestedCategories.map((category) => {
+                      const active = parsedCategories.values.some(
+                        (item) => item.toLowerCase() === category.toLowerCase(),
+                      )
+                      return (
+                        <Button
+                          key={category}
+                          type="button"
+                          size="sm"
+                          variant={active ? 'secondary' : 'outline'}
+                          disabled={mutation.isPending}
+                          onClick={() => {
+                            const next = active
+                              ? parsedCategories.values.filter(
+                                  (item) => item.toLowerCase() !== category.toLowerCase(),
+                                )
+                              : [...parsedCategories.values, category]
+                            setCategoriesText(next.join(', '))
+                          }}
+                        >
+                          {category}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </Disclosure>
+          )}
           <Disclosure title="Import limits">
             {!remote && mode === 'incremental' && (
               <div className="field">
@@ -378,7 +501,8 @@ export function CollectDialog({
                 !definitionReady ||
                 invalidPages ||
                 invalidDuration ||
-                invalidKnownPages
+                invalidKnownPages ||
+                invalidMetadataFilters
               }
             >
               <PlayIcon aria-hidden="true" />

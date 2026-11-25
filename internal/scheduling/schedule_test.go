@@ -60,6 +60,11 @@ func TestScheduleRejectsAmbiguousOrUnsafeTiming(t *testing.T) {
 		{Mode: model.ModePreview},
 		{MaxPages: -1},
 		{KnownPages: 10001},
+		{Every: "1h", Mode: model.ModeIncremental, MetadataFilters: &model.MetadataFilters{Categories: []string{"2000"}}},
+		{Every: "1h", Mode: model.ModeFull, MetadataFilters: &model.MetadataFilters{IdentificationStatuses: []string{"unmatched"}}},
+		{Every: "1h", Mode: model.ModeMetadata, MetadataFilters: &model.MetadataFilters{IdentificationStatuses: []string{"invalid"}}},
+		{Every: "1h", Mode: model.ModeMetadata, MetadataFilters: &model.MetadataFilters{Categories: []string{"   "}}},
+		{Every: "1h", Mode: model.ModeMetadata, MetadataFilters: &model.MetadataFilters{Categories: []string{secret + "\x00"}}},
 	}
 	for index, settings := range cases {
 		if _, err := Parse(settings); err == nil {
@@ -67,6 +72,16 @@ func TestScheduleRejectsAmbiguousOrUnsafeTiming(t *testing.T) {
 		} else if strings.Contains(err.Error(), secret) {
 			t.Errorf("schedule error disclosed input: %s", err)
 		}
+	}
+	validMetadata, err := Parse(model.Schedule{
+		Every: "6h", Mode: model.ModeMetadata,
+		MetadataFilters: &model.MetadataFilters{
+			Categories:             []string{"2000", "5000"},
+			IdentificationStatuses: []string{"unmatched", "ambiguous"},
+		},
+	})
+	if err != nil || !validMetadata.Enabled || validMetadata.Mode != model.ModeMetadata {
+		t.Fatalf("valid filtered metadata schedule rejected: %+v %v", validMetadata, err)
 	}
 }
 
@@ -163,7 +178,7 @@ func TestFullRoutineUsesBaseTicksAndRespectsContinuationHolds(t *testing.T) {
 	}
 }
 
-func TestMetadataFollowupContinuationRequiresMatchingIncrementalSchedule(t *testing.T) {
+func TestMetadataFollowupContinuationRequiresMatchingDiscoverySchedule(t *testing.T) {
 	plan, err := Parse(model.Schedule{Every: "1m", FullEvery: "1h"})
 	if err != nil {
 		t.Fatal(err)
@@ -178,10 +193,12 @@ func TestMetadataFollowupContinuationRequiresMatchingIncrementalSchedule(t *test
 		change func(*Source, *model.Run)
 		state  string
 	}{
-		{name: "matching follow-up", state: "paused"},
+		{name: "matching incremental follow-up", state: "paused"},
+		{name: "matching Full follow-up", state: "paused", change: func(s *Source, _ *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0 }},
 		{name: "changed revision", state: "blocked", change: func(s *Source, _ *model.Run) { s.Revision = "changed" }},
-		{name: "standalone Metadata", state: "blocked", change: func(_ *Source, r *model.Run) { r.MetadataParentRunID = "" }},
-		{name: "Full schedule", state: "blocked", change: func(s *Source, _ *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0 }},
+		{name: "standalone Metadata on incremental schedule", state: "blocked", change: func(_ *Source, r *model.Run) { r.MetadataParentRunID = "" }},
+		{name: "standalone Metadata on Full schedule", state: "blocked", change: func(s *Source, r *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0; r.MetadataParentRunID = "" }},
+		{name: "follow-up on Metadata schedule", state: "blocked", change: func(s *Source, _ *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeMetadata, 0 }},
 		{name: "manual budget", state: "waiting", change: func(_ *Source, r *model.Run) { r.Trigger = model.TriggerManual }},
 		{name: "manual hold", state: "blocked", change: func(_ *Source, r *model.Run) { r.PauseReason = model.PauseManual }},
 		{name: "requested pause", state: "blocked", change: func(_ *Source, r *model.Run) { r.PauseRequested = true }},

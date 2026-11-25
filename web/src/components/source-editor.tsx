@@ -23,7 +23,9 @@ import { sourceCredentialPurpose } from '@/lib/secret-reference'
 import { DurationSelect, ScheduleTimingFields } from '@/components/schedule-fields'
 import { timingMode, type TimingMode } from '@/lib/schedule-input'
 import { Switch } from '@/components/ui/switch'
+import { MultiSelect } from '@/components/ui/multi-select'
 import { isJSONAdapter } from '@/lib/source-adapters'
+import { metadataIdentificationOptions } from '@/lib/metadata-filters'
 import { Label } from '@/components/ui/label'
 import {
   Tabs,
@@ -858,15 +860,15 @@ function TraversalSettings() {
             <StringArrayField
               path={['traversal', 'enrich_fields']}
               label="Source detail fields"
-              help="Fields filled by Metadata mode through ID recovery, not by discovery itself. An optional follow-up after Incremental can fill these fields for newly inserted torrents only."
+              help="Fields filled by Metadata mode through ID recovery, not by discovery itself. An optional follow-up after Update or Rebuild can fill these fields for newly inserted torrents only."
             />
             <BooleanField
               path={['traversal', 'metadata_after_incremental']}
-              label="Fetch source details after updates"
+              label="Fetch source details after imports"
               allowEnabled={metadataSupported}
               help={
                 metadataSupported
-                  ? 'Off by default. After a successful Incremental or its initial Full, queue a separate Metadata run only for newly inserted native torrents still missing configured fields. Existing torrents are excluded; no eligible new torrents means no follow-up.'
+                  ? 'Off by default. After a successful Update or Rebuild, queue a separate Metadata run only for newly inserted native torrents still missing configured fields. Existing torrents are excluded; no eligible new torrents means no follow-up.'
                   : 'Unavailable: requires a JSON source, ID recovery and configured metadata enrichment fields. Remote catalogs are not supported. Disable this option or configure these prerequisites; it will not enrich this source as configured.'
               }
             />
@@ -1171,9 +1173,17 @@ function SourceScheduleSettings() {
     document.getIn(['http', 'catalog']) !== true &&
     document.kindIn(['traversal', 'id_recovery']) === 'object' &&
     document.lengthIn(['traversal', 'enrich_fields']) > 0
+  const hasMetadataFilters =
+    document.kindIn(['schedule', 'metadata_filters']) !== undefined &&
+    document.kindIn(['schedule', 'metadata_filters']) !== 'null'
+  const rawStatuses = document.getIn(['schedule', 'metadata_filters', 'identification_statuses'])
+  const selectedStatuses = Array.isArray(rawStatuses)
+    ? rawStatuses.filter((item): item is string => typeof item === 'string')
+    : []
   const invalidPolicy =
     (mode === 'metadata' && !metadataSupported) ||
-    Boolean(fullEvery && (mode !== 'incremental' || timing === 'manual'))
+    Boolean(fullEvery && (mode !== 'incremental' || timing === 'manual')) ||
+    Boolean(hasMetadataFilters && mode !== 'metadata')
   const reportTiming = useCallback(
     (invalid: boolean) => reportDraft(id + '-timing', invalid),
     [id, reportDraft],
@@ -1238,12 +1248,63 @@ function SourceScheduleSettings() {
         />
         {invalidPolicy && (
           <p className="help text-destructive" role="alert">
-            Source details require configured metadata enrichment. A periodic rebuild requires an
-            automatic Update schedule. Review the collection mode and Collection policy before
-            saving.
+            Source details require configured metadata enrichment. Detail filters require Fetch
+            source details mode. A periodic rebuild requires an automatic Update schedule. Review
+            the collection mode, Detail filters and Collection policy before saving.
           </p>
         )}
       </FieldSection>
+      {(mode === 'metadata' || hasMetadataFilters) && (
+        <OptionalSection
+          title="Detail filters"
+          description="Optional filters for scheduled Fetch source details runs. Narrow candidates by current identification status and/or exact source categories."
+          configuredPaths={[['schedule', 'metadata_filters']]}
+        >
+          {hasMetadataFilters && mode !== 'metadata' && (
+            <Button
+              type="button"
+              variant="warning"
+              size="sm"
+              onClick={() => change((next) => next.deleteIn(['schedule', 'metadata_filters']))}
+            >
+              <TrashIcon aria-hidden="true" />
+              Clear detail filters
+            </Button>
+          )}
+          <div className="field">
+            <Label
+              htmlFor={`${id}-metadata-statuses`}
+              help="Leave unset to process all torrents missing configured source detail fields. Select Not identified and Needs review to focus on unresolved releases."
+            >
+              Identification status
+            </Label>
+            <MultiSelect
+              id={`${id}-metadata-statuses`}
+              label="Identification status"
+              allLabel="All identification statuses"
+              value={selectedStatuses}
+              options={metadataIdentificationOptions}
+              onChange={(values) =>
+                change((next) => {
+                  if (values.length > 0) {
+                    next.setIn(['schedule', 'metadata_filters', 'identification_statuses'], values)
+                    return
+                  }
+                  next.deleteIn(['schedule', 'metadata_filters', 'identification_statuses'])
+                  if (next.lengthIn(['schedule', 'metadata_filters', 'categories']) === 0) {
+                    next.deleteIn(['schedule', 'metadata_filters'])
+                  }
+                })
+              }
+            />
+          </div>
+          <StringArrayField
+            path={['schedule', 'metadata_filters', 'categories']}
+            label="Categories"
+            help="Exact source categories, ignoring case. Leave empty to include all categories."
+          />
+        </OptionalSection>
+      )}
       <OptionalSection title="Collection policy">
         <DurationSelect
           label="Rebuild whole source periodically"

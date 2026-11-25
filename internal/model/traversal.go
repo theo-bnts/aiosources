@@ -1,5 +1,111 @@
 package model
 
+import (
+	"slices"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
+const (
+	MaxMetadataFilterCategories    = 100
+	MaxMetadataFilterCategoryBytes = 256
+)
+
+var validMetadataIdentificationStatuses = []string{"unmatched", "ambiguous", "pending", "matched"}
+
+// MetadataFilters optionally narrow a standalone Metadata run to specific
+// source categories and/or current identification statuses.
+type MetadataFilters struct {
+	Categories             []string `json:"categories,omitempty"`
+	IdentificationStatuses []string `json:"identification_statuses,omitempty"`
+}
+
+func (f *MetadataFilters) Empty() bool {
+	return f == nil || (len(f.Categories) == 0 && len(f.IdentificationStatuses) == 0)
+}
+
+// Normalize trims and deduplicates categories (ignoring case) and validates
+// identification statuses against the canonical identification state names.
+// Empty filters normalize to nil so callers omit empty objects in snapshots.
+func (f *MetadataFilters) Normalize() (*MetadataFilters, error) {
+	if f == nil {
+		return nil, nil
+	}
+	if len(f.Categories) > MaxMetadataFilterCategories || len(f.IdentificationStatuses) > len(validMetadataIdentificationStatuses) {
+		return nil, ErrInvalid
+	}
+	var categories []string
+	if len(f.Categories) > 0 {
+		seen := make(map[string]bool, len(f.Categories))
+		categories = make([]string, 0, len(f.Categories))
+		for _, raw := range f.Categories {
+			value := strings.TrimSpace(raw)
+			if value == "" || len(value) > MaxMetadataFilterCategoryBytes || !utf8.ValidString(value) {
+				return nil, ErrInvalid
+			}
+			for _, r := range value {
+				if unicode.IsControl(r) {
+					return nil, ErrInvalid
+				}
+			}
+			key := strings.ToLower(value)
+			if !seen[key] {
+				seen[key] = true
+				categories = append(categories, value)
+			}
+		}
+	}
+	var statuses []string
+	if len(f.IdentificationStatuses) > 0 {
+		seen := make(map[string]bool, len(f.IdentificationStatuses))
+		statuses = make([]string, 0, len(f.IdentificationStatuses))
+		for _, status := range f.IdentificationStatuses {
+			if !slices.Contains(validMetadataIdentificationStatuses, status) {
+				return nil, ErrInvalid
+			}
+			if !seen[status] {
+				seen[status] = true
+				statuses = append(statuses, status)
+			}
+		}
+	}
+	if len(categories) == 0 && len(statuses) == 0 {
+		return nil, nil
+	}
+	return &MetadataFilters{
+		Categories:             categories,
+		IdentificationStatuses: statuses,
+	}, nil
+}
+
+// Valid checks that stored filters are non-empty, canonical and free of duplicates.
+func (f *MetadataFilters) Valid() bool {
+	if f == nil || f.Empty() {
+		return false
+	}
+	normalized, err := f.Normalize()
+	if err != nil || normalized == nil {
+		return false
+	}
+	return slices.Equal(f.Categories, normalized.Categories) &&
+		slices.Equal(f.IdentificationStatuses, normalized.IdentificationStatuses)
+}
+
+// DiagnosticStatusesOnly reports whether every selected identification status
+// is covered by the partial aio_matches_diagnostic_status index.
+func (f *MetadataFilters) DiagnosticStatusesOnly() bool {
+	if f == nil || len(f.IdentificationStatuses) == 0 {
+		return false
+	}
+	for _, status := range f.IdentificationStatuses {
+		if status != "unmatched" && status != "ambiguous" {
+			return false
+		}
+	}
+	return true
+}
+
 // JSONTraversal describes overlapping searches of a bounded listing API.
 // Completion compares committed unique source IDs in every selected scope with
 // its advertised total; a search-window boundary is not EOF.
@@ -23,7 +129,7 @@ type JSONTraversal struct {
 	// Metadata mode fills these missing fields; standalone runs cover the catalogue.
 	EnrichFields []string `json:"enrich_fields,omitempty"`
 	// MetadataAfterIncremental queues a separate Metadata run for new native IDs
-	// after successful Incremental completion. Existing snapshots default to off.
+	// after successful Incremental or Full discovery completion. Existing snapshots default to off.
 	MetadataAfterIncremental bool `json:"metadata_after_incremental,omitempty"`
 }
 

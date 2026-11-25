@@ -38,6 +38,7 @@ import {
 import { useSourceNames } from '@/lib/source-names'
 import type { Items, Page, ProviderSummary, Run, RunEvent } from '@/lib/types'
 import { messageText, useDate, runModeLabel, number, statusLabels } from '@/lib/format'
+import { formatIdentificationStatuses, formatMetadataFiltersSummary } from '@/lib/metadata-filters'
 import { useURLPagination } from '@/lib/pagination'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
@@ -676,7 +677,11 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
           ) : (
             <>
               Metadata mode: fills missing configured fields throughout the native catalog that
-              existed before this run, including old records. No torrents are discovered or removed.
+              existed before this run, including old records.
+              {formatMetadataFiltersSummary(run.metadata_filters).length > 0 && (
+                <> Filters: {formatMetadataFiltersSummary(run.metadata_filters).join(' · ')}.</>
+              )}{' '}
+              No torrents are discovered or removed.
             </>
           )}
         </p>
@@ -747,6 +752,20 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
               {run.max_pages === 0 ? 'Unlimited' : `${number(run.max_pages)} pages`}
             </dd>
           </div>
+          {run.metadata_filters?.identification_statuses?.length ? (
+            <div>
+              <dt className="text-xs text-muted-foreground">Identification filter</dt>
+              <dd className="mt-1.5">
+                {formatIdentificationStatuses(run.metadata_filters.identification_statuses)}
+              </dd>
+            </div>
+          ) : null}
+          {run.metadata_filters?.categories?.length ? (
+            <div>
+              <dt className="text-xs text-muted-foreground">Category filter</dt>
+              <dd className="mt-1.5 break-words">{run.metadata_filters.categories.join(', ')}</dd>
+            </div>
+          ) : null}
         </dl>
       </Disclosure>
       <Tabs

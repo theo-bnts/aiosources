@@ -148,15 +148,16 @@ type Output struct {
 }
 
 type Schedule struct {
-	Enabled     *bool   `json:"enabled,omitempty"`
-	Every       string  `json:"every,omitempty"`
-	FullEvery   string  `json:"full_every,omitempty"`
-	Cron        string  `json:"cron,omitempty"`
-	Timezone    string  `json:"timezone,omitempty"`
-	MaxPages    int     `json:"max_pages,omitempty"`
-	Mode        RunMode `json:"mode,omitempty"`
-	KnownPages  int     `json:"known_pages,omitempty"`
-	RetryFailed bool    `json:"retry_failed,omitempty"`
+	Enabled         *bool            `json:"enabled,omitempty"`
+	Every           string           `json:"every,omitempty"`
+	FullEvery       string           `json:"full_every,omitempty"`
+	Cron            string           `json:"cron,omitempty"`
+	Timezone        string           `json:"timezone,omitempty"`
+	MaxPages        int              `json:"max_pages,omitempty"`
+	Mode            RunMode          `json:"mode,omitempty"`
+	KnownPages      int              `json:"known_pages,omitempty"`
+	RetryFailed     bool             `json:"retry_failed,omitempty"`
+	MetadataFilters *MetadataFilters `json:"metadata_filters,omitempty"`
 }
 
 type ScheduleSummary struct {
@@ -238,11 +239,12 @@ const (
 )
 
 type StartRun struct {
-	ProviderID         string  `json:"provider_id"`
-	Mode               RunMode `json:"mode"`
-	MaxPages           *int    `json:"max_pages,omitempty"`
-	MaxDurationSeconds *int    `json:"max_duration_seconds,omitempty"`
-	KnownPages         *int    `json:"known_pages,omitempty"`
+	ProviderID         string           `json:"provider_id"`
+	Mode               RunMode          `json:"mode"`
+	MaxPages           *int             `json:"max_pages,omitempty"`
+	MaxDurationSeconds *int             `json:"max_duration_seconds,omitempty"`
+	KnownPages         *int             `json:"known_pages,omitempty"`
+	MetadataFilters    *MetadataFilters `json:"metadata_filters,omitempty"`
 }
 
 type RunTrigger string
@@ -261,6 +263,7 @@ type Run struct {
 	InitialFull           bool              `json:"initial_full,omitempty"`
 	Trigger               RunTrigger        `json:"trigger"`
 	MetadataParentRunID   string            `json:"metadata_parent_run_id,omitempty"`
+	MetadataFilters       *MetadataFilters  `json:"metadata_filters,omitempty"`
 	Status                RunStatus         `json:"status"`
 	CancelRequested       bool              `json:"cancel_requested"`
 	PauseRequested        bool              `json:"pause_requested"`

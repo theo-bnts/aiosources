@@ -91,6 +91,12 @@ func buildJSONSchema() json.RawMessage {
 	set("schedule.full_every", "description", "Optional Go duration of at least 1m; requires an incremental every/cron schedule. Full reconciliation replaces a fresh Incremental on the first eligible base tick after its deadline.")
 	set("schedule.cron", "description", "Five-field cron expression, mutually exclusive with every.")
 	set("schedule.timezone", "description", "IANA time zone; defaults to UTC.")
+	set("schedule.metadata_filters", "description", "Optional filters for scheduled Metadata runs (requires schedule.mode metadata). Narrows candidates by source category and/or current identification status.")
+	set("schedule.metadata_filters.categories", "maxItems", model.MaxMetadataFilterCategories)
+	field("schedule.metadata_filters.categories")["items"].(map[string]any)["minLength"] = 1
+	field("schedule.metadata_filters.categories")["items"].(map[string]any)["maxLength"] = model.MaxMetadataFilterCategoryBytes
+	set("schedule.metadata_filters.identification_statuses", "uniqueItems", true)
+	field("schedule.metadata_filters.identification_statuses")["items"].(map[string]any)["enum"] = []string{"unmatched", "ambiguous", "pending", "matched"}
 	set("catalog_sync", "description", "Remote catalog synchronization only. Uses a simple interval and the durable catalog checkpoint. Replaces legacy schedule settings for remote catalogs.")
 	set("catalog_sync", "required", []string{"interval_minutes"})
 	set("catalog_sync.enabled", "default", false)
@@ -99,7 +105,7 @@ func buildJSONSchema() json.RawMessage {
 	set("traversal.total_mode", "enum", []string{"", "strict", "at_least"})
 	set("traversal.incremental_order", "enum", []string{"", "id", "published_at"})
 	set("traversal.metadata_after_incremental", "default", false)
-	set("traversal.metadata_after_incremental", "description", "After a successful Incremental, queue Metadata only for newly added native IDs with missing enrich_fields. Requires Metadata support; disabled by default. Existing run snapshots are unchanged.")
+	set("traversal.metadata_after_incremental", "description", "After a successful Incremental or Full discovery run, queue Metadata only for newly added native IDs with missing enrich_fields. Requires Metadata support; disabled by default. Existing run snapshots are unchanged.")
 	set("html", "description", "HTML adapter only. CSS selectors read server-rendered pages; no scripts, styles, images or embedded resources are executed or fetched. Empty pages require an explicit empty_selector match.")
 	set("html", "required", []string{"page_selector", "rows_selector", "id", "fields"})
 	set("html.invalid_record_policy", "enum", []string{"", "fail", "reject"})
