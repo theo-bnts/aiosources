@@ -39,22 +39,7 @@ export interface TorznabCapabilitiesResult {
 
 export type TorznabCapabilityField = 'name' | 'id' | 'url' | 'page_size' | 'search_mode'
 
-export interface TorznabCapabilityFieldChange {
-  field: TorznabCapabilityField
-  label: string
-  currentDisplay: string
-  nextDisplay: string
-  currentValue: string | number | undefined
-  nextValue: string | number
-  matches: boolean
-  overwrites: boolean
-}
-
-export const TORZNAB_TEMPLATE_NAME = 'Example Torznab provider'
-export const TORZNAB_TEMPLATE_ID = 'example_torznab'
 export const TORZNAB_TEMPLATE_URL = 'https://indexer.example/api'
-export const TORZNAB_TEMPLATE_PAGE_SIZE = 100
-export const TORZNAB_TEMPLATE_SEARCH_MODE = 'search'
 
 export const torznabSearchModeLabels: Record<string, string> = {
   search: 'General search',
@@ -64,8 +49,17 @@ export const torznabSearchModeLabels: Record<string, string> = {
   book: 'Books',
 }
 
-export function formatTorznabSearchMode(mode: string): string {
-  return torznabSearchModeLabels[mode] ?? mode
+export function torznabSearchModeOptionLabels(
+  caps: TorznabCapabilitiesResult | null,
+): Record<string, string> {
+  const labels: Record<string, string> = { ...torznabSearchModeLabels }
+  if (!caps) return labels
+  for (const item of caps.searches) {
+    if (!item.available && labels[item.mode]) {
+      labels[item.mode] = `${labels[item.mode]} (unavailable)`
+    }
+  }
+  return labels
 }
 
 export function torznabConnectionKey(document: ProviderJSON, urlOverride?: string): string {
@@ -89,7 +83,7 @@ export function isTorznabCapabilitiesStale(
   if (!fetchedKey || !caps) return false
   const current = torznabConnectionKey(document)
   if (current === fetchedKey) return false
-  // Applying the canonical discovered endpoint URL does not invalidate the fetch.
+  // Applying the canonical discovered endpoint URL does not invalidate the cache.
   if (caps.endpoint && torznabConnectionKey(document, '') === stripURLFromKey(fetchedKey)) {
     const rawURL = document.get('url')
     const currentURL = typeof rawURL === 'string' ? rawURL.trim() : ''
@@ -107,155 +101,95 @@ function stripURLFromKey(key: string): string {
   }
 }
 
-export function isCanonicalEndpointUpgrade(currentURL: string, discoveredURL: string): boolean {
-  const trimmed = currentURL.trim()
-  if (!trimmed || trimmed === TORZNAB_TEMPLATE_URL) return true
-  try {
-    const current = new URL(trimmed)
-    const discovered = new URL(discoveredURL)
-    if (current.origin !== discovered.origin) return false
-    const currentPath = current.pathname.replace(/\/+$/, '')
-    const discoveredPath = discovered.pathname.replace(/\/+$/, '')
-    // Same path with reserved query params cleaned (e.g. ?t=caps) or base URL -> /api discovery.
-    if (currentPath === discoveredPath) return true
-    if (currentPath === '' || discoveredPath.startsWith(`${currentPath}/`)) return true
-    return false
-  } catch {
-    return false
-  }
-}
-
 export function isTorznabTemplatePlaceholderURL(url: unknown): boolean {
   return typeof url !== 'string' || url.trim() === '' || url.trim() === TORZNAB_TEMPLATE_URL
 }
 
-export function planTorznabCapabilityChanges(
-  document: ProviderJSON,
+export function resolveTorznabCapabilityFieldValue(
   caps: TorznabCapabilitiesResult,
-  options: { isExistingSource: boolean },
-): TorznabCapabilityFieldChange[] {
-  const changes: TorznabCapabilityFieldChange[] = []
-  const { isExistingSource } = options
-
-  const title = caps.title?.trim() ?? ''
-  if (title) {
-    const current = typeof document.get('name') === 'string' ? document.get('name') : ''
-    const currentText = typeof current === 'string' ? current : ''
-    const matches = currentText === title
-    const overwrites =
-      !matches &&
-      currentText.trim() !== '' &&
-      (isExistingSource || currentText !== TORZNAB_TEMPLATE_NAME)
-    changes.push({
-      field: 'name',
-      label: 'Display name',
-      currentDisplay: currentText || 'Not set',
-      nextDisplay: title,
-      currentValue: currentText || undefined,
-      nextValue: title,
-      matches,
-      overwrites,
-    })
+  field: TorznabCapabilityField,
+): { value: string | number; label: string; missingMessage: string } | null {
+  switch (field) {
+    case 'name': {
+      const title = caps.title?.trim() ?? ''
+      return title
+        ? {
+            value: title,
+            label: 'Display name',
+            missingMessage: 'This server did not advertise a display name.',
+          }
+        : null
+    }
+    case 'id': {
+      const id = caps.suggested_id?.trim() ?? ''
+      return id
+        ? {
+            value: id,
+            label: 'Source identifier',
+            missingMessage: 'Could not derive a source identifier from capabilities.',
+          }
+        : null
+    }
+    case 'url': {
+      const endpoint = caps.endpoint?.trim() ?? ''
+      return endpoint
+        ? {
+            value: endpoint,
+            label: 'Source URL',
+            missingMessage: 'This server did not return an endpoint URL.',
+          }
+        : null
+    }
+    case 'page_size': {
+      const raw = caps.recommended_page_size || caps.limits.max || caps.limits.default || 0
+      const clamped = raw > 0 ? Math.min(raw, 10000) : 0
+      return clamped > 0
+        ? {
+            value: clamped,
+            label: 'Page size',
+            missingMessage: 'This server did not advertise page-size limits.',
+          }
+        : null
+    }
+    case 'search_mode': {
+      const mode = caps.recommended_search_mode?.trim() ?? ''
+      return mode
+        ? {
+            value: mode,
+            label: 'Search mode',
+            missingMessage: 'This server did not advertise supported search modes.',
+          }
+        : null
+    }
   }
+}
 
-  const suggestedID = caps.suggested_id?.trim() ?? ''
-  if (!isExistingSource && suggestedID) {
-    const current = typeof document.get('id') === 'string' ? document.get('id') : ''
-    const currentText = typeof current === 'string' ? current : ''
-    const matches = currentText === suggestedID
-    const overwrites = !matches && currentText.trim() !== '' && currentText !== TORZNAB_TEMPLATE_ID
-    changes.push({
-      field: 'id',
-      label: 'Source identifier',
-      currentDisplay: currentText || 'Not set',
-      nextDisplay: suggestedID,
-      currentValue: currentText || undefined,
-      nextValue: suggestedID,
-      matches,
-      overwrites,
-    })
+export function readTorznabCapabilityFieldValue(
+  document: ProviderJSON,
+  field: TorznabCapabilityField,
+): string | number | undefined {
+  switch (field) {
+    case 'name': {
+      const value = document.get('name')
+      return typeof value === 'string' ? value : undefined
+    }
+    case 'id': {
+      const value = document.get('id')
+      return typeof value === 'string' ? value : undefined
+    }
+    case 'url': {
+      const value = document.get('url')
+      return typeof value === 'string' ? value : undefined
+    }
+    case 'page_size': {
+      const value = document.get('page_size')
+      return typeof value === 'number' && Number.isInteger(value) ? value : undefined
+    }
+    case 'search_mode': {
+      const value = document.getIn(['options', 'search_mode'])
+      return typeof value === 'string' ? value : undefined
+    }
   }
-
-  const endpoint = caps.endpoint?.trim() ?? ''
-  if (endpoint) {
-    const current = typeof document.get('url') === 'string' ? document.get('url') : ''
-    const currentText = typeof current === 'string' ? current : ''
-    const matches = currentText === endpoint
-    const overwrites =
-      !matches &&
-      currentText.trim() !== '' &&
-      (isExistingSource || !isCanonicalEndpointUpgrade(currentText, endpoint))
-    changes.push({
-      field: 'url',
-      label: 'Source URL',
-      currentDisplay: currentText || 'Not set',
-      nextDisplay: endpoint,
-      currentValue: currentText || undefined,
-      nextValue: endpoint,
-      matches,
-      overwrites,
-    })
-  }
-
-  const recommendedPageSize = caps.recommended_page_size ?? 0
-  if (recommendedPageSize > 0) {
-    const rawPageSize = document.get('page_size')
-    const current =
-      typeof rawPageSize === 'number' && Number.isInteger(rawPageSize) ? rawPageSize : undefined
-    const matches = current === recommendedPageSize
-    const overwrites =
-      !matches &&
-      current !== undefined &&
-      (isExistingSource || current !== TORZNAB_TEMPLATE_PAGE_SIZE)
-    const sourceLabel =
-      caps.limits.max && caps.limits.max > 0
-        ? `${recommendedPageSize} (server max)`
-        : `${recommendedPageSize} (server default)`
-    changes.push({
-      field: 'page_size',
-      label: 'Page size',
-      currentDisplay: current !== undefined ? String(current) : 'Default (100)',
-      nextDisplay: sourceLabel,
-      currentValue: current,
-      nextValue: recommendedPageSize,
-      matches,
-      overwrites,
-    })
-  }
-
-  const recommendedMode = caps.recommended_search_mode?.trim() ?? ''
-  if (recommendedMode) {
-    const rawMode = document.getIn(['options', 'search_mode'])
-    const currentExplicit = typeof rawMode === 'string' ? rawMode : ''
-    const effectiveMode = currentExplicit || TORZNAB_TEMPLATE_SEARCH_MODE
-    const advertisedCurrent = caps.searches.find((item) => item.mode === effectiveMode)
-    // Keep a working user-selected search mode (e.g. movie/tvsearch) intact unless it is
-    // explicitly advertised unavailable by the server.
-    const currentSupported = advertisedCurrent ? advertisedCurrent.available : true
-    const matches =
-      effectiveMode === recommendedMode || (currentExplicit !== '' && currentSupported)
-    const overwrites =
-      !matches &&
-      (isExistingSource ||
-        (currentExplicit !== '' && currentExplicit !== TORZNAB_TEMPLATE_SEARCH_MODE))
-    const currentDisplay = currentExplicit
-      ? advertisedCurrent && !advertisedCurrent.available
-        ? `${formatTorznabSearchMode(currentExplicit)} (unavailable)`
-        : formatTorznabSearchMode(currentExplicit)
-      : 'General search (default)'
-    changes.push({
-      field: 'search_mode',
-      label: 'Search mode',
-      currentDisplay,
-      nextDisplay: formatTorznabSearchMode(recommendedMode),
-      currentValue: currentExplicit || undefined,
-      nextValue: recommendedMode,
-      matches,
-      overwrites,
-    })
-  }
-
-  return changes
 }
 
 export function applyTorznabCapabilityField(
@@ -280,21 +214,6 @@ export function applyTorznabCapabilityField(
       next.setIn(['options', 'search_mode'], String(value))
       break
   }
-}
-
-export function applyTorznabCapabilityChanges(
-  next: ProviderJSON,
-  changes: readonly TorznabCapabilityFieldChange[],
-  options: { includeOverwrites: boolean },
-): TorznabCapabilityFieldChange[] {
-  const applied: TorznabCapabilityFieldChange[] = []
-  for (const item of changes) {
-    if (item.matches) continue
-    if (item.overwrites && !options.includeOverwrites) continue
-    applyTorznabCapabilityField(next, item.field, item.nextValue)
-    applied.push(item)
-  }
-  return applied
 }
 
 export function readSelectedCategoryIDs(document: ProviderJSON): number[] {

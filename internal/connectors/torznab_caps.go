@@ -319,7 +319,7 @@ func classifyTorznabCapabilityError(err error) error {
 		return &TorznabCapabilityError{
 			Status:  http.StatusUnprocessableEntity,
 			Code:    "not_found",
-			Message: "No valid Torznab capabilities (t=caps) document was found at this URL. Check that the URL points to a Torznab endpoint.",
+			Message: "No valid Torznab capabilities document was found at this URL. Check that the URL points to a Torznab endpoint.",
 		}
 	}
 	if errors.As(err, &httpErr) {

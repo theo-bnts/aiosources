@@ -838,8 +838,7 @@ function ProviderForm({
         jsonActions={
           <>
             <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
               disabled={busy || fieldDraft}
               onClick={() => fileInput.current?.click()}
             >
@@ -847,8 +846,7 @@ function ProviderForm({
               Import JSON
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
               disabled={locallyInvalid || fieldDraft}
               onClick={() => {
                 const blob = new Blob([json], { type: 'application/json;charset=utf-8' })

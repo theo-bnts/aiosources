@@ -42,24 +42,36 @@ export function TextField({
   help,
   placeholder,
   readOnly = false,
-}: FieldProps & { placeholder?: string; readOnly?: boolean }) {
+  action,
+}: FieldProps & { placeholder?: string; readOnly?: boolean; action?: ReactNode }) {
   const { document, change } = useSourceEditor()
   const id = useId()
   const value = document.getIn(path)
   const mismatch = value !== undefined && typeof value !== 'string'
+  const input = (
+    <Input
+      id={id}
+      className={action ? 'min-w-0 flex-1' : undefined}
+      value={typeof value === 'string' ? value : ''}
+      placeholder={placeholder}
+      readOnly={readOnly}
+      aria-describedby={mismatch ? `${id}-help` : undefined}
+      onChange={(event) => change((next) => next.setIn(path, event.target.value))}
+    />
+  )
   return (
     <div className="field min-w-0">
       <Label htmlFor={id} help={help}>
         {label}
       </Label>
-      <Input
-        id={id}
-        value={typeof value === 'string' ? value : ''}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        aria-describedby={mismatch ? `${id}-help` : undefined}
-        onChange={(event) => change((next) => next.setIn(path, event.target.value))}
-      />
+      {action ? (
+        <div className="flex min-w-0 flex-col gap-2 lg:flex-row">
+          {input}
+          {action}
+        </div>
+      ) : (
+        input
+      )}
       {mismatch && (
         <p id={`${id}-help`} className="help">
           The current value is not text. Enter text to replace it, or repair it in JSON.
@@ -76,40 +88,52 @@ export function SelectField({
   choices,
   fallback = 'Not set (use default)',
   labels = {},
+  action,
 }: FieldProps & {
   choices: readonly string[]
   fallback?: string
   labels?: Record<string, string>
+  action?: ReactNode
 }) {
   const { document, change } = useSourceEditor()
   const id = useId()
   const value = document.getIn(path)
   const current = typeof value === 'string' ? value : ''
+  const select = (
+    <select
+      id={id}
+      className={action ? 'native-select min-w-0 w-full lg:flex-1' : 'native-select w-full'}
+      value={current}
+      onChange={(event) =>
+        change((next) =>
+          event.target.value ? next.setIn(path, event.target.value) : next.deleteIn(path),
+        )
+      }
+    >
+      <option value="">{fallback}</option>
+      {current && !choices.includes(current) && (
+        <option value={current}>{current} (current)</option>
+      )}
+      {choices.map((choice) => (
+        <option key={choice} value={choice}>
+          {labels[choice] ?? choice}
+        </option>
+      ))}
+    </select>
+  )
   return (
     <div className="field min-w-0">
       <Label htmlFor={id} help={help}>
         {label}
       </Label>
-      <select
-        id={id}
-        className="native-select w-full"
-        value={current}
-        onChange={(event) =>
-          change((next) =>
-            event.target.value ? next.setIn(path, event.target.value) : next.deleteIn(path),
-          )
-        }
-      >
-        <option value="">{fallback}</option>
-        {current && !choices.includes(current) && (
-          <option value={current}>{current} (current)</option>
-        )}
-        {choices.map((choice) => (
-          <option key={choice} value={choice}>
-            {labels[choice] ?? choice}
-          </option>
-        ))}
-      </select>
+      {action ? (
+        <div className="flex min-w-0 flex-col gap-2 lg:flex-row">
+          {select}
+          {action}
+        </div>
+      ) : (
+        select
+      )}
     </div>
   )
 }
@@ -163,11 +187,13 @@ export function JSONField({
   multiline = false,
   required = typeof path[path.length - 1] === 'number',
   placeholder,
+  action,
 }: FieldProps & {
   integer?: boolean
   multiline?: boolean
   required?: boolean
   placeholder?: string
+  action?: ReactNode
 }) {
   const { document, change, reportDraft, readOnly } = useSourceEditor()
   const id = useId()
@@ -197,6 +223,18 @@ export function JSONField({
     reportDraft(id, Boolean(invalid))
     if (!invalid) change((next) => next.setRawIn(path, value))
   }
+  const singleLineInput = (
+    <Input
+      id={id}
+      className={action ? 'min-w-0 flex-1 font-mono text-xs' : 'font-mono text-xs'}
+      inputMode={integer ? 'numeric' : undefined}
+      placeholder={placeholder}
+      value={draft}
+      aria-invalid={Boolean(error)}
+      aria-describedby={error ? `${id}-help` : undefined}
+      onChange={(event) => update(event.target.value)}
+    />
+  )
   return (
     <div className="field min-w-0">
       <Label htmlFor={multiline ? undefined : id} help={help}>
@@ -212,17 +250,13 @@ export function JSONField({
           ariaInvalid={Boolean(error)}
           ariaDescribedBy={error ? `${id}-help` : undefined}
         />
+      ) : action ? (
+        <div className="flex min-w-0 flex-col gap-2 lg:flex-row">
+          {singleLineInput}
+          {action}
+        </div>
       ) : (
-        <Input
-          id={id}
-          className="font-mono text-xs"
-          inputMode={integer ? 'numeric' : undefined}
-          placeholder={placeholder}
-          value={draft}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-help` : undefined}
-          onChange={(event) => update(event.target.value)}
-        />
+        singleLineInput
       )}
       {error ? (
         <div id={`${id}-help`} className="space-y-1 text-xs text-destructive" role="alert">

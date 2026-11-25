@@ -4,16 +4,17 @@ import assert from 'node:assert/strict'
 import { parseProviderJSON } from '../src/lib/provider-json.ts'
 import {
   applyTorznabCategories,
-  applyTorznabCapabilityChanges,
   applyTorznabCapabilityField,
   applyUseAdvertisedCategories,
   countTorznabCategories,
   filterTorznabCategories,
   findUnknownCategoryIDs,
   isTorznabCapabilitiesStale,
-  planTorznabCapabilityChanges,
   readSelectedCategoryIDs,
+  readTorznabCapabilityFieldValue,
+  resolveTorznabCapabilityFieldValue,
   torznabConnectionKey,
+  torznabSearchModeOptionLabels,
   type TorznabCapabilitiesResult,
 } from '../src/lib/torznab-capabilities.ts'
 
@@ -68,46 +69,30 @@ const templateJSON = `{
   }
 }`
 
-test('new Torznab template treats placeholder defaults and canonical endpoint as safe fills', () => {
-  const doc = parseProviderJSON(templateJSON)
-  const changes = planTorznabCapabilityChanges(doc, sampleCaps, { isExistingSource: false })
-  const pending = changes.filter((item) => !item.matches)
-
-  assert.deepEqual(
-    pending.map((item) => item.field),
-    ['name', 'id', 'url', 'page_size'],
-  )
+test('per-field capability resolution extracts values, clamps page_size and handles missing metadata', () => {
+  assert.equal(resolveTorznabCapabilityFieldValue(sampleCaps, 'name')?.value, 'Cinema Archive')
+  assert.equal(resolveTorznabCapabilityFieldValue(sampleCaps, 'id')?.value, 'cinema_archive')
   assert.equal(
-    pending.some((item) => item.overwrites),
-    false,
+    resolveTorznabCapabilityFieldValue(sampleCaps, 'url')?.value,
+    'https://tracker.example/api',
   )
+  assert.equal(resolveTorznabCapabilityFieldValue(sampleCaps, 'page_size')?.value, 200)
+  assert.equal(resolveTorznabCapabilityFieldValue(sampleCaps, 'search_mode')?.value, 'search')
 
-  const applied = applyTorznabCapabilityChanges(doc, changes, { includeOverwrites: false })
-  assert.equal(applied.length, 4)
-  assert.equal(doc.get('name'), 'Cinema Archive')
-  assert.equal(doc.get('id'), 'cinema_archive')
-  assert.equal(doc.get('url'), 'https://tracker.example/api')
-  assert.equal(doc.get('page_size'), 200)
+  const oversized: TorznabCapabilitiesResult = {
+    endpoint: 'https://tracker.example/api',
+    limits: { default: 50000, max: 99999 },
+    recommended_page_size: 99999,
+    searches: [],
+    categories: [],
+  }
+  assert.equal(resolveTorznabCapabilityFieldValue(oversized, 'page_size')?.value, 10000)
+  assert.equal(resolveTorznabCapabilityFieldValue(oversized, 'name'), null)
+  assert.equal(resolveTorznabCapabilityFieldValue(oversized, 'id'), null)
+  assert.equal(resolveTorznabCapabilityFieldValue(oversized, 'search_mode'), null)
 })
 
-test('new Torznab draft with custom name flags only that field as overwrite', () => {
-  const doc = parseProviderJSON(templateJSON)
-  doc.set('name', 'My Personal Tracker')
-
-  const changes = planTorznabCapabilityChanges(doc, sampleCaps, { isExistingSource: false })
-  const nameChange = changes.find((item) => item.field === 'name')
-  const idChange = changes.find((item) => item.field === 'id')
-
-  assert.equal(nameChange?.overwrites, true)
-  assert.equal(idChange?.overwrites, false)
-
-  applyTorznabCapabilityChanges(doc, changes, { includeOverwrites: false })
-  assert.equal(doc.get('name'), 'My Personal Tracker')
-  assert.equal(doc.get('id'), 'cinema_archive')
-  assert.equal(doc.get('page_size'), 200)
-})
-
-test('existing source never suggests changing id and marks customized fields as overwrites', () => {
+test('applying individual fields overrides existing values cleanly', () => {
   const doc = parseProviderJSON(`{
     "version": 1,
     "id": "existing_source",
@@ -116,56 +101,28 @@ test('existing source never suggests changing id and marks customized fields as 
     "url": "https://tracker.example/api",
     "enabled": true,
     "page_size": 50,
-    "search": { "categories": [] },
-    "options": { "category_scope": "combined", "search_mode": "tvsearch" }
-  }`)
-
-  const changes = planTorznabCapabilityChanges(doc, sampleCaps, { isExistingSource: true })
-  assert.equal(
-    changes.some((item) => item.field === 'id'),
-    false,
-  )
-  // tvsearch is advertised available, so it should remain untouched.
-  assert.equal(changes.find((item) => item.field === 'search_mode')?.matches, true)
-  assert.equal(changes.find((item) => item.field === 'name')?.overwrites, true)
-  assert.equal(changes.find((item) => item.field === 'page_size')?.overwrites, true)
-
-  // Non-overwrite pass changes nothing on a customized existing source.
-  const safeApplied = applyTorznabCapabilityChanges(doc, changes, { includeOverwrites: false })
-  assert.equal(safeApplied.length, 0)
-  assert.equal(doc.get('name'), 'Existing Custom Name')
-  assert.equal(doc.get('page_size'), 50)
-
-  // Explicit overwrite pass updates both fields while preserving id and tvsearch.
-  const allApplied = applyTorznabCapabilityChanges(doc, changes, { includeOverwrites: true })
-  assert.deepEqual(
-    allApplied.map((item) => item.field),
-    ['name', 'page_size'],
-  )
-  assert.equal(doc.get('id'), 'existing_source')
-  assert.equal(doc.get('name'), 'Cinema Archive')
-  assert.equal(doc.get('page_size'), 200)
-  assert.equal(doc.getIn(['options', 'search_mode']), 'tvsearch')
-})
-
-test('existing source with unavailable search_mode flags it for replacement', () => {
-  const doc = parseProviderJSON(`{
-    "version": 1,
-    "id": "movie_only",
-    "name": "Cinema Archive",
-    "adapter": "torznab",
-    "url": "https://tracker.example/api",
-    "enabled": true,
-    "page_size": 200,
     "options": { "search_mode": "movie" }
   }`)
 
-  const changes = planTorznabCapabilityChanges(doc, sampleCaps, { isExistingSource: true })
-  const modeChange = changes.find((item) => item.field === 'search_mode')
-  assert.equal(modeChange?.matches, false)
-  assert.equal(modeChange?.overwrites, true)
-  assert.equal(modeChange?.nextValue, 'search')
-  assert.match(modeChange?.currentDisplay ?? '', /unavailable/i)
+  assert.equal(readTorznabCapabilityFieldValue(doc, 'name'), 'Existing Custom Name')
+  assert.equal(readTorznabCapabilityFieldValue(doc, 'page_size'), 50)
+  assert.equal(readTorznabCapabilityFieldValue(doc, 'search_mode'), 'movie')
+
+  applyTorznabCapabilityField(doc, 'name', 'Cinema Archive')
+  applyTorznabCapabilityField(doc, 'page_size', 200)
+  applyTorznabCapabilityField(doc, 'search_mode', 'search')
+
+  assert.equal(doc.get('id'), 'existing_source')
+  assert.equal(doc.get('name'), 'Cinema Archive')
+  assert.equal(doc.get('page_size'), 200)
+  assert.equal(doc.getIn(['options', 'search_mode']), 'search')
+})
+
+test('search mode option labels mark unavailable modes without extra banners', () => {
+  const labels = torznabSearchModeOptionLabels(sampleCaps)
+  assert.equal(labels.search, 'General search')
+  assert.equal(labels.tvsearch, 'Series')
+  assert.equal(labels.movie, 'Films (unavailable)')
 })
 
 test('category selection keeps category_scope valid and preserves unknown IDs', () => {
@@ -227,7 +184,7 @@ test('category filtering matches names and IDs while keeping parent hierarchy', 
   assert.equal(byParent[0].subcategories?.length, 2)
 })
 
-test('staleness ignores canonical endpoint adoption but flags other connection edits', () => {
+test('cache stays valid after canonical endpoint adoption and invalidates on connection edits', () => {
   const doc = parseProviderJSON(templateJSON)
   const fetchedKey = torznabConnectionKey(doc)
 

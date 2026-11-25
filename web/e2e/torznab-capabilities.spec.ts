@@ -5,8 +5,10 @@ import { closeListener, listen } from './server'
 
 async function startMockTorznabServer(expectedKey: string): Promise<{
   origin: string
+  capsRequests: () => number
   close: () => Promise<void>
 }> {
+  let requests = 0
   const httpServer: Server = createHTTPServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     if (url.pathname === '/') {
@@ -19,6 +21,7 @@ async function startMockTorznabServer(expectedKey: string): Promise<{
       response.end()
       return
     }
+    requests += 1
     if (expectedKey && url.searchParams.get('apikey') !== expectedKey) {
       response.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' })
       response.end(
@@ -60,6 +63,7 @@ async function startMockTorznabServer(expectedKey: string): Promise<{
   const port = await listen(httpServer)
   return {
     origin: `http://127.0.0.1:${port}`,
+    capsRequests: () => requests,
     close: () => closeListener(httpServer),
   }
 }
@@ -72,7 +76,7 @@ async function addCredentialSecret(page: Page, value: string) {
   await expect(dialog).toBeHidden()
 }
 
-test('new Torznab source discovers capabilities, fills defaults and picks categories by name', async ({
+test('new Torznab source fills fields from cached capabilities and uses consistent mode tabs and JSON buttons', async ({
   page,
 }) => {
   const apiKey = 'torznab-e2e-secret-key'
@@ -85,75 +89,101 @@ test('new Torznab source discovers capabilities, fills defaults and picks catego
       .filter({ has: page.getByText('torznab', { exact: true }) })
     await template.getByRole('button', { name: 'Use this template', exact: true }).click()
 
-    await expect(
-      page.getByText('Auto-configure from Torznab capabilities (t=caps)', { exact: true }),
-    ).toBeVisible()
-    await page.getByRole('button', { name: 'Open Connection', exact: true }).click()
+    // Editor mode switcher uses the same tab bar style as the rest of the app.
+    const modeBar = page.getByRole('group', { name: 'Definition editor mode', exact: true })
+    await expect(modeBar).toHaveAttribute('data-slot', 'tabs-list')
+    await expect(page.getByRole('button', { name: 'Visual stages', exact: true })).toHaveAttribute(
+      'data-slot',
+      'tabs-trigger',
+    )
+    // No global summary menu or t=caps jargon.
+    await expect(page.locator('main')).not.toContainText('t=caps')
 
-    // Supply the root URL (without /api) and store a secret through SecretPicker.
-    await page.getByLabel('Source URL', { exact: true }).fill(mock.origin)
-    await addCredentialSecret(page, apiKey)
-
-    await page.getByRole('button', { name: 'Fetch capabilities (t=caps)', exact: true }).click()
-
-    const summary = page.getByRole('region', {
-      name: 'Discovered Torznab capabilities',
-      exact: true,
-    })
-    await expect(summary).toBeVisible()
-    await expect(summary).toContainText('Cinema Archive')
-    await expect(summary).toContainText('8 categories')
-    await expect(summary).toContainText('Quota 995 / 1,000')
-
-    // All 4 fields (name, id, url, page_size) are template defaults or canonicalized URL -> safe 1-click apply.
+    // JSON mode buttons match Check configuration (outline variant).
+    await page.getByRole('button', { name: 'JSON', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Import JSON', exact: true })).toHaveAttribute(
+      'data-variant',
+      'outline',
+    )
+    await expect(page.getByRole('button', { name: 'Export JSON', exact: true })).toHaveAttribute(
+      'data-variant',
+      'outline',
+    )
     if (process.env.QA_DIRECTORY) {
       await page.screenshot({
-        path: `${process.env.QA_DIRECTORY}/torznab-caps-review-1440.png`,
+        path: `${process.env.QA_DIRECTORY}/torznab-json-mode-1440.png`,
         fullPage: true,
         animations: 'disabled',
       })
     }
-    await summary
-      .getByRole('button', { name: 'Apply discovered settings (4)', exact: true })
-      .click()
-    await expect(summary).toContainText('All settings match')
-    await expect(page.getByLabel('Source URL', { exact: true })).toHaveValue(`${mock.origin}/api`)
+    await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
 
-    // Filter and pick specific categories from the advertised tree.
-    const categoryFilter = page.getByLabel('Advertised categories', { exact: true })
-    await categoryFilter.fill('anime')
+    // Enter root URL (without /api) and add secret in Connection.
+    await page.getByRole('tab', { name: 'Connection', exact: true }).click()
+    await page.getByLabel('Source URL', { exact: true }).fill(mock.origin)
+    await addCredentialSecret(page, apiKey)
+
+    // First capability click fetches once and updates Source URL to canonical /api.
+    await page
+      .getByRole('button', { name: 'Get source url from capabilities', exact: true })
+      .click()
+    await expect(page.getByLabel('Source URL', { exact: true })).toHaveValue(`${mock.origin}/api`)
+    expect(mock.capsRequests()).toBe(1)
+
+    // Categories are already available from cache without a second request.
     const categoriesGroup = page.getByRole('group', {
       name: 'Torznab advertised categories',
       exact: true,
     })
+    await expect(categoriesGroup).toBeVisible()
+    const categoryFilter = page.getByLabel('Categories', { exact: true })
+    await categoryFilter.fill('anime')
     await categoriesGroup.getByRole('checkbox', { name: /Anime/ }).check()
     await categoryFilter.fill('uhd')
     await categoriesGroup.getByRole('checkbox', { name: /UHD/ }).check()
     await categoryFilter.fill('')
 
+    // Search mode dropdown annotates unavailable modes cleanly without extra banners.
+    await expect(
+      page.getByLabel('Search mode', { exact: true }).locator('option[value="movie"]'),
+    ).toHaveText('Films (unavailable)')
+
     if (process.env.QA_DIRECTORY) {
       await page.screenshot({
-        path: `${process.env.QA_DIRECTORY}/torznab-caps-applied-1440.png`,
+        path: `${process.env.QA_DIRECTORY}/torznab-connection-1440.png`,
         fullPage: true,
         animations: 'disabled',
       })
     }
 
-    // Re-expanding the summary shows all fields matching.
-    await summary.getByRole('button', { name: 'Show details', exact: true }).click()
-    await expect(summary).toContainText('All discovered settings match this draft.')
-
-    // Verify Identity & Pagination stages received the discovered values.
+    // Identity fields reuse the cached capabilities with zero extra server requests.
     await page.getByRole('tab', { name: 'Identity', exact: true }).click()
+    await page
+      .getByRole('button', { name: 'Get display name from capabilities', exact: true })
+      .click()
     await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('Cinema Archive')
+    await page
+      .getByRole('button', { name: 'Get source identifier from capabilities', exact: true })
+      .click()
     await expect(page.getByLabel('Source identifier', { exact: true })).toHaveValue(
       'cinema_archive',
     )
 
-    await page.getByRole('tab', { name: 'Pagination', exact: true }).click()
-    await expect(page.getByLabel('Page size', { exact: true })).toHaveValue('200')
+    if (process.env.QA_DIRECTORY) {
+      await page.screenshot({
+        path: `${process.env.QA_DIRECTORY}/torznab-identity-1440.png`,
+        fullPage: true,
+        animations: 'disabled',
+      })
+    }
 
-    // Save the new source and verify persisted JSON.
+    // Pagination page size reuses the same cache.
+    await page.getByRole('tab', { name: 'Pagination', exact: true }).click()
+    await page.getByRole('button', { name: 'Get page size from capabilities', exact: true }).click()
+    await expect(page.getByLabel('Page size', { exact: true })).toHaveValue('200')
+    expect(mock.capsRequests()).toBe(1)
+
+    // Save and verify persisted JSON.
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/providers\/cinema_archive$/)
     const saved = await (await page.request.get('/api/providers/cinema_archive')).json()
@@ -168,13 +198,12 @@ test('new Torznab source discovers capabilities, fills defaults and picks catego
   }
 })
 
-test('existing Torznab source lets users pick categories safely and confirms before overwriting custom values', async ({
+test('existing Torznab source loads categories cleanly and overrides individual fields on click', async ({
   page,
 }) => {
   const apiKey = 'existing-source-key'
   const mock = await startMockTorznabServer(apiKey)
   try {
-    // Seed an already-configured Torznab source with custom name, page_size, and an unlisted category ID.
     const session = await (await page.request.get('/api/session')).json()
     const putSecret = await page.request.put('/api/secrets/existing_torznab_key', {
       headers: { 'X-CSRF-Token': session.csrf_token },
@@ -195,7 +224,7 @@ test('existing Torznab source lets users pick categories safely and confirms bef
         rate_limit_reset: 'epoch',
         page_size: 50,
         search: { categories: [99999] },
-        options: { category_scope: 'combined', search_mode: 'search' },
+        options: { category_scope: 'combined', search_mode: 'movie' },
       },
       null,
       2,
@@ -209,74 +238,57 @@ test('existing Torznab source lets users pick categories safely and confirms bef
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.goto('/providers/my_existing_tracker')
     await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('My Custom Cinema')
+    // Existing source identifier cannot change, so no capability button is shown for it.
+    await expect(
+      page.getByRole('button', { name: 'Get source identifier from capabilities', exact: true }),
+    ).toHaveCount(0)
 
-    // Go straight to Connection -> Search scope and load categories without modifying existing settings.
+    // Load categories directly from Connection -> Search scope without touching other fields.
     await page.getByRole('tab', { name: 'Connection', exact: true }).click()
-    await page.getByRole('button', { name: 'Fetch categories (t=caps)', exact: true }).click()
+    await page.getByRole('button', { name: 'Load from capabilities', exact: true }).click()
 
-    const summary = page.getByRole('region', {
-      name: 'Discovered Torznab capabilities',
-      exact: true,
-    })
-    await expect(summary).toBeVisible()
-    // Existing source ID is never proposed for change.
-    await expect(summary).not.toContainText('Source identifier')
-    // Existing unlisted category ID 99999 is preserved and displayed.
+    // Unlisted custom category ID 99999 is preserved.
     await expect(page.getByText('Unlisted category IDs kept in this draft:')).toBeVisible()
+    expect(mock.capsRequests()).toBe(1)
     await expect(
       page.getByRole('button', { name: 'Remove category 99999', exact: true }),
     ).toBeVisible()
 
-    // Select a category from the fetched list.
     const categoriesGroup = page.getByRole('group', {
       name: 'Torznab advertised categories',
       exact: true,
     })
     await categoriesGroup.getByRole('checkbox', { name: /Lossless/ }).check()
 
-    // Confirm existing custom Display name and Page size were NOT overwritten.
-    await page.getByRole('tab', { name: 'Identity', exact: true }).click()
-    await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('My Custom Cinema')
-    // Per-field inline apply button is available right beneath Display name.
-    await expect(page.getByRole('button', { name: 'Apply name', exact: true })).toBeVisible()
+    // Clicking the per-field button on Search mode directly overrides unavailable 'movie' with 'search' from cache.
+    await page
+      .getByRole('button', { name: 'Get search mode from capabilities', exact: true })
+      .click()
+    await expect(page.getByLabel('Search mode', { exact: true })).toHaveValue('search')
 
-    // Test per-field apply on Pagination stage.
+    // Other fields remain untouched until the user clicks their buttons.
     await page.getByRole('tab', { name: 'Pagination', exact: true }).click()
     await expect(page.getByLabel('Page size', { exact: true })).toHaveValue('50')
-    await page.getByRole('button', { name: 'Use max (200)', exact: true }).click()
+    await page.getByRole('button', { name: 'Get page size from capabilities', exact: true }).click()
     await expect(page.getByLabel('Page size', { exact: true })).toHaveValue('200')
 
-    // Display name still differs -> bulk overwrite requires explicit confirmation dialog listing what changes.
-    await summary.getByRole('button', { name: 'Overwrite all (1)', exact: true }).click()
-    const confirmDialog = page.getByRole('alertdialog')
-    await expect(confirmDialog).toBeVisible()
-    await expect(confirmDialog).toContainText('Overwrite existing source settings?')
-    await expect(confirmDialog).toContainText('Display name')
-    await expect(confirmDialog).toContainText('My Custom Cinema')
-    await expect(confirmDialog).toContainText('Cinema Archive')
-
-    // Cancelling preserves custom value.
-    await confirmDialog.getByRole('button', { name: 'Back', exact: true }).click()
-    await expect(confirmDialog).toBeHidden()
     await page.getByRole('tab', { name: 'Identity', exact: true }).click()
     await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('My Custom Cinema')
-
-    // Confirming overwrites Display name while keeping source ID untouched.
-    await summary.getByRole('button', { name: 'Overwrite all (1)', exact: true }).click()
     await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'Overwrite settings', exact: true })
+      .getByRole('button', { name: 'Get display name from capabilities', exact: true })
       .click()
     await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('Cinema Archive')
     await expect(page.getByLabel('Source identifier', { exact: true })).toHaveValue(
       'my_existing_tracker',
     )
+    // Entire flow used only 1 capability request.
+    expect(mock.capsRequests()).toBe(1)
 
+    await page.getByRole('tab', { name: 'Connection', exact: true }).click()
     if (process.env.QA_DIRECTORY) {
-      await page.getByRole('tab', { name: 'Connection', exact: true }).click()
       await page.setViewportSize({ width: 390, height: 900 })
       await page.screenshot({
-        path: `${process.env.QA_DIRECTORY}/torznab-caps-mobile-390.png`,
+        path: `${process.env.QA_DIRECTORY}/torznab-connection-mobile-390.png`,
         fullPage: true,
         animations: 'disabled',
       })
@@ -292,6 +304,7 @@ test('existing Torznab source lets users pick categories safely and confirms bef
           '[data-slot="input"]',
           '[data-slot="button"]',
           '[data-slot="disclosure-trigger"]',
+          '[data-slot="tabs-list"]',
           '.native-select',
         ]
         for (const element of document.querySelectorAll<HTMLElement>(selectors.join(','))) {
@@ -312,7 +325,6 @@ test('existing Torznab source lets users pick categories safely and confirms bef
       expect(issues).toEqual([])
     }
 
-    // Save and confirm persisted categories (both newly selected + preserved unlisted ID) & updated settings.
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
     const updated = await (await page.request.get('/api/providers/my_existing_tracker')).json()
@@ -320,6 +332,7 @@ test('existing Torznab source lets users pick categories safely and confirms bef
     expect(updatedDef.id).toBe('my_existing_tracker')
     expect(updatedDef.name).toBe('Cinema Archive')
     expect(updatedDef.page_size).toBe(200)
+    expect(updatedDef.options.search_mode).toBe('search')
     expect(updatedDef.search.categories).toEqual([3040, 99999])
   } finally {
     await mock.close()
@@ -341,14 +354,15 @@ test('Torznab capability fetch surfaces safe inline errors without leaking secre
     await page.getByLabel('Source URL', { exact: true }).fill(`${mock.origin}/api`)
 
     // Template's placeholder secret_ref does not exist -> actionable missing-secret error.
-    await page.getByRole('button', { name: 'Fetch capabilities (t=caps)', exact: true }).click()
+    await page.getByRole('button', { name: 'Load from capabilities', exact: true }).click()
     const alert = page.getByRole('alert')
     await expect(alert).toBeVisible()
     await expect(alert).toContainText('credential secret was not found in Secrets')
+    await expect(alert).not.toContainText('t=caps')
 
     // Store a wrong API key and retry -> auth rejected without echoing secret value.
     await addCredentialSecret(page, wrongSecret)
-    await page.getByRole('button', { name: 'Fetch capabilities (t=caps)', exact: true }).click()
+    await page.getByRole('button', { name: 'Load from capabilities', exact: true }).click()
     await expect(alert).toContainText('rejected the configured credentials')
     await expect(page.locator('body')).not.toContainText(wrongSecret)
   } finally {

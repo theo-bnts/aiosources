@@ -25,9 +25,17 @@ import { timingMode, type TimingMode } from '@/lib/schedule-input'
 import { Switch } from '@/components/ui/switch'
 import { isJSONAdapter } from '@/lib/source-adapters'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  tabsListVariants,
+  tabsTriggerClassName,
+} from '@/components/ui/tabs'
 import { InfoTip } from '@/components/ui/info-tip'
 import { CodeEditor } from '@/components/code-editor'
+import { torznabSearchModeOptionLabels } from '@/lib/torznab-capabilities'
 import {
   HTMLMappingSettings,
   HTMLDetailSettings,
@@ -35,15 +43,11 @@ import {
   SourceHTMLCompatibility,
 } from '@/components/source-html-fields'
 import {
-  TorznabCapabilitiesBanner,
+  TorznabCapabilitiesErrorNotice,
   TorznabCapabilitiesProvider,
-  TorznabCapabilitiesToolbarAction,
   TorznabCategoryPicker,
-  TorznabConnectionDiscoveryBox,
-  TorznabFieldHint,
-  TorznabIdentityIntro,
-  TorznabPageSizeHint,
-  TorznabSearchModeHints,
+  TorznabFieldCapabilityButton,
+  useTorznabCapabilities,
 } from '@/components/torznab-capabilities'
 import {
   OptionalSection,
@@ -97,28 +101,34 @@ const remoteStages = stages.filter((stage) => stage.id !== 'schedules')
 
 function IdentitySettings({ sourceID }: { sourceID?: string }) {
   const { document } = useSourceEditor()
+  const torznab = document.get('adapter') === 'torznab'
   const jsonAdapter = document.get('adapter') === 'http_json' ? 'http_json' : 'json'
   return (
     <FieldSection title="Source identity">
-      <TorznabIdentityIntro />
       <FieldGrid>
-        <div className="min-w-0">
-          <TextField path={['name']} label="Display name" placeholder="Archive name" />
-          <TorznabFieldHint field="name" buttonLabel="Apply name" />
-        </div>
-        <div className="min-w-0">
-          <TextField
-            path={['id']}
-            label="Source identifier"
-            placeholder="archive-main"
-            help={
-              sourceID
-                ? 'Keep this identifier stable. Invalid definitions can be repaired before saving.'
-                : 'Use a unique, safe identifier such as archive-main.'
-            }
-          />
-          {!sourceID && <TorznabFieldHint field="id" buttonLabel="Apply identifier" />}
-        </div>
+        <TextField
+          path={['name']}
+          label="Display name"
+          placeholder="Archive name"
+          action={
+            torznab ? <TorznabFieldCapabilityButton field="name" label="Display name" /> : undefined
+          }
+        />
+        <TextField
+          path={['id']}
+          label="Source identifier"
+          placeholder="archive-main"
+          help={
+            sourceID
+              ? 'Keep this identifier stable. Invalid definitions can be repaired before saving.'
+              : 'Use a unique, safe identifier such as archive-main.'
+          }
+          action={
+            torznab && !sourceID ? (
+              <TorznabFieldCapabilityButton field="id" label="Source identifier" />
+            ) : undefined
+          }
+        />
         <SelectField
           path={['adapter']}
           label="Source type"
@@ -284,6 +294,7 @@ function AuthenticationSettings({ other = false }: { other?: boolean }) {
 
 function ConnectionSettings() {
   const { document } = useSourceEditor()
+  const { capabilities } = useTorznabCapabilities()
   const torznab = document.get('adapter') === 'torznab'
   const html = document.get('adapter') === 'html'
   return (
@@ -292,20 +303,20 @@ function ConnectionSettings() {
         title="Endpoint"
         description="Use credential-free URLs. Secrets are resolved from the vault when a run starts."
       >
-        <div className="min-w-0">
-          <TextField
-            path={['url']}
-            label="Source URL"
-            placeholder={
-              html
-                ? 'https://archive.example/catalog'
-                : torznab
-                  ? 'https://indexer.example/api'
-                  : 'https://archive.example/api/items'
-            }
-          />
-          {torznab && <TorznabFieldHint field="url" buttonLabel="Use discovered URL" />}
-        </div>
+        <TextField
+          path={['url']}
+          label="Source URL"
+          placeholder={
+            html
+              ? 'https://archive.example/catalog'
+              : torznab
+                ? 'https://indexer.example/api'
+                : 'https://archive.example/api/items'
+          }
+          action={
+            torznab ? <TorznabFieldCapabilityButton field="url" label="Source URL" /> : undefined
+          }
+        />
         {!torznab && (
           <SelectField
             path={['http', 'method']}
@@ -316,7 +327,6 @@ function ConnectionSettings() {
         )}
       </FieldSection>
       <AuthenticationSettings />
-      {torznab && <TorznabConnectionDiscoveryBox />}
       {!torznab && (
         <FieldSection title="Request parameters">
           <MapField
@@ -346,13 +356,8 @@ function ConnectionSettings() {
               label="Search mode"
               choices={['search', 'tvsearch', 'movie', 'music', 'book']}
               fallback="General search (default)"
-              labels={{
-                search: 'General search',
-                tvsearch: 'Series',
-                movie: 'Films',
-                music: 'Music',
-                book: 'Books',
-              }}
+              labels={torznabSearchModeOptionLabels(capabilities)}
+              action={<TorznabFieldCapabilityButton field="search_mode" label="Search mode" />}
             />
             <SelectField
               path={['options', 'category_scope']}
@@ -367,7 +372,6 @@ function ConnectionSettings() {
               help="Use separate requests when the source limits each category independently."
             />
           </FieldGrid>
-          <TorznabSearchModeHints />
           <TextField
             path={['search', 'query']}
             label="Search query"
@@ -608,8 +612,12 @@ function PaginationSettings() {
           integer
           placeholder="100"
           help="Records requested per page. Use the maximum allowed by your source."
+          action={
+            torznab ? (
+              <TorznabFieldCapabilityButton field="page_size" label="Page size" />
+            ) : undefined
+          }
         />
-        {torznab && <TorznabPageSizeHint />}
       </FieldSection>
       {torznab ? (
         <>
@@ -1417,40 +1425,44 @@ export function SourceEditor({
           }
           className="space-y-4"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div
-              className="inline-flex gap-1 rounded-md border border-border bg-card p-1"
-              role="group"
-              aria-label="Definition editor mode"
-            >
-              <Button
-                size="sm"
-                variant={mode === 'visual' ? 'secondary' : 'ghost'}
-                aria-pressed={mode === 'visual'}
-                disabled={document.errors.length > 0 || drafts.size > 0}
-                onClick={() => onModeChange('visual')}
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="min-w-[180px] max-w-full flex-1 overflow-x-auto overflow-y-hidden">
+              <div
+                data-slot="tabs-list"
+                data-variant="default"
+                className={tabsListVariants({ variant: 'default' })}
+                role="group"
+                aria-label="Definition editor mode"
               >
-                <FlowArrowIcon />
-                Visual stages
-              </Button>
-              <Button
-                size="sm"
-                variant={mode === 'json' ? 'secondary' : 'ghost'}
-                aria-pressed={mode === 'json'}
-                disabled={drafts.size > 0}
-                onClick={() => onModeChange('json')}
-              >
-                <BracketsCurlyIcon />
-                JSON
-              </Button>
-            </div>
-            {mode === 'json' && jsonActions ? (
-              <div className="flex flex-wrap gap-2">{jsonActions}</div>
-            ) : mode === 'visual' ? (
-              <div className="flex flex-wrap gap-2">
-                <TorznabCapabilitiesToolbarAction />
+                <button
+                  type="button"
+                  data-slot="tabs-trigger"
+                  data-state={mode === 'visual' ? 'active' : 'inactive'}
+                  aria-pressed={mode === 'visual'}
+                  disabled={document.errors.length > 0 || drafts.size > 0}
+                  className={tabsTriggerClassName}
+                  onClick={() => onModeChange('visual')}
+                >
+                  <FlowArrowIcon aria-hidden="true" />
+                  Visual stages
+                </button>
+                <button
+                  type="button"
+                  data-slot="tabs-trigger"
+                  data-state={mode === 'json' ? 'active' : 'inactive'}
+                  aria-pressed={mode === 'json'}
+                  disabled={drafts.size > 0}
+                  className={tabsTriggerClassName}
+                  onClick={() => onModeChange('json')}
+                >
+                  <BracketsCurlyIcon aria-hidden="true" />
+                  JSON
+                </button>
               </div>
-            ) : null}
+            </div>
+            {mode === 'json' && jsonActions && (
+              <div className="flex shrink-0 flex-wrap gap-2">{jsonActions}</div>
+            )}
           </div>
           {drafts.size > 0 && (
             <p className="notice notice-warning" role="status">
@@ -1494,7 +1506,7 @@ export function SourceEditor({
             </>
           ) : (
             <>
-              <TorznabCapabilitiesBanner currentStage={current.id} />
+              <TorznabCapabilitiesErrorNotice currentStage={current.id} />
               <Tabs
                 value={current.id}
                 onValueChange={(value) => {

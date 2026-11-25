@@ -1,19 +1,12 @@
 import {
-  ArrowClockwiseIcon,
   ArrowRightIcon,
-  CaretDownIcon,
-  CaretUpIcon,
-  CheckCircleIcon,
-  CheckIcon,
   CloudArrowDownIcon,
   EraserIcon,
   ListChecksIcon,
   MagnifyingGlassIcon,
-  PlugsConnectedIcon,
   WarningCircleIcon,
   XIcon,
 } from '@phosphor-icons/react'
-import { useMutation } from '@tanstack/react-query'
 import {
   createContext,
   useCallback,
@@ -30,48 +23,40 @@ import { api, ApiError } from '@/lib/api'
 import { messageText, number } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import {
-  applyTorznabCapabilityChanges,
   applyTorznabCapabilityField,
   applyTorznabCategories,
   applyUseAdvertisedCategories,
   countTorznabCategories,
   filterTorznabCategories,
   findUnknownCategoryIDs,
-  formatTorznabSearchMode,
   isTorznabCapabilitiesStale,
   isTorznabTemplatePlaceholderURL,
-  planTorznabCapabilityChanges,
   readSelectedCategoryIDs,
+  readTorznabCapabilityFieldValue,
+  resolveTorznabCapabilityFieldValue,
   torznabConnectionKey,
   type TorznabCapabilitiesResult,
   type TorznabCapabilityField,
-  type TorznabCapabilityFieldChange,
   type TorznabCategoryCapability,
 } from '@/lib/torznab-capabilities'
 import { OptionalSection, useSourceEditor } from '@/components/source-editor-fields'
-import { ConfirmAction } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+type CapabilityTarget = TorznabCapabilityField | 'categories'
+
 interface TorznabCapabilitiesContextValue {
   enabled: boolean
-  isExistingSource: boolean
   capabilities: TorznabCapabilitiesResult | null
-  changes: TorznabCapabilityFieldChange[]
-  pending: boolean
+  busyTarget: CapabilityTarget | null
   error: unknown
-  stale: boolean
   blocked: boolean
-  placeholderURL: boolean
-  fetchCapabilities: () => void
-  clearCapabilities: () => void
+  fillField: (field: TorznabCapabilityField) => Promise<void>
+  loadCategories: () => Promise<void>
   dismissError: () => void
-  applyField: (field: TorznabCapabilityField, value: string | number, label?: string) => void
-  applyBulk: (includeOverwrites: boolean) => void
   jumpToStage: (stage: 'identity' | 'connection' | 'pagination') => void
-  jumpToCategories: () => void
 }
 
 const TorznabCapabilitiesContext = createContext<TorznabCapabilitiesContextValue | null>(null)
@@ -80,6 +65,14 @@ export function useTorznabCapabilities() {
   const value = useContext(TorznabCapabilitiesContext)
   if (!value) throw new Error('Torznab capability controls require a TorznabCapabilitiesProvider.')
   return value
+}
+
+const missingFieldMessages: Record<TorznabCapabilityField, string> = {
+  name: 'This server did not advertise a display name in its capabilities.',
+  id: 'Could not derive a source identifier from capabilities.',
+  url: 'This server did not return an endpoint URL.',
+  page_size: 'This server did not advertise page-size limits in its capabilities.',
+  search_mode: 'This server did not advertise supported search modes in its capabilities.',
 }
 
 export function TorznabCapabilitiesProvider({
@@ -98,60 +91,24 @@ export function TorznabCapabilitiesProvider({
   const { document, change, readOnly } = useSourceEditor()
   const notify = useNotification()
   const isTorznab = document.get('adapter') === 'torznab'
-  const isExistingSource = Boolean(sourceID)
-  const [capabilities, setCapabilities] = useState<TorznabCapabilitiesResult | null>(null)
-  const [fetchedKey, setFetchedKey] = useState<string | null>(null)
-  const [error, setError] = useState<unknown>(null)
-  const requestCounter = useRef(0)
-  const abortRef = useRef<AbortController | null>(null)
-  const pendingScrollToCategories = useRef(false)
 
-  const inspect = useMutation({
-    mutationFn: async (variables: {
-      json: string
-      sourceId?: string
-      connectionKey: string
-      requestId: number
-      signal: AbortSignal
-    }) => {
-      const result = await api<TorznabCapabilitiesResult>('/providers/torznab-capabilities', {
-        method: 'POST',
-        signal: variables.signal,
-        body: JSON.stringify({
-          json: variables.json,
-          source_id: variables.sourceId ?? '',
-        }),
-      })
-      return {
-        result,
-        connectionKey: variables.connectionKey,
-        requestId: variables.requestId,
-      }
-    },
-    onSuccess: ({ result, connectionKey, requestId }) => {
-      if (requestId !== requestCounter.current) return
-      abortRef.current = null
-      setCapabilities(result)
-      setFetchedKey(connectionKey)
-      setError(null)
-      const categories = countTorznabCategories(result.categories)
-      notify(
-        categories > 0
-          ? `Loaded Torznab capabilities (${number(categories)} ${categories === 1 ? 'category' : 'categories'}). Review and apply what you need.`
-          : 'Loaded Torznab capabilities. Review and apply what you need.',
-      )
-    },
-    onError: (caught, variables) => {
-      if (
-        variables.requestId !== requestCounter.current ||
-        (caught instanceof Error && caught.name === 'AbortError')
-      ) {
-        return
-      }
-      abortRef.current = null
-      setError(caught)
-    },
-  })
+  const [cache, setCache] = useState<{
+    data: TorznabCapabilitiesResult
+    key: string
+  } | null>(null)
+  const [busyTarget, setBusyTarget] = useState<CapabilityTarget | null>(null)
+  const [error, setError] = useState<unknown>(null)
+
+  const cacheRef = useRef(cache)
+  cacheRef.current = cache
+  const abortRef = useRef<AbortController | null>(null)
+  const inflightRef = useRef<Promise<TorznabCapabilitiesResult | null> | null>(null)
+  const requestCounter = useRef(0)
+
+  const capabilities = useMemo(() => {
+    if (!isTorznab || !cache) return null
+    return isTorznabCapabilitiesStale(cache.key, document, cache.data) ? null : cache.data
+  }, [isTorznab, cache, document])
 
   useEffect(() => {
     return () => {
@@ -164,144 +121,141 @@ export function TorznabCapabilitiesProvider({
       requestCounter.current += 1
       abortRef.current?.abort()
       abortRef.current = null
-      setCapabilities(null)
-      setFetchedKey(null)
+      inflightRef.current = null
+      setCache(null)
+      setBusyTarget(null)
       setError(null)
     }
   }, [isTorznab])
 
-  const fetchCapabilities = useCallback(() => {
-    if (!isTorznab || readOnly || blocked || inspect.isPending) return
-    if (isTorznabTemplatePlaceholderURL(document.get('url'))) {
-      onJumpToStage('connection')
+  const ensureCapabilities = useCallback(
+    async (target: CapabilityTarget): Promise<TorznabCapabilitiesResult | null> => {
+      if (!isTorznab || readOnly || blocked) return null
+      const cached = cacheRef.current
+      if (cached && !isTorznabCapabilitiesStale(cached.key, document, cached.data)) {
+        setError(null)
+        return cached.data
+      }
+      if (isTorznabTemplatePlaceholderURL(document.get('url'))) {
+        onJumpToStage('connection')
+        notify({
+          message: 'Enter your Torznab server URL in Connection first.',
+          warning: true,
+        })
+        return null
+      }
+      if (inflightRef.current) {
+        return inflightRef.current
+      }
+
+      const requestId = requestCounter.current + 1
+      requestCounter.current = requestId
+      const connectionKey = torznabConnectionKey(document)
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+      setBusyTarget(target)
+      setError(null)
+
+      const promise = (async () => {
+        try {
+          const result = await api<TorznabCapabilitiesResult>('/providers/torznab-capabilities', {
+            method: 'POST',
+            signal: controller.signal,
+            body: JSON.stringify({
+              json: rawJSON,
+              source_id: sourceID ?? '',
+            }),
+          })
+          if (requestId !== requestCounter.current) return null
+          const nextCache = { data: result, key: connectionKey }
+          cacheRef.current = nextCache
+          setCache(nextCache)
+          setError(null)
+          return result
+        } catch (caught) {
+          if (
+            requestId === requestCounter.current &&
+            !(caught instanceof Error && caught.name === 'AbortError')
+          ) {
+            setError(caught)
+          }
+          return null
+        } finally {
+          if (requestId === requestCounter.current) {
+            abortRef.current = null
+            inflightRef.current = null
+            setBusyTarget(null)
+          }
+        }
+      })()
+
+      inflightRef.current = promise
+      return promise
+    },
+    [isTorznab, readOnly, blocked, document, rawJSON, sourceID, onJumpToStage, notify],
+  )
+
+  const fillField = useCallback(
+    async (field: TorznabCapabilityField) => {
+      const caps = await ensureCapabilities(field)
+      if (!caps) return
+      const resolved = resolveTorznabCapabilityFieldValue(caps, field)
+      if (!resolved) {
+        notify({ message: missingFieldMessages[field], warning: true })
+        return
+      }
+      const current = readTorznabCapabilityFieldValue(document, field)
+      if (current === resolved.value) {
+        notify(`${resolved.label} already matches capabilities.`)
+        return
+      }
+      change((next) => applyTorznabCapabilityField(next, field, resolved.value))
+      notify(`${resolved.label} updated from capabilities.`)
+    },
+    [ensureCapabilities, document, change, notify],
+  )
+
+  const loadCategories = useCallback(async () => {
+    const caps = await ensureCapabilities('categories')
+    if (!caps) return
+    const total = countTorznabCategories(caps.categories)
+    if (total === 0) {
       notify({
-        message:
-          'Enter your Torznab server URL and authentication in Connection, then fetch capabilities.',
+        message: 'This server did not advertise any categories in its capabilities.',
         warning: true,
       })
-      return
+    } else {
+      notify(
+        `Loaded ${number(total)} ${total === 1 ? 'category' : 'categories'} from capabilities.`,
+      )
     }
-    const requestId = requestCounter.current + 1
-    requestCounter.current = requestId
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    setError(null)
-    inspect.mutate({
-      json: rawJSON,
-      sourceId: sourceID,
-      connectionKey: torznabConnectionKey(document),
-      requestId,
-      signal: controller.signal,
-    })
-  }, [isTorznab, readOnly, blocked, inspect, rawJSON, sourceID, document, onJumpToStage, notify])
+  }, [ensureCapabilities, notify])
 
-  const clearCapabilities = useCallback(() => {
-    requestCounter.current += 1
-    abortRef.current?.abort()
-    abortRef.current = null
-    setCapabilities(null)
-    setFetchedKey(null)
-    setError(null)
-  }, [])
-
-  const dismissError = useCallback(() => {
-    setError(null)
-  }, [])
-
-  const changes = useMemo(
-    () =>
-      capabilities
-        ? planTorznabCapabilityChanges(document, capabilities, { isExistingSource })
-        : [],
-    [document, capabilities, isExistingSource],
-  )
-
-  const stale = useMemo(
-    () => isTorznabCapabilitiesStale(fetchedKey, document, capabilities),
-    [fetchedKey, document, capabilities],
-  )
-
-  const placeholderURL = useMemo(
-    () => isTorznabTemplatePlaceholderURL(document.get('url')),
-    [document],
-  )
-
-  const applyField = useCallback(
-    (field: TorznabCapabilityField, value: string | number, label?: string) => {
-      change((next) => applyTorznabCapabilityField(next, field, value))
-      notify(label ? `${label} updated from t=caps.` : 'Setting updated from t=caps.')
-    },
-    [change, notify],
-  )
-
-  const applyBulk = useCallback(
-    (includeOverwrites: boolean) => {
-      if (!capabilities) return
-      let appliedCount = 0
-      change((next) => {
-        const planned = planTorznabCapabilityChanges(next, capabilities, { isExistingSource })
-        const applied = applyTorznabCapabilityChanges(next, planned, { includeOverwrites })
-        appliedCount = applied.length
-      })
-      if (appliedCount > 0) {
-        notify(
-          `Applied ${appliedCount} ${appliedCount === 1 ? 'setting' : 'settings'} from t=caps. Save when ready.`,
-        )
-      }
-    },
-    [capabilities, change, isExistingSource, notify],
-  )
-
-  const jumpToCategories = useCallback(() => {
-    pendingScrollToCategories.current = true
-    onJumpToStage('connection')
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        if (!pendingScrollToCategories.current) return
-        pendingScrollToCategories.current = false
-        const target = window.document.querySelector<HTMLElement>('[data-torznab-categories]')
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
-    })
-  }, [onJumpToStage])
+  const dismissError = useCallback(() => setError(null), [])
 
   const value = useMemo<TorznabCapabilitiesContextValue>(
     () => ({
       enabled: isTorznab,
-      isExistingSource,
       capabilities,
-      changes,
-      pending: inspect.isPending,
+      busyTarget,
       error,
-      stale,
       blocked,
-      placeholderURL,
-      fetchCapabilities,
-      clearCapabilities,
+      fillField,
+      loadCategories,
       dismissError,
-      applyField,
-      applyBulk,
       jumpToStage: onJumpToStage,
-      jumpToCategories,
     }),
     [
       isTorznab,
-      isExistingSource,
       capabilities,
-      changes,
-      inspect.isPending,
+      busyTarget,
       error,
-      stale,
       blocked,
-      placeholderURL,
-      fetchCapabilities,
-      clearCapabilities,
+      fillField,
+      loadCategories,
       dismissError,
-      applyField,
-      applyBulk,
       onJumpToStage,
-      jumpToCategories,
     ],
   )
 
@@ -312,654 +266,85 @@ export function TorznabCapabilitiesProvider({
   )
 }
 
-export function TorznabCapabilitiesToolbarAction() {
-  const { readOnly } = useSourceEditor()
-  const { enabled, capabilities, pending, blocked, fetchCapabilities } = useTorznabCapabilities()
-  if (!enabled || capabilities) return null
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      disabled={readOnly || blocked || pending}
-      onClick={fetchCapabilities}
-    >
-      <CloudArrowDownIcon aria-hidden="true" />
-      {pending ? 'Fetching capabilities…' : 'Fetch capabilities'}
-    </Button>
-  )
-}
-
-export function TorznabCapabilitiesBanner({ currentStage }: { currentStage: string }) {
-  const { document, readOnly } = useSourceEditor()
-  const {
-    enabled,
-    capabilities,
-    changes,
-    pending,
-    error,
-    stale,
-    blocked,
-    fetchCapabilities,
-    clearCapabilities,
-    dismissError,
-    applyField,
-    applyBulk,
-    jumpToStage,
-    jumpToCategories,
-  } = useTorznabCapabilities()
-  const [expanded, setExpanded] = useState(true)
-  const pendingChanges = changes.filter((item) => !item.matches)
-  const safeChanges = pendingChanges.filter((item) => !item.overwrites)
-  const overwriteChanges = pendingChanges.filter((item) => item.overwrites)
-
-  useEffect(() => {
-    if (!capabilities) return
-    setExpanded(pendingChanges.length > 0)
-  }, [capabilities])
-
-  if (!enabled) return null
-
-  const errorCode = error instanceof ApiError ? error.code : undefined
+export function TorznabCapabilitiesErrorNotice({ currentStage }: { currentStage: string }) {
+  const { enabled, error, dismissError, jumpToStage } = useTorznabCapabilities()
+  if (!enabled || !error) return null
+  const code = error instanceof ApiError ? error.code : undefined
   const showConnectionLink =
     currentStage !== 'connection' &&
-    (errorCode === 'configuration' ||
-      errorCode === 'missing_secret' ||
-      errorCode === 'authentication' ||
-      errorCode === 'not_found')
-
-  const categoryCount = capabilities ? countTorznabCategories(capabilities.categories) : 0
-  const selectedCategories = readSelectedCategoryIDs(document)
-  const categoryScope =
-    typeof document.getIn(['options', 'category_scope']) === 'string'
-      ? String(document.getIn(['options', 'category_scope']))
-      : 'combined'
-  const currentSearchMode =
-    typeof document.getIn(['options', 'search_mode']) === 'string' &&
-    document.getIn(['options', 'search_mode'])
-      ? String(document.getIn(['options', 'search_mode']))
-      : 'search'
-  const rawPageSize = document.get('page_size')
-  const currentPageSize =
-    typeof rawPageSize === 'number' && Number.isInteger(rawPageSize) ? rawPageSize : undefined
-
-  let discoveredHost = ''
-  if (capabilities?.endpoint) {
-    try {
-      discoveredHost = new URL(capabilities.endpoint).host
-    } catch {
-      discoveredHost = capabilities.endpoint
-    }
-  }
+    (code === 'configuration' ||
+      code === 'missing_secret' ||
+      code === 'authentication' ||
+      code === 'not_found')
 
   return (
-    <div className="space-y-3">
-      {error ? (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm"
-        >
-          <div className="flex items-start gap-3">
-            <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
-            <div className="min-w-0 flex-1 space-y-3">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Could not fetch Torznab capabilities (t=caps)</p>
-                <p className="break-words text-sm text-muted-foreground">
-                  {error instanceof Error
-                    ? messageText(error.message)
-                    : 'The capabilities check failed.'}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={readOnly || blocked || pending}
-                  onClick={fetchCapabilities}
-                >
-                  <ArrowClockwiseIcon aria-hidden="true" />
-                  Try again
-                </Button>
-                {showConnectionLink && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => jumpToStage('connection')}
-                  >
-                    <ArrowRightIcon aria-hidden="true" />
-                    Open Connection
-                  </Button>
-                )}
-                <Button type="button" size="sm" variant="ghost" onClick={dismissError}>
-                  <XIcon aria-hidden="true" />
-                  Dismiss
-                </Button>
-              </div>
-            </div>
+    <div
+      role="alert"
+      className="rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm"
+    >
+      <div className="flex items-start gap-3">
+        <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Could not load Torznab capabilities</p>
+            <p className="break-words text-sm text-muted-foreground">
+              {error instanceof Error
+                ? messageText(error.message)
+                : 'The capabilities check failed.'}
+            </p>
           </div>
-        </div>
-      ) : null}
-
-      {capabilities ? (
-        <section
-          aria-label="Discovered Torznab capabilities"
-          className="overflow-hidden rounded-md border border-border bg-card"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <PlugsConnectedIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
-                <h3 className="break-words text-sm font-semibold">
-                  {capabilities.title || discoveredHost || 'Torznab capabilities'}
-                </h3>
-                <Badge variant="success">t=caps loaded</Badge>
-                {pendingChanges.length === 0 && <Badge variant="outline">All settings match</Badge>}
-                {stale && <Badge variant="warning">Connection changed</Badge>}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge variant="secondary">
-                  {number(categoryCount)} {categoryCount === 1 ? 'category' : 'categories'}
-                </Badge>
-                {capabilities.limits.max || capabilities.limits.default ? (
-                  <Badge variant="outline">
-                    Limit{' '}
-                    {capabilities.limits.max
-                      ? `max ${number(capabilities.limits.max)}`
-                      : `default ${number(capabilities.limits.default ?? 0)}`}
-                  </Badge>
-                ) : null}
-                {capabilities.rate_limit &&
-                capabilities.rate_limit.remaining !== undefined &&
-                capabilities.rate_limit.limit !== undefined ? (
-                  <Badge variant="info">
-                    Quota {number(capabilities.rate_limit.remaining)} /{' '}
-                    {number(capabilities.rate_limit.limit)}
-                  </Badge>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {!expanded && categoryCount > 0 && currentStage !== 'connection' && (
-                <Button type="button" size="sm" variant="outline" onClick={jumpToCategories}>
-                  <ListChecksIcon aria-hidden="true" />
-                  Categories
-                </Button>
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                aria-expanded={expanded}
-                onClick={() => setExpanded((current) => !current)}
-              >
-                {expanded ? (
-                  <>
-                    <CaretUpIcon aria-hidden="true" />
-                    Hide details
-                  </>
-                ) : (
-                  <>
-                    <CaretDownIcon aria-hidden="true" />
-                    Show details
-                  </>
-                )}
-              </Button>
+          <div className="flex flex-wrap gap-2">
+            {showConnectionLink && (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={readOnly || blocked || pending}
-                onClick={fetchCapabilities}
+                onClick={() => jumpToStage('connection')}
               >
-                <ArrowClockwiseIcon
-                  aria-hidden="true"
-                  className={pending ? 'animate-spin' : undefined}
-                />
-                {pending ? 'Refreshing…' : 'Refresh'}
+                <ArrowRightIcon aria-hidden="true" />
+                Open Connection
               </Button>
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Dismiss discovered capabilities"
-                onClick={clearCapabilities}
-              >
-                <XIcon aria-hidden="true" />
-              </Button>
-            </div>
+            )}
+            <Button type="button" size="sm" variant="ghost" onClick={dismissError}>
+              <XIcon aria-hidden="true" />
+              Dismiss
+            </Button>
           </div>
-
-          {expanded && (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-3">
-                <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-                  {pendingChanges.length === 0 ? (
-                    <span className="inline-flex items-center gap-1.5 text-foreground">
-                      <CheckCircleIcon
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                      />
-                      All discovered settings match this draft.
-                    </span>
-                  ) : overwriteChanges.length === 0 ? (
-                    <>
-                      {safeChanges.length}{' '}
-                      {safeChanges.length === 1 ? 'setting is' : 'settings are'} ready to fill from{' '}
-                      <code className="mono">t=caps</code>.
-                    </>
-                  ) : safeChanges.length > 0 ? (
-                    <>
-                      {safeChanges.length} empty/default{' '}
-                      {safeChanges.length === 1 ? 'field' : 'fields'} can be filled safely;{' '}
-                      {overwriteChanges.length} customized{' '}
-                      {overwriteChanges.length === 1 ? 'field differs' : 'fields differ'}.
-                    </>
-                  ) : (
-                    <>
-                      {overwriteChanges.length} discovered{' '}
-                      {overwriteChanges.length === 1 ? 'setting differs' : 'settings differ'} from
-                      your current configuration. Apply individual fields below or overwrite all.
-                    </>
-                  )}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {safeChanges.length > 0 && overwriteChanges.length === 0 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={readOnly}
-                      onClick={() => {
-                        applyBulk(false)
-                        setExpanded(false)
-                      }}
-                    >
-                      <CheckIcon aria-hidden="true" />
-                      Apply discovered settings ({safeChanges.length})
-                    </Button>
-                  )}
-                  {safeChanges.length > 0 && overwriteChanges.length > 0 && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={readOnly}
-                      onClick={() => applyBulk(false)}
-                    >
-                      <CheckIcon aria-hidden="true" />
-                      Fill missing defaults ({safeChanges.length})
-                    </Button>
-                  )}
-                  {overwriteChanges.length > 0 && (
-                    <ConfirmAction
-                      title="Overwrite existing source settings?"
-                      description={
-                        <div className="space-y-3">
-                          <p>
-                            Applying all discovered settings will replace the following customized
-                            values in this draft:
-                          </p>
-                          <ul className="list-disc space-y-1.5 pl-5 text-foreground">
-                            {overwriteChanges.map((item) => (
-                              <li key={item.field} className="break-words">
-                                <span className="font-medium">{item.label}:</span>{' '}
-                                <span className="text-muted-foreground">{item.currentDisplay}</span>{' '}
-                                → <span className="font-medium">{item.nextDisplay}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          {safeChanges.length > 0 && (
-                            <p>
-                              It will also fill {safeChanges.length} empty/default{' '}
-                              {safeChanges.length === 1 ? 'field' : 'fields'}.
-                            </p>
-                          )}
-                          <p>
-                            Only this draft is updated; your saved source does not change until you
-                            click Save. Categories are edited separately.
-                          </p>
-                        </div>
-                      }
-                      label="Overwrite settings"
-                      variant="warning"
-                      trigger={
-                        <Button type="button" size="sm" variant="warning" disabled={readOnly}>
-                          {safeChanges.length > 0
-                            ? `Apply all (overwrites ${overwriteChanges.length})`
-                            : `Overwrite all (${overwriteChanges.length})`}
-                        </Button>
-                      }
-                      action={async () => {
-                        applyBulk(true)
-                        setExpanded(false)
-                      }}
-                    />
-                  )}
-                  {categoryCount > 0 && (
-                    <Button type="button" size="sm" variant="outline" onClick={jumpToCategories}>
-                      <ListChecksIcon aria-hidden="true" />
-                      {selectedCategories.length > 0
-                        ? `Categories (${selectedCategories.length} selected)`
-                        : 'Browse categories'}
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div className="divide-y divide-border border-t border-border">
-                {changes.map((item) => (
-                  <div
-                    key={item.field}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium">{item.label}</span>
-                        {item.matches ? (
-                          <Badge variant="success">Matches</Badge>
-                        ) : item.overwrites ? (
-                          <Badge variant="warning">Differs</Badge>
-                        ) : (
-                          <Badge variant="info">Ready</Badge>
-                        )}
-                      </div>
-                      <p className="break-words text-xs text-muted-foreground">
-                        {item.matches ? (
-                          <span
-                            className={item.field === 'url' || item.field === 'id' ? 'mono' : ''}
-                          >
-                            {item.nextDisplay}
-                          </span>
-                        ) : (
-                          <>
-                            Current:{' '}
-                            <span
-                              className={
-                                item.field === 'url' || item.field === 'id' ? 'mono break-all' : ''
-                              }
-                            >
-                              {item.currentDisplay}
-                            </span>{' '}
-                            → Discovered:{' '}
-                            <span
-                              className={`font-medium text-foreground ${item.field === 'url' || item.field === 'id' ? 'mono break-all' : ''}`}
-                            >
-                              {item.nextDisplay}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      {!item.matches && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={item.overwrites ? 'outline' : 'secondary'}
-                          disabled={readOnly}
-                          aria-label={`${item.overwrites ? 'Overwrite' : 'Apply'} ${item.label}`}
-                          onClick={() => applyField(item.field, item.nextValue, item.label)}
-                        >
-                          <CheckIcon aria-hidden="true" />
-                          {item.overwrites ? 'Overwrite' : 'Apply'}
-                        </Button>
-                      )}
-                      {item.field === 'page_size' &&
-                        (() => {
-                          const effectiveDefault = capabilities.limits.default
-                            ? Math.min(capabilities.limits.default, 10000)
-                            : 0
-                          const effectiveMax = capabilities.limits.max
-                            ? Math.min(capabilities.limits.max, 10000)
-                            : 0
-                          if (
-                            !effectiveDefault ||
-                            !effectiveMax ||
-                            effectiveDefault === effectiveMax ||
-                            currentPageSize === effectiveDefault
-                          ) {
-                            return null
-                          }
-                          return (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={readOnly}
-                              onClick={() => applyField('page_size', effectiveDefault, 'Page size')}
-                            >
-                              Use default ({effectiveDefault})
-                            </Button>
-                          )
-                        })()}
-                    </div>
-                  </div>
-                ))}
-
-                {capabilities.searches.length > 0 && (
-                  <div className="space-y-2 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-medium">Supported search modes</span>
-                      <span className="text-xs text-muted-foreground">
-                        Click an available mode to use it
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {capabilities.searches.map((mode) => {
-                        const active = currentSearchMode === mode.mode
-                        if (!mode.available) {
-                          return (
-                            <Badge key={mode.mode} variant="outline" className="py-1 opacity-70">
-                              {formatTorznabSearchMode(mode.mode)} · unavailable
-                            </Badge>
-                          )
-                        }
-                        return (
-                          <Button
-                            key={mode.mode}
-                            type="button"
-                            size="sm"
-                            variant={active ? 'secondary' : 'outline'}
-                            aria-pressed={active}
-                            disabled={readOnly}
-                            onClick={() => applyField('search_mode', mode.mode, 'Search mode')}
-                          >
-                            {active && <CheckIcon aria-hidden="true" />}
-                            {formatTorznabSearchMode(mode.mode)}
-                          </Button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <span className="text-sm font-medium">Categories</span>
-                    <p className="text-xs text-muted-foreground">
-                      {categoryCount === 0
-                        ? 'This server did not advertise categories in t=caps.'
-                        : categoryScope === 'advertised'
-                          ? `${number(categoryCount)} advertised categories · importing all advertised categories.`
-                          : selectedCategories.length > 0
-                            ? `${number(categoryCount)} advertised categories · ${selectedCategories.length} selected (${categoryScope === 'each' ? 'separate requests' : 'combined'}).`
-                            : `${number(categoryCount)} advertised categories · no category filter applied (all categories).`}
-                    </p>
-                  </div>
-                  {categoryCount > 0 && (
-                    <Button type="button" size="sm" variant="outline" onClick={jumpToCategories}>
-                      <ArrowRightIcon aria-hidden="true" />
-                      Manage categories
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </section>
-      ) : null}
-    </div>
-  )
-}
-
-export function TorznabIdentityIntro() {
-  const { enabled, isExistingSource, capabilities, jumpToStage } = useTorznabCapabilities()
-  if (!enabled || isExistingSource || capabilities) return null
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/25 p-4">
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className="text-sm font-medium">Auto-configure from Torznab capabilities (t=caps)</p>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Enter your Torznab URL and credentials in Connection to detect the display name, source
-          identifier, endpoint URL, page size, search modes, and categories automatically.
-        </p>
+        </div>
       </div>
-      <Button type="button" size="sm" variant="outline" onClick={() => jumpToStage('connection')}>
-        <ArrowRightIcon aria-hidden="true" />
-        Open Connection
-      </Button>
     </div>
   )
 }
 
-export function TorznabFieldHint({
+export function TorznabFieldCapabilityButton({
   field,
-  buttonLabel,
+  label,
 }: {
-  field: 'name' | 'id' | 'url'
-  buttonLabel: string
+  field: TorznabCapabilityField
+  label: string
 }) {
   const { readOnly } = useSourceEditor()
-  const { enabled, capabilities, changes, applyField } = useTorznabCapabilities()
-  if (!enabled || !capabilities) return null
-  const change = changes.find((item) => item.field === field)
-  if (!change || change.matches) return null
+  const { enabled, busyTarget, blocked, fillField } = useTorznabCapabilities()
+  if (!enabled) return null
+  const loading = busyTarget === field
   return (
-    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/25 px-3 py-2">
-      <p className="min-w-0 flex-1 break-words text-xs text-muted-foreground">
-        From <code className="mono">t=caps</code>:{' '}
-        <span
-          className={`font-medium text-foreground ${field === 'url' || field === 'id' ? 'mono break-all' : ''}`}
-        >
-          {change.nextDisplay}
-        </span>
-      </p>
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={readOnly}
-        onClick={() => applyField(change.field, change.nextValue, change.label)}
-      >
-        <CheckIcon aria-hidden="true" />
-        {buttonLabel}
-      </Button>
-    </div>
-  )
-}
-
-export function TorznabConnectionDiscoveryBox() {
-  const { readOnly } = useSourceEditor()
-  const { enabled, capabilities, pending, blocked, placeholderURL, fetchCapabilities } =
-    useTorznabCapabilities()
-  if (!enabled || capabilities) return null
-  return (
-    <section
-      data-settings-section="Torznab capabilities"
-      className="space-y-3 rounded-md border border-border bg-muted/20 p-4"
+    <Button
+      type="button"
+      variant="outline"
+      className="self-start shrink-0"
+      aria-label={`Get ${label.toLowerCase()} from capabilities`}
+      disabled={readOnly || blocked || busyTarget !== null}
+      onClick={() => void fillField(field)}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <h3 className="text-sm font-medium">Discover capabilities (t=caps)</h3>
-          <p className="text-xs leading-5 text-muted-foreground">
-            Read the server’s advertised title, endpoint, page-size limits, search modes, and
-            categories using the URL and authentication above. Nothing in this draft is modified
-            until you apply it.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={readOnly || blocked || pending || placeholderURL}
-          onClick={fetchCapabilities}
-        >
-          <CloudArrowDownIcon aria-hidden="true" />
-          {pending ? 'Fetching capabilities…' : 'Fetch capabilities (t=caps)'}
-        </Button>
-      </div>
-      {placeholderURL && (
-        <p className="text-xs text-muted-foreground">
-          Enter your Torznab server URL in Endpoint above to enable capability discovery.
-        </p>
-      )}
-    </section>
-  )
-}
-
-export function TorznabSearchModeHints() {
-  const { document, readOnly } = useSourceEditor()
-  const { enabled, capabilities, applyField } = useTorznabCapabilities()
-  if (!enabled || !capabilities || capabilities.searches.length === 0) return null
-  const currentMode =
-    typeof document.getIn(['options', 'search_mode']) === 'string' &&
-    document.getIn(['options', 'search_mode'])
-      ? String(document.getIn(['options', 'search_mode']))
-      : 'search'
-  const currentCap = capabilities.searches.find((item) => item.mode === currentMode)
-  const recommended = capabilities.recommended_search_mode
-
-  return (
-    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
-      {currentCap && !currentCap.available && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
-          <p className="min-w-0 flex-1 text-warning-foreground">
-            This server advertises{' '}
-            <span className="font-medium">{formatTorznabSearchMode(currentMode)}</span> as
-            unavailable.
-          </p>
-          {recommended && recommended !== currentMode && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={readOnly}
-              onClick={() => applyField('search_mode', recommended, 'Search mode')}
-            >
-              <CheckIcon aria-hidden="true" />
-              Use {formatTorznabSearchMode(recommended)}
-            </Button>
-          )}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">Advertised modes:</span>
-        {capabilities.searches.map((item) => (
-          <Badge
-            key={item.mode}
-            variant={
-              !item.available ? 'outline' : item.mode === currentMode ? 'success' : 'secondary'
-            }
-          >
-            {formatTorznabSearchMode(item.mode)}
-            {item.available ? '' : ' (unavailable)'}
-          </Badge>
-        ))}
-      </div>
-      {currentCap?.available && currentCap.supported_params.length > 0 && (
-        <p className="break-words text-xs text-muted-foreground">
-          Supported parameters for {formatTorznabSearchMode(currentCap.mode)}:{' '}
-          <span className="mono">{currentCap.supported_params.join(', ')}</span>
-        </p>
-      )}
-    </div>
+      <CloudArrowDownIcon aria-hidden="true" />
+      {loading ? 'Loading…' : 'From capabilities'}
+    </Button>
   )
 }
 
 export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
   const { document, change, readOnly } = useSourceEditor()
-  const { enabled, capabilities, pending, blocked, placeholderURL, fetchCapabilities } =
-    useTorznabCapabilities()
+  const { enabled, capabilities, busyTarget, blocked, loadCategories } = useTorznabCapabilities()
   const notify = useNotification()
   const filterId = useId()
   const [query, setQuery] = useState('')
@@ -1005,21 +390,17 @@ export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
 
   if (!capabilities) {
     return (
-      <div data-torznab-categories className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-3">
-          <p className="min-w-0 flex-1 text-xs leading-5 text-muted-foreground">
-            Fetch <code className="mono">t=caps</code> to browse and filter this source’s categories
-            by name instead of entering numeric IDs manually.
-          </p>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="help">Load categories from capabilities to select them by name.</p>
           <Button
             type="button"
-            size="sm"
             variant="outline"
-            disabled={readOnly || blocked || pending || placeholderURL}
-            onClick={fetchCapabilities}
+            disabled={readOnly || blocked || busyTarget !== null}
+            onClick={() => void loadCategories()}
           >
             <CloudArrowDownIcon aria-hidden="true" />
-            {pending ? 'Loading categories…' : 'Fetch categories (t=caps)'}
+            {busyTarget === 'categories' ? 'Loading…' : 'Load from capabilities'}
           </Button>
         </div>
         {fallback}
@@ -1029,10 +410,10 @@ export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
 
   if (categories.length === 0) {
     return (
-      <div data-torznab-categories className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          This server did not advertise any categories in <code className="mono">t=caps</code>. You
-          can still configure numeric category IDs below.
+      <div className="space-y-3">
+        <p className="help">
+          This server did not advertise any categories. You can still configure numeric category IDs
+          below.
         </p>
         {fallback}
       </div>
@@ -1040,10 +421,10 @@ export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
   }
 
   return (
-    <div data-torznab-categories className="space-y-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Label htmlFor={filterId}>Advertised categories</Label>
+          <Label htmlFor={filterId}>Categories</Label>
           <Badge variant={selectedIDs.length > 0 ? 'info' : 'secondary'}>
             {categoryScope === 'advertised'
               ? 'All advertised'
@@ -1084,9 +465,9 @@ export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
       </div>
 
       {categoryScope === 'advertised' && (
-        <p className="rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-          Currently configured to import every category advertised by this source. Checking specific
-          categories below switches Category requests to Combine selected categories.
+        <p className="help">
+          Currently importing every category advertised by this source. Checking specific categories
+          below switches Category requests to Combine selected categories.
         </p>
       )}
 
@@ -1183,7 +564,7 @@ export function TorznabCategoryPicker({ fallback }: { fallback: ReactNode }) {
 
       <OptionalSection
         title="Manual category IDs"
-        description="Edit numeric Torznab category IDs directly, including custom IDs not advertised in t=caps."
+        description="Edit numeric Torznab category IDs directly, including custom IDs not listed by capabilities."
         configuredPaths={[['search', 'categories']]}
       >
         {fallback}
@@ -1205,77 +586,4 @@ function flattenDescendantCategories(
     }
   }
   return result
-}
-
-export function TorznabPageSizeHint() {
-  const { document, readOnly } = useSourceEditor()
-  const { enabled, capabilities, applyField } = useTorznabCapabilities()
-  if (!enabled || !capabilities) return null
-  const { default: defaultLimit, max: maxLimit } = capabilities.limits
-  if (!defaultLimit && !maxLimit) return null
-  const raw = document.get('page_size')
-  const current = typeof raw === 'number' && Number.isInteger(raw) ? raw : undefined
-  const exceedsMax = Boolean(maxLimit && current && current > maxLimit)
-  const effectiveMax = maxLimit ? Math.min(maxLimit, 10000) : 0
-  const effectiveDefault = defaultLimit ? Math.min(defaultLimit, 10000) : 0
-
-  return (
-    <div
-      className={`space-y-2 rounded-md border px-3 py-2.5 text-xs ${
-        exceedsMax ? 'border-warning/40 bg-warning/10' : 'border-border bg-muted/25'
-      }`}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-muted-foreground">
-            Advertised by <code className="mono">t=caps</code>:{' '}
-            {maxLimit ? (
-              <>
-                max <span className="mono font-medium text-foreground">{number(maxLimit)}</span>
-              </>
-            ) : null}
-            {maxLimit && defaultLimit ? ' · ' : null}
-            {defaultLimit ? (
-              <>
-                default{' '}
-                <span className="mono font-medium text-foreground">{number(defaultLimit)}</span>
-              </>
-            ) : null}
-          </p>
-          {exceedsMax && (
-            <p className="text-warning-foreground">
-              Current page size ({current}) exceeds this server’s advertised maximum ({maxLimit}).
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {effectiveMax > 0 && current !== effectiveMax && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={readOnly}
-              onClick={() => applyField('page_size', effectiveMax, 'Page size')}
-            >
-              <CheckIcon aria-hidden="true" />
-              Use max ({effectiveMax})
-            </Button>
-          )}
-          {effectiveDefault > 0 &&
-            effectiveDefault !== effectiveMax &&
-            current !== effectiveDefault && (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={readOnly}
-                onClick={() => applyField('page_size', effectiveDefault, 'Page size')}
-              >
-                Use default ({effectiveDefault})
-              </Button>
-            )}
-        </div>
-      </div>
-    </div>
-  )
 }
