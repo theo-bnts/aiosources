@@ -15,7 +15,7 @@ var sharedHashRE = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
 
 func (s *Store) PublicAccess(ctx context.Context) (model.PublicAccess, error) {
 	var out model.PublicAccess
-	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,generation,torznab_enabled,torznab_generation,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation,use_instance_debrid,use_instance_announces FROM aiosources.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration, &out.UseInstanceDebrid, &out.UseInstanceAnnounces)
+	err := s.pool.QueryRow(ctx, `SELECT revision,enabled,generation,torznab_enabled,torznab_generation,trending_enabled,search_enabled,stremio_enabled,stremio_generation,catalog_enabled,catalog_generation,use_instance_debrid,use_instance_announces FROM aiosources.aio_public_access WHERE singleton`).Scan(&out.Revision, &out.Enabled, &out.Generation, &out.TorznabEnabled, &out.TorznabGeneration, &out.TrendingEnabled, &out.SearchEnabled, &out.StremioEnabled, &out.StremioGeneration, &out.CatalogEnabled, &out.CatalogGeneration, &out.UseInstanceDebrid, &out.UseInstanceAnnounces)
 	return out, databaseError("read public access", err)
 }
 func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) error {
@@ -29,8 +29,8 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 	if err = lockCatalogPolicy(ctx, tx, "lock public catalog publication policy"); err != nil {
 		return err
 	}
-	var previous, previousTorznab, previousSearch, previousStremio, previousCatalog, previousDebrid, previousAnnounces bool
-	err = tx.QueryRow(ctx, `SELECT enabled,torznab_enabled,search_enabled,stremio_enabled,catalog_enabled,use_instance_debrid,use_instance_announces FROM aiosources.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousTorznab, &previousSearch, &previousStremio, &previousCatalog, &previousDebrid, &previousAnnounces)
+	var previous, previousTorznab, previousTrending, previousSearch, previousStremio, previousCatalog, previousDebrid, previousAnnounces bool
+	err = tx.QueryRow(ctx, `SELECT enabled,torznab_enabled,trending_enabled,search_enabled,stremio_enabled,catalog_enabled,use_instance_debrid,use_instance_announces FROM aiosources.aio_public_access WHERE singleton AND revision=$1 FOR UPDATE`, value.Revision).Scan(&previous, &previousTorznab, &previousTrending, &previousSearch, &previousStremio, &previousCatalog, &previousDebrid, &previousAnnounces)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.ErrConflict
 	}
@@ -40,9 +40,9 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 	tag, err := tx.Exec(ctx, `UPDATE aiosources.aio_public_access SET revision=revision+1,enabled=$1,
  generation=generation+CASE WHEN enabled<>$1 OR use_instance_debrid<>$7 OR use_instance_announces<>$8 THEN 1 ELSE 0 END,
  torznab_enabled=$3,torznab_generation=torznab_generation+CASE WHEN torznab_enabled<>$3 THEN 1 ELSE 0 END,
- search_enabled=$4,stremio_enabled=$5,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$5 THEN 1 ELSE 0 END,
+ trending_enabled=$9,search_enabled=$4,stremio_enabled=$5,stremio_generation=stremio_generation+CASE WHEN stremio_enabled<>$5 THEN 1 ELSE 0 END,
  catalog_enabled=$6,catalog_generation=catalog_generation+CASE WHEN catalog_enabled<>$6 THEN 1 ELSE 0 END,
- use_instance_debrid=$7,use_instance_announces=$8 WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled, value.CatalogEnabled, value.UseInstanceDebrid, value.UseInstanceAnnounces)
+ use_instance_debrid=$7,use_instance_announces=$8 WHERE singleton AND revision=$2`, value.Enabled, value.Revision, value.TorznabEnabled, value.SearchEnabled, value.StremioEnabled, value.CatalogEnabled, value.UseInstanceDebrid, value.UseInstanceAnnounces, value.TrendingEnabled)
 	if err != nil {
 		return databaseError("save public access", err)
 	}
@@ -62,6 +62,15 @@ func (s *Store) SetPublicAccess(ctx context.Context, value model.PublicAccess) e
 		kind := "security.public_torznab_disabled"
 		if value.TorznabEnabled {
 			kind = "security.public_torznab_enabled"
+		}
+		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
+			return err
+		}
+	}
+	if previousTrending != value.TrendingEnabled {
+		kind := "security.public_trending_disabled"
+		if value.TrendingEnabled {
+			kind = "security.public_trending_enabled"
 		}
 		if err = recordAccessActivityTx(ctx, tx, kind, "public"); err != nil {
 			return err

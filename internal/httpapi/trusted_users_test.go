@@ -218,7 +218,7 @@ func TestTrustedSearchTimeoutDoesNotInvalidateSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &server{auth: auth, options: Options{Store: f.db, AIOSource: addon}, streams: make(chan struct{}, 1)}
-	handler := s.trustedCatalogHandler(20*time.Millisecond, func(_ http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) (any, error) {
+	handler := s.trustedCatalogHandler("search", 20*time.Millisecond, func(_ http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) (any, error) {
 		<-r.Context().Done()
 		return map[string]string{"title": "must-not-be-returned"}, r.Context().Err()
 	})
@@ -238,7 +238,7 @@ func TestNewTrustedAccountsDefaultToAllFeaturesWithoutEnablingAccount(t *testing
 	f, _, _ := addonAPI(t)
 	created := f.request("POST", "/api/trusted-users", `{"email":"reader@example.invalid","password":"synthetic trusted password"}`, true, "")
 	var user model.TrustedUser
-	if created.Code != 201 || json.Unmarshal(created.Body.Bytes(), &user) != nil || user.Enabled || !user.SearchEnabled || !user.TorznabEnabled || !user.StremioEnabled || !user.CatalogEnabled || !user.UseInstanceDebrid || !user.UseInstanceAnnounces {
+	if created.Code != 201 || json.Unmarshal(created.Body.Bytes(), &user) != nil || user.Enabled || !user.TrendingEnabled || !user.SearchEnabled || !user.TorznabEnabled || !user.StremioEnabled || !user.CatalogEnabled || !user.UseInstanceDebrid || !user.UseInstanceAnnounces {
 		t.Fatal("inconsistent account defaults", created.Code, user)
 	}
 }

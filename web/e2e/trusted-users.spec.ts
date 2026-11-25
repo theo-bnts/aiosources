@@ -44,6 +44,7 @@ test('trusted users have the visitor workspace with instance services and no adm
     dialog.getByRole('switch', { name: 'Allow shared catalogs', exact: true }),
   ).toBeChecked()
   for (const name of [
+    'Allow Trending',
     'Allow Search',
     'Allow Torznab connections',
     'Allow Stremio connections',
@@ -79,6 +80,7 @@ test('trusted users have the visitor workspace with instance services and no adm
       visitor.getByRole('heading', { name: 'Stremio', exact: true, level: 1 }),
     ).toBeVisible()
     const navigation = visitor.getByRole('navigation', { name: 'Main navigation', exact: true })
+    await expect(navigation.getByRole('button')).toHaveText(['Browse', 'Connections'])
     await expect(navigation.getByRole('link')).toHaveText([
       'Trending',
       'Search',

@@ -347,12 +347,13 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
     next.delete('offset')
     setSearch(next, { flushSync: true, preventScrollReset: true })
   }
+  const backFallback =
+    visitor && !visitor.info.search_enabled && visitor.info.trending_enabled
+      ? { to: `${visitor.trusted ? '/trusted' : '/public'}/trending`, label: 'Trending' }
+      : { to: searchPath, label: 'Search' }
   return (
     <div className={visitor ? 'space-y-6' : 'page'}>
-      <PageHeader
-        title={title.data?.title || 'Source releases'}
-        back={{ to: searchPath, label: 'Search' }}
-      />
+      <PageHeader title={title.data?.title || 'Source releases'} back={backFallback} />
       <ErrorNotice error={title.error} retry={() => void title.refetch()} />
       {title.isPending ? (
         <Loading label="Loading title" />

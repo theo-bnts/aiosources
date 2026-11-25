@@ -6,6 +6,7 @@ import {
   CaretDownIcon,
   CloudArrowDownIcon,
   CloudCheckIcon,
+  CompassIcon,
   DatabaseIcon,
   DevicesIcon,
   DownloadSimpleIcon,
@@ -228,10 +229,9 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
-    id: 'trending',
-    label: 'Trending',
-    standalone: true,
-    icon: TrendUpIcon,
+    id: 'browse',
+    label: 'Browse',
+    icon: CompassIcon,
     defaultOpen: true,
     items: [
       {
@@ -240,15 +240,6 @@ const navigationGroups: NavigationGroup[] = [
         description: 'Most active identified titles across each category for a chosen period.',
         icon: TrendUpIcon,
       },
-    ],
-  },
-  {
-    id: 'search',
-    label: 'Search',
-    standalone: true,
-    icon: MagnifyingGlassIcon,
-    defaultOpen: true,
-    items: [
       {
         to: '/search',
         label: 'Search',
@@ -370,39 +361,29 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
 ]
-const publicTrendingNavigation: NavigationGroup = {
-  id: 'public-trending',
-  label: 'Trending',
-  standalone: true,
-  icon: TrendUpIcon,
-  defaultOpen: true,
-  items: [
-    {
-      to: '/public/trending',
-      label: 'Trending',
-      description:
-        'Most active films, series, games, software, music and books for a chosen period.',
-      icon: TrendUpIcon,
-    },
-  ],
-}
-const publicSearchNavigation: NavigationGroup = {
-  id: 'public-search',
-  label: 'Search',
-  standalone: true,
-  icon: MagnifyingGlassIcon,
-  defaultOpen: true,
-  items: [
-    {
-      to: '/public/search',
-      label: 'Search',
-      description:
-        'Find films, series, games, software, music and books and download through your own debrid accounts.',
-      icon: MagnifyingGlassIcon,
-    },
-  ],
-}
 const publicNavigationGroups: NavigationGroup[] = [
+  {
+    id: 'browse',
+    label: 'Browse',
+    icon: CompassIcon,
+    defaultOpen: true,
+    items: [
+      {
+        to: '/public/trending',
+        label: 'Trending',
+        description:
+          'Most active films, series, games, software, music and books for a chosen period.',
+        icon: TrendUpIcon,
+      },
+      {
+        to: '/public/search',
+        label: 'Search',
+        description:
+          'Find films, series, games, software, music and books and download through your own debrid accounts.',
+        icon: MagnifyingGlassIcon,
+      },
+    ],
+  },
   {
     id: 'integrations',
     label: 'Connections',
@@ -675,23 +656,22 @@ export function AppShell({
 }) {
   const publicInfo = useVisitorConfig(trustedMode, publicMode)
   const baseGroups = publicMode
-    ? [
-        ...(publicInfo.data?.search_enabled
-          ? [publicTrendingNavigation, publicSearchNavigation]
-          : []),
-        ...publicNavigationGroups
-          .map((group) => ({
-            ...group,
-            items: group.items.filter((item) =>
-              item.to === '/public'
-                ? publicInfo.data?.stremio_enabled
-                : item.to === '/public/torznab'
-                  ? publicInfo.data?.torznab_enabled
-                  : publicInfo.data?.catalog_enabled,
-            ),
-          }))
-          .filter((group) => group.items.length > 0),
-      ]
+    ? publicNavigationGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) =>
+            item.to === '/public/trending'
+              ? publicInfo.data?.trending_enabled
+              : item.to === '/public/search'
+                ? publicInfo.data?.search_enabled
+                : item.to === '/public'
+                  ? publicInfo.data?.stremio_enabled
+                  : item.to === '/public/torznab'
+                    ? publicInfo.data?.torznab_enabled
+                    : publicInfo.data?.catalog_enabled,
+          ),
+        }))
+        .filter((group) => group.items.length > 0)
     : navigationGroups
   const groups = trustedMode
     ? baseGroups.map((group) => ({
@@ -714,16 +694,20 @@ export function AppShell({
     return schedulePrimaryRoutePrefetch()
   }, [publicMode, trustedMode])
   const location = useLocation()
+  const visitorBrowseSection = (prefix: '/public' | '/trusted') =>
+    location.pathname === `${prefix}/trending`
+      ? `${prefix}/trending`
+      : location.pathname.startsWith(`${prefix}/search`)
+        ? !publicInfo.data?.search_enabled && publicInfo.data?.trending_enabled
+          ? `${prefix}/trending`
+          : `${prefix}/search`
+        : location.pathname === `${prefix}/torznab`
+          ? `${prefix}/torznab`
+          : location.pathname === `${prefix}/sharing`
+            ? `${prefix}/sharing`
+            : prefix
   let navigationPath = publicMode
-    ? location.pathname === '/public/trending'
-      ? '/public/trending'
-      : location.pathname.startsWith('/public/search')
-        ? '/public/search'
-        : location.pathname === '/public/torznab'
-          ? '/public/torznab'
-          : location.pathname === '/public/sharing'
-            ? '/public/sharing'
-            : '/public'
+    ? visitorBrowseSection('/public')
     : ['/runs', '/raw', '/pages'].some(
           (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
         ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
@@ -739,17 +723,7 @@ export function AppShell({
                 location.pathname.startsWith('/metadata/history')
               ? '/metadata/videos'
               : location.pathname
-  if (trustedMode)
-    navigationPath =
-      location.pathname === '/trusted/trending'
-        ? '/trusted/trending'
-        : location.pathname.startsWith('/trusted/search')
-          ? '/trusted/search'
-          : location.pathname === '/trusted/torznab'
-            ? '/trusted/torznab'
-            : location.pathname === '/trusted/sharing'
-              ? '/trusted/sharing'
-              : '/trusted'
+  if (trustedMode) navigationPath = visitorBrowseSection('/trusted')
   const activeItem = [...items]
     .sort((a, b) => b.to.length - a.to.length)
     .find(
@@ -985,6 +959,7 @@ export function AppShell({
                 trusted={trustedMode}
                 visibility={{
                   admin: !publicMode,
+                  trending: publicInfo.data?.trending_enabled,
                   search: publicInfo.data?.search_enabled,
                   stremio: publicInfo.data?.stremio_enabled,
                   torznab: publicInfo.data?.torznab_enabled,

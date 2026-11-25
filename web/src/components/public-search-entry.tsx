@@ -33,12 +33,19 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
   )
   const base = info.trusted ? '/trusted' : '/public'
   const id = new RegExp(`^${base}/search/([0-9]+)$`).exec(location.pathname)?.[1]
+  const isTrending = location.pathname === `${base}/trending`
   const form = (
     <PublicCredentialsForm
       info={info}
       connection="search"
       submitLabel={
-        info.use_instance_debrid ? 'Save' : configuration ? 'Update services' : 'Start searching'
+        info.use_instance_debrid
+          ? 'Save'
+          : configuration
+            ? 'Update services'
+            : isTrending
+              ? 'Start browsing'
+              : 'Start searching'
       }
     >
       <PublicAnnounceFields

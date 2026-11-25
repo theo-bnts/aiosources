@@ -130,6 +130,7 @@ test('catalog sharing and reception expose the same data menu and exact searchab
 test('instance credential settings do not offer personal keys while optional own announces remain searchable', () => {
   const entries = visibleSettings({
     admin: false,
+    trending: true,
     search: true,
     stremio: true,
     torznab: true,
@@ -138,7 +139,25 @@ test('instance credential settings do not offer personal keys while optional own
     announces: true,
   })
   assert.ok(entries.every((setting) => !setting.title.endsWith('API key')))
+  assert.ok(entries.some((setting) => setting.id === 'visitor.trending.announces'))
   assert.ok(entries.some((setting) => setting.id === 'visitor.search.announces'))
   assert.ok(entries.some((setting) => setting.id === 'visitor.stremio.announces'))
   assert.ok(entries.some((setting) => setting.id === 'visitor.torznab.announces'))
+  assert.equal(settingByID('public.trending')?.title, 'Allow Trending')
+  assert.equal(
+    settingByID('visitor.trending.announces')?.group,
+    'Browse / Trending / Private source playback',
+  )
+  assert.equal(
+    settingByID('visitor.search.announces')?.group,
+    'Browse / Search / Private source playback',
+  )
+  const trendingOnly = visibleSettings({
+    admin: false,
+    trending: true,
+    search: false,
+    services: ['torbox'],
+  })
+  assert.ok(trendingOnly.some((setting) => setting.id === 'visitor.trending.tb'))
+  assert.ok(!trendingOnly.some((setting) => setting.public === 'search'))
 })

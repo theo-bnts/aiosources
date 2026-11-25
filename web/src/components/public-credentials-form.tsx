@@ -203,7 +203,8 @@ export function PublicCredentialsForm({
             <InfoTip label="Personal credentials">
               <p>
                 Your personal keys and optional announce URLs are remembered automatically on this
-                browser in an encrypted configuration, shared between Search, Stremio and Torznab.
+                browser in an encrypted configuration, shared between Trending, Search, Stremio and
+                Torznab.
               </p>
               <p>
                 Request history retains media, results and errors for the instance’s configured

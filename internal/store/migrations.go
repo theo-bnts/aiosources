@@ -62,6 +62,7 @@ var migrations = []struct {
 	{107, trendingSnapshotSchema},
 	{108, diagnosticStatusIndexSchema},
 	{109, metadataFiltersSchema},
+	{110, trendingAccessSchema},
 }
 
 // Older workers could advance the visible MusicBrainz snapshot before the
@@ -170,6 +171,11 @@ CREATE TABLE IF NOT EXISTS aiosources.schema_migrations(version INTEGER PRIMARY 
 	if !metadata && version >= 97 {
 		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_public_access SET search_enabled=true,stremio_enabled=true,torznab_enabled=true,catalog_enabled=true WHERE singleton`); err != nil {
 			return databaseError("initialize access permissions", err)
+		}
+	}
+	if !metadata && version >= 110 {
+		if _, err = tx.Exec(ctx, `UPDATE aiosources.aio_public_access SET trending_enabled=true WHERE singleton`); err != nil {
+			return databaseError("initialize trending access permission", err)
 		}
 	}
 	return databaseError("commit schema migration", tx.Commit(ctx))

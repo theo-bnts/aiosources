@@ -12,8 +12,9 @@ test('Public permissions share one optional section, while Network expands into 
   const permissions = form
     .locator('details')
     .filter({ has: page.locator('summary').getByText('Permissions', { exact: true }) })
-  await expect(permissions.getByRole('switch')).toHaveCount(4)
+  await expect(permissions.getByRole('switch')).toHaveCount(5)
   for (const name of [
+    'Allow Trending',
     'Allow Search',
     'Allow Torznab connections',
     'Allow Stremio connections',

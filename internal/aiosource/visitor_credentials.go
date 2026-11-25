@@ -144,11 +144,15 @@ func (s *Service) retainedPersonalAnnounces(ctx context.Context, access model.Pu
 }
 
 func (s *Service) PublicInstanceSearch(ctx context.Context, audience string) (*PublicInstallation, error) {
+	return s.PublicInstanceCatalog(ctx, audience, "search")
+}
+
+func (s *Service) PublicInstanceCatalog(ctx context.Context, audience, feature string) (*PublicInstallation, error) {
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !access.Enabled || !access.SearchEnabled || !access.UseInstanceDebrid {
+	if !access.Enabled || !access.Allows(feature) || !access.UseInstanceDebrid {
 		return nil, ErrAuth
 	}
 	visitor := &PublicInstallation{Generation: access.Generation, Audience: audience, Services: map[string]string{}}

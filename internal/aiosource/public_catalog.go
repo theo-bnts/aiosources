@@ -10,14 +10,18 @@ import (
 )
 
 func (s *Service) PublicSearchAccess(ctx context.Context, visitor *PublicInstallation) (model.PublicAccess, error) {
+	return s.PublicCatalogAccess(ctx, visitor, "search")
+}
+
+func (s *Service) PublicCatalogAccess(ctx context.Context, visitor *PublicInstallation, feature string) (model.PublicAccess, error) {
 	if visitor != nil && visitor.Trusted != nil {
-		return s.visitorAccess(ctx, visitor, "search")
+		return s.visitorAccess(ctx, visitor, feature)
 	}
 	access, err := s.DB.PublicAccess(ctx)
 	if err != nil {
 		return access, err
 	}
-	if visitor == nil || !access.UseInstanceDebrid && !validPublicKeys(visitor.Services) || !access.Enabled || !access.SearchEnabled || access.Generation != visitor.Generation {
+	if visitor == nil || !access.UseInstanceDebrid && !validPublicKeys(visitor.Services) || !access.Enabled || !access.Allows(feature) || access.Generation != visitor.Generation {
 		return access, ErrAuth
 	}
 	return access, nil
@@ -26,7 +30,7 @@ func (s *Service) PublicSearchAccess(ctx context.Context, visitor *PublicInstall
 // Only the identified metadata DTO crosses this boundary. Raw observations,
 // source definitions, native identities and credentials never accompany titles.
 func (s *Service) PublicCatalogSearch(ctx context.Context, visitor *PublicInstallation, opts model.ListOptions, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
-	_, err := s.PublicSearchAccess(ctx, visitor)
+	_, err := s.PublicCatalogAccess(ctx, visitor, "search")
 	if err != nil {
 		return model.List[model.CatalogTitle]{}, err
 	}
@@ -35,7 +39,7 @@ func (s *Service) PublicCatalogSearch(ctx context.Context, visitor *PublicInstal
 }
 
 func (s *Service) PublicCatalogTrending(ctx context.Context, visitor *PublicInstallation, opts model.CatalogTrendingOptions) (model.CatalogTrending, error) {
-	_, err := s.PublicSearchAccess(ctx, visitor)
+	_, err := s.PublicCatalogAccess(ctx, visitor, "trending")
 	if err != nil {
 		return model.CatalogTrending{}, err
 	}
@@ -43,7 +47,7 @@ func (s *Service) PublicCatalogTrending(ctx context.Context, visitor *PublicInst
 }
 
 func (s *Service) PublicCatalogTitle(ctx context.Context, visitor *PublicInstallation, workID int64, locales ...string) (model.CatalogTitle, error) {
-	_, err := s.PublicSearchAccess(ctx, visitor)
+	_, err := s.PublicCatalogAccess(ctx, visitor, "browse")
 	if err != nil {
 		return model.CatalogTitle{}, err
 	}
@@ -90,7 +94,11 @@ func (s *Service) openPublicCatalogValue(purpose, token string, result any) erro
 }
 
 func (s *Service) PublicCatalogDownload(ctx context.Context, visitor *PublicInstallation, workID int64, input model.CatalogDownloadInput) (result model.CatalogDownload, downloadErr error) {
-	if _, err := s.PublicSearchAccess(ctx, visitor); err != nil {
+	feature := "browse"
+	if workID == 0 {
+		feature = "search"
+	}
+	if _, err := s.PublicCatalogAccess(ctx, visitor, feature); err != nil {
 		return model.CatalogDownload{}, err
 	}
 	var source publicCatalogSource

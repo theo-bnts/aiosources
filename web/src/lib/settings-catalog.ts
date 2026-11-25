@@ -20,7 +20,7 @@ export type Setting = {
   entity?: SettingsEntity
   stage?: string
   adapters?: string[]
-  public?: 'search' | 'stremio' | 'torznab' | 'catalog' | 'interface'
+  public?: 'trending' | 'search' | 'stremio' | 'torznab' | 'catalog' | 'interface'
 }
 
 const settings: Setting[] = []
@@ -419,6 +419,7 @@ add(
     keywords: 'public access acces',
   },
   [
+    ['public.trending', 'Allow Trending'],
     ['public.search', 'Allow Search'],
     ['public.stremio', 'Allow Stremio connections'],
     ['public.torznab', 'Allow Torznab connections'],
@@ -855,7 +856,11 @@ source(
     ['order', 'Incremental listing order'],
     ['totals', 'Total pointers'],
     ['enrich', 'Source detail fields'],
-    ['detail-updates', 'Fetch source details after imports', 'updates incremental full rebuild metadata details'],
+    [
+      'detail-updates',
+      'Fetch source details after imports',
+      'updates incremental full rebuild metadata details',
+    ],
     ['scopes', 'Scopes'],
     ['partitions', 'Partitions'],
     ['variants', 'Query variants'],
@@ -946,18 +951,23 @@ for (const setting of settings.filter((entry) => entry.entity === 'source')) {
 for (const [area, route] of [
   ['stremio', '/public'],
   ['torznab', '/public/torznab'],
+  ['trending', '/public/trending'],
   ['search', '/public/search'],
 ] as const) {
+  const isBrowse = area === 'search' || area === 'trending'
+  const areaGroup =
+    area === 'trending'
+      ? 'Browse / Trending'
+      : area === 'search'
+        ? 'Browse / Search'
+        : `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'}`
   if (area !== 'torznab')
     add(
       {
         route,
-        group:
-          area === 'search'
-            ? 'Search'
-            : `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'}`,
+        group: areaGroup,
         public: area,
-        reveal: area === 'search' ? ['Debrid services'] : [],
+        reveal: isBrowse ? ['Debrid services'] : [],
       },
       [
         ...debridProviders.map(
@@ -968,20 +978,14 @@ for (const [area, route] of [
   settings.push({
     id: `visitor.${area}.announces`,
     title: 'Private source announce URLs',
-    group:
-      area === 'search'
-        ? 'Search / Private source playback'
-        : `Connections / ${area === 'stremio' ? 'Stremio' : 'Torznab'} / Private source playback`,
+    group: `${areaGroup} / Private source playback`,
     route,
     control: 'public-announce-settings',
-    reveal:
-      area === 'search'
-        ? ['Debrid services', 'Private source playback']
-        : ['Private source playback'],
+    reveal: isBrowse ? ['Debrid services', 'Private source playback'] : ['Private source playback'],
     public: area,
     keywords: 'private tracker passkey annonce sources',
   })
-  if (area !== 'search')
+  if (!isBrowse)
     add(
       {
         route,
@@ -1012,7 +1016,7 @@ for (const [area, route] of [
           : []),
       ],
     )
-  if (area !== 'search')
+  if (!isBrowse)
     add(
       {
         route,
@@ -1069,6 +1073,7 @@ export function settingURL(setting: Setting, entity?: string, create = false) {
 
 export type SettingsVisibility = {
   admin: boolean
+  trending?: boolean
   search?: boolean
   stremio?: boolean
   torznab?: boolean

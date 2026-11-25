@@ -165,7 +165,7 @@ func (s *Service) TrustedVisitorWithCredentials(ctx context.Context, grant model
 		clear(visitor.Announces)
 		return nil, err
 	}
-	if !user.UseInstanceDebrid && (feature == "search" || feature == "stremio") && !validPublicKeys(visitor.Services) {
+	if !user.UseInstanceDebrid && (feature == "search" || feature == "trending" || feature == "browse" || feature == "stremio") && !validPublicKeys(visitor.Services) {
 		clear(visitor.Services)
 		clear(visitor.Announces)
 		return nil, ErrAuth
@@ -182,7 +182,7 @@ func (s *Service) visitorAccess(ctx context.Context, visitor *PublicInstallation
 		if feature != "credentials" && !user.Allows(feature) {
 			return model.PublicAccess{}, ErrAuth
 		}
-		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, SearchEnabled: user.SearchEnabled, StremioEnabled: user.StremioEnabled, TorznabEnabled: user.TorznabEnabled, CatalogEnabled: user.CatalogEnabled, Generation: user.Generation}, nil
+		return model.PublicAccess{CredentialPolicy: user.CredentialPolicy, Enabled: true, TrendingEnabled: user.TrendingEnabled, SearchEnabled: user.SearchEnabled, StremioEnabled: user.StremioEnabled, TorznabEnabled: user.TorznabEnabled, CatalogEnabled: user.CatalogEnabled, Generation: user.Generation}, nil
 	}
 	return s.DB.PublicAccess(ctx)
 }

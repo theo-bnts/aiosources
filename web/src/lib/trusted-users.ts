@@ -1,4 +1,5 @@
 export type TrustedPermissions = {
+  trending_enabled: boolean
   search_enabled: boolean
   stremio_enabled: boolean
   torznab_enabled: boolean
@@ -15,6 +16,11 @@ export type TrustedUser = TrustedPermissions & {
   updated_at: string
 }
 export const trustedPermissionControls = [
+  [
+    'trending_enabled',
+    'Allow Trending',
+    'Browse trending titles across categories and download using the permitted debrid credentials.',
+  ],
   [
     'search_enabled',
     'Allow Search',

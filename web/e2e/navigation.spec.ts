@@ -48,9 +48,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Debrid', 'Debrid', '/debrid/settings'],
     ['Debrid', 'Debrid', '/debrid/history'],
     ['Debrid', 'Debrid', '/debrid/history/missing'],
-    ['Trending', 'Trending', '/trending'],
-    ['Search', 'Search', '/search'],
-    ['Search', 'Search', '/search/999999'],
+    ['Browse', 'Trending', '/trending'],
+    ['Browse', 'Search', '/search'],
+    ['Browse', 'Search', '/search/999999'],
     ['Connections', 'Stremio', '/addon'],
     ['Connections', 'Stremio', '/addon/settings'],
     ['Connections', 'Stremio', '/addon/history'],
@@ -84,7 +84,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     await expect(
       page.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
     ).toHaveText(
-      ['Sources', 'Metadata', 'Connections', 'Administration'].includes(group)
+      ['Sources', 'Metadata', 'Browse', 'Connections', 'Administration'].includes(group)
         ? label === 'Torrents'
           ? ['Sources/', 'Indexers/', label]
           : ['Incoming', 'Outgoing'].includes(label)
@@ -100,7 +100,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     )
     const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
     await expect(navigation.locator('a[aria-current="page"]')).toHaveText(label)
-    if (['Sources', 'Metadata', 'Connections', 'Administration'].includes(group))
+    if (['Sources', 'Metadata', 'Browse', 'Connections', 'Administration'].includes(group))
       await expect(navigation.getByRole('button', { name: group, exact: true })).toHaveAttribute(
         'aria-expanded',
         'true',
@@ -139,6 +139,7 @@ test('navigation and page tabs remain coherent on every current and legacy route
     'Indexers',
     'Metadata',
     'Catalogs',
+    'Browse',
     'Connections',
     'Administration',
     'Security',

@@ -94,6 +94,7 @@ export function SettingsSearch({
     () => createSettingsIndex(visibleSettings(visibility)),
     [
       visibility.admin,
+      visibility.trending,
       visibility.search,
       visibility.stremio,
       visibility.torznab,

@@ -9,6 +9,7 @@ test('public navigation only offers enabled connections and follows policy chang
   const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.locator('summary').getByText('Permissions', { exact: true }).click()
   await access.getByLabel('Enable public access', { exact: true }).check()
+  await access.getByLabel('Allow Trending', { exact: true }).uncheck()
   await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
   await access.getByLabel('Allow shared catalogs', { exact: true }).uncheck()
   await access.getByLabel('Allow Search', { exact: true }).check()
@@ -24,9 +25,12 @@ test('public navigation only offers enabled connections and follows policy chang
   try {
     await visitor.goto('/public/torznab')
     await expect(visitor).toHaveURL(/\/public\/search$/)
-    await expect(nav.getByRole('link', { name: 'Trending', exact: true })).toBeVisible()
+    const browse = nav.getByRole('button', { name: 'Browse', exact: true })
+    await expect(browse).toBeVisible()
+    await expect(browse).toHaveAttribute('aria-expanded', 'true')
+    await expect(nav.getByRole('link', { name: 'Trending', exact: true })).toHaveCount(0)
     await expect(nav.getByRole('link', { name: 'Search', exact: true })).toBeVisible()
-    await expect(nav.getByRole('link')).toHaveText(['Trending', 'Search'])
+    await expect(nav.getByRole('link')).toHaveText(['Search'])
     await expect(nav.getByRole('link', { name: 'Stremio', exact: true })).toHaveCount(0)
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toHaveCount(0)
     await expect(nav.getByRole('button', { name: 'Connections', exact: true })).toHaveCount(0)
@@ -36,6 +40,13 @@ test('public navigation only offers enabled connections and follows policy chang
     await expect(
       visitor.getByRole('button', { name: 'Start searching', exact: true }),
     ).toBeVisible()
+    await access.getByLabel('Allow Trending', { exact: true }).check()
+    await save()
+    await expect(nav.getByRole('link')).toHaveText(['Trending', 'Search'])
+    await browse.click()
+    await expect(browse).toHaveAttribute('aria-expanded', 'false')
+    await browse.click()
+    await expect(browse).toHaveAttribute('aria-expanded', 'true')
     await access.getByLabel('Allow Stremio connections', { exact: true }).check()
     await save()
     await expect(nav.getByRole('link', { name: 'Stremio', exact: true })).toBeVisible()
@@ -64,16 +75,20 @@ test('public navigation only offers enabled connections and follows policy chang
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toBeVisible()
     await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
     await save()
-    await expect(visitor).toHaveURL(/\/public\/search$/)
+    await expect(visitor).toHaveURL(/\/public\/trending$/)
     await expect(connections).toHaveCount(0)
+    await expect(visitor.getByRole('button', { name: 'Start browsing', exact: true })).toBeVisible()
     await visitor.setViewportSize({ width: 390, height: 844 })
     expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     )
     await access.getByLabel('Allow Search', { exact: true }).uncheck()
     await save()
+    await expect(visitor).toHaveURL(/\/public\/trending$/)
+    await access.getByLabel('Allow Trending', { exact: true }).uncheck()
+    await save()
     await expect(visitor.getByRole('tab', { name: 'Trusted user', exact: true })).toBeVisible()
-    await expect(visitor.getByRole('button', { name: 'Start searching', exact: true })).toHaveCount(
+    await expect(visitor.getByRole('button', { name: 'Start browsing', exact: true })).toHaveCount(
       0,
     )
   } finally {

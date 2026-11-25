@@ -197,7 +197,10 @@ func TestMetadataFollowupContinuationRequiresMatchingDiscoverySchedule(t *testin
 		{name: "matching Full follow-up", state: "paused", change: func(s *Source, _ *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0 }},
 		{name: "changed revision", state: "blocked", change: func(s *Source, _ *model.Run) { s.Revision = "changed" }},
 		{name: "standalone Metadata on incremental schedule", state: "blocked", change: func(_ *Source, r *model.Run) { r.MetadataParentRunID = "" }},
-		{name: "standalone Metadata on Full schedule", state: "blocked", change: func(s *Source, r *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0; r.MetadataParentRunID = "" }},
+		{name: "standalone Metadata on Full schedule", state: "blocked", change: func(s *Source, r *model.Run) {
+			s.Plan.Mode, s.Plan.FullEvery = model.ModeFull, 0
+			r.MetadataParentRunID = ""
+		}},
 		{name: "follow-up on Metadata schedule", state: "blocked", change: func(s *Source, _ *model.Run) { s.Plan.Mode, s.Plan.FullEvery = model.ModeMetadata, 0 }},
 		{name: "manual budget", state: "waiting", change: func(_ *Source, r *model.Run) { r.Trigger = model.TriggerManual }},
 		{name: "manual hold", state: "blocked", change: func(_ *Source, r *model.Run) { r.PauseReason = model.PauseManual }},

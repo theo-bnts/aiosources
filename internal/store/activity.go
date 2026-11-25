@@ -160,6 +160,12 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	if kind == "security.public_credentials_changed" {
 		query = strings.Replace(query, "aiosources.activity_message($3)", "'Public credential policy changed'", 1)
 	}
+	if kind == "security.public_trending_enabled" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Public Trending enabled'", 1)
+	}
+	if kind == "security.public_trending_disabled" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Public Trending disabled'", 1)
+	}
 	if kind == "security.trusted_user_changed" {
 		query = strings.Replace(query, "aiosources.activity_message($3)", "'Trusted user account updated'", 1)
 	}

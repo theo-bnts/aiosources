@@ -39,20 +39,24 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/public-access", s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			model.PublicAccess
-			StremioEnabled *bool `json:"stremio_enabled"`
-			CatalogEnabled *bool `json:"catalog_enabled"`
+			TrendingEnabled *bool `json:"trending_enabled"`
+			StremioEnabled  *bool `json:"stremio_enabled"`
+			CatalogEnabled  *bool `json:"catalog_enabled"`
 		}
 		if !decodeJSON(w, r, &input) {
 			return
 		}
 		value := input.PublicAccess
-		if input.StremioEnabled == nil || input.CatalogEnabled == nil {
-			// A settings form opened before the upgrade must not revoke Stremio
+		if input.TrendingEnabled == nil || input.StremioEnabled == nil || input.CatalogEnabled == nil {
+			// A settings form opened before the upgrade must not revoke Trending, Stremio
 			// or catalog access merely because it does not yet contain the new control.
 			current, err := s.options.Store.PublicAccess(r.Context())
 			if err != nil {
 				respondError(w, err)
 				return
+			}
+			if input.TrendingEnabled == nil {
+				input.TrendingEnabled = &current.TrendingEnabled
 			}
 			if input.StremioEnabled == nil {
 				input.StremioEnabled = &current.StremioEnabled
@@ -61,6 +65,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 				input.CatalogEnabled = &current.CatalogEnabled
 			}
 		}
+		value.TrendingEnabled = *input.TrendingEnabled
 		value.StremioEnabled = *input.StremioEnabled
 		value.CatalogEnabled = *input.CatalogEnabled
 		if value.Enabled && !s.publicOriginAllowed() {
@@ -90,7 +95,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 			return
 		}
 		enabled := value.Enabled && s.publicOriginAllowed()
-		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled}
+		info := map[string]any{"enabled": enabled, "use_instance_debrid": enabled && value.UseInstanceDebrid, "use_instance_announces": enabled && value.UseInstanceAnnounces, "providers": aiosource.PublicProviders, "stremio_enabled": enabled && value.StremioEnabled, "torznab_enabled": enabled && value.TorznabEnabled, "trending_enabled": enabled && value.TrendingEnabled, "search_enabled": enabled && value.SearchEnabled, "catalog_enabled": enabled && value.CatalogEnabled}
 		var allSources []aiosource.PublicPrivateSource
 		if enabled {
 			var e error

@@ -41,11 +41,11 @@ func TestAccessUpgradeRemovesFactorsAndPreservesSessionsAndPermissions(t *testin
 		t.Fatal("session lost", err)
 	}
 	access, err := db.PublicAccess(ctx)
-	if err != nil || access.Enabled || access.SearchEnabled || !access.TorznabEnabled || access.StremioEnabled || access.CatalogEnabled || access.UseInstanceDebrid || access.UseInstanceAnnounces {
+	if err != nil || access.Enabled || access.TrendingEnabled || access.SearchEnabled || !access.TorznabEnabled || access.StremioEnabled || access.CatalogEnabled || access.UseInstanceDebrid || access.UseInstanceAnnounces {
 		t.Fatal("existing access choices changed", access, err)
 	}
 	var permissions string
-	if err = db.pool.QueryRow(ctx, `SELECT permissions::text FROM aiosources.trusted_users WHERE id='preserved-user'`).Scan(&permissions); err != nil || strings.Contains(permissions, "expose_sources") || !strings.Contains(permissions, `"search_enabled": true`) {
+	if err = db.pool.QueryRow(ctx, `SELECT permissions::text FROM aiosources.trusted_users WHERE id='preserved-user'`).Scan(&permissions); err != nil || strings.Contains(permissions, "expose_sources") || !strings.Contains(permissions, `"search_enabled": true`) || !strings.Contains(permissions, `"trending_enabled": true`) {
 		t.Fatal("trusted permissions lost", err)
 	}
 	policy, err := db.RuntimeSection(ctx, "security")
@@ -86,5 +86,66 @@ func TestTrustedCatalogTracksChangesWithoutPublicAccess(t *testing.T) {
 	var tracking bool
 	if err = db.pool.QueryRow(ctx, `SELECT enabled FROM aiosources.catalog_tracking`).Scan(&tracking); err != nil || tracking {
 		t.Fatal("revoked trusted catalog retained tracking", err)
+	}
+}
+
+func TestTrendingAccessUpgradeInheritsSearchAndLogsChanges(t *testing.T) {
+	ctx, endpoint := testutil.NewDatabase(t)
+	db, err := Open(ctx, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err = db.migrateThrough(ctx, 109); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE aiosources.aio_public_access SET enabled=true,search_enabled=true;
+ INSERT INTO aiosources.trusted_users(id,email,password_hash,enabled,permissions) VALUES
+  ('with-search','with-search@example.invalid','opaque-hash',true,'{"search_enabled":true}'),
+  ('without-search','without-search@example.invalid','opaque-hash',true,'{"search_enabled":false}')`); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	access, err := db.PublicAccess(ctx)
+	if err != nil || !access.TrendingEnabled || !access.SearchEnabled {
+		t.Fatalf("expected public trending_enabled to inherit search_enabled=true, got %+v err=%v", access, err)
+	}
+	users, err := db.TrustedUsers(ctx)
+	if err != nil || len(users) != 2 {
+		t.Fatalf("list trusted users: %+v err=%v", users, err)
+	}
+	byID := map[string]model.TrustedUser{}
+	for _, u := range users {
+		byID[u.ID] = u
+	}
+	if !byID["with-search"].TrendingEnabled || byID["without-search"].TrendingEnabled {
+		t.Fatalf("trusted trending_enabled inheritance mismatch: %+v", byID)
+	}
+	access.TrendingEnabled = false
+	if err = db.SetPublicAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	access, _ = db.PublicAccess(ctx)
+	access.TrendingEnabled = true
+	if err = db.SetPublicAccess(ctx, access); err != nil {
+		t.Fatal(err)
+	}
+	var messages []string
+	rows, err := db.pool.Query(ctx, `SELECT message FROM aiosources.activity_logs WHERE kind IN ('security.public_trending_disabled','security.public_trending_enabled') ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var message string
+		if err = rows.Scan(&message); err != nil {
+			t.Fatal(err)
+		}
+		messages = append(messages, message)
+	}
+	if strings.Join(messages, "|") != "Public Trending disabled|Public Trending enabled" {
+		t.Fatalf("unexpected trending audit log messages: %v", messages)
 	}
 }

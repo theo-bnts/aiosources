@@ -106,7 +106,11 @@ export function suggestedProviderCategories(provider?: Provider): string[] {
   const values: string[] = []
   const add = (raw: string) => {
     const value = raw.trim()
-    if (!value || encoder.encode(value).length > MAX_METADATA_FILTER_CATEGORY_BYTES || hasControlChar(value)) {
+    if (
+      !value ||
+      encoder.encode(value).length > MAX_METADATA_FILTER_CATEGORY_BYTES ||
+      hasControlChar(value)
+    ) {
       return
     }
     const key = value.toLowerCase()

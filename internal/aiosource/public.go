@@ -241,7 +241,7 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if err != nil {
 		return "", err
 	}
-	if !access.Enabled || stremio && !access.StremioEnabled || !stremio && !access.SearchEnabled {
+	if !access.Enabled || stremio && !access.StremioEnabled || !stremio && !access.Allows("browse") {
 		return "", model.ErrNotFound
 	}
 	if (!access.UseInstanceDebrid && !validPublicKeys(keys) || len(keys) > 0 && !validPublicKeys(keys)) || audience == "" {
@@ -264,7 +264,7 @@ func (s *Service) createPublicInstallation(ctx context.Context, audience string,
 	if !latest.Enabled || latest.Generation != access.Generation {
 		return "", model.ErrNotFound
 	}
-	if stremio && (!latest.StremioEnabled || latest.StremioGeneration != access.StremioGeneration) || !stremio && !latest.SearchEnabled {
+	if stremio && (!latest.StremioEnabled || latest.StremioGeneration != access.StremioGeneration) || !stremio && !latest.Allows("browse") {
 		return "", model.ErrNotFound
 	}
 	if err = s.validatePublicAnnounces(ctx, latest, announces); err != nil {

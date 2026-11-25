@@ -12,6 +12,7 @@ type PublicAccess struct {
 	CredentialPolicy
 	Revision          int64 `json:"revision"`
 	Enabled           bool  `json:"enabled"`
+	TrendingEnabled   bool  `json:"trending_enabled"`
 	SearchEnabled     bool  `json:"search_enabled"`
 	StremioEnabled    bool  `json:"stremio_enabled"`
 	StremioGeneration int64 `json:"-"`
@@ -20,6 +21,24 @@ type PublicAccess struct {
 	CatalogEnabled    bool  `json:"catalog_enabled"`
 	CatalogGeneration int64 `json:"-"`
 	Generation        int64 `json:"-"`
+}
+
+func (a PublicAccess) Allows(feature string) bool {
+	switch feature {
+	case "trending":
+		return a.TrendingEnabled
+	case "search":
+		return a.SearchEnabled
+	case "browse":
+		return a.SearchEnabled || a.TrendingEnabled
+	case "stremio":
+		return a.StremioEnabled
+	case "torznab":
+		return a.TorznabEnabled
+	case "catalog":
+		return a.CatalogEnabled
+	}
+	return false
 }
 
 // PublicTorznabOptions travel in the client URL, never a saved visitor profile.

@@ -216,7 +216,7 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
-test('public trending follows Search permission and returns to public trending from title details', async ({
+test('public and trusted trending use the dedicated Trending permission under Browse independently of Search', async ({
   page,
   server,
   browser,
@@ -251,12 +251,16 @@ test('public trending follows Search permission and returns to public trending f
     await db.end()
   }
 
-  // Enable public access with Search and instance debrid so the visitor can browse immediately.
+  // First disable Trending while keeping Search enabled: /public/trending must redirect away.
   await page.goto('/public-access')
   const access = page.getByRole('form', { name: 'Public', exact: true })
   await access.getByLabel('Enable public access', { exact: true }).check()
   await access.locator('summary').getByText('Permissions', { exact: true }).click()
+  await access.getByLabel('Allow Trending', { exact: true }).uncheck()
   await access.getByLabel('Allow Search', { exact: true }).check()
+  await access.getByLabel('Allow Stremio connections', { exact: true }).uncheck()
+  await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
+  await access.getByLabel('Allow shared catalogs', { exact: true }).uncheck()
   await access.locator('summary').getByText('Credentials', { exact: true }).click()
   await access.getByLabel('Use instance debrid accounts', { exact: true }).check()
   await access.getByRole('button', { name: 'Save', exact: true }).click()
@@ -266,11 +270,28 @@ test('public trending follows Search permission and returns to public trending f
   const visitor = await context.newPage()
   try {
     await visitor.goto('/public/trending')
+    await expect(visitor).toHaveURL(/\/public\/search$/)
+    const nav = visitor.getByRole('navigation', { name: 'Main navigation' })
+    await expect(nav.getByRole('button', { name: 'Browse', exact: true })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Trending', exact: true })).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: 'Search', exact: true })).toBeVisible()
+
+    // Now enable Trending while disabling Search: Trending works standalone under Browse.
+    await access.getByLabel('Allow Trending', { exact: true }).check()
+    await access.getByLabel('Allow Search', { exact: true }).uncheck()
+    await access.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+
+    await expect(visitor).toHaveURL(/\/public\/trending$/)
     await expect(
       visitor.getByRole('heading', { name: 'Trending', exact: true, level: 1 }),
     ).toBeVisible()
-    const nav = visitor.getByRole('navigation', { name: 'Main navigation' })
+    await expect(
+      visitor.getByRole('navigation', { name: 'Breadcrumb', exact: true }).getByRole('listitem'),
+    ).toHaveText(['Browse/', 'Trending'])
+    await expect(nav.getByRole('link')).toHaveText(['Trending'])
     await expect(nav.locator('a[aria-current="page"]')).toHaveText('Trending')
+
     const filmLink = visitor
       .locator('main section')
       .first()
@@ -281,9 +302,58 @@ test('public trending follows Search permission and returns to public trending f
     await expect(
       visitor.getByRole('heading', { name: 'Public Trending Film', exact: true }),
     ).toBeVisible()
+    // Reloading title detail while Search is disabled still keeps Browse / Trending navigation & back link.
+    await visitor.reload()
+    await expect(
+      visitor.getByRole('heading', { name: 'Public Trending Film', exact: true }),
+    ).toBeVisible()
+    await expect(nav.locator('a[aria-current="page"]')).toHaveText('Trending')
     await visitor.getByRole('main').getByRole('link', { name: 'Trending', exact: true }).click()
     await expect(visitor).toHaveURL(/\/public\/trending$/)
   } finally {
     await context.close()
+  }
+
+  // Trusted user with Trending enabled and Search disabled.
+  await page.goto('/trusted-users')
+  await page.getByRole('button', { name: 'Add user', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add trusted user', exact: true })
+  await dialog.getByLabel('Email', { exact: true }).fill('trending.reader@example.invalid')
+  await dialog.getByLabel('Password', { exact: true }).fill('reader-' + server.password)
+  await dialog.getByRole('switch', { name: 'Enable account', exact: true }).check()
+  await dialog.locator('summary').getByText('Permissions', { exact: true }).click()
+  await dialog.getByRole('switch', { name: 'Allow Trending', exact: true }).check()
+  for (const name of [
+    'Allow Search',
+    'Allow Torznab connections',
+    'Allow Stremio connections',
+    'Allow shared catalogs',
+  ])
+    await dialog.getByRole('switch', { name, exact: true }).uncheck()
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('Trending', { exact: true }).first()).toBeVisible()
+
+  const trustedContext = await browser.newContext({ baseURL: server.origin })
+  const trustedPage = await trustedContext.newPage()
+  try {
+    await trustedPage.goto('/login')
+    await trustedPage.getByLabel('Email', { exact: true }).fill('trending.reader@example.invalid')
+    await trustedPage.getByLabel('Password', { exact: true }).fill('reader-' + server.password)
+    await trustedPage.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await expect(trustedPage).toHaveURL(/\/trusted\/trending$/)
+    const trustedNav = trustedPage.getByRole('navigation', { name: 'Main navigation' })
+    await expect(trustedNav.getByRole('button')).toHaveText(['Browse'])
+    await expect(trustedNav.getByRole('link')).toHaveText(['Trending'])
+    await expect(
+      trustedPage
+        .locator('main section')
+        .first()
+        .getByRole('link', { name: /Public Trending Film/ }),
+    ).toBeVisible()
+    await trustedPage.goto('/trusted/search')
+    await expect(trustedPage).toHaveURL(/\/trusted\/trending$/)
+  } finally {
+    await trustedContext.close()
   }
 })

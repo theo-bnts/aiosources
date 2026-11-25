@@ -25,10 +25,24 @@ func optionalBearerCredential(r *http.Request) (string, bool, bool) {
 	return strings.TrimPrefix(values[0], "Bearer "), true, true
 }
 
-func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalogAction) http.HandlerFunc {
+func publicCatalogDisabledMessage(feature string) string {
+	if feature == "trending" {
+		return "Public Trending is disabled"
+	}
+	return "Public Search is disabled"
+}
+
+func publicCatalogCredentialMessage(feature string) string {
+	if feature == "trending" {
+		return "Enter your debrid service keys to use Trending."
+	}
+	return "Enter your debrid service keys to use Search."
+}
+
+func (s *server) publicCatalogHandler(feature string, budget time.Duration, action publicCatalogAction) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.publicOriginAllowed() {
-			writeError(w, 404, "Public Search is disabled")
+			writeError(w, 404, publicCatalogDisabledMessage(feature))
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead && !s.hasPublicOrigin(r) {
@@ -48,17 +62,17 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			respondError(w, err)
 			return
 		}
-		if !access.Enabled || !access.SearchEnabled {
-			writeError(w, 404, "Public Search is disabled")
+		if !access.Enabled || !access.Allows(feature) {
+			writeError(w, 404, publicCatalogDisabledMessage(feature))
 			return
 		}
 		token, present, valid := optionalBearerCredential(r)
 		var visitor *aiosource.PublicInstallation
 		if !present && access.UseInstanceDebrid {
-			visitor, err = s.options.AIOSource.PublicInstanceSearch(ctx, s.auth.origin)
+			visitor, err = s.options.AIOSource.PublicInstanceCatalog(ctx, s.auth.origin, feature)
 		} else {
 			if !present || !valid {
-				writeError(w, 401, "Enter your debrid service keys to use Search.")
+				writeError(w, 401, publicCatalogCredentialMessage(feature))
 				return
 			}
 			visitor, err = s.options.AIOSource.OpenPublicInstallation(ctx, s.auth.origin, token)
@@ -84,8 +98,8 @@ func (s *server) publicCatalogHandler(budget time.Duration, action publicCatalog
 			respondError(w, err)
 			return
 		}
-		if !latest.Enabled || !latest.SearchEnabled {
-			writeError(w, 404, "Public Search is disabled")
+		if !latest.Enabled || !latest.Allows(feature) {
+			writeError(w, 404, publicCatalogDisabledMessage(feature))
 			return
 		}
 		if latest.Generation != visitor.Generation {
@@ -114,8 +128,8 @@ func (s *server) registerPublicCatalog(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/public/catalog-downloads/{token}", s.publicCatalogFile)
 }
 
-func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handler func(time.Duration, publicCatalogAction) http.HandlerFunc) {
-	mux.HandleFunc("GET "+prefix+"/catalog/torrents", handler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handler func(string, time.Duration, publicCatalogAction) http.HandlerFunc) {
+	mux.HandleFunc("GET "+prefix+"/catalog/torrents", handler("search", 20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, selection, filters, ok := catalogReleaseInput(w, r)
 		if !ok {
 			return nil, nil
@@ -125,21 +139,21 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 		}
 		return s.options.AIOSource.CatalogTorrents(r.Context(), opts, filters, visitor)
 	}))
-	mux.HandleFunc("GET "+prefix+"/catalog/search", handler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/search", handler("search", 10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, filters, ok := catalogSearchInput(w, r)
 		if !ok {
 			return nil, nil
 		}
 		return s.options.AIOSource.PublicCatalogSearch(r.Context(), visitor, opts, filters)
 	}))
-	mux.HandleFunc("GET "+prefix+"/catalog/trending", handler(30*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/trending", handler("trending", 30*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		opts, ok := catalogTrendingInput(w, r)
 		if !ok {
 			return nil, nil
 		}
 		return s.options.AIOSource.PublicCatalogTrending(r.Context(), visitor, opts)
 	}))
-	mux.HandleFunc("GET "+prefix+"/catalog/{id}", handler(10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/{id}", handler("browse", 10*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
@@ -149,7 +163,7 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 		}
 		return s.options.AIOSource.PublicCatalogTitle(r.Context(), visitor, id, catalogLanguage(r), aiosource.Normalize(r.URL.Query().Get("q")))
 	}))
-	mux.HandleFunc("GET "+prefix+"/catalog/{id}/releases", handler(20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("GET "+prefix+"/catalog/{id}/releases", handler("browse", 20*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
@@ -160,10 +174,29 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 		}
 		return s.options.AIOSource.PublicCatalogReleases(r.Context(), visitor, id, selection, opts, filters)
 	}))
-	mux.HandleFunc("POST "+prefix+"/catalog/{id}/download", handler(65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
+	mux.HandleFunc("POST "+prefix+"/catalog/{id}/download", handler("browse", 65*time.Second, func(w http.ResponseWriter, r *http.Request, visitor *aiosource.PublicInstallation) (any, error) {
 		id, ok := catalogID(w, r)
 		if !ok {
 			return nil, nil
+		}
+		ticketFeature := "browse"
+		if id == 0 {
+			ticketFeature = "search"
+			if visitor.Trusted != nil {
+				if !currentTrustedSession(r).User.Allows("search") {
+					writeError(w, 403, "This feature is not enabled for your account")
+					return nil, nil
+				}
+			} else {
+				access, err := s.options.Store.PublicAccess(r.Context())
+				if err != nil {
+					return nil, err
+				}
+				if !access.Enabled || !access.SearchEnabled {
+					writeError(w, 404, publicCatalogDisabledMessage("search"))
+					return nil, nil
+				}
+			}
 		}
 		var input model.CatalogDownloadInput
 		r.Body = http.MaxBytesReader(w, r.Body, 16384)
@@ -195,6 +228,7 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 			result.URL, result.URLValidSeconds, e = s.sealDownloadTicket("public-catalog-file-v1", "/api/public/catalog-downloads/", expires, publicCatalogFileTicket{
 				Trusted:    visitor.Trusted,
 				Session:    sessionID,
+				Feature:    ticketFeature,
 				Service:    result.Service,
 				URL:        result.URL,
 				Audience:   audience,
@@ -212,6 +246,7 @@ func (s *server) registerVisitorCatalog(mux *http.ServeMux, prefix string, handl
 type publicCatalogFileTicket struct {
 	Trusted    *model.TrustedGrant `json:"trusted,omitempty"`
 	Session    string              `json:"session,omitempty"`
+	Feature    string              `json:"feature,omitempty"`
 	Service    string              `json:"service"`
 	URL        string              `json:"url"`
 	Audience   string              `json:"audience"`
@@ -239,6 +274,10 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
+	feature := ticket.Feature
+	if feature == "" {
+		feature = "search"
+	}
 	authorize := func(ctx context.Context) error {
 		if ticket.Trusted != nil {
 			if ticket.Session == "" {
@@ -251,7 +290,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return err
 			}
-			if ts.ID != ticket.Session || ts.User.ID != ticket.Trusted.UserID || ts.User.Generation != ticket.Trusted.Generation || !ts.User.SearchEnabled {
+			if ts.ID != ticket.Session || ts.User.ID != ticket.Trusted.UserID || ts.User.Generation != ticket.Trusted.Generation || !ts.User.Allows(feature) {
 				return model.ErrNotFound
 			}
 			return nil
@@ -263,7 +302,7 @@ func (s *server) publicCatalogFile(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return e
 		}
-		if !access.Enabled || !access.SearchEnabled || access.Generation != ticket.Generation {
+		if !access.Enabled || !access.Allows(feature) || access.Generation != ticket.Generation {
 			return model.ErrNotFound
 		}
 		return nil

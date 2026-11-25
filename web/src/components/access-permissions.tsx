@@ -12,7 +12,11 @@ export function AccessPermissions({
   id: string
   value: Pick<
     TrustedPermissions,
-    'search_enabled' | 'torznab_enabled' | 'stremio_enabled' | 'catalog_enabled'
+    | 'trending_enabled'
+    | 'search_enabled'
+    | 'torznab_enabled'
+    | 'stremio_enabled'
+    | 'catalog_enabled'
   >
   onChange: (value: Partial<TrustedPermissions>) => void
   disabled?: boolean

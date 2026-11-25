@@ -319,9 +319,7 @@ export function CollectDialog({
                   value={identificationStatuses}
                   options={metadataIdentificationOptions}
                   disabled={mutation.isPending}
-                  onChange={(values) =>
-                    setIdentificationStatuses(values as IdentificationStatus[])
-                  }
+                  onChange={(values) => setIdentificationStatuses(values as IdentificationStatus[])}
                 />
               </div>
               <div className="field">
@@ -341,7 +339,11 @@ export function CollectDialog({
                   onChange={(event) => setCategoriesText(event.target.value)}
                 />
                 {invalidMetadataFilters && (
-                  <p id="collect-categories-error" role="alert" className="text-sm text-destructive">
+                  <p
+                    id="collect-categories-error"
+                    role="alert"
+                    className="text-sm text-destructive"
+                  >
                     {parsedCategories.error}
                   </p>
                 )}

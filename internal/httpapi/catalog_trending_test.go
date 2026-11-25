@@ -91,7 +91,7 @@ func TestCatalogTrendingAdminPublicAndValidation(t *testing.T) {
 	defer upstream.Close()
 	addon.Providers.TBBase, addon.Providers.Client = upstream.URL, upstream.Client()
 
-	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true, StremioEnabled: true, SearchEnabled: false}); err != nil {
+	if err := f.db.SetPublicAccess(f.ctx, model.PublicAccess{Revision: 1, Enabled: true, StremioEnabled: true, SearchEnabled: true, TrendingEnabled: false}); err != nil {
 		t.Fatal(err)
 	}
 	send := func(method, path, body, credential string) *httptest.ResponseRecorder {
@@ -113,25 +113,119 @@ func TestCatalogTrendingAdminPublicAndValidation(t *testing.T) {
 		t.Fatalf("install failed: %d %s", inst.Code, inst.Body)
 	}
 	if got := send("GET", "/api/public/catalog/trending?period=day", "", installed.Credential); got.Code != 404 {
-		t.Fatalf("public trending should be disabled when search_enabled=false, got %d", got.Code)
+		t.Fatalf("public trending should be disabled when trending_enabled=false even if search_enabled=true, got %d", got.Code)
+	}
+	if got := send("GET", "/api/public/catalog/search?q=Trending", "", installed.Credential); got.Code != 200 {
+		t.Fatalf("public search should remain enabled when trending_enabled=false, got %d %s", got.Code, got.Body)
 	}
 
+	// Enable Trending independently while disabling Search.
 	access, _ := f.db.PublicAccess(f.ctx)
-	access.SearchEnabled = true
+	access.SearchEnabled = false
+	access.TrendingEnabled = true
 	if err := f.db.SetPublicAccess(f.ctx, access); err != nil {
 		t.Fatal(err)
 	}
+	// An older open settings form omitting trending_enabled must preserve it.
+	access, _ = f.db.PublicAccess(f.ctx)
+	if put := f.request("PUT", "/api/public-access", fmt.Sprintf(`{"revision":%d,"enabled":true,"search_enabled":false,"stremio_enabled":true}`, access.Revision), true, ""); put.Code != 204 {
+		t.Fatalf("public-access update failed: %d %s", put.Code, put.Body)
+	}
+	access, _ = f.db.PublicAccess(f.ctx)
+	if !access.TrendingEnabled || access.SearchEnabled {
+		t.Fatalf("omitting trending_enabled unexpectedly changed flags: %+v", access)
+	}
+	var cfg struct {
+		TrendingEnabled bool `json:"trending_enabled"`
+		SearchEnabled   bool `json:"search_enabled"`
+	}
+	if got := send("GET", "/api/public/config", "", ""); got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &cfg) != nil || !cfg.TrendingEnabled || cfg.SearchEnabled {
+		t.Fatalf("unexpected public config: %d %s", got.Code, got.Body)
+	}
+	if got := send("POST", "/api/public/credentials", `{"services":{"torbox":"`+key+`"}}`, ""); got.Code != 200 {
+		t.Fatalf("public credentials should work when trending_enabled=true and search_enabled=false, got %d %s", got.Code, got.Body)
+	}
 	if got := send("GET", "/api/public/catalog/trending?period=day", "", ""); got.Code != 401 {
 		t.Fatalf("unauthenticated public trending accepted: %d", got.Code)
+	}
+	if got := send("GET", "/api/public/catalog/search?q=Trending", "", installed.Credential); got.Code != 404 {
+		t.Fatalf("public search should stay disabled when only trending_enabled=true, got %d", got.Code)
+	}
+	if got := send("GET", "/api/public/catalog/torrents?q=Trending", "", installed.Credential); got.Code != 404 {
+		t.Fatalf("public direct torrents should stay disabled when only trending_enabled=true, got %d", got.Code)
 	}
 	pub := send("GET", "/api/public/catalog/trending?period=month", "", installed.Credential)
 	var pubPayload model.CatalogTrending
 	if pub.Code != 200 || json.Unmarshal(pub.Body.Bytes(), &pubPayload) != nil || pubPayload.Period != "month" || len(pubPayload.Categories[0].Items) != 2 {
 		t.Fatalf("public trending failed: %d %s", pub.Code, pub.Body)
 	}
+	// Clicking a trending item opens its title detail even when search_enabled=false.
+	workID := pubPayload.Categories[0].Items[0].ID
+	if got := send("GET", fmt.Sprintf("/api/public/catalog/%d", workID), "", installed.Credential); got.Code != 200 {
+		t.Fatalf("public title detail from trending failed when search_enabled=false: %d %s", got.Code, got.Body)
+	}
 	for _, leaked := range []string{"hidden-source", "secret-native-id", "tracker.invalid", key} {
 		if strings.Contains(pub.Body.String(), leaked) {
 			t.Fatalf("public trending leaked %q", leaked)
 		}
+	}
+
+	// Trusted user permissions: Trending and Search are independent.
+	created := f.request("POST", "/api/trusted-users", `{"email":"trend.only@example.invalid","password":"synthetic trusted password","enabled":true,"trending_enabled":true,"search_enabled":false,"stremio_enabled":false,"torznab_enabled":false,"catalog_enabled":false}`, true, "")
+	if created.Code != 201 {
+		t.Fatalf("create trusted user failed: %d %s", created.Code, created.Body)
+	}
+	login := trustedRequest(f, nil, "POST", "/api/trusted/login", `{"email":"trend.only@example.invalid","password":"synthetic trusted password"}`)
+	var cookie *http.Cookie
+	for _, c := range login.Result().Cookies() {
+		if c.Name == trustedSessionCookie {
+			cookie = c
+		}
+	}
+	if login.Code != 200 || cookie == nil {
+		t.Fatalf("trusted login failed: %d %s", login.Code, login.Body)
+	}
+	var trustedCfg struct {
+		TrendingEnabled bool `json:"trending_enabled"`
+		SearchEnabled   bool `json:"search_enabled"`
+	}
+	if got := trustedRequest(f, cookie, "GET", "/api/trusted/config", ""); got.Code != 200 || json.Unmarshal(got.Body.Bytes(), &trustedCfg) != nil || !trustedCfg.TrendingEnabled || trustedCfg.SearchEnabled {
+		t.Fatalf("unexpected trusted config: %d %s", got.Code, got.Body)
+	}
+	if got := trustedRequest(f, cookie, "GET", "/api/trusted/catalog/trending?period=week", ""); got.Code != 200 {
+		t.Fatalf("trusted trending failed: %d %s", got.Code, got.Body)
+	}
+	if got := trustedRequest(f, cookie, "GET", fmt.Sprintf("/api/trusted/catalog/%d", workID), ""); got.Code != 200 {
+		t.Fatalf("trusted title detail from trending failed: %d %s", got.Code, got.Body)
+	}
+	if got := trustedRequest(f, cookie, "POST", "/api/trusted/credentials", `{}`); got.Code != 200 {
+		t.Fatalf("trusted credentials should work with trending_enabled=true, got %d %s", got.Code, got.Body)
+	}
+	if got := trustedRequest(f, cookie, "GET", "/api/trusted/catalog/search?q=Trending", ""); got.Code != 403 {
+		t.Fatalf("trusted search should be denied when search_enabled=false, got %d", got.Code)
+	}
+	if got := trustedRequest(f, cookie, "GET", "/api/trusted/catalog/torrents?q=Trending", ""); got.Code != 403 {
+		t.Fatalf("trusted torrents should be denied when search_enabled=false, got %d", got.Code)
+	}
+
+	createdSearchOnly := f.request("POST", "/api/trusted-users", `{"email":"search.only@example.invalid","password":"synthetic trusted password","enabled":true,"trending_enabled":false,"search_enabled":true,"stremio_enabled":false,"torznab_enabled":false,"catalog_enabled":false}`, true, "")
+	if createdSearchOnly.Code != 201 {
+		t.Fatalf("create search-only trusted user failed: %d %s", createdSearchOnly.Code, createdSearchOnly.Body)
+	}
+	loginSearch := trustedRequest(f, nil, "POST", "/api/trusted/login", `{"email":"search.only@example.invalid","password":"synthetic trusted password"}`)
+	var searchCookie *http.Cookie
+	for _, c := range loginSearch.Result().Cookies() {
+		if c.Name == trustedSessionCookie {
+			searchCookie = c
+		}
+	}
+	if loginSearch.Code != 200 || searchCookie == nil {
+		t.Fatalf("search-only trusted login failed: %d %s", loginSearch.Code, loginSearch.Body)
+	}
+	if got := trustedRequest(f, searchCookie, "GET", "/api/trusted/catalog/trending?period=week", ""); got.Code != 403 {
+		t.Fatalf("trusted trending should be denied when trending_enabled=false, got %d", got.Code)
+	}
+	if got := trustedRequest(f, searchCookie, "GET", "/api/trusted/catalog/search?q=Trending", ""); got.Code != 200 {
+		t.Fatalf("trusted search should succeed when search_enabled=true, got %d %s", got.Code, got.Body)
 	}
 }

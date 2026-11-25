@@ -60,7 +60,8 @@ export function PublicEntry({
   if (!available) {
     return fallbackTarget ? <Navigate to={fallbackTarget} replace /> : <Login />
   }
-  if (section === 'search') return layout(<PublicSearchEntry info={info.data} />)
+  if (section === 'search' || section === 'trending')
+    return layout(<PublicSearchEntry info={info.data} />)
   if (section === 'catalog')
     return layout(<PublicSharedCatalogEntry key={info.data.catalog_revision} info={info.data} />)
   if (section === 'torznab') return layout(<PublicTorznabEntry info={info.data} />)

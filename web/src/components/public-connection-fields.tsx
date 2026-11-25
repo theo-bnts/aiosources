@@ -26,7 +26,7 @@ export function useRequestController() {
   return request
 }
 
-export type VisitorSection = 'stremio' | 'search' | 'torznab' | 'catalog'
+export type VisitorSection = 'stremio' | 'trending' | 'search' | 'torznab' | 'catalog'
 
 export function resolveVisitorSection(
   info: PublicInfo,
@@ -34,39 +34,53 @@ export function resolveVisitorSection(
   prefix: '/public' | '/trusted',
 ): { section: VisitorSection; available: boolean; validPath: boolean; fallbackTarget: string } {
   const isTrending = pathname === `${prefix}/trending`
-  const isSearch = pathname === `${prefix}/search` || pathname.startsWith(`${prefix}/search/`)
+  const isTitleDetail = new RegExp(`^${prefix}/search/[0-9]+$`).test(pathname)
+  const isSearch =
+    pathname === `${prefix}/search` || (pathname.startsWith(`${prefix}/search/`) && !isTitleDetail)
   const validPath =
     pathname === prefix ||
     pathname === `${prefix}/torznab` ||
     pathname === `${prefix}/sharing` ||
     isTrending ||
+    isTitleDetail ||
     isSearch
-  const section: VisitorSection =
-    isTrending || isSearch
-      ? 'search'
-      : pathname === `${prefix}/torznab`
-        ? 'torznab'
-        : pathname === `${prefix}/sharing`
-          ? 'catalog'
-          : 'stremio'
-  const available = Boolean(
-    section === 'search'
+  const section: VisitorSection = isTrending
+    ? 'trending'
+    : isTitleDetail
       ? info.search_enabled
-      : section === 'stremio'
-        ? info.stremio_enabled
-        : section === 'torznab'
-          ? info.torznab_enabled
-          : info.catalog_enabled,
+        ? 'search'
+        : 'trending'
+      : isSearch
+        ? 'search'
+        : pathname === `${prefix}/torznab`
+          ? 'torznab'
+          : pathname === `${prefix}/sharing`
+            ? 'catalog'
+            : 'stremio'
+  const available = Boolean(
+    isTitleDetail
+      ? info.search_enabled || info.trending_enabled
+      : section === 'trending'
+        ? info.trending_enabled
+        : section === 'search'
+          ? info.search_enabled
+          : section === 'stremio'
+            ? info.stremio_enabled
+            : section === 'torznab'
+              ? info.torznab_enabled
+              : info.catalog_enabled,
   )
   const fallbackTarget = info.stremio_enabled
     ? prefix
-    : info.search_enabled
-      ? `${prefix}/search`
-      : info.torznab_enabled
-        ? `${prefix}/torznab`
-        : info.catalog_enabled
-          ? `${prefix}/sharing`
-          : ''
+    : info.trending_enabled
+      ? `${prefix}/trending`
+      : info.search_enabled
+        ? `${prefix}/search`
+        : info.torznab_enabled
+          ? `${prefix}/torznab`
+          : info.catalog_enabled
+            ? `${prefix}/sharing`
+            : ''
   return { section, available, validPath, fallbackTarget }
 }
 
@@ -119,6 +133,7 @@ export type PublicInfo = {
   use_instance_announces?: boolean
   stremio_enabled?: boolean
   torznab_enabled?: boolean
+  trending_enabled?: boolean
   search_enabled?: boolean
   catalog_enabled?: boolean
   catalog_revision?: number

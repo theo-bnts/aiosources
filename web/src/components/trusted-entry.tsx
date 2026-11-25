@@ -37,7 +37,8 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
       </div>,
     )
   if (!validPath || !available) return <Navigate to={fallbackTarget} replace />
-  if (section === 'search') return layout(<PublicSearchEntry info={access} />)
+  if (section === 'search' || section === 'trending')
+    return layout(<PublicSearchEntry info={access} />)
   if (section === 'catalog')
     return layout(<PublicSharedCatalogEntry key={access.catalog_revision} trusted info={access} />)
   return layout(

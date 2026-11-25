@@ -21,6 +21,7 @@ import { FormStatus } from '@/components/form-status'
 type Access = {
   revision: number
   enabled: boolean
+  trending_enabled: boolean
   search_enabled: boolean
   stremio_enabled: boolean
   torznab_enabled: boolean
@@ -42,6 +43,7 @@ export function PublicAccessSettings() {
     (draft.value.enabled !== query.data?.enabled ||
       draft.value.use_instance_debrid !== query.data?.use_instance_debrid ||
       draft.value.use_instance_announces !== query.data?.use_instance_announces ||
+      draft.value.trending_enabled !== query.data?.trending_enabled ||
       draft.value.search_enabled !== query.data?.search_enabled ||
       draft.value.stremio_enabled !== query.data?.stremio_enabled ||
       draft.value.torznab_enabled !== query.data?.torznab_enabled ||
@@ -56,6 +58,7 @@ export function PublicAccessSettings() {
         next.enabled === query.data.enabled &&
         next.use_instance_debrid === query.data.use_instance_debrid &&
         next.use_instance_announces === query.data.use_instance_announces &&
+        next.trending_enabled === query.data.trending_enabled &&
         next.search_enabled === query.data.search_enabled &&
         next.stremio_enabled === query.data.stremio_enabled &&
         next.torznab_enabled === query.data.torznab_enabled &&
@@ -102,6 +105,10 @@ export function PublicAccessSettings() {
               : latest.use_instance_announces,
           enabled:
             draft.value.enabled !== draft.base.enabled ? draft.value.enabled : latest.enabled,
+          trending_enabled:
+            draft.value.trending_enabled !== draft.base.trending_enabled
+              ? draft.value.trending_enabled
+              : latest.trending_enabled,
           search_enabled:
             draft.value.search_enabled !== draft.base.search_enabled
               ? draft.value.search_enabled
@@ -123,6 +130,7 @@ export function PublicAccessSettings() {
           value.enabled === latest.enabled &&
           value.use_instance_debrid === latest.use_instance_debrid &&
           value.use_instance_announces === latest.use_instance_announces &&
+          value.trending_enabled === latest.trending_enabled &&
           value.search_enabled === latest.search_enabled &&
           value.stremio_enabled === latest.stremio_enabled &&
           value.torznab_enabled === latest.torznab_enabled &&

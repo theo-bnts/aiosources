@@ -151,7 +151,7 @@ func (s *Service) catalogReleases(ctx context.Context, workID int64, selection m
 	result, _, _ := newCatalogReleaseList(opts)
 	if visitor != nil {
 		var err error
-		_, err = s.PublicSearchAccess(ctx, visitor)
+		_, err = s.PublicCatalogAccess(ctx, visitor, "browse")
 		if err != nil {
 			return result, err
 		}
@@ -408,7 +408,11 @@ func (s *Service) catalogDownload(ctx context.Context, workID int64, input model
 	lock := "catalog-download:" + input.Service + ":" + selected.OccurrenceID
 	trigger := "manual"
 	if visitor != nil {
-		if _, err = s.PublicSearchAccess(ctx, visitor); err != nil {
+		feature := "browse"
+		if workID == 0 {
+			feature = "search"
+		}
+		if _, err = s.PublicCatalogAccess(ctx, visitor, feature); err != nil {
 			return result, err
 		}
 		if visitor.Services[input.Service] == "" || !AllowsInstallation(visitor.Preferences, selected.Provider, input.Service, r.Type) {

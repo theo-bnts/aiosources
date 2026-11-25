@@ -27,6 +27,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 	save := s.auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			model.TrustedUser
+			TrendingEnabled      *bool  `json:"trending_enabled"`
 			SearchEnabled        *bool  `json:"search_enabled"`
 			TorznabEnabled       *bool  `json:"torznab_enabled"`
 			StremioEnabled       *bool  `json:"stremio_enabled"`
@@ -41,6 +42,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 		}
 		input.ID = r.PathValue("id")
 		defaultEnabled := input.ID == ""
+		input.TrustedUser.TrendingEnabled = boolOrDefault(input.TrendingEnabled, defaultEnabled)
 		input.TrustedUser.SearchEnabled = boolOrDefault(input.SearchEnabled, defaultEnabled)
 		input.TrustedUser.TorznabEnabled = boolOrDefault(input.TorznabEnabled, defaultEnabled)
 		input.TrustedUser.StremioEnabled = boolOrDefault(input.StremioEnabled, defaultEnabled)
@@ -100,7 +102,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("GET /api/trusted/config", s.auth.protectTrusted("", s.trustedConfig))
 	mux.HandleFunc("POST /api/trusted/connections/{feature}", s.auth.protectTrusted("", s.trustedConnection))
-	for path, feature := range map[string]string{"/api/trusted/install": "stremio", "/api/trusted/credentials": "search", "/api/trusted/torznab/install": "torznab"} {
+	for path, feature := range map[string]string{"/api/trusted/install": "stremio", "/api/trusted/credentials": "browse", "/api/trusted/torznab/install": "torznab"} {
 		mux.HandleFunc("POST "+path, s.auth.protectTrusted("", func(w http.ResponseWriter, r *http.Request) {
 			r.SetPathValue("feature", feature)
 			s.trustedConnection(w, r)
@@ -167,7 +169,7 @@ func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	providers := availablePublicProviders(config, !user.UseInstanceDebrid)
-	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog")}
+	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "trending_enabled": user.TrendingEnabled, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog")}
 	sources, e := s.options.AIOSource.TrustedSources(r.Context(), trustedGrant(r))
 	if e != nil {
 		respondError(w, e)
@@ -227,7 +229,7 @@ func (s *server) trustedConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { clear(personal.Services); clear(personal.Announces) }()
-	if feature == "search" || feature == "stremio" {
+	if feature == "search" || feature == "trending" || feature == "browse" || feature == "stremio" {
 		if err = s.options.AIOSource.ValidatePersonalServices(ctx, personal, true); err != nil {
 			respondError(w, err)
 			return
@@ -245,7 +247,7 @@ func (s *server) trustedConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	result := map[string]any{"credential": remembered.Credential, "services": remembered.Services, "announces": remembered.Announces, "instance_services": remembered.InstanceServices}
 	switch feature {
-	case "search":
+	case "search", "trending", "browse":
 	case "stremio":
 		result["manifest_url"] = origin + "/trusted/stremio/" + token + "/manifest.json"
 	case "torznab":
@@ -264,8 +266,8 @@ func (s *server) trustedConnection(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, result)
 }
 
-func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalogAction) http.HandlerFunc {
-	return s.auth.protectTrusted("search", func(w http.ResponseWriter, r *http.Request) {
+func (s *server) trustedCatalogHandler(feature string, budget time.Duration, action publicCatalogAction) http.HandlerFunc {
+	return s.auth.protectTrusted(feature, func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), budget)
 		defer cancel()
 		r = r.WithContext(ctx)
@@ -291,7 +293,7 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 			}
 			defer func() { clear(personal.Services); clear(personal.Announces) }()
 			var err error
-			visitor, err = s.options.AIOSource.TrustedVisitorWithCredentials(ctx, grant, audience, "search", model.StreamPreferences{}, personal.Services, personal.Announces)
+			visitor, err = s.options.AIOSource.TrustedVisitorWithCredentials(ctx, grant, audience, feature, model.StreamPreferences{}, personal.Services, personal.Announces)
 			if err != nil {
 				publicCredentialError(w, err)
 				return
@@ -302,12 +304,17 @@ func (s *server) trustedCatalogHandler(budget time.Duration, action publicCatalo
 		if result == nil && err == nil {
 			return
 		}
-		if _, e := s.options.Store.TrustedUser(ctx, grant); e != nil {
+		user, e := s.options.Store.TrustedUser(ctx, grant)
+		if e != nil {
 			if errors.Is(e, store.ErrAuthentication) {
 				writeError(w, 401, "Your account changed. Sign in again.")
 			} else {
 				respondError(w, e)
 			}
+			return
+		}
+		if !user.Allows(feature) {
+			writeError(w, 403, "This feature is not enabled for your account")
 			return
 		}
 		writeVisitorCatalogResult(w, result, err)

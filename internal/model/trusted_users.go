@@ -6,16 +6,21 @@ import "time"
 // permissions never authorize administration, definitions or secret values.
 type TrustedPermissions struct {
 	CredentialPolicy
-	SearchEnabled  bool `json:"search_enabled"`
-	StremioEnabled bool `json:"stremio_enabled"`
-	TorznabEnabled bool `json:"torznab_enabled"`
-	CatalogEnabled bool `json:"catalog_enabled"`
+	TrendingEnabled bool `json:"trending_enabled"`
+	SearchEnabled   bool `json:"search_enabled"`
+	StremioEnabled  bool `json:"stremio_enabled"`
+	TorznabEnabled  bool `json:"torznab_enabled"`
+	CatalogEnabled  bool `json:"catalog_enabled"`
 }
 
 func (p TrustedPermissions) Allows(feature string) bool {
 	switch feature {
+	case "trending":
+		return p.TrendingEnabled
 	case "search":
 		return p.SearchEnabled
+	case "browse":
+		return p.SearchEnabled || p.TrendingEnabled
 	case "stremio":
 		return p.StremioEnabled
 	case "torznab":

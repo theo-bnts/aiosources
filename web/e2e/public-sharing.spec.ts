@@ -15,6 +15,7 @@ test('public shared catalogs follow administrator permissions without saving vis
   await expect(catalog).toBeChecked()
   await access.getByRole('switch', { name: 'Enable public access', exact: true }).check()
   await expect(catalog).toBeEnabled()
+  await access.getByLabel('Allow Trending', { exact: true }).uncheck()
   await access.getByLabel('Allow Search', { exact: true }).uncheck()
   await access.getByLabel('Allow Torznab connections', { exact: true }).uncheck()
   await access.getByRole('switch', { name: 'Allow Stremio connections', exact: true }).uncheck()

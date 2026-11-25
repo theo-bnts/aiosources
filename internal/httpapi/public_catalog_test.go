@@ -234,7 +234,7 @@ func TestPublicSearchRechecksPermissionsBeforeReturningSlowResults(t *testing.T)
 				t.Fatal(err)
 			}
 			s := &server{public: &publicAdmission{}, auth: auth, options: Options{Store: f.db, AIOSource: addon, Vault: addon.Vault}}
-			handler := s.publicCatalogHandler(time.Second, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) (any, error) {
+			handler := s.publicCatalogHandler("search", time.Second, func(w http.ResponseWriter, r *http.Request, _ *aiosource.PublicInstallation) (any, error) {
 				current, _ := f.db.PublicAccess(r.Context())
 				switch change {
 				case "search":
