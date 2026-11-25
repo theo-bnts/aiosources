@@ -8,6 +8,13 @@ import {
 } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 
+const allowedCoverPattern =
+  /^https:\/\/(?:image\.tmdb\.org\/t\/p\/|covers\.openlibrary\.org\/b\/id\/|images\.igdb\.com\/igdb\/image\/upload\/t_cover_big\/|cdn\.jsdelivr\.net\/gh\/selfhst\/icons@main\/png\/[a-z0-9][a-z0-9-]{0,127}\.png$|coverartarchive\.org\/release(?:-group)?\/[0-9a-f-]{36}\/front(?:-500|-250)?$)/
+
+export function isAllowedCoverURL(src?: string): src is string {
+  return Boolean(src && allowedCoverPattern.test(src))
+}
+
 export function CatalogCover({
   src,
   book = false,
@@ -24,11 +31,7 @@ export function CatalogCover({
   large?: boolean
 }) {
   const [failed, setFailed] = useState('')
-  const allowed =
-    src &&
-    /^https:\/\/(?:image\.tmdb\.org\/t\/p\/|covers\.openlibrary\.org\/b\/id\/|images\.igdb\.com\/igdb\/image\/upload\/t_cover_big\/|cdn\.jsdelivr\.net\/gh\/selfhst\/icons@main\/png\/[a-z0-9][a-z0-9-]{0,127}\.png$|coverartarchive\.org\/release(?:-group)?\/[0-9a-f-]{36}\/front(?:-500|-250)?$)/.test(
-      src,
-    )
+  const allowed = isAllowedCoverURL(src)
   const Icon = music
     ? MusicNotesIcon
     : software

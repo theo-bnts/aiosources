@@ -33,19 +33,22 @@ export function resolveVisitorSection(
   pathname: string,
   prefix: '/public' | '/trusted',
 ): { section: VisitorSection; available: boolean; validPath: boolean; fallbackTarget: string } {
+  const isTrending = pathname === `${prefix}/trending`
   const isSearch = pathname === `${prefix}/search` || pathname.startsWith(`${prefix}/search/`)
   const validPath =
     pathname === prefix ||
     pathname === `${prefix}/torznab` ||
     pathname === `${prefix}/sharing` ||
+    isTrending ||
     isSearch
-  const section: VisitorSection = isSearch
-    ? 'search'
-    : pathname === `${prefix}/torznab`
-      ? 'torznab'
-      : pathname === `${prefix}/sharing`
-        ? 'catalog'
-        : 'stremio'
+  const section: VisitorSection =
+    isTrending || isSearch
+      ? 'search'
+      : pathname === `${prefix}/torznab`
+        ? 'torznab'
+        : pathname === `${prefix}/sharing`
+          ? 'catalog'
+          : 'stremio'
   const available = Boolean(
     section === 'search'
       ? info.search_enabled

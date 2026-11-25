@@ -45,7 +45,8 @@ export async function visitorAPI<T>(
       error instanceof ApiError &&
       error.status === 401 &&
       visitor.credential &&
-      (!visitor.trusted || !path.startsWith('/catalog/search'))
+      (!visitor.trusted ||
+        (!path.startsWith('/catalog/search') && !path.startsWith('/catalog/trending')))
     ) {
       forgetPublicCredential(visitor.credential, visitor.info.credential_scope)
     }

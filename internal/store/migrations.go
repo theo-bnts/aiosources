@@ -56,6 +56,7 @@ var migrations = []struct {
 	{102, musicSchema},
 	{103, softwareSchema},
 	{104, repairCatalogSyncCheckpoints},
+	{105, trendingIndexSchema},
 }
 
 // Older workers could advance the visible MusicBrainz snapshot before the

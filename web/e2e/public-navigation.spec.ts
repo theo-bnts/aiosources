@@ -24,7 +24,9 @@ test('public navigation only offers enabled connections and follows policy chang
   try {
     await visitor.goto('/public/torznab')
     await expect(visitor).toHaveURL(/\/public\/search$/)
+    await expect(nav.getByRole('link', { name: 'Trending', exact: true })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Search', exact: true })).toBeVisible()
+    await expect(nav.getByRole('link')).toHaveText(['Trending', 'Search'])
     await expect(nav.getByRole('link', { name: 'Stremio', exact: true })).toHaveCount(0)
     await expect(nav.getByRole('link', { name: 'Torznab', exact: true })).toHaveCount(0)
     await expect(nav.getByRole('button', { name: 'Connections', exact: true })).toHaveCount(0)

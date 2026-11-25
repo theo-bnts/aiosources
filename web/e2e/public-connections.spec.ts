@@ -56,6 +56,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     await visitor.goto('/')
     const navigation = visitor.getByRole('navigation', { name: 'Main navigation' })
     await expect(navigation.getByRole('link')).toHaveText([
+      'Trending',
       'Search',
       'Torznab',
       'Stremio',
@@ -172,6 +173,7 @@ test('public connections share the shell and encrypted Torznab filters without v
     )
     await visitor.getByRole('button', { name: 'Open navigation', exact: true }).click()
     await expect(visitor.getByRole('dialog').getByRole('link')).toHaveText([
+      'Trending',
       'Search',
       'Torznab',
       'Stremio',

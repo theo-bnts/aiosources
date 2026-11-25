@@ -11,6 +11,9 @@ import { PublicAnnounceFields, type PublicInfo } from './public-connection-field
 const CatalogSearchPage = lazy(() =>
   import('@/pages/catalog-search').then((module) => ({ default: module.CatalogSearchPage })),
 )
+const CatalogTrendingPage = lazy(() =>
+  import('@/pages/catalog-trending').then((module) => ({ default: module.CatalogTrendingPage })),
+)
 const CatalogTorrentsPage = lazy(() =>
   import('@/pages/catalog-torrents').then((module) => ({ default: module.CatalogTorrentsPage })),
 )
@@ -82,8 +85,18 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
             )}
           </section>
         )}
-        <Suspense fallback={<Loading label="Loading Search" />}>
-          {location.pathname === `${base}/search/torrents` ? (
+        <Suspense
+          fallback={
+            <Loading
+              label={
+                location.pathname === `${base}/trending` ? 'Loading Trending' : 'Loading Search'
+              }
+            />
+          }
+        >
+          {location.pathname === `${base}/trending` ? (
+            <CatalogTrendingPage />
+          ) : location.pathname === `${base}/search/torrents` ? (
             <CatalogTorrentsPage />
           ) : id ? (
             <CatalogTitlePage publicID={id} />

@@ -241,6 +241,7 @@ async function invalidateData(cancelRefetch: boolean) {
       'release-correspondences',
       'release-correspondence-detail',
       'catalog-search',
+      'catalog-trending',
       'catalog-title',
       'catalog-releases',
       'catalog-torrents',
@@ -267,6 +268,7 @@ async function invalidateData(cancelRefetch: boolean) {
             const heavy =
               key === 'source-torrent-stats' ||
               key === 'debrid-statistics' ||
+              key === 'catalog-trending' ||
               (key === 'aiosource' &&
                 (query.queryKey.length === 1 || query.queryKey[1] === 'information'))
             // Progress events must not turn a slower statistics read into a five-second scan.

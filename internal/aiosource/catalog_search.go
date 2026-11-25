@@ -16,6 +16,10 @@ func (s *Service) CatalogSearch(ctx context.Context, opts model.ListOptions, fil
 	return s.DB.CatalogTitles(ctx, opts, Normalize(opts.Query), filters)
 }
 
+func (s *Service) CatalogTrending(ctx context.Context, opts model.CatalogTrendingOptions) (model.CatalogTrending, error) {
+	return s.DB.CatalogTrending(ctx, opts)
+}
+
 // Start a series at an episode actually represented by its local releases.
 // No remote metadata request or download is needed to choose the controls.
 func (s *Service) CatalogTitle(ctx context.Context, workID int64, locales ...string) (model.CatalogTitle, error) {

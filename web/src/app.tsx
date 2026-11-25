@@ -28,6 +28,7 @@ import {
   SignOutIcon,
   StackIcon,
   TerminalWindowIcon,
+  TrendUpIcon,
   UsersThreeIcon,
   XIcon,
 } from '@phosphor-icons/react'
@@ -226,6 +227,21 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
+    id: 'trending',
+    label: 'Trending',
+    standalone: true,
+    icon: TrendUpIcon,
+    defaultOpen: true,
+    items: [
+      {
+        to: '/trending',
+        label: 'Trending',
+        description: 'Most active identified titles across each category for a chosen period.',
+        icon: TrendUpIcon,
+      },
+    ],
+  },
+  {
     id: 'search',
     label: 'Search',
     standalone: true,
@@ -353,6 +369,22 @@ const navigationGroups: NavigationGroup[] = [
     ],
   },
 ]
+const publicTrendingNavigation: NavigationGroup = {
+  id: 'public-trending',
+  label: 'Trending',
+  standalone: true,
+  icon: TrendUpIcon,
+  defaultOpen: true,
+  items: [
+    {
+      to: '/public/trending',
+      label: 'Trending',
+      description:
+        'Most active films, series, games, software, music and books for a chosen period.',
+      icon: TrendUpIcon,
+    },
+  ],
+}
 const publicSearchNavigation: NavigationGroup = {
   id: 'public-search',
   label: 'Search',
@@ -640,7 +672,9 @@ export function AppShell({
   const publicInfo = useVisitorConfig(trustedMode, publicMode)
   const baseGroups = publicMode
     ? [
-        ...(publicInfo.data?.search_enabled ? [publicSearchNavigation] : []),
+        ...(publicInfo.data?.search_enabled
+          ? [publicTrendingNavigation, publicSearchNavigation]
+          : []),
         ...publicNavigationGroups
           .map((group) => ({
             ...group,
@@ -673,13 +707,15 @@ export function AppShell({
   useLiveUpdates(!publicMode)
   const location = useLocation()
   let navigationPath = publicMode
-    ? location.pathname.startsWith('/public/search')
-      ? '/public/search'
-      : location.pathname === '/public/torznab'
-        ? '/public/torznab'
-        : location.pathname === '/public/sharing'
-          ? '/public/sharing'
-          : '/public'
+    ? location.pathname === '/public/trending'
+      ? '/public/trending'
+      : location.pathname.startsWith('/public/search')
+        ? '/public/search'
+        : location.pathname === '/public/torznab'
+          ? '/public/torznab'
+          : location.pathname === '/public/sharing'
+            ? '/public/sharing'
+            : '/public'
     : ['/runs', '/raw', '/pages'].some(
           (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
         ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
@@ -696,13 +732,16 @@ export function AppShell({
               ? '/metadata/videos'
               : location.pathname
   if (trustedMode)
-    navigationPath = location.pathname.startsWith('/trusted/search')
-      ? '/trusted/search'
-      : location.pathname === '/trusted/torznab'
-        ? '/trusted/torznab'
-        : location.pathname === '/trusted/sharing'
-          ? '/trusted/sharing'
-          : '/trusted'
+    navigationPath =
+      location.pathname === '/trusted/trending'
+        ? '/trusted/trending'
+        : location.pathname.startsWith('/trusted/search')
+          ? '/trusted/search'
+          : location.pathname === '/trusted/torznab'
+            ? '/trusted/torznab'
+            : location.pathname === '/trusted/sharing'
+              ? '/trusted/sharing'
+              : '/trusted'
   const activeItem = [...items]
     .sort((a, b) => b.to.length - a.to.length)
     .find(

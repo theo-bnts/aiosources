@@ -34,6 +34,14 @@ func (s *Service) PublicCatalogSearch(ctx context.Context, visitor *PublicInstal
 	return result, err
 }
 
+func (s *Service) PublicCatalogTrending(ctx context.Context, visitor *PublicInstallation, opts model.CatalogTrendingOptions) (model.CatalogTrending, error) {
+	_, err := s.PublicSearchAccess(ctx, visitor)
+	if err != nil {
+		return model.CatalogTrending{}, err
+	}
+	return s.CatalogTrending(ctx, opts)
+}
+
 func (s *Service) PublicCatalogTitle(ctx context.Context, visitor *PublicInstallation, workID int64, locales ...string) (model.CatalogTitle, error) {
 	_, err := s.PublicSearchAccess(ctx, visitor)
 	if err != nil {

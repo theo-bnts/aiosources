@@ -73,6 +73,48 @@ func (s *server) catalogSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, items)
 }
+
+func catalogTrendingInput(w http.ResponseWriter, r *http.Request) (model.CatalogTrendingOptions, bool) {
+	query, ok := requestQuery(w, r)
+	if !ok {
+		return model.CatalogTrendingOptions{}, false
+	}
+	period := query.Get("period")
+	if period == "" {
+		period = model.DefaultTrendingPeriod
+	}
+	if _, valid := model.TrendingPeriodDays(period); !valid {
+		writeError(w, http.StatusUnprocessableEntity, "Choose a supported trending period: day, week, month, quarter or year.")
+		return model.CatalogTrendingOptions{}, false
+	}
+	limit := model.DefaultTrendingLimit
+	if raw := query.Get("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > model.MaxTrendingLimit {
+			writeError(w, http.StatusUnprocessableEntity, "Choose a trending limit between 1 and 50.")
+			return model.CatalogTrendingOptions{}, false
+		}
+		limit = parsed
+	}
+	return model.CatalogTrendingOptions{
+		Period:   period,
+		Language: catalogLanguage(r),
+		Limit:    limit,
+	}, true
+}
+
+func (s *server) catalogTrending(w http.ResponseWriter, r *http.Request) {
+	opts, ok := catalogTrendingInput(w, r)
+	if !ok {
+		return
+	}
+	result, err := s.options.AIOSource.CatalogTrending(r.Context(), opts)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
 func (s *server) catalogTitle(w http.ResponseWriter, r *http.Request) {
 	id, ok := catalogID(w, r)
 	if !ok {

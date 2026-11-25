@@ -272,6 +272,9 @@ const AIOSourcePage = lazy(() => import('@/pages/aiosource'))
 const CatalogSearchPage = lazy(() =>
   import('@/pages/catalog-search').then((m) => ({ default: m.CatalogSearchPage })),
 )
+const CatalogTrendingPage = lazy(() =>
+  import('@/pages/catalog-trending').then((m) => ({ default: m.CatalogTrendingPage })),
+)
 const CatalogTorrentsPage = lazy(() =>
   import('@/pages/catalog-torrents').then((m) => ({ default: m.CatalogTorrentsPage })),
 )
@@ -569,6 +572,7 @@ const router = createBrowserRouter(
           <Route path={filesResultsPath} element={<TorrentsPage />} />
         </Route>
         <Route path="torrents" element={<LegacyFiles />} />
+        <Route path="trending" element={<CatalogTrendingPage />} />
         <Route path="search" element={<CatalogSearchPage />} />
         <Route path="search/torrents" element={<CatalogTorrentsPage />} />
         <Route path="search/:id" element={<CatalogTitlePage />} />

@@ -88,6 +88,7 @@ for (const width of [390, 1440]) {
     test.setTimeout(120_000)
     await page.setViewportSize({ width, height: 1100 })
     for (const route of [
+      '/trending',
       '/search',
       '/torrents',
       '/providers/settings',

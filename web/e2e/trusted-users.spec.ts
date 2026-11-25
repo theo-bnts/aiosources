@@ -80,6 +80,7 @@ test('trusted users have the visitor workspace with instance services and no adm
     ).toBeVisible()
     const navigation = visitor.getByRole('navigation', { name: 'Main navigation', exact: true })
     await expect(navigation.getByRole('link')).toHaveText([
+      'Trending',
       'Search',
       'Torznab',
       'Stremio',
