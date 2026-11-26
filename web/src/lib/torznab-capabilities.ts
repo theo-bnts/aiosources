@@ -39,9 +39,9 @@ export interface TorznabCapabilitiesResult {
 
 export type TorznabCapabilityField = 'name' | 'id' | 'url' | 'page_size' | 'search_mode'
 
-export const TORZNAB_TEMPLATE_URL = 'https://indexer.example/api'
+const TORZNAB_TEMPLATE_URL = 'https://indexer.example/api'
 
-export const torznabSearchModeLabels: Record<string, string> = {
+const torznabSearchModeLabels: Record<string, string> = {
   search: 'General search',
   tvsearch: 'Series',
   movie: 'Films',
@@ -255,9 +255,7 @@ export function applyUseAdvertisedCategories(next: ProviderJSON): void {
   next.setIn(['search', 'categories'], [])
 }
 
-export function flattenTorznabCategoryIDs(
-  categories: readonly TorznabCategoryCapability[],
-): Set<number> {
+function flattenTorznabCategoryIDs(categories: readonly TorznabCategoryCapability[]): Set<number> {
   const ids = new Set<number>()
   const visit = (items: readonly TorznabCategoryCapability[]) => {
     for (const item of items) {

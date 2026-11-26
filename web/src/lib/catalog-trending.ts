@@ -1,9 +1,7 @@
 import {
-  catalogCardContext,
   catalogCardSummary,
   catalogCategories,
   catalogPrimaryYear,
-  catalogSubtypeLabel,
   catalogTorrentCount,
   type CatalogCardKind,
   type CatalogCategoryID,
@@ -64,10 +62,8 @@ export function trendingPeriodLabel(period: TrendingPeriod): string {
 }
 
 export const trendingPrimaryYear = catalogPrimaryYear
-export const trendingItemContext = catalogCardContext
-export const trendingItemSubtype = catalogSubtypeLabel
 export const trendingItemSummary = catalogCardSummary
-export const trendingTorrentCount = catalogTorrentCount
+const trendingTorrentCount = catalogTorrentCount
 
 function formatTrendingRate(value: number, unit: 'episode' | 'season'): string {
   const rounded = Math.max(1, Math.round(value))

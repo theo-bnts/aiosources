@@ -10,9 +10,9 @@ import (
 	"html"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -182,9 +182,9 @@ func respondError(w http.ResponseWriter, err error) {
 		// Do not expose database connection strings, source URLs or payloads.
 		var dbErr *store.DatabaseError
 		if errors.As(err, &dbErr) {
-			fmt.Fprintf(os.Stderr, "administration operation failed: %s\n", dbErr.Error())
+			slog.Error("Administration operation failed", "error", dbErr.Error())
 		} else {
-			fmt.Fprintf(os.Stderr, "administration operation failed (%T)\n", err)
+			slog.Error("Administration operation failed", "error_type", fmt.Sprintf("%T", err))
 		}
 		writeError(w, http.StatusInternalServerError, "The operation failed. Check the service status.")
 	}
@@ -771,7 +771,7 @@ func recoverRequests(next http.Handler) http.Handler {
 				if value == http.ErrAbortHandler {
 					panic(value)
 				}
-				fmt.Fprintf(os.Stderr, "administration handler panic (%T)\n", value)
+				slog.Error("Administration handler panic", "panic_type", fmt.Sprintf("%T", value))
 				writeError(w, http.StatusInternalServerError, "Internal service error")
 			}
 		}()

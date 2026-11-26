@@ -31,7 +31,7 @@ export function AboutDialog() {
           aria-label="About AIOSources"
           title="About AIOSources"
         >
-          <InfoIcon />
+          <InfoIcon aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent aria-describedby={undefined}>

@@ -4,10 +4,10 @@ import type { MultiSelectOption } from './multi-select-values.ts'
 
 const encoder = new TextEncoder()
 
-export const MAX_METADATA_FILTER_CATEGORIES = 100
-export const MAX_METADATA_FILTER_CATEGORY_BYTES = 256
+const MAX_METADATA_FILTER_CATEGORIES = 100
+const MAX_METADATA_FILTER_CATEGORY_BYTES = 256
 
-export const metadataIdentificationOrder: readonly IdentificationStatus[] = [
+const metadataIdentificationOrder: readonly IdentificationStatus[] = [
   'unmatched',
   'ambiguous',
   'pending',

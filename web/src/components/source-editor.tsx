@@ -1541,7 +1541,7 @@ export function SourceEditor({
               <p className="font-medium">Repair the JSON to enable visual editing and saving.</p>
               <ul className="mt-2 list-inside list-disc">
                 {document.errors.map((error, index) => (
-                  <li key={index}>{error}</li>
+                  <li key={`${error}-${index}`}>{error}</li>
                 ))}
               </ul>
             </div>

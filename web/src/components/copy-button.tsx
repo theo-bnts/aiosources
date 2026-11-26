@@ -56,7 +56,7 @@ export function CopyButton({
         disabled={copying || !value}
         onClick={() => void copy()}
       >
-        {feedback === 'copied' ? <CheckIcon /> : <CopyIcon />}
+        {feedback === 'copied' ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
         {copying ? 'Copying…' : feedback === 'copied' ? 'Copied' : label}
       </Button>
       {feedback === 'copied' && (

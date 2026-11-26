@@ -263,7 +263,7 @@ function HTMLFieldMap({ path, detail = false }: { path: ProviderPath; detail?: b
                 aria-label={`Remove ${label} mapping`}
                 onClick={() => change((next) => next.deleteIn([...path, key]))}
               >
-                <TrashIcon />
+                <TrashIcon aria-hidden="true" />
               </Button>
             </div>
             <HTMLFieldSettings path={[...path, key]} label={label} optionsInline={detail} />
@@ -299,7 +299,7 @@ function HTMLFieldMap({ path, detail = false }: { path: ProviderPath; detail?: b
             setName('')
           }}
         >
-          <PlusIcon /> Add field
+          <PlusIcon aria-hidden="true" /> Add field
         </Button>
       </div>
     </div>
@@ -403,7 +403,7 @@ export function HTMLDetailSettings() {
             )
           }
         >
-          <PlusIcon /> Configure detail pages
+          <PlusIcon aria-hidden="true" /> Configure detail pages
         </Button>
       )}
     </OptionalSection>
@@ -526,7 +526,7 @@ export function HTMLPaginationSettings() {
                 change((next) => next.setIn(['html', key], { selector: '', format: 'integer' }))
               }
             >
-              <PlusIcon /> Add {label.toLowerCase()} check
+              <PlusIcon aria-hidden="true" /> Add {label.toLowerCase()} check
             </Button>
           )
         })}

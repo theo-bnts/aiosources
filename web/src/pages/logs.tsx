@@ -188,7 +188,7 @@ export function LogsPage() {
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Button id="log-submit" type="submit">
-              <MagnifyingGlassIcon />
+              <MagnifyingGlassIcon aria-hidden="true" />
               Apply filters
             </Button>
             <ClearFiltersButton

@@ -88,7 +88,11 @@ export function ResultSorting({
                     )
                   }
                 >
-                  {rule?.direction === 'asc' ? <ArrowUpIcon /> : <ArrowDownIcon />}
+                  {rule?.direction === 'asc' ? (
+                    <ArrowUpIcon aria-hidden="true" />
+                  ) : (
+                    <ArrowDownIcon aria-hidden="true" />
+                  )}
                 </Button>
               </div>
             </div>
@@ -181,7 +185,7 @@ export function QuerySorting({
             title={ascending ? 'Ascending · click to reverse' : 'Descending · click to reverse'}
             onClick={() => onChange(ascending ? selected.desc : selected.asc)}
           >
-            {ascending ? <ArrowUpIcon /> : <ArrowDownIcon />}
+            {ascending ? <ArrowUpIcon aria-hidden="true" /> : <ArrowDownIcon aria-hidden="true" />}
           </Button>
         </div>
       </div>

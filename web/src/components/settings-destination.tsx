@@ -162,10 +162,14 @@ export function SettingsDestination() {
       attributes: true,
       attributeFilter: ['open', 'data-state', 'disabled'],
     })
+    const unsubscribeQueries = queryClient.getQueryCache().subscribe(() => {
+      if (!queryClient.isFetching()) schedule()
+    })
     schedule()
     // No polling. A bounded observer follows lazy pages and their initial requests.
     const timeout = window.setTimeout(() => {
       observer.disconnect()
+      unsubscribeQueries()
       if (!finished && performance.now() - start >= 14900) {
         const root = document.getElementById('main-content')
         const fallback = root?.querySelector<HTMLElement>('[role="tabpanel"]')
@@ -181,6 +185,7 @@ export function SettingsDestination() {
     return () => {
       finished = true
       observer.disconnect()
+      unsubscribeQueries()
       cancelAnimationFrame(frame)
       window.clearTimeout(timeout)
       clearHighlight?.()

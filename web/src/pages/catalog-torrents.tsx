@@ -141,7 +141,7 @@ export function CatalogTorrentsPage() {
         </Disclosure>
         <div className="flex flex-wrap gap-2">
           <Button id="direct-torrent-submit" type="submit">
-            <MagnifyingGlassIcon />
+            <MagnifyingGlassIcon aria-hidden="true" />
             Search
           </Button>
           <ClearFiltersButton

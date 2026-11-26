@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -421,9 +422,11 @@ func (m *Manager) PauseForDatabaseMaintenance() (func(ctx context.Context, resto
 		once.Do(func() {
 			if restored && started {
 				if err := m.recoverInterrupted(ctx); err != nil {
-					_ = err
+					slog.Warn("Could not recover interrupted runs after database restore")
 				}
-				_ = m.db.InitializeCollectionSettings(ctx, m.initialWorkers)
+				if err := m.db.InitializeCollectionSettings(ctx, m.initialWorkers); err != nil {
+					slog.Warn("Could not initialize collection settings after database restore")
+				}
 			}
 			m.mu.Lock()
 			m.paused = false

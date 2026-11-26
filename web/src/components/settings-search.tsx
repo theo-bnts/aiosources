@@ -232,7 +232,7 @@ export function SettingsSearch({
         aria-label="Search settings"
         aria-haspopup="dialog"
       >
-        <MagnifyingGlassIcon className="shrink-0" />
+        <MagnifyingGlassIcon className="shrink-0" aria-hidden="true" />
         <span className="truncate">Search settings…</span>
         <kbd
           className="ml-auto hidden rounded border border-border px-1.5 text-xs lg:inline"
@@ -276,7 +276,7 @@ export function SettingsSearch({
                   input.current?.focus()
                 }}
               >
-                <ArrowLeftIcon />
+                <ArrowLeftIcon aria-hidden="true" />
               </Button>
             ) : (
               <MagnifyingGlassIcon className="shrink-0 text-muted-foreground" aria-hidden="true" />

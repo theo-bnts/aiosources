@@ -15,5 +15,36 @@ export default defineConfig({
       '/healthz': { target: apiTarget, changeOrigin: false },
     },
   },
-  build: { outDir: 'dist', emptyOutDir: true },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/,
+              priority: 40,
+            },
+            {
+              name: 'vendor-query',
+              test: /[\\/]node_modules[\\/]@tanstack[\\/]/,
+              priority: 35,
+            },
+            {
+              name: 'vendor-radix',
+              test: /[\\/]node_modules[\\/](radix-ui|@radix-ui|@floating-ui)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'vendor-codemirror',
+              test: /[\\/]node_modules[\\/](@codemirror|@lezer|@uiw|style-mod|w3c-keyname|crelt)[\\/]/,
+              priority: 25,
+            },
+          ],
+        },
+      },
+    },
+  },
 })

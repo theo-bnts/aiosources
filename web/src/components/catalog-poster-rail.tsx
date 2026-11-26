@@ -92,7 +92,7 @@ export function CatalogPosterCard({
             aria-hidden="true"
             className="flex h-full w-full items-center justify-center bg-muted/50 text-muted-foreground/70"
           >
-            <FallbackIcon size={36} />
+            <FallbackIcon size={36} aria-hidden="true" />
           </div>
         )}
       </div>

@@ -140,7 +140,7 @@ export function SecuritySessionsPage() {
                           variant="warning"
                           trigger={
                             <Button variant="warning" size="sm">
-                              <SignOutIcon />
+                              <SignOutIcon aria-hidden="true" />
                               {item.current ? 'Sign out' : 'Revoke'}
                             </Button>
                           }

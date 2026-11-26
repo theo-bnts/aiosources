@@ -286,7 +286,7 @@ export default function SharingPage({
     <div className={format === 'catalog' ? 'page' : 'space-y-5'}>
       <PageActions>
         <Button disabled={!shares.data} onClick={() => openEditor('new')}>
-          <PlusIcon />
+          <PlusIcon aria-hidden="true" />
           {connection ? 'Create access' : 'Create share'}
         </Button>
       </PageActions>
@@ -499,7 +499,7 @@ export default function SharingPage({
                 )}
                 <div className="card-actions">
                   <Button variant="outline" size="sm" onClick={() => openEditor(share)}>
-                    <PencilSimpleIcon />
+                    <PencilSimpleIcon aria-hidden="true" />
                     Edit
                   </Button>
                   <ConfirmAction
@@ -519,7 +519,7 @@ export default function SharingPage({
                     variant="warning"
                     trigger={
                       <Button variant="warning" size="sm">
-                        <ArrowClockwiseIcon />
+                        <ArrowClockwiseIcon aria-hidden="true" />
                         {stremio
                           ? 'Replace installation key'
                           : torznab
@@ -550,7 +550,7 @@ export default function SharingPage({
                     variant="destructive"
                     trigger={
                       <Button variant="destructive" size="sm">
-                        <TrashIcon />
+                        <TrashIcon aria-hidden="true" />
                         Delete
                       </Button>
                     }

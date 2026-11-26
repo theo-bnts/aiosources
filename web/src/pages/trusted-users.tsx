@@ -59,7 +59,7 @@ export default function TrustedUsersPage() {
     <div className="page">
       <PageActions>
         <Button onClick={() => setEditing({ ...emptyUser })}>
-          <PlusIcon />
+          <PlusIcon aria-hidden="true" />
           Add user
         </Button>
       </PageActions>
@@ -101,7 +101,7 @@ export default function TrustedUsersPage() {
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => setEditing(user)}>
-                      <PencilSimpleIcon />
+                      <PencilSimpleIcon aria-hidden="true" />
                       Edit
                     </Button>
                     <ConfirmAction
@@ -118,7 +118,7 @@ export default function TrustedUsersPage() {
                       }}
                       trigger={
                         <Button variant="destructive">
-                          <TrashIcon />
+                          <TrashIcon aria-hidden="true" />
                           Delete
                         </Button>
                       }

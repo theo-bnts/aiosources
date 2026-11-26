@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 // Tab changes stay within the current page. Keep public return-view state, but
 // let ordinary page/detail navigation retain its normal focus and scroll reset.
-export function pageTabState(state: unknown) {
+function pageTabState(state: unknown) {
   return {
     ...(state && typeof state === 'object' && !Array.isArray(state) ? state : {}),
     pageTab: true,

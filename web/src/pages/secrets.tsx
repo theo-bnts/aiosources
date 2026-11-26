@@ -116,7 +116,7 @@ export default function SecretsPage() {
         title="Secrets"
         actions={
           <Button onClick={() => openSecret()}>
-            <PlusIcon />
+            <PlusIcon aria-hidden="true" />
             Create secret
           </Button>
         }
@@ -155,7 +155,7 @@ export default function SecretsPage() {
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button variant="warning" size="sm" onClick={() => openSecret(secret.name)}>
-                        <ArrowClockwiseIcon />
+                        <ArrowClockwiseIcon aria-hidden="true" />
                         Replace
                       </Button>
                       <ConfirmAction
@@ -169,7 +169,7 @@ export default function SecretsPage() {
                             size="sm"
                             aria-label={`Delete secret ${secret.name}`}
                           >
-                            <TrashIcon />
+                            <TrashIcon aria-hidden="true" />
                             Delete
                           </Button>
                         }

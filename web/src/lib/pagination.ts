@@ -4,7 +4,7 @@ import { resetListView } from './list-view'
 
 export const pageSize = 50
 
-export function normalizePageOffset(value: string | number | null, limit = pageSize) {
+function normalizePageOffset(value: string | number | null, limit = pageSize) {
   const offset = Number(value)
   return Number.isSafeInteger(offset) && offset > 0 ? Math.floor(offset / limit) * limit : 0
 }

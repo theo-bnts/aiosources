@@ -74,7 +74,7 @@ export function MultiSelect({
             <span className="min-w-0 flex-1 truncate text-left" title={selected}>
               {selected}
             </span>
-            <CaretDownIcon className="shrink-0" />
+            <CaretDownIcon className="shrink-0" aria-hidden="true" />
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>

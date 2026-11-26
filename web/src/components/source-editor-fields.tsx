@@ -428,7 +428,7 @@ function MapRow({
         aria-label={`Remove ${name}`}
         onClick={() => change((next) => next.deleteIn([...path, name]))}
       >
-        <TrashIcon />
+        <TrashIcon aria-hidden="true" />
       </Button>
     </div>
   )
@@ -514,7 +514,7 @@ export function MapField({
                 setKey('')
               }}
             >
-              <PlusIcon />
+              <PlusIcon aria-hidden="true" />
               Add entry
             </Button>
           </div>
@@ -570,7 +570,7 @@ export function ArrayField({
                     change((next) => next.deleteIn([...path, index]))
                   }}
                 >
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                 </Button>
               </div>
               {children([...path, index], index)}
@@ -582,7 +582,7 @@ export function ArrayField({
             size="sm"
             onClick={() => change((next) => next.setIn([...path, count], initial))}
           >
-            <PlusIcon />
+            <PlusIcon aria-hidden="true" />
             Add {label.toLowerCase()}
           </Button>
         </>

@@ -20,17 +20,6 @@ export interface TorrentFilters {
   sort?: TorrentSort
 }
 
-export const torrentSortOptions: { value: TorrentSort; label: string }[] = [
-  { value: 'recent', label: 'Most recent' },
-  { value: 'oldest', label: 'Oldest first' },
-  { value: 'size_desc', label: 'Largest first' },
-  { value: 'size_asc', label: 'Smallest first' },
-  { value: 'name_asc', label: 'Name (A–Z)' },
-  { value: 'name_desc', label: 'Name (Z–A)' },
-  { value: 'relevance_asc', label: 'Search relevance (ascending)' },
-  { value: 'relevance', label: 'Search relevance' },
-]
-
 export const torrentFilterKeys = [
   'q',
   'category',

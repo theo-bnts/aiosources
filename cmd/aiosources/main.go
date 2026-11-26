@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -270,7 +271,7 @@ Database commands require DATABASE_URL. Run <command> --help for flags.
 		if _, err := registry.UpgradeDefinitions(); err != nil {
 			// The old adapter remains supported if the filesystem cannot be
 			// updated. A cosmetic rename must not prevent collection recovery.
-			fmt.Fprintln(os.Stderr, "aiosources: Source adapter names could not be updated; existing definitions remain supported")
+			slog.Warn("Source adapter names could not be updated; existing definitions remain supported")
 		}
 	}
 	manager := jobs.New(db, registry, secretVault.Resolve, c.workers)

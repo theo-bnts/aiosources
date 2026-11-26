@@ -151,7 +151,11 @@ export function ErrorNotice({
       className={`rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm ${presentation === 'notification' ? 'pr-12' : ''}`}
     >
       <div className="flex items-start gap-3">
-        <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
+        <WarningCircleIcon
+          size={20}
+          className="mt-0.5 shrink-0 text-destructive"
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1 space-y-2">
           <p className="break-words text-sm">
             {error instanceof Error
@@ -163,13 +167,13 @@ export function ErrorNotice({
           {error instanceof ApiError && error.details.length > 0 && (
             <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
               {error.details.map((issue, i) => (
-                <li key={i}>{issue}</li>
+                <li key={`${issue}-${i}`}>{issue}</li>
               ))}
             </ul>
           )}
           {retry && (
             <Button type="button" size="sm" variant="outline" onClick={retry}>
-              <ArrowClockwiseIcon />
+              <ArrowClockwiseIcon aria-hidden="true" />
               {retryLabel}
             </Button>
           )}
@@ -289,7 +293,7 @@ export function Pager({
           disabled={busy || offset === 0}
           onClick={() => onChange(Math.max(0, Math.min(lastOffset, offset - limit)))}
         >
-          <ArrowLeftIcon />
+          <ArrowLeftIcon aria-hidden="true" />
           Previous
         </Button>
         <Button
@@ -300,7 +304,7 @@ export function Pager({
           onClick={() => onChange(offset + limit)}
         >
           Next
-          <ArrowRightIcon />
+          <ArrowRightIcon aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -336,7 +340,7 @@ export function ClearFiltersButton({
         onClear()
       }}
     >
-      <XIcon />
+      <XIcon aria-hidden="true" />
       Clear filters
     </Button>
   )

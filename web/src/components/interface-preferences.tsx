@@ -51,7 +51,7 @@ export function InterfacePreferences() {
           aria-label="Interface preferences"
           title="Interface preferences"
         >
-          <GearSixIcon />
+          <GearSixIcon aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent

@@ -283,7 +283,11 @@ export function TorznabCapabilitiesErrorNotice({ currentStage }: { currentStage:
       className="rounded-md border border-destructive/40 bg-card p-4 text-card-foreground shadow-sm"
     >
       <div className="flex items-start gap-3">
-        <WarningCircleIcon size={20} className="mt-0.5 shrink-0 text-destructive" />
+        <WarningCircleIcon
+          size={20}
+          className="mt-0.5 shrink-0 text-destructive"
+          aria-hidden="true"
+        />
         <div className="min-w-0 flex-1 space-y-3">
           <div className="space-y-1">
             <p className="text-sm font-medium">Could not load Torznab capabilities</p>

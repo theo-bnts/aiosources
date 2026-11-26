@@ -182,7 +182,7 @@ export const OperationDetailPage = preloadableComponent(
   'OperationDetailPage',
 )
 
-export function prefetchChunk(key: RouteChunkKey) {
+function prefetchChunk(key: RouteChunkKey) {
   routeLoaders[key]()
 }
 
