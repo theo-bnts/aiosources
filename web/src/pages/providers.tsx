@@ -30,6 +30,7 @@ import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { routes } from '@/lib/routes'
 import { filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
 
@@ -100,8 +101,8 @@ export function ProvidersPage() {
         title="Sources"
         actions={
           <Button asChild>
-            <Link to="/providers/new" state={listState}>
-              <PlusIcon />
+            <Link to={routes.sources.indexers.torrents.newSource} state={listState}>
+              <PlusIcon aria-hidden="true" />
               Add source
             </Link>
           </Button>
@@ -270,14 +271,14 @@ function SourceCard({
           providerId={source.id}
           trigger={
             <Button size="sm" disabled={!source.valid || !source.enabled || active}>
-              <PlayIcon />
+              <PlayIcon aria-hidden="true" />
               Run manual import
             </Button>
           }
         />
         <Button size="sm" variant="outline" asChild>
           <Link to={sourceSettingsPath(source.id)} state={listState}>
-            <PencilSimpleIcon />
+            <PencilSimpleIcon aria-hidden="true" />
             Edit
           </Link>
         </Button>
@@ -286,7 +287,7 @@ function SourceCard({
             to={`${filesResultsPath}?provider=${encodeURIComponent(source.id)}`}
             state={listState}
           >
-            <MagnifyingGlassIcon />
+            <MagnifyingGlassIcon aria-hidden="true" />
             View imported data
           </Link>
         </Button>
@@ -297,7 +298,7 @@ function SourceCard({
           variant="destructive"
           trigger={
             <Button size="sm" variant="destructive" disabled={active}>
-              <TrashIcon />
+              <TrashIcon aria-hidden="true" />
               Delete
             </Button>
           }
@@ -355,7 +356,7 @@ export function ProviderEditor() {
           <>
             <PageHeader
               title="Source configuration"
-              back={{ to: '/providers/settings', label: 'All sources' }}
+              back={{ to: routes.sources.indexers.torrents.settings, label: 'All sources' }}
             />
             <ErrorNotice error={document.error} retry={() => void document.refetch()} />
           </>
@@ -383,10 +384,10 @@ export function ProviderEditor() {
     <div className="page">
       <PageHeader
         title="Add source"
-        back={{ to: '/providers/settings', label: 'All sources' }}
+        back={{ to: routes.sources.indexers.torrents.settings, label: 'All sources' }}
         actions={
           <Button variant="outline" onClick={() => setJSONDefinition(true)}>
-            <BracketsCurlyIcon />
+            <BracketsCurlyIcon aria-hidden="true" />
             Use JSON
           </Button>
         }
@@ -451,14 +452,18 @@ function ProviderForm({
 }) {
   const navigate = useNavigate()
   const { state: navigationState, hash, key: navigationKey } = useLocation()
-  const returnView = useDetailBackLink({ to: '/providers/settings', label: 'All sources' })!
+  const returnView = useDetailBackLink({
+    to: routes.sources.indexers.torrents.settings,
+    label: 'All sources',
+  })!
   // A source deletion removes its run details too. Return only to surviving
   // list views, keeping their filters, rather than to an erased detail page.
-  const deletionTarget = /^\/(?:providers(?:\/settings)?|runs|torrents|remotes)(?:\?|$)/.test(
-    returnView.to,
-  )
-    ? returnView.to
-    : '/providers/settings'
+  const deletionTarget =
+    /^\/(?:sources\/(?:indexers\/torrents\/(?:statistics|settings|history)|remote-catalogs\/(?:statistics|settings|history)|files\/(?:statistics|results))|providers(?:\/settings)?|runs|torrents|remotes)(?:\?|$)/.test(
+      returnView.to,
+    )
+      ? returnView.to
+      : routes.sources.indexers.torrents.settings
   const [json, setJSON] = useState(document?.json ?? initialJSON ?? template?.template ?? '')
   const [savedJSON, setSavedJSON] = useState(document?.json ?? '')
   const [revision, setRevision] = useState(document?.revision ?? '')
@@ -610,12 +615,12 @@ function ProviderForm({
     <>
       <PageHeader
         title={sourceID ? document?.provider.name || sourceID : 'Configure source'}
-        back={{ to: '/providers/settings', label: 'All sources' }}
+        back={{ to: routes.sources.indexers.torrents.settings, label: 'All sources' }}
         actions={
           <>
             <div className="inline-flex items-center gap-1.5">
               <Button variant="outline" disabled={blocked} onClick={() => validate.mutate(json)}>
-                <CheckCircleIcon />
+                <CheckCircleIcon aria-hidden="true" />
                 {validate.isPending ? 'Checking…' : 'Check configuration'}
               </Button>
               <InfoTip label="Check configuration">
@@ -648,7 +653,7 @@ function ProviderForm({
               disabled={busy || loadRemote.isPending}
               onClick={() => loadRemote.mutate()}
             >
-              <ArrowClockwiseIcon />
+              <ArrowClockwiseIcon aria-hidden="true" />
               {loadRemote.isPending ? 'Loading…' : 'Compare server version'}
             </Button>
           </section>
@@ -842,7 +847,7 @@ function ProviderForm({
               disabled={busy || fieldDraft}
               onClick={() => fileInput.current?.click()}
             >
-              <UploadSimpleIcon />
+              <UploadSimpleIcon aria-hidden="true" />
               Import JSON
             </Button>
             <Button
@@ -859,7 +864,7 @@ function ProviderForm({
                 window.setTimeout(() => URL.revokeObjectURL(url), 1000)
               }}
             >
-              <DownloadSimpleIcon />
+              <DownloadSimpleIcon aria-hidden="true" />
               Export JSON
             </Button>
           </>
@@ -871,7 +876,7 @@ function ProviderForm({
           aria-label="Source validation issues"
         >
           {issues?.map((issue, index) => (
-            <li key={index}>{issue}</li>
+            <li key={`${issue}-${index}`}>{issue}</li>
           ))}
         </ul>
       )}
@@ -891,7 +896,7 @@ function ProviderForm({
                       Boolean(document?.issues?.length)
                     }
                   >
-                    <PlayIcon />
+                    <PlayIcon aria-hidden="true" />
                     Run manual import
                   </Button>
                 }
@@ -903,7 +908,7 @@ function ProviderForm({
                 variant="destructive"
                 trigger={
                   <Button variant="destructive" disabled={busy}>
-                    <TrashIcon />
+                    <TrashIcon aria-hidden="true" />
                     Delete source
                   </Button>
                 }

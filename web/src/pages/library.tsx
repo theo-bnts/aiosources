@@ -23,6 +23,7 @@ import { useURLPagination } from '@/lib/pagination'
 import { resetListView } from '@/lib/list-view'
 import { identificationResultsPath } from '@/lib/metadata-navigation'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
+import { rawPagePath, rawRecordPath, routes, runDetailPath } from '@/lib/routes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -134,7 +135,7 @@ function ProcessedRecordFilters({
       </Disclosure>
       <div className="flex flex-wrap gap-2">
         <Button id="raw-submit" type="submit">
-          <MagnifyingGlassIcon />
+          <MagnifyingGlassIcon aria-hidden="true" />
           Search
         </Button>
         <ClearFiltersButton onClear={onClear} />
@@ -159,7 +160,7 @@ function DownloadButton({
   return (
     <div className="space-y-2">
       <Button variant="outline" disabled={download.isPending} onClick={() => download.mutate()}>
-        <DownloadSimpleIcon />
+        <DownloadSimpleIcon aria-hidden="true" />
         {download.isPending ? 'Downloading…' : label}
       </Button>
       <ErrorNotice error={download.error} scope="action" />
@@ -222,7 +223,7 @@ export function TorrentsPage() {
                     <ClearFiltersButton onClear={() => applyFilters({})} />
                   ) : (
                     <Button variant="outline" asChild>
-                      <Link to="/providers/settings">
+                      <Link to={routes.sources.indexers.torrents.settings}>
                         <PlugsConnectedIcon aria-hidden="true" />
                         Choose a source
                       </Link>
@@ -335,7 +336,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                         <TableCell className="min-w-52 max-w-xl whitespace-normal">
                           <Link
                             className="font-medium leading-6 hover:text-primary"
-                            to={`/raw/${record.id}`}
+                            to={rawRecordPath(record.id)}
                             state={listState}
                           >
                             {record.fields?.title != null
@@ -378,7 +379,7 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                           {record.page_id > 0 && record.payload_retained !== false ? (
                             <Link
                               className="data-link"
-                              to={`/pages/${encodeURIComponent(String(record.page_id))}`}
+                              to={rawPagePath(record.page_id)}
                               state={listState}
                             >
                               {number(record.page)}
@@ -393,11 +394,11 @@ export function RawTableView({ runId, compact = false }: { runId: string; compac
                         <TableCell>
                           <Button variant="ghost" size="icon-sm" asChild>
                             <Link
-                              to={`/raw/${encodeURIComponent(String(record.id))}`}
+                              to={rawRecordPath(record.id)}
                               state={listState}
                               aria-label={`View record ${record.id}`}
                             >
-                              <ArrowRightIcon />
+                              <ArrowRightIcon aria-hidden="true" />
                             </Link>
                           </Button>
                         </TableCell>
@@ -448,7 +449,10 @@ export function RawDetailPage() {
   if (!detail.data)
     return (
       <div className="page">
-        <PageHeader title="Processed record" back={{ to: '/runs', label: 'Torrent history' }} />
+        <PageHeader
+          title="Processed record"
+          back={{ to: routes.sources.indexers.torrents.history, label: 'Torrent history' }}
+        />
         <ErrorNotice error={detail.error} retry={() => void detail.refetch()} />
       </div>
     )
@@ -465,7 +469,7 @@ export function RawDetailPage() {
         title={`Processed record #${record.id}`}
         description={`${sourceName(record.provider_id)} · ${record.source_id || 'Source ID missing'}`}
         back={{
-          to: `/runs/${encodeURIComponent(record.run_id)}?tab=raw`,
+          to: `${runDetailPath(record.run_id)}?tab=raw`,
           label: 'Processed records',
         }}
         actions={
@@ -527,10 +531,10 @@ export function RawDetailPage() {
             {record.page_id > 0 && payloadRetained ? (
               <Link
                 className="data-link inline-flex items-center gap-2"
-                to={`/pages/${encodeURIComponent(String(record.page_id))}`}
+                to={rawPagePath(record.page_id)}
                 state={listState}
               >
-                <FileTextIcon />
+                <FileTextIcon aria-hidden="true" />
                 Page {record.page} · #{record.page_id}
               </Link>
             ) : record.page_id > 0 ? (
@@ -605,9 +609,9 @@ export function RawDetailPage() {
           </div>
           <div className="toolbar">
             <Button variant="ghost" asChild>
-              <Link to={`/pages/${encodeURIComponent(String(record.page_id))}`} state={listState}>
+              <Link to={rawPagePath(record.page_id)} state={listState}>
                 View page
-                <ArrowRightIcon />
+                <ArrowRightIcon aria-hidden="true" />
               </Link>
             </Button>
             <DownloadButton
@@ -646,7 +650,7 @@ export function RawPageView() {
         title={`Original page #${id}`}
         description="Historical response archive"
         help="New response bodies are not stored. Historical archived responses remain available when their page exists."
-        back={{ to: '/runs', label: 'Torrent history' }}
+        back={{ to: routes.sources.indexers.torrents.history, label: 'Torrent history' }}
         actions={
           page.data && (
             <DownloadButton

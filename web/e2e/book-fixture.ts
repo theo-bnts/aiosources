@@ -148,7 +148,7 @@ export async function exerciseBookSearch(page: Page, server: TestServer) {
     /^https:\/\/covers.openlibrary.org\/b\/id\/12345/,
   )
   await page.getByRole('link', { name: 'The Amber Orchard', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`/search/${book}`))
+  await expect(page).toHaveURL(new RegExp(`/browse/search/${book}`))
   await expect(page.getByLabel('Season', { exact: true })).toHaveCount(0)
   const choiceArea = page.locator('tbody tr').filter({ hasText: 'EPUB' })
   const choose = choiceArea.getByRole('button', { name: 'Choose file', exact: true })
@@ -202,7 +202,7 @@ export async function exerciseBookSearch(page: Page, server: TestServer) {
     'https://image.tmdb.org/t/p/w342/syntheticPoster.jpg',
   )
   await page.goto('/metadata/history?service=openlibrary')
-  await expect(page).toHaveURL(/\/metadata\/books\/history$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/books\/history$/)
   await expect(page.locator('main tbody tr')).toHaveCount(1)
   await expect(page.locator('main tbody tr')).toContainText('Open Library')
   await page.goto('/metadata/videos/history')

@@ -80,7 +80,7 @@ test('Identification is a separate sidebar page and shared cache statistics matc
   expect(text).not.toContain('account')
   const nav = page.getByRole('navigation', { name: 'Main navigation', exact: true })
   await nav.getByRole('link', { name: 'Identification', exact: true }).click()
-  await expect(page).toHaveURL(/\/metadata\/identification$/)
+  await expect(page).toHaveURL(/\/metadata\/identification\/statistics$/)
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
     'Statistics',
     'Results',

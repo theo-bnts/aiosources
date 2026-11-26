@@ -40,7 +40,7 @@ for (const change of ['forget', 'replace'] as const) {
       })
     })
     await page.getByRole('link', { name: 'Administration', exact: true }).click()
-    await expect(page).toHaveURL(`${server.origin}/providers`)
+    await expect(page).toHaveURL(`${server.origin}/sources/indexers/torrents/statistics`)
     await expect(page.getByLabel('TorBox API key', { exact: true })).toHaveCount(0)
 
     const other = await page.context().newPage()
@@ -73,7 +73,7 @@ for (const change of ['forget', 'replace'] as const) {
         )
         .toBeGreaterThan(0)
       await page.goBack()
-      await expect(page).toHaveURL(`${server.origin}/public`)
+      await expect(page).toHaveURL(`${server.origin}/public/connections/stremio`)
       await expect(page.getByLabel('TorBox API key', { exact: true })).not.toHaveAttribute(
         'placeholder',
         /Saved on this browser/,

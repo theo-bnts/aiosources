@@ -488,7 +488,7 @@ test.describe('import directory summaries', () => {
       await expect(card.getByText('Synthetic import failure.', { exact: true })).toHaveCount(1)
       await expect(last.getByRole('link')).toHaveAttribute(
         'href',
-        `${path.startsWith('/remotes') ? '/remotes/history' : '/runs'}/${id}`,
+        `${path.startsWith('/remotes') ? '/sources/remote-catalogs/history' : '/sources/indexers/torrents/history'}/${id}`,
       )
     }
     expect(server.sourceRequests()).toBe(0)

@@ -42,7 +42,7 @@ async function createSource(
   await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   if (save) {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(`/providers/${id}$`))
+    await expect(page).toHaveURL(new RegExp(`/sources/indexers/torrents/settings/${id}$`))
   }
   return JSON.stringify({
     version: 1,
@@ -424,7 +424,7 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   server,
 }) => {
   await page.goto('/sharing/remotes?q=synthetic&state=disabled')
-  await expect(page).toHaveURL(/\/remotes\/settings\?q=synthetic&state=disabled$/)
+  await expect(page).toHaveURL(/\/sources\/remote-catalogs\/settings\?q=synthetic&state=disabled$/)
   await expect(page.getByRole('heading', { name: 'Remote catalogs', level: 1 })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
     'aria-selected',
@@ -465,7 +465,7 @@ test('remote catalogs belong to Sources and use simple intervals with safe concu
   await expect(page.getByText('Every 45 minutes', { exact: true })).toBeVisible()
   expect((await (await page.request.get('/api/schedules')).json()).items).toEqual([])
   await page.getByRole('link', { name: 'Shared catalogs', exact: true }).click()
-  await expect(page).toHaveURL(/\/sharing$/)
+  await expect(page).toHaveURL(/\/connections\/shared-catalogs\/statistics$/)
   await expect(page.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',

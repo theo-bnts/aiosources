@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ErrorNotice } from '@/components/common'
 import type { Status } from '@/lib/aiosource-types'
+import { routes } from '@/lib/routes'
 
 const labels = {
   games: 'Game information',
@@ -35,7 +36,7 @@ export function MaintenanceStatus({
                   ? 'reset completed.'
                   : 'reset did not complete.'
             }`}{' '}
-        <Link to="/logs" className="data-link">
+        <Link to={routes.administration.logs} className="data-link">
           View logs
         </Link>
       </p>

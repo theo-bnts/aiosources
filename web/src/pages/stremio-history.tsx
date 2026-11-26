@@ -22,6 +22,7 @@ import { useSourceNames } from '@/lib/source-names'
 import { number, bytes, percentage, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
+import { routes, stremioRequestPath } from '@/lib/routes'
 import { filesResultsPath } from '@/lib/source-navigation'
 import { resetListView } from '@/lib/list-view'
 import type { Page } from '@/lib/types'
@@ -101,19 +102,19 @@ export function StremioStatisticsPage() {
               <Statistic
                 label="Results returned"
                 value={query.data.results}
-                to="/addon/history?status=results"
+                to={`${routes.connections.stremio.history}?status=results`}
               />
               <Statistic
                 label="Requests without results"
                 value={query.data.empty}
                 detail={`(${percentage(query.data.empty, query.data.requests)})`}
-                to="/addon/history?status=empty"
+                to={`${routes.connections.stremio.history}?status=empty`}
               />
               <Statistic
                 label="Failed or interrupted requests"
                 value={query.data.failed}
                 detail={`(${percentage(query.data.failed, query.data.requests)})`}
-                to="/addon/history?status=failed,cancelled,invalid,busy"
+                to={`${routes.connections.stremio.history}?status=failed,cancelled,invalid,busy`}
               />
               <Statistic label="Average response time (ms)" value={query.data.average_ms} />
             </dl>
@@ -125,7 +126,7 @@ export function StremioStatisticsPage() {
                 <Statistic
                   label="Retained requests"
                   value={query.data.requests}
-                  to="/addon/history"
+                  to={routes.connections.stremio.history}
                 />
                 {query.data.since && (
                   <Statistic label="Oldest request" value={date(query.data.since)} size="sm" />
@@ -274,7 +275,7 @@ export function StremioHistoryPage() {
                         <TableCell>
                           <Link
                             className="data-link mono"
-                            to={`/addon/history/${item.id}`}
+                            to={stremioRequestPath(item.id)}
                             state={listState}
                           >
                             {item.resource}
@@ -299,11 +300,11 @@ export function StremioHistoryPage() {
                         <TableCell>
                           <Button variant="ghost" size="icon-sm" asChild>
                             <Link
-                              to={`/addon/history/${item.id}`}
+                              to={stremioRequestPath(item.id)}
                               state={listState}
                               aria-label={`Open request ${item.id}`}
                             >
-                              <ArrowRightIcon />
+                              <ArrowRightIcon aria-hidden="true" />
                             </Link>
                           </Button>
                         </TableCell>
@@ -357,7 +358,7 @@ export function StremioRequestPage() {
             ? `${kinds[item.kind]} · ${origins[item.origin]} · ${item.resource} · ${date(item.created_at)}`
             : undefined
         }
-        back={{ to: '/addon/history', label: 'Stremio history' }}
+        back={{ to: routes.connections.stremio.history, label: 'Stremio history' }}
         actions={item && <Outcome item={item} />}
       />
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
@@ -458,7 +459,9 @@ export function StremioRequestPage() {
                         </TableHeader>
                         <TableBody>
                           {item.results.map((result, index) => (
-                            <TableRow key={index}>
+                            <TableRow
+                              key={`${result.provider}:${result.source_id}:${result.service}:${result.filename}:${index}`}
+                            >
                               <TableCell className="max-w-lg whitespace-normal">
                                 <p className="font-medium">{result.name}</p>
                                 <p className="mt-1 whitespace-pre-wrap break-words text-sm">
@@ -542,7 +545,9 @@ export function StremioRequestPage() {
                     </TableHeader>
                     <TableBody>
                       {item.calls!.map((call, index) => (
-                        <TableRow key={index}>
+                        <TableRow
+                          key={`${call.phase}:${call.http_status}:${call.error_code}:${index}`}
+                        >
                           <TableCell>{providerSteps[call.phase] ?? 'Provider request'}</TableCell>
                           <TableCell>
                             <Badge variant={call.error_code ? 'warning' : 'success'}>

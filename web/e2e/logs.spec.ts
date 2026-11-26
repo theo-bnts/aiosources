@@ -52,14 +52,14 @@ test('logs preserve alert context, include debug on demand and filter services i
     for (const service of ['tmdb', 'alldebrid', 'torbox']) {
       await selectMultiple(page, 'Source or service', [`service:${service}`])
       await page.getByRole('button', { name: 'Apply filters', exact: true }).click()
-      await expect(page).toHaveURL(new RegExp(`/logs\\?service=${service}$`))
+      await expect(page).toHaveURL(new RegExp(`/administration/logs\\?service=${service}$`))
       await expect(page.getByText(`Failure fixture: ${service}`, { exact: true })).toBeVisible()
       await expect(page.getByText('Source fixture: tmdb', { exact: true })).toHaveCount(0)
       const link = page.locator('.table-frame').getByRole('link')
       await expect(link).toHaveCount(1)
       await expect(link).toHaveAttribute(
         'href',
-        service === 'tmdb' ? '/metadata/videos' : '/debrid',
+        service === 'tmdb' ? '/metadata/catalogs/videos/statistics' : '/debrid/statistics',
       )
       await page.reload()
       await expect(scope).toHaveText(

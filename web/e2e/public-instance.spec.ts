@@ -178,7 +178,7 @@ test('Stremio history distinguishes public streams, manifests and playback with 
   } finally {
     await db.end()
   }
-  await page.goto('/addon/history')
+  await page.goto('/connections/stremio/history')
   await selectMultiple(page, 'Installation', ['public'])
   await selectMultiple(page, 'Request type', ['playback'])
   await expect(page.getByRole('link', { name: 'imdb:tt1234567', exact: true })).toHaveCount(1)

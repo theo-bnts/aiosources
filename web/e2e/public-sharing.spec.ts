@@ -50,7 +50,7 @@ test('public shared catalogs follow administrator permissions without saving vis
   const visitor = await context.newPage()
   try {
     await visitor.goto('/public')
-    await expect(visitor).toHaveURL(/\/public\/sharing$/)
+    await expect(visitor).toHaveURL(/\/public\/connections\/shared-catalogs$/)
     const nav = visitor.getByRole('navigation', { name: 'Main navigation' })
     await expect(nav.getByRole('button', { name: 'Connections', exact: true })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Shared catalogs', exact: true })).toBeVisible()

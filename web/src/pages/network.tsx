@@ -19,6 +19,7 @@ import { api, ApiError, ConnectionError } from '@/lib/api'
 import { useNotification } from '@/lib/notifications'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { Link } from 'react-router-dom'
+import { routes } from '@/lib/routes'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames } from '@/lib/list-view'
 import type { NetworkProxy, NetworkSettings } from '@/lib/network-types'
@@ -108,7 +109,7 @@ export function NetworkPage() {
               })
           }}
         >
-          <PlusIcon />
+          <PlusIcon aria-hidden="true" />
           Add proxy
         </Button>
       </PageActions>
@@ -175,7 +176,7 @@ export function NetworkPage() {
                       disabled={probe.isPending || save.isPending}
                       onClick={() => probe.mutate(proxy.id)}
                     >
-                      <CheckCircleIcon />
+                      <CheckCircleIcon aria-hidden="true" />
                       {probe.isPending && probe.variables === proxy.id
                         ? 'Testing…'
                         : 'Test connection'}
@@ -186,7 +187,7 @@ export function NetworkPage() {
                       disabled={save.isPending}
                       onClick={() => setEditing({ proxy, settings })}
                     >
-                      <PencilSimpleIcon />
+                      <PencilSimpleIcon aria-hidden="true" />
                       Edit
                     </Button>
                     <ConfirmAction
@@ -205,7 +206,7 @@ export function NetworkPage() {
                               : undefined
                           }
                         >
-                          <TrashIcon />
+                          <TrashIcon aria-hidden="true" />
                           Delete
                         </Button>
                       }
@@ -220,7 +221,10 @@ export function NetworkPage() {
                   {used && (
                     <p className="help">
                       Assigned in{' '}
-                      <Link to="/network/outgoing/routing" className="data-link">
+                      <Link
+                        to={routes.administration.network.outgoing.routing}
+                        className="data-link"
+                      >
                         Routing
                       </Link>
                       . Change those assignments before deleting this proxy.

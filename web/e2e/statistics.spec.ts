@@ -45,16 +45,16 @@ test('statistics are the first view, settings contain configuration and statuses
     await db.end()
   }
 
-  for (const [path, heading, statistic] of [
-    ['/providers', 'Torrents', 'Imported torrents'],
-    ['/metadata/videos', 'Videos', 'Catalog entries'],
-    ['/metadata/games', 'Games', 'Catalog entries'],
-    ['/metadata/software', 'Software', 'Software applications'],
-    ['/metadata/music', 'Music', 'Release groups'],
-    ['/metadata/books', 'Books', 'Catalog entries'],
+  for (const [base, heading, statistic] of [
+    ['/sources/indexers/torrents', 'Torrents', 'Imported torrents'],
+    ['/metadata/catalogs/videos', 'Videos', 'Catalog entries'],
+    ['/metadata/catalogs/games', 'Games', 'Catalog entries'],
+    ['/metadata/catalogs/software', 'Software', 'Software applications'],
+    ['/metadata/catalogs/music', 'Music', 'Release groups'],
+    ['/metadata/catalogs/books', 'Books', 'Catalog entries'],
     ['/debrid', 'Debrid', 'Configured services'],
   ]) {
-    await page.goto(path)
+    await page.goto(`${base}/statistics`)
     const views = page.getByRole('tablist', { name: `${heading} views`, exact: true })
     await expect(views.getByRole('tab')).toHaveText(['Statistics', 'Settings', 'History'])
     await expect(views.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
@@ -64,7 +64,7 @@ test('statistics are the first view, settings contain configuration and statuses
     await expect(views.locator('svg[aria-hidden="true"]')).toHaveCount(3)
     await expect(page.getByText(statistic, { exact: true }).first()).toBeVisible()
     await views.getByRole('tab', { name: 'Settings', exact: true }).click()
-    await expect(page).toHaveURL(server.origin + path + '/settings')
+    await expect(page).toHaveURL(server.origin + base + '/settings')
     await expect(page.getByText(statistic, { exact: true })).toHaveCount(0)
     await expect(page.locator('[role="tabpanel"] header .page-description')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(0)
@@ -116,7 +116,7 @@ test('the Statistics tab preserves unsaved settings until an explicit discard', 
   await expect(interval).toHaveValue(changed)
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
   await prompt.getByRole('button', { name: 'Discard changes', exact: true }).click()
-  await expect(page).toHaveURL(/\/metadata\/videos$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/videos\/statistics$/)
   await page.getByRole('tab', { name: 'Settings', exact: true }).click()
   await expect(interval).toHaveValue(original)
 })

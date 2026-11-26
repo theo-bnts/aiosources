@@ -58,7 +58,7 @@ test.describe('returning from details', () => {
     await expect(page.getByRole('button', { name: 'Keep paused', exact: true })).toHaveCount(0)
     await page.goto('/runs/budget-hold')
     await page.getByRole('link', { name: 'View source settings', exact: true }).click()
-    await expect(page).toHaveURL(/\/providers\/example#schedules$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/example#schedules$/)
     await expect(page.getByRole('tab', { name: 'Schedules', exact: true })).toHaveAttribute(
       'aria-selected',
       'true',
@@ -83,7 +83,7 @@ test.describe('returning from details', () => {
       data: { revision: '', json: JSON.stringify(definition) },
     })
     expect(saved.status()).toBe(200)
-    await page.goto('/providers/settings?q=Example&state=disabled')
+    await page.goto('/sources/indexers/torrents/settings?q=Example&state=disabled')
     const sourcesView = page.url()
     await page.getByRole('link', { name: 'Example source', exact: true }).click()
     await page.reload()
@@ -98,7 +98,7 @@ test.describe('returning from details', () => {
     })
     await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page).toHaveURL(/\/providers\/added$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/added$/)
     await page.getByRole('link', { name: 'All sources', exact: true }).click()
     await expect(page).toHaveURL(sourcesView)
     const db = new pg.Client({ connectionString: server.databaseURL })
@@ -115,7 +115,9 @@ test.describe('returning from details', () => {
     } finally {
       await db.end()
     }
-    await page.goto('/runs?provider=example&status=succeeded&limit=50&offset=50')
+    await page.goto(
+      '/sources/indexers/torrents/history?provider=example&status=succeeded&limit=50&offset=50',
+    )
     const importsView = page.url()
     await page.getByRole('link', { name: /^Open run saved-run-/ }).click()
     await page.getByRole('tab', { name: 'Published changes', exact: true }).click()
@@ -129,7 +131,7 @@ test.describe('returning from details', () => {
       .first()
       .click()
     await page.getByRole('link', { name: 'Torrent history', exact: true }).last().click()
-    await expect(page).toHaveURL(server.origin + '/runs')
+    await expect(page).toHaveURL(server.origin + '/sources/indexers/torrents/history')
     await page.goto('/runs/saved-run-1')
     await expect(page.getByRole('region', { name: 'Run events', exact: true })).toBeVisible()
     for (const width of [1920, 390]) {
@@ -223,7 +225,7 @@ test('empty identification and operation event pages recover without discarding 
   await expect.poll(() => new URL(page.url()).searchParams.has('offset')).toBe(false)
   await expect(events.getByRole('cell', { name: '5', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'History', exact: true }).last().click()
-  await expect(page).toHaveURL(server.origin + '/metadata/videos/history')
+  await expect(page).toHaveURL(server.origin + '/metadata/catalogs/videos/history')
 })
 
 test('sharing forms use common draft feedback and do not write reverted edits', async ({

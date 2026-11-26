@@ -7,6 +7,7 @@ import {
   identificationCorrespondencesPath,
   identificationResultsPath,
 } from '@/lib/metadata-navigation'
+import { routes } from '@/lib/routes'
 import { number, percentage, useDate } from '@/lib/format'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Statistic } from '@/components/statistic'
@@ -83,7 +84,7 @@ export function IdentificationStatistics() {
               : 'No completed identification'
           }
           size="sm"
-          to="/metadata/identification/history"
+          to={routes.metadata.identification.history}
         />
         <Statistic
           label="Next automatic identification"
@@ -99,10 +100,10 @@ export function IdentificationStatistics() {
                     : 'Waiting for information'
           }
           size="sm"
-          to="/metadata/identification/settings"
+          to={routes.metadata.identification.settings}
         />
       </dl>
-      <Link to="/metadata/identification/history" aria-label="View identification history">
+      <Link to={routes.metadata.identification.history} aria-label="View identification history">
         <Badge variant={status.matching ? 'info' : status.matching_error ? 'warning' : 'secondary'}>
           {status.matching
             ? 'Identification running'

@@ -128,7 +128,7 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
     ).toBeVisible()
   await expect(alpha.getByRole('link', { name: '2 awaiting import completion' })).toHaveAttribute(
     'href',
-    '/runs/synthetic-full',
+    '/sources/indexers/torrents/history/synthetic-full',
   )
   await expect(
     page.getByRole('link', { name: 'View 0 imported torrents from Empty source', exact: true }),
@@ -147,7 +147,7 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   await alpha
     .getByRole('link', { name: 'View 5 imported torrents from Alpha source', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/files\/results\?provider=alpha$/)
+  await expect(page).toHaveURL(/\/sources\/files\/results\?provider=alpha$/)
   await expect(
     page.getByRole('link', { name: 'Alpha identified release', exact: true }),
   ).toBeVisible()
@@ -199,7 +199,7 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   expect(fileListReads).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await files.getByRole('link', { name: 'Remote copy', exact: true }).click()
-  await expect(page).toHaveURL(/\/files\/results\?provider=remote$/)
+  await expect(page).toHaveURL(/\/sources\/files\/results\?provider=remote$/)
   await expect(tabs.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true')
   await expect(
     page.getByRole('link', { name: 'Remote identified release', exact: true }),

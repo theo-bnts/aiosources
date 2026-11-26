@@ -254,7 +254,7 @@ func (s *server) registerPublicInstance(mux *http.ServeMux) {
 		mux,
 		"/public/stremio",
 		"public",
-		"/public",
+		"/public/connections/stremio",
 		func() string { return s.auth.origin },
 		func(w http.ResponseWriter, r *http.Request) {
 			s.options.AIOSource.RecordAddonRequest("public", "stream", r.PathValue("type"), "", time.Now(), model.ErrInvalid)

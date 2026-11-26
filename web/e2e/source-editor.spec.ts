@@ -97,7 +97,7 @@ async function saveSource(
   const saved = await response
   expect(saved.status()).toBe(status)
   if (status !== 200) return
-  await expect(page).toHaveURL(new RegExp(`/providers/${id}$`))
+  await expect(page).toHaveURL(new RegExp(`/sources/indexers/torrents/settings/${id}$`))
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   return (await saved.json()) as SourceDocument
 }

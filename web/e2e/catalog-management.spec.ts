@@ -85,7 +85,7 @@ test('remote manual imports share the source action dialog and open remote histo
     await dialog.getByLabel('Page budget per attempt', { exact: true }).fill('0')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
-    await expect(page).toHaveURL(/\/remotes\/history\/remote-action$/)
+    await expect(page).toHaveURL(/\/sources\/remote-catalogs\/history\/remote-action$/)
     expect(requests.at(-1)).toEqual({ provider_id: 'remote-copy', mode, max_pages: 0 })
   }
   await page.goto('/providers/settings')
@@ -190,13 +190,13 @@ test.describe('remote catalog history and ownership', () => {
       await expect(page.getByRole('menuitemcheckbox')).toHaveText(['Remote copy'])
       await page.keyboard.press('Escape')
       await page.getByRole('link', { name: 'Open run remote-copy-run', exact: true }).click()
-      await expect(page).toHaveURL(/\/remotes\/history\/remote-copy-run$/)
+      await expect(page).toHaveURL(/\/sources\/remote-catalogs\/history\/remote-copy-run$/)
       await expect(page.getByRole('tab', { name: 'History', exact: true })).toHaveAttribute(
         'aria-selected',
         'true',
       )
       await page.goto('/runs/remote-copy-run')
-      await expect(page).toHaveURL(/\/remotes\/history\/remote-copy-run$/)
+      await expect(page).toHaveURL(/\/sources\/remote-catalogs\/history\/remote-copy-run$/)
       await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
       await expect(
         page.getByRole('link', { name: 'View 1 imported torrents from Remote copy', exact: true }),
@@ -222,7 +222,7 @@ test.describe('remote catalog history and ownership', () => {
       await expect(card.getByRole('link', { name: 'History', exact: true })).toHaveCount(0)
       await expect(
         card.getByRole('link', { name: 'View imported data', exact: true }),
-      ).toHaveAttribute('href', '/files/results?provider=remote-copy')
+      ).toHaveAttribute('href', '/sources/files/results?provider=remote-copy')
       await db.query(
         `UPDATE aiosources.runs SET status='running',finished_at=NULL WHERE id='remote-copy-run'`,
       )
@@ -273,7 +273,7 @@ test.describe('remote catalog history and ownership', () => {
         page
           .getByRole('region', { name: 'Source Native source', exact: true })
           .getByRole('link', { name: 'View imported data', exact: true }),
-      ).toHaveAttribute('href', '/files/results?provider=native')
+      ).toHaveAttribute('href', '/sources/files/results?provider=native')
     } finally {
       await db.end()
     }

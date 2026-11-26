@@ -66,7 +66,7 @@ test('Storage saving is the default, edits are explicit and data reset requires 
   await expect(mode).not.toBeChecked()
   await expect(reset).toBeEnabled()
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
-  await expect(page).toHaveURL(/\/health$/)
+  await expect(page).toHaveURL(/\/administration\/storage\/statistics$/)
   await expect(
     page.getByRole('heading', { name: 'PostgreSQL database', exact: true }),
   ).toBeVisible()

@@ -59,7 +59,7 @@ func (s *server) registerAIOSource(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("GET /stremio/{token}/configure", s.aioProtect(func(w http.ResponseWriter, r *http.Request) {
 		if validatePrivateConnection(w, r) {
-			http.Redirect(w, r, "/addon/settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/connections/stremio/settings", http.StatusSeeOther)
 		}
 	}))
 	mux.HandleFunc("GET /stremio/{token}/stream/{type}/{id}", s.aioProtect(s.aioStreams))

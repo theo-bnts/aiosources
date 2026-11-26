@@ -39,11 +39,11 @@ test.describe('source cards', () => {
       await expect(card.locator('dt')).toHaveText(['Schedule', 'Last run'])
       await expect(card.getByRole('link', { name: 'Every 1 hour', exact: true })).toHaveAttribute(
         'href',
-        '/providers/example#schedules',
+        '/sources/indexers/torrents/settings/example#schedules',
       )
       await expect(card.getByRole('link', { name: 'Completed', exact: true })).toHaveAttribute(
         'href',
-        '/runs/card-run',
+        '/sources/indexers/torrents/history/card-run',
       )
       await expect(card.getByText(/^Next:/)).toBeVisible()
       await expect(card.getByText('Adapter', { exact: true })).toHaveCount(0)
@@ -144,7 +144,7 @@ test('deleting an edited source removes its data, retains secrets and returns to
   const confirm = page.getByRole('alertdialog')
   await expect(confirm).toContainText('Stored secrets')
   await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
-  await expect(page).toHaveURL(/\/providers\/settings\?q=Disposable$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\?q=Disposable$/)
   await expect(page.getByRole('heading', { name: 'Unsaved changes', exact: true })).toHaveCount(0)
   expect((await page.request.get('/api/runs/disposable-run')).status()).toBe(404)
   expect((await page.request.get('/api/providers/disposable')).status()).toBe(404)

@@ -59,7 +59,7 @@ func (s *server) registerTrustedStremio(mux *http.ServeMux) {
 		mux,
 		"/trusted/stremio",
 		"private",
-		"/trusted",
+		"/trusted/connections/stremio",
 		s.connectionOrigin,
 		func(w http.ResponseWriter, _ *http.Request) {
 			respondError(w, model.ErrInvalid)

@@ -10,6 +10,7 @@ import {
   queryClient,
 } from '@/lib/api'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
+import { routes } from '@/lib/routes'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -217,7 +218,7 @@ export function PublicAccessSettings() {
               </Button>
               {query.data?.enabled && (
                 <Button variant="outline" asChild>
-                  <Link to="/public">
+                  <Link to={routes.public.base}>
                     <ArrowSquareOutIcon aria-hidden="true" />
                     Open public homepage
                   </Link>

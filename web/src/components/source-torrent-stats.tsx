@@ -6,6 +6,7 @@ import { useListViewState } from '@/lib/detail-navigation'
 import { bytes, number, percentage, useDate } from '@/lib/format'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
 import { identificationResultsPath } from '@/lib/metadata-navigation'
+import { routes, runDetailPath } from '@/lib/routes'
 import { filesResultsPath } from '@/lib/source-navigation'
 import type { SourceTorrentOverview, SourceTorrentStats as TorrentStats } from '@/lib/types'
 
@@ -65,7 +66,7 @@ export function SourceTorrentStats({
             </Link>
             {counts.storage && (
               <Link
-                to="/health#source-storage"
+                to={`${routes.administration.storage.statistics}#source-storage`}
                 className="data-link text-xs text-muted-foreground"
                 title={`Estimated PostgreSQL source data and indexes, including retained import history. Measured ${date(counts.storage.measured_at)}. View storage details.`}
               >
@@ -102,7 +103,7 @@ export function SourceTorrentStats({
         <div className="space-y-2 border-t pt-2 text-xs text-muted-foreground">
           <Link
             className="data-link tabular-nums"
-            to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(counts.pending_import.run_id)}`}
+            to={runDetailPath(counts.pending_import.run_id, remote)}
             state={listState}
           >
             {number(counts.pending_import.torrents)} awaiting import completion

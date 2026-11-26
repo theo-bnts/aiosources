@@ -15,6 +15,7 @@ import { MaintenanceStatus } from '@/components/maintenance-status'
 import { SettingsSections } from '@/components/settings-sections'
 import { RuntimeSettingsPanel } from '@/components/runtime-settings'
 import { messageText, number as formatNumber } from '@/lib/format'
+import { routes } from '@/lib/routes'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
@@ -897,7 +898,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-videos')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset video information
                 </Button>
               }
@@ -912,7 +913,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-games')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset game information
                 </Button>
               }
@@ -927,7 +928,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-software')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset software information
                 </Button>
               }
@@ -942,7 +943,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-books')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset book information
                 </Button>
               }
@@ -957,7 +958,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-music')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset music information
                 </Button>
               }
@@ -972,7 +973,7 @@ export default function AIOSourcePage({
               action={() => action.mutateAsync('reset-mapping')}
               trigger={
                 <Button variant="destructive" disabled={maintenanceBusy}>
-                  <TrashIcon />
+                  <TrashIcon aria-hidden="true" />
                   Reset matches
                 </Button>
               }
@@ -990,7 +991,7 @@ export default function AIOSourcePage({
             action={() => action.mutateAsync('reset-cache')}
             trigger={
               <Button variant="destructive" disabled={action.isPending || resetting}>
-                <TrashIcon />
+                <TrashIcon aria-hidden="true" />
                 Reset cache
               </Button>
             }
@@ -1059,7 +1060,7 @@ export default function AIOSourcePage({
                 <p role="status" className="notice notice-warning">
                   {formatNumber(status.books!.skipped)} unreadable or oversized book records were
                   skipped.{' '}
-                  <Link className="data-link" to="/metadata/books/history">
+                  <Link className="data-link" to={metadataSections.books.history}>
                     View history
                   </Link>
                 </p>
@@ -1145,7 +1146,7 @@ export default function AIOSourcePage({
                               ? status.music?.error || ''
                               : status.matching_error || '',
                   )}{' '}
-                  <Link className="data-link" to={`${metadataSections[section].path}/history`}>
+                  <Link className="data-link" to={metadataSections[section].history}>
                     View history
                   </Link>
                 </p>
@@ -1164,7 +1165,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync')}
                     >
-                      <ArrowClockwiseIcon />
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Update film & series information
                     </Button>
                     {status.syncing && (
@@ -1173,7 +1174,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-sync')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop film & series information update
                       </Button>
                     )}
@@ -1192,7 +1193,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync-games')}
                     >
-                      <ArrowClockwiseIcon />
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Update game information
                     </Button>
                     {status.games?.running && (
@@ -1201,7 +1202,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-games')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop game information update
                       </Button>
                     )}
@@ -1215,7 +1216,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync-software')}
                     >
-                      <ArrowClockwiseIcon />
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Update software information
                     </Button>
                     {status.software?.running && (
@@ -1224,7 +1225,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-software')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop software information update
                       </Button>
                     )}
@@ -1238,7 +1239,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync-books')}
                     >
-                      <ArrowClockwiseIcon />
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Update book information
                     </Button>
                     {status.books?.running && (
@@ -1247,7 +1248,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-books')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop book information update
                       </Button>
                     )}
@@ -1261,7 +1262,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('sync-music')}
                     >
-                      <ArrowClockwiseIcon />
+                      <ArrowClockwiseIcon aria-hidden="true" />
                       Update music information
                     </Button>
                     {status.music?.running && (
@@ -1270,7 +1271,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-music')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop music information update
                       </Button>
                     )}
@@ -1288,7 +1289,7 @@ export default function AIOSourcePage({
                       )}
                       onClick={() => action.mutate('match')}
                     >
-                      <MagnifyingGlassIcon />
+                      <MagnifyingGlassIcon aria-hidden="true" />
                       Identify torrents
                     </Button>
                     <Button
@@ -1296,7 +1297,7 @@ export default function AIOSourcePage({
                       disabled={Boolean(status.matching || resetting || action.isPending || dirty)}
                       onClick={() => action.mutate('recompute-correspondences')}
                     >
-                      <LinkIcon />
+                      <LinkIcon aria-hidden="true" />
                       Recompute correspondences
                     </Button>
                     {status.matching && (
@@ -1305,7 +1306,7 @@ export default function AIOSourcePage({
                         disabled={action.isPending}
                         onClick={() => action.mutate('stop-matching')}
                       >
-                        <StopIcon />
+                        <StopIcon aria-hidden="true" />
                         Stop identification
                       </Button>
                     )}
@@ -1336,7 +1337,7 @@ export default function AIOSourcePage({
                 <>
                   For uncached private torrents, add the complete announce URL, including its
                   passkey, in{' '}
-                  <Link className="data-link" to="/security/secrets">
+                  <Link className="data-link" to={routes.administration.security.secrets}>
                     Secrets
                   </Link>
                   , or directly below, then save the playback settings. The URL is used exactly as

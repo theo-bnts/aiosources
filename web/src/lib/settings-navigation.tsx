@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { debridProviders } from './debrid'
+import { routes } from './routes'
 import { settingFromHash, type Setting } from './settings-catalog'
 import { isSourceSettingsPath } from './source-navigation'
 import { settingsEditorDestination, settingsEditorNavigationKey } from './settings-editor'
@@ -18,7 +19,7 @@ export function useSettingDestination(): Setting | undefined {
       }
     }
     const debridProvider =
-      rawHash && location.pathname === '/debrid/settings'
+      rawHash && location.pathname === routes.debrid.settings
         ? debridProviders.find((item) => item.secret === rawHash)
         : undefined
     return debridProvider
@@ -26,7 +27,7 @@ export function useSettingDestination(): Setting | undefined {
           id: `debrid.${debridProvider.id}`,
           title: `${debridProvider.name} API key`,
           group: 'Debrid / Settings',
-          route: '/debrid/settings',
+          route: routes.debrid.settings,
           control: debridProvider.secret,
         }
       : undefined

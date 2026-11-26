@@ -404,7 +404,9 @@ test('public settings search follows enabled features and never fetches administ
     await visitor.getByRole('button', { name: 'Search settings', exact: true }).click()
     await search.getByRole('combobox').fill('stremio preferred language')
     await search.getByRole('option').first().click()
-    await expect(visitor).toHaveURL(/\/public#setting=visitor.stremio.language$/)
+    await expect(visitor).toHaveURL(
+      /\/public\/connections\/stremio#setting=visitor.stremio.language$/,
+    )
     await expect(visitor.getByLabel('Preferred language', { exact: true })).toBeDisabled()
     await expect(
       visitor.getByLabel('Preferred language', { exact: true }).locator('..'),

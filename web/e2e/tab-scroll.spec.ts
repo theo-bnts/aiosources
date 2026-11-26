@@ -95,16 +95,16 @@ test('opening a secondary view directly reveals its active tab without scrolling
 test('switching page tabs keeps scroll position and keyboard focus while menu navigation resets', async ({
   page,
 }) => {
-  await page.goto('/health/settings')
+  await page.goto('/administration/storage/settings')
   await retainDocumentHeight(page)
   const statistics = page.getByRole('tab', { name: 'Statistics', exact: true })
   await statistics.click()
-  await expect(page).toHaveURL(/\/health$/)
+  await expect(page).toHaveURL(/\/administration\/storage\/statistics$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
   await expect(statistics).toBeFocused()
   await page.keyboard.press('ArrowRight')
-  await expect(page).toHaveURL(/\/health\/settings$/)
+  await expect(page).toHaveURL(/\/administration\/storage\/settings$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(25)
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toBeFocused()
@@ -116,7 +116,7 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
     .getByRole('navigation', { name: 'Main navigation', exact: true })
     .getByRole('link', { name: 'Videos', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/metadata\/videos$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/videos\/statistics$/)
   await settleNavigation(page)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
   await expect(page.locator('#main-content')).toBeFocused()
@@ -124,10 +124,10 @@ test('switching page tabs keeps scroll position and keyboard focus while menu na
 
 test('history tabs keep scroll and their selected view', async ({ page }) => {
   for (const [url, tab, target] of [
-    ['/metadata/videos', 'History', /\/metadata\/videos\/history$/],
-    ['/addon', 'History', /\/addon\/history$/],
-    ['/debrid', 'History', /\/debrid\/history$/],
-    ['/providers', 'History', /\/runs$/],
+    ['/metadata/catalogs/videos/statistics', 'History', /\/metadata\/catalogs\/videos\/history$/],
+    ['/connections/stremio/statistics', 'History', /\/connections\/stremio\/history$/],
+    ['/debrid/statistics', 'History', /\/debrid\/history$/],
+    ['/sources/indexers/torrents/statistics', 'History', /\/sources\/indexers\/torrents\/history$/],
   ] as const) {
     await page.goto(url)
     await retainDocumentHeight(page)
@@ -178,7 +178,7 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
   await page.keyboard.press('Home')
   await expect(identity).toBeFocused()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page).toHaveURL(/\/providers\/tab-guard-source$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/tab-guard-source$/)
   await page.getByLabel('Display name', { exact: true }).fill('Unsaved tab draft')
   const history = page.getByRole('tab', { name: 'History', exact: true })
   await history.click()
@@ -188,7 +188,7 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
   await expect(page.getByLabel('Display name', { exact: true })).toHaveValue('Unsaved tab draft')
   await history.click()
   await prompt.getByRole('button', { name: 'Discard changes', exact: true }).click()
-  await expect(page).toHaveURL(/\/runs$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history$/)
   await expect(prompt).toHaveCount(0)
   const persisted = await (await page.request.get('/api/providers/tab-guard-source')).json()
   expect(persisted.provider.name).toBe('Tab guard source')
@@ -197,11 +197,11 @@ test('source stage keyboard navigation keeps position and page tabs protect unsa
 test('catalog pages use the same statistics and settings navigation as other sections', async ({
   page,
 }) => {
-  for (const [path, title, labels] of [
-    ['/sharing', 'Shared catalogs', ['Statistics', 'Settings']],
-    ['/remotes', 'Remote catalogs', ['Statistics', 'Settings', 'History']],
+  for (const [base, title, labels] of [
+    ['/connections/shared-catalogs', 'Shared catalogs', ['Statistics', 'Settings']],
+    ['/sources/remote-catalogs', 'Remote catalogs', ['Statistics', 'Settings', 'History']],
   ] as const) {
-    await page.goto(path)
+    await page.goto(`${base}/statistics`)
     const tabs = page.getByRole('tablist', { name: `${title} views`, exact: true })
     await expect(tabs.getByRole('tab')).toHaveText([...labels])
     await expect(tabs.getByRole('tab', { name: 'Statistics', exact: true })).toHaveAttribute(
@@ -209,11 +209,11 @@ test('catalog pages use the same statistics and settings navigation as other sec
       'true',
     )
     await tabs.getByRole('tab', { name: 'Settings', exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(path + '/settings$'))
+    await expect(page).toHaveURL(new RegExp(base + '/settings$'))
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(0)
   }
   await page.goto('/sharing/remotes')
-  await expect(page).toHaveURL(/\/remotes\/settings$/)
+  await expect(page).toHaveURL(/\/sources\/remote-catalogs\/settings$/)
   await expect(page.getByRole('tab', { name: 'Settings', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',

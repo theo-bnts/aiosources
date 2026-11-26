@@ -154,7 +154,7 @@ test('operation errors remain in their history and manual controls without appea
     'warning',
   )
   await activity.click()
-  await expect(page).toHaveURL(/\/metadata\/videos\/history$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/videos\/history$/)
   await expect(page.getByRole('row').filter({ hasText: 'Interrupted' })).toContainText(message)
   await page.getByRole('link', { name: 'Open run interrupted-update', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: message })).toBeVisible()
@@ -187,7 +187,9 @@ test('Security separates its pages and preserves existing bookmarks without repe
       })
     ).status(),
   ).toBe(204)
-  for (const [path, target, region] of [['/secrets', '/security/secrets', 'Secrets']]) {
+  for (const [path, target, region] of [
+    ['/secrets', '/administration/security/secrets', 'Secrets'],
+  ]) {
     await page.goto(path)
     await expect(page).toHaveURL((url) => url.pathname === target)
     await expect(page.getByRole('region', { name: region, exact: true })).toBeVisible()
@@ -199,7 +201,7 @@ test('Security separates its pages and preserves existing bookmarks without repe
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
   await expect(page.getByText('Stored secrets', { exact: true })).toHaveCount(0)
-  await expect(page).toHaveURL(/\/security\/secrets$/)
+  await expect(page).toHaveURL(/\/administration\/security\/secrets$/)
   await expect(
     page.getByRole('region', { name: 'Secrets', exact: true }).getByRole('columnheader'),
   ).toHaveText(['Reference', 'Last updated', 'Actions'])
@@ -208,7 +210,7 @@ test('Security separates its pages and preserves existing bookmarks without repe
     .getByRole('navigation', { name: 'Main navigation', exact: true })
     .getByRole('link', { name: 'Active sessions', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/security\/sessions$/)
+  await expect(page).toHaveURL(/\/administration\/security\/active-sessions$/)
   await page.locator('#main-content').evaluate((main) => {
     main.style.minHeight = '2400px'
   })

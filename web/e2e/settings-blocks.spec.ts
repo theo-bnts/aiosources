@@ -180,7 +180,7 @@ test('contextual help opens on a real touch screen and its links never toggle th
     expect(bounds!.x).toBeGreaterThanOrEqual(8)
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390)
     await popup.getByRole('link', { name: 'Secrets', exact: true }).tap()
-    await expect(mobile).toHaveURL(/\/security\/secrets$/)
+    await expect(mobile).toHaveURL(/\/administration\/security\/secrets$/)
     await expect(
       mobile.getByRole('heading', { name: 'Secrets', exact: true, level: 1 }),
     ).toBeVisible()

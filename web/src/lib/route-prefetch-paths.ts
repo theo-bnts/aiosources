@@ -1,3 +1,5 @@
+import { routes } from './routes.ts'
+
 export type RouteChunkKey =
   | 'statistics'
   | 'providers'
@@ -51,8 +53,21 @@ function normalizePathname(rawPath: string): string {
 export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
   const path = normalizePathname(rawPath)
 
-  if (path === '/' || path === '/providers' || path === '/indexers') return 'statistics'
+  // Sources -> Indexers -> Torrents
   if (
+    path === '/' ||
+    path === routes.sources.base ||
+    path === routes.sources.indexers.base ||
+    path === routes.sources.indexers.torrents.base ||
+    path === routes.sources.indexers.torrents.statistics ||
+    path === '/providers' ||
+    path === '/indexers'
+  ) {
+    return 'statistics'
+  }
+  if (
+    path === routes.sources.indexers.torrents.settings ||
+    path.startsWith(`${routes.sources.indexers.torrents.settings}/`) ||
     path === '/providers/settings' ||
     path === '/providers/new' ||
     path.startsWith('/providers/') ||
@@ -63,6 +78,18 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
     return 'providers'
   }
   if (
+    path.startsWith(`${routes.sources.indexers.torrents.raw}/`) ||
+    path.startsWith(`${routes.sources.indexers.torrents.pages}/`) ||
+    path.startsWith('/raw/') ||
+    path.startsWith('/pages/')
+  ) {
+    return 'library'
+  }
+  if (
+    path === routes.sources.indexers.torrents.history ||
+    path.startsWith(`${routes.sources.indexers.torrents.history}/`) ||
+    path === routes.sources.remoteCatalogs.history ||
+    path.startsWith(`${routes.sources.remoteCatalogs.history}/`) ||
     path === '/runs' ||
     path.startsWith('/runs/') ||
     path === '/raw' ||
@@ -71,20 +98,47 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
   ) {
     return 'runs'
   }
-  if (path === '/files') return 'files-statistics'
+
+  // Sources -> Remote catalogs
   if (
-    path === '/files/results' ||
-    path === '/torrents' ||
-    path.startsWith('/raw/') ||
-    path.startsWith('/pages/')
+    path === routes.sources.remoteCatalogs.base ||
+    path === routes.sources.remoteCatalogs.statistics ||
+    path === routes.sources.remoteCatalogs.settings ||
+    path === '/remotes' ||
+    path === '/remotes/settings' ||
+    path === '/sharing/remotes'
   ) {
+    return 'remotes'
+  }
+
+  // Sources -> Files
+  if (
+    path === routes.sources.files.base ||
+    path === routes.sources.files.statistics ||
+    path === '/files'
+  ) {
+    return 'files-statistics'
+  }
+  if (path === routes.sources.files.results || path === '/files/results' || path === '/torrents') {
     return 'library'
   }
 
-  if (path === '/trending' || path === '/public/trending' || path === '/trusted/trending') {
+  // Browse -> Trending & Search (admin, public, trusted)
+  if (
+    path === routes.browse.base ||
+    path === routes.browse.trending ||
+    path === routes.public.trending ||
+    path === routes.trusted.trending ||
+    path === '/trending' ||
+    path === '/public/trending' ||
+    path === '/trusted/trending'
+  ) {
     return 'catalog-trending'
   }
   if (
+    path === routes.browse.searchTorrents ||
+    path === routes.public.searchTorrents ||
+    path === routes.trusted.searchTorrents ||
     path === '/search/torrents' ||
     path === '/public/search/torrents' ||
     path === '/trusted/search/torrents'
@@ -92,6 +146,12 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
     return 'catalog-torrents'
   }
   if (
+    path === routes.browse.search ||
+    path.startsWith(`${routes.browse.search}/`) ||
+    path === routes.public.search ||
+    path.startsWith(`${routes.public.search}/`) ||
+    path === routes.trusted.search ||
+    path.startsWith(`${routes.trusted.search}/`) ||
     path === '/search' ||
     path.startsWith('/search/') ||
     path === '/public/search' ||
@@ -102,43 +162,103 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
     return 'catalog-search'
   }
 
-  if (path === '/metadata/identification') return 'identification-statistics'
-  if (path === '/metadata/identification/results') return 'matching-diagnostics'
-  if (path === '/metadata/identification/correspondences') return 'release-correspondences'
-
+  // Metadata -> Identification
   if (
-    path === '/metadata/identification/settings' ||
-    path === '/debrid/settings' ||
+    path === routes.metadata.identification.base ||
+    path === routes.metadata.identification.statistics
+  ) {
+    return 'identification-statistics'
+  }
+  if (path === routes.metadata.identification.results) return 'matching-diagnostics'
+  if (path === routes.metadata.identification.correspondences) return 'release-correspondences'
+
+  // Metadata / Debrid / Stremio settings
+  if (
+    path === routes.metadata.identification.settings ||
+    path === routes.debrid.settings ||
+    path === routes.connections.stremio.settings ||
     path === '/addon/settings' ||
-    /^\/metadata\/(videos|games|software|music|books)\/settings$/.test(path) ||
+    /^\/metadata\/(?:catalogs\/)?(videos|games|software|music|books)\/settings$/.test(path) ||
     path === '/metadata/settings'
   ) {
     return 'aiosource'
   }
+
+  // Metadata / Debrid history
   if (
-    path === '/debrid/history' ||
-    path.startsWith('/debrid/history/') ||
+    path === routes.debrid.history ||
+    path.startsWith(`${routes.debrid.history}/`) ||
     path === '/metadata/history' ||
     path.startsWith('/metadata/history/') ||
-    /^\/metadata\/(videos|games|software|music|books|identification)\/history(\/|$)/.test(path)
+    /^\/metadata\/(?:catalogs\/)?(videos|games|software|music|books)\/history(\/|$)/.test(path) ||
+    path === routes.metadata.identification.history ||
+    path.startsWith(`${routes.metadata.identification.history}/`)
   ) {
     return 'operation-history'
   }
+
+  // Metadata / Debrid statistics
   if (
-    path === '/debrid' ||
-    path === '/metadata' ||
-    path === '/metadata/catalogs' ||
-    /^\/metadata\/(videos|games|software|music|books)$/.test(path)
+    path === routes.debrid.base ||
+    path === routes.debrid.statistics ||
+    path === routes.metadata.base ||
+    path === routes.metadata.catalogs.base ||
+    /^\/metadata\/(?:catalogs\/)?(videos|games|software|music|books)(?:\/statistics)?$/.test(path)
   ) {
     return 'statistics'
   }
 
-  if (path === '/addon' || path === '/addon/history' || path.startsWith('/addon/history/')) {
+  // Connections
+  if (
+    path === routes.connections.stremio.base ||
+    path === routes.connections.stremio.statistics ||
+    path === routes.connections.stremio.history ||
+    path.startsWith(`${routes.connections.stremio.history}/`) ||
+    path === '/addon' ||
+    path === '/addon/history' ||
+    path.startsWith('/addon/history/')
+  ) {
     return 'stremio-history'
   }
-  if (path === '/health' || path === '/health/settings') return 'health'
-  if (path === '/logs' || path === '/notifications' || path === '/webhooks') return 'logs'
   if (
+    path === routes.connections.sharedCatalogs.base ||
+    path === routes.connections.sharedCatalogs.statistics ||
+    path === routes.connections.sharedCatalogs.settings ||
+    path === '/sharing' ||
+    path === '/sharing/settings'
+  ) {
+    return 'sharing'
+  }
+  if (
+    path === routes.connections.base ||
+    path === routes.connections.torznab ||
+    path === '/torznab'
+  ) {
+    return 'torznab'
+  }
+
+  // Administration
+  if (
+    path === routes.administration.storage.base ||
+    path === routes.administration.storage.statistics ||
+    path === routes.administration.storage.settings ||
+    path === '/health' ||
+    path === '/health/settings'
+  ) {
+    return 'health'
+  }
+  if (
+    path === routes.administration.logs ||
+    path === '/logs' ||
+    path === '/notifications' ||
+    path === '/webhooks'
+  ) {
+    return 'logs'
+  }
+  if (
+    path === routes.administration.network.outgoing.base ||
+    path === routes.administration.network.outgoing.proxies ||
+    path === routes.administration.network.outgoing.routing ||
     path === '/network/outgoing' ||
     path === '/network/outgoing/routing' ||
     path === '/network/proxies' ||
@@ -146,15 +266,29 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
   ) {
     return 'network'
   }
-  if (path === '/network/incoming' || path === '/network') return 'incoming-network'
-  if (path === '/sharing' || path === '/sharing/settings') return 'sharing'
-  if (path === '/remotes' || path === '/remotes/settings' || path === '/sharing/remotes') {
-    return 'remotes'
-  }
-  if (path === '/public-access') return 'public-access'
-  if (path === '/trusted-users' || path === '/users') return 'trusted-users'
-  if (path === '/torznab') return 'torznab'
   if (
+    path === routes.administration.network.base ||
+    path === routes.administration.network.incoming ||
+    path === '/network/incoming' ||
+    path === '/network'
+  ) {
+    return 'incoming-network'
+  }
+  if (path === routes.administration.users.public || path === '/public-access') {
+    return 'public-access'
+  }
+  if (
+    path === routes.administration.users.base ||
+    path === routes.administration.users.trusted ||
+    path === '/trusted-users' ||
+    path === '/users'
+  ) {
+    return 'trusted-users'
+  }
+  if (
+    path === routes.administration.base ||
+    path === routes.administration.security.base ||
+    path.startsWith(`${routes.administration.security.base}/`) ||
     path === '/security' ||
     path.startsWith('/security/') ||
     path === '/secrets' ||

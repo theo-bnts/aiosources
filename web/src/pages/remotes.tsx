@@ -27,6 +27,7 @@ import { mergeRemoteDraft, remoteDraft, remoteJSON, validateRemoteURL } from '@/
 import type { RemoteDraft } from '@/lib/remote-config'
 import { messageText, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
+import { routes } from '@/lib/routes'
 import { filesResultsPath } from '@/lib/source-navigation'
 import { ListFilters, useListFilters } from '@/components/list-filters'
 import { compareListNames } from '@/lib/list-view'
@@ -113,7 +114,7 @@ export function RemoteStatisticsPage() {
                 label="Awaiting import completion"
                 value={counts.data || !items.length ? totals.awaiting_import : 'Not available'}
                 loadingLabel={items.length > 0 && counts.isPending ? 'Loading counts…' : undefined}
-                to="/remotes/history"
+                to={routes.sources.remoteCatalogs.history}
               />
               <Statistic
                 label="Enabled catalogs"
@@ -216,7 +217,7 @@ export default function RemotesPage() {
     <div className="page">
       <PageActions>
         <Button onClick={() => setEditing('new')}>
-          <PlusIcon />
+          <PlusIcon aria-hidden="true" />
           Add remote catalog
         </Button>
       </PageActions>
@@ -324,13 +325,13 @@ export default function RemotesPage() {
                     remote
                     trigger={
                       <Button size="sm" disabled={!remote.valid || !remote.enabled || active}>
-                        <PlayIcon />
+                        <PlayIcon aria-hidden="true" />
                         Run manual import
                       </Button>
                     }
                   />
                   <Button size="sm" variant="outline" onClick={() => setEditing(remote)}>
-                    <PencilSimpleIcon />
+                    <PencilSimpleIcon aria-hidden="true" />
                     Edit
                   </Button>
                   <Button size="sm" variant="outline" asChild>
@@ -338,7 +339,7 @@ export default function RemotesPage() {
                       to={`${filesResultsPath}?provider=${encodeURIComponent(remote.id)}`}
                       state={listState}
                     >
-                      <MagnifyingGlassIcon />
+                      <MagnifyingGlassIcon aria-hidden="true" />
                       View imported data
                     </Link>
                   </Button>
@@ -353,7 +354,7 @@ export default function RemotesPage() {
                         variant="destructive"
                         disabled={['queued', 'running'].includes(remote.last_run?.status ?? '')}
                       >
-                        <TrashIcon />
+                        <TrashIcon aria-hidden="true" />
                         Delete
                       </Button>
                     }

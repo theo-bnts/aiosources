@@ -185,7 +185,7 @@ test('new Torznab source fills fields from cached capabilities and uses consiste
 
     // Save and verify persisted JSON.
     await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page).toHaveURL(/\/providers\/cinema_archive$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/cinema_archive$/)
     const saved = await (await page.request.get('/api/providers/cinema_archive')).json()
     const definition = JSON.parse(saved.json)
     expect(definition.name).toBe('Cinema Archive')

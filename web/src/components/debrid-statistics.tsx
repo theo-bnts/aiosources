@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { number, percentage, useDate } from '@/lib/format'
+import { routes } from '@/lib/routes'
 import type { Config } from '@/lib/aiosource-types'
 import { ErrorNotice, Loading } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
@@ -73,7 +74,10 @@ export function DebridStatistics({ config }: { config: Config }) {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-1.5">
                         <h3 className="section-title mb-0">
-                          <Link className="data-link" to={`/debrid/settings#${provider.secret}`}>
+                          <Link
+                            className="data-link"
+                            to={`${routes.debrid.settings}#${provider.secret}`}
+                          >
                             {name}
                           </Link>
                         </h3>
@@ -119,8 +123,8 @@ export function DebridStatistics({ config }: { config: Config }) {
                     )}
                     <div className="card-actions mt-auto">
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/debrid/history?service=${service}`}>
-                          <ArrowRightIcon />
+                        <Link to={`${routes.debrid.history}?service=${service}`}>
+                          <ArrowRightIcon aria-hidden="true" />
                           View history
                         </Link>
                       </Button>

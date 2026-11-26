@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { usePublicCredential } from '@/lib/public-credentials'
 import { randomID } from '@/lib/random-id'
 import { PublicSearchContext } from '@/lib/public-search'
+import { visitorRoutes } from '@/lib/routes'
 import {
   CatalogSearchPage,
   CatalogTitlePage,
@@ -31,9 +32,9 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
       sourceScope,
     ],
   )
-  const base = info.trusted ? '/trusted' : '/public'
-  const id = new RegExp(`^${base}/search/([0-9]+)$`).exec(location.pathname)?.[1]
-  const isTrending = location.pathname === `${base}/trending`
+  const r = visitorRoutes(info.trusted ? '/trusted' : '/public')
+  const id = new RegExp(`^${r.search}/([0-9]+)$`).exec(location.pathname)?.[1]
+  const isTrending = location.pathname === r.trending
   const form = (
     <PublicCredentialsForm
       info={info}
@@ -84,18 +85,10 @@ export function PublicSearchEntry({ info }: { info: PublicInfo }) {
             )}
           </section>
         )}
-        <Suspense
-          fallback={
-            <Loading
-              label={
-                location.pathname === `${base}/trending` ? 'Loading Trending' : 'Loading Search'
-              }
-            />
-          }
-        >
-          {location.pathname === `${base}/trending` ? (
+        <Suspense fallback={<Loading label={isTrending ? 'Loading Trending' : 'Loading Search'} />}>
+          {isTrending ? (
             <CatalogTrendingPage />
-          ) : location.pathname === `${base}/search/torrents` ? (
+          ) : location.pathname === r.searchTorrents ? (
             <CatalogTorrentsPage />
           ) : id ? (
             <CatalogTitlePage publicID={id} />

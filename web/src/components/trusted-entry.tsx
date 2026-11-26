@@ -22,7 +22,7 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
       </div>
     )
   const access = info.data
-  const { section, available, validPath, fallbackTarget } = resolveVisitorSection(
+  const { section, available, validPath, fallbackTarget, canonicalPath } = resolveVisitorSection(
     access,
     location.pathname,
     '/trusted',
@@ -37,6 +37,14 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
       </div>,
     )
   if (!validPath || !available) return <Navigate to={fallbackTarget} replace />
+  if (canonicalPath && canonicalPath !== location.pathname)
+    return (
+      <Navigate
+        to={`${canonicalPath}${location.search}${location.hash}`}
+        state={location.state}
+        replace
+      />
+    )
   if (section === 'search' || section === 'trending')
     return layout(<PublicSearchEntry info={access} />)
   if (section === 'catalog')

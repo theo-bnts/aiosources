@@ -25,8 +25,10 @@ import {
   catalogAPI,
   catalogQueryKey,
   catalogSearchPath,
+  catalogTrendingPath,
   usePublicSearch,
 } from '@/lib/public-search'
+import { routes } from '@/lib/routes'
 import { useSourceNames } from '@/lib/source-names'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
@@ -169,7 +171,7 @@ export function CatalogSearchPage() {
         </Disclosure>
         <div className="flex flex-wrap gap-2">
           <Button id="catalog-submit" type="submit">
-            <MagnifyingGlassIcon />
+            <MagnifyingGlassIcon aria-hidden="true" />
             Search
           </Button>
           <ClearFiltersButton
@@ -254,7 +256,7 @@ export function CatalogSearchPage() {
             to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
             state={listState}
           >
-            <MagnifyingGlassIcon />
+            <MagnifyingGlassIcon aria-hidden="true" />
             Search torrents directly
           </Link>
         </Button>
@@ -349,7 +351,7 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
   }
   const backFallback =
     visitor && !visitor.info.search_enabled && visitor.info.trending_enabled
-      ? { to: `${visitor.trusted ? '/trusted' : '/public'}/trending`, label: 'Trending' }
+      ? { to: catalogTrendingPath(visitor), label: 'Trending' }
       : { to: searchPath, label: 'Search' }
   return (
     <div className={visitor ? 'space-y-6' : 'page'}>
@@ -593,8 +595,9 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                     ) && (
                       <p className="help">
                         Private sources without an announce URL allow cached downloads only. Add
-                        your announce URL in <Link to="/debrid/settings">Debrid settings</Link> to
-                        enable uncached downloads.
+                        your announce URL in{' '}
+                        <Link to={routes.debrid.settings}>Debrid settings</Link> to enable uncached
+                        downloads.
                       </p>
                     )}
                   {releases.data.items?.length ? (

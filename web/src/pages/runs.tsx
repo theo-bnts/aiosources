@@ -9,6 +9,7 @@ import {
   StopIcon,
 } from '@phosphor-icons/react'
 import { compareListNames, resetListView } from '@/lib/list-view'
+import { rawPagePath, routes, runDetailPath } from '@/lib/routes'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import {
   ResultCount,
@@ -87,7 +88,7 @@ export function RunsTable({ runs, remote = false }: { runs: Run[]; remote?: bool
               <TableCell>
                 <Link
                   className="data-link font-medium"
-                  to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`}
+                  to={runDetailPath(run.id, remote)}
                   state={listState}
                 >
                   {sourceName(run.provider_id, run.provider_name)}
@@ -116,11 +117,11 @@ export function RunsTable({ runs, remote = false }: { runs: Run[]; remote?: bool
               <TableCell>
                 <Button variant="ghost" size="icon-sm" asChild>
                   <Link
-                    to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`}
+                    to={runDetailPath(run.id, remote)}
                     state={listState}
                     aria-label={`Open run ${run.id}`}
                   >
-                    <ArrowRightIcon />
+                    <ArrowRightIcon aria-hidden="true" />
                   </Link>
                 </Button>
               </TableCell>
@@ -406,11 +407,11 @@ function EventsView({ runId }: { runId: string }) {
                         event.data.metadata_run_id !== '' && (
                           <Link
                             className="data-link inline-flex items-center gap-2 text-xs leading-6"
-                            to={`/runs/${encodeURIComponent(event.data.metadata_run_id)}`}
+                            to={runDetailPath(event.data.metadata_run_id)}
                             state={listState}
                           >
                             Open Metadata follow-up · new torrents only
-                            <ArrowRightIcon />
+                            <ArrowRightIcon aria-hidden="true" />
                           </Link>
                         )}
                       {typeof event.data?.page_id === 'number' &&
@@ -422,11 +423,11 @@ function EventsView({ runId }: { runId: string }) {
                         ) : (
                           <Link
                             className="data-link inline-flex items-center gap-2 text-xs leading-6"
-                            to={`/pages/${event.data.page_id}`}
+                            to={rawPagePath(event.data.page_id)}
                             state={listState}
                           >
                             Open response
-                            <ArrowRightIcon />
+                            <ArrowRightIcon aria-hidden="true" />
                           </Link>
                         ))}
                     </div>
@@ -466,7 +467,9 @@ function EventsView({ runId }: { runId: string }) {
 
 export function RunDetailPage({ remote = false }: { remote?: boolean }) {
   const location = useLocation()
-  const historyPath = remote ? '/remotes/history' : '/runs'
+  const historyPath = remote
+    ? routes.sources.remoteCatalogs.history
+    : routes.sources.indexers.torrents.history
   const sourceName = useSourceNames()
   const date = useDate()
   const changesPage = useURLPagination({ limitKey: 'changes_limit', offsetKey: 'changes_offset' })
@@ -555,7 +558,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
   if (Boolean(run.remote_catalog) !== remote)
     return (
       <Navigate
-        to={`${run.remote_catalog ? '/remotes/history' : '/runs'}/${encodeURIComponent(id)}${location.search}${location.hash}`}
+        to={`${runDetailPath(id, Boolean(run.remote_catalog))}${location.search}${location.hash}`}
         state={location.state}
         replace
       />
@@ -666,7 +669,7 @@ export function RunDetailPage({ remote = false }: { remote?: boolean }) {
               newly inserted by{' '}
               <Link
                 className="data-link"
-                to={`/runs/${encodeURIComponent(run.metadata_parent_run_id)}`}
+                to={runDetailPath(run.metadata_parent_run_id)}
                 state={listState}
               >
                 the parent collection

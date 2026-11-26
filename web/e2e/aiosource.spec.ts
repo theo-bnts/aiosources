@@ -320,7 +320,7 @@ test('private playback saves independently and fields have space below their lab
   await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
   await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page).toHaveURL(/\/providers\/private-playback$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/private-playback$/)
   await page.goto('/secrets')
   const announce = 'https://tracker.example/synthetic%2Fkey/announce?source=one'
   for (const [name, value] of [

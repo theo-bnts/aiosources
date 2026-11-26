@@ -296,7 +296,7 @@ for (const width of [1440, 390]) {
     await page.keyboard.press('Escape')
     await expect(
       storage.getByRole('link', { name: /Open import from Readable source name/ }),
-    ).toHaveAttribute('href', '/runs/synthetic-cancelled')
+    ).toHaveAttribute('href', '/sources/indexers/torrents/history/synthetic-cancelled')
     await expect(storage.getByText('Cancelled', { exact: true })).toBeVisible()
     const metadata = storage.getByRole('button', { name: 'Metadata', exact: true })
     await metadata.click()
@@ -305,11 +305,11 @@ for (const width of [1440, 390]) {
       storage.getByRole('heading', { name: 'By metadata type', exact: true }),
     ).toBeVisible()
     for (const [label, path] of [
-      ['Books', '/metadata/books'],
-      ['Music', '/metadata/music'],
-      ['Software', '/metadata/software'],
-      ['Videos', '/metadata/videos'],
-      ['Games', '/metadata/games'],
+      ['Books', '/metadata/catalogs/books/statistics'],
+      ['Music', '/metadata/catalogs/music/statistics'],
+      ['Software', '/metadata/catalogs/software/statistics'],
+      ['Videos', '/metadata/catalogs/videos/statistics'],
+      ['Games', '/metadata/catalogs/games/statistics'],
     ]) {
       await expect(storage.getByRole('link', { name: label, exact: true })).toHaveAttribute(
         'href',

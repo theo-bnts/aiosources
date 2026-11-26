@@ -44,7 +44,7 @@ test('Public permissions share one optional section, while Network expands into 
   await expect(enabled).toBeChecked({ checked: !initial })
   await enabled.click()
   await limitsLink.click()
-  await expect(page).toHaveURL(/\/security\/limits$/)
+  await expect(page).toHaveURL(/\/administration\/security\/limits$/)
   await openDisclosure(page, 'Public request limits')
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toBeVisible()
   const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true })
@@ -279,7 +279,7 @@ test('incoming proxy trust and public quotas use coherent forms and apply to bot
   page,
 }) => {
   await page.goto('/network/incoming')
-  await expect(page).toHaveURL(/\/network\/incoming$/)
+  await expect(page).toHaveURL(/\/administration\/network\/incoming$/)
   await expect(page.getByRole('heading', { name: 'Trusted proxy', exact: true })).toBeVisible()
   await expect(page.getByRole('tablist')).toHaveCount(0)
   await expect(

@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import type { PublicInfo } from '@/components/public-connection-fields'
 import { api, ApiError } from './api'
 import { forgetPublicCredential } from './public-credentials'
+import { routes } from './routes'
 
 export type PublicSearchAccess = {
   trusted?: boolean
@@ -14,7 +15,19 @@ export const PublicSearchContext = createContext<PublicSearchAccess | null>(null
 export const usePublicSearch = () => useContext(PublicSearchContext)
 
 export function catalogSearchPath(visitor: PublicSearchAccess | null): string {
-  return visitor?.trusted ? '/trusted/search' : visitor ? '/public/search' : '/search'
+  return visitor?.trusted
+    ? routes.trusted.search
+    : visitor
+      ? routes.public.search
+      : routes.browse.search
+}
+
+export function catalogTrendingPath(visitor: PublicSearchAccess | null): string {
+  return visitor?.trusted
+    ? routes.trusted.trending
+    : visitor
+      ? routes.public.trending
+      : routes.browse.trending
 }
 
 export function catalogQueryKey(

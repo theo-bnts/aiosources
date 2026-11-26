@@ -23,6 +23,7 @@ import {
   parseMetadataCategories,
   suggestedProviderCategories,
 } from '@/lib/metadata-filters'
+import { runDetailPath } from '@/lib/routes'
 import { useListViewState } from '@/lib/detail-navigation'
 import { Button } from '@/components/ui/button'
 import { Disclosure } from '@/components/ui/disclosure'
@@ -103,12 +104,9 @@ export function CollectDialog({
     onSuccess: async (run) => {
       setOpen(false)
       await refreshData()
-      navigate(
-        `${run.remote_catalog ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`,
-        {
-          state: returnView,
-        },
-      )
+      navigate(runDetailPath(run.id, Boolean(run.remote_catalog)), {
+        state: returnView,
+      })
     },
   })
   const items = sources.data?.items?.filter((item) => Boolean(item.remote_catalog) === remote)
@@ -147,7 +145,7 @@ export function CollectDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button>
-            <PlayIcon />
+            <PlayIcon aria-hidden="true" />
             Run manual import
           </Button>
         )}

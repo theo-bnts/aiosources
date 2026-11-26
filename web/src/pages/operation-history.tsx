@@ -29,6 +29,7 @@ import {
   metadataSections,
   type MetadataSection,
 } from '@/lib/metadata-navigation'
+import { routes } from '@/lib/routes'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -182,7 +183,7 @@ export function OperationHistoryPage({
     ? metadataSections[metadataSection].service
     : search.get('service') || ''
   const status = search.get('status') || ''
-  const historyPath = metadataSection ? metadataHistoryPath(metadataSection) : `/${section}/history`
+  const historyPath = metadataSection ? metadataHistoryPath(metadataSection) : routes.debrid.history
   const filtered = Boolean(status || (!metadataSection && (kind || service)))
   const date = useDate()
   const query = useQuery({
@@ -332,7 +333,7 @@ export function OperationHistoryPage({
                               state={listState}
                               aria-label={`Open run ${run.id}`}
                             >
-                              <ArrowRightIcon />
+                              <ArrowRightIcon aria-hidden="true" />
                             </Link>
                           </Button>
                         </TableCell>
@@ -373,7 +374,16 @@ export function OperationDetailPage({
 }) {
   const { id } = useParams()
   const location = useLocation()
-  const historyPath = metadataSection ? metadataHistoryPath(metadataSection) : `/${section}/history`
+  const currentHistoryPath = metadataSection
+    ? metadataHistoryPath(metadataSection)
+    : section === 'debrid'
+      ? routes.debrid.history
+      : '/metadata/history'
+  const backHistoryPath = metadataSection
+    ? metadataHistoryPath(metadataSection)
+    : section === 'debrid'
+      ? routes.debrid.history
+      : routes.metadata.catalogs.videos.history
   const pagination = useURLPagination()
   const { limit, offset } = pagination
   const date = useDate()
@@ -386,8 +396,8 @@ export function OperationDetailPage({
   const targetHistory = run.data
     ? run.data.kind === 'metadata' || run.data.kind === 'matching'
       ? metadataHistoryPath(metadataOperationSection(run.data.kind, run.data.service))
-      : '/debrid/history'
-    : historyPath
+      : routes.debrid.history
+    : currentHistoryPath
   const events = useQuery({
     queryKey: ['operation-events', id, offset, limit],
     queryFn: ({ signal }) =>
@@ -396,12 +406,12 @@ export function OperationDetailPage({
         { signal },
       ),
     refetchInterval: LIVE_REFRESH_INTERVAL,
-    enabled: Boolean(run.data && targetHistory === historyPath),
+    enabled: Boolean(run.data && targetHistory === currentHistoryPath),
     placeholderData: (previousData, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previousData : undefined,
   })
   const result = run.data
-  if (result && targetHistory !== historyPath)
+  if (result && targetHistory !== currentHistoryPath)
     return (
       <Navigate
         to={`${targetHistory}/${encodeURIComponent(result.id)}${location.search}${location.hash}`}
@@ -413,7 +423,7 @@ export function OperationDetailPage({
     <div className="page">
       <PageHeader
         title={result ? kinds[result.kind] : 'Operation'}
-        back={{ to: historyPath, label: 'History' }}
+        back={{ to: backHistoryPath, label: 'History' }}
       />
       <ErrorNotice error={run.error} retry={() => void run.refetch()} />
       {run.isPending ? (

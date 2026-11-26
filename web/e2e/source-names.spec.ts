@@ -117,14 +117,14 @@ test('source display names stay consistent while routes and historical identity 
     await page.goto(`/runs?provider=${source.id}`)
     await expect(page.getByRole('link', { name, exact: true })).toHaveAttribute(
       'href',
-      '/runs/display-run',
+      '/sources/indexers/torrents/history/display-run',
     )
     await page.getByRole('link', { name, exact: true }).click()
     await expect(page.locator('.page').first()).toContainText(name)
     await page.goto('/logs?q=Example%20source%20activity')
     await expect(page.getByRole('link', { name: `Source: ${name}`, exact: true })).toHaveAttribute(
       'href',
-      `/providers/${source.id}`,
+      `/sources/indexers/torrents/settings/${source.id}`,
     )
     await page.goto(
       `/metadata/identification/results?match_status=matched&match_provider=${source.id}`,
@@ -136,7 +136,7 @@ test('source display names stay consistent while routes and historical identity 
     await page.goto(`/addon/history/${requestID}`)
     await expect(
       page.getByRole('link', { name: `${name} · release-1`, exact: true }),
-    ).toHaveAttribute('href', `/files/results?provider=${source.id}&q=release-1`)
+    ).toHaveAttribute('href', `/sources/files/results?provider=${source.id}&q=release-1`)
   }
   const renamed = await (await page.request.get(`/api/providers/${source.id}`)).json()
   expect(

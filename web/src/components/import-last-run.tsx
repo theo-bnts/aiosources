@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Run } from '@/lib/types'
 import { messageText, useDate } from '@/lib/format'
+import { runDetailPath } from '@/lib/routes'
 import { RunStatusBadge } from '@/components/common'
 
 export function ImportLastRun({
@@ -23,10 +24,7 @@ export function ImportLastRun({
       <dt className="text-muted-foreground">Last run</dt>
       <dd className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
         {run ? (
-          <Link
-            to={`${remote ? '/remotes/history' : '/runs'}/${encodeURIComponent(run.id)}`}
-            state={state}
-          >
+          <Link to={runDetailPath(run.id, remote)} state={state}>
             <RunStatusBadge run={run} />
           </Link>
         ) : (

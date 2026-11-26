@@ -18,13 +18,13 @@ test('directory editors and shared preferences use consistent, accessible mobile
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 844 })
     for (const [route, action, title] of [
-      ['/network/outgoing', 'Add proxy', 'Add proxy'],
-      ['/remotes/settings', 'Add remote catalog', 'Add remote catalog'],
-      ['/addon/settings', 'Create access', 'Create access'],
-      ['/torznab', 'Create access', 'Create access'],
-      ['/sharing/settings', 'Create share', 'Create share'],
-      ['/trusted-users', 'Add user', 'Add trusted user'],
-      ['/security/secrets', 'Create secret', 'Create secret'],
+      ['/administration/network/outgoing/proxies', 'Add proxy', 'Add proxy'],
+      ['/sources/remote-catalogs/settings', 'Add remote catalog', 'Add remote catalog'],
+      ['/connections/stremio/settings', 'Create access', 'Create access'],
+      ['/connections/torznab', 'Create access', 'Create access'],
+      ['/connections/shared-catalogs/settings', 'Create share', 'Create share'],
+      ['/administration/users/trusted', 'Add user', 'Add trusted user'],
+      ['/administration/security/secrets', 'Create secret', 'Create secret'],
     ]) {
       await page.goto(route)
       const origin = new URL(page.url()).pathname
@@ -62,7 +62,7 @@ test('directory editors and shared preferences use consistent, accessible mobile
     await page.keyboard.press('Tab')
     await expect(preferences.getByLabel('Rows per page', { exact: true })).toBeFocused()
     await preferences.getByRole('button', { name: 'Close', exact: true }).click()
-    await page.goto('/security/sessions')
+    await page.goto('/administration/security/active-sessions')
     await expect(page.locator('main')).not.toContainText('Each session keeps the expiry')
   }
   expect(failures).toEqual([])

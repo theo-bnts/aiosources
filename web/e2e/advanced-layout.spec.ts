@@ -262,7 +262,7 @@ test('a missing advanced HTML field opens its setup group without changing the s
   await page.getByRole('tab', { name: 'Connection', exact: true }).click()
   await page.getByLabel('Source URL', { exact: true }).fill(server.sourceURL)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page).toHaveURL(/\/providers\/advanced-html$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/advanced-html$/)
   const original = await (await page.request.get('/api/providers/advanced-html')).json()
   const writes: string[] = []
   page.on('request', (request) => {

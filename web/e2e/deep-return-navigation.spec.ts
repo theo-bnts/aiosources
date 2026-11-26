@@ -24,14 +24,14 @@ test('returning through a processed record and its run retains the original hist
   } finally {
     await db.end()
   }
-  await page.goto('/runs?provider=nested-source&status=succeeded')
+  await page.goto('/sources/indexers/torrents/history?provider=nested-source&status=succeeded')
   const origin = page.url()
   await page.getByRole('link', { name: 'Open run nested-run', exact: true }).click()
   await page.getByRole('tab', { name: 'Processed records', exact: true }).click()
   await page.getByRole('link', { name: `View record ${recordID}`, exact: true }).click()
   await page.reload()
   await page.locator('main').getByRole('link', { name: 'Processed records', exact: true }).click()
-  await expect(page).toHaveURL(/\/runs\/nested-run\?tab=raw$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\/nested-run\?tab=raw$/)
   await page
     .locator('main')
     .getByRole('link', { name: /^(Torrent history|History)$/ })

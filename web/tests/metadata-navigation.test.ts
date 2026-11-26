@@ -10,35 +10,35 @@ import { settingByID, settingURL } from '../src/lib/settings-catalog.ts'
 test('metadata histories separate video, book and shared identification operations', () => {
   assert.equal(metadataOperationSection('metadata', 'tmdb'), 'videos')
   assert.equal(metadataOperationSection('metadata', 'igdb'), 'games')
-  assert.equal(metadataHistoryPath('games'), '/metadata/games/history')
+  assert.equal(metadataHistoryPath('games'), '/metadata/catalogs/games/history')
   assert.equal(metadataOperationSection('metadata', 'software'), 'software')
-  assert.equal(metadataHistoryPath('software'), '/metadata/software/history')
+  assert.equal(metadataHistoryPath('software'), '/metadata/catalogs/software/history')
   assert.equal(metadataOperationSection('metadata', 'openlibrary'), 'books')
   assert.equal(metadataOperationSection('metadata', 'musicbrainz'), 'music')
-  assert.equal(metadataHistoryPath('music'), '/metadata/music/history')
+  assert.equal(metadataHistoryPath('music'), '/metadata/catalogs/music/history')
   assert.equal(metadataOperationSection('matching', 'local'), 'identification')
-  assert.equal(metadataHistoryPath('books'), '/metadata/books/history')
+  assert.equal(metadataHistoryPath('books'), '/metadata/catalogs/books/history')
   assert.equal(
     legacyMetadataHistory('?service=software&kind=metadata&status=succeeded'),
-    '/metadata/software/history?status=succeeded',
+    '/metadata/catalogs/software/history?status=succeeded',
   )
   assert.equal(
     legacyMetadataHistory('?service=musicbrainz&kind=metadata&status=succeeded'),
-    '/metadata/music/history?status=succeeded',
+    '/metadata/catalogs/music/history?status=succeeded',
   )
   assert.equal(
     legacyMetadataHistory('?service=openlibrary&kind=metadata&status=failed&offset=50'),
-    '/metadata/books/history?status=failed&offset=50',
+    '/metadata/catalogs/books/history?status=failed&offset=50',
   )
   assert.equal(
     legacyMetadataHistory('?service=tmdb&status=succeeded'),
-    '/metadata/videos/history?status=succeeded',
+    '/metadata/catalogs/videos/history?status=succeeded',
   )
   assert.equal(
     legacyMetadataHistory('?kind=matching&limit=25'),
     '/metadata/identification/history?limit=25',
   )
-  assert.equal(legacyMetadataHistory(''), '/metadata/videos/history')
+  assert.equal(legacyMetadataHistory(''), '/metadata/catalogs/videos/history')
 })
 
 test('existing settings identifiers point to their separated metadata workspace', () => {
@@ -49,14 +49,14 @@ test('existing settings identifiers point to their separated metadata workspace'
     'metadata.interval',
     'runtime.metadata.workers',
   ])
-    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/videos/settings#'))
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/catalogs/videos/settings#'))
   for (const id of [
     'metadata.games-client',
     'metadata.games-key',
     'metadata.games-auto',
     'metadata.games-interval',
   ])
-    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/games/settings#'))
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/catalogs/games/settings#'))
   for (const id of [
     'metadata.software-key',
     'metadata.software',
@@ -67,9 +67,9 @@ test('existing settings identifiers point to their separated metadata workspace'
     'metadata.software-icons',
     'metadata.software-platforms',
   ])
-    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/software/settings#'))
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/catalogs/software/settings#'))
   for (const id of ['metadata.books', 'metadata.book-interval'])
-    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/books/settings#'))
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/catalogs/books/settings#'))
   for (const id of [
     'metadata.music-key',
     'metadata.music',
@@ -80,7 +80,7 @@ test('existing settings identifiers point to their separated metadata workspace'
     'metadata.music-types',
     'metadata.music-languages',
   ])
-    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/music/settings#'))
+    assert.ok(settingURL(settingByID(id)!).startsWith('/metadata/catalogs/music/settings#'))
   for (const id of [
     'metadata.match',
     'metadata.match-interval',

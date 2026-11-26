@@ -6,6 +6,7 @@ import { api, AUTO_REFRESH_INTERVAL, queryClient, refreshData, uploadBinary } fr
 import { prepareBrowserDownload } from '@/lib/browser-download'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
+import { routes } from '@/lib/routes'
 import { useUnsavedChanges } from '@/lib/unsaved-changes'
 import { ErrorNotice, Loading } from '@/components/common'
 import {
@@ -395,7 +396,7 @@ export function DatabaseBackupPanel() {
           {status?.restore.status === 'running' && (
             <p role="status" className="help">
               {restorePhaseMessage(status.restore)}{' '}
-              <Link to="/logs" className="data-link">
+              <Link to={routes.administration.logs} className="data-link">
                 View logs
               </Link>
             </p>
@@ -405,7 +406,7 @@ export function DatabaseBackupPanel() {
             <p role="status" className="help">
               Database backup restored
               {status.restore.filename ? ` from ${status.restore.filename}` : ''}.{' '}
-              <Link to="/logs" className="data-link">
+              <Link to={routes.administration.logs} className="data-link">
                 View logs
               </Link>
             </p>

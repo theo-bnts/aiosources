@@ -7,7 +7,7 @@ import {
 } from '../src/lib/settings-editor.ts'
 
 const current = {
-  pathname: '/network/outgoing',
+  pathname: '/administration/network/outgoing/proxies',
   search: '?configure=proxy-alpha',
   hash: '#setting=proxy.name',
 }
@@ -53,7 +53,10 @@ test('browser preferences preserve the underlying connection editor', () => {
 })
 
 test('settings links cannot open an editor for another route or an unknown setting', () => {
-  assert.equal(settingsEditorDestination({ ...current, pathname: '/torznab' }), undefined)
+  assert.equal(
+    settingsEditorDestination({ ...current, pathname: '/connections/torznab' }),
+    undefined,
+  )
   assert.equal(settingsEditorDestination({ ...current, hash: '#setting=unknown.field' }), undefined)
   assert.equal(settingsEditorDestination({ ...current, search: '' }), undefined)
 })

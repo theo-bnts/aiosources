@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
+import { routes } from './routes.ts'
 import { filesResultsPath, isSourceSettingsPath } from './source-navigation.ts'
 import {
   identificationCorrespondencesPath,
@@ -8,11 +9,44 @@ import {
 
 const viewLabels: Record<string, string> = {
   '/': 'Sources',
+  [routes.sources.indexers.torrents.statistics]: 'Torrent statistics',
+  [routes.sources.indexers.torrents.settings]: 'All sources',
+  [routes.sources.indexers.torrents.history]: 'Torrent history',
+  [routes.sources.files.statistics]: 'Files',
+  [filesResultsPath]: 'Files',
+  [routes.browse.trending]: 'Trending',
+  [routes.public.trending]: 'Trending',
+  [routes.trusted.trending]: 'Trending',
+  [routes.browse.search]: 'Search',
+  [routes.public.search]: 'Search',
+  [routes.trusted.search]: 'Search',
+  [routes.browse.searchTorrents]: 'Search torrents',
+  [routes.public.searchTorrents]: 'Search torrents',
+  [routes.trusted.searchTorrents]: 'Search torrents',
+  [routes.sources.remoteCatalogs.statistics]: 'Remote catalogs',
+  [routes.sources.remoteCatalogs.settings]: 'Remote catalogs',
+  [routes.sources.remoteCatalogs.history]: 'Remote catalog history',
+  [routes.connections.sharedCatalogs.settings]: 'Shared catalog settings',
+  [routes.connections.stremio.history]: 'Stremio history',
+  [routes.metadata.identification.statistics]: 'Identification',
+  [identificationResultsPath]: 'Identification',
+  [identificationCorrespondencesPath]: 'Correspondences',
+  [routes.metadata.catalogs.videos.history]: 'Video history',
+  [routes.metadata.catalogs.games.history]: 'Game history',
+  [routes.metadata.catalogs.software.history]: 'Software history',
+  [routes.metadata.catalogs.music.history]: 'Music history',
+  [routes.metadata.catalogs.books.history]: 'Book history',
+  [routes.metadata.identification.history]: 'Identification history',
+  [routes.debrid.history]: 'Debrid history',
+  [routes.administration.storage.statistics]: 'Storage',
+  [routes.administration.logs]: 'Logs',
+  // Legacy views retained for in-flight browser history state across upgrades.
   '/providers': 'Torrent statistics',
   '/providers/settings': 'All sources',
   '/runs': 'Torrent history',
   '/torrents': 'Files',
-  [filesResultsPath]: 'Files',
+  '/files': 'Files',
+  '/files/results': 'Files',
   '/trending': 'Trending',
   '/public/trending': 'Trending',
   '/trusted/trending': 'Trending',
@@ -30,28 +64,37 @@ const viewLabels: Record<string, string> = {
   '/addon/history': 'Stremio history',
   '/metadata/history': 'Metadata history',
   '/metadata/identification': 'Identification',
-  [identificationResultsPath]: 'Identification',
-  [identificationCorrespondencesPath]: 'Correspondences',
   '/metadata/videos/history': 'Video history',
   '/metadata/games/history': 'Game history',
   '/metadata/software/history': 'Software history',
   '/metadata/music/history': 'Music history',
   '/metadata/books/history': 'Book history',
-  '/metadata/identification/history': 'Identification history',
-  '/debrid/history': 'Debrid history',
   '/health': 'Storage',
   '/logs': 'Logs',
 }
 type ListView = { pathname: string; search: string; returnView?: ListView }
 export type BackLink = { to: string; label: string; state?: { returnView: ListView } }
 
+function isLegacySourceSettingsPath(pathname: string) {
+  return (
+    !/^\/providers\/(?:new|settings)$/i.test(pathname) &&
+    /^\/providers\/(?:id\/)?[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/i.test(pathname)
+  )
+}
+
 function viewLabel(pathname: string) {
   if (Object.hasOwn(viewLabels, pathname)) return viewLabels[pathname]
-  if (/^\/(?:runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(pathname))
+  if (
+    /^\/(?:sources\/(?:indexers\/torrents|remote-catalogs)\/history|runs|remotes\/history)\/[A-Za-z0-9_-]{1,128}$/.test(
+      pathname,
+    )
+  )
     return 'Processed records'
-  if (/^\/raw\/[1-9][0-9]{0,15}$/.test(pathname)) return 'Processed record'
-  if (isSourceSettingsPath(pathname)) return 'Source settings'
-  if (/^\/(?:(?:public|trusted)\/)?search\/[1-9][0-9]{0,15}$/.test(pathname))
+  if (/^\/(?:sources\/indexers\/torrents\/history\/raw|raw)\/[1-9][0-9]{0,15}$/.test(pathname))
+    return 'Processed record'
+  if (isSourceSettingsPath(pathname) || isLegacySourceSettingsPath(pathname))
+    return 'Source settings'
+  if (/^\/(?:(?:public|trusted)\/)?(?:browse\/)?search\/[1-9][0-9]{0,15}$/.test(pathname))
     return 'Source releases'
   return undefined
 }

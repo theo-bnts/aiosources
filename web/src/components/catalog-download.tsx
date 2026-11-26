@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { DownloadSimpleIcon, PlusIcon, ArrowRightIcon } from '@phosphor-icons/react'
 import { api, ApiError, queryClient } from '@/lib/api'
 import { usePublicSearch, visitorAPI } from '@/lib/public-search'
+import { routes } from '@/lib/routes'
 import { bytes } from '@/lib/format'
 import { useNotification } from '@/lib/notifications'
 import { prepareBrowserDownload } from '@/lib/browser-download'
@@ -249,7 +250,7 @@ export function DownloadAction({
             title={details || undefined}
             onClick={() => prepareBrowserDownload().start(ready.url!)}
           >
-            <DownloadSimpleIcon />
+            <DownloadSimpleIcon aria-hidden="true" />
             Download file
           </Button>
         ) : (
@@ -277,9 +278,9 @@ export function DownloadAction({
             }}
           >
             {cached || waiting || (chooseFile && selectedFile) ? (
-              <DownloadSimpleIcon />
+              <DownloadSimpleIcon aria-hidden="true" />
             ) : (
-              <PlusIcon />
+              <PlusIcon aria-hidden="true" />
             )}
             {mutation.isPending
               ? 'Preparing…'
@@ -296,9 +297,12 @@ export function DownloadAction({
         )}
         {!visitor && operation && !operationID && (
           <Button asChild size="sm" variant="ghost">
-            <Link to={`/debrid/history/${encodeURIComponent(operation)}`} state={listState}>
+            <Link
+              to={`${routes.debrid.history}/${encodeURIComponent(operation)}`}
+              state={listState}
+            >
               View operation
-              <ArrowRightIcon />
+              <ArrowRightIcon aria-hidden="true" />
             </Link>
           </Button>
         )}

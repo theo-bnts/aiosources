@@ -2,6 +2,7 @@ import { BugIcon, InfoIcon, WarningIcon, WarningCircleIcon } from '@phosphor-ico
 import { Link } from 'react-router-dom'
 import { activityServices, type ActivityLevel } from '@/lib/activity-types'
 import { useListViewState } from '@/lib/detail-navigation'
+import { routes, runDetailPath } from '@/lib/routes'
 import { useSourceNames } from '@/lib/source-names'
 import { sourceSettingsPath } from '@/lib/source-navigation'
 import { Badge } from '@/components/ui/badge'
@@ -43,7 +44,7 @@ export function ActivityLinks({
   const listState = useListViewState()
   const servicePage = activityServices.find((item) => item.id === service)
   const operationsPage = kind?.startsWith('health.')
-    ? { to: '/health', label: 'Storage' }
+    ? { to: routes.administration.storage.statistics, label: 'Storage' }
     : undefined
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -65,7 +66,7 @@ export function ActivityLinks({
         <Link
           className="data-link font-mono"
           title={run_id}
-          to={`/runs/${encodeURIComponent(run_id)}`}
+          to={runDetailPath(run_id)}
           state={listState}
         >
           Run: {run_id.slice(0, 8)}

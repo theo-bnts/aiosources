@@ -52,13 +52,22 @@ export function PublicEntry({
       </main>
     )
   if (!info.data?.enabled) return <Login />
-  const { section, available, fallbackTarget } = resolveVisitorSection(
+  const { section, available, validPath, fallbackTarget, canonicalPath } = resolveVisitorSection(
     info.data,
     location.pathname,
     '/public',
   )
-  if (!available) {
+  if (!validPath || !available) {
     return fallbackTarget ? <Navigate to={fallbackTarget} replace /> : <Login />
+  }
+  if (canonicalPath && canonicalPath !== location.pathname) {
+    return (
+      <Navigate
+        to={`${canonicalPath}${location.search}${location.hash}`}
+        state={location.state}
+        replace
+      />
+    )
   }
   if (section === 'search' || section === 'trending')
     return layout(<PublicSearchEntry info={info.data} />)

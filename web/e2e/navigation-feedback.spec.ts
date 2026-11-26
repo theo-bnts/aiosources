@@ -242,13 +242,13 @@ test.describe('return navigation', () => {
     } finally {
       await db.end()
     }
-    await page.goto('/providers/settings?q=Return&state=disabled')
+    await page.goto('/sources/indexers/torrents/settings?q=Return&state=disabled')
     const origin = page.url()
     await page
       .getByRole('region', { name: 'Source Return source', exact: true })
       .getByRole('link', { name: 'Completed', exact: true })
       .click()
-    await expect(page).toHaveURL(/\/runs\/return-run$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\/return-run$/)
     await page.getByRole('tab', { name: 'Processed records', exact: true }).click()
     await page.reload()
     await page.getByRole('link', { name: 'All sources', exact: true }).click()
@@ -289,10 +289,10 @@ test.describe('return navigation', () => {
     await expect(dialog.locator('#collect-provider')).toHaveText('Manual return')
     await expect(dialog.getByRole('combobox', { name: 'Source', exact: true })).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
-    await expect(page).toHaveURL(/\/runs\//)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\//)
     await page.reload()
     await page.getByRole('link', { name: 'Source settings', exact: true }).click()
-    await expect(page).toHaveURL(/\/providers\/manual-return$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/manual-return$/)
     expect(server.sourceRequests()).toBeGreaterThan(0)
   })
 
@@ -318,10 +318,10 @@ test.describe('return navigation', () => {
     } finally {
       await db.end()
     }
-    await page.goto('/files/results?q=example&provider=search-source&sort=oldest')
+    await page.goto('/sources/files/results?q=example&provider=search-source&sort=oldest')
     const origin = page.url()
     await page.getByRole('link', { name: 'Open processed record for record', exact: true }).click()
-    await expect(page).toHaveURL(/\/raw\/[0-9]+$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\/raw\/[0-9]+$/)
     await page.reload()
     await page.locator('main').getByRole('link', { name: 'Files', exact: true }).click()
     await expect(page).toHaveURL(origin)
@@ -383,7 +383,9 @@ test.describe('return navigation', () => {
     }
     await page.goto('/sharing/remotes?q=Remote&state=disabled')
     // The suffix also matches the legacy address before its redirect commits.
-    await expect(page).toHaveURL(server.origin + '/remotes/settings?q=Remote&state=disabled')
+    await expect(page).toHaveURL(
+      server.origin + '/sources/remote-catalogs/settings?q=Remote&state=disabled',
+    )
     const origin = page.url()
     await page.getByRole('link', { name: 'Completed', exact: true }).click()
     await page.reload()

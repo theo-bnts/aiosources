@@ -39,6 +39,7 @@ import { SettingsDestination } from '@/components/settings-destination'
 import {
   Component,
   Suspense,
+  lazy,
   useEffect,
   useId,
   useRef,
@@ -51,7 +52,7 @@ import { Link, Outlet, useLocation, Navigate } from 'react-router-dom'
 import { UnsavedChangesScope, useDiscardChanges } from '@/lib/unsaved-changes'
 import { isPageTabNavigation } from '@/lib/page-tabs'
 import { prefetchRoute, schedulePrimaryRoutePrefetch } from '@/lib/route-prefetch'
-import { filesPath } from '@/lib/source-navigation'
+import { routes, visitorRoutes, type VisitorPrefix } from '@/lib/routes'
 import type { Icon } from '@phosphor-icons/react'
 
 import {
@@ -77,8 +78,13 @@ import {
 import { ErrorNotice, Loading, PageHeadingLevel, PageHeaderVisibility } from '@/components/common'
 import { Login } from '@/components/login'
 import { useSessionExpired, useVisitorConfig } from '@/components/public-connection-fields'
-import { PublicEntry } from '@/components/public-entry'
-import { TrustedEntry } from '@/components/trusted-entry'
+
+const PublicEntry = lazy(() =>
+  import('@/components/public-entry').then((module) => ({ default: module.PublicEntry })),
+)
+const TrustedEntry = lazy(() =>
+  import('@/components/trusted-entry').then((module) => ({ default: module.TrustedEntry })),
+)
 
 export class RootBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
@@ -95,7 +101,7 @@ export class RootBoundary extends Component<{ children: ReactNode }, { error: Er
           </p>
           <ErrorNotice error={this.state.error} />
           <Button onClick={() => window.location.reload()}>
-            <ArrowClockwiseIcon />
+            <ArrowClockwiseIcon aria-hidden="true" />
             Reload application
           </Button>
         </main>
@@ -105,6 +111,7 @@ export class RootBoundary extends Component<{ children: ReactNode }, { error: Er
 }
 type NavigationItem = {
   to: string
+  match?: string
   label: string
   description: string
   icon: Icon
@@ -134,13 +141,14 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/indexers',
+        to: routes.sources.indexers.base,
         label: 'Indexers',
         description: 'Manage your indexer connections.',
         icon: PlugsConnectedIcon,
         children: [
           {
-            to: '/providers',
+            to: routes.sources.indexers.torrents.statistics,
+            match: routes.sources.indexers.torrents.base,
             label: 'Torrents',
             description: 'Torrent source connections and automatic imports.',
             icon: DownloadSimpleIcon,
@@ -148,13 +156,15 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/remotes',
+        to: routes.sources.remoteCatalogs.statistics,
+        match: routes.sources.remoteCatalogs.base,
         label: 'Remote catalogs',
         description: 'Import read-only catalogs shared by other instances.',
         icon: CloudArrowDownIcon,
       },
       {
-        to: filesPath,
+        to: routes.sources.files.statistics,
+        match: routes.sources.files.base,
         label: 'Files',
         description: 'Browse imported files and see how they are distributed across sources.',
         icon: ListMagnifyingGlassIcon,
@@ -168,37 +178,42 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/metadata/catalogs',
+        to: routes.metadata.catalogs.base,
         label: 'Catalogs',
         description: 'Manage video, game, software, music and book information.',
         icon: DatabaseIcon,
         children: [
           {
-            to: '/metadata/videos',
+            to: routes.metadata.catalogs.videos.statistics,
+            match: routes.metadata.catalogs.videos.base,
             label: 'Videos',
             description: 'Film and series information, updates and history.',
             icon: FilmStripIcon,
           },
           {
-            to: '/metadata/games',
+            to: routes.metadata.catalogs.games.statistics,
+            match: routes.metadata.catalogs.games.base,
             label: 'Games',
             description: 'Game information, updates and history.',
             icon: GameControllerIcon,
           },
           {
-            to: '/metadata/software',
+            to: routes.metadata.catalogs.software.statistics,
+            match: routes.metadata.catalogs.software.base,
             label: 'Software',
             description: 'Software application catalog, icons index and history.',
             icon: AppWindowIcon,
           },
           {
-            to: '/metadata/music',
+            to: routes.metadata.catalogs.music.statistics,
+            match: routes.metadata.catalogs.music.base,
             label: 'Music',
             description: 'Music release information, Cover Art Archive index and history.',
             icon: MusicNotesIcon,
           },
           {
-            to: '/metadata/books',
+            to: routes.metadata.catalogs.books.statistics,
+            match: routes.metadata.catalogs.books.base,
             label: 'Books',
             description: 'Book and audiobook information, updates and history.',
             icon: BookOpenIcon,
@@ -206,7 +221,8 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/metadata/identification',
+        to: routes.metadata.identification.statistics,
+        match: routes.metadata.identification.base,
         label: 'Identification',
         description: 'Review and correct torrent identification.',
         icon: ListChecksIcon,
@@ -221,7 +237,8 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/debrid',
+        to: routes.debrid.statistics,
+        match: routes.debrid.base,
         label: 'Debrid',
         description: 'Cache availability and playback providers.',
         icon: CloudCheckIcon,
@@ -235,13 +252,13 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/trending',
+        to: routes.browse.trending,
         label: 'Trending',
         description: 'Most active identified titles across each category for a chosen period.',
         icon: TrendUpIcon,
       },
       {
-        to: '/search',
+        to: routes.browse.search,
         label: 'Search',
         description: 'Find identified titles and download through your debrid services.',
         icon: MagnifyingGlassIcon,
@@ -255,19 +272,21 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/torznab',
+        to: routes.connections.torznab,
         label: 'Torznab',
         description: 'Connect external applications to your published catalog.',
         icon: BroadcastIcon,
       },
       {
-        to: '/addon',
+        to: routes.connections.stremio.statistics,
+        match: routes.connections.stremio.base,
         label: 'Stremio',
         description: 'Connect your catalog to Stremio or AIOStreams.',
         icon: PlayCircleIcon,
       },
       {
-        to: '/sharing',
+        to: routes.connections.sharedCatalogs.statistics,
+        match: routes.connections.sharedCatalogs.base,
         label: 'Shared catalogs',
         description: 'Share published catalogs with other instances.',
         icon: ShareNetworkIcon,
@@ -281,25 +300,25 @@ const navigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/security',
+        to: routes.administration.security.base,
         label: 'Security',
         description: 'Encrypted secrets, sign-in protection and active sessions.',
         icon: ShieldCheckIcon,
         children: [
           {
-            to: '/security/secrets',
+            to: routes.administration.security.secrets,
             label: 'Secrets',
             description: 'Manage encrypted credentials.',
             icon: KeyIcon,
           },
           {
-            to: '/security/limits',
+            to: routes.administration.security.limits,
             label: 'Limits',
             description: 'Manage administrator, trusted user and public access limits.',
             icon: GaugeIcon,
           },
           {
-            to: '/security/sessions',
+            to: routes.administration.security.activeSessions,
             label: 'Active sessions',
             description: 'Review and revoke signed-in devices.',
             icon: DevicesIcon,
@@ -307,19 +326,20 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/network',
+        to: routes.administration.network.base,
         label: 'Network',
         description: 'Incoming proxy trust and outgoing connections.',
         icon: GlobeIcon,
         children: [
           {
-            to: '/network/incoming',
+            to: routes.administration.network.incoming,
             label: 'Incoming',
             description: 'Recognize visitor IP addresses behind trusted proxies.',
             icon: ShieldCheckIcon,
           },
           {
-            to: '/network/outgoing',
+            to: routes.administration.network.outgoing.proxies,
+            match: routes.administration.network.outgoing.base,
             label: 'Outgoing',
             description: 'Manage proxies and choose how services connect.',
             icon: GlobeIcon,
@@ -327,19 +347,19 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/users',
+        to: routes.administration.users.base,
         label: 'Users',
         description: 'Trusted user accounts and visitor access.',
         icon: UsersThreeIcon,
         children: [
           {
-            to: '/trusted-users',
+            to: routes.administration.users.trusted,
             label: 'Trusted',
             description: 'Manage user accounts, feature permissions and credentials.',
             icon: UsersThreeIcon,
           },
           {
-            to: '/public-access',
+            to: routes.administration.users.public,
             label: 'Public',
             description: 'Manage visitor permissions and credentials.',
             icon: GlobeIcon,
@@ -347,13 +367,14 @@ const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        to: '/health',
+        to: routes.administration.storage.statistics,
+        match: routes.administration.storage.base,
         label: 'Storage',
         description: 'PostgreSQL storage, local available space and data retention.',
         icon: DatabaseIcon,
       },
       {
-        to: '/logs',
+        to: routes.administration.logs,
         label: 'Logs',
         description: 'Service activity and alerts.',
         icon: TerminalWindowIcon,
@@ -369,14 +390,14 @@ const publicNavigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/public/trending',
+        to: routes.public.trending,
         label: 'Trending',
         description:
           'Most active films, series, games, software, music and books for a chosen period.',
         icon: TrendUpIcon,
       },
       {
-        to: '/public/search',
+        to: routes.public.search,
         label: 'Search',
         description:
           'Find films, series, games, software, music and books and download through your own debrid accounts.',
@@ -391,19 +412,19 @@ const publicNavigationGroups: NavigationGroup[] = [
     defaultOpen: true,
     items: [
       {
-        to: '/public/torznab',
+        to: routes.public.torznab,
         label: 'Torznab',
         description: 'Connect a Torznab client with your own optional announce URLs.',
         icon: BroadcastIcon,
       },
       {
-        to: '/public',
+        to: routes.public.stremio,
         label: 'Stremio',
         description: 'Connect Stremio or AIOStreams with your own debrid accounts.',
         icon: PlayCircleIcon,
       },
       {
-        to: '/public/sharing',
+        to: routes.public.sharedCatalogs,
         label: 'Shared catalogs',
         description: 'Keep a read-only catalog copy on another AIOSources instance.',
         icon: ShareNetworkIcon,
@@ -573,39 +594,51 @@ export function SessionGate({ children }: { children: ReactNode }) {
         <ErrorNotice error={session.error} retry={() => void session.refetch()} />
       </div>
     )
-  if (location.pathname === '/user-login') return <Navigate to="/login" replace />
-  if (session.data.role === 'trusted' && location.pathname === '/login') return <Login />
-  if (session.data.role === 'trusted' && location.pathname !== '/login')
+  const visitorFallback = (
+    <div className="mx-auto max-w-lg px-6 py-24">
+      <Loading label="Loading page" />
+    </div>
+  )
+  if (location.pathname === '/user-login') return <Navigate to={routes.login} replace />
+  if (session.data.role === 'trusted' && location.pathname === routes.login) return <Login />
+  if (session.data.role === 'trusted' && location.pathname !== routes.login)
     return (
-      <TrustedEntry
-        layout={(content) => (
-          <AppShell publicMode trustedMode>
-            {content}
-          </AppShell>
-        )}
-      />
+      <Suspense fallback={visitorFallback}>
+        <TrustedEntry
+          layout={(content) => (
+            <AppShell publicMode trustedMode>
+              {content}
+            </AppShell>
+          )}
+        />
+      </Suspense>
     )
-  if (location.pathname.startsWith('/trusted') && !location.pathname.startsWith('/trusted-users')) {
+  if (location.pathname === '/trusted' || location.pathname.startsWith('/trusted/')) {
     if (!session.data.authenticated) return <Login />
-    return <Navigate to="/trusted-users" replace />
+    return <Navigate to={routes.administration.users.trusted} replace />
   }
   if (location.pathname === '/public' || location.pathname.startsWith('/public/'))
     return (
-      <PublicEntry
-        layout={(content) => (
-          <AppShell publicMode authenticated={session.data.authenticated}>
-            {content}
-          </AppShell>
-        )}
-      />
+      <Suspense fallback={visitorFallback}>
+        <PublicEntry
+          layout={(content) => (
+            <AppShell publicMode authenticated={session.data.authenticated}>
+              {content}
+            </AppShell>
+          )}
+        />
+      </Suspense>
     )
   if (!session.data.authenticated)
-    return location.pathname === '/login' ? (
+    return location.pathname === routes.login ? (
       <Login />
     ) : (
-      <PublicEntry layout={(content) => <AppShell publicMode>{content}</AppShell>} />
+      <Suspense fallback={visitorFallback}>
+        <PublicEntry layout={(content) => <AppShell publicMode>{content}</AppShell>} />
+      </Suspense>
     )
-  if (location.pathname === '/login') return <Navigate to="/" replace />
+  if (location.pathname === routes.login)
+    return <Navigate to={routes.sources.indexers.torrents.statistics} replace />
   return (
     <>
       <ErrorNotice error={session.error} retry={() => void session.refetch()} />
@@ -660,13 +693,13 @@ export function AppShell({
         .map((group) => ({
           ...group,
           items: group.items.filter((item) =>
-            item.to === '/public/trending'
+            item.to === routes.public.trending
               ? publicInfo.data?.trending_enabled
-              : item.to === '/public/search'
+              : item.to === routes.public.search
                 ? publicInfo.data?.search_enabled
-                : item.to === '/public'
+                : item.to === routes.public.stremio
                   ? publicInfo.data?.stremio_enabled
-                  : item.to === '/public/torznab'
+                  : item.to === routes.public.torznab
                     ? publicInfo.data?.torznab_enabled
                     : publicInfo.data?.catalog_enabled,
           ),
@@ -679,6 +712,7 @@ export function AppShell({
         items: group.items.map((item) => ({
           ...item,
           to: item.to.replace(/^\/public(?=\/|$)/, '/trusted'),
+          ...(item.match ? { match: item.match.replace(/^\/public(?=\/|$)/, '/trusted') } : {}),
           description: item.description
             .replace('your own debrid accounts', 'the instance’s debrid accounts')
             .replace('your own optional announce URLs', 'the instance’s permitted sources'),
@@ -694,44 +728,44 @@ export function AppShell({
     return schedulePrimaryRoutePrefetch()
   }, [publicMode, trustedMode])
   const location = useLocation()
-  const visitorBrowseSection = (prefix: '/public' | '/trusted') =>
-    location.pathname === `${prefix}/trending`
-      ? `${prefix}/trending`
-      : location.pathname.startsWith(`${prefix}/search`)
-        ? !publicInfo.data?.search_enabled && publicInfo.data?.trending_enabled
-          ? `${prefix}/trending`
-          : `${prefix}/search`
-        : location.pathname === `${prefix}/torznab`
-          ? `${prefix}/torznab`
-          : location.pathname === `${prefix}/sharing`
-            ? `${prefix}/sharing`
-            : prefix
+  const visitorBrowseSection = (prefix: VisitorPrefix) => {
+    const r = visitorRoutes(prefix)
+    if (location.pathname === r.trending || location.pathname === `${prefix}/trending`) {
+      return r.trending
+    }
+    if (
+      location.pathname === r.search ||
+      location.pathname.startsWith(`${r.search}/`) ||
+      location.pathname === `${prefix}/search` ||
+      location.pathname.startsWith(`${prefix}/search/`)
+    ) {
+      return !publicInfo.data?.search_enabled && publicInfo.data?.trending_enabled
+        ? r.trending
+        : r.search
+    }
+    if (location.pathname === r.torznab || location.pathname === `${prefix}/torznab`) {
+      return r.torznab
+    }
+    if (location.pathname === r.sharedCatalogs || location.pathname === `${prefix}/sharing`) {
+      return r.sharedCatalogs
+    }
+    return r.stremio
+  }
   let navigationPath = publicMode
     ? visitorBrowseSection('/public')
-    : ['/runs', '/raw', '/pages'].some(
-          (path) => location.pathname === path || location.pathname.startsWith(path + '/'),
-        ) || ['/', '/settings', '/schedules', '/import-settings'].includes(location.pathname)
-      ? '/providers'
-      : ['/notifications', '/webhooks'].includes(location.pathname)
-        ? '/logs'
-        : location.pathname === '/sharing/remotes'
-          ? '/remotes'
-          : location.pathname === '/secrets'
-            ? '/security'
-            : location.pathname === '/metadata' ||
-                location.pathname === '/metadata/settings' ||
-                location.pathname.startsWith('/metadata/history')
-              ? '/metadata/videos'
-              : location.pathname
+    : location.pathname.startsWith('/metadata/history')
+      ? routes.metadata.catalogs.videos.statistics
+      : location.pathname
   if (trustedMode) navigationPath = visitorBrowseSection('/trusted')
   const activeItem = [...items]
-    .sort((a, b) => b.to.length - a.to.length)
-    .find(
-      (item) =>
-        !item.children?.length &&
-        (navigationPath === item.to ||
-          (item.to !== '/' && navigationPath.startsWith(`${item.to}/`))),
-    )
+    .sort((a, b) => (b.match ?? b.to).length - (a.match ?? a.to).length)
+    .find((item) => {
+      if (item.children?.length) return false
+      const prefix = item.match ?? item.to
+      return (
+        navigationPath === prefix || (prefix !== '/' && navigationPath.startsWith(`${prefix}/`))
+      )
+    })
   const activeGroup = groups.find((group) => navigationItems(group.items).includes(activeItem!))
   const activeSections = navigationSections(groups).filter((item) =>
     navigationItems(item.children ?? []).includes(activeItem!),
@@ -855,7 +889,7 @@ export function AppShell({
     publicMode && !trustedMode ? (
       <div className="shrink-0 space-y-2 p-3">
         <Button variant="outline" className="w-full" asChild>
-          <Link to={authenticated ? '/providers' : '/login'}>
+          <Link to={authenticated ? routes.sources.indexers.torrents.statistics : routes.login}>
             {authenticated ? (
               <ShieldCheckIcon aria-hidden="true" />
             ) : (
@@ -874,7 +908,7 @@ export function AppShell({
           disabled={logout.isPending}
           onClick={() => discard(() => logout.mutate())}
         >
-          <SignOutIcon />
+          <SignOutIcon aria-hidden="true" />
           {logout.isPending ? 'Signing out…' : 'Sign out'}
         </Button>
       </div>
@@ -914,7 +948,7 @@ export function AppShell({
                   aria-label="Open navigation"
                   aria-controls="mobile-navigation"
                 >
-                  <ListIcon />
+                  <ListIcon aria-hidden="true" />
                 </Button>
               </DialogTrigger>
               <nav
@@ -1021,7 +1055,7 @@ export function AppShell({
                 className="ml-auto shrink-0"
                 aria-label="Close navigation"
               >
-                <XIcon />
+                <XIcon aria-hidden="true" />
               </Button>
             </DialogClose>
           </div>

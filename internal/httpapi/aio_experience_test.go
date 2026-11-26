@@ -81,7 +81,7 @@ func TestIdentificationReviewAndStremioHistoryRequireAdministratorAndCSRF(t *tes
 		t.Fatal("global processed-record search remains available")
 	}
 	response = f.request("GET", "/stremio/"+token+"/configure", "", false, "")
-	if response.Code != 303 || response.Header().Get("Location") != "/addon/settings" {
+	if response.Code != 303 || response.Header().Get("Location") != "/connections/stremio/settings" {
 		t.Fatal("configuration no longer opens addon settings")
 	}
 }

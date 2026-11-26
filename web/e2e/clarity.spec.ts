@@ -72,7 +72,7 @@ test('source configuration navigation preserves unsaved edits and saving release
   await page.getByRole('button', { name: 'Replace editor content', exact: true }).click()
   await page.getByRole('button', { name: 'Visual stages', exact: true }).click()
   await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page).toHaveURL(/\/providers\/guard-source$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/guard-source$/)
   await expect(page.getByRole('alertdialog')).toHaveCount(0)
   await page.getByLabel('Display name', { exact: true }).fill('Unsaved source name')
   await page
@@ -338,7 +338,7 @@ SELECT run_id,provider_id,'synthetic-error',id,0,''::bytea,content_type,'{"title
     })
     await expect(rejected.getByText('Raw payload not stored', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Rejected sample', exact: true }).click()
-    await expect(page).toHaveURL(/\/raw\/\d+$/)
+    await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\/raw\/\d+$/)
     await expect(page.getByRole('heading', { name: /^Processed record #\d+$/ })).toBeVisible()
     await expect(page.getByText('Original content not retained.', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'About Original content', exact: true }).click()

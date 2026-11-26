@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { usePublicSearch } from '@/lib/public-search'
+import { routes } from '@/lib/routes'
 import { ReleasePresentation } from '@/components/release-presentation'
 import { DownloadAction } from '@/components/catalog-download'
 import type { CatalogRelease, CatalogSelection } from '@/lib/catalog-search-types'
@@ -58,8 +59,8 @@ export function CatalogReleaseList({
                       'No service is available for this version.'
                     ) : (
                       <>
-                        <Link to="/debrid/settings">Configure a debrid service</Link> to download
-                        this version.
+                        <Link to={routes.debrid.settings}>Configure a debrid service</Link> to
+                        download this version.
                       </>
                     )}
                   </p>

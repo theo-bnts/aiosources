@@ -327,7 +327,8 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await page.getByRole('link', { name: 'Example Film: New Day', exact: true }).click()
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname === `/search/${ids.movie}` && url.searchParams.get('q') === 'example new day',
+      url.pathname === `/browse/search/${ids.movie}` &&
+      url.searchParams.get('q') === 'example new day',
   )
   const filters = page.getByRole('region', { name: 'Source release filters', exact: true })
   await openDisclosure(filters, 'Filters')
@@ -361,7 +362,7 @@ test('catalog search groups clean titles, sorts source versions and retains the 
   await page.keyboard.press('Escape')
   await page.getByRole('main').getByRole('link', { name: 'Search', exact: true }).click()
   await expect(page).toHaveURL(
-    (url) => url.pathname === '/search' && url.searchParams.get('q') === 'example new day',
+    (url) => url.pathname === '/browse/search' && url.searchParams.get('q') === 'example new day',
   )
   await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue(
     'example new day',
@@ -402,7 +403,7 @@ test('catalog year is a single optional filter and survives opening a title and 
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page.locator('[data-result-count]')).toHaveText('2 titles')
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
-  await expect(page).toHaveURL(/\/search$/)
+  await expect(page).toHaveURL(/\/browse\/search$/)
   await expect(page.getByLabel('Title, author or identifier', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Year', { exact: true })).toHaveValue('')
   await expect(page.getByLabel('Type', { exact: true })).toHaveText('All media')
@@ -817,7 +818,7 @@ test('an added file can be followed and downloaded from its original history ope
         body: 'Synthetic followed download',
       }),
     )
-    await page.goto(`/search/${ids.movie}?cached_only=false`)
+    await page.goto(`/browse/search/${ids.movie}?cached_only=false`)
     const releasesView = page.url()
     await page.getByRole('button', { name: 'Add to debrid', exact: true }).click()
     await page.getByRole('link', { name: 'View operation', exact: true }).click()
@@ -943,19 +944,19 @@ test('direct torrent Search is always reachable and reuses release formatting wi
   }
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
-    await page.goto('/search')
+    await page.goto('/browse/search')
     await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
-    await expect(page).toHaveURL(/\/search\/torrents$/)
+    await expect(page).toHaveURL(/\/browse\/search\/torrents$/)
     await expect(page.getByRole('heading', { name: 'Find a torrent', exact: true })).toBeVisible()
-    await page.goto('/search')
+    await page.goto('/browse/search')
     await page.getByLabel('Title, author or identifier', { exact: true }).fill('Example Film')
     await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
-    await expect(page).toHaveURL(/\/search\/torrents\?q=Example(?:%20|\+)Film/)
+    await expect(page).toHaveURL(/\/browse\/search\/torrents\?q=Example(?:%20|\+)Film/)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
-    await page.goto('/search?q=Example%20Film')
+    await page.goto('/browse/search?q=Example%20Film')
     await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
     await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
-    await expect(page).toHaveURL(/\/search\/torrents\?q=Example(?:%20|\+)Film/)
+    await expect(page).toHaveURL(/\/browse\/search\/torrents\?q=Example(?:%20|\+)Film/)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await expect(page.locator('[data-slot="release-presentation"]')).toHaveCount(2)
     await expect(page.getByRole('button', { name: 'Download', exact: true })).toHaveCount(1)

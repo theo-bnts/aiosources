@@ -54,10 +54,10 @@ test('access limits have independent saves, supported defaults and compatible bo
   await trusted.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(trusted.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.goto('/public-access/limits')
-  await expect(page).toHaveURL(/\/security\/limits#public-request-limits$/)
+  await expect(page).toHaveURL(/\/administration\/security\/limits#public-request-limits$/)
   await expect(page.getByLabel('Public requests per minute', { exact: true })).toBeVisible()
   await page.goto('/security/settings#sessions')
-  await expect(page).toHaveURL(/\/security\/sessions#sessions$/)
+  await expect(page).toHaveURL(/\/administration\/security\/active-sessions#sessions$/)
   await page.goto('/public-access')
   await expect(page.getByRole('tab', { name: 'Request limits', exact: true })).toHaveCount(0)
 })
@@ -193,7 +193,7 @@ test('occurrence windows retain identification filters, navigation, browser hist
     expect(new URL(page.url()).pathname).toBe('/metadata/identification/results')
   }
   await page.goto('/torrents?q=Overlay')
-  await expect(page).toHaveURL(/\/files\/results\?q=Overlay$/)
+  await expect(page).toHaveURL(/\/sources\/files\/results\?q=Overlay$/)
   await page.getByRole('link', { name: 'Overlay Example', exact: true }).click()
   await expect(
     page.getByRole('dialog').getByRole('tab', { name: 'Published fields', exact: true }),

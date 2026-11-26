@@ -23,6 +23,7 @@ import {
   Outlet,
   Navigate,
   useLocation,
+  useParams,
 } from 'react-router-dom'
 import { UnsavedChangesProvider } from '@/lib/unsaved-changes'
 
@@ -35,7 +36,8 @@ import { InterfacePreferences } from '@/components/interface-preferences'
 import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
 import { settingFromHash } from '@/lib/settings-catalog'
-import { filesPath, filesResultsPath } from '@/lib/source-navigation'
+import { rawPagePath, rawRecordPath, routes, runDetailPath, stremioRequestPath } from '@/lib/routes'
+import { filesPath, filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
 import {
   identificationCorrespondencesPath,
   identificationResultsPath,
@@ -88,63 +90,80 @@ import './index.css'
 
 prefetchRoute(window.location.pathname)
 
+function PreserveRedirect({ to }: { to: string }) {
+  const { search, hash, state } = useLocation()
+  return <Navigate to={`${to}${search}${hash}`} state={state} replace />
+}
+
+function LegacyParamRedirect({ build }: { build: (id: string) => string }) {
+  const { id = '' } = useParams()
+  const { search, hash, state } = useLocation()
+  return <Navigate to={`${build(id)}${search}${hash}`} state={state} replace />
+}
+
 function LegacySecuritySettings() {
   const location = useLocation()
   const setting = settingFromHash(location.hash)
-  const target = setting?.route.startsWith('/security/')
+  const target = setting?.route.startsWith(`${routes.administration.security.base}/`)
     ? setting.route
     : location.hash === '#sessions'
-      ? '/security/sessions'
+      ? routes.administration.security.activeSessions
       : location.hash === '#verification' || location.hash.startsWith('#runtime-security')
-        ? '/security/limits'
-        : '/security/secrets'
+        ? routes.administration.security.limits
+        : routes.administration.security.secrets
   return (
     <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
   )
 }
-function LegacySecurityLimits() {
-  const location = useLocation()
-  return (
-    <Navigate
-      to={`/security/limits${location.search}${location.hash}`}
-      state={location.state}
-      replace
-    />
-  )
-}
+
 function LegacyPublicLimits() {
   const location = useLocation()
   return (
     <Navigate
-      to={`/security/limits${location.search}${location.hash || '#public-request-limits'}`}
+      to={`${routes.administration.security.limits}${location.search}${location.hash || '#public-request-limits'}`}
       state={location.state}
       replace
     />
   )
 }
+
+function resolveSecurityLimitsHashTarget(hash: string) {
+  const setting = settingFromHash(hash)
+  return setting?.route.startsWith(`${routes.administration.security.base}/`)
+    ? setting.route
+    : hash === '#secrets'
+      ? routes.administration.security.secrets
+      : hash === '#sessions'
+        ? routes.administration.security.activeSessions
+        : ''
+}
+
+function LegacySecurityLimits() {
+  const location = useLocation()
+  const target =
+    resolveSecurityLimitsHashTarget(location.hash) || routes.administration.security.limits
+  return (
+    <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
+  )
+}
+
 function SecurityLimitsRoute() {
   const location = useLocation()
-  const setting = settingFromHash(location.hash)
-  const target = setting?.route.startsWith('/security/')
-    ? setting.route
-    : location.hash === '#secrets'
-      ? '/security/secrets'
-      : location.hash === '#sessions'
-        ? '/security/sessions'
-        : ''
-  if (target && target !== '/security/limits')
+  const target = resolveSecurityLimitsHashTarget(location.hash)
+  if (target && target !== routes.administration.security.limits)
     return (
       <Navigate to={`${target}${location.search}${location.hash}`} state={location.state} replace />
     )
   return <SecurityLimitsPage />
 }
+
 function LegacyImportSettings() {
   const location = useLocation()
   const search = new URLSearchParams(location.search)
   search.set('settings', 'advanced')
   return (
     <Navigate
-      to={`/providers/settings?${search}#advanced-import-settings`}
+      to={`${routes.sources.indexers.torrents.settings}?${search}#advanced-import-settings`}
       state={location.state}
       replace
     />
@@ -157,14 +176,9 @@ function LegacyActivity() {
   search.delete('unread')
   search.delete('include_deleted')
   if (location.pathname === '/webhooks') search.set('q', 'external_notification')
-  return <Navigate to={`/logs${search.size ? '?' + search : ''}`} state={location.state} replace />
-}
-
-function LegacyRemotes() {
-  const location = useLocation()
   return (
     <Navigate
-      to={`/remotes/settings${location.search}${location.hash}`}
+      to={`${routes.administration.logs}${search.size ? '?' + search : ''}`}
       state={location.state}
       replace
     />
@@ -186,7 +200,7 @@ function LegacyRawHistory() {
   } else if (search.get('provider')) target.set('provider', search.get('provider')!)
   return (
     <Navigate
-      to={`${run ? '/runs/' + encodeURIComponent(run) : '/runs'}${target.size ? '?' + target : ''}`}
+      to={`${run ? runDetailPath(run) : routes.sources.indexers.torrents.history}${target.size ? '?' + target : ''}`}
       replace
       state={location.state}
     />
@@ -215,9 +229,18 @@ function IdentificationStatisticsRoute() {
   )
 }
 
-function LegacyFiles() {
-  const { search, hash, state } = useLocation()
-  return <Navigate to={filesResultsPath + search + hash} state={state} replace />
+function LegacyIdentificationRoot() {
+  const location = useLocation()
+  const results = legacyIdentificationResults(location.search, location.hash)
+  return (
+    <Navigate
+      to={
+        results || `${routes.metadata.identification.statistics}${location.search}${location.hash}`
+      }
+      state={location.state}
+      replace
+    />
+  )
 }
 
 function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' }) {
@@ -226,14 +249,14 @@ function LegacyMetadata({ view }: { view: 'statistics' | 'settings' | 'history' 
   const settingRoute = settingFromHash(location.hash)?.route
   const settingsPath = settingRoute?.startsWith('/metadata/')
     ? settingRoute
-    : '/metadata/videos/settings'
+    : routes.metadata.catalogs.videos.settings
   const to =
     identification ||
     (view === 'history'
       ? legacyMetadataHistory(location.search)
       : view === 'settings'
         ? `${settingsPath}${location.search}${location.hash}`
-        : `/metadata/videos${location.search}${location.hash}`)
+        : `${routes.metadata.catalogs.videos.statistics}${location.search}${location.hash}`)
   return <Navigate to={to} state={location.state} replace />
 }
 
@@ -267,96 +290,29 @@ const router = createBrowserRouter(
           </OccurrenceNavigationProvider>
         }
       >
-        <Route index element={<Navigate to="/providers" replace />} />
+        <Route
+          index
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+
+        {/* Sources -> Indexers -> Torrents */}
         <Route
           element={
             <WorkspaceLayout
               title="Torrents"
               tabs={[
-                { path: '/providers', label: 'Statistics', icon: ChartBarIcon },
                 {
-                  path: '/providers/settings',
-                  label: 'Settings',
-                  icon: GearSixIcon,
-                  routes: ['/providers/settings', '/providers'],
-                },
-                {
-                  path: '/runs',
-                  label: 'History',
-                  icon: ClockCounterClockwiseIcon,
-                  routes: ['/runs', '/raw', '/pages'],
-                },
-              ]}
-            />
-          }
-        >
-          <Route path="providers" element={<SourceStatisticsPage />} />
-          <Route path="providers/settings" element={<ProvidersPage />} />
-          <Route path="providers/new" element={<ProviderEditor key="new" />} />
-          <Route path="providers/id/:id" element={<ProviderEditor />} />
-          <Route path="providers/:id" element={<ProviderEditor />} />
-          <Route path="runs" element={<RunsPage />} />
-          <Route path="runs/:id" element={<RunDetailPage />} />
-          <Route path="raw" element={<LegacyRawHistory />} />
-          <Route path="raw/:id" element={<RawDetailPage />} />
-          <Route path="pages/:id" element={<RawPageView />} />
-        </Route>
-        <Route path="metadata/catalogs" element={<Navigate to="/metadata/videos" replace />} />
-        <Route path="metadata" element={<LegacyMetadata view="statistics" />} />
-        <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
-        <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
-        <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
-        {(['videos', 'games', 'software', 'music', 'books'] as const).map((section) => {
-          const { path, label } = metadataSections[section]
-          return (
-            <Route
-              key={section}
-              element={
-                <WorkspaceLayout
-                  title={label}
-                  tabs={[
-                    { path, label: 'Statistics', icon: ChartBarIcon },
-                    { path: `${path}/settings`, label: 'Settings', icon: GearSixIcon },
-                    { path: `${path}/history`, label: 'History', icon: ClockCounterClockwiseIcon },
-                  ]}
-                />
-              }
-            >
-              <Route path={path} element={<AIOStatisticsPage section={section} />} />
-              <Route
-                path={`${path}/settings`}
-                element={<AIOSourcePage key={section} section={section} />}
-              />
-              <Route
-                path={`${path}/history`}
-                element={<OperationHistoryPage section="metadata" metadataSection={section} />}
-              />
-              <Route
-                path={`${path}/history/:id`}
-                element={<OperationDetailPage section="metadata" metadataSection={section} />}
-              />
-            </Route>
-          )
-        })}
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Identification"
-              tabs={[
-                {
-                  path: metadataSections.identification.path,
+                  path: routes.sources.indexers.torrents.statistics,
                   label: 'Statistics',
                   icon: ChartBarIcon,
                 },
-                { path: identificationResultsPath, label: 'Results', icon: ListChecksIcon },
                 {
-                  path: identificationCorrespondencesPath,
-                  label: 'Correspondences',
-                  icon: LinkIcon,
+                  path: routes.sources.indexers.torrents.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
                 },
-                { path: '/metadata/identification/settings', label: 'Settings', icon: GearSixIcon },
                 {
-                  path: '/metadata/identification/history',
+                  path: routes.sources.indexers.torrents.history,
                   label: 'History',
                   icon: ClockCounterClockwiseIcon,
                 },
@@ -365,147 +321,69 @@ const router = createBrowserRouter(
           }
         >
           <Route
-            path={metadataSections.identification.path}
-            element={<IdentificationStatisticsRoute />}
+            path={routes.sources.indexers.torrents.statistics}
+            element={<SourceStatisticsPage />}
           />
-          <Route path={identificationResultsPath} element={<MatchingDiagnostics />} />
-          <Route path={identificationCorrespondencesPath} element={<ReleaseCorrespondences />} />
+          <Route path={routes.sources.indexers.torrents.settings} element={<ProvidersPage />} />
           <Route
-            path="metadata/identification/settings"
-            element={<AIOSourcePage key="identification" section="identification" />}
-          />
-          <Route
-            path="metadata/identification/history"
-            element={<OperationHistoryPage section="metadata" metadataSection="identification" />}
+            path={routes.sources.indexers.torrents.newSource}
+            element={<ProviderEditor key="new" />}
           />
           <Route
-            path="metadata/identification/history/:id"
-            element={<OperationDetailPage section="metadata" metadataSection="identification" />}
+            path={`${routes.sources.indexers.torrents.settings}/id/:id`}
+            element={<ProviderEditor />}
           />
+          <Route
+            path={`${routes.sources.indexers.torrents.settings}/:id`}
+            element={<ProviderEditor />}
+          />
+          <Route path={routes.sources.indexers.torrents.history} element={<RunsPage />} />
+          <Route
+            path={`${routes.sources.indexers.torrents.history}/:id`}
+            element={<RunDetailPage />}
+          />
+          <Route path={`${routes.sources.indexers.torrents.raw}/:id`} element={<RawDetailPage />} />
+          <Route path={`${routes.sources.indexers.torrents.pages}/:id`} element={<RawPageView />} />
         </Route>
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Debrid"
-              tabs={[
-                { path: '/debrid', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/debrid/settings', label: 'Settings', icon: GearSixIcon },
-                { path: '/debrid/history', label: 'History', icon: ClockCounterClockwiseIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="debrid" element={<AIOStatisticsPage section="debrid" />} />
-          <Route path="debrid/settings" element={<AIOSourcePage key="debrid" section="debrid" />} />
-          <Route
-            path="debrid/history"
-            element={<OperationHistoryPage key="debrid-history" section="debrid" />}
-          />
-          <Route path="debrid/history/:id" element={<OperationDetailPage section="debrid" />} />
-        </Route>
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Storage"
-              tabs={[
-                { path: '/health', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/health/settings', label: 'Settings', icon: GearSixIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="health" element={<HealthPage />} />
-          <Route path="health/settings" element={<StorageSettingsPage />} />
-        </Route>
-        <Route path="security" element={<LegacySecuritySettings />} />
-        <Route path="security/limits" element={<SecurityLimitsRoute />} />
-        <Route path="security/settings" element={<LegacySecurityLimits />} />
-        <Route path="security/secrets" element={<SecuritySecretsPage />} />
-        <Route path="security/verification" element={<Navigate to="/security/limits" replace />} />
-        <Route path="security/sessions" element={<SecuritySessionsPage />} />
-        <Route path="users" element={<Navigate to="/trusted-users" replace />} />
-        <Route path="trusted-users" element={<TrustedUsersPage />} />
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Stremio"
-              tabs={[
-                { path: '/addon', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/addon/settings', label: 'Settings', icon: GearSixIcon },
-                { path: '/addon/history', label: 'History', icon: ClockCounterClockwiseIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="addon" element={<StremioStatisticsPage />} />
-          <Route
-            path="addon/settings"
-            element={<AIOSourcePage key="stremio" section="stremio" />}
-          />
-          <Route path="addon/history" element={<StremioHistoryPage />} />
-          <Route path="addon/history/:id" element={<StremioRequestPage />} />
-        </Route>
+
+        {/* Sources -> Remote catalogs */}
         <Route
           element={
             <WorkspaceLayout
               title="Remote catalogs"
               tabs={[
-                { path: '/remotes', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/remotes/settings', label: 'Settings', icon: GearSixIcon },
-                { path: '/remotes/history', label: 'History', icon: ClockCounterClockwiseIcon },
+                {
+                  path: routes.sources.remoteCatalogs.statistics,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                {
+                  path: routes.sources.remoteCatalogs.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+                {
+                  path: routes.sources.remoteCatalogs.history,
+                  label: 'History',
+                  icon: ClockCounterClockwiseIcon,
+                },
               ]}
             />
           }
         >
-          <Route path="remotes" element={<RemoteStatisticsPage />} />
-          <Route path="remotes/settings" element={<RemotesPage />} />
-          <Route path="remotes/history" element={<RunsPage remote />} />
-          <Route path="remotes/history/:id" element={<RunDetailPage remote />} />
+          <Route
+            path={routes.sources.remoteCatalogs.statistics}
+            element={<RemoteStatisticsPage />}
+          />
+          <Route path={routes.sources.remoteCatalogs.settings} element={<RemotesPage />} />
+          <Route path={routes.sources.remoteCatalogs.history} element={<RunsPage remote />} />
+          <Route
+            path={`${routes.sources.remoteCatalogs.history}/:id`}
+            element={<RunDetailPage remote />}
+          />
         </Route>
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Shared catalogs"
-              tabs={[
-                { path: '/sharing', label: 'Statistics', icon: ChartBarIcon },
-                { path: '/sharing/settings', label: 'Settings', icon: GearSixIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="sharing" element={<SharedCatalogStatisticsPage />} />
-          <Route path="sharing/settings" element={<SharingPage />} />
-        </Route>
-        <Route path="torznab" element={<TorznabPage />} />
-        <Route path="public-access" element={<PublicAccessPage />} />
-        <Route path="public-access/limits" element={<LegacyPublicLimits />} />
-        <Route path="sharing/remotes" element={<LegacyRemotes />} />
-        <Route path="logs" element={<LogsPage />} />
-        <Route path="network/incoming" element={<IncomingNetworkPage />} />
-        <Route
-          element={
-            <WorkspaceLayout
-              title="Outgoing"
-              tabs={[
-                { path: '/network/outgoing', label: 'Proxies', icon: GlobeIcon },
-                { path: '/network/outgoing/routing', label: 'Routing', icon: PathIcon },
-              ]}
-            />
-          }
-        >
-          <Route path="network/outgoing" element={<NetworkPage />} />
-          <Route path="network/outgoing/routing" element={<NetworkRoutingPage />} />
-        </Route>
-        <Route path="network" element={<Navigate to="/network/incoming" replace />} />
-        <Route path="network/proxies" element={<Navigate to="/network/outgoing" replace />} />
-        <Route
-          path="network/routing"
-          element={<Navigate to="/network/outgoing/routing" replace />}
-        />
-        <Route path="network/limits" element={<LegacyPublicLimits />} />
-        <Route path="notifications" element={<LegacyActivity />} />
-        <Route path="webhooks" element={<LegacyActivity />} />
-        <Route path="indexers" element={<Navigate to="/providers" replace />} />
+
+        {/* Sources -> Files */}
         <Route
           element={
             <WorkspaceLayout
@@ -520,15 +398,524 @@ const router = createBrowserRouter(
           <Route path={filesPath} element={<FilesStatisticsPage />} />
           <Route path={filesResultsPath} element={<TorrentsPage />} />
         </Route>
-        <Route path="torrents" element={<LegacyFiles />} />
-        <Route path="trending" element={<CatalogTrendingPage />} />
-        <Route path="search" element={<CatalogSearchPage />} />
-        <Route path="search/torrents" element={<CatalogTorrentsPage />} />
-        <Route path="search/:id" element={<CatalogTitlePage />} />
+
+        {/* Metadata -> Catalogs */}
+        {(['videos', 'games', 'software', 'music', 'books'] as const).map((section) => {
+          const { label, statistics, settings, history } = metadataSections[section]
+          return (
+            <Route
+              key={section}
+              element={
+                <WorkspaceLayout
+                  title={label}
+                  tabs={[
+                    { path: statistics, label: 'Statistics', icon: ChartBarIcon },
+                    { path: settings, label: 'Settings', icon: GearSixIcon },
+                    { path: history, label: 'History', icon: ClockCounterClockwiseIcon },
+                  ]}
+                />
+              }
+            >
+              <Route path={statistics} element={<AIOStatisticsPage section={section} />} />
+              <Route path={settings} element={<AIOSourcePage key={section} section={section} />} />
+              <Route
+                path={history}
+                element={<OperationHistoryPage section="metadata" metadataSection={section} />}
+              />
+              <Route
+                path={`${history}/:id`}
+                element={<OperationDetailPage section="metadata" metadataSection={section} />}
+              />
+            </Route>
+          )
+        })}
+
+        {/* Metadata -> Identification */}
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Identification"
+              tabs={[
+                {
+                  path: routes.metadata.identification.statistics,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                { path: identificationResultsPath, label: 'Results', icon: ListChecksIcon },
+                {
+                  path: identificationCorrespondencesPath,
+                  label: 'Correspondences',
+                  icon: LinkIcon,
+                },
+                {
+                  path: routes.metadata.identification.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+                {
+                  path: routes.metadata.identification.history,
+                  label: 'History',
+                  icon: ClockCounterClockwiseIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route
+            path={routes.metadata.identification.statistics}
+            element={<IdentificationStatisticsRoute />}
+          />
+          <Route path={identificationResultsPath} element={<MatchingDiagnostics />} />
+          <Route path={identificationCorrespondencesPath} element={<ReleaseCorrespondences />} />
+          <Route
+            path={routes.metadata.identification.settings}
+            element={<AIOSourcePage key="identification" section="identification" />}
+          />
+          <Route
+            path={routes.metadata.identification.history}
+            element={<OperationHistoryPage section="metadata" metadataSection="identification" />}
+          />
+          <Route
+            path={`${routes.metadata.identification.history}/:id`}
+            element={<OperationDetailPage section="metadata" metadataSection="identification" />}
+          />
+        </Route>
+
+        {/* Debrid */}
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Debrid"
+              tabs={[
+                { path: routes.debrid.statistics, label: 'Statistics', icon: ChartBarIcon },
+                { path: routes.debrid.settings, label: 'Settings', icon: GearSixIcon },
+                { path: routes.debrid.history, label: 'History', icon: ClockCounterClockwiseIcon },
+              ]}
+            />
+          }
+        >
+          <Route path={routes.debrid.statistics} element={<AIOStatisticsPage section="debrid" />} />
+          <Route
+            path={routes.debrid.settings}
+            element={<AIOSourcePage key="debrid" section="debrid" />}
+          />
+          <Route
+            path={routes.debrid.history}
+            element={<OperationHistoryPage key="debrid-history" section="debrid" />}
+          />
+          <Route
+            path={`${routes.debrid.history}/:id`}
+            element={<OperationDetailPage section="debrid" />}
+          />
+        </Route>
+
+        {/* Browse */}
+        <Route path={routes.browse.trending} element={<CatalogTrendingPage />} />
+        <Route path={routes.browse.search} element={<CatalogSearchPage />} />
+        <Route path={routes.browse.searchTorrents} element={<CatalogTorrentsPage />} />
+        <Route path={`${routes.browse.search}/:id`} element={<CatalogTitlePage />} />
+
+        {/* Connections */}
+        <Route path={routes.connections.torznab} element={<TorznabPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Stremio"
+              tabs={[
+                {
+                  path: routes.connections.stremio.statistics,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                {
+                  path: routes.connections.stremio.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+                {
+                  path: routes.connections.stremio.history,
+                  label: 'History',
+                  icon: ClockCounterClockwiseIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route path={routes.connections.stremio.statistics} element={<StremioStatisticsPage />} />
+          <Route
+            path={routes.connections.stremio.settings}
+            element={<AIOSourcePage key="stremio" section="stremio" />}
+          />
+          <Route path={routes.connections.stremio.history} element={<StremioHistoryPage />} />
+          <Route
+            path={`${routes.connections.stremio.history}/:id`}
+            element={<StremioRequestPage />}
+          />
+        </Route>
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Shared catalogs"
+              tabs={[
+                {
+                  path: routes.connections.sharedCatalogs.statistics,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                {
+                  path: routes.connections.sharedCatalogs.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route
+            path={routes.connections.sharedCatalogs.statistics}
+            element={<SharedCatalogStatisticsPage />}
+          />
+          <Route path={routes.connections.sharedCatalogs.settings} element={<SharingPage />} />
+        </Route>
+
+        {/* Administration -> Security */}
+        <Route path={routes.administration.security.secrets} element={<SecuritySecretsPage />} />
+        <Route path={routes.administration.security.limits} element={<SecurityLimitsRoute />} />
+        <Route
+          path={routes.administration.security.activeSessions}
+          element={<SecuritySessionsPage />}
+        />
+
+        {/* Administration -> Network */}
+        <Route path={routes.administration.network.incoming} element={<IncomingNetworkPage />} />
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Outgoing"
+              tabs={[
+                {
+                  path: routes.administration.network.outgoing.proxies,
+                  label: 'Proxies',
+                  icon: GlobeIcon,
+                },
+                {
+                  path: routes.administration.network.outgoing.routing,
+                  label: 'Routing',
+                  icon: PathIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route path={routes.administration.network.outgoing.proxies} element={<NetworkPage />} />
+          <Route
+            path={routes.administration.network.outgoing.routing}
+            element={<NetworkRoutingPage />}
+          />
+        </Route>
+
+        {/* Administration -> Users */}
+        <Route path={routes.administration.users.trusted} element={<TrustedUsersPage />} />
+        <Route path={routes.administration.users.public} element={<PublicAccessPage />} />
+
+        {/* Administration -> Storage */}
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Storage"
+              tabs={[
+                {
+                  path: routes.administration.storage.statistics,
+                  label: 'Statistics',
+                  icon: ChartBarIcon,
+                },
+                {
+                  path: routes.administration.storage.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route path={routes.administration.storage.statistics} element={<HealthPage />} />
+          <Route path={routes.administration.storage.settings} element={<StorageSettingsPage />} />
+        </Route>
+
+        {/* Administration -> Logs */}
+        <Route path={routes.administration.logs} element={<LogsPage />} />
+
+        {/* Canonical group/section entry redirects */}
+        <Route
+          path="sources"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+        <Route
+          path="sources/indexers"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+        <Route
+          path="sources/indexers/torrents"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+        <Route
+          path="sources/remote-catalogs"
+          element={<PreserveRedirect to={routes.sources.remoteCatalogs.statistics} />}
+        />
+        <Route
+          path="sources/files"
+          element={<PreserveRedirect to={routes.sources.files.statistics} />}
+        />
+        <Route
+          path="metadata/catalogs"
+          element={<PreserveRedirect to={routes.metadata.catalogs.videos.statistics} />}
+        />
+        {(['videos', 'games', 'software', 'music', 'books'] as const).map((section) => (
+          <Route
+            key={`catalog-root-${section}`}
+            path={`metadata/catalogs/${section}`}
+            element={<PreserveRedirect to={metadataSections[section].statistics} />}
+          />
+        ))}
+        <Route path="metadata/identification" element={<LegacyIdentificationRoot />} />
+        <Route path="debrid" element={<PreserveRedirect to={routes.debrid.statistics} />} />
+        <Route path="browse" element={<PreserveRedirect to={routes.browse.trending} />} />
+        <Route path="connections" element={<PreserveRedirect to={routes.connections.torznab} />} />
+        <Route
+          path="connections/stremio"
+          element={<PreserveRedirect to={routes.connections.stremio.statistics} />}
+        />
+        <Route
+          path="connections/shared-catalogs"
+          element={<PreserveRedirect to={routes.connections.sharedCatalogs.statistics} />}
+        />
+        <Route
+          path="administration"
+          element={<PreserveRedirect to={routes.administration.security.secrets} />}
+        />
+        <Route path="administration/security" element={<LegacySecuritySettings />} />
+        <Route
+          path="administration/security/sessions"
+          element={<PreserveRedirect to={routes.administration.security.activeSessions} />}
+        />
+        <Route
+          path="administration/network"
+          element={<PreserveRedirect to={routes.administration.network.incoming} />}
+        />
+        <Route
+          path="administration/network/outgoing"
+          element={<PreserveRedirect to={routes.administration.network.outgoing.proxies} />}
+        />
+        <Route
+          path="administration/users"
+          element={<PreserveRedirect to={routes.administration.users.trusted} />}
+        />
+        <Route
+          path="administration/storage"
+          element={<PreserveRedirect to={routes.administration.storage.statistics} />}
+        />
+
+        {/* Legacy bookmark redirects (preserving search, hash, and history state) */}
+        <Route
+          path="indexers"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+        <Route
+          path="providers"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.statistics} />}
+        />
+        <Route
+          path="providers/settings"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.settings} />}
+        />
+        <Route
+          path="providers/new"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.newSource} />}
+        />
+        <Route
+          path="providers/id/:id"
+          element={<LegacyParamRedirect build={sourceSettingsPath} />}
+        />
+        <Route path="providers/:id" element={<LegacyParamRedirect build={sourceSettingsPath} />} />
+        <Route
+          path="runs"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.history} />}
+        />
+        <Route
+          path="runs/:id"
+          element={<LegacyParamRedirect build={(id) => runDetailPath(id)} />}
+        />
+        <Route path="raw" element={<LegacyRawHistory />} />
+        <Route path="raw/:id" element={<LegacyParamRedirect build={rawRecordPath} />} />
+        <Route path="pages/:id" element={<LegacyParamRedirect build={rawPagePath} />} />
+        <Route
+          path="remotes"
+          element={<PreserveRedirect to={routes.sources.remoteCatalogs.statistics} />}
+        />
+        <Route
+          path="remotes/settings"
+          element={<PreserveRedirect to={routes.sources.remoteCatalogs.settings} />}
+        />
+        <Route
+          path="remotes/history"
+          element={<PreserveRedirect to={routes.sources.remoteCatalogs.history} />}
+        />
+        <Route
+          path="remotes/history/:id"
+          element={<LegacyParamRedirect build={(id) => runDetailPath(id, true)} />}
+        />
+        <Route
+          path="sharing/remotes"
+          element={<PreserveRedirect to={routes.sources.remoteCatalogs.settings} />}
+        />
+        <Route path="files" element={<PreserveRedirect to={routes.sources.files.statistics} />} />
+        <Route
+          path="files/results"
+          element={<PreserveRedirect to={routes.sources.files.results} />}
+        />
+        <Route path="torrents" element={<PreserveRedirect to={routes.sources.files.results} />} />
+        <Route path="metadata" element={<LegacyMetadata view="statistics" />} />
+        <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
+        <Route path="metadata/history" element={<LegacyMetadata view="history" />} />
+        <Route path="metadata/history/:id" element={<OperationDetailPage section="metadata" />} />
+        {(['videos', 'games', 'software', 'music', 'books'] as const).map((section) => (
+          <React.Fragment key={`legacy-metadata-${section}`}>
+            <Route
+              path={`metadata/${section}`}
+              element={<PreserveRedirect to={metadataSections[section].statistics} />}
+            />
+            <Route
+              path={`metadata/${section}/settings`}
+              element={<PreserveRedirect to={metadataSections[section].settings} />}
+            />
+            <Route
+              path={`metadata/${section}/history`}
+              element={<PreserveRedirect to={metadataSections[section].history} />}
+            />
+            <Route
+              path={`metadata/${section}/history/:id`}
+              element={
+                <LegacyParamRedirect
+                  build={(id) => `${metadataSections[section].history}/${encodeURIComponent(id)}`}
+                />
+              }
+            />
+          </React.Fragment>
+        ))}
+        <Route path="trending" element={<PreserveRedirect to={routes.browse.trending} />} />
+        <Route path="search" element={<PreserveRedirect to={routes.browse.search} />} />
+        <Route
+          path="search/torrents"
+          element={<PreserveRedirect to={routes.browse.searchTorrents} />}
+        />
+        <Route
+          path="search/:id"
+          element={
+            <LegacyParamRedirect
+              build={(id) => `${routes.browse.search}/${encodeURIComponent(id)}`}
+            />
+          }
+        />
+        <Route path="torznab" element={<PreserveRedirect to={routes.connections.torznab} />} />
+        <Route
+          path="addon"
+          element={<PreserveRedirect to={routes.connections.stremio.statistics} />}
+        />
+        <Route
+          path="addon/settings"
+          element={<PreserveRedirect to={routes.connections.stremio.settings} />}
+        />
+        <Route
+          path="addon/history"
+          element={<PreserveRedirect to={routes.connections.stremio.history} />}
+        />
+        <Route
+          path="addon/history/:id"
+          element={<LegacyParamRedirect build={stremioRequestPath} />}
+        />
+        <Route
+          path="sharing"
+          element={<PreserveRedirect to={routes.connections.sharedCatalogs.statistics} />}
+        />
+        <Route
+          path="sharing/settings"
+          element={<PreserveRedirect to={routes.connections.sharedCatalogs.settings} />}
+        />
+        <Route
+          path="health"
+          element={<PreserveRedirect to={routes.administration.storage.statistics} />}
+        />
+        <Route
+          path="health/settings"
+          element={<PreserveRedirect to={routes.administration.storage.settings} />}
+        />
+        <Route path="security" element={<LegacySecuritySettings />} />
         <Route path="secrets" element={<LegacySecuritySettings />} />
-        <Route path="schedules" element={<Navigate to="/providers/settings" replace />} />
-        <Route path="settings" element={<Navigate to="/providers/settings" replace />} />
+        <Route
+          path="security/secrets"
+          element={<PreserveRedirect to={routes.administration.security.secrets} />}
+        />
+        <Route path="security/limits" element={<LegacySecurityLimits />} />
+        <Route path="security/settings" element={<LegacySecurityLimits />} />
+        <Route
+          path="security/verification"
+          element={<PreserveRedirect to={routes.administration.security.limits} />}
+        />
+        <Route
+          path="security/sessions"
+          element={<PreserveRedirect to={routes.administration.security.activeSessions} />}
+        />
+        <Route
+          path="users"
+          element={<PreserveRedirect to={routes.administration.users.trusted} />}
+        />
+        <Route
+          path="trusted-users"
+          element={<PreserveRedirect to={routes.administration.users.trusted} />}
+        />
+        <Route
+          path="public-access"
+          element={<PreserveRedirect to={routes.administration.users.public} />}
+        />
+        <Route path="public-access/limits" element={<LegacyPublicLimits />} />
+        <Route
+          path="network"
+          element={<PreserveRedirect to={routes.administration.network.incoming} />}
+        />
+        <Route
+          path="network/incoming"
+          element={<PreserveRedirect to={routes.administration.network.incoming} />}
+        />
+        <Route
+          path="network/outgoing"
+          element={<PreserveRedirect to={routes.administration.network.outgoing.proxies} />}
+        />
+        <Route
+          path="network/outgoing/routing"
+          element={<PreserveRedirect to={routes.administration.network.outgoing.routing} />}
+        />
+        <Route
+          path="network/proxies"
+          element={<PreserveRedirect to={routes.administration.network.outgoing.proxies} />}
+        />
+        <Route
+          path="network/routing"
+          element={<PreserveRedirect to={routes.administration.network.outgoing.routing} />}
+        />
+        <Route path="network/limits" element={<LegacyPublicLimits />} />
+        <Route path="logs" element={<PreserveRedirect to={routes.administration.logs} />} />
+        <Route path="notifications" element={<LegacyActivity />} />
+        <Route path="webhooks" element={<LegacyActivity />} />
+        <Route
+          path="schedules"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.settings} />}
+        />
+        <Route
+          path="settings"
+          element={<PreserveRedirect to={routes.sources.indexers.torrents.settings} />}
+        />
         <Route path="import-settings" element={<LegacyImportSettings />} />
+
         <Route
           path="*"
           element={
@@ -538,7 +925,7 @@ const router = createBrowserRouter(
                 description="This address does not match a console page."
                 action={
                   <Button asChild>
-                    <Link to="/">
+                    <Link to={routes.sources.indexers.torrents.statistics}>
                       <ArrowLeftIcon aria-hidden="true" />
                       Back to Sources
                     </Link>

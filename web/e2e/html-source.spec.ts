@@ -40,7 +40,7 @@ async function saveHTMLSource(page: Page) {
   )
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await response).status()).toBe(200)
-  await expect(page).toHaveURL(/\/providers\/html_example$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings\/html_example$/)
 }
 
 test('HTML uses the source stages, validates selectors without requests and keeps a mobile layout', async ({
@@ -153,7 +153,7 @@ test.describe('HTML collection', () => {
       )
       await dialog.getByRole('button', { name: 'Run manual import', exact: true }).click()
       const run = await (await response).json()
-      await expect(page).toHaveURL(new RegExp(`/runs/${run.id}$`))
+      await expect(page).toHaveURL(new RegExp(`/sources/indexers/torrents/history/${run.id}$`))
       await expect
         .poll(async () => {
           const current = await (await page.request.get(`/api/runs/${run.id}`)).json()

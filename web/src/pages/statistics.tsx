@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { api, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
+import { routes } from '@/lib/routes'
 import { filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
@@ -54,7 +55,7 @@ export function SourceStatisticsPage() {
   if (new URLSearchParams(location.search).get('settings') === 'advanced')
     return (
       <Navigate
-        to={`/providers/settings${location.search}${location.hash}`}
+        to={`${routes.sources.indexers.torrents.settings}${location.search}${location.hash}`}
         state={location.state}
         replace
       />
@@ -77,17 +78,17 @@ export function SourceStatisticsPage() {
             label="Awaiting import completion"
             value={counts.totals ? counts.totals.awaiting_import : 'Not available'}
             loadingLabel={counts.isPending && !providers.isError ? 'Loading counts…' : undefined}
-            to="/runs"
+            to={routes.sources.indexers.torrents.history}
           />
           <Statistic
             label="Running imports"
             value={overview.data.source_running}
-            to="/runs?status=running"
+            to={`${routes.sources.indexers.torrents.history}?status=running`}
           />
           <Statistic
             label="Queued imports"
             value={overview.data.source_queued}
-            to="/runs?status=queued"
+            to={`${routes.sources.indexers.torrents.history}?status=queued`}
           />
         </dl>
       )}
@@ -124,8 +125,11 @@ export function SourceStatisticsPage() {
               />
               <div className="card-actions mt-auto">
                 <Button asChild variant="outline" size="sm">
-                  <Link to={`/runs?provider=${encodeURIComponent(source.id)}`} state={listState}>
-                    <ArrowRightIcon />
+                  <Link
+                    to={`${routes.sources.indexers.torrents.history}?provider=${encodeURIComponent(source.id)}`}
+                    state={listState}
+                  >
+                    <ArrowRightIcon aria-hidden="true" />
                     View history
                   </Link>
                 </Button>
@@ -174,7 +178,7 @@ function VideoStatisticsPage() {
         : COLLECTION_REFRESH_INTERVAL(),
   })
   const status = query.data
-  const path = '/metadata/videos'
+  const path = routes.metadata.catalogs.videos.base
   const running = Boolean(status?.syncing)
   const resetting =
     status?.maintenance?.status === 'running' &&
@@ -282,7 +286,7 @@ function BookStatisticsPage() {
   })
   const status = query.data
   const books = status?.books
-  const path = '/metadata/books'
+  const path = routes.metadata.catalogs.books.base
   const running = Boolean(books?.running)
   const resetting =
     status?.maintenance?.status === 'running' &&
@@ -427,7 +431,7 @@ function DebridStatisticsPage() {
             {status.status.cleanup_failed > 0 && (
               <p role="alert" className="notice notice-warning">
                 Retry temporary magnet cleanup in{' '}
-                <Link className="underline" to="/debrid/settings#maintenance">
+                <Link className="underline" to={`${routes.debrid.settings}#maintenance`}>
                   Settings
                 </Link>
                 .
@@ -477,7 +481,7 @@ function GameStatisticsPage() {
                 label="Synchronization"
                 value={sync}
                 size="sm"
-                to="/metadata/games/settings"
+                to={routes.metadata.catalogs.games.settings}
               />
             </dl>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -485,13 +489,13 @@ function GameStatisticsPage() {
                 label="Last successful update"
                 value={games.last_sync ? date(games.last_sync) : 'No completed update'}
                 size="sm"
-                to="/metadata/games/history"
+                to={routes.metadata.catalogs.games.history}
               />
               <Statistic
                 label="Changes applied through"
                 value={games.changes_through ? date(games.changes_through) : 'Not established'}
                 size="sm"
-                to="/metadata/games/history"
+                to={routes.metadata.catalogs.games.history}
               />
               <Statistic
                 label="Next automatic update"
@@ -507,7 +511,7 @@ function GameStatisticsPage() {
                           : 'Waiting'
                 }
                 size="sm"
-                to="/metadata/games/settings"
+                to={routes.metadata.catalogs.games.settings}
               />
             </dl>
             <Disclosure title="Synchronization details">
@@ -565,7 +569,7 @@ function SoftwareStatisticsPage() {
                 label="Synchronization"
                 value={resetting ? 'Resetting information' : softwareSyncLabel(software, automatic)}
                 size="sm"
-                to="/metadata/software/settings"
+                to={routes.metadata.catalogs.software.settings}
               />
               <Statistic
                 label="NVD update mode"
@@ -575,13 +579,13 @@ function SoftwareStatisticsPage() {
                     : 'Incremental API (public rate)'
                 }
                 size="sm"
-                to="/metadata/software/settings"
+                to={routes.metadata.catalogs.software.settings}
               />
               <Statistic
                 label="Last successful update"
                 value={software.last_sync ? date(software.last_sync) : 'No completed update'}
                 size="sm"
-                to="/metadata/software/history"
+                to={routes.metadata.catalogs.software.history}
               />
               <Statistic
                 label="NVD changes applied through"
@@ -591,7 +595,7 @@ function SoftwareStatisticsPage() {
                     : 'Not established'
                 }
                 size="sm"
-                to="/metadata/software/history"
+                to={routes.metadata.catalogs.software.history}
               />
               <Statistic
                 label="NVD snapshot date"
@@ -616,11 +620,11 @@ function SoftwareStatisticsPage() {
                           : 'Waiting'
                 }
                 size="sm"
-                to="/metadata/software/settings"
+                to={routes.metadata.catalogs.software.settings}
               />
             </dl>
             <div className="flex flex-wrap gap-2" aria-label="Current activity">
-              <Link to="/metadata/software/history" aria-label="View update history">
+              <Link to={routes.metadata.catalogs.software.history} aria-label="View update history">
                 <Badge
                   variant={
                     software.running || resetting
@@ -714,7 +718,7 @@ function MusicStatisticsPage() {
                 label="Synchronization"
                 value={resetting ? 'Resetting information' : musicSyncLabel(music, automatic)}
                 size="sm"
-                to="/metadata/music/settings"
+                to={routes.metadata.catalogs.music.settings}
               />
               <Statistic
                 label="Update feed"
@@ -726,19 +730,19 @@ function MusicStatisticsPage() {
                     : 'Full exports (CC0)'
                 }
                 size="sm"
-                to="/metadata/music/settings"
+                to={routes.metadata.catalogs.music.settings}
               />
               <Statistic
                 label="Last successful update"
                 value={music.last_sync ? date(music.last_sync) : 'No completed update'}
                 size="sm"
-                to="/metadata/music/history"
+                to={routes.metadata.catalogs.music.history}
               />
               <Statistic
                 label="Changes applied through"
                 value={music.changes_through ? date(music.changes_through) : 'Not established'}
                 size="sm"
-                to="/metadata/music/history"
+                to={routes.metadata.catalogs.music.history}
               />
               <Statistic
                 label="Export date"
@@ -759,11 +763,11 @@ function MusicStatisticsPage() {
                           : 'Waiting'
                 }
                 size="sm"
-                to="/metadata/music/settings"
+                to={routes.metadata.catalogs.music.settings}
               />
             </dl>
             <div className="flex flex-wrap gap-2" aria-label="Current activity">
-              <Link to="/metadata/music/history" aria-label="View update history">
+              <Link to={routes.metadata.catalogs.music.history} aria-label="View update history">
                 <Badge
                   variant={
                     music.running || resetting ? 'info' : needsAttention ? 'warning' : 'secondary'

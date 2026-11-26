@@ -43,6 +43,23 @@ test('detail return links retain the complete public list view and direct links 
     { to: '/runs/run-one?tab=raw&raw_status=error&raw_offset=50', label: 'Processed records' },
   )
   for (const [pathname, search, label] of [
+    ['/sources/files/results', '?q=example&provider=source&sort=oldest', 'Files'],
+    ['/browse/trending', '?period=month', 'Trending'],
+    ['/public/browse/trending', '?period=quarter', 'Trending'],
+    ['/trusted/browse/trending', '?period=year', 'Trending'],
+    ['/browse/search', '?q=example&type=tv&offset=50', 'Search'],
+    ['/public/browse/search', '?q=example&type=tv&year=2026&offset=50', 'Search'],
+    ['/browse/search/torrents', '?q=example&provider=source&offset=50', 'Search torrents'],
+    ['/public/browse/search/torrents', '?q=example&cached_only=true', 'Search torrents'],
+    ['/sources/remote-catalogs/settings', '?q=example&state=disabled', 'Remote catalogs'],
+    ['/sources/remote-catalogs/history', '?status=failed&offset=50', 'Remote catalog history'],
+    ['/sources/remote-catalogs/history/run-one', '?tab=raw&raw_offset=50', 'Processed records'],
+    ['/sources/indexers/torrents/history/run-one', '?tab=raw&raw_offset=50', 'Processed records'],
+    ['/sources/indexers/torrents/history/raw/42', '', 'Processed record'],
+    ['/sources/indexers/torrents/settings/source-one', '', 'Source settings'],
+    ['/administration/logs', '?service=tmdb', 'Logs'],
+    ['/administration/storage/statistics', '', 'Storage'],
+    // Legacy views kept for continuity across in-flight browser history state
     ['/torrents', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/files/results', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/trending', '?period=month', 'Trending'],

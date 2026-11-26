@@ -94,7 +94,7 @@ test('video and book workspaces keep separate counts and histories under one Met
         })
         .click()
       await expect(page).toHaveURL(
-        new RegExp(`/metadata/${section}/history\\?service=other&kind=matching$`),
+        new RegExp(`/metadata/catalogs/${section}/history\\?service=other&kind=matching$`),
       )
     }
   }
@@ -127,7 +127,7 @@ test('video and book workspaces keep separate counts and histories under one Met
     'Correspondences should not request global identification counts',
   ).toEqual([])
   await page.getByRole('tab', { name: 'Statistics', exact: true }).click()
-  await expect(page).toHaveURL(/\/metadata\/identification$/)
+  await expect(page).toHaveURL(/\/metadata\/identification\/statistics$/)
   const statistics = page.getByRole('region', { name: 'Identification statistics', exact: true })
   await expect(statistics).toBeVisible()
   await expect(filters).toHaveCount(0)
@@ -139,15 +139,15 @@ test('video and book workspaces keep separate counts and histories under one Met
   )
   await expect(filters).toBeVisible()
   await page.goto('/metadata/settings#setting=metadata.books')
-  await expect(page).toHaveURL(/\/metadata\/books\/settings#setting=metadata.books$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/books\/settings#setting=metadata.books$/)
   await expect(page.getByLabel('Automatically update book information')).toBeFocused()
   await page.goto('/metadata/settings#setting=metadata.match')
   await expect(page).toHaveURL(/\/metadata\/identification\/settings#setting=metadata.match$/)
   await expect(page.getByLabel('Automatically identify torrents')).toBeFocused()
   await page.goto('/metadata/history?service=openlibrary&status=succeeded&limit=25')
-  await expect(page).toHaveURL(/\/metadata\/books\/history\?status=succeeded&limit=25$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/books\/history\?status=succeeded&limit=25$/)
   await page.goto('/metadata/history/book-update')
-  await expect(page).toHaveURL(/\/metadata\/books\/history\/book-update$/)
+  await expect(page).toHaveURL(/\/metadata\/catalogs\/books\/history\/book-update$/)
   await expect(page.getByRole('tab', { name: 'History', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -431,7 +431,7 @@ for (const section of ['videos', 'books'] as const) {
         : { works: 1, editions: 1, authors: 1, position: 1234 },
     )
     await page.getByRole('tab', { name: 'History', exact: true }).click()
-    await expect(page).toHaveURL(new RegExp(`/metadata/${section}/history$`))
+    await expect(page).toHaveURL(new RegExp(`/metadata/catalogs/${section}/history$`))
     await expect(page.getByText('No runs in this view', { exact: true })).toBeVisible()
     await page.goto(`/metadata/${books ? 'videos' : 'books'}/settings#maintenance`)
     await expect(page.getByRole('button', { name: otherLabel, exact: true })).toBeVisible()

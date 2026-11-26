@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, queryClient, setCSRF } from '@/lib/api'
+import { routes } from '@/lib/routes'
 import type { Session } from '@/lib/types'
 import { clearPublicCredentials, useRequestController } from './public-connection-fields'
 import { Button } from './ui/button'
@@ -87,12 +88,12 @@ function LoginForm({ trusted }: { trusted: boolean }) {
         !['/login', '/user-login', '/'].includes(location.pathname) &&
         !/^\/(public|trusted)(\/|$)/.test(location.pathname)
           ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
-          : '/providers'
+          : routes.sources.indexers.torrents.statistics
       const trustedReturnTo =
         safePathname &&
         (location.pathname === '/trusted' || location.pathname.startsWith('/trusted/'))
           ? location.pathname + (query.size ? '?' + query.toString() : '') + location.hash
-          : '/trusted'
+          : routes.trusted.base
       navigate(trusted ? trustedReturnTo : returnTo, { replace: true })
     } catch (caught) {
       if (!controller.signal.aborted) setError(caught)

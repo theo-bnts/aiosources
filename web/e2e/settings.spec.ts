@@ -99,7 +99,7 @@ test('advanced import controls load on demand and folding preserves drafts and n
   await expect(workers).toHaveValue(changed)
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname === '/providers/settings' &&
+      url.pathname === '/sources/indexers/torrents/settings' &&
       url.searchParams.get('settings') === 'advanced' &&
       url.searchParams.get('q') === 'Original' &&
       url.hash === '#advanced-import-settings',
@@ -252,7 +252,7 @@ test('browser display defaults ignore retired preferences and stay separate from
     ),
   )
   await page.goto('/settings')
-  await expect(page).toHaveURL(/\/providers\/settings$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/settings$/)
   await expect(page.getByRole('heading', { name: 'Torrents', exact: true, level: 1 })).toBeVisible()
   await expect(page.getByLabel('Display timezone', { exact: true })).toHaveCount(0)
   await page.goto('/torrents?limit=100')

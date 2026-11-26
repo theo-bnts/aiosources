@@ -36,6 +36,6 @@ for (const id of ['new', 'settings', 'New', 'Settings']) {
       .getByRole('option', { name: new RegExp(name) })
       .click()
     await expect(page.getByLabel('Request timeout', { exact: true })).toBeFocused()
-    expect(new URL(page.url()).pathname).toBe(`/providers/id/${id}`)
+    expect(new URL(page.url()).pathname).toBe(`/sources/indexers/torrents/settings/id/${id}`)
   })
 }

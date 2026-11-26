@@ -6,6 +6,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { ArrowRightIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { bytes, number, percentage, useDate } from '@/lib/format'
 import { useListViewState } from '@/lib/detail-navigation'
+import { routes, runDetailPath } from '@/lib/routes'
 import { useSourceNames } from '@/lib/source-names'
 import type { SystemHealth, StorageCategory } from '@/lib/health-types'
 import { Button } from '@/components/ui/button'
@@ -139,11 +140,11 @@ const metadataCatalogLabels: Record<string, string> = {
 }
 
 const metadataCatalogPaths: Record<string, string> = {
-  videos: '/metadata/videos',
-  games: '/metadata/games',
-  software: '/metadata/software',
-  music: '/metadata/music',
-  books: '/metadata/books',
+  videos: routes.metadata.catalogs.videos.statistics,
+  games: routes.metadata.catalogs.games.statistics,
+  software: routes.metadata.catalogs.software.statistics,
+  music: routes.metadata.catalogs.music.statistics,
+  books: routes.metadata.catalogs.books.statistics,
 }
 
 function metadataCatalogOrderIndex(kind: string) {
@@ -327,7 +328,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                       <TableCell className="whitespace-normal">
                         <Link
                           className="data-link break-words font-medium"
-                          to={`/runs/${encodeURIComponent(run.run_id)}`}
+                          to={runDetailPath(run.run_id)}
                           state={listState}
                         >
                           {sourceName(run.provider_id, run.provider_name)}
@@ -349,7 +350,7 @@ function SourceStorageDetails({ report }: { report: SystemHealth }) {
                       <TableCell>
                         <Button asChild variant="ghost" size="icon-sm">
                           <Link
-                            to={`/runs/${encodeURIComponent(run.run_id)}`}
+                            to={runDetailPath(run.run_id)}
                             state={listState}
                             aria-label={`Open import from ${sourceName(run.provider_id, run.provider_name)} on ${date(run.created_at)}`}
                           >

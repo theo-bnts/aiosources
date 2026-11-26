@@ -5,6 +5,66 @@ test('navigation and page tabs remain coherent on every current and legacy route
 }) => {
   test.setTimeout(90_000)
   const destinations = [
+    // Canonical hierarchical URLs
+    ['Sources', 'Torrents', '/sources/indexers/torrents/statistics'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/settings'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/settings/new'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/history'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/history/missing'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/history/raw/999999'],
+    ['Sources', 'Torrents', '/sources/indexers/torrents/history/pages/999999'],
+    ['Sources', 'Remote catalogs', '/sources/remote-catalogs/statistics'],
+    ['Sources', 'Remote catalogs', '/sources/remote-catalogs/settings'],
+    ['Sources', 'Remote catalogs', '/sources/remote-catalogs/history'],
+    ['Sources', 'Remote catalogs', '/sources/remote-catalogs/history/missing'],
+    ['Sources', 'Files', '/sources/files/statistics'],
+    ['Sources', 'Files', '/sources/files/results'],
+    ['Metadata', 'Videos', '/metadata/catalogs/videos/statistics'],
+    ['Metadata', 'Videos', '/metadata/catalogs/videos/settings'],
+    ['Metadata', 'Videos', '/metadata/catalogs/videos/history'],
+    ['Metadata', 'Games', '/metadata/catalogs/games/statistics'],
+    ['Metadata', 'Games', '/metadata/catalogs/games/settings'],
+    ['Metadata', 'Games', '/metadata/catalogs/games/history'],
+    ['Metadata', 'Software', '/metadata/catalogs/software/statistics'],
+    ['Metadata', 'Software', '/metadata/catalogs/software/settings'],
+    ['Metadata', 'Software', '/metadata/catalogs/software/history'],
+    ['Metadata', 'Music', '/metadata/catalogs/music/statistics'],
+    ['Metadata', 'Music', '/metadata/catalogs/music/settings'],
+    ['Metadata', 'Music', '/metadata/catalogs/music/history'],
+    ['Metadata', 'Books', '/metadata/catalogs/books/statistics'],
+    ['Metadata', 'Books', '/metadata/catalogs/books/settings'],
+    ['Metadata', 'Books', '/metadata/catalogs/books/history'],
+    ['Metadata', 'Identification', '/metadata/identification/statistics'],
+    ['Metadata', 'Identification', '/metadata/identification/results'],
+    ['Metadata', 'Identification', '/metadata/identification/correspondences'],
+    ['Metadata', 'Identification', '/metadata/identification/settings'],
+    ['Metadata', 'Identification', '/metadata/identification/history'],
+    ['Debrid', 'Debrid', '/debrid/statistics'],
+    ['Debrid', 'Debrid', '/debrid/settings'],
+    ['Debrid', 'Debrid', '/debrid/history'],
+    ['Debrid', 'Debrid', '/debrid/history/missing'],
+    ['Browse', 'Trending', '/browse/trending'],
+    ['Browse', 'Search', '/browse/search'],
+    ['Browse', 'Search', '/browse/search/torrents'],
+    ['Browse', 'Search', '/browse/search/999999'],
+    ['Connections', 'Torznab', '/connections/torznab'],
+    ['Connections', 'Stremio', '/connections/stremio/statistics'],
+    ['Connections', 'Stremio', '/connections/stremio/settings'],
+    ['Connections', 'Stremio', '/connections/stremio/history'],
+    ['Connections', 'Shared catalogs', '/connections/shared-catalogs/statistics'],
+    ['Connections', 'Shared catalogs', '/connections/shared-catalogs/settings'],
+    ['Administration', 'Secrets', '/administration/security/secrets'],
+    ['Administration', 'Limits', '/administration/security/limits'],
+    ['Administration', 'Active sessions', '/administration/security/active-sessions'],
+    ['Administration', 'Incoming', '/administration/network/incoming'],
+    ['Administration', 'Outgoing', '/administration/network/outgoing/proxies'],
+    ['Administration', 'Outgoing', '/administration/network/outgoing/routing'],
+    ['Administration', 'Trusted', '/administration/users/trusted'],
+    ['Administration', 'Public', '/administration/users/public'],
+    ['Administration', 'Storage', '/administration/storage/statistics'],
+    ['Administration', 'Storage', '/administration/storage/settings'],
+    ['Administration', 'Logs', '/administration/logs'],
+    // Legacy bookmark redirects
     ['Sources', 'Torrents', '/providers'],
     ['Sources', 'Torrents', '/providers/settings'],
     ['Sources', 'Torrents', '/schedules'],
@@ -38,16 +98,9 @@ test('navigation and page tabs remain coherent on every current and legacy route
     ['Metadata', 'Books', '/metadata/books/settings'],
     ['Metadata', 'Books', '/metadata/books/history'],
     ['Metadata', 'Identification', '/metadata/identification'],
-    ['Metadata', 'Identification', '/metadata/identification/results'],
-    ['Metadata', 'Identification', '/metadata/identification/correspondences'],
-    ['Metadata', 'Identification', '/metadata/identification/settings'],
-    ['Metadata', 'Identification', '/metadata/identification/history'],
     ['Metadata', 'Videos', '/metadata/history'],
     ['Metadata', 'Videos', '/metadata/history/missing'],
     ['Debrid', 'Debrid', '/debrid'],
-    ['Debrid', 'Debrid', '/debrid/settings'],
-    ['Debrid', 'Debrid', '/debrid/history'],
-    ['Debrid', 'Debrid', '/debrid/history/missing'],
     ['Browse', 'Trending', '/trending'],
     ['Browse', 'Search', '/search'],
     ['Browse', 'Search', '/search/999999'],
@@ -183,12 +236,15 @@ test('navigation and page tabs remain coherent on every current and legacy route
     page.getByRole('tablist', { name: 'Torrents views', exact: true }).getByRole('tab'),
   ).toHaveText(['Statistics', 'Settings', 'History'])
   await page.getByRole('tab', { name: 'History', exact: true }).click()
-  await expect(page).toHaveURL(/\/runs$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history$/)
   await expect(page.getByRole('heading', { name: 'History', exact: true })).toHaveCount(0)
   await page.goto('/runs?provider=example&status=failed&offset=50&limit=25')
+  await expect(page).toHaveURL(
+    /\/sources\/indexers\/torrents\/history\?provider=example&status=failed&offset=50&limit=25$/,
+  )
   await expect(page.getByRole('navigation', { name: 'History views', exact: true })).toHaveCount(0)
   await page.goto('/raw?provider=example&limit=25')
-  await expect(page).toHaveURL(/\/runs\?provider=example$/)
+  await expect(page).toHaveURL(/\/sources\/indexers\/torrents\/history\?provider=example$/)
   await expect(page.getByLabel('Processing result', { exact: true })).toHaveCount(0)
 })
 

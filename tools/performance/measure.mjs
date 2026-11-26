@@ -617,11 +617,17 @@ try {
     }
     const pages = [
       ...applicationPages,
-      ...entities.works.map((work) => ['search.detail.' + work.media_type, '/search/' + work.id]),
-      ...entities.runs.map((run, index) => ['sources.run.' + index, '/runs/' + q(run.id)]),
+      ...entities.works.map((work) => [
+        'search.detail.' + work.media_type,
+        '/browse/search/' + work.id,
+      ]),
+      ...entities.runs.map((run, index) => [
+        'sources.run.' + index,
+        '/sources/indexers/torrents/history/' + q(run.id),
+      ]),
       ...entities.sources.map((source, index) => [
         'sources.editor.' + index,
-        '/providers/' + q(source.provider_id),
+        '/sources/indexers/torrents/settings/' + q(source.provider_id),
       ]),
     ]
     for (const [id, route] of pages) {
@@ -683,12 +689,12 @@ try {
       }
     }
     for (const [id, route, button] of [
-      ['stremio.create', '/addon/settings', 'Create access'],
-      ['torznab.create', '/torznab', 'Create access'],
-      ['sharing.create', '/sharing/settings', 'Create share'],
-      ['remotes.create', '/remotes/settings', 'Add remote catalog'],
-      ['network.create', '/network/outgoing', 'Add proxy'],
-      ['security.create', '/security/secrets', 'Create secret'],
+      ['stremio.create', '/connections/stremio/settings', 'Create access'],
+      ['torznab.create', '/connections/torznab', 'Create access'],
+      ['sharing.create', '/connections/shared-catalogs/settings', 'Create share'],
+      ['remotes.create', '/sources/remote-catalogs/settings', 'Add remote catalog'],
+      ['network.create', '/administration/network/outgoing/proxies', 'Add proxy'],
+      ['security.create', '/administration/security/secrets', 'Create secret'],
     ]) {
       await resetPage()
       await navigate(route)
@@ -715,10 +721,10 @@ try {
     }
     await context.close()
     for (const [id, route] of [
-      ['stremio', '/public'],
-      ['torznab', '/public/torznab'],
-      ['sharing', '/public/sharing'],
-      ['search', '/public/search'],
+      ['stremio', '/public/connections/stremio'],
+      ['torznab', '/public/connections/torznab'],
+      ['sharing', '/public/connections/shared-catalogs'],
+      ['search', '/public/browse/search'],
     ]) {
       const visitor = await browser.newContext({
         baseURL: origin,

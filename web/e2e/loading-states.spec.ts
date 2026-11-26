@@ -81,7 +81,7 @@ test('Security opens Secrets directly without requesting a removed statistics da
     if (['/api/security', '/api/security/sessions'].includes(path)) requested.push(path)
   })
   await page.goto('/security')
-  await expect(page).toHaveURL(/\/security\/secrets$/)
+  await expect(page).toHaveURL(/\/administration\/security\/secrets$/)
   await expect(page.getByRole('heading', { name: 'Secrets', exact: true })).toBeVisible()
   await expect(page.getByText('Stored secrets', { exact: true })).toHaveCount(0)
   expect(requested).toEqual([])

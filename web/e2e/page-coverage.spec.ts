@@ -2,14 +2,14 @@ import { applicationPages } from './application-pages'
 import { test, expect } from './fixtures'
 
 test('other book formats have their own explicit filter', async ({ page }) => {
-  await page.goto('/search')
+  await page.goto('/browse/search')
   await page.locator('summary', { hasText: /^Filters$/ }).click()
   await page.getByRole('button', { name: 'Type', exact: true }).click()
   await expect(
     page.getByRole('menuitemcheckbox', { name: 'Other books', exact: true }),
   ).toBeVisible()
   await page.keyboard.press('Escape')
-  await page.goto('/torznab')
+  await page.goto('/connections/torznab')
   await page.getByRole('button', { name: 'Create access', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await dialog.locator('summary', { hasText: /^Filters$/ }).click()

@@ -17,6 +17,7 @@ import { decodeSearchJSON, exactField, exactJSON, fieldChanges } from '@/lib/sea
 import { bytes, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
+import { rawRecordPath, routes, runDetailPath } from '@/lib/routes'
 import { Badge } from '@/components/ui/badge'
 import { Statistic } from '@/components/statistic'
 import { Button } from '@/components/ui/button'
@@ -108,11 +109,11 @@ export function TorrentTable({
                 {torrent.raw_id != null ? (
                   <Button asChild variant="ghost" size="icon-sm">
                     <Link
-                      to={`/raw/${torrent.raw_id}`}
+                      to={rawRecordPath(torrent.raw_id)}
                       state={listState}
                       aria-label={`Open processed record for ${torrent.source_id}`}
                     >
-                      <ArrowRightIcon />
+                      <ArrowRightIcon aria-hidden="true" />
                     </Link>
                   </Button>
                 ) : (
@@ -267,7 +268,7 @@ function ChangeEntry({ change }: { change: TorrentChange }) {
   const date = useDate()
   const location = useLocation()
   const listState = useListViewState()
-  const runPrefix = location.pathname.startsWith('/remotes/history') ? '/remotes/history' : '/runs'
+  const isRemote = location.pathname.startsWith(routes.sources.remoteCatalogs.history)
   return (
     <Disclosure
       title={
@@ -292,11 +293,11 @@ function ChangeEntry({ change }: { change: TorrentChange }) {
       {change.run_id ? (
         <Link
           className="data-link inline-flex items-center gap-2 break-all text-xs"
-          to={`${runPrefix}/${encodeURIComponent(change.run_id)}?tab=changes`}
+          to={`${runDetailPath(change.run_id, isRemote)}?tab=changes`}
           state={listState}
         >
           Run {change.run_id}
-          <ArrowRightIcon className="shrink-0" />
+          <ArrowRightIcon aria-hidden="true" className="shrink-0" />
         </Link>
       ) : (
         <p className="help">No run attribution recorded for this publication.</p>
@@ -469,9 +470,9 @@ export function OccurrenceDialog({
                       />
                       {torrent.raw_id != null && (
                         <Button asChild>
-                          <Link to={`/raw/${torrent.raw_id}`} state={listState}>
+                          <Link to={rawRecordPath(torrent.raw_id)} state={listState}>
                             View processed record
-                            <ArrowRightIcon />
+                            <ArrowRightIcon aria-hidden="true" />
                           </Link>
                         </Button>
                       )}
@@ -676,7 +677,7 @@ export function RunChangesList({
               <Button variant="outline" size="sm" asChild>
                 <OccurrenceLink occurrenceId={change.occurrence_id} tab="history">
                   Occurrence history
-                  <ArrowRightIcon />
+                  <ArrowRightIcon aria-hidden="true" />
                 </OccurrenceLink>
               </Button>
             </div>

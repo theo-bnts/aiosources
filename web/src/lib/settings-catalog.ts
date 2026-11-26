@@ -1,5 +1,6 @@
 import type { CatalogEntities } from './catalog-types'
 import { debridProviders } from './debrid.ts'
+import { routes } from './routes.ts'
 import { runtimeSections, type RuntimeSection } from './runtime-settings-definitions.ts'
 import { importNumberFields } from './import-settings-definitions.ts'
 import { sourceSettingsPath } from './source-navigation.ts'
@@ -28,7 +29,7 @@ settings.push({
   id: 'trusted.accounts',
   title: 'Trusted',
   label: 'Add user',
-  route: '/trusted-users',
+  route: routes.administration.users.trusted,
   group: 'Administration / Users / Trusted',
   keywords:
     'trusted user account email password permissions enable disable utilisateur confiance mot de passe',
@@ -56,21 +57,21 @@ function add(
 }
 
 const runtimeLocations: Record<RuntimeSection, [string, string]> = {
-  debrid: ['/debrid/settings', 'Debrid'],
-  debrid_retries: ['/debrid/settings', 'Debrid'],
-  outgoing: ['/network/outgoing', 'Administration / Network / Outgoing'],
-  connections: ['/network/incoming', 'Administration / Network / Incoming'],
-  downloads: ['/network/incoming', 'Administration / Network / Incoming'],
-  payloads: ['/security/limits', 'Administration / Security / Limits'],
-  history: ['/health/settings', 'Administration / Storage'],
-  security: ['/security/limits', 'Administration / Security / Limits'],
-  trusted_security: ['/security/limits', 'Administration / Security / Limits'],
-  source_retries: ['/providers/settings', 'Sources / Indexers / Torrents'],
-  identification: ['/metadata/identification/settings', 'Metadata / Identification'],
-  matching: ['/metadata/identification/settings', 'Metadata / Identification'],
-  metadata: ['/metadata/videos/settings', 'Metadata / Catalogs / Videos'],
+  debrid: [routes.debrid.settings, 'Debrid'],
+  debrid_retries: [routes.debrid.settings, 'Debrid'],
+  outgoing: [routes.administration.network.outgoing.proxies, 'Administration / Network / Outgoing'],
+  connections: [routes.administration.network.incoming, 'Administration / Network / Incoming'],
+  downloads: [routes.administration.network.incoming, 'Administration / Network / Incoming'],
+  payloads: [routes.administration.security.limits, 'Administration / Security / Limits'],
+  history: [routes.administration.storage.settings, 'Administration / Storage'],
+  security: [routes.administration.security.limits, 'Administration / Security / Limits'],
+  trusted_security: [routes.administration.security.limits, 'Administration / Security / Limits'],
+  source_retries: [routes.sources.indexers.torrents.settings, 'Sources / Indexers / Torrents'],
+  identification: [routes.metadata.identification.settings, 'Metadata / Identification'],
+  matching: [routes.metadata.identification.settings, 'Metadata / Identification'],
+  metadata: [routes.metadata.catalogs.videos.settings, 'Metadata / Catalogs / Videos'],
   metadata_retries: [
-    '/metadata/videos/settings',
+    routes.metadata.catalogs.videos.settings,
     'Metadata / Catalogs / Videos, Games, Software, Music & Books',
   ],
 }
@@ -92,7 +93,7 @@ for (const [key, field] of Object.entries(importNumberFields))
   settings.push({
     id: `imports.${key}`,
     title: field.label,
-    route: '/providers/settings',
+    route: routes.sources.indexers.torrents.settings,
     group: `Sources / Indexers / Torrents / Import execution / ${importCategory(key)}`,
     control: `collection-${key}`,
     reveal: ['Import execution', importCategory(key)],
@@ -100,7 +101,7 @@ for (const [key, field] of Object.entries(importNumberFields))
   })
 add(
   {
-    route: '/providers/settings',
+    route: routes.sources.indexers.torrents.settings,
     group: 'Sources / Indexers / Torrents / Import execution',
     reveal: ['Import execution'],
   },
@@ -115,7 +116,7 @@ add(
 )
 add(
   {
-    route: '/metadata/videos/settings',
+    route: routes.metadata.catalogs.videos.settings,
     group: 'Metadata / Catalogs / Videos / Settings',
     keywords: 'TMDB films movies series video metadonnees',
   },
@@ -132,7 +133,7 @@ add(
 )
 add(
   {
-    route: '/metadata/games/settings',
+    route: routes.metadata.catalogs.games.settings,
     group: 'Metadata / Catalogs / Games / Settings',
     keywords: 'IGDB Twitch games jeux video metadata',
   },
@@ -147,7 +148,7 @@ add(
 )
 add(
   {
-    route: '/metadata/software/settings',
+    route: routes.metadata.catalogs.software.settings,
     group: 'Metadata / Catalogs / Software / Settings',
     keywords:
       'NVD CPE NIST WinGet Microsoft Homebrew Cask selfh.st icons software applications logiciels metadata',
@@ -197,7 +198,7 @@ add(
 )
 add(
   {
-    route: '/metadata/music/settings',
+    route: routes.metadata.catalogs.music.settings,
     group: 'Metadata / Catalogs / Music / Settings',
     keywords:
       'MusicBrainz Cover Art Archive Discogs Wikidata music musique albums flac mp3 metadata',
@@ -243,7 +244,7 @@ add(
 )
 add(
   {
-    route: '/metadata/books/settings',
+    route: routes.metadata.catalogs.books.settings,
     group: 'Metadata / Catalogs / Books / Settings',
     keywords: 'Open Library books ebooks audiobooks livres metadonnees',
   },
@@ -272,7 +273,7 @@ add(
 )
 add(
   {
-    route: '/metadata/identification/settings',
+    route: routes.metadata.identification.settings,
     group: 'Metadata / Identification / Settings',
     keywords: 'matching films series books automatic identification',
   },
@@ -285,7 +286,7 @@ add(
     ],
   ],
 )
-add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
+add({ route: routes.debrid.settings, group: 'Debrid / Settings' }, [
   ...debridProviders.map(
     (p) =>
       [
@@ -303,7 +304,7 @@ add({ route: '/debrid/settings', group: 'Debrid / Settings' }, [
 ])
 add(
   {
-    route: '/debrid/settings',
+    route: routes.debrid.settings,
     group: 'Debrid / Private source playback',
     entity: 'tracker',
     reveal: ['Private source playback'],
@@ -315,7 +316,7 @@ add(
 )
 add(
   {
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Settings',
     keywords: 'storage stockage disk espace retention',
     reveal: ['Torrent data'],
@@ -330,7 +331,7 @@ add(
 )
 add(
   {
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Search indexes',
     reveal: ['Search indexes'],
   },
@@ -345,7 +346,7 @@ add(
 )
 add(
   {
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Retention overrides',
     reveal: ['Retention overrides'],
   },
@@ -372,7 +373,7 @@ settings.push(
   {
     id: 'storage.database.export',
     title: 'Export database',
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Database backup',
     label: 'Export database',
     control: 'database-backup-export',
@@ -382,7 +383,7 @@ settings.push(
   {
     id: 'storage.database.import',
     title: 'Import database',
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Database backup',
     label: 'Import database',
     control: 'database-backup-import',
@@ -392,7 +393,7 @@ settings.push(
   {
     id: 'storage.reset',
     title: 'Reset all source data',
-    route: '/health/settings',
+    route: routes.administration.storage.settings,
     group: 'Administration / Storage / Maintenance',
     label: 'Reset all source data',
     reveal: ['Maintenance'],
@@ -401,7 +402,7 @@ settings.push(
 )
 add(
   {
-    route: '/network/incoming',
+    route: routes.administration.network.incoming,
     group: 'Administration / Network / Incoming / Trusted proxy',
     keywords: 'cloudflare tunnel ip header entete reseau proxy confiance',
   },
@@ -414,7 +415,7 @@ add(
 )
 add(
   {
-    route: '/security/limits',
+    route: routes.administration.security.limits,
     group: 'Administration / Security / Limits / Public request limits',
     reveal: ['Public request limits'],
     keywords: 'public rate limit quota limite requetes',
@@ -427,7 +428,7 @@ add(
 )
 add(
   {
-    route: '/public-access',
+    route: routes.administration.users.public,
     group: 'Administration / Users / Public / Settings',
     keywords: 'public access acces',
   },
@@ -435,7 +436,7 @@ add(
 )
 add(
   {
-    route: '/public-access',
+    route: routes.administration.users.public,
     group: 'Administration / Users / Public / Settings',
     reveal: ['Permissions'],
     keywords: 'public access acces',
@@ -450,7 +451,7 @@ add(
 )
 add(
   {
-    route: '/public-access',
+    route: routes.administration.users.public,
     group: 'Administration / Users / Public / Credentials',
     reveal: ['Credentials'],
     keywords: 'admin instance credentials keys announces debrid identifiants cles',
@@ -462,7 +463,7 @@ add(
 )
 add(
   {
-    route: '/public-access',
+    route: routes.administration.users.public,
     group: 'Administration / Users / Public / Shared catalog data',
     reveal: ['Shared catalog data', 'Filters'],
     keywords: 'public sharing catalog permissions',
@@ -482,7 +483,7 @@ for (const [id, title, category] of [
     id: `public.catalog-${id}`,
     title,
     label: title,
-    route: '/public-access',
+    route: routes.administration.users.public,
     group: `Administration / Users / Public / Shared catalog data / ${category}`,
     reveal: ['Shared catalog data', 'Shared data', category],
     keywords: 'public sharing permissions',
@@ -491,7 +492,7 @@ for (const [id, title, category] of [
     id: `visitor.catalog.${id}`,
     title,
     label: title,
-    route: '/public/sharing',
+    route: routes.public.sharedCatalogs,
     group: `Connections / Shared catalogs / Shared data / ${category}`,
     reveal: ['Shared data', category],
     public: 'catalog',
@@ -501,7 +502,7 @@ settings.push({
   id: 'visitor.catalog.sources',
   title: 'Sources',
   label: 'Sources',
-  route: '/public/sharing',
+  route: routes.public.sharedCatalogs,
   group: 'Connections / Shared catalogs / Filters',
   reveal: ['Filters'],
   public: 'catalog',
@@ -509,7 +510,7 @@ settings.push({
 
 add(
   {
-    route: '/network/outgoing/routing',
+    route: routes.administration.network.outgoing.routing,
     group: 'Administration / Network / Outgoing / Routing',
     keywords: 'proxy VPN WARP route reseau connexion',
   },
@@ -527,14 +528,14 @@ add(
 settings.push({
   id: 'routing.source',
   title: 'Source connection',
-  route: '/network/outgoing/routing',
+  route: routes.administration.network.outgoing.routing,
   group: 'Administration / Network / Outgoing / Routing',
   entity: 'source-route',
   keywords: 'source proxy VPN WARP routing',
 })
 add(
   {
-    route: '/network/outgoing',
+    route: routes.administration.network.outgoing.proxies,
     group: 'Administration / Network / Outgoing / Proxies',
     entity: 'proxy',
     keywords: 'proxy VPN WARP SOCKS HTTP MediaFlow reseau',
@@ -555,7 +556,7 @@ settings.push({
   id: 'security.secret-references',
   title: 'Using references in JSON',
   group: 'Administration / Security / Secrets',
-  route: '/security/secrets',
+  route: routes.administration.security.secrets,
   control: 'secret-reference-help',
   reveal: ['Using references in JSON'],
   keywords: 'secrets auth.secret_ref auth.username_ref auth.password_ref http.secret_headers',
@@ -564,7 +565,7 @@ settings.push(
   {
     id: 'security.secrets',
     title: 'Secrets',
-    route: '/security/secrets',
+    route: routes.administration.security.secrets,
     group: 'Administration / Security / Secrets',
     control: 'secrets',
     keywords: 'password credential key token mot de passe cle',
@@ -573,7 +574,7 @@ settings.push(
   {
     id: 'security.sessions',
     title: 'Active sessions',
-    route: '/security/sessions',
+    route: routes.administration.security.activeSessions,
     group: 'Administration / Security / Active sessions',
     control: 'sessions',
     keywords: 'devices sign out appareils deconnexion',
@@ -598,7 +599,7 @@ for (const [id, title] of [
 
 add(
   {
-    route: '/remotes/settings',
+    route: routes.sources.remoteCatalogs.settings,
     group: 'Sources / Remote catalogs / Settings',
     entity: 'remote',
     keywords: 'remote catalog catalogue distant sync import',
@@ -614,8 +615,8 @@ add(
   ],
 )
 for (const [entity, route, group] of [
-  ['share', '/sharing/settings', 'Connections / Shared catalogs'],
-  ['remote', '/remotes/settings', 'Sources / Remote catalogs'],
+  ['share', routes.connections.sharedCatalogs.settings, 'Connections / Shared catalogs'],
+  ['remote', routes.sources.remoteCatalogs.settings, 'Sources / Remote catalogs'],
 ] as const) {
   add(
     {
@@ -651,9 +652,9 @@ for (const [entity, route, group] of [
   )
 }
 for (const [entity, route, name] of [
-  ['stremio', '/addon/settings', 'Stremio'],
-  ['torznab', '/torznab', 'Torznab'],
-  ['share', '/sharing/settings', 'Shared catalogs'],
+  ['stremio', routes.connections.stremio.settings, 'Stremio'],
+  ['torznab', routes.connections.torznab, 'Torznab'],
+  ['share', routes.connections.sharedCatalogs.settings, 'Shared catalogs'],
 ] as const) {
   const group = `Connections / ${name}`
   add({ route, group: `${group} / Settings`, entity }, [
@@ -730,7 +731,7 @@ function source(
 ) {
   add(
     {
-      route: '/providers/settings',
+      route: routes.sources.indexers.torrents.settings,
       group: `Sources / Indexers / Torrents / ${stage === 'collection' ? 'Imports' : stage.charAt(0).toUpperCase() + stage.slice(1)}`,
       entity: 'source',
       stage,
@@ -971,10 +972,10 @@ for (const setting of settings.filter((entry) => entry.entity === 'source')) {
 // Public destinations are a separate allowlist. No administrator labels or source
 // names are exposed by the public index, including on an administrator's /public view.
 for (const [area, route] of [
-  ['stremio', '/public'],
-  ['torznab', '/public/torznab'],
-  ['trending', '/public/trending'],
-  ['search', '/public/search'],
+  ['stremio', routes.public.stremio],
+  ['torznab', routes.public.torznab],
+  ['trending', routes.public.trending],
+  ['search', routes.public.search],
 ] as const) {
   const isBrowse = area === 'search' || area === 'trending'
   const areaGroup =
@@ -1085,7 +1086,7 @@ export function settingFromHash(hash: string) {
   }
 }
 export function settingURL(setting: Setting, entity?: string, create = false) {
-  if (setting.entity === 'source' && create) return '/providers/new'
+  if (setting.entity === 'source' && create) return routes.sources.indexers.torrents.newSource
   let route = setting.route
   if (setting.entity === 'source' && entity) route = sourceSettingsPath(entity)
   const url = new URL(route || '/', 'https://settings.invalid')

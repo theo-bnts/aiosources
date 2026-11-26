@@ -40,7 +40,7 @@ async function openAbout(page: Page) {
 test('credits use bundled assets and licenses without changing the current view or source drafts', async ({
   page,
 }) => {
-  await page.goto('/providers/new')
+  await page.goto('/sources/indexers/torrents/settings/new')
   await page.getByRole('button', { name: 'Use this template', exact: true }).first().click()
   const name = page.getByRole('textbox', { name: 'Display name', exact: true })
   await name.fill('Example Library')
@@ -163,7 +163,7 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await expect(password).toHaveValue('synthetic-form-draft')
     }
 
-    await page.goto('/public-access')
+    await page.goto('/administration/users/public')
     const access = page.getByRole('form', { name: 'Public', exact: true })
     await access.locator('summary').getByText('Permissions', { exact: true }).click()
     await access.getByLabel('Enable public access', { exact: true }).check()
@@ -193,7 +193,10 @@ test('one About entry stays in the same place on public, sign-in and administrat
       await expect(visitor.getByLabel('Administrator password', { exact: true })).toBeVisible()
       await checkAtSamePosition(visitor, anchor)
 
-      await page.goto('/public')
+      await page.goto('/public/connections/stremio')
+      await expect(
+        page.getByRole('heading', { name: 'Connect your debrid services', exact: true }),
+      ).toBeVisible()
       await checkAtSamePosition(page, anchor)
       if (width < 1024)
         await page.getByRole('button', { name: 'Open navigation', exact: true }).click()

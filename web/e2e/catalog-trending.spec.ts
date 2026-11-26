@@ -187,30 +187,30 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
 
   // Switching periods updates URL and rankings accurately.
   await period.selectOption('day')
-  await expect(page).toHaveURL(/\/trending\?period=day$/)
+  await expect(page).toHaveURL(/\/browse\/trending\?period=day$/)
   await expect(videoLinks.first()).toContainText('Daily Spotlight')
   await expect(videoLinks).toHaveCount(1)
 
   await period.selectOption('month')
-  await expect(page).toHaveURL(/\/trending\?period=month$/)
+  await expect(page).toHaveURL(/\/browse\/trending\?period=month$/)
   await expect(videoLinks.first()).toContainText('Monthly Hit')
 
   await period.selectOption('quarter')
-  await expect(page).toHaveURL(/\/trending\?period=quarter$/)
+  await expect(page).toHaveURL(/\/browse\/trending\?period=quarter$/)
   await expect(videoLinks.first()).toContainText('Quarter Favorite')
 
   await period.selectOption('year')
-  await expect(page).toHaveURL(/\/trending\?period=year$/)
+  await expect(page).toHaveURL(/\/browse\/trending\?period=year$/)
   await expect(videoLinks.first()).toContainText('Yearly Champion')
 
   // Clicking a poster opens the title detail page and returns cleanly to Trending with its period.
   await videoLinks.first().click()
-  await expect(page).toHaveURL(/\/search\/\d+$/)
+  await expect(page).toHaveURL(/\/browse\/search\/\d+$/)
   await expect(page.getByRole('heading', { name: 'Yearly Champion', exact: true })).toBeVisible()
   const backLink = page.getByRole('main').getByRole('link', { name: 'Trending', exact: true })
   await expect(backLink).toBeVisible()
   await backLink.click()
-  await expect(page).toHaveURL(/\/trending\?period=year$/)
+  await expect(page).toHaveURL(/\/browse\/trending\?period=year$/)
   await expect(period).toHaveValue('year')
 
   // Mobile layout keeps zero horizontal document overflow.
@@ -272,7 +272,7 @@ test('public and trusted trending use the dedicated Trending permission under Br
   const visitor = await context.newPage()
   try {
     await visitor.goto('/public/trending')
-    await expect(visitor).toHaveURL(/\/public\/search$/)
+    await expect(visitor).toHaveURL(/\/public\/browse\/search$/)
     const nav = visitor.getByRole('navigation', { name: 'Main navigation' })
     await expect(nav.getByRole('button', { name: 'Browse', exact: true })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Trending', exact: true })).toHaveCount(0)
@@ -284,7 +284,7 @@ test('public and trusted trending use the dedicated Trending permission under Br
     await access.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(access.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 
-    await expect(visitor).toHaveURL(/\/public\/trending$/)
+    await expect(visitor).toHaveURL(/\/public\/browse\/trending$/)
     await expect(
       visitor.getByRole('heading', { name: 'Trending', exact: true, level: 1 }),
     ).toBeVisible()
@@ -300,7 +300,7 @@ test('public and trusted trending use the dedicated Trending permission under Br
       .getByRole('link', { name: /Public Trending Film/ })
     await expect(filmLink).toBeVisible()
     await filmLink.click()
-    await expect(visitor).toHaveURL(/\/public\/search\/\d+$/)
+    await expect(visitor).toHaveURL(/\/public\/browse\/search\/\d+$/)
     await expect(
       visitor.getByRole('heading', { name: 'Public Trending Film', exact: true }),
     ).toBeVisible()
@@ -311,13 +311,13 @@ test('public and trusted trending use the dedicated Trending permission under Br
     ).toBeVisible()
     await expect(nav.locator('a[aria-current="page"]')).toHaveText('Trending')
     await visitor.getByRole('main').getByRole('link', { name: 'Trending', exact: true }).click()
-    await expect(visitor).toHaveURL(/\/public\/trending$/)
+    await expect(visitor).toHaveURL(/\/public\/browse\/trending$/)
   } finally {
     await context.close()
   }
 
   // Trusted user with Trending enabled and Search disabled.
-  await page.goto('/trusted-users')
+  await page.goto('/administration/users/trusted')
   await page.getByRole('button', { name: 'Add user', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Add trusted user', exact: true })
   await dialog.getByLabel('Email', { exact: true }).fill('trending.reader@example.invalid')
@@ -343,7 +343,7 @@ test('public and trusted trending use the dedicated Trending permission under Br
     await trustedPage.getByLabel('Email', { exact: true }).fill('trending.reader@example.invalid')
     await trustedPage.getByLabel('Password', { exact: true }).fill('reader-' + server.password)
     await trustedPage.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(trustedPage).toHaveURL(/\/trusted\/trending$/)
+    await expect(trustedPage).toHaveURL(/\/trusted\/browse\/trending$/)
     const trustedNav = trustedPage.getByRole('navigation', { name: 'Main navigation' })
     await expect(trustedNav.getByRole('button')).toHaveText(['Browse'])
     await expect(trustedNav.getByRole('link')).toHaveText(['Trending'])
@@ -354,7 +354,7 @@ test('public and trusted trending use the dedicated Trending permission under Br
         .getByRole('link', { name: /Public Trending Film/ }),
     ).toBeVisible()
     await trustedPage.goto('/trusted/search')
-    await expect(trustedPage).toHaveURL(/\/trusted\/trending$/)
+    await expect(trustedPage).toHaveURL(/\/trusted\/browse\/trending$/)
   } finally {
     await trustedContext.close()
   }

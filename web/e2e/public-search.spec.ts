@@ -278,7 +278,7 @@ test('Search is opt-in and remembers encrypted services across Stremio, reloads 
     await expect(visitor.locator('[data-result-count]')).toHaveText('1 source release')
     await expect(
       visitor.locator('main').getByRole('link', { name: 'Search', exact: true }),
-    ).toHaveAttribute('href', '/public/search?q=example+film')
+    ).toHaveAttribute('href', '/public/browse/search?q=example+film')
     await expect(visitor.getByLabel('Source', { exact: true })).toBeHidden()
     await expect(
       visitor.getByLabel('Sort by', { exact: true }).locator('option[value=source]'),

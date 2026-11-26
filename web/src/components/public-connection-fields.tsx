@@ -2,6 +2,7 @@ import { TrashIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { api, LIVE_REFRESH_INTERVAL } from '@/lib/api'
 import type { CatalogEntities } from '@/lib/catalog-types'
+import { visitorRoutes, type VisitorPrefix } from '@/lib/routes'
 import { Disclosure } from '@/components/ui/disclosure'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -31,19 +32,24 @@ export type VisitorSection = 'stremio' | 'trending' | 'search' | 'torznab' | 'ca
 export function resolveVisitorSection(
   info: PublicInfo,
   pathname: string,
-  prefix: '/public' | '/trusted',
-): { section: VisitorSection; available: boolean; validPath: boolean; fallbackTarget: string } {
-  const isTrending = pathname === `${prefix}/trending`
-  const isTitleDetail = new RegExp(`^${prefix}/search/[0-9]+$`).test(pathname)
-  const isSearch =
-    pathname === `${prefix}/search` || (pathname.startsWith(`${prefix}/search/`) && !isTitleDetail)
-  const validPath =
-    pathname === prefix ||
-    pathname === `${prefix}/torznab` ||
-    pathname === `${prefix}/sharing` ||
-    isTrending ||
-    isTitleDetail ||
-    isSearch
+  prefix: VisitorPrefix,
+): {
+  section: VisitorSection
+  available: boolean
+  validPath: boolean
+  fallbackTarget: string
+  canonicalPath?: string
+} {
+  const r = visitorRoutes(prefix)
+  const titleMatch = new RegExp(`^${prefix}/(?:browse/)?search/([0-9]+)$`).exec(pathname)
+  const isTitleDetail = Boolean(titleMatch)
+  const isTrending = pathname === r.trending || pathname === `${prefix}/trending`
+  const isSearchTorrents = pathname === r.searchTorrents || pathname === `${prefix}/search/torrents`
+  const isSearch = pathname === r.search || pathname === `${prefix}/search` || isSearchTorrents
+  const isTorznab = pathname === r.torznab || pathname === `${prefix}/torznab`
+  const isCatalog = pathname === r.sharedCatalogs || pathname === `${prefix}/sharing`
+  const isStremio = pathname === r.stremio || pathname === prefix
+  const validPath = isStremio || isTorznab || isCatalog || isTrending || isTitleDetail || isSearch
   const section: VisitorSection = isTrending
     ? 'trending'
     : isTitleDetail
@@ -52,9 +58,9 @@ export function resolveVisitorSection(
         : 'trending'
       : isSearch
         ? 'search'
-        : pathname === `${prefix}/torznab`
+        : isTorznab
           ? 'torznab'
-          : pathname === `${prefix}/sharing`
+          : isCatalog
             ? 'catalog'
             : 'stremio'
   const available = Boolean(
@@ -71,17 +77,32 @@ export function resolveVisitorSection(
               : info.catalog_enabled,
   )
   const fallbackTarget = info.stremio_enabled
-    ? prefix
+    ? r.stremio
     : info.trending_enabled
-      ? `${prefix}/trending`
+      ? r.trending
       : info.search_enabled
-        ? `${prefix}/search`
+        ? r.search
         : info.torznab_enabled
-          ? `${prefix}/torznab`
+          ? r.torznab
           : info.catalog_enabled
-            ? `${prefix}/sharing`
+            ? r.sharedCatalogs
             : ''
-  return { section, available, validPath, fallbackTarget }
+  const canonicalPath = isTrending
+    ? r.trending
+    : titleMatch
+      ? `${r.search}/${titleMatch[1]}`
+      : isSearchTorrents
+        ? r.searchTorrents
+        : isSearch
+          ? r.search
+          : isTorznab
+            ? r.torznab
+            : isCatalog
+              ? r.sharedCatalogs
+              : isStremio
+                ? r.stremio
+                : undefined
+  return { section, available, validPath, fallbackTarget, canonicalPath }
 }
 
 export function pruneVisitorOptions<

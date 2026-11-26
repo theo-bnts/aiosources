@@ -76,18 +76,21 @@ test('public search only includes enabled public controls and browser preference
 test('entity destinations encode identifiers and keep configuration selection separate from field targets', () => {
   const source = settingByID('source.timeout')!
   const url = new URL(settingURL(source, 'archive / one'), 'https://example.invalid')
-  assert.equal(url.pathname, '/providers/archive%20%2F%20one')
+  assert.equal(url.pathname, '/sources/indexers/torrents/settings/archive%20%2F%20one')
   assert.equal(url.searchParams.get('configure'), 'archive / one')
   assert.equal(settingFromHash(url.hash), source)
-  assert.equal(settingURL(source, 'new', true), '/providers/new')
-  assert.equal(settingURL(source, 'new'), '/providers/id/new?configure=new#setting=source.timeout')
+  assert.equal(settingURL(source, 'new', true), '/sources/indexers/torrents/settings/new')
+  assert.equal(
+    settingURL(source, 'new'),
+    '/sources/indexers/torrents/settings/id/new?configure=new#setting=source.timeout',
+  )
   assert.equal(
     settingURL(settingByID('imports.workers')!),
-    '/providers/settings#setting=imports.workers',
+    '/sources/indexers/torrents/settings#setting=imports.workers',
   )
   assert.equal(
     settingURL(settingByID('torznab.rate')!, 'new'),
-    '/torznab?configure=new#setting=torznab.rate',
+    '/connections/torznab?configure=new#setting=torznab.rate',
   )
 })
 
@@ -106,7 +109,7 @@ test('public shared catalog settings expose only enabled data choices', () => {
   )
   assert.equal(
     settingURL(settingByID('visitor.catalog.languages')!),
-    '/public/sharing#setting=visitor.catalog.languages',
+    '/public/connections/shared-catalogs#setting=visitor.catalog.languages',
   )
   assert.deepEqual(settingByID('visitor.catalog.languages')?.reveal, ['Shared data', 'Torrents'])
   assert.deepEqual(settingByID('public.catalog-languages')?.reveal, [
