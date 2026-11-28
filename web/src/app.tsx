@@ -43,6 +43,7 @@ import {
   lazy,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent,
@@ -843,6 +844,16 @@ export function AppShell({
   }, [])
   const previousPath = useRef(location.pathname)
   const focusMainOnClose = useRef(false)
+  useLayoutEffect(() => {
+    if (previousPath.current !== location.pathname) {
+      if (!isPageTabNavigation(location.state)) {
+        focusMainOnClose.current = true
+        mainRef.current?.focus({ preventScroll: true })
+        window.scrollTo({ top: 0 })
+      }
+      previousPath.current = location.pathname
+    }
+  }, [location.pathname, location.state])
   useEffect(() => {
     setMobileOpen(false)
     const activeKeys = [activeGroupId, ...activeSectionKey.split('|')].filter(Boolean) as string[]
@@ -854,15 +865,7 @@ export function AppShell({
             ...Object.fromEntries(activeKeys.map((key) => [key, true])),
           },
     )
-    if (previousPath.current !== location.pathname) {
-      if (!isPageTabNavigation(location.state)) {
-        focusMainOnClose.current = true
-        mainRef.current?.focus({ preventScroll: true })
-        window.scrollTo({ top: 0 })
-      }
-      previousPath.current = location.pathname
-    }
-  }, [location.pathname, location.state, activeGroupId, activeSectionKey])
+  }, [location.pathname, activeGroupId, activeSectionKey])
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(openGroups))

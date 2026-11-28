@@ -211,6 +211,7 @@ test('Security separates its pages and preserves existing bookmarks without repe
     .getByRole('link', { name: 'Active sessions', exact: true })
     .click()
   await expect(page).toHaveURL(/\/administration\/security\/active-sessions$/)
+  await expect(page.getByRole('region', { name: 'Active sessions', exact: true })).toBeVisible()
   await page.locator('#main-content').evaluate((main) => {
     main.style.minHeight = '2400px'
   })
