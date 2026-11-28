@@ -108,7 +108,7 @@ func (s NetworkSettings) Validate() error {
 	}
 	for target, route := range s.Overrides {
 		proxy, ok := known[route]
-		if (!networkTarget.MatchString(target) && target != "downloads") || !ok {
+		if (!networkTarget.MatchString(target) && target != "downloads" && target != "notifications") || !ok {
 			return errors.New("Each connection override needs a valid target and an existing proxy or direct connection")
 		}
 		if !proxy.SupportsTarget(target) {

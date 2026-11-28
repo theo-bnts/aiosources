@@ -1,9 +1,10 @@
-import { MagnifyingGlassIcon, TelevisionIcon } from '@phosphor-icons/react'
+import { BellIcon, MagnifyingGlassIcon, TelevisionIcon } from '@phosphor-icons/react'
 import { CatalogCover } from '@/components/catalog-cover'
 import { CatalogPosterRail } from '@/components/catalog-poster-rail'
+import { ReleaseAlertDialog, type ReleaseAlertTarget } from '@/components/release-alert-dialog'
 import { catalogCardSummary, catalogTorrentCount } from '@/lib/catalog-cards'
 import { useCatalogSearch } from '@/lib/use-catalog-search'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 import { CatalogReleaseList } from '@/components/catalog-release-list'
 import { FilterSelect } from '@/components/filter-select'
 import { catalogMediaTypes } from '@/lib/connection-options'
@@ -19,7 +20,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { params } from '@/lib/api'
+import { api, params } from '@/lib/api'
+import { formatAlertEpisode, type ReleaseAlert } from '@/lib/notification-types'
 import { isWholeNumberString, number } from '@/lib/format'
 import {
   catalogAPI,
@@ -32,7 +34,7 @@ import { routes } from '@/lib/routes'
 import { useSourceNames } from '@/lib/source-names'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { useURLPagination } from '@/lib/pagination'
-import type { Page } from '@/lib/types'
+import type { Items, Page } from '@/lib/types'
 import type { CatalogTitle, CatalogRelease, CatalogSelection } from '@/lib/catalog-search-types'
 import {
   ClearFiltersButton,
@@ -98,17 +100,42 @@ export function CatalogSearchPage() {
   useLayoutEffect(() => setDraftQuery(q), [q])
   const kind = search.get('type') || ''
   const year = search.get('year') || ''
+  const canAlert = !visitor || (Boolean(visitor.trusted) && Boolean(visitor.info.alerts_enabled))
+  const includeUnavailable = canAlert && search.get('unavailable') === 'true'
+  const [alertTarget, setAlertTarget] = useState<ReleaseAlertTarget | null>(null)
+  const alertsQuery = useQuery({
+    queryKey: [visitor?.trusted ? 'trusted-alerts' : 'alerts', language],
+    enabled: canAlert && includeUnavailable,
+    queryFn: ({ signal }) =>
+      api<Items<ReleaseAlert>>(
+        `${visitor?.trusted ? '/trusted/alerts' : '/alerts'}?language=${encodeURIComponent(language)}`,
+        { signal },
+      ),
+  })
+  const activeAlertsByWork = useMemo(
+    () => new Set((alertsQuery.data?.items ?? []).map((item) => item.work_id)),
+    [alertsQuery.data],
+  )
   const query = useCatalogSearch({
     q,
     type: kind,
     year,
     language,
+    includeUnavailable,
   })
   const visibleSections = query.sections.filter(
     (section) => section.isPending || section.items.length > 0,
   )
   const hasMatches = query.sections.some((section) => section.items.length > 0)
-  const resetScrollKey = `${q}\0${kind}\0${year}`
+  const resetScrollKey = `${q}\0${kind}\0${year}\0${includeUnavailable}`
+  function toggleUnavailable(enabled: boolean) {
+    const next = new URLSearchParams(search)
+    const trimmed = draftQuery.trim()
+    if (trimmed.length >= 2) next.set('q', trimmed)
+    if (enabled) next.set('unavailable', 'true')
+    else next.delete('unavailable')
+    setSearch(next, { flushSync: true })
+  }
   return (
     <div className={visitor ? 'min-w-0 space-y-6' : 'page min-w-0'}>
       <form
@@ -123,6 +150,7 @@ export function CatalogSearchPage() {
           next.set('q', trimmed)
           if (data.get('type')) next.set('type', String(data.get('type')))
           if (data.get('year')) next.set('year', String(data.get('year')))
+          if (includeUnavailable) next.set('unavailable', 'true')
           setSearch(next, { flushSync: true })
         }}
       >
@@ -168,6 +196,21 @@ export function CatalogSearchPage() {
               />
             </div>
           </div>
+          {canAlert && (
+            <div className="flex max-w-sm items-center justify-between gap-3">
+              <Label
+                htmlFor="catalog-unavailable"
+                help="Include titles from your local metadata catalogs that have no source releases yet so you can set a release alert."
+              >
+                Include titles without releases
+              </Label>
+              <Switch
+                id="catalog-unavailable"
+                checked={includeUnavailable}
+                onCheckedChange={toggleUnavailable}
+              />
+            </div>
+          )}
         </Disclosure>
         <div className="flex flex-wrap gap-2">
           <Button id="catalog-submit" type="submit">
@@ -213,14 +256,33 @@ export function CatalogSearchPage() {
                 <CatalogPosterRail
                   key={section.id}
                   category={{ id: section.id, label: section.label, frame: section.frame }}
-                  items={section.items.map((title) => ({
-                    id: title.id,
-                    title: title.title,
-                    cover: title.cover,
-                    summary: catalogCardSummary(title),
-                    metric: catalogTorrentCount(title.releases),
-                    to: `${searchPath}/${title.id}?${params({ q })}`,
-                  }))}
+                  items={section.items.map((title) => {
+                    const unavailable = title.releases === 0 && canAlert
+                    const alertActive = unavailable && activeAlertsByWork.has(title.id)
+                    return {
+                      id: title.id,
+                      title: title.title,
+                      cover: title.cover,
+                      summary: catalogCardSummary(title),
+                      metric: unavailable
+                        ? alertActive
+                          ? 'Alert active'
+                          : 'No releases'
+                        : catalogTorrentCount(title.releases),
+                      to: `${searchPath}/${title.id}?${params({ q })}`,
+                      alertActive,
+                      ...(unavailable
+                        ? {
+                            onSelect: () =>
+                              setAlertTarget({
+                                mode: 'create',
+                                work: title,
+                                unavailableNotice: true,
+                              }),
+                          }
+                        : {}),
+                    }
+                  })}
                   loading={section.isPending}
                   loadingLabel={`Searching ${section.label.toLowerCase()}`}
                   countLabel={
@@ -242,15 +304,33 @@ export function CatalogSearchPage() {
             <Empty
               title="No matching titles"
               description={
-                visitor
-                  ? 'No identified titles match this search.'
-                  : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing.'
+                includeUnavailable
+                  ? 'No titles match this search in your local metadata catalogs.'
+                  : visitor
+                    ? canAlert
+                      ? 'No identified titles with available releases match this search. You can also search titles without releases to set an alert.'
+                      : 'No identified titles match this search.'
+                    : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing, or search titles without releases to set an alert.'
+              }
+              action={
+                canAlert && !includeUnavailable ? (
+                  <Button type="button" variant="outline" onClick={() => toggleUnavailable(true)}>
+                    <BellIcon aria-hidden="true" />
+                    Include titles without releases
+                  </Button>
+                ) : undefined
               }
             />
           ) : null}
         </>
       )}
       <div className="flex flex-wrap justify-center gap-2">
+        {canAlert && q.trim().length >= 2 && !includeUnavailable && visibleSections.length > 0 && (
+          <Button type="button" variant="outline" onClick={() => toggleUnavailable(true)}>
+            <BellIcon aria-hidden="true" />
+            Include titles without releases
+          </Button>
+        )}
         <Button asChild variant="outline">
           <Link
             to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
@@ -261,6 +341,18 @@ export function CatalogSearchPage() {
           </Link>
         </Button>
       </div>
+      {canAlert && (
+        <ReleaseAlertDialog
+          open={alertTarget !== null}
+          onOpenChange={(next) => {
+            if (!next) setAlertTarget(null)
+          }}
+          target={alertTarget}
+          trusted={Boolean(visitor?.trusted)}
+          trustedSources={visitor?.info.sources}
+          existingAlerts={alertsQuery.data?.items ?? undefined}
+        />
+      )}
     </div>
   )
 }
@@ -338,6 +430,34 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
       catalogAPI<Page<CatalogRelease>>(`/catalog/${id}/releases?${query}`, visitor, { signal }),
     enabled: Boolean(title.data),
   })
+  const canAlert = !visitor || (Boolean(visitor.trusted) && Boolean(visitor.info.alerts_enabled))
+  const [episodeAlertOpen, setEpisodeAlertOpen] = useState(false)
+  const episodeAlerts = useQuery({
+    queryKey: [visitor?.trusted ? 'trusted-alerts' : 'alerts', titleLanguage],
+    enabled: canAlert && title.data?.type === 'tv',
+    queryFn: ({ signal }) =>
+      api<Items<ReleaseAlert>>(
+        `${visitor?.trusted ? '/trusted/alerts' : '/alerts'}?language=${encodeURIComponent(titleLanguage)}`,
+        { signal },
+      ),
+  })
+  const activeEpisodeAlert =
+    title.data?.type === 'tv'
+      ? episodeAlerts.data?.items?.find(
+          (item) =>
+            item.work_id === title.data!.id &&
+            item.season === selection.season &&
+            item.episode === selection.episode,
+        )
+      : undefined
+  const noNarrowingFilters = !cachedOnly && !provider && preferences.mode === 'all'
+  const canAlertEpisode =
+    canAlert &&
+    title.data?.type === 'tv' &&
+    releases.data?.total === 0 &&
+    noNarrowingFilters &&
+    selection.season !== undefined &&
+    selection.episode !== undefined
   const sourceOptions = [...(title.data?.providers ?? [])].sort((a, b) =>
     sourceName(a).localeCompare(sourceName(b)),
   )
@@ -627,6 +747,20 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                                 ? 'No releases match this episode and the selected filters. Try another episode or disable the language filter.'
                                 : 'No releases match the selected source and language filters. Adjust them to see other versions.'
                       }
+                      action={
+                        canAlertEpisode ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setEpisodeAlertOpen(true)}
+                          >
+                            <BellIcon aria-hidden="true" />
+                            {activeEpisodeAlert
+                              ? `Manage alert (${formatAlertEpisode(selection.season, selection.episode)})`
+                              : `Set release alert for ${formatAlertEpisode(selection.season, selection.episode)}`}
+                          </Button>
+                        ) : undefined
+                      }
                     />
                   )}
                   <Pager
@@ -636,6 +770,26 @@ export function CatalogTitlePage({ publicID }: { publicID?: string }) {
                     onChange={pagination.setOffset}
                     busy={releases.isFetching}
                   />
+                  {canAlert && title.data.type === 'tv' && (
+                    <ReleaseAlertDialog
+                      open={episodeAlertOpen}
+                      onOpenChange={setEpisodeAlertOpen}
+                      target={
+                        episodeAlertOpen
+                          ? {
+                              mode: 'create',
+                              work: title.data,
+                              season: selection.season,
+                              episode: selection.episode,
+                              unavailableNotice: true,
+                            }
+                          : null
+                      }
+                      trusted={Boolean(visitor?.trusted)}
+                      trustedSources={visitor?.info.sources}
+                      existingAlerts={episodeAlerts.data?.items ?? undefined}
+                    />
+                  )}
                 </>
               )
             )}

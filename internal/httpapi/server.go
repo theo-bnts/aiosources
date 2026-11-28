@@ -72,6 +72,9 @@ func New(options Options) (http.Handler, error) {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
 	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), torznabCaps: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
+	if options.AIOSource != nil && options.AIOSource.PublicURL == "" && options.PublicURL != "" {
+		options.AIOSource.PublicURL = options.PublicURL
+	}
 	cleanupStaleDatabaseRestores(options.DataDir)
 	s.initRequestPolicy()
 	network := &outbound.Router{Settings: options.Store.NetworkSettings, Secrets: options.Vault.Resolve}
@@ -131,6 +134,7 @@ func New(options Options) (http.Handler, error) {
 	s.registerCollectionSettingsRoutes(mux)
 	s.registerRuntimeSettingsRoutes(mux)
 	s.registerNetworkRoutes(mux)
+	s.registerNotificationRoutes(mux)
 	s.registerTrustedUsers(mux)
 	mux.HandleFunc("/api/", auth.protect(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "API route not found")

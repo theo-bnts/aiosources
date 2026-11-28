@@ -34,6 +34,13 @@ func (s *Service) PublicCatalogSearch(ctx context.Context, visitor *PublicInstal
 	if err != nil {
 		return model.List[model.CatalogTitle]{}, err
 	}
+	if filters.IncludeUnavailable {
+		if visitor == nil || visitor.Trusted == nil {
+			filters.IncludeUnavailable = false
+		} else if _, err := s.PublicCatalogAccess(ctx, visitor, "alerts"); err != nil {
+			filters.IncludeUnavailable = false
+		}
+	}
 	result, err := s.CatalogSearch(ctx, opts, filters)
 	return result, err
 }

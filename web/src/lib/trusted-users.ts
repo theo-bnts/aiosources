@@ -4,6 +4,7 @@ export type TrustedPermissions = {
   stremio_enabled: boolean
   torznab_enabled: boolean
   catalog_enabled: boolean
+  alerts_enabled: boolean
   use_instance_debrid: boolean
   use_instance_announces: boolean
 }
@@ -25,6 +26,11 @@ export const trustedPermissionControls = [
     'search_enabled',
     'Allow Search',
     'Search the catalog and download using the permitted debrid credentials.',
+  ],
+  [
+    'alerts_enabled',
+    'Allow release alerts',
+    'Set availability alerts for titles without releases using notification channels enabled by the administrator.',
   ],
   [
     'torznab_enabled',

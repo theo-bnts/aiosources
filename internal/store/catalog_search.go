@@ -189,6 +189,9 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 			media = append(media, kind)
 		}
 	}
+	if filters.IncludeUnavailable {
+		return s.catalogTitlesWithUnavailable(ctx, opts, identity, normalized, locale, media, formats, filters)
+	}
 	args, matching, anchor := catalogWordFilter(normalized, []any{identity, media, normalized})
 	args, wordStarts := catalogWordStartFilter(normalized, args)
 	scopeCTEs := []string{
@@ -281,7 +284,103 @@ func (s *Store) CatalogTitles(ctx context.Context, opts model.ListOptions, norma
 	return result, databaseError("finish catalog search", tx.Commit(ctx))
 }
 
+// catalogTitlesWithUnavailable searches across all local metadata works in
+// aio_works, including titles without currently matched source releases.
+func (s *Store) catalogTitlesWithUnavailable(ctx context.Context, opts model.ListOptions, identity, normalized, locale string, media, formats []string, filters model.CatalogSearchFilters) (model.List[model.CatalogTitle], error) {
+	result := model.List[model.CatalogTitle]{Items: []model.CatalogTitle{}, Limit: opts.Limit, Offset: opts.Offset}
+	args := []any{identity, media, normalized}
+	matching, anchor, wordStarts := "", "", ""
+	if len([]rune(normalized)) < 3 {
+		// Short 2-character queries cannot use pg_trgm GIN indexes for LIKE;
+		// keep full-catalog search bounded to exact normalized titles and IDs.
+		matching = "normalized = $3"
+	} else {
+		args, matching, anchor = catalogWordFilter(normalized, args)
+		args, wordStarts = catalogWordStartFilter(normalized, args)
+	}
+	includeBooks := len(media) == 0 || slices.Contains(media, "book")
+	includeSoftware := len(media) == 0 || slices.Contains(media, "software")
+	includeMusic := len(media) == 0 || slices.Contains(media, "music")
+	bookExtras := ""
+	if includeBooks {
+		bookExtras = bookCatalogCandidates("$1", "$3", matching, anchor)
+	}
+	softwareExtras := ""
+	if includeSoftware {
+		softwareExtras = softwareCatalogCandidates("$1", "$3", matching)
+	}
+	musicExtras := ""
+	if includeMusic {
+		musicExtras = musicCatalogCandidates("$1", "$3")
+	}
+	scopePrefix := "WITH " + catalogMatchedScope + " "
+	titleMatching := strings.ReplaceAll(matching, "normalized ", "t.normalized ")
+	filter := ` FROM (SELECT id,max(precision) AS precision,max(relevance) AS text_sim FROM (
+ SELECT id,9 AS precision,1::real AS relevance FROM aiosources.aio_works WHERE (imdb_id<>'' AND imdb_id=$1) OR tmdb_id=$1 OR (tvdb_id<>'' AND tvdb_id=$1) OR (igdb_id<>'' AND igdb_id=$1)
+ UNION ALL SELECT t.work_id,` + catalogTitlePrecisionSQL("t.normalized", "$3", wordStarts) + `,
+ public.similarity($3,t.normalized) FROM aiosources.aio_titles t WHERE ` + titleMatching + bookExtras + softwareExtras + musicExtras + `) matches GROUP BY id) candidates
+ LEFT JOIN catalog_matched_ids cm ON cm.id=candidates.id
+ JOIN aiosources.aio_works w ON w.id=candidates.id WHERE NOT w.adult AND (cardinality($2::text[])=0 OR w.media_type=ANY($2))`
+	allBookFormats := slices.Contains(formats, "book") && slices.Contains(formats, "ebook") && slices.Contains(formats, "audiobook")
+	if len(formats) > 0 && !allBookFormats {
+		args = append(args, formats)
+		filter += " AND (w.media_type<>'book' OR NOT EXISTS(SELECT 1" + catalogReleaseSource + ") OR EXISTS(SELECT 1" + catalogReleaseSource + " AND " + bookReleaseKindSQL("m") + fmt.Sprintf("=ANY($%d::text[])))", len(args))
+	}
+	if filters.Year != 0 {
+		args = append(args, filters.Year)
+		year := fmt.Sprintf("$%d::int", len(args))
+		filter += ` AND ` + catalogYearFilter(year)
+	}
+	alias := catalogQueryAlias(matching, "$3")
+	columns := catalogTitleColumns(fmt.Sprintf("$%d", len(args)+1), alias)
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return result, databaseError("begin full catalog search", err)
+	}
+	defer rollback(tx)
+	countArgs := append([]any{}, args...)
+	args = append(args, locale, opts.Limit, opts.Offset)
+	relevanceExpr := `(candidates.text_sim*0.55+least(ln(greatest(COALESCE(cm.match_count,0),1)::double precision)/6.0,1.0)*0.45)::real`
+	pageSQL := scopePrefix + `SELECT page.total,page.precision,page.relevance,page.sort_year,` + columns + ` FROM (SELECT count(*) OVER() AS total,candidates.precision,(COALESCE(cm.match_count,0)>0) AS has_releases,` + relevanceExpr + ` AS relevance,COALESCE((SELECT min(y) FROM unnest(w.years) y),0) AS sort_year,w.id` + filter + fmt.Sprintf(` ORDER BY candidates.precision DESC,has_releases DESC,relevance DESC,sort_year DESC,w.id LIMIT $%d OFFSET $%d) page JOIN aiosources.aio_works w ON w.id=page.id ORDER BY page.precision DESC,page.has_releases DESC,page.relevance DESC,page.sort_year DESC,w.id`, len(args)-1, len(args))
+	rows, err := tx.Query(ctx, pageSQL, args...)
+	if err != nil {
+		return result, databaseError("search full catalog titles", err)
+	}
+	for rows.Next() {
+		rank := &model.CatalogSearchRanking{}
+		title, e := scanCatalogTitle(rows, &result.Total, &rank.Precision, &rank.Relevance, &rank.Year)
+		if e != nil {
+			rows.Close()
+			return result, databaseError("read full catalog title", e)
+		}
+		title.Ranking = rank
+		result.Items = append(result.Items, title)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return result, databaseError("search full catalog titles", err)
+	}
+	if len(result.Items) == 0 && opts.Offset > 0 {
+		if err = tx.QueryRow(ctx, scopePrefix+`SELECT count(*)`+filter, countArgs...).Scan(&result.Total); err != nil {
+			return result, databaseError("count full catalog titles", err)
+		}
+	}
+	return result, databaseError("finish full catalog search", tx.Commit(ctx))
+}
+
 func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (model.CatalogTitle, error) {
+	return s.catalogTitleByID(ctx, id, true, locales...)
+}
+
+// CatalogWork reads a non-adult local catalog work even when it has no matched
+// source releases yet (used for release alerts).
+func (s *Store) CatalogWork(ctx context.Context, id int64, locales ...string) (model.CatalogTitle, error) {
+	return s.catalogTitleByID(ctx, id, false, locales...)
+}
+
+func (s *Store) catalogTitleByID(ctx context.Context, id int64, requireReleases bool, locales ...string) (model.CatalogTitle, error) {
 	locale := "en"
 	if len(locales) > 0 && locales[0] != "" {
 		locale = locales[0]
@@ -295,7 +394,11 @@ func (s *Store) CatalogTitle(ctx context.Context, id int64, locales ...string) (
 			alias = catalogQueryAlias(matching, "$3")
 		}
 	}
-	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM aiosources.aio_works w WHERE w.id=$1 AND NOT w.adult AND EXISTS(SELECT 1`+catalogReleaseSource+`)`, args...))
+	releaseClause := ""
+	if requireReleases {
+		releaseClause = ` AND EXISTS(SELECT 1` + catalogReleaseSource + `)`
+	}
+	title, err := scanCatalogTitle(s.pool.QueryRow(ctx, `SELECT `+catalogTitleColumns("$2", alias)+` FROM aiosources.aio_works w WHERE w.id=$1 AND NOT w.adult`+releaseClause, args...))
 	return title, databaseError("read catalog title", err)
 }
 

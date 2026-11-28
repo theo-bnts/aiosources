@@ -25,6 +25,7 @@ export type RouteChunkKey =
   | 'catalog-trending'
   | 'catalog-torrents'
   | 'operation-history'
+  | 'alerts'
 
 export const PRIMARY_ADMIN_ROUTE_CHUNKS: readonly RouteChunkKey[] = [
   'statistics',
@@ -228,6 +229,16 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
     path === '/sharing/settings'
   ) {
     return 'sharing'
+  }
+  if (
+    path === routes.connections.alerts.base ||
+    path === routes.connections.alerts.active ||
+    path === routes.connections.alerts.settings ||
+    path === routes.trusted.alerts ||
+    path === routes.public.alerts ||
+    path === '/alerts'
+  ) {
+    return 'alerts'
   }
   if (
     path === routes.connections.base ||

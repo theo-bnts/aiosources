@@ -66,12 +66,19 @@ func (s *Service) drainMatching(ctx context.Context, history *operationHistory) 
 		}
 		err = group.Wait()
 		processed := 0
+		matchedWorks := []int64{}
 		for _, results := range outcomes {
 			for _, result := range results {
 				history.run.Processed++
 				history.run.Results[result.Status]++
 				processed++
+				if result.Status == "matched" && result.Work != nil && result.Work.ID > 0 {
+					matchedWorks = append(matchedWorks, result.Work.ID)
+				}
 			}
+		}
+		if len(matchedWorks) > 0 {
+			s.wakeAlertsForWorks(ctx, matchedWorks)
 		}
 		history.checkpoint(ctx, "identification")
 		if err != nil {

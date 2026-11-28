@@ -30,17 +30,19 @@ export function useCatalogSearch({
   type,
   year,
   language,
+  includeUnavailable = false,
 }: {
   q: string
   type: string
   year: string
   language: string
+  includeUnavailable?: boolean
 }) {
   const visitor = usePublicSearch()
   const enabled = q.trim().length >= 2
   const categories = catalogSearchCategories(type)
   const prefix = catalogQueryKey(visitor, 'search')
-  const scopeKey = `${prefix.join('\0')}\0${q}\0${type}\0${year}\0${language}`
+  const scopeKey = `${prefix.join('\0')}\0${q}\0${type}\0${year}\0${language}\0${includeUnavailable}`
   const [extraLimits, setExtraLimits] = useState<{ scope: string; values: Record<string, number> }>(
     {
       scope: scopeKey,
@@ -51,7 +53,15 @@ export function useCatalogSearch({
 
   function read(categoryType: string, limit: number, signal: AbortSignal) {
     return catalogAPI<Page<CatalogTitle>>(
-      `/catalog/search?${params({ q, type: categoryType, year, language, limit, offset: 0 })}`,
+      `/catalog/search?${params({
+        q,
+        type: categoryType,
+        year,
+        language,
+        include_unavailable: includeUnavailable ? 'true' : '',
+        limit,
+        offset: 0,
+      })}`,
       visitor,
       { signal },
     )
@@ -61,7 +71,16 @@ export function useCatalogSearch({
     queries: categories.map((category) => {
       const limit = limits[category.id] ?? DEFAULT_SEARCH_RAIL_LIMIT
       return {
-        queryKey: [...prefix, 'rail', q, category.type, year, language, limit] as const,
+        queryKey: [
+          ...prefix,
+          'rail',
+          q,
+          category.type,
+          year,
+          language,
+          includeUnavailable,
+          limit,
+        ] as const,
         queryFn: ({ signal }: { signal: AbortSignal }) => read(category.type, limit, signal),
         enabled,
         refetchInterval: false as const,
@@ -75,12 +94,13 @@ export function useCatalogSearch({
           if (!prev) return undefined
           const base = prefix.length
           if (
-            prev.length === base + 6 &&
+            prev.length === base + 7 &&
             prev[base] === 'rail' &&
             prev[base + 1] === q &&
             prev[base + 2] === category.type &&
             prev[base + 3] === year &&
-            prev[base + 4] === language
+            prev[base + 4] === language &&
+            prev[base + 5] === includeUnavailable
           ) {
             return previousData
           }

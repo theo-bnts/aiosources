@@ -8,6 +8,7 @@ export function AccessPermissions({
   value,
   onChange,
   disabled,
+  includeAlerts = false,
 }: {
   id: string
   value: Pick<
@@ -17,17 +18,21 @@ export function AccessPermissions({
     | 'torznab_enabled'
     | 'stremio_enabled'
     | 'catalog_enabled'
-  >
+  > & { alerts_enabled?: boolean }
   onChange: (value: Partial<TrustedPermissions>) => void
   disabled?: boolean
+  includeAlerts?: boolean
 }) {
+  const controls = includeAlerts
+    ? trustedPermissionControls
+    : trustedPermissionControls.filter(([key]) => key !== 'alerts_enabled')
   return (
     <div className="space-y-5">
-      {trustedPermissionControls.map(([key, label, help]) => (
+      {controls.map(([key, label, help]) => (
         <div className="flex items-center gap-3" key={key}>
           <Switch
             id={`${id}-${key.replaceAll('_', '-')}`}
-            checked={value[key]}
+            checked={Boolean(value[key])}
             disabled={disabled}
             onCheckedChange={(checked) => onChange({ [key]: checked })}
           />

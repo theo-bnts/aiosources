@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  BellIcon,
   ChartBarIcon,
   ClockCounterClockwiseIcon,
   GearSixIcon,
@@ -45,6 +46,7 @@ import {
   metadataSections,
 } from '@/lib/metadata-navigation'
 import {
+  ActiveAlertsPage,
   AIOSourcePage,
   AIOStatisticsPage,
   CatalogSearchPage,
@@ -59,6 +61,7 @@ import {
   MatchingDiagnostics,
   NetworkPage,
   NetworkRoutingPage,
+  NotificationChannelsPage,
   OperationDetailPage,
   OperationHistoryPage,
   ProviderEditor,
@@ -265,7 +268,7 @@ const router = createBrowserRouter(
     <Route
       element={
         <>
-          <div className="fixed top-3 right-5 z-(--layer-header-actions) flex items-center gap-2 md:right-9">
+          <div className="fixed top-6 right-6 z-(--layer-header-actions) flex items-center gap-2 md:right-7">
             <InterfacePreferences />
             <AboutDialog />
           </div>
@@ -577,6 +580,28 @@ const router = createBrowserRouter(
           />
           <Route path={routes.connections.sharedCatalogs.settings} element={<SharingPage />} />
         </Route>
+        <Route
+          element={
+            <WorkspaceLayout
+              title="Alerts"
+              tabs={[
+                {
+                  path: routes.connections.alerts.active,
+                  label: 'Active alerts',
+                  icon: BellIcon,
+                },
+                {
+                  path: routes.connections.alerts.settings,
+                  label: 'Settings',
+                  icon: GearSixIcon,
+                },
+              ]}
+            />
+          }
+        >
+          <Route path={routes.connections.alerts.active} element={<ActiveAlertsPage />} />
+          <Route path={routes.connections.alerts.settings} element={<NotificationChannelsPage />} />
+        </Route>
 
         {/* Administration -> Security */}
         <Route path={routes.administration.security.secrets} element={<SecuritySecretsPage />} />
@@ -689,6 +714,11 @@ const router = createBrowserRouter(
           path="connections/shared-catalogs"
           element={<PreserveRedirect to={routes.connections.sharedCatalogs.statistics} />}
         />
+        <Route
+          path="connections/alerts"
+          element={<PreserveRedirect to={routes.connections.alerts.active} />}
+        />
+        <Route path="alerts" element={<PreserveRedirect to={routes.connections.alerts.active} />} />
         <Route
           path="administration"
           element={<PreserveRedirect to={routes.administration.security.secrets} />}

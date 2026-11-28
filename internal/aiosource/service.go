@@ -6,6 +6,7 @@ import (
 	"github.com/theo-bnts/aiosources/internal/books"
 	"github.com/theo-bnts/aiosources/internal/model"
 	"github.com/theo-bnts/aiosources/internal/music"
+	"github.com/theo-bnts/aiosources/internal/notifications"
 	"github.com/theo-bnts/aiosources/internal/outbound"
 	"github.com/theo-bnts/aiosources/internal/providers"
 	"github.com/theo-bnts/aiosources/internal/software"
@@ -58,6 +59,9 @@ type Service struct {
 	musicCancel               context.CancelFunc
 	musicDone                 <-chan struct{}
 	Network                   *outbound.Router
+	PublicURL                 string
+	NotificationHTTP          *http.Client
+	NotificationOptions       notifications.Options
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
 	cancel                    context.CancelFunc
@@ -81,6 +85,7 @@ type Service struct {
 	// Public probes have their own capacity, preserving room for administrator work.
 	publicProbes   map[string]*capacityGate
 	automationWake chan struct{}
+	alertWake      chan struct{}
 }
 type flight struct {
 	warm      bool // Immutable admission state, shared by callers joining this check.
@@ -106,6 +111,7 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	s.musicRate.setRate(1)
 	s.MusicHTTP = &http.Client{Transport: s.Network.Transport("metadata:musicbrainz", outbound.HTTPTransport()), CheckRedirect: trustedMusicExport}
 	s.MetadataHTTP.Transport = s.Network.Transport("metadata:tmdb", outbound.HTTPTransport())
+	s.NotificationHTTP = notifications.NewHTTPClient(s.Network.Transport("notifications", outbound.HTTPTransport()))
 	s.Providers.Client.Timeout = 0 // Per-request policy supplies the deadline.
 	s.Providers.Timeout = func(ctx context.Context) (time.Duration, error) { return s.outgoingTimeout(ctx, "debrid_seconds") }
 	s.Providers.Client.Transport = s.Network.Transport("", outbound.HTTPTransport())
@@ -120,6 +126,7 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 	}
 	defer release()
 	s.automationWake = make(chan struct{}, 1)
+	s.alertWake = make(chan struct{}, 1)
 	if err = db.RecoverOperations(ctx); err != nil {
 		cancel()
 		return nil, err
@@ -128,12 +135,13 @@ func New(ctx context.Context, db *store.Store, v *vault.Vault, sources *provider
 		cancel()
 		return nil, err
 	}
-	s.wg.Add(5)
+	s.wg.Add(6)
 	go s.storageIndexes()
 	go s.retainHistory()
 	go s.maintenance()
 	go s.automation()
 	go s.warmTrending()
+	go s.releaseAlerts()
 	return s, nil
 }
 func (s *Service) Authorized(ctx context.Context, token string) bool {
@@ -162,6 +170,9 @@ func (s *Service) Close(ctx context.Context) error {
 	}
 	if s.MetadataHTTP != nil {
 		defer s.MetadataHTTP.CloseIdleConnections()
+	}
+	if s.NotificationHTTP != nil {
+		defer s.NotificationHTTP.CloseIdleConnections()
 	}
 	if s.Providers != nil && s.Providers.Client != nil {
 		defer s.Providers.Client.CloseIdleConnections()

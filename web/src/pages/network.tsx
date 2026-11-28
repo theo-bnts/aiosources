@@ -697,6 +697,20 @@ export function NetworkRoutingPage() {
                 ))}
               </div>
             </section>
+            <section className="section-card">
+              <h2 className="section-title">Alerts & notifications</h2>
+              <div className="grid gap-5 md:grid-cols-2">
+                <ConnectionSelect
+                  id="network-notifications"
+                  label="Notification channels"
+                  value={settings.overrides.notifications ?? ''}
+                  settings={settings}
+                  inherit="Use default connection"
+                  disabled={save.isPending}
+                  onChange={(value) => route('notifications', value)}
+                />
+              </div>
+            </section>
             {settings.proxies.some((proxy) => !proxy.enabled && proxyInUse(settings, proxy.id)) && (
               <p role="status" className="notice notice-warning">
                 Some connections use a disabled proxy. Enable it in Proxies or choose another

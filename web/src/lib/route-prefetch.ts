@@ -87,6 +87,7 @@ const catalogSearchModule = createModuleLoader(() => import('@/pages/catalog-sea
 const catalogTrendingModule = createModuleLoader(() => import('@/pages/catalog-trending'))
 const catalogTorrentsModule = createModuleLoader(() => import('@/pages/catalog-torrents'))
 const operationHistoryModule = createModuleLoader(() => import('@/pages/operation-history'))
+const alertsModule = createModuleLoader(() => import('@/pages/alerts'))
 
 const routeLoaders: Record<RouteChunkKey, () => void> = {
   statistics: statisticsModule.preload,
@@ -113,9 +114,15 @@ const routeLoaders: Record<RouteChunkKey, () => void> = {
   'catalog-trending': catalogTrendingModule.preload,
   'catalog-torrents': catalogTorrentsModule.preload,
   'operation-history': operationHistoryModule.preload,
+  alerts: alertsModule.preload,
 }
 
 export const SourceStatisticsPage = preloadableComponent(statisticsModule, 'SourceStatisticsPage')
+export const ActiveAlertsPage = preloadableComponent(alertsModule, 'ActiveAlertsPage')
+export const NotificationChannelsPage = preloadableComponent(
+  alertsModule,
+  'NotificationChannelsPage',
+)
 export const AIOStatisticsPage = preloadableComponent(statisticsModule, 'AIOStatisticsPage')
 export const ProvidersPage = preloadableComponent(providersModule, 'ProvidersPage')
 export const ProviderEditor = preloadableComponent(providersModule, 'ProviderEditor')

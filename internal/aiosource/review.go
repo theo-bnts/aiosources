@@ -17,5 +17,6 @@ func (s *Service) SaveReview(ctx context.Context, occurrence string, input model
 		return err
 	}
 	s.wakeAutomation()
+	s.wakeAlerts()
 	return nil
 }

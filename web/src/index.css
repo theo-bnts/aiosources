@@ -17,6 +17,7 @@
   --text-3xl: 1.5rem;
   --text-3xl--line-height: 1.25;
   --color-background: var(--background);
+  --color-chrome: var(--chrome);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--foreground);
@@ -36,6 +37,7 @@
   --color-border: #343c40;
   --color-input: #3c4549;
   --color-ring: var(--primary);
+  --shadow-chrome: 0 14px 34px -14px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.045);
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -45,6 +47,7 @@
 :root {
   color-scheme: dark;
   --control-height: 2.75rem;
+  --shell-gap: 0.75rem;
   --header-actions-width: calc(2 * var(--control-height) + 0.5rem);
   --layer-menu: 40;
   --layer-header: 50;
@@ -52,10 +55,11 @@
   --layer-overlay: 60;
   --layer-dialog: 60;
   --layer-dialog-menu: 65;
-  --background: #191d20;
+  --background: #111518;
+  --chrome: #181d21;
   --foreground: #e5e9ea;
-  --card: #202528;
-  --popover: #23292d;
+  --card: #1f2529;
+  --popover: #242b30;
   --primary: #87cabc;
 }
 @media (min-width: 48rem) {
@@ -67,8 +71,23 @@
   * {
     @apply border-border;
   }
+  html {
+    background-color: var(--background);
+  }
   body {
-    @apply m-0 bg-background font-sans text-sm text-foreground antialiased;
+    @apply m-0 bg-transparent font-sans text-sm text-foreground antialiased;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(62rem 36rem at 8% -6%, rgb(135 202 188 / 0.11), transparent 64%),
+      radial-gradient(48rem 32rem at 92% 0%, rgb(96 156 172 / 0.08), transparent 62%),
+      radial-gradient(52rem 34rem at 50% 108%, rgb(135 202 188 / 0.045), transparent 68%),
+      linear-gradient(180deg, #141a1e 0%, #101417 52%, #0c1013 100%);
   }
   fieldset {
     min-inline-size: 0;
@@ -208,7 +227,7 @@
     [id^='runtime-'],
     [data-slot='disclosure'][id]
   ) {
-  scroll-margin-top: calc(var(--app-header-height, 4rem) + 1rem);
+  scroll-margin-top: calc(var(--app-header-height, 4.75rem) + 1rem);
 }
 [data-setting-highlight] {
   outline: 2px solid var(--primary);

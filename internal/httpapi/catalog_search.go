@@ -58,6 +58,14 @@ func catalogSearchInput(w http.ResponseWriter, r *http.Request) (model.ListOptio
 		}
 		filters.Year = year
 	}
+	if raw := r.URL.Query().Get("include_unavailable"); raw != "" {
+		include, err := strconv.ParseBool(raw)
+		if err != nil {
+			respondError(w, model.ErrInvalid)
+			return opts, filters, false
+		}
+		filters.IncludeUnavailable = include
+	}
 	return opts, filters, true
 }
 

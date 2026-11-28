@@ -27,7 +27,7 @@ export function useRequestController() {
   return request
 }
 
-export type VisitorSection = 'stremio' | 'trending' | 'search' | 'torznab' | 'catalog'
+export type VisitorSection = 'stremio' | 'trending' | 'search' | 'torznab' | 'catalog' | 'alerts'
 
 export function resolveVisitorSection(
   info: PublicInfo,
@@ -48,8 +48,11 @@ export function resolveVisitorSection(
   const isSearch = pathname === r.search || pathname === `${prefix}/search` || isSearchTorrents
   const isTorznab = pathname === r.torznab || pathname === `${prefix}/torznab`
   const isCatalog = pathname === r.sharedCatalogs || pathname === `${prefix}/sharing`
+  const isAlerts =
+    prefix === '/trusted' && (pathname === r.alerts || pathname === `${prefix}/alerts`)
   const isStremio = pathname === r.stremio || pathname === prefix
-  const validPath = isStremio || isTorznab || isCatalog || isTrending || isTitleDetail || isSearch
+  const validPath =
+    isStremio || isTorznab || isCatalog || isTrending || isTitleDetail || isSearch || isAlerts
   const section: VisitorSection = isTrending
     ? 'trending'
     : isTitleDetail
@@ -62,7 +65,9 @@ export function resolveVisitorSection(
           ? 'torznab'
           : isCatalog
             ? 'catalog'
-            : 'stremio'
+            : isAlerts
+              ? 'alerts'
+              : 'stremio'
   const available = Boolean(
     isTitleDetail
       ? info.search_enabled || info.trending_enabled
@@ -74,7 +79,9 @@ export function resolveVisitorSection(
             ? info.stremio_enabled
             : section === 'torznab'
               ? info.torznab_enabled
-              : info.catalog_enabled,
+              : section === 'alerts'
+                ? prefix === '/trusted' && info.alerts_enabled
+                : info.catalog_enabled,
   )
   const fallbackTarget = info.stremio_enabled
     ? r.stremio
@@ -86,7 +93,9 @@ export function resolveVisitorSection(
           ? r.torznab
           : info.catalog_enabled
             ? r.sharedCatalogs
-            : ''
+            : prefix === '/trusted' && info.alerts_enabled
+              ? r.alerts
+              : ''
   const canonicalPath = isTrending
     ? r.trending
     : titleMatch
@@ -99,9 +108,11 @@ export function resolveVisitorSection(
             ? r.torznab
             : isCatalog
               ? r.sharedCatalogs
-              : isStremio
-                ? r.stremio
-                : undefined
+              : isAlerts
+                ? r.alerts
+                : isStremio
+                  ? r.stremio
+                  : undefined
   return { section, available, validPath, fallbackTarget, canonicalPath }
 }
 
@@ -156,6 +167,7 @@ export type PublicInfo = {
   torznab_enabled?: boolean
   trending_enabled?: boolean
   search_enabled?: boolean
+  alerts_enabled?: boolean
   catalog_enabled?: boolean
   catalog_revision?: number
   catalog_fields?: string[]

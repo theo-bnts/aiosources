@@ -150,6 +150,9 @@ func (s *Store) DeleteTrustedUser(ctx context.Context, id string, revision int64
 	if tag.RowsAffected() != 1 {
 		return model.ErrConflict
 	}
+	if _, err = tx.Exec(ctx, `DELETE FROM aiosources.release_alerts WHERE owner_type='trusted' AND owner_id=$1`, id); err != nil {
+		return databaseError("delete trusted user alerts", err)
+	}
 	if err = recordAccessActivityTx(ctx, tx, "security.trusted_user_deleted", id); err != nil {
 		return err
 	}

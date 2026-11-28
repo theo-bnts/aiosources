@@ -41,6 +41,8 @@ export const applicationPages = [
   ['torznab.settings', '/connections/torznab'],
   ['sharing.statistics', '/connections/shared-catalogs/statistics'],
   ['sharing.settings', '/connections/shared-catalogs/settings'],
+  ['alerts.active', '/connections/alerts/active'],
+  ['alerts.settings', '/connections/alerts/settings'],
   ['security.secrets', '/administration/security/secrets'],
   ['security.limits', '/administration/security/limits'],
   ['security.sessions', '/administration/security/active-sessions'],

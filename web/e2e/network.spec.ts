@@ -161,6 +161,7 @@ test('proxy profiles use Secrets and route services independently without activa
     'Sources',
     'Metadata',
     'Debrid',
+    'Alerts & notifications',
   ])
   await page.getByLabel('AllDebrid', { exact: true }).selectOption(initial.proxies[0].id)
   await page.getByLabel('Sample connection', { exact: true }).selectOption('direct')

@@ -11,6 +11,7 @@ type TrustedPermissions struct {
 	StremioEnabled  bool `json:"stremio_enabled"`
 	TorznabEnabled  bool `json:"torznab_enabled"`
 	CatalogEnabled  bool `json:"catalog_enabled"`
+	AlertsEnabled   bool `json:"alerts_enabled"`
 }
 
 func (p TrustedPermissions) Allows(feature string) bool {
@@ -27,6 +28,8 @@ func (p TrustedPermissions) Allows(feature string) bool {
 		return p.TorznabEnabled
 	case "catalog":
 		return p.CatalogEnabled
+	case "alerts":
+		return p.AlertsEnabled
 	}
 	return false
 }

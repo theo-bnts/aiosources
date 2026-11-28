@@ -32,6 +32,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 			TorznabEnabled       *bool  `json:"torznab_enabled"`
 			StremioEnabled       *bool  `json:"stremio_enabled"`
 			CatalogEnabled       *bool  `json:"catalog_enabled"`
+			AlertsEnabled        *bool  `json:"alerts_enabled"`
 			Password             string `json:"password"`
 			UseInstanceDebrid    *bool  `json:"use_instance_debrid"`
 			UseInstanceAnnounces *bool  `json:"use_instance_announces"`
@@ -47,6 +48,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 		input.TrustedUser.TorznabEnabled = boolOrDefault(input.TorznabEnabled, defaultEnabled)
 		input.TrustedUser.StremioEnabled = boolOrDefault(input.StremioEnabled, defaultEnabled)
 		input.TrustedUser.CatalogEnabled = boolOrDefault(input.CatalogEnabled, defaultEnabled)
+		input.TrustedUser.AlertsEnabled = boolOrDefault(input.AlertsEnabled, false)
 		input.TrustedUser.UseInstanceDebrid = boolOrDefault(input.UseInstanceDebrid, defaultEnabled)
 		input.TrustedUser.UseInstanceAnnounces = boolOrDefault(input.UseInstanceAnnounces, defaultEnabled)
 		if _, err := store.NormalizeTrustedEmail(input.Email); err != nil {
@@ -109,6 +111,7 @@ func (s *server) registerTrustedUsers(mux *http.ServeMux) {
 		}))
 	}
 	s.registerVisitorCatalog(mux, "/api/trusted", s.trustedCatalogHandler)
+	s.registerTrustedAlerts(mux)
 	s.registerTrustedStremio(mux)
 	mux.HandleFunc("/trusted/torznab/api", s.publicTorznabFeed)
 	mux.HandleFunc("/trusted/catalogs/{configuration}", s.publicCatalogFeed)
@@ -169,7 +172,7 @@ func (s *server) trustedConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	providers := availablePublicProviders(config, !user.UseInstanceDebrid)
-	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "trending_enabled": user.TrendingEnabled, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog")}
+	info := map[string]any{"enabled": true, "trusted": true, "credential_scope": "trusted:" + user.ID + ":" + strconv.FormatInt(user.Revision, 10), "use_instance_debrid": user.UseInstanceDebrid, "use_instance_announces": user.UseInstanceAnnounces, "providers": providers, "trending_enabled": user.TrendingEnabled, "search_enabled": user.SearchEnabled, "stremio_enabled": user.StremioEnabled, "torznab_enabled": user.TorznabEnabled, "catalog_enabled": user.Allows("catalog"), "alerts_enabled": user.AlertsEnabled}
 	sources, e := s.options.AIOSource.TrustedSources(r.Context(), trustedGrant(r))
 	if e != nil {
 		respondError(w, e)

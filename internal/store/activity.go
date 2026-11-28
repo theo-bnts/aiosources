@@ -124,6 +124,7 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 			"maintenance.cache_completed", "maintenance.cache_failed", "maintenance.cache_interrupted":
 		case "catalog.public_link_created", "catalog.public_exported", "catalog.public_failed":
 		case "network.settings_changed", "network.test_completed", "network.test_failed":
+		case "notifications.channel_saved", "notifications.channel_deleted", "notifications.alert_sent", "notifications.alert_failed":
 		case "service.started", "service.stopped", "service.failed", "scheduler.started", "scheduler.stopped", "scheduler.failed", "schedule.failed", "schedule.queued", "schedule.skipped",
 			"health.warning", "health.recovered", "history.retention_failed", "history.retention_recovered", "storage.sources_reset",
 			"storage.database_exported", "storage.database_imported",
@@ -184,6 +185,18 @@ func recordActivityTx(ctx context.Context, tx pgx.Tx, level, kind, message, prov
 	}
 	if kind == "storage.database_imported" {
 		query = strings.Replace(query, "aiosources.activity_message($3)", "'Database backup restored'", 1)
+	}
+	if kind == "notifications.channel_saved" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Notification channel saved'", 1)
+	}
+	if kind == "notifications.channel_deleted" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Notification channel deleted'", 1)
+	}
+	if kind == "notifications.alert_sent" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Release alert notification sent'", 1)
+	}
+	if kind == "notifications.alert_failed" {
+		query = strings.Replace(query, "aiosources.activity_message($3)", "'Release alert notification delivery failed'", 1)
 	}
 	if strings.HasPrefix(kind, "network.") {
 		query = `INSERT INTO aiosources.activity_logs(event_id,level,kind,message,provider_id,run_id,data,service) VALUES($1,$2,$3,aiosources.activity_message($3),$4,$5,aiosources.safe_activity_data($6),'network')`

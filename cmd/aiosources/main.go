@@ -365,6 +365,7 @@ func serve(ctx context.Context, c config, db *store.Store, registry *providers.R
 	if err != nil {
 		return err
 	}
+	addon.PublicURL = c.publicURL
 	finishStage()
 	finishStage = startupStage(true, "sign-in protection")
 	handler, err := httpapi.New(httpapi.Options{

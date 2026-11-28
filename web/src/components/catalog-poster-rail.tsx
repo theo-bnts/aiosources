@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   AppWindowIcon,
+  BellIcon,
   BookOpenIcon,
   CaretLeftIcon,
   CaretRightIcon,
@@ -9,6 +10,7 @@ import {
   MagnifyingGlassIcon,
   MusicNotesIcon,
   PlusIcon,
+  WarningCircleIcon,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
@@ -21,12 +23,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export type CatalogPosterCardItem = {
   id: number
+  key?: string
   title: string
   cover?: string
   summary: string
   metric: string
   metricTitle?: string
   to: string
+  onSelect?: () => void
+  alertActive?: boolean
+  alertStatus?: 'watching' | 'retrying'
 }
 
 const categoryIcons: Record<CatalogCategoryID | 'catalog', Icon> = {
@@ -55,15 +61,8 @@ export function CatalogPosterCard({
   const metaId = useId()
   const [failedSrc, setFailedSrc] = useState('')
   const showImage = isAllowedCoverURL(item.cover) && failedSrc !== item.cover
-  return (
-    <Link
-      to={item.to}
-      state={state}
-      aria-labelledby={titleId}
-      aria-describedby={metaId}
-      data-slot="catalog-card"
-      className="group block w-36 shrink-0 snap-start rounded-lg outline-none sm:w-40"
-    >
+  const cardBody = (
+    <>
       <div
         data-slot="catalog-card-frame"
         data-frame={frame}
@@ -95,6 +94,28 @@ export function CatalogPosterCard({
             <FallbackIcon size={36} aria-hidden="true" />
           </div>
         )}
+        {(item.alertStatus === 'retrying' ||
+          item.alertStatus === 'watching' ||
+          item.alertActive) && (
+          <span
+            title={
+              item.alertStatus === 'retrying' ? 'Alert delivery retrying' : 'Release alert active'
+            }
+            aria-label={
+              item.alertStatus === 'retrying' ? 'Alert delivery retrying' : 'Release alert active'
+            }
+            className={cn(
+              'absolute top-2 right-2 flex size-7 items-center justify-center rounded-full border border-border/70 bg-background/90 shadow-xs backdrop-blur-xs',
+              item.alertStatus === 'retrying' ? 'text-destructive' : 'text-primary',
+            )}
+          >
+            {item.alertStatus === 'retrying' ? (
+              <WarningCircleIcon size={15} weight="fill" aria-hidden="true" />
+            ) : (
+              <BellIcon size={15} weight="fill" aria-hidden="true" />
+            )}
+          </span>
+        )}
       </div>
       <div className="mt-2 space-y-0.5 px-0.5">
         <p
@@ -111,6 +132,32 @@ export function CatalogPosterCard({
           </p>
         </div>
       </div>
+    </>
+  )
+  if (item.onSelect) {
+    return (
+      <button
+        type="button"
+        onClick={item.onSelect}
+        aria-labelledby={titleId}
+        aria-describedby={metaId}
+        data-slot="catalog-card"
+        className="group block w-36 shrink-0 cursor-pointer snap-start rounded-lg text-left outline-none sm:w-40"
+      >
+        {cardBody}
+      </button>
+    )
+  }
+  return (
+    <Link
+      to={item.to}
+      state={state}
+      aria-labelledby={titleId}
+      aria-describedby={metaId}
+      data-slot="catalog-card"
+      className="group block w-36 shrink-0 snap-start rounded-lg outline-none sm:w-40"
+    >
+      {cardBody}
     </Link>
   )
 }
@@ -263,7 +310,7 @@ export function CatalogPosterRail({
         >
           {items.map((item, index) => (
             <CatalogPosterCard
-              key={item.id}
+              key={item.key ?? item.id}
               item={item}
               frame={category.frame}
               icon={Icon}

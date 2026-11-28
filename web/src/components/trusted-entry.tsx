@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { ActiveAlertsPage } from '@/lib/route-prefetch'
 import { resolveVisitorSection, useVisitorConfig } from './public-connection-fields'
 import { PublicSharedCatalogEntry } from './public-shared-catalog-entry'
 import { PublicStremioEntry } from './public-entry'
@@ -49,6 +50,18 @@ export function TrustedEntry({ layout }: { layout: (children: ReactNode) => Reac
     return layout(<PublicSearchEntry info={access} />)
   if (section === 'catalog')
     return layout(<PublicSharedCatalogEntry key={access.catalog_revision} trusted info={access} />)
+  if (section === 'alerts')
+    return layout(
+      <Suspense
+        fallback={
+          <div className="page">
+            <Loading label="Loading alerts" />
+          </div>
+        }
+      >
+        <ActiveAlertsPage trusted trustedInfo={access} />
+      </Suspense>,
+    )
   return layout(
     section === 'torznab' ? (
       <PublicTorznabEntry info={access} />

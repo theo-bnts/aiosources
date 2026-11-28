@@ -1,6 +1,7 @@
 import {
   AppWindowIcon,
   ArrowClockwiseIcon,
+  BellIcon,
   BookOpenIcon,
   BroadcastIcon,
   CaretDownIcon,
@@ -67,7 +68,6 @@ import {
 } from '@/lib/api'
 import type { Session } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogClose,
@@ -291,6 +291,13 @@ const navigationGroups: NavigationGroup[] = [
         description: 'Share published catalogs with other instances.',
         icon: ShareNetworkIcon,
       },
+      {
+        to: routes.connections.alerts.active,
+        match: routes.connections.alerts.base,
+        label: 'Alerts',
+        description: 'Configure notification channels and track release alerts.',
+        icon: BellIcon,
+      },
     ],
   },
   {
@@ -429,12 +436,18 @@ const publicNavigationGroups: NavigationGroup[] = [
         description: 'Keep a read-only catalog copy on another AIOSources instance.',
         icon: ShareNetworkIcon,
       },
+      {
+        to: routes.public.alerts,
+        label: 'Alerts',
+        description: 'Manage your release availability alerts.',
+        icon: BellIcon,
+      },
     ],
   },
 ]
 const navigationStorageKey = 'aiosources.navigation.groups'
 const navigationLinkClassName =
-  'flex min-h-(--control-height) items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary'
+  'flex min-h-(--control-height) items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:font-medium aria-[current=page]:text-primary'
 
 function AppNavigation({
   groups = navigationGroups,
@@ -519,7 +532,7 @@ function AppNavigation({
     <nav
       ref={navRef}
       aria-label="Main navigation"
-      className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4 [scrollbar-width:thin]"
+      className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-3.5 [scrollbar-width:thin]"
     >
       {groups
         .filter((group) => group.items.length > 0)
@@ -537,7 +550,7 @@ function AppNavigation({
                   aria-expanded={openGroups[group.id] ?? group.defaultOpen}
                   aria-controls={`${id}-${group.id}`}
                   onClick={() => onToggle(group.id)}
-                  className="flex min-h-(--control-height) w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground"
+                  className="flex min-h-(--control-height) w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-expanded:text-foreground"
                 >
                   <group.icon size={19} aria-hidden="true" className="shrink-0" />
                   <span className="min-w-0 flex-1">{group.label}</span>
@@ -701,7 +714,9 @@ export function AppShell({
                   ? publicInfo.data?.stremio_enabled
                   : item.to === routes.public.torznab
                     ? publicInfo.data?.torznab_enabled
-                    : publicInfo.data?.catalog_enabled,
+                    : item.to === routes.public.alerts
+                      ? trustedMode && publicInfo.data?.alerts_enabled
+                      : publicInfo.data?.catalog_enabled,
           ),
         }))
         .filter((group) => group.items.length > 0)
@@ -748,6 +763,12 @@ export function AppShell({
     }
     if (location.pathname === r.sharedCatalogs || location.pathname === `${prefix}/sharing`) {
       return r.sharedCatalogs
+    }
+    if (
+      prefix === '/trusted' &&
+      (location.pathname === r.alerts || location.pathname === `${prefix}/alerts`)
+    ) {
+      return r.alerts
     }
     return r.stremio
   }
@@ -808,8 +829,13 @@ export function AppShell({
     const header = headerRef.current
     const shell = shellRef.current
     if (!header || !shell) return
-    const measure = () =>
-      shell.style.setProperty('--app-header-height', `${header.getBoundingClientRect().height}px`)
+    const measure = () => {
+      const top = parseFloat(getComputedStyle(header).top) || 0
+      shell.style.setProperty(
+        '--app-header-height',
+        `${header.getBoundingClientRect().height + top}px`,
+      )
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(header)
@@ -881,7 +907,11 @@ export function AppShell({
   }
   const branding = (
     <>
-      <DatabaseIcon size={24} aria-hidden="true" className="shrink-0 text-primary" />
+      <DatabaseIcon
+        size={24}
+        aria-hidden="true"
+        className="shrink-0 text-primary drop-shadow-[0_0_12px_rgba(135,202,188,0.25)]"
+      />
       <span className="text-2xl leading-none font-semibold tracking-tight">AIOSources</span>
     </>
   )
@@ -928,23 +958,28 @@ export function AppShell({
         >
           Skip to content
         </a>
-        <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col overflow-hidden border-r border-border bg-[#141719] lg:flex">
-          <div className="flex h-20 shrink-0 items-center gap-3 px-6">{branding}</div>
-          <Separator />
+        <div className="fixed top-3 left-3 z-30 hidden h-16 w-60 items-center gap-3 px-6 lg:flex">
+          {branding}
+        </div>
+        <aside className="fixed top-[calc(var(--shell-gap)+4rem+var(--shell-gap))] bottom-3 left-3 z-30 hidden w-60 flex-col overflow-hidden rounded-2xl border border-border/80 bg-chrome/90 shadow-chrome backdrop-blur-md lg:flex">
           <AppNavigation {...navigationProps} />
           {footer}
         </aside>
-        <div className="lg:pl-60">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 z-40 h-5 bg-gradient-to-b from-background/95 via-background/60 to-transparent lg:left-[calc(15rem+var(--shell-gap))]"
+        />
+        <div className="pt-3 lg:pl-[calc(15rem+var(--shell-gap))]">
           <header
             ref={headerRef}
-            className="sticky top-0 z-(--layer-header) flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/95 px-5 py-3 backdrop-blur-sm md:px-9 lg:pr-[calc(2.25rem+var(--header-actions-width)+0.75rem)]"
+            className="sticky top-3 z-(--layer-header) mx-3 flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-chrome/90 px-3 py-3 shadow-chrome backdrop-blur-md md:pl-5 md:pr-4 lg:pr-[calc(1rem+var(--header-actions-width)+0.75rem)]"
           >
-            <div className="flex min-w-0 flex-1 items-center gap-3 pr-[calc(var(--header-actions-width)+0.75rem)] lg:pr-0">
+            <div className="flex min-w-0 flex-1 items-start gap-2.5 pr-[calc(var(--header-actions-width)+0.75rem)] sm:gap-3 lg:items-center lg:pr-0">
               <DialogTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="lg:hidden"
+                  className="rounded-lg lg:hidden"
                   aria-label="Open navigation"
                   aria-controls="mobile-navigation"
                 >
@@ -1036,7 +1071,7 @@ export function AppShell({
           id="mobile-navigation"
           aria-describedby={undefined}
           showCloseButton={false}
-          className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-2rem)] translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-y-0 border-l-0 bg-[#141719] p-0 data-[state=closed]:animate-none data-[state=open]:animate-none sm:max-w-80"
+          className="top-3 bottom-3 left-3 flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100%-1.5rem)] translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border border-border/80 bg-chrome/95 p-0 shadow-chrome backdrop-blur-md data-[state=closed]:animate-none data-[state=open]:animate-none sm:max-w-80"
           onCloseAutoFocus={(event) => {
             if (focusMainOnClose.current) {
               event.preventDefault()
@@ -1046,13 +1081,13 @@ export function AppShell({
           }}
         >
           <DialogTitle className="sr-only">Main navigation</DialogTitle>
-          <div className="flex h-20 shrink-0 items-center gap-3 border-b border-border px-5">
+          <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 px-5">
             {branding}
             <DialogClose asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="ml-auto shrink-0"
+                className="ml-auto shrink-0 rounded-lg"
                 aria-label="Close navigation"
               >
                 <XIcon aria-hidden="true" />

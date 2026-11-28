@@ -33,6 +33,9 @@ func (s *Service) drainCorrespondences(ctx context.Context, history *operationHi
 			if err != nil {
 				return err
 			}
+			if enriched > 0 {
+				s.wakeAlerts()
+			}
 			if history != nil {
 				if groups > 0 {
 					history.run.Results["correspondence_groups"] += int64(groups)

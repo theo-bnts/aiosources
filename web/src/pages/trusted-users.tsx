@@ -33,6 +33,7 @@ const emptyUser: TrustedUser = {
   updated_at: '',
   trending_enabled: true,
   search_enabled: true,
+  alerts_enabled: false,
   torznab_enabled: true,
   stremio_enabled: true,
   catalog_enabled: true,
@@ -182,6 +183,7 @@ function UserEditor({
             revision: value.revision,
             trending_enabled: value.trending_enabled,
             search_enabled: value.search_enabled,
+            alerts_enabled: value.alerts_enabled,
             stremio_enabled: value.stremio_enabled,
             torznab_enabled: value.torznab_enabled,
             catalog_enabled: value.catalog_enabled,
@@ -286,6 +288,7 @@ function UserEditor({
               <AccessPermissions
                 id="trusted"
                 value={value}
+                includeAlerts
                 onChange={(change) => setValue({ ...value, ...change })}
               />
             </Disclosure>

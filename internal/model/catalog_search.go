@@ -5,9 +5,10 @@ import "time"
 // CatalogSearchFilters apply to local metadata, independently of release filters.
 // A year selects any known release year, or a year within a series' known span.
 type CatalogSearchFilters struct {
-	Type     string
-	Year     int
-	Language string
+	Type               string
+	Year               int
+	Language           string
+	IncludeUnavailable bool
 }
 
 type CatalogReleaseFilters struct {

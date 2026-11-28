@@ -137,7 +137,8 @@ OR EXISTS(SELECT 1 FROM aiosources.settings WHERE key='aiosource.config.v2' AND 
 $1 IN (value::jsonb->>'tmdb_secret',value::jsonb->>'igdb_secret',value::jsonb->>'software_nvd_secret',value::jsonb->>'musicbrainz_secret',value::jsonb->>'alldebrid_secret',value::jsonb->>'torbox_secret',value::jsonb->>'debridlink_secret',value::jsonb->>'deepbrid_secret',value::jsonb->>'premiumize_secret',value::jsonb->>'realdebrid_secret')
 OR EXISTS(SELECT 1 FROM jsonb_each(COALESCE(value::jsonb->'trackers','{}'::jsonb)) t WHERE $1 IN (t.value->>'announce_secret',t.value->>'passkey_secret'))))
 OR EXISTS(SELECT 1 FROM aiosources.network_settings n CROSS JOIN LATERAL jsonb_array_elements(n.proxies) p
-WHERE $1 IN (p->>'username_ref',p->>'password_ref',p->>'api_password_ref'))`, name).Scan(&referenced); err != nil {
+WHERE $1 IN (p->>'username_ref',p->>'password_ref',p->>'api_password_ref'))
+OR EXISTS(SELECT 1 FROM aiosources.notification_channels nc WHERE $1 IN (nc.secret_ref,nc.header_secret_ref))`, name).Scan(&referenced); err != nil {
 		return databaseError("check encrypted secret dependencies", err)
 	}
 	if referenced {

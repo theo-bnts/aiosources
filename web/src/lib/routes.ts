@@ -98,6 +98,11 @@ export const routes = {
       statistics: '/connections/shared-catalogs/statistics',
       settings: '/connections/shared-catalogs/settings',
     },
+    alerts: {
+      base: '/connections/alerts',
+      active: '/connections/alerts/active',
+      settings: '/connections/alerts/settings',
+    },
   },
   administration: {
     base: '/administration',
@@ -136,6 +141,7 @@ export const routes = {
     torznab: '/public/connections/torznab',
     stremio: '/public/connections/stremio',
     sharedCatalogs: '/public/connections/shared-catalogs',
+    alerts: '/public/connections/alerts',
   },
   trusted: {
     base: '/trusted',
@@ -145,6 +151,7 @@ export const routes = {
     torznab: '/trusted/connections/torznab',
     stremio: '/trusted/connections/stremio',
     sharedCatalogs: '/trusted/connections/shared-catalogs',
+    alerts: '/trusted/connections/alerts',
   },
 } as const
 

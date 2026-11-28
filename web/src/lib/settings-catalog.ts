@@ -25,15 +25,34 @@ export type Setting = {
 }
 
 const settings: Setting[] = []
-settings.push({
-  id: 'trusted.accounts',
-  title: 'Trusted',
-  label: 'Add user',
-  route: routes.administration.users.trusted,
-  group: 'Administration / Users / Trusted',
-  keywords:
-    'trusted user account email password permissions enable disable utilisateur confiance mot de passe',
-})
+settings.push(
+  {
+    id: 'trusted.accounts',
+    title: 'Trusted',
+    label: 'Add user',
+    route: routes.administration.users.trusted,
+    group: 'Administration / Users / Trusted',
+    keywords:
+      'trusted user account email password permissions enable disable alerts utilisateur confiance mot de passe',
+  },
+  {
+    id: 'alerts.channels',
+    title: 'Notification channels',
+    label: 'Add channel',
+    route: routes.connections.alerts.settings,
+    group: 'Connections / Alerts / Settings',
+    keywords:
+      'alerts release notifications watchlist discord webhook telegram ntfy gotify slack mattermost channel alerte',
+  },
+  {
+    id: 'network.notifications',
+    title: 'Notification channels routing',
+    route: routes.administration.network.outgoing.routing,
+    group: 'Administration / Network / Outgoing / Routing',
+    control: 'network-notifications',
+    keywords: 'notifications alerts webhook proxy routing reseau',
+  },
+)
 const importCategory = (key: string) =>
   key === 'workers'
     ? 'Concurrency'
