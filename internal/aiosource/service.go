@@ -59,9 +59,10 @@ type Service struct {
 	musicCancel               context.CancelFunc
 	musicDone                 <-chan struct{}
 	Network                   *outbound.Router
-	PublicURL                 string
+	publicURL                 string
 	NotificationHTTP          *http.Client
-	NotificationOptions       notifications.Options
+	notificationOpts          notifications.Options
+	alertsMu                  sync.Mutex
 	metadataRate              metadataRequestLimiter
 	ctx                       context.Context
 	cancel                    context.CancelFunc

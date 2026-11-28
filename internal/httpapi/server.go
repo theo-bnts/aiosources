@@ -72,8 +72,8 @@ func New(options Options) (http.Handler, error) {
 		return nil, errors.New("compiled frontend index.html is missing; build web before starting the server")
 	}
 	s := &server{options: options, files: make(chan struct{}, 8), fileClient: newCatalogFileClient(), auth: auth, streams: make(chan struct{}, 64), trustedStreams: make(chan struct{}, 64), torznab: make(chan struct{}, 8), torznabCaps: make(chan struct{}, 8), streamAuth: make(chan struct{}, 64)}
-	if options.AIOSource != nil && options.AIOSource.PublicURL == "" && options.PublicURL != "" {
-		options.AIOSource.PublicURL = options.PublicURL
+	if options.AIOSource != nil && options.PublicURL != "" {
+		options.AIOSource.SetPublicURLIfEmpty(options.PublicURL)
 	}
 	cleanupStaleDatabaseRestores(options.DataDir)
 	s.initRequestPolicy()

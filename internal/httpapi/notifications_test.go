@@ -70,7 +70,7 @@ func TestNotificationChannelsSecretProtectionAndTestDelivery(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	addon.NotificationOptions = notifications.Options{Client: srv.Client(), AllowAnyDiscord: true}
+	addon.SetNotificationOptions(notifications.Options{Client: srv.Client(), AllowAnyDiscord: true})
 
 	// Store encrypted webhook secret.
 	putSec := f.request("PUT", "/api/secrets/discord_hook_1", fmt.Sprintf(`{"value":%q,"revision":0}`, srv.URL+"/api/webhooks/1/tok"), true, "")
@@ -142,7 +142,7 @@ func TestReleaseAlertLifecycleFiltersRetryAndAutoDelete(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	addon.NotificationOptions = notifications.Options{Client: srv.Client(), AllowAnyDiscord: true}
+	addon.SetNotificationOptions(notifications.Options{Client: srv.Client(), AllowAnyDiscord: true})
 
 	if res := f.request("PUT", "/api/secrets/discord_main", fmt.Sprintf(`{"value":%q,"revision":0}`, srv.URL+"/api/webhooks/10/secret-tok"), true, ""); res.Code != 204 {
 		t.Fatalf("put secret: %d", res.Code)
@@ -308,7 +308,7 @@ func TestTrustedUserAlertPermissionsChannelIsolationAndCleanup(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	addon.NotificationOptions = notifications.Options{Client: srv.Client(), AllowAnyDiscord: true}
+	addon.SetNotificationOptions(notifications.Options{Client: srv.Client(), AllowAnyDiscord: true})
 
 	if res := f.request("PUT", "/api/secrets/hook_shared", fmt.Sprintf(`{"value":%q,"revision":0}`, srv.URL+"/api/webhooks/1/shared"), true, ""); res.Code != 204 {
 		t.Fatalf("put secret: %d", res.Code)

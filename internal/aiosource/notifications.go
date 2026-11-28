@@ -39,9 +39,33 @@ func (s *Service) wakeAlertsForWorks(ctx context.Context, workIDs []int64) {
 	}
 }
 
+func (s *Service) SetPublicURL(raw string) {
+	s.mu.Lock()
+	s.publicURL = strings.TrimSpace(raw)
+	s.mu.Unlock()
+}
+
+func (s *Service) SetPublicURLIfEmpty(raw string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return
+	}
+	s.mu.Lock()
+	if s.publicURL == "" {
+		s.publicURL = raw
+	}
+	s.mu.Unlock()
+}
+
+func (s *Service) SetNotificationOptions(opts notifications.Options) {
+	s.mu.Lock()
+	s.notificationOpts = opts
+	s.mu.Unlock()
+}
+
 func (s *Service) releaseAlerts() {
 	defer s.wg.Done()
-	timer := time.NewTimer(s.runReleaseAlertsTick())
+	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
 	for {
 		select {
@@ -124,7 +148,9 @@ func (s *Service) resolveChannelSecrets(ctx context.Context, channel model.Notif
 }
 
 func (s *Service) notificationOptions() notifications.Options {
-	opts := s.NotificationOptions
+	s.mu.Lock()
+	opts := s.notificationOpts
+	s.mu.Unlock()
 	if opts.Client == nil {
 		opts.Client = s.NotificationHTTP
 	}
@@ -226,6 +252,11 @@ func (s *Service) DeleteReleaseAlert(ctx context.Context, id, ownerType, ownerID
 }
 
 func (s *Service) ProcessReleaseAlerts(ctx context.Context) error {
+	s.alertsMu.Lock()
+	defer s.alertsMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	release, locked, err := s.DB.AIOLock(ctx, "release-alerts")
 	if err != nil || !locked {
 		return err
@@ -452,7 +483,10 @@ func (s *Service) evaluateReleaseAlert(ctx context.Context, alert model.ReleaseA
 }
 
 func (s *Service) alertItemURL(alert model.ReleaseAlert) string {
-	base := strings.TrimRight(strings.TrimSpace(s.PublicURL), "/")
+	s.mu.Lock()
+	raw := s.publicURL
+	s.mu.Unlock()
+	base := strings.TrimRight(strings.TrimSpace(raw), "/")
 	if base == "" {
 		return ""
 	}
