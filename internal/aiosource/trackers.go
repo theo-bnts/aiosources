@@ -53,6 +53,9 @@ func (s *Service) migrateTrackerSecrets(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if c.IGDBClientID != "" {
+		return s.SaveConfig(ctx, c)
+	}
 	for _, t := range c.Trackers {
 		if t.Announce != "" || t.PasskeySecret != "" {
 			return s.SaveConfig(ctx, c)
@@ -63,6 +66,27 @@ func (s *Service) migrateTrackerSecrets(ctx context.Context) error {
 
 func (s *Service) saveTrackerSecrets(ctx context.Context, c model.AIOConfig) error {
 	encrypted := map[string][]byte{}
+	if c.IGDBClientID != "" {
+		value := strings.TrimSpace(c.IGDBClientID)
+		if err := validateIGDBClientID(value); err != nil {
+			return err
+		}
+		var random [12]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			return fmt.Errorf("cannot name migrated Twitch client ID secret")
+		}
+		c.IGDBClientIDSecret = "igdb_client_id_" + hex.EncodeToString(random[:])
+		ciphertext, err := s.Vault.EncryptSecret(c.IGDBClientIDSecret, value)
+		if err != nil {
+			return err
+		}
+		encrypted[c.IGDBClientIDSecret] = ciphertext
+		c.IGDBClientID = ""
+	} else if c.IGDBClientIDSecret != "" {
+		if _, err := s.igdbClientID(ctx, c); err != nil {
+			return err
+		}
+	}
 	trackers := make(map[string]model.AIOTracker, len(c.Trackers))
 	for id, t := range c.Trackers {
 		if t.Announce != "" {

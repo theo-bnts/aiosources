@@ -271,7 +271,16 @@ func (s *Service) SaveConfig(ctx context.Context, c model.AIOConfig) error {
 	if c.MusicBrainzMinutes < 15 || c.MusicBrainzMinutes > 1440 {
 		return model.ErrInvalid
 	}
-	if len(c.IGDBClientID) > 128 || strings.ContainsAny(c.IGDBClientID, "\r\n\x00 ") || c.IGDBMinutes < 5 || c.IGDBMinutes > 1440 || c.IGDBRequestsPerSecond < 1 || c.IGDBRequestsPerSecond > 4 || c.IGDBReconcileDays < 1 || c.IGDBReconcileDays > 30 || c.IGDBEnabled && (c.IGDBClientID == "" || c.IGDBSecret == "") {
+	if c.IGDBClientIDSecret != "" && c.IGDBClientID != "" {
+		return model.ErrInvalid
+	}
+	if c.IGDBClientID != "" {
+		if err := validateIGDBClientID(strings.TrimSpace(c.IGDBClientID)); err != nil {
+			return err
+		}
+	}
+	hasIGDBClientID := c.IGDBClientIDSecret != "" || strings.TrimSpace(c.IGDBClientID) != ""
+	if c.IGDBMinutes < 5 || c.IGDBMinutes > 1440 || c.IGDBRequestsPerSecond < 1 || c.IGDBRequestsPerSecond > 4 || c.IGDBReconcileDays < 1 || c.IGDBReconcileDays > 30 || c.IGDBEnabled && (!hasIGDBClientID || c.IGDBSecret == "") {
 		return model.ErrInvalid
 	}
 	if c.OpenLibraryMinutes < 5 || c.OpenLibraryMinutes > 1440 || c.SyncMinutes < 5 || c.SyncMinutes > 1440 || c.MatchSeconds < 5 || c.MatchSeconds > 86400 || c.TMDBRequestsPerSecond < 1 || c.TMDBRequestsPerSecond > 40 || c.CacheMinutes < 5 || c.CacheMinutes > 43200 || c.ResponseSeconds < 2 || c.ResponseSeconds > 60 || len(c.Trackers) > 200 {

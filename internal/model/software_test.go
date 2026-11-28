@@ -31,13 +31,17 @@ func TestSoftwareCoverURLStrictValidation(t *testing.T) {
 
 func TestSoftwareSecretReferencesAndProviderCalls(t *testing.T) {
 	cfg := AIOConfig{
-		TMDBSecret:        "tmdb_ref",
-		IGDBSecret:        "igdb_ref",
-		SoftwareNVDSecret: "nvd_ref",
-		MusicBrainzSecret: "mb_ref",
+		TMDBSecret:         "tmdb_ref",
+		IGDBClientIDSecret: "igdb_client_ref",
+		IGDBSecret:         "igdb_ref",
+		SoftwareNVDSecret:  "nvd_ref",
+		MusicBrainzSecret:  "mb_ref",
 	}
-	if !slices.Contains(cfg.SecretReferences(), "nvd_ref") {
-		t.Fatalf("SoftwareNVDSecret missing from SecretReferences: %v", cfg.SecretReferences())
+	refs := cfg.SecretReferences()
+	for _, expected := range []string{"tmdb_ref", "igdb_client_ref", "igdb_ref", "nvd_ref", "mb_ref"} {
+		if !slices.Contains(refs, expected) {
+			t.Fatalf("%s missing from SecretReferences: %v", expected, refs)
+		}
 	}
 	for _, phase := range []string{
 		"software_nvd_meta",

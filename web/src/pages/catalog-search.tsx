@@ -217,6 +217,15 @@ export function CatalogSearchPage() {
             <MagnifyingGlassIcon aria-hidden="true" />
             Search
           </Button>
+          <Button asChild variant="outline">
+            <Link
+              to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
+              state={listState}
+            >
+              <MagnifyingGlassIcon aria-hidden="true" />
+              Search torrents directly
+            </Link>
+          </Button>
           <ClearFiltersButton
             onClear={() => {
               setDraftQuery('')
@@ -308,39 +317,14 @@ export function CatalogSearchPage() {
                   ? 'No titles match this search in your local metadata catalogs.'
                   : visitor
                     ? canAlert
-                      ? 'No identified titles with available releases match this search. You can also search titles without releases to set an alert.'
+                      ? 'No identified titles with available releases match this search. Enable “Include titles without releases” in Filters to set an alert.'
                       : 'No identified titles match this search.'
-                    : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing, or search titles without releases to set an alert.'
-              }
-              action={
-                canAlert && !includeUnavailable ? (
-                  <Button type="button" variant="outline" onClick={() => toggleUnavailable(true)}>
-                    <BellIcon aria-hidden="true" />
-                    Include titles without releases
-                  </Button>
-                ) : undefined
+                    : 'Only titles with currently identified source releases appear here. Check Sources and Metadata if an imported title is missing, or enable “Include titles without releases” in Filters to set an alert.'
               }
             />
           ) : null}
         </>
       )}
-      <div className="flex flex-wrap justify-center gap-2">
-        {canAlert && q.trim().length >= 2 && !includeUnavailable && visibleSections.length > 0 && (
-          <Button type="button" variant="outline" onClick={() => toggleUnavailable(true)}>
-            <BellIcon aria-hidden="true" />
-            Include titles without releases
-          </Button>
-        )}
-        <Button asChild variant="outline">
-          <Link
-            to={`${searchPath}/torrents${draftQuery.trim() ? `?${params({ q: draftQuery.trim() })}` : ''}`}
-            state={listState}
-          >
-            <MagnifyingGlassIcon aria-hidden="true" />
-            Search torrents directly
-          </Link>
-        </Button>
-      </div>
       {canAlert && (
         <ReleaseAlertDialog
           open={alertTarget !== null}

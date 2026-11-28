@@ -121,6 +121,27 @@ func decodeGame(d igdbGame) (model.AIOWork, error) {
 	return w, nil
 }
 
+func validateIGDBClientID(value string) error {
+	if value == "" || len(value) > 128 || strings.ContainsAny(value, "\r\n\x00 ") {
+		return fmt.Errorf("%w: Twitch client ID must be a non-empty identifier without spaces", model.ErrInvalid)
+	}
+	return nil
+}
+
+func (s *Service) igdbClientID(ctx context.Context, c model.AIOConfig) (string, error) {
+	if c.IGDBClientIDSecret == "" {
+		return "", nil
+	}
+	value, err := s.key(ctx, c.IGDBClientIDSecret)
+	if err != nil {
+		return "", err
+	}
+	if err = validateIGDBClientID(value); err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
 func (s *Service) GameState() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.gamesRunning }
 func (s *Service) StartGames(ctx context.Context, trigger string) error {
 	if trigger != "manual" && trigger != "automatic" {
@@ -130,11 +151,16 @@ func (s *Service) StartGames(ctx context.Context, trigger string) error {
 	if err != nil {
 		return err
 	}
-	if c.IGDBClientID == "" || c.IGDBSecret == "" {
+	if c.IGDBClientIDSecret == "" || c.IGDBSecret == "" {
 		return model.ErrInvalid
 	}
-	if _, err = s.key(ctx, c.IGDBSecret); err != nil {
+	if _, err = s.igdbClientID(ctx, c); err != nil {
 		return err
+	}
+	if key, err := s.key(ctx, c.IGDBSecret); err != nil {
+		return err
+	} else if key == "" {
+		return model.ErrInvalid
 	}
 
 	s.mu.Lock()
@@ -209,7 +235,7 @@ func (s *Service) SyncGames(ctx context.Context, trigger string) (syncErr error)
 			return nil
 		}
 	}
-	if c.IGDBClientID == "" || c.IGDBSecret == "" {
+	if c.IGDBClientIDSecret == "" || c.IGDBSecret == "" {
 		return model.ErrInvalid
 	}
 	h, err := s.beginOperation(ctx, "metadata", "igdb", trigger, "games", "igdb")
@@ -318,31 +344,40 @@ type igdbError struct{ message string }
 
 func (e *igdbError) Error() string { return e.message }
 
-func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *operationHistory) (string, error) {
+func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *operationHistory) (string, string, error) {
+	clientID, err := s.igdbClientID(ctx, c)
+	if err != nil {
+		return "", "", err
+	}
+	if clientID == "" {
+		return "", "", model.ErrInvalid
+	}
 	key, err := s.key(ctx, c.IGDBSecret)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if key == "" {
-		return "", model.ErrInvalid
+		return "", "", model.ErrInvalid
 	}
+	clientFP := fingerprint(clientID)
+	secretFP := fingerprint(key)
 	// This mutex belongs to the sole IGDB worker. It also protects explicit
 	// test calls and prevents token renewal storms on simultaneous requests.
 	s.gameTokenMu.Lock()
 	defer s.gameTokenMu.Unlock()
-	if s.gameToken.client == c.IGDBClientID && s.gameToken.credential == fingerprint(key) && time.Until(s.gameToken.expires) > time.Minute {
-		return s.gameToken.value, nil
+	if s.gameToken.client == clientFP && s.gameToken.credential == secretFP && time.Until(s.gameToken.expires) > time.Minute {
+		return s.gameToken.value, clientID, nil
 	}
-	body := url.Values{"client_id": {c.IGDBClientID}, "client_secret": {key}, "grant_type": {"client_credentials"}}
+	body := url.Values{"client_id": {clientID}, "client_secret": {key}, "grant_type": {"client_credentials"}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.IGDBTokenURL, strings.NewReader(body.Encode()))
 	if err != nil {
-		return "", ErrInvalidResponse
+		return "", "", ErrInvalidResponse
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "AIOSources/"+Version)
 	client, err := s.prepareOutgoingClient(ctx, s.GameHTTP, "metadata_seconds", false)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	started := time.Now()
 	res, err := client.Do(req)
@@ -355,19 +390,19 @@ func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *ope
 	}
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", ctx.Err()
+			return "", "", ctx.Err()
 		}
-		return "", &igdbError{message: "IGDB authentication is unreachable. Check the network settings."}
+		return "", "", &igdbError{message: "IGDB authentication is unreachable. Check the network settings."}
 	}
 	defer res.Body.Close()
 	if res.StatusCode == 429 || res.StatusCode >= 500 {
 		message := "IGDB authentication is temporarily unavailable. Saved progress is preserved."
 		retry := metadataRetryAfter(res.Header.Get("Retry-After"), 5*time.Minute, time.Now())
 		_ = s.DB.GameUpdateFailure(ctx, message, time.Now().Add(retry))
-		return "", &igdbError{message: message}
+		return "", "", &igdbError{message: message}
 	}
 	if res.StatusCode != http.StatusOK {
-		return "", &igdbError{message: "IGDB authentication failed. Check the Twitch client ID and client secret."}
+		return "", "", &igdbError{message: "IGDB authentication failed. Check the Twitch client ID and client secret."}
 	}
 	var token struct {
 		Token   string `json:"access_token"`
@@ -376,13 +411,13 @@ func (s *Service) igdbAccessToken(ctx context.Context, c model.AIOConfig, h *ope
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, 65537))
 	if ctx.Err() != nil {
-		return "", ctx.Err()
+		return "", "", ctx.Err()
 	}
 	if err != nil || len(data) > 65536 || json.Unmarshal(data, &token) != nil || token.Token == "" || len(token.Token) > 4096 || token.Expires <= 60 || !strings.EqualFold(token.Type, "bearer") {
-		return "", ErrInvalidResponse
+		return "", "", ErrInvalidResponse
 	}
-	s.gameToken = igdbToken{value: token.Token, client: c.IGDBClientID, credential: fingerprint(key), expires: time.Now().Add(time.Duration(min(token.Expires, 86400)) * time.Second)}
-	return token.Token, nil
+	s.gameToken = igdbToken{value: token.Token, client: clientFP, credential: secretFP, expires: time.Now().Add(time.Duration(min(token.Expires, 86400)) * time.Second)}
+	return token.Token, clientID, nil
 }
 
 func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationHistory, path, query string, out any) error {
@@ -395,7 +430,7 @@ func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationH
 		if err = s.gameRate.wait(ctx); err != nil {
 			return err
 		}
-		token, err := s.igdbAccessToken(ctx, c, h)
+		token, clientID, err := s.igdbAccessToken(ctx, c, h)
 		if err != nil {
 			return err
 		}
@@ -403,7 +438,7 @@ func (s *Service) igdbPOST(ctx context.Context, c model.AIOConfig, h *operationH
 		if err != nil {
 			return ErrInvalidResponse
 		}
-		req.Header.Set("Client-ID", c.IGDBClientID)
+		req.Header.Set("Client-ID", clientID)
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "text/plain")

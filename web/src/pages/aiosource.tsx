@@ -357,7 +357,12 @@ export default function AIOSourcePage({
   const secret = (
     label: string,
     key:
-      'tmdb_secret' | 'igdb_secret' | 'software_nvd_secret' | 'musicbrainz_secret' | DebridSecret,
+      | 'tmdb_secret'
+      | 'igdb_client_id_secret'
+      | 'igdb_secret'
+      | 'software_nvd_secret'
+      | 'musicbrainz_secret'
+      | DebridSecret,
     help?: ReactNode,
   ) => (
     <SecretPicker
@@ -368,26 +373,30 @@ export default function AIOSourcePage({
       savedValue={query.data?.config[key] ?? ''}
       onChange={(reference) => update(scope, { [key]: reference })}
       prefix={
-        key === 'igdb_secret'
-          ? 'igdb_client_secret'
-          : key === 'tmdb_secret'
-            ? 'tmdb_api_token'
-            : key === 'software_nvd_secret'
-              ? 'software_nvd_api_key'
-              : key === 'musicbrainz_secret'
-                ? 'musicbrainz_replication_token'
-                : `${key.replace('_secret', '')}_api_key`
+        key === 'igdb_client_id_secret'
+          ? 'igdb_client_id'
+          : key === 'igdb_secret'
+            ? 'igdb_client_secret'
+            : key === 'tmdb_secret'
+              ? 'tmdb_api_token'
+              : key === 'software_nvd_secret'
+                ? 'software_nvd_api_key'
+                : key === 'musicbrainz_secret'
+                  ? 'musicbrainz_replication_token'
+                  : `${key.replace('_secret', '')}_api_key`
       }
       addLabel={`Add ${
-        key === 'igdb_secret'
-          ? 'Twitch client secret'
-          : key === 'tmdb_secret'
-            ? 'TMDB token'
-            : key === 'software_nvd_secret'
-              ? 'NVD API key'
-              : key === 'musicbrainz_secret'
-                ? 'MetaBrainz token'
-                : `${debridProviders.find((provider) => provider.secret === key)?.name} key`
+        key === 'igdb_client_id_secret'
+          ? 'Twitch client ID'
+          : key === 'igdb_secret'
+            ? 'Twitch client secret'
+            : key === 'tmdb_secret'
+              ? 'TMDB token'
+              : key === 'software_nvd_secret'
+                ? 'NVD API key'
+                : key === 'musicbrainz_secret'
+                  ? 'MetaBrainz token'
+                  : `${debridProviders.find((provider) => provider.secret === key)?.name} key`
       }`}
       valueLabel={label}
       disabled={save.isPending}
@@ -590,23 +599,14 @@ export default function AIOSourcePage({
               </div>
             )}
             {section === 'games' && (
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="field">
-                  <Label htmlFor="igdb-client-id">Twitch client ID</Label>
-                  <Input
-                    id="igdb-client-id"
-                    autoComplete="off"
-                    maxLength={128}
-                    value={config.igdb_client_id ?? ''}
-                    onChange={(e) => update(scope, { igdb_client_id: e.target.value.trim() })}
-                  />
-                </div>
-                <div className="min-w-0 space-y-1">
+              <div className="space-y-2">
+                <div className="grid gap-5 md:grid-cols-2">
+                  {secret('Twitch client ID', 'igdb_client_id_secret')}
                   {secret('Twitch client secret', 'igdb_secret')}
-                  <CredentialPageLink href="https://dev.twitch.tv/console/apps/create">
-                    Get Twitch credentials
-                  </CredentialPageLink>
                 </div>
+                <CredentialPageLink href="https://dev.twitch.tv/console/apps/create">
+                  Get Twitch credentials
+                </CredentialPageLink>
               </div>
             )}
             {section === 'software' && (
@@ -1188,7 +1188,7 @@ export default function AIOSourcePage({
                         resetting ||
                         action.isPending ||
                         dirty ||
-                        !status.config.igdb_client_id ||
+                        !status.config.igdb_client_id_secret ||
                         !status.config.igdb_secret,
                       )}
                       onClick={() => action.mutate('sync-games')}

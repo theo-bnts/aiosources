@@ -147,7 +147,7 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   await alpha
     .getByRole('link', { name: 'View 5 imported torrents from Alpha source', exact: true })
     .click()
-  await expect(page).toHaveURL(/\/sources\/files\/results\?provider=alpha$/)
+  await expect(page).toHaveURL(/\/sources\/files\/explorer\?provider=alpha$/)
   await expect(
     page.getByRole('link', { name: 'Alpha identified release', exact: true }),
   ).toBeVisible()
@@ -181,7 +181,7 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   })
   await page.goto('/files')
   const tabs = page.getByRole('tablist', { name: 'Files views', exact: true })
-  await expect(tabs.getByRole('tab')).toHaveText(['Statistics', 'Results'])
+  await expect(tabs.getByRole('tab')).toHaveText(['Statistics', 'Explorer'])
   await expect(tabs.getByRole('tab', { name: 'Statistics' })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -199,8 +199,8 @@ SELECT run_id,provider_id,source_id,'{}'::jsonb,id FROM aiosources.raw_records W
   expect(fileListReads).toEqual([])
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await files.getByRole('link', { name: 'Remote copy', exact: true }).click()
-  await expect(page).toHaveURL(/\/sources\/files\/results\?provider=remote$/)
-  await expect(tabs.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(/\/sources\/files\/explorer\?provider=remote$/)
+  await expect(tabs.getByRole('tab', { name: 'Explorer' })).toHaveAttribute('aria-selected', 'true')
   await expect(
     page.getByRole('link', { name: 'Remote identified release', exact: true }),
   ).toBeVisible()

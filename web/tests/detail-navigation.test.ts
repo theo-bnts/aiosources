@@ -43,7 +43,7 @@ test('detail return links retain the complete public list view and direct links 
     { to: '/runs/run-one?tab=raw&raw_status=error&raw_offset=50', label: 'Processed records' },
   )
   for (const [pathname, search, label] of [
-    ['/sources/files/results', '?q=example&provider=source&sort=oldest', 'Files'],
+    ['/sources/files/explorer', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/browse/trending', '?period=month', 'Trending'],
     ['/public/browse/trending', '?period=quarter', 'Trending'],
     ['/trusted/browse/trending', '?period=year', 'Trending'],
@@ -62,6 +62,7 @@ test('detail return links retain the complete public list view and direct links 
     // Legacy views kept for continuity across in-flight browser history state
     ['/torrents', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/files/results', '?q=example&provider=source&sort=oldest', 'Files'],
+    ['/sources/files/results', '?q=example&provider=source&sort=oldest', 'Files'],
     ['/trending', '?period=month', 'Trending'],
     ['/public/trending', '?period=quarter', 'Trending'],
     ['/trusted/trending', '?period=year', 'Trending'],

@@ -6,8 +6,8 @@ import {
   GearSixIcon,
   GlobeIcon,
   IconContext,
-  LinkIcon,
   ListChecksIcon,
+  ListMagnifyingGlassIcon,
   PathIcon,
 } from '@phosphor-icons/react'
 import { OccurrenceNavigationProvider } from '@/lib/occurrence-navigation'
@@ -31,6 +31,7 @@ import { UnsavedChangesProvider } from '@/lib/unsaved-changes'
 import { queryClient } from '@/lib/api'
 import { AppShell, RootBoundary, SessionGate } from '@/app'
 import { Empty } from '@/components/common'
+import { IdentificationMatchesLayout } from '@/components/identification-matches'
 import { WorkspaceLayout } from '@/components/workspace-layout'
 import { Button } from '@/components/ui/button'
 import { InterfacePreferences } from '@/components/interface-preferences'
@@ -38,7 +39,7 @@ import { AboutDialog } from '@/components/about-dialog'
 import { NotificationProvider } from '@/components/notifications'
 import { settingFromHash } from '@/lib/settings-catalog'
 import { rawPagePath, rawRecordPath, routes, runDetailPath, stremioRequestPath } from '@/lib/routes'
-import { filesPath, filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
+import { filesExplorerPath, filesPath, sourceSettingsPath } from '@/lib/source-navigation'
 import {
   identificationCorrespondencesPath,
   identificationResultsPath,
@@ -393,13 +394,13 @@ const router = createBrowserRouter(
               title="Files"
               tabs={[
                 { path: filesPath, label: 'Statistics', icon: ChartBarIcon },
-                { path: filesResultsPath, label: 'Results', icon: ListChecksIcon },
+                { path: filesExplorerPath, label: 'Explorer', icon: ListMagnifyingGlassIcon },
               ]}
             />
           }
         >
           <Route path={filesPath} element={<FilesStatisticsPage />} />
-          <Route path={filesResultsPath} element={<TorrentsPage />} />
+          <Route path={filesExplorerPath} element={<TorrentsPage />} />
         </Route>
 
         {/* Metadata -> Catalogs */}
@@ -444,11 +445,11 @@ const router = createBrowserRouter(
                   label: 'Statistics',
                   icon: ChartBarIcon,
                 },
-                { path: identificationResultsPath, label: 'Results', icon: ListChecksIcon },
                 {
-                  path: identificationCorrespondencesPath,
-                  label: 'Correspondences',
-                  icon: LinkIcon,
+                  path: identificationResultsPath,
+                  matches: [identificationResultsPath, identificationCorrespondencesPath],
+                  label: 'Matches',
+                  icon: ListChecksIcon,
                 },
                 {
                   path: routes.metadata.identification.settings,
@@ -468,8 +469,22 @@ const router = createBrowserRouter(
             path={routes.metadata.identification.statistics}
             element={<IdentificationStatisticsRoute />}
           />
-          <Route path={identificationResultsPath} element={<MatchingDiagnostics />} />
-          <Route path={identificationCorrespondencesPath} element={<ReleaseCorrespondences />} />
+          <Route
+            path={identificationResultsPath}
+            element={
+              <IdentificationMatchesLayout view="results">
+                <MatchingDiagnostics />
+              </IdentificationMatchesLayout>
+            }
+          />
+          <Route
+            path={identificationCorrespondencesPath}
+            element={
+              <IdentificationMatchesLayout view="correspondences">
+                <ReleaseCorrespondences />
+              </IdentificationMatchesLayout>
+            }
+          />
           <Route
             path={routes.metadata.identification.settings}
             element={<AIOSourcePage key="identification" section="identification" />}
@@ -692,6 +707,10 @@ const router = createBrowserRouter(
           element={<PreserveRedirect to={routes.sources.files.statistics} />}
         />
         <Route
+          path="sources/files/results"
+          element={<PreserveRedirect to={routes.sources.files.explorer} />}
+        />
+        <Route
           path="metadata/catalogs"
           element={<PreserveRedirect to={routes.metadata.catalogs.videos.statistics} />}
         />
@@ -703,6 +722,10 @@ const router = createBrowserRouter(
           />
         ))}
         <Route path="metadata/identification" element={<LegacyIdentificationRoot />} />
+        <Route
+          path="metadata/identification/matches"
+          element={<PreserveRedirect to={identificationResultsPath} />}
+        />
         <Route path="debrid" element={<PreserveRedirect to={routes.debrid.statistics} />} />
         <Route path="browse" element={<PreserveRedirect to={routes.browse.trending} />} />
         <Route path="connections" element={<PreserveRedirect to={routes.connections.torznab} />} />
@@ -801,9 +824,9 @@ const router = createBrowserRouter(
         <Route path="files" element={<PreserveRedirect to={routes.sources.files.statistics} />} />
         <Route
           path="files/results"
-          element={<PreserveRedirect to={routes.sources.files.results} />}
+          element={<PreserveRedirect to={routes.sources.files.explorer} />}
         />
-        <Route path="torrents" element={<PreserveRedirect to={routes.sources.files.results} />} />
+        <Route path="torrents" element={<PreserveRedirect to={routes.sources.files.explorer} />} />
         <Route path="metadata" element={<LegacyMetadata view="statistics" />} />
         <Route path="metadata/settings" element={<LegacyMetadata view="settings" />} />
         <Route path="metadata/history" element={<LegacyMetadata view="history" />} />

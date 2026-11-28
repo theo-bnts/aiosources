@@ -1,7 +1,6 @@
 import {
   BellIcon,
   FloppyDiskIcon,
-  GearSixIcon,
   MagnifyingGlassIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
@@ -21,6 +20,7 @@ import {
   alertCardMetric,
   alertCardSummary,
   groupAlertsByCategory,
+  notificationChannelTypeGroups,
   notificationChannelTypeLabel,
   notificationChannelTypes,
   ntfyPriorities,
@@ -58,7 +58,7 @@ function emptyChannel(): NotificationChannel {
   return {
     id: '',
     name: '',
-    type: 'discord',
+    type: 'webhook',
     enabled: true,
     is_default: false,
     allow_trusted: true,
@@ -128,9 +128,10 @@ export function ActiveAlertsPage({
 
   const channelsQuery = useQuery({
     queryKey: channelsKey,
+    enabled: trusted,
     queryFn: ({ signal }) =>
       api<Items<NotificationChannel | NotificationChannelSummary>>(
-        trusted ? '/trusted/notifications/channels' : '/notifications/channels',
+        '/trusted/notifications/channels',
         { signal },
       ),
     refetchInterval: AUTO_REFRESH_INTERVAL,
@@ -148,24 +149,6 @@ export function ActiveAlertsPage({
 
   return (
     <div className="page min-w-0">
-      {!trusted && channelsQuery.isSuccess && enabledChannels.length === 0 && (
-        <div className="notice flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium">No notification channel configured yet</p>
-            <p className="help">
-              Add a Discord webhook, ntfy topic, Gotify server, Telegram chat, Slack webhook or
-              generic webhook in Settings to receive release alerts.
-            </p>
-          </div>
-          <Button asChild size="sm">
-            <Link to={routes.connections.alerts.settings}>
-              <GearSixIcon aria-hidden="true" />
-              Configure channels
-            </Link>
-          </Button>
-        </div>
-      )}
-
       {trusted && channelsQuery.isSuccess && enabledChannels.length === 0 && (
         <div className="notice space-y-1">
           <p className="text-sm font-medium">No notification channels available</p>
@@ -342,7 +325,7 @@ export function NotificationChannelsPage() {
             <Empty
               icon={BellIcon}
               title="No notification channels"
-              description="Configure a Discord webhook, ntfy, Gotify, Telegram, Slack/Mattermost or generic webhook channel to receive release alerts."
+              description="Configure a generic webhook or a Discord, Gotify, ntfy, Slack/Mattermost or Telegram channel to receive release alerts."
             />
           ) : (
             <div className="grid items-stretch gap-4 xl:grid-cols-2">
@@ -546,7 +529,7 @@ function ChannelEditorDialog({
                 id="channel-name"
                 required
                 maxLength={160}
-                placeholder="e.g. Discord Movies"
+                placeholder="e.g. Movie alerts"
                 value={value.name}
                 onChange={(event) => setValue({ ...value, name: event.target.value })}
               />
@@ -560,10 +543,14 @@ function ChannelEditorDialog({
                 value={value.type}
                 onChange={(event) => setType(event.target.value as NotificationChannelType)}
               >
-                {notificationChannelTypes.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
+                {notificationChannelTypeGroups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               {selectedType && <p className="help">{selectedType.description}</p>}

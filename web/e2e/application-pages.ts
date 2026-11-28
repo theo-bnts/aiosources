@@ -8,7 +8,7 @@ export const applicationPages = [
   ['remotes.settings', '/sources/remote-catalogs/settings'],
   ['remotes.history', '/sources/remote-catalogs/history'],
   ['files.statistics', '/sources/files/statistics'],
-  ['torrents', '/sources/files/results'],
+  ['torrents', '/sources/files/explorer'],
   ['videos.statistics', '/metadata/catalogs/videos/statistics'],
   ['videos.settings', '/metadata/catalogs/videos/settings'],
   ['videos.history', '/metadata/catalogs/videos/history'],

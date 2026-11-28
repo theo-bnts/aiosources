@@ -5,9 +5,12 @@ import "time"
 // Credential values never enter configuration or API responses. References
 // resolve through the same encrypted vault as collection credentials.
 type AIOConfig struct {
-	Revision                 int64                 `json:"revision"`
-	TMDBSecret               string                `json:"tmdb_secret"`
-	IGDBClientID             string                `json:"igdb_client_id"`
+	Revision           int64  `json:"revision"`
+	TMDBSecret         string `json:"tmdb_secret"`
+	IGDBClientIDSecret string `json:"igdb_client_id_secret"`
+	// Legacy plaintext client ID retained only to migrate pre-existing v2 settings
+	// into an encrypted secret automatically on startup or save.
+	IGDBClientID             string                `json:"igdb_client_id,omitempty"`
 	IGDBSecret               string                `json:"igdb_secret"`
 	IGDBEnabled              bool                  `json:"igdb_enabled"`
 	IGDBMinutes              int                   `json:"igdb_minutes"`

@@ -31,7 +31,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { routes } from '@/lib/routes'
-import { filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
+import { filesExplorerPath, sourceSettingsPath } from '@/lib/source-navigation'
 import { parseProviderJSON, rebaseProviderJSON } from '@/lib/provider-json'
 
 import { api, ApiError, queryClient, refreshData, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
@@ -284,7 +284,7 @@ function SourceCard({
         </Button>
         <Button size="sm" variant="outline" asChild>
           <Link
-            to={`${filesResultsPath}?provider=${encodeURIComponent(source.id)}`}
+            to={`${filesExplorerPath}?provider=${encodeURIComponent(source.id)}`}
             state={listState}
           >
             <MagnifyingGlassIcon aria-hidden="true" />

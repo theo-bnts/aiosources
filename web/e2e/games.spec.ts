@@ -13,7 +13,13 @@ test('Games uses independent settings blocks and the same navigation on desktop 
     page.getByLabel('Automatically update game information', { exact: true }),
   ).not.toBeChecked()
   const main = page.getByRole('form', { name: 'Games configuration', exact: true })
-  await page.getByLabel('Twitch client ID', { exact: true }).fill('synthetic-client')
+  await page.getByRole('button', { name: 'Add Twitch client ID', exact: true }).click()
+  const clientDialog = page.getByRole('dialog')
+  await clientDialog.getByLabel('Twitch client ID', { exact: true }).fill('synthetic-client')
+  await clientDialog.getByRole('button', { name: 'Store and select', exact: true }).click()
+  await expect(clientDialog).toHaveCount(0)
+  const clientRef = await page.getByLabel('Twitch client ID', { exact: true }).inputValue()
+  expect(clientRef).toMatch(/^igdb_client_id_/)
   await openDisclosure(page, 'Automatic updates')
   const updates = page.getByRole('form', { name: 'Games automatic updates', exact: true })
   await updates.getByLabel('Game information update interval (minutes)', { exact: true }).fill('30')
@@ -25,7 +31,7 @@ test('Games uses independent settings blocks and the same navigation on desktop 
   await updates.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(updates.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await page.reload()
-  await expect(page.getByLabel('Twitch client ID', { exact: true })).toHaveValue('synthetic-client')
+  await expect(page.getByLabel('Twitch client ID', { exact: true })).toHaveValue(clientRef)
   await expect(
     page.getByLabel('Game information update interval (minutes)', { exact: true }),
   ).toHaveValue('30')
@@ -57,12 +63,16 @@ test('IGDB credentials use the shared secret editor and never appear in configur
   page,
 }) => {
   await page.goto('/metadata/games/settings')
+  await page.getByRole('button', { name: 'Add Twitch client ID', exact: true }).click()
+  const clientEditor = page.getByRole('dialog')
+  await clientEditor.getByLabel('Twitch client ID', { exact: true }).fill('synthetic-client')
+  await clientEditor.getByRole('button', { name: 'Store and select', exact: true }).click()
+  await expect(clientEditor).toHaveCount(0)
   await page.getByRole('button', { name: 'Add Twitch client secret', exact: true }).click()
   const editor = page.getByRole('dialog')
   await editor.getByLabel('Twitch client secret', { exact: true }).fill('synthetic-game-credential')
   await editor.getByRole('button', { name: 'Store and select', exact: true }).click()
   await expect(editor).toHaveCount(0)
-  await page.getByLabel('Twitch client ID', { exact: true }).fill('synthetic-client')
   await page
     .getByRole('form', { name: 'Games configuration', exact: true })
     .getByRole('button', { name: 'Save', exact: true })
@@ -73,11 +83,16 @@ test('IGDB credentials use the shared secret editor and never appear in configur
       .getByRole('button', { name: 'Save', exact: true }),
   ).toBeDisabled()
   await expect(
+    page.getByRole('button', { name: 'Replace Twitch client ID', exact: true }),
+  ).toBeVisible()
+  await expect(
     page.getByRole('button', { name: 'Replace Twitch client secret', exact: true }),
   ).toBeVisible()
   const response = await page.request.get('/api/aiosource/controls')
   const body = await response.text()
+  expect(body).not.toContain('synthetic-client')
   expect(body).not.toContain('synthetic-game-credential')
+  expect(JSON.parse(body).config.igdb_client_id_secret).toMatch(/^igdb_client_id_/)
   expect(JSON.parse(body).config.igdb_secret).toMatch(/^igdb_client_secret_/)
   await page.getByRole('tab', { name: 'History', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Games', exact: true, level: 1 })).toBeVisible()

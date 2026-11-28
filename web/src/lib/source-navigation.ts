@@ -1,7 +1,7 @@
 import { routes } from './routes.ts'
 
 export const filesPath = routes.sources.files.statistics
-export const filesResultsPath = routes.sources.files.results
+export const filesExplorerPath = routes.sources.files.explorer
 
 const sourceSettingsPrefix = routes.sources.indexers.torrents.settings
 

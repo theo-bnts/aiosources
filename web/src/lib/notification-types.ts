@@ -75,42 +75,61 @@ export type ReleaseAlert = {
   updated_at: string
 }
 
-export const notificationChannelTypes: readonly {
+export type NotificationChannelTypeOption = {
   value: NotificationChannelType
   label: string
   description: string
+}
+
+export const notificationChannelTypeGroups: readonly {
+  label: string
+  options: readonly NotificationChannelTypeOption[]
 }[] = [
   {
-    value: 'discord',
-    label: 'Discord',
-    description: 'Send rich embeds with covers and direct links to a Discord channel webhook.',
+    label: 'Generic',
+    options: [
+      {
+        value: 'webhook',
+        label: 'Generic webhook',
+        description:
+          'Send structured JSON payloads to any HTTP endpoint (n8n, Home Assistant, etc.).',
+      },
+    ],
   },
   {
-    value: 'ntfy',
-    label: 'ntfy',
-    description: 'Push notifications to ntfy.sh or your self-hosted ntfy server.',
-  },
-  {
-    value: 'gotify',
-    label: 'Gotify',
-    description: 'Send push notifications to a self-hosted Gotify server.',
-  },
-  {
-    value: 'telegram',
-    label: 'Telegram',
-    description: 'Deliver messages via the Telegram Bot HTTP API without running a bot.',
-  },
-  {
-    value: 'slack',
-    label: 'Slack / Mattermost',
-    description: 'Post formatted messages to a Slack or Mattermost incoming webhook.',
-  },
-  {
-    value: 'webhook',
-    label: 'Generic webhook',
-    description: 'Send structured JSON payloads to any HTTP endpoint (n8n, Home Assistant, etc.).',
+    label: 'Platforms',
+    options: [
+      {
+        value: 'discord',
+        label: 'Discord',
+        description: 'Send rich embeds with covers and direct links to a Discord channel webhook.',
+      },
+      {
+        value: 'gotify',
+        label: 'Gotify',
+        description: 'Send push notifications to a self-hosted Gotify server.',
+      },
+      {
+        value: 'ntfy',
+        label: 'ntfy',
+        description: 'Push notifications to ntfy.sh or your self-hosted ntfy server.',
+      },
+      {
+        value: 'slack',
+        label: 'Slack / Mattermost',
+        description: 'Post formatted messages to a Slack or Mattermost incoming webhook.',
+      },
+      {
+        value: 'telegram',
+        label: 'Telegram',
+        description: 'Deliver messages via the Telegram Bot HTTP API without running a bot.',
+      },
+    ],
   },
 ]
+
+export const notificationChannelTypes: readonly NotificationChannelTypeOption[] =
+  notificationChannelTypeGroups.flatMap((group) => group.options)
 
 export const ntfyPriorities = [
   { value: '', label: 'Default' },

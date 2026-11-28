@@ -1,7 +1,7 @@
 export type Tracker = { private: boolean; announce_secret: string }
 export type Config = {
   revision: number
-  igdb_client_id: string
+  igdb_client_id_secret: string
   igdb_secret: string
   igdb_enabled: boolean
   igdb_minutes: number

@@ -25,7 +25,7 @@ export const routes = {
     files: {
       base: '/sources/files',
       statistics: '/sources/files/statistics',
-      results: '/sources/files/results',
+      explorer: '/sources/files/explorer',
     },
   },
   metadata: {

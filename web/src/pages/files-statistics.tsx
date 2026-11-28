@@ -14,7 +14,7 @@ import {
 import { api, params } from '@/lib/api'
 import { number, percentage } from '@/lib/format'
 import { compareListNames } from '@/lib/list-view'
-import { filesResultsPath } from '@/lib/source-navigation'
+import { filesExplorerPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 
 export default function FilesStatisticsPage() {
@@ -51,7 +51,7 @@ export default function FilesStatisticsPage() {
               className="col-span-2 sm:col-span-1"
               label="Imported files"
               value={total}
-              to={filesResultsPath}
+              to={filesExplorerPath}
               help="Each published record counts once per source. The same torrent can appear in multiple sources."
             />
             <Statistic label="From local sources" value={local} />
@@ -81,7 +81,7 @@ export default function FilesStatisticsPage() {
                         <TableCell className="whitespace-normal [overflow-wrap:anywhere]">
                           <Link
                             className="data-link"
-                            to={`${filesResultsPath}?${params({ provider: row.id })}`}
+                            to={`${filesExplorerPath}?${params({ provider: row.id })}`}
                           >
                             {row.name}
                           </Link>

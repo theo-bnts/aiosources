@@ -7,7 +7,7 @@ import { bytes, number, percentage, useDate } from '@/lib/format'
 import { identificationResults, identificationStatuses } from '@/lib/identification'
 import { identificationResultsPath } from '@/lib/metadata-navigation'
 import { routes, runDetailPath } from '@/lib/routes'
-import { filesResultsPath } from '@/lib/source-navigation'
+import { filesExplorerPath } from '@/lib/source-navigation'
 import type { SourceTorrentOverview, SourceTorrentStats as TorrentStats } from '@/lib/types'
 
 export function useSourceTorrentStats(enabled: boolean) {
@@ -53,7 +53,7 @@ export function SourceTorrentStats({
           <dd className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <Link
               className="data-link font-medium tabular-nums"
-              to={`${filesResultsPath}?${params({ provider: counts.provider_id })}`}
+              to={`${filesExplorerPath}?${params({ provider: counts.provider_id })}`}
               aria-label={`View ${number(counts.imported)} imported torrents from ${source}`}
             >
               {number(counts.imported)}

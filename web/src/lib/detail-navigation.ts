@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
 import { routes } from './routes.ts'
-import { filesResultsPath, isSourceSettingsPath } from './source-navigation.ts'
+import { filesExplorerPath, isSourceSettingsPath } from './source-navigation.ts'
 import {
   identificationCorrespondencesPath,
   identificationResultsPath,
@@ -13,7 +13,7 @@ const viewLabels: Record<string, string> = {
   [routes.sources.indexers.torrents.settings]: 'All sources',
   [routes.sources.indexers.torrents.history]: 'Torrent history',
   [routes.sources.files.statistics]: 'Files',
-  [filesResultsPath]: 'Files',
+  [filesExplorerPath]: 'Files',
   [routes.browse.trending]: 'Trending',
   [routes.public.trending]: 'Trending',
   [routes.trusted.trending]: 'Trending',
@@ -47,6 +47,7 @@ const viewLabels: Record<string, string> = {
   '/torrents': 'Files',
   '/files': 'Files',
   '/files/results': 'Files',
+  '/sources/files/results': 'Files',
   '/trending': 'Trending',
   '/public/trending': 'Trending',
   '/trusted/trending': 'Trending',

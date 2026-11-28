@@ -220,6 +220,8 @@ export function SettingsSearch({
       } else go(setting)
     }
   }
+  const hasQuery = Boolean(normalizeSettingQuery(query))
+  const showResults = Boolean(selected || hasQuery)
   const activeID = count ? `${id}-result-${Math.min(active, count - 1)}` : undefined
   return (
     <>
@@ -263,7 +265,7 @@ export function SettingsSearch({
               <DialogDescription id={`${id}-description`}>{selected.title}</DialogDescription>
             )}
           </DialogHeader>
-          <div className="flex items-center gap-2 border-y border-border px-4 py-3">
+          <div className="flex items-center gap-2 border-t border-border px-4 py-3">
             {selected ? (
               <Button
                 size="icon"
@@ -281,16 +283,13 @@ export function SettingsSearch({
             ) : (
               <MagnifyingGlassIcon className="shrink-0 text-muted-foreground" aria-hidden="true" />
             )}
-            <InfoTip label="Search settings">
-              Search by setting name or topic. Use ↑ ↓ and Enter to choose a result.
-            </InfoTip>
             <Input
               ref={input}
               aria-describedby={`${id}-keyboard-help`}
               className="min-w-0 border-0 bg-transparent shadow-none focus-visible:ring-0"
               role="combobox"
               aria-label={selected ? `Find ${entityNames[selected.entity!][0]}` : 'Find a setting'}
-              aria-expanded="true"
+              aria-expanded={showResults}
               aria-autocomplete="list"
               aria-controls={`${id}-results`}
               aria-activedescendant={activeID}
@@ -321,13 +320,20 @@ export function SettingsSearch({
                 }
               }}
             />
+            <InfoTip label="Search settings">
+              Search by setting name or topic. Use ↑ ↓ and Enter to choose a result.
+            </InfoTip>
             <span id={`${id}-keyboard-help`} className="sr-only">
               Use the up and down arrow keys and Enter to choose a result.
             </span>
           </div>
           <div
             ref={results}
-            className="max-h-[55dvh] min-h-0 overflow-y-auto overscroll-contain p-2"
+            className={
+              showResults
+                ? 'max-h-[55dvh] min-h-0 overflow-y-auto overscroll-contain border-t border-border p-2'
+                : 'min-h-0 overflow-hidden p-0'
+            }
           >
             {selected && (
               <>
@@ -423,8 +429,12 @@ export function SettingsSearch({
             aria-live="polite"
             className="border-t border-border px-5 py-3 text-xs text-muted-foreground"
           >
-            {selected ? `${choices.length} configurations` : `${matches.length} settings`}
-            {rows.length > shown ? ` · ${shown} shown` : ''}
+            {selected
+              ? `${choices.length} configurations`
+              : hasQuery
+                ? `${matches.length} settings`
+                : `Type to search ${index.length} settings`}
+            {showResults && rows.length > shown ? ` · ${shown} shown` : ''}
           </p>
         </DialogContent>
       </Dialog>

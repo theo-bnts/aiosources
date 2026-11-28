@@ -23,7 +23,7 @@ import { number, bytes, percentage, useDate } from '@/lib/format'
 import { useURLPagination } from '@/lib/pagination'
 import { useListViewState, useViewSearchParams } from '@/lib/detail-navigation'
 import { routes, stremioRequestPath } from '@/lib/routes'
-import { filesResultsPath } from '@/lib/source-navigation'
+import { filesExplorerPath } from '@/lib/source-navigation'
 import { resetListView } from '@/lib/list-view'
 import type { Page } from '@/lib/types'
 import type { StremioRequest, StremioStatistics } from '@/lib/stremio-types'
@@ -470,7 +470,7 @@ export function StremioRequestPage() {
                                 {result.source_id ? (
                                   <Link
                                     className="data-link mt-2 inline-block text-xs"
-                                    to={`${filesResultsPath}?${params({ provider: result.provider, q: result.source_id })}`}
+                                    to={`${filesExplorerPath}?${params({ provider: result.provider, q: result.source_id })}`}
                                   >
                                     {sourceName(result.provider, result.provider_name)} ·{' '}
                                     {result.source_id}

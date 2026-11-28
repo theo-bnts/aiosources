@@ -111,13 +111,19 @@ func TestGamesResumeCommittedBatchesAfterAServiceRestart(t *testing.T) {
 	}))
 	defer upstream.Close()
 	s.IGDBBase, s.IGDBTokenURL, s.GameHTTP = upstream.URL, upstream.URL+"/token", upstream.Client()
+	if err := s.Vault.Put(ctx, "igdb_client_fixture", "synthetic-client"); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Vault.Put(ctx, "igdb_fixture", "synthetic-secret"); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
-	c.IGDBClientID, c.IGDBSecret = "synthetic-client", "igdb_fixture"
+	c.IGDBClientIDSecret, c.IGDBSecret = "igdb_client_fixture", "igdb_fixture"
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
+	}
+	if err := s.DB.DeleteSecret(ctx, "igdb_client_fixture"); !errors.Is(err, model.ErrConflict) {
+		t.Fatal("a configured IGDB client ID secret could be deleted", err)
 	}
 	if err := s.DB.DeleteSecret(ctx, "igdb_fixture"); !errors.Is(err, model.ErrConflict) {
 		t.Fatal("a configured IGDB credential could be deleted", err)
@@ -183,11 +189,14 @@ func TestGamesImportLocalSearchReviewAndIsolatedReset(t *testing.T) {
 	}))
 	defer upstream.Close()
 	s.IGDBBase, s.IGDBTokenURL, s.GameHTTP = upstream.URL, upstream.URL+"/token", upstream.Client()
+	if err := s.Vault.Put(ctx, "igdb_client_fixture", "synthetic-client"); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Vault.Put(ctx, "igdb_fixture", "synthetic-client-secret"); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
-	c.IGDBClientID, c.IGDBSecret = "synthetic-client", "igdb_fixture"
+	c.IGDBClientIDSecret, c.IGDBSecret = "igdb_client_fixture", "igdb_fixture"
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
@@ -276,11 +285,14 @@ func TestGamesRejectMalformedPagesAndRenewRevokedTokens(t *testing.T) {
 	}))
 	defer upstream.Close()
 	s.IGDBBase, s.IGDBTokenURL, s.GameHTTP = upstream.URL, upstream.URL+"/token", upstream.Client()
+	if err := s.Vault.Put(ctx, "igdb_client_fixture", "synthetic-client"); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Vault.Put(ctx, "igdb_fixture", "synthetic-secret"); err != nil {
 		t.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
-	c.IGDBClientID, c.IGDBSecret = "synthetic-client", "igdb_fixture"
+	c.IGDBClientIDSecret, c.IGDBSecret = "igdb_client_fixture", "igdb_fixture"
 	if err := s.SaveConfig(ctx, c); err != nil {
 		t.Fatal(err)
 	}
@@ -298,6 +310,67 @@ func TestGamesRejectMalformedPagesAndRenewRevokedTokens(t *testing.T) {
 	var leaked int
 	if err = conn.QueryRow(ctx, `SELECT count(*) FROM aiosources.operation_runs WHERE error LIKE '%synthetic-secret%' OR error LIKE '%synthetic-1%'`).Scan(&leaked); err != nil || leaked != 0 {
 		t.Fatal("credentials entered operation history")
+	}
+}
+
+func TestLegacyIGDBClientIDMigratesToEncryptedSecret(t *testing.T) {
+	ctx, s, _ := testService(t)
+	if err := s.Vault.Put(ctx, "igdb_secret_ref", "synthetic-secret"); err != nil {
+		t.Fatal(err)
+	}
+	// Seed a legacy v2 setting containing plaintext igdb_client_id directly in the database.
+	if err := s.DB.SetSetting(ctx, "aiosource.config.v2", `{"revision":2,"igdb_client_id":"legacy-twitch-client-id","igdb_secret":"igdb_secret_ref","igdb_enabled":true,"igdb_minutes":15,"igdb_requests_per_second":3,"igdb_reconcile_days":7,"software_minutes":360,"openlibrary_minutes":15,"musicbrainz_minutes":60,"sync_minutes":15,"match_seconds":30,"tmdb_requests_per_second":35,"cache_minutes":4320,"response_seconds":5,"trackers":{}}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	restarted, err := New(ctx, s.DB, s.Vault, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := restarted.Close(cleanup); err != nil {
+			t.Error(err)
+		}
+	})
+	current, err := s.DB.AIOConfig(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(current.IGDBClientIDSecret, "igdb_client_id_") || current.IGDBClientID != "" {
+		t.Fatalf("legacy igdb_client_id was not migrated: %+v", current)
+	}
+	resolved, err := restarted.igdbClientID(ctx, current)
+	if err != nil || resolved != "legacy-twitch-client-id" {
+		t.Fatalf("migrated igdb client ID mismatch: %q %v", resolved, err)
+	}
+	rawSetting, err := s.DB.Setting(ctx, "aiosource.config.v2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rawSetting, "legacy-twitch-client-id") || strings.Contains(rawSetting, `"igdb_client_id":`) {
+		t.Fatalf("plaintext igdb_client_id remained in settings: %s", rawSetting)
+	}
+	if err := s.DB.DeleteSecret(ctx, current.IGDBClientIDSecret); !errors.Is(err, model.ErrConflict) {
+		t.Fatalf("configured igdb_client_id_secret could be deleted: %v", err)
+	}
+	// Conflicting plaintext and secret reference must be rejected.
+	conflicting := current
+	conflicting.IGDBClientID = "another-client"
+	if err := restarted.SaveConfig(ctx, conflicting); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("conflicting igdb_client_id and igdb_client_id_secret accepted: %v", err)
+	}
+	// Secret containing spaces must be rejected.
+	if err := s.Vault.Put(ctx, "bad_client_id", "invalid client id"); err != nil {
+		t.Fatal(err)
+	}
+	invalid := current
+	invalid.IGDBClientIDSecret = "bad_client_id"
+	if err := restarted.SaveConfig(ctx, invalid); !errors.Is(err, model.ErrInvalid) {
+		t.Fatalf("invalid client ID secret value accepted: %v", err)
 	}
 }
 
@@ -329,11 +402,14 @@ func BenchmarkGameInformation(b *testing.B) {
 	}))
 	defer server.Close()
 	s.IGDBBase, s.IGDBTokenURL, s.GameHTTP = server.URL, server.URL+"/token", server.Client()
+	if err := s.Vault.Put(ctx, "game_benchmark_client", "synthetic-client"); err != nil {
+		b.Fatal(err)
+	}
 	if err := s.Vault.Put(ctx, "game_benchmark", "synthetic-credential"); err != nil {
 		b.Fatal(err)
 	}
 	c, _ := s.DB.AIOConfig(ctx)
-	c.IGDBClientID, c.IGDBSecret = "synthetic-client", "game_benchmark"
+	c.IGDBClientIDSecret, c.IGDBSecret = "game_benchmark_client", "game_benchmark"
 	if err := s.SaveConfig(ctx, c); err != nil {
 		b.Fatal(err)
 	}

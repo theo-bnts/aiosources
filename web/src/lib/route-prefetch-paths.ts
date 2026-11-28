@@ -120,7 +120,12 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
   ) {
     return 'files-statistics'
   }
-  if (path === routes.sources.files.results || path === '/files/results' || path === '/torrents') {
+  if (
+    path === routes.sources.files.explorer ||
+    path === '/sources/files/results' ||
+    path === '/files/results' ||
+    path === '/torrents'
+  ) {
     return 'library'
   }
 
@@ -170,7 +175,11 @@ export function resolveRouteChunkKey(rawPath: string): RouteChunkKey | null {
   ) {
     return 'identification-statistics'
   }
-  if (path === routes.metadata.identification.results) return 'matching-diagnostics'
+  if (
+    path === routes.metadata.identification.results ||
+    path === '/metadata/identification/matches'
+  )
+    return 'matching-diagnostics'
   if (path === routes.metadata.identification.correspondences) return 'release-correspondences'
 
   // Metadata / Debrid / Stremio settings

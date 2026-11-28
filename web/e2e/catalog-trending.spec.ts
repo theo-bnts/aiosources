@@ -185,9 +185,11 @@ test('trending ranks categories across all periods, scrolls horizontally and ret
   await expect(page.locator('main section').nth(4)).toContainText('Orbital Manual')
   await expect(page.locator('main section').nth(4)).toContainText('Book · 2024')
 
-  // Switching periods updates URL and rankings accurately.
+  // Switching periods updates URL, hides empty categories, and updates rankings accurately.
   await period.selectOption('day')
   await expect(page).toHaveURL(/\/browse\/trending\?period=day$/)
+  await expect(headings).toHaveText(['Videos'])
+  await expect(page.getByText(/No trending .* in the past day/)).toHaveCount(0)
   await expect(videoLinks.first()).toContainText('Daily Spotlight')
   await expect(videoLinks).toHaveCount(1)
 

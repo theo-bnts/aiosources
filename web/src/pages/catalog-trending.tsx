@@ -1,3 +1,4 @@
+import { TrendUpIcon } from '@phosphor-icons/react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 
 import { params } from '@/lib/api'
@@ -25,7 +26,7 @@ import {
 } from '@/lib/public-search'
 import { cn } from '@/lib/utils'
 import { CatalogPosterRail, type CatalogPosterCardItem } from '@/components/catalog-poster-rail'
-import { ErrorNotice } from '@/components/common'
+import { Empty, ErrorNotice } from '@/components/common'
 import { Label } from '@/components/ui/label'
 
 export function CatalogTrendingPage() {
@@ -63,6 +64,10 @@ export function CatalogTrendingPage() {
       })),
     )
   }
+
+  const visibleCategories = query.isPending
+    ? trendingCategories
+    : trendingCategories.filter((category) => (itemsByCategory.get(category.id) ?? []).length > 0)
 
   function changePeriod(nextPeriod: TrendingPeriod) {
     const next = new URLSearchParams(search)
@@ -102,28 +107,34 @@ export function CatalogTrendingPage() {
 
       <ErrorNotice error={query.error} retry={() => void query.refetch()} />
 
-      {(!query.isError || Boolean(query.data)) && (
-        <div
-          className={cn(
-            'min-w-0 space-y-8 transition-opacity duration-150',
-            query.isPlaceholderData && query.isFetching && 'opacity-70',
-          )}
-        >
-          {trendingCategories.map((category, index) => (
-            <CatalogPosterRail
-              key={category.id}
-              category={category}
-              items={itemsByCategory.get(category.id) ?? []}
-              loading={query.isPending}
-              loadingLabel={`Loading trending ${category.label.toLowerCase()}`}
-              emptyMessage={`No trending ${category.label.toLowerCase()} in the ${periodLabel.toLowerCase()}.`}
-              eagerRow={index === 0}
-              listState={listState}
-              resetScrollKey={period}
-            />
-          ))}
-        </div>
-      )}
+      {(!query.isError || Boolean(query.data)) &&
+        (visibleCategories.length > 0 ? (
+          <div
+            className={cn(
+              'min-w-0 space-y-8 transition-opacity duration-150',
+              query.isPlaceholderData && query.isFetching && 'opacity-70',
+            )}
+          >
+            {visibleCategories.map((category, index) => (
+              <CatalogPosterRail
+                key={category.id}
+                category={category}
+                items={itemsByCategory.get(category.id) ?? []}
+                loading={query.isPending}
+                loadingLabel={`Loading trending ${category.label.toLowerCase()}`}
+                eagerRow={index === 0}
+                listState={listState}
+                resetScrollKey={period}
+              />
+            ))}
+          </div>
+        ) : (
+          <Empty
+            icon={TrendUpIcon}
+            title="No trending titles"
+            description={`No trending titles in the ${periodLabel.toLowerCase()}.`}
+          />
+        ))}
     </div>
   )
 }

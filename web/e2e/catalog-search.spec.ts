@@ -945,7 +945,19 @@ test('direct torrent Search is always reachable and reuses release formatting wi
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto('/browse/search')
-    await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
+    // Search torrents directly sits next to Search in the form, with no standalone unavailable-titles button.
+    const searchBtn = page.getByRole('button', { name: 'Search', exact: true })
+    const directBtn = page.getByRole('link', { name: 'Search torrents directly', exact: true })
+    await expect(
+      page.getByRole('button', { name: 'Include titles without releases', exact: true }),
+    ).toHaveCount(0)
+    if (width >= 1024) {
+      const searchBox = (await searchBtn.boundingBox())!
+      const directBox = (await directBtn.boundingBox())!
+      expect(Math.abs(searchBox.y - directBox.y)).toBeLessThan(2)
+      expect(directBox.x).toBeGreaterThan(searchBox.x + searchBox.width - 1)
+    }
+    await directBtn.click()
     await expect(page).toHaveURL(/\/browse\/search\/torrents$/)
     await expect(page.getByRole('heading', { name: 'Find a torrent', exact: true })).toBeVisible()
     await page.goto('/browse/search')
@@ -955,6 +967,9 @@ test('direct torrent Search is always reachable and reuses release formatting wi
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')
     await page.goto('/browse/search?q=Example%20Film')
     await expect(page.locator('[data-result-count]')).toHaveText('0 titles')
+    await expect(
+      page.getByRole('button', { name: 'Include titles without releases', exact: true }),
+    ).toHaveCount(0)
     await page.getByRole('link', { name: 'Search torrents directly', exact: true }).click()
     await expect(page).toHaveURL(/\/browse\/search\/torrents\?q=Example(?:%20|\+)Film/)
     await expect(page.locator('[data-result-count]')).toHaveText('2 torrents')

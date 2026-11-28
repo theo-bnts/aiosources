@@ -7,21 +7,24 @@ import { Loading, PageHeaderVisibility } from '@/components/common'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PageActionsTarget } from '@/components/page-actions'
 
-type WorkspaceTab = { path: string; label: string; icon: Icon }
+type WorkspaceTab = { path: string; matches?: readonly string[]; label: string; icon: Icon }
 
 export function WorkspaceLayout({ title, tabs }: { title: string; tabs: WorkspaceTab[] }) {
   const location = useLocation()
   const [actions, setActions] = useState<HTMLDivElement | null>(null)
   const navigate = usePageTabNavigate()
   const current =
-    tabs.find((tab) => tab.path === location.pathname) ??
+    tabs.find(
+      (tab) => tab.path === location.pathname || tab.matches?.includes(location.pathname),
+    ) ??
     [...tabs]
       .reverse()
       .find(
         (tab) => location.pathname === tab.path || location.pathname.startsWith(tab.path + '/'),
       ) ??
     tabs[0]
-  const rootView = current.path === location.pathname
+  const rootView =
+    current.path === location.pathname || Boolean(current.matches?.includes(location.pathname))
   return (
     <div className="page">
       <Tabs

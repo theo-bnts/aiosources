@@ -104,8 +104,7 @@ test('video and book workspaces keep separate counts and histories under one Met
   )
   await expect(page.getByRole('tablist').getByRole('tab')).toHaveText([
     'Statistics',
-    'Results',
-    'Correspondences',
+    'Matches',
     'Settings',
     'History',
   ])
@@ -113,12 +112,27 @@ test('video and book workspaces keep separate counts and histories under one Met
   await expect(
     page.getByRole('link', { name: 'Open run identification-update', exact: true }),
   ).toBeVisible()
-  await page.getByRole('tab', { name: 'Results', exact: true }).click()
+  await page.getByRole('tab', { name: 'Matches', exact: true }).click()
+  const subviews = page.getByRole('group', { name: 'Matches view', exact: true })
+  await expect(subviews.getByRole('button', { name: 'Results', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(
+    subviews.getByRole('button', { name: 'Correspondences', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'false')
   const filters = page.getByRole('form', { name: 'Identification filters', exact: true })
   await expect(filters).toBeVisible()
   expect(fullStatisticsReads, 'Results should not request global identification counts').toEqual([])
-  await page.getByRole('tab', { name: 'Correspondences', exact: true }).click()
+  await subviews.getByRole('button', { name: 'Correspondences', exact: true }).click()
   await expect(page).toHaveURL(/\/metadata\/identification\/correspondences$/)
+  await expect(page.getByRole('tab', { name: 'Matches', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
+  await expect(
+    subviews.getByRole('button', { name: 'Correspondences', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true')
   await expect(
     page.getByRole('form', { name: 'Correspondence filters', exact: true }),
   ).toBeVisible()
@@ -133,8 +147,12 @@ test('video and book workspaces keep separate counts and histories under one Met
   await expect(filters).toHaveCount(0)
   await statistics.getByRole('link', { name: 'View identified torrents', exact: true }).click()
   await expect(page).toHaveURL(/\/metadata\/identification\/results\?match_status=matched$/)
-  await expect(page.getByRole('tab', { name: 'Results', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: 'Matches', exact: true })).toHaveAttribute(
     'aria-selected',
+    'true',
+  )
+  await expect(subviews.getByRole('button', { name: 'Results', exact: true })).toHaveAttribute(
+    'aria-pressed',
     'true',
   )
   await expect(filters).toBeVisible()

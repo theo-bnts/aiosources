@@ -157,7 +157,7 @@ add(
     keywords: 'IGDB Twitch games jeux video metadata',
   },
   [
-    ['metadata.games-client', 'Twitch client ID'],
+    ['metadata.games-client', 'Twitch client ID', 'IGDB client ID secret'],
     ['metadata.games-key', 'Twitch client secret', 'IGDB API key'],
     ['metadata.games-auto', 'Automatically update game information'],
     ['metadata.games-interval', 'Game information update interval (minutes)'],

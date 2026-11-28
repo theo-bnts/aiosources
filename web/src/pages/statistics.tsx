@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom'
 import { api, LIVE_REFRESH_INTERVAL, COLLECTION_REFRESH_INTERVAL } from '@/lib/api'
 import { useListViewState } from '@/lib/detail-navigation'
 import { routes } from '@/lib/routes'
-import { filesResultsPath, sourceSettingsPath } from '@/lib/source-navigation'
+import { filesExplorerPath, sourceSettingsPath } from '@/lib/source-navigation'
 import type { Items, ProviderSummary } from '@/lib/types'
 import type { CollectionOverview } from '@/lib/collection-types'
 import type { Controls, InformationStatus } from '@/lib/aiosource-types'
@@ -72,7 +72,7 @@ export function SourceStatisticsPage() {
             label="Imported torrents"
             value={counts.totals ? counts.totals.imported : 'Not available'}
             loadingLabel={counts.isPending && !providers.isError ? 'Loading counts…' : undefined}
-            to={filesResultsPath}
+            to={filesExplorerPath}
           />
           <Statistic
             label="Awaiting import completion"

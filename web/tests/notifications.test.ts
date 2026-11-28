@@ -10,7 +10,9 @@ import {
   formatAlertSizeInput,
   groupAlertsByCategory,
   hasActiveAlertFilters,
+  notificationChannelTypeGroups,
   notificationChannelTypeLabel,
+  notificationChannelTypes,
   parseAlertSizeInput,
   type ReleaseAlert,
 } from '../src/lib/notification-types.ts'
@@ -55,6 +57,20 @@ test('alert episode and filter summaries format cleanly for display', () => {
   )
   assert.equal(notificationChannelTypeLabel('discord'), 'Discord')
   assert.equal(notificationChannelTypeLabel('webhook'), 'Generic webhook')
+  assert.deepEqual(
+    notificationChannelTypeGroups.map((group) => ({
+      label: group.label,
+      values: group.options.map((option) => option.value),
+    })),
+    [
+      { label: 'Generic', values: ['webhook'] },
+      { label: 'Platforms', values: ['discord', 'gotify', 'ntfy', 'slack', 'telegram'] },
+    ],
+  )
+  assert.deepEqual(
+    notificationChannelTypes.map((option) => option.value),
+    ['webhook', 'discord', 'gotify', 'ntfy', 'slack', 'telegram'],
+  )
 })
 
 test('groupAlertsByCategory mirrors Search category order and hides empty categories', () => {

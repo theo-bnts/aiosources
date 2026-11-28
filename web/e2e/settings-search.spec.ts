@@ -38,6 +38,13 @@ test('settings search is local, keyboard accessible and reveals lazy advanced co
   const dialog = page.getByRole('dialog', { name: 'Search settings', exact: true })
   const input = dialog.getByRole('combobox')
   await expect(input).toBeFocused()
+  await expect(dialog.getByRole('status')).toContainText(/^Type to search \d+ settings$/)
+  // Info tip sits to the right of the search input, and empty search avoids an empty gap.
+  const inputBox = (await input.boundingBox())!
+  const infoBox = (await dialog
+    .getByRole('button', { name: 'About Search settings', exact: true })
+    .boundingBox())!
+  expect(infoBox.x).toBeGreaterThanOrEqual(inputBox.x + inputBox.width - 1)
   const before = calls.length
   await input.fill('Queued torrents')
   await expect(dialog.getByRole('option').first()).toContainText('Queued torrents per pass')
