@@ -28,7 +28,8 @@ const tabsListVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-muted',
+        default:
+          'bg-white/[0.045] ring-1 ring-inset ring-white/[0.09] backdrop-blur-md shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]',
         line: 'gap-1 bg-transparent',
       },
     },
@@ -114,7 +115,7 @@ function TabsList({
 const tabsTriggerClassName = cn(
   "relative inline-flex h-full min-h-[calc(var(--control-height)-6px)] shrink-0 flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-foreground/60 transition-[color,background-color,border-color,box-shadow,opacity] group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
   'group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent',
-  'data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground',
+  'data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-white/14 dark:data-[state=active]:bg-white/9 dark:data-[state=active]:text-foreground dark:data-[state=active]:shadow-[inset_0_1px_0_rgb(255_255_255/0.1)]',
   'after:absolute after:hidden after:bg-foreground after:opacity-0 after:transition-opacity group-data-[variant=line]/tabs-list:after:block group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-0 group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:right-0 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100',
 )
 

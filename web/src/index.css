@@ -25,19 +25,20 @@
   --color-popover-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: #102e2a;
-  --color-secondary: #292e31;
+  --color-secondary: #2d2d2d;
   --color-secondary-foreground: var(--foreground);
-  --color-muted: #23282b;
-  --color-muted-foreground: #a2abad;
-  --color-accent: #2c3436;
+  --color-muted: #272727;
+  --color-muted-foreground: #a9a9a9;
+  --color-accent: #323232;
   --color-accent-foreground: var(--foreground);
   --color-destructive: #f5a29b;
   --color-warning: var(--color-amber-300);
   --color-warning-foreground: var(--color-amber-200);
-  --color-border: #343c40;
-  --color-input: #3c4549;
+  --color-border: #3a3a3a;
+  --color-input: #434343;
   --color-ring: var(--primary);
-  --shadow-chrome: 0 14px 34px -14px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.045);
+  --shadow-chrome: 0 18px 42px -16px rgb(0 0 0 / 0.72), inset 0 1px 0 rgb(255 255 255 / 0.11);
+  --shadow-glass: 0 12px 30px -18px rgb(0 0 0 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.075);
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -55,11 +56,11 @@
   --layer-overlay: 60;
   --layer-dialog: 60;
   --layer-dialog-menu: 65;
-  --background: #111518;
-  --chrome: #181d21;
-  --foreground: #e5e9ea;
-  --card: #1f2529;
-  --popover: #242b30;
+  --background: #101010;
+  --chrome: #181818;
+  --foreground: #ececec;
+  --card: #1f1f1f;
+  --popover: #242424;
   --primary: #87cabc;
 }
 @media (min-width: 48rem) {
@@ -86,15 +87,15 @@
     background:
       radial-gradient(
         circle farthest-corner at min(16rem, 22vw) 3rem,
-        rgb(135 202 188 / 0.14) 0%,
-        rgb(120 186 176 / 0.115) 14%,
-        rgb(100 162 160 / 0.085) 28%,
-        rgb(76 130 138 / 0.055) 44%,
-        rgb(52 94 108 / 0.028) 62%,
-        rgb(30 56 68 / 0.01) 80%,
-        rgb(15 19 22 / 0) 100%
+        rgb(135 202 188 / 0.17) 0%,
+        rgb(122 190 178 / 0.135) 14%,
+        rgb(100 166 158 / 0.095) 28%,
+        rgb(74 132 130 / 0.058) 44%,
+        rgb(48 92 94 / 0.028) 62%,
+        rgb(26 52 56 / 0.01) 80%,
+        rgb(14 14 14 / 0) 100%
       ),
-      linear-gradient(145deg, #141a1e 0%, #11161a 48%, #0d1114 100%);
+      linear-gradient(145deg, #161616 0%, #111111 48%, #0c0c0c 100%);
   }
   fieldset {
     min-inline-size: 0;
@@ -146,11 +147,37 @@
   .section-title {
     @apply break-words text-base font-medium tracking-tight;
   }
+  .glass-chrome {
+    @apply backdrop-blur-xl backdrop-saturate-150;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.065) 0%, rgb(255 255 255 / 0.03) 100%),
+      rgb(18 18 18 / 0.72);
+    border-color: rgb(255 255 255 / 0.11);
+    box-shadow: var(--shadow-chrome);
+  }
+  .glass-surface {
+    @apply backdrop-blur-lg backdrop-saturate-125;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
+      rgb(24 24 24 / 0.54);
+    border-color: rgb(255 255 255 / 0.095);
+    box-shadow: var(--shadow-glass);
+  }
   .section-card {
-    @apply min-w-0 space-y-5 rounded-md border border-border bg-card p-5 sm:p-6;
+    @apply min-w-0 space-y-5 rounded-xl border p-5 backdrop-blur-lg backdrop-saturate-125 sm:p-6;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
+      rgb(24 24 24 / 0.54);
+    border-color: rgb(255 255 255 / 0.095);
+    box-shadow: var(--shadow-glass);
   }
   .statistic-card {
-    @apply min-w-0 rounded-md border border-border bg-card p-4;
+    @apply min-w-0 rounded-xl border p-4 backdrop-blur-lg backdrop-saturate-125;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
+      rgb(24 24 24 / 0.54);
+    border-color: rgb(255 255 255 / 0.095);
+    box-shadow: var(--shadow-glass);
   }
   .toolbar {
     @apply flex flex-wrap items-center gap-3;
@@ -159,7 +186,9 @@
     @apply flex flex-wrap items-center gap-3;
   }
   .table-frame {
-    @apply overflow-hidden rounded-md border border-border bg-card/30;
+    @apply overflow-hidden rounded-xl border backdrop-blur-md;
+    background-color: rgb(24 24 24 / 0.45);
+    border-color: rgb(255 255 255 / 0.095);
   }
   .field {
     @apply grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2;
@@ -180,7 +209,9 @@
     @apply text-primary underline-offset-4 hover:underline;
   }
   .notice {
-    @apply rounded-md border border-border bg-muted/50 px-4 py-3 text-sm leading-6;
+    @apply rounded-xl border px-4 py-3 text-sm leading-6 backdrop-blur-md;
+    background-color: rgb(255 255 255 / 0.04);
+    border-color: rgb(255 255 255 / 0.095);
   }
   .notice-warning {
     @apply border-warning/30 bg-warning/10 text-warning-foreground;
@@ -206,7 +237,7 @@
   outline: 1px solid var(--primary) !important;
 }
 .cm-editor .cm-gutters {
-  border-right: 1px solid #343c40;
+  border-right: 1px solid #3a3a3a;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

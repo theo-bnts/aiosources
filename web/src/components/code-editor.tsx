@@ -7,9 +7,9 @@ import { InfoTip } from '@/components/ui/info-tip'
 
 const editorTheme = EditorView.theme(
   {
-    '&': { backgroundColor: '#161a1d', color: '#d6dddf' },
-    '.cm-gutters': { backgroundColor: '#1b2023', color: '#869496' },
-    '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: '#27312f' },
+    '&': { backgroundColor: '#161616', color: '#dedede' },
+    '.cm-gutters': { backgroundColor: '#1c1c1c', color: '#8c8c8c' },
+    '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: '#252f2d' },
     '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: '#35554e' },
     '.cm-cursor': { borderLeftColor: '#87cabc' },
   },

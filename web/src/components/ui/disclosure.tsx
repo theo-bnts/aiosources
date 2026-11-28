@@ -30,7 +30,7 @@ export function Disclosure({
       data-variant={variant}
       className={cn(
         '[&[open]>summary>svg]:rotate-90',
-        inline ? '' : 'rounded-md border border-border bg-card',
+        inline ? '' : 'glass-surface rounded-xl border',
         className,
       )}
     >
@@ -64,7 +64,7 @@ export function Disclosure({
         data-slot="disclosure-content"
         className={cn(
           'min-w-0',
-          inline ? 'space-y-3 pt-3' : 'space-y-4 border-t border-border p-4',
+          inline ? 'space-y-3 pt-3' : 'space-y-4 border-t border-white/10 p-4',
         )}
       >
         {children}

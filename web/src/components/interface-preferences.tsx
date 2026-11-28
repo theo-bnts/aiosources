@@ -47,7 +47,7 @@ export function InterfacePreferences() {
         <Button
           variant="outline"
           size="icon"
-          className="rounded-lg border-border/80 bg-background/70 backdrop-blur-sm hover:bg-accent/80 dark:border-border/80 dark:bg-background/70 dark:hover:bg-accent/80"
+          className="rounded-lg border-white/11 bg-black/30 backdrop-blur-md hover:bg-white/10 dark:border-white/11 dark:bg-black/30 dark:hover:bg-white/10"
           aria-label="Interface preferences"
           title="Interface preferences"
         >
