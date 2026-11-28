@@ -227,7 +227,7 @@ export function SettingsSearch({
         ref={trigger}
         data-input-like
         variant="outline"
-        className="w-full min-w-0 justify-start gap-2 rounded-lg border-white/11 bg-black/30 text-base font-normal text-muted-foreground backdrop-blur-md hover:bg-black/45 md:text-sm lg:w-64 xl:w-72 dark:border-white/11 dark:bg-black/30 dark:hover:bg-black/45"
+        className="w-full min-w-0 justify-start gap-2 rounded-lg border-white/11 bg-black/30 text-base font-normal text-muted-foreground hover:bg-black/45 md:text-sm lg:w-64 xl:w-72 dark:border-white/11 dark:bg-black/30 dark:hover:bg-black/45"
         onClick={show}
         aria-label="Search settings"
         aria-haspopup="dialog"

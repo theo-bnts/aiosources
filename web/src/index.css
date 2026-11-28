@@ -148,7 +148,6 @@
     @apply break-words text-base font-medium tracking-tight;
   }
   .glass-chrome {
-    @apply backdrop-blur-xl backdrop-saturate-150;
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.065) 0%, rgb(255 255 255 / 0.03) 100%),
       rgb(18 18 18 / 0.72);
@@ -156,7 +155,6 @@
     box-shadow: var(--shadow-chrome);
   }
   .glass-surface {
-    @apply backdrop-blur-lg backdrop-saturate-125;
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
       rgb(24 24 24 / 0.54);
@@ -164,7 +162,7 @@
     box-shadow: var(--shadow-glass);
   }
   .section-card {
-    @apply min-w-0 space-y-5 rounded-xl border p-5 backdrop-blur-lg backdrop-saturate-125 sm:p-6;
+    @apply min-w-0 space-y-5 rounded-xl border p-5 sm:p-6;
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
       rgb(24 24 24 / 0.54);
@@ -172,7 +170,7 @@
     box-shadow: var(--shadow-glass);
   }
   .statistic-card {
-    @apply min-w-0 rounded-xl border p-4 backdrop-blur-lg backdrop-saturate-125;
+    @apply min-w-0 rounded-xl border p-4;
     background:
       linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0.025) 100%),
       rgb(24 24 24 / 0.54);
@@ -186,7 +184,7 @@
     @apply flex flex-wrap items-center gap-3;
   }
   .table-frame {
-    @apply overflow-hidden rounded-xl border backdrop-blur-md;
+    @apply overflow-hidden rounded-xl border;
     background-color: rgb(24 24 24 / 0.45);
     border-color: rgb(255 255 255 / 0.095);
   }
@@ -209,7 +207,7 @@
     @apply text-primary underline-offset-4 hover:underline;
   }
   .notice {
-    @apply rounded-xl border px-4 py-3 text-sm leading-6 backdrop-blur-md;
+    @apply rounded-xl border px-4 py-3 text-sm leading-6;
     background-color: rgb(255 255 255 / 0.04);
     border-color: rgb(255 255 255 / 0.095);
   }

@@ -29,7 +29,7 @@ const tabsListVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-white/[0.045] ring-1 ring-inset ring-white/[0.09] backdrop-blur-md shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]',
+          'bg-white/[0.045] ring-1 ring-inset ring-white/[0.09] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]',
         line: 'gap-1 bg-transparent',
       },
     },

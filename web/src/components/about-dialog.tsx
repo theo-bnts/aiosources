@@ -27,7 +27,7 @@ export function AboutDialog() {
         <Button
           variant="outline"
           size="icon"
-          className="rounded-lg border-white/11 bg-black/30 backdrop-blur-md hover:bg-white/10 dark:border-white/11 dark:bg-black/30 dark:hover:bg-white/10"
+          className="rounded-lg border-white/11 bg-black/30 hover:bg-white/10 dark:border-white/11 dark:bg-black/30 dark:hover:bg-white/10"
           aria-label="About AIOSources"
           title="About AIOSources"
         >

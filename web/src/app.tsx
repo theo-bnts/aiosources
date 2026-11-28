@@ -971,7 +971,7 @@ export function AppShell({
         <div className="pt-3 lg:pl-[calc(15rem+var(--shell-gap))]">
           <header
             ref={headerRef}
-            className="glass-chrome sticky top-3 z-(--layer-header) mx-3 flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border px-3 py-3 md:pl-5 md:pr-4 lg:pr-[calc(1rem+var(--header-actions-width)+0.75rem)]"
+            className="glass-chrome sticky top-3 z-(--layer-header) mx-3 flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border px-3 py-3 backdrop-blur-md md:pl-5 md:pr-4 lg:pr-[calc(1rem+var(--header-actions-width)+0.75rem)]"
           >
             <div className="flex min-w-0 flex-1 items-start gap-2.5 pr-[calc(var(--header-actions-width)+0.75rem)] sm:gap-3 lg:items-center lg:pr-0">
               <DialogTrigger asChild>
@@ -1070,7 +1070,7 @@ export function AppShell({
           id="mobile-navigation"
           aria-describedby={undefined}
           showCloseButton={false}
-          className="top-3 bottom-3 left-3 flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100%-1.5rem)] translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border border-white/12 bg-chrome/78 p-0 shadow-[0_22px_50px_-16px_rgb(0_0_0/0.78),inset_0_1px_0_rgb(255_255_255/0.12)] backdrop-blur-xl data-[state=closed]:animate-none data-[state=open]:animate-none sm:max-w-80"
+          className="top-3 bottom-3 left-3 flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100%-1.5rem)] translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border border-white/12 bg-chrome/78 p-0 shadow-[0_22px_50px_-16px_rgb(0_0_0/0.78),inset_0_1px_0_rgb(255_255_255/0.12)] backdrop-blur-md data-[state=closed]:animate-none data-[state=open]:animate-none sm:max-w-80"
           onCloseAutoFocus={(event) => {
             if (focusMainOnClose.current) {
               event.preventDefault()
