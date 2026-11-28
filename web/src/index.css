@@ -84,10 +84,17 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(62rem 36rem at 8% -6%, rgb(135 202 188 / 0.11), transparent 64%),
-      radial-gradient(48rem 32rem at 92% 0%, rgb(96 156 172 / 0.08), transparent 62%),
-      radial-gradient(52rem 34rem at 50% 108%, rgb(135 202 188 / 0.045), transparent 68%),
-      linear-gradient(180deg, #141a1e 0%, #101417 52%, #0c1013 100%);
+      radial-gradient(
+        circle farthest-corner at min(16rem, 22vw) 3rem,
+        rgb(135 202 188 / 0.14) 0%,
+        rgb(120 186 176 / 0.115) 14%,
+        rgb(100 162 160 / 0.085) 28%,
+        rgb(76 130 138 / 0.055) 44%,
+        rgb(52 94 108 / 0.028) 62%,
+        rgb(30 56 68 / 0.01) 80%,
+        rgb(15 19 22 / 0) 100%
+      ),
+      linear-gradient(145deg, #141a1e 0%, #11161a 48%, #0d1114 100%);
   }
   fieldset {
     min-inline-size: 0;

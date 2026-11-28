@@ -958,21 +958,17 @@ export function AppShell({
         >
           Skip to content
         </a>
-        <div className="fixed top-3 left-3 z-30 hidden h-16 w-60 items-center gap-3 px-6 lg:flex">
-          {branding}
-        </div>
-        <aside className="fixed top-[calc(var(--shell-gap)+4rem+var(--shell-gap))] bottom-3 left-3 z-30 hidden w-60 flex-col overflow-hidden rounded-2xl border border-border/80 bg-chrome/90 shadow-chrome backdrop-blur-md lg:flex">
+        <aside className="fixed inset-y-3 left-3 z-30 hidden w-60 flex-col overflow-hidden rounded-2xl border border-border/80 bg-chrome/88 shadow-chrome backdrop-blur-md lg:flex">
+          <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border/70 px-5">
+            {branding}
+          </div>
           <AppNavigation {...navigationProps} />
           {footer}
         </aside>
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 z-40 h-5 bg-gradient-to-b from-background/95 via-background/60 to-transparent lg:left-[calc(15rem+var(--shell-gap))]"
-        />
         <div className="pt-3 lg:pl-[calc(15rem+var(--shell-gap))]">
           <header
             ref={headerRef}
-            className="sticky top-3 z-(--layer-header) mx-3 flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-chrome/90 px-3 py-3 shadow-chrome backdrop-blur-md md:pl-5 md:pr-4 lg:pr-[calc(1rem+var(--header-actions-width)+0.75rem)]"
+            className="sticky top-3 z-(--layer-header) mx-3 flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-chrome/88 px-3 py-3 shadow-chrome backdrop-blur-md md:pl-5 md:pr-4 lg:pr-[calc(1rem+var(--header-actions-width)+0.75rem)]"
           >
             <div className="flex min-w-0 flex-1 items-start gap-2.5 pr-[calc(var(--header-actions-width)+0.75rem)] sm:gap-3 lg:items-center lg:pr-0">
               <DialogTrigger asChild>
